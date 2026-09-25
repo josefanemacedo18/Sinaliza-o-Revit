@@ -180,13 +180,20 @@ Painel **Representação no Revit** (em todas as janelas):
 
 ## 10. Quantitativos
 
-* Linhas por **código × cor × material**: área pintada (m²), extensão (m), unidades, número de
-  elementos, consumo estimado (L/m² ou kg/m²) e referência normativa.
-* **Resumo por cor e material** com consumo e microesferas de vidro.
-* **Exportar CSV**: separador `;` e vírgula decimal (abre direto no Excel em português).
-* **Criar tabela no Revit**: tabela *SV - Quantitativos de sinalização* (Modelos genéricos) agrupada
-  por grupo, código e cor, com totais. Marcas em 2D (regiões preenchidas) aparecem no quadro do
-  plugin e no CSV.
+* Itens separados por **categoria**: 1. Sinalização horizontal, 2. Sinalização vertical,
+  3. Dispositivos auxiliares e segregação física, 4. Acessibilidade (rampas e piso tátil),
+  5. Calçadas, meios-fios e urbanização, 6. Moderação de tráfego, 7. Mobiliário e elementos urbanos.
+* Filtro por categoria e **pesquisa** (código, descrição, cor, material); abas *Itens por categoria*,
+  *Resumo por categoria* e *Pintura por cor e material*.
+* Cada linha traz a **quantidade na unidade de medição** do item (m², m ou un), área (pintada para
+  tintas, em planta para concreto/grama/metal), extensão, unidades, consumo estimado e referência.
+* **Exportar CSV**: blocos por categoria com subtotais, resumo por categoria e resumo de pintura
+  (separador `;` e vírgula decimal – abre direto no Excel em português). Exporta a categoria/pesquisa
+  atual.
+* **Criar tabela no Revit**: *SV - Quantitativos de sinalização* agrupada por **categoria** (com
+  cabeçalho e subtotal), grupo, código e cor. **Tabelas por categoria** cria uma tabela para cada
+  categoria. O parâmetro compartilhado **SV_Categoria** também pode ser usado em filtros de vista.
+* Para a prancha, use **Detalhamento → Quadro de Quantitativos** (seção 16).
 
 ---
 
@@ -208,6 +215,20 @@ a legenda (ex.: velocidade na R-19; "-" remove a legenda), o suporte (coluna sim
 ou sem suporte) e a altura livre sob a placa (2,10 m em calçadas). 1º clique: posição do suporte;
 2º clique: sentido do tráfego que lê a placa – a face fica voltada para quem se aproxima. A vista
 frontal da janela mostra a placa como o condutor a vê.
+
+O catálogo traz a série completa do MBST/CTB Anexo II – **regulamentação R-1 a R-40** (com as
+variantes a/b/c), **advertência A-1a a A-48**, marcadores de alinhamento e de perigo, Cruz de Santo
+André, **serviços auxiliares** (hospital, posto, restaurante, hotel, ônibus, táxi, PcD...),
+**atrativos turísticos**, **educativas**, **indicação** (destino, distância, localidade, marco
+quilométrico), **informações complementares** (horário, exceções, distância) e **sinalização
+temporária de obras** (fundo laranja). Cada placa tem descrição do significado e **pictograma
+desenhado** (setas, curvas, veículos, pedestres, animais, tarja de proibição...). Placas com valor
+(R-14 a R-19, A-20, A-37, A-38, A-46 a A-48) usam a legenda editável (ex.: `3,0 m`, `10 t`, `40`).
+A lista tem miniaturas e pesquisa por código, nome ou descrição.
+
+Os pictogramas são esquemáticos e reconhecíveis; para o desenho oficial exato, confira a edição
+vigente do manual. O catálogo pode ser alterado (seção `placas`, campo `pictograma` – ver
+[CATALOGO.md](CATALOGO.md)).
 
 ## 13. Urbanismo e drenagem
 
@@ -263,9 +284,55 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   projeto, com amostra desenhada (linha no padrão real, zebrado, símbolo, placa, dispositivo...) e
   "código – nome". Escolha incluir horizontal, vertical e/ou elementos físicos. O quadro se
   atualiza ao criar novas marcas e com **Atualizar Todas**.
+* **Detalhar Placas → Numerar**: numera as placas (P01, P02... de cima para baixo, da esquerda para
+  a direita). O número aparece junto ao símbolo e no Quadro de Placas; para trocar um número, use
+  **Editar** sobre o símbolo.
+* **Cotar Seção**: clique dois pontos atravessando a via. O plugin encontra as linhas, faixas,
+  canteiros, meios-fios e calçadas cortados e cria a cadeia de cotas – linhas pintadas estreitas são
+  cotadas pelo eixo (larguras de faixa eixo a eixo) – e a cota total. A cota se atualiza quando a
+  sinalização muda.
+* **Detalhe Típico**: selecione uma marca e clique a posição. Desenha a marca ampliada (escala do
+  detalhe, ex.: 1:20) e cotada: traço/espaço e larguras/afastamentos das linhas; barras e
+  espaçamento do zebrado; dimensões das vagas; **placa em elevação** com suporte, altura livre e
+  altura total. Traz notas com as especificações.
+* **Quadro de Quantitativos**: tabela na prancha por categoria (código, descrição, unidade,
+  quantidade), de todas as categorias ou só de uma.
+* **Quadro de Placas**: símbolo, numeração, código, descrição, dimensões e quantidade de cada placa.
+* **Notas Gerais**: bloco de notas numeradas com texto padrão editável (normas, materiais, altura
+  livre das placas, acessibilidade...).
+* **Norte**: indicação de norte (com ângulo).
 * **Mostrar/Ocultar Eixos**: alterna a visibilidade das linhas "SV - Eixo de sinalização" na vista
   (se a vista usa um modelo de vista, altere-o em V/G).
+
+Legenda, quadros e cotas de seção acompanham o projeto: são regenerados quando as marcas são
+criadas, editadas ou quando os eixos mudam (e com **Atualizar Todas**). Todos podem ser editados com
+**Editar**.
 
 Dica: para pranchas, combine a sinalização em 3D (vista de planta com os sólidos) com os detalhes
 de placas e o quadro de legenda – ou converta a sinalização horizontal para 2D (**Alternar 2D/3D**)
 em uma vista dedicada.
+
+## 17. Calçadas
+
+* **Orelha de Calçada**: desenhe (ou clique dois pontos) na **face do meio-fio** existente, no trecho
+  do avanço, com a calçada à esquerda do sentido do desenho (ou desmarque a opção). Parâmetros:
+  avanço sobre a pista (largura do estacionamento, ex.: 2,20 m), transição em **curvas reversas**
+  (raio) ou **chanfro**, altura e largura do meio-fio, **canteiro** gramado com margens e árvores.
+  As vagas e linhas da pista sob a orelha são recortadas automaticamente (e restauradas se a orelha
+  for apagada + **Atualizar Todas**). Se o trecho for curto para o raio, o raio é reduzido e um aviso
+  é mostrado.
+* **Área de Calçada**: contorno fechado livre (esquinas com avanço, ilhas, alargamentos). Tipos:
+  calçada/avanço em concreto, canteiro gramado, **ciclovia no nível da calçada** (pintura vermelha),
+  **parklet/deck**, faixa de serviço ajardinada e pavimento. Meio-fio opcional no contorno e
+  **arredondamento automático dos cantos**. Pode recortar calçadas, gramados e marcas existentes.
+* **Canteiros**: canteiros gramados, **jardineiras elevadas** com mureta e **grelhas de árvore**
+  distribuídos ao longo da faixa de serviço (comprimento, largura, espaçamento entre centros ou
+  faixa contínua, deslocamento lateral) com árvores; recortam a calçada sob eles.
+* **Cul-de-sac**: 1º clique no início do balão sobre o eixo; 2º clique no centro do balão (ou fim
+  da via). Tipos **circular, excêntrico (esquerda/direita), gota, em "T" (martelo), em "Y" e em
+  "L"**. Gera pavimento, meio-fio, calçada, **ilha central** ajardinada e **linha de bordo**, com
+  raio de concordância. Avisa quando o raio de giro fica abaixo de 9 m (confira a legislação
+  municipal de parcelamento para o raio mínimo exigido).
+
+Todas as ferramentas de calçada são paramétricas: **Editar** reabre a janela com pré-visualização e
+o elemento é regenerado (com os recortes atualizados).

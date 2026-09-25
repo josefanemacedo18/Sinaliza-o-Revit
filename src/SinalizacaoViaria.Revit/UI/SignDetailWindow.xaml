@@ -39,6 +39,22 @@
                 <CheckBox x:Name="CkLeader" Content="Linha de chamada até o suporte" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
                 <CheckBox x:Name="CkLabel" Content="Código da placa abaixo do símbolo" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
                 <CheckBox x:Name="CkName" Content="Incluir o nome (ex.: R-1 Parada obrigatória)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                <GroupBox x:Name="GbNumbering" Header="Numeração das placas">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <CheckBox Grid.ColumnSpan="2" x:Name="CkNumber" Content="Numerar (P01, P02...) – de cima para baixo, da esquerda para a direita" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <TextBlock Grid.Row="1" Text="Prefixo" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbPrefix" Text="P" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="2" Text="Primeiro número" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbStart" Text="1" TextChanged="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <Grid x:Name="GrNumber" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Número da placa" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Column="1" x:Name="TbNumber" TextChanged="AnyChanged" ToolTip="Ex.: P07 (vazio = sem número)"/>
+                </Grid>
                 <TextBlock Style="{StaticResource Hint}" Text="Dica: para mover um símbolo, edite-o (Editar) e altere distância/direção. Detalhes de placas já detalhadas nesta vista são atualizados, não duplicados."/>
             </StackPanel>
         </ScrollViewer>

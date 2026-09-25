@@ -87,6 +87,19 @@ public static class SignGenerator
             }
             case FormaPlaca.Quadrado:
                 return Polygon2.Rectangle(new Vec2(-w / 2, bottom), new Vec2(w / 2, bottom + w));
+            case FormaPlaca.CruzSantoAndre:
+            {
+                // w = vão total; travessas com 1/6 do comprimento, a 50° da horizontal.
+                var c = new Vec2(0, bottom + h / 2);
+                var a = Math.Atan2(h, w);
+                var len = Math.Sqrt(w * w + h * h);
+                var bw = len / 6.5;
+                var d1 = Vec2.FromAngle(a);
+                var d2 = Vec2.FromAngle(Math.PI - a);
+                var arms = PolygonOps.Union(PolygonOps.Strip(new[] { c - d1 * (len / 2), c + d1 * (len / 2) }, bw)
+                    .Concat(PolygonOps.Strip(new[] { c - d2 * (len / 2), c + d2 * (len / 2) }, bw)));
+                return arms[0];
+            }
             default:
                 return Polygon2.Rectangle(new Vec2(-w / 2, bottom), new Vec2(w / 2, bottom + h));
         }
@@ -98,7 +111,7 @@ public static class SignGenerator
         FormaPlaca.Circulo or FormaPlaca.Octogono or FormaPlaca.Quadrado => w,
         FormaPlaca.TrianguloInvertido => w * Math.Sqrt(3) / 2,
         FormaPlaca.Losango => w * Math.Sqrt(2),
-        _ => h,
+        _ => h,  // retângulo e cruz de Santo André
     };
 
     /// <summary>
@@ -124,6 +137,11 @@ public static class SignGenerator
         }
 
         var text = legend ?? p.Legenda;
+        if ((p.Pictograma is { Count: > 0 } || p.Proibicao) && inner.Count > 0)
+        {
+            res.AddRange(PictogramRenderer.Render(p, inner[0], text, glyphs, border));
+            return res;
+        }
         if (!string.IsNullOrWhiteSpace(text) && text != "-" && inner.Count > 0)
         {
             var (mn, mx) = inner[0].Bounds;
@@ -166,8 +184,9 @@ public static class SignGenerator
 
         foreach (var (shape, color, layer) in Face(p, w, h, bottom, d.Legend, glyphs))
         {
-            var offset = layer switch { 0 => 0.0, 1 => PlateThickness, _ => PlateThickness + 0.002 };
-            var depth = layer == 0 ? PlateThickness : layer == 1 ? 0.002 : 0.001;
+            // Camadas do pictograma empilhadas (0,5 mm cada) para não haver faces coincidentes.
+            var offset = layer switch { 0 => 0.0, 1 => PlateThickness, _ => PlateThickness + 0.002 + (layer - 2) * 0.0005 };
+            var depth = layer == 0 ? PlateThickness : layer == 1 ? 0.002 : 0.0005;
             var origin = backPlane + toDriver * offset;
             geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(origin, right, shape, toDriver, depth), color));
         }

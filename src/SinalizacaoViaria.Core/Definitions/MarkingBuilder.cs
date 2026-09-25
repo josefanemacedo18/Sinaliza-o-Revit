@@ -23,6 +23,9 @@ public sealed class BuildContext
     /// <summary>Todas as marcas do projeto (quadro de legenda).</summary>
     public Func<IReadOnlyList<MarkingDefinition>>? AllDefinitions { get; init; }
 
+    /// <summary>Geometria de outra marca do projeto (cotas de seção, quadros de quantitativos).</summary>
+    public Func<MarkingDefinition, MarkingGeometry?>? GeometryOf { get; init; }
+
     /// <summary>Converte mm de papel em metros de modelo.</summary>
     public double Mm(double paperMm) => paperMm * ViewScale / 1000.0;
 }
@@ -77,6 +80,15 @@ public static class MarkingBuilder
         SignPlanDetailDefinition sd => DetailGenerator.SignDetail(sd, ctx),
         LabelDefinition lb => DetailGenerator.Label(lb, ctx),
         LegendDefinition lg => DetailGenerator.Legend(lg, ctx),
+        SectionDimensionDefinition sd2 => DetailGenerator.SectionDimensions(sd2, ctx),
+        TypicalDetailDefinition td => DetailGenerator.TypicalDetail(td, ctx),
+        QuantityTableDefinition qt => DetailGenerator.QuantityTable(qt, ctx),
+        NotesDefinition nt => DetailGenerator.Notes(nt, ctx),
+        NorthArrowDefinition na => DetailGenerator.NorthArrow(na, ctx),
+        CurbExtensionDefinition ce => path == null ? Missing("Linha da face do meio-fio não encontrada.") : SidewalkGenerator.CurbExtension(ce, path, ctx),
+        SidewalkAreaDefinition sa => path == null ? Missing("Contorno da área não encontrado.") : SidewalkGenerator.Area(sa, path),
+        PlanterDefinition pl => path == null ? Missing("Linha dos canteiros não encontrada.") : SidewalkGenerator.Planter(pl, path, ctx),
+        CulDeSacDefinition cd => path == null ? Missing("Eixo do cul-de-sac não encontrado.") : SidewalkGenerator.CulDeSac(cd, path),
         TrafficCalmingDefinition tc => path == null || path.Points.Count < 2 ? Missing("Bordos da pista não encontrados.") : TrafficCalmingGenerator.Generate(tc, path, ctx.Catalog),
         _ => throw new NotSupportedException(def.GetType().Name),
     };
@@ -377,8 +389,38 @@ public static class MarkingBuilder
                 {
                     TipoRampa.AcessoVeiculos => "Rampa de acesso de veículos (guia rebaixada)",
                     TipoRampa.RebaixamentoSemAbas => "Rebaixamento de calçada sem abas",
+                    TipoRampa.RebaixamentoTotal => "Rebaixamento total da calçada com rampas laterais",
                     _ => "Rebaixamento de calçada com abas laterais",
                 }, GrupoMarca.Urbanizacao, "ABNT NBR 9050 / NBR 16537", "un");
+            case CurbExtensionDefinition:
+                return new MarkingInfo("ORELHA", "Orelha (avanço) de calçada", GrupoMarca.Urbanizacao, "Projeto urbano – desenho de calçadas / NBR 9050", "un");
+            case SidewalkAreaDefinition sa:
+                return new MarkingInfo(sa.DisplayCode, sa.Type switch
+                {
+                    TipoAreaCalcada.Canteiro => "Canteiro gramado (área)",
+                    TipoAreaCalcada.Ciclovia => "Ciclovia no nível da calçada (pintura vermelha)",
+                    TipoAreaCalcada.Deck => "Parklet / área de estar em deck",
+                    TipoAreaCalcada.Pavimento => "Pavimento (área)",
+                    TipoAreaCalcada.FaixaServico => "Faixa de serviço ajardinada",
+                    _ => "Avanço / área de calçada",
+                }, GrupoMarca.Urbanizacao, "Projeto urbano – desenho de calçadas / NBR 9050", "m²");
+            case PlanterDefinition pl:
+                return new MarkingInfo(pl.DisplayCode, pl.Type switch
+                {
+                    TipoCanteiroCalcada.Jardineira => "Jardineira elevada na calçada",
+                    TipoCanteiroCalcada.GrelhaArvore => "Grelha de proteção de árvore",
+                    _ => "Canteiro gramado na calçada",
+                }, GrupoMarca.Urbanizacao, "Projeto urbano – arborização / faixa de serviço (NBR 9050)", pl.Spacing <= 0 ? "m" : "un");
+            case CulDeSacDefinition cd:
+                return new MarkingInfo(cd.DisplayCode, cd.Type switch
+                {
+                    TipoCulDeSac.Martelo => "Cul-de-sac em \"T\" (martelo)",
+                    TipoCulDeSac.EmY => "Cul-de-sac em \"Y\"",
+                    TipoCulDeSac.EmLEsquerda or TipoCulDeSac.EmLDireita => "Cul-de-sac em \"L\"",
+                    TipoCulDeSac.ExcentricoEsquerda or TipoCulDeSac.ExcentricoDireita => "Cul-de-sac circular excêntrico",
+                    TipoCulDeSac.Gota => "Cul-de-sac em gota",
+                    _ => "Cul-de-sac circular (balão de retorno)",
+                }, GrupoMarca.Urbanizacao, "Projeto viário – balão de retorno (legislação municipal de parcelamento)", "un");
             case TrafficCalmingDefinition tc:
                 return new MarkingInfo(tc.DisplayCode, tc.Type switch
                 {

@@ -43,9 +43,26 @@ public sealed class MarkingService
     private Dictionary<string, MarkingDefinition> Definitions =>
         _definitions ??= MarkingStorage.Definitions(_doc).GroupBy(d => d.Id).ToDictionary(g => g.Key, g => g.First());
 
+    private readonly Dictionary<string, MarkingGeometry?> _geometryCache = new();
+
+    /// <summary>Geometria sem detalhes (null para detalhes ou em caso de erro) – prévias de quadros.</summary>
+    public MarkingGeometry? BuildGeometryOrNull(MarkingDefinition d) => OtherGeometry(d);
+
+    /// <summary>Geometria das demais marcas (cotas de seção, quadros de quantitativos) – sem detalhes, para não haver recursão.</summary>
+    private MarkingGeometry? OtherGeometry(MarkingDefinition d)
+    {
+        if (d is IAnnotationDefinition) return null;
+        var key = d.Id + "|" + d.ToJson().GetHashCode();
+        if (_geometryCache.TryGetValue(key, out var g)) return g;
+        try { g = BuildGeometry(d, out _); }
+        catch (Exception ex) { Log.Error($"OtherGeometry {d.DisplayCode}", ex); g = null; }
+        _geometryCache[key] = g;
+        return g;
+    }
+
     /// <summary>Ordena para gerar primeiro as marcas e depois os detalhes/anotações que dependem delas.</summary>
     public static List<MarkingDefinition> DependencyOrder(IEnumerable<MarkingDefinition> defs) =>
-        defs.OrderBy(d => d is LegendDefinition ? 2 : d is IAnnotationDefinition ? 1 : 0).ToList();
+        defs.OrderBy(d => d is IProjectWideAnnotation ? 2 : d is IAnnotationDefinition ? 1 : 0).ToList();
 
     /// <summary>Regenera os detalhes/anotações que apontam para as marcas indicadas (e os quadros de legenda).</summary>
     public List<RenderResult> RenderDependents(IEnumerable<string> markingIds, bool includeLegends)
@@ -53,7 +70,7 @@ public sealed class MarkingService
         var ids = markingIds.ToHashSet();
         _definitions = null;
         var deps = Definitions.Values.Where(d => d is IAnnotationDefinition a && !ids.Contains(d.Id)
-            && (a.TargetId != null ? ids.Contains(a.TargetId) : includeLegends && d is LegendDefinition)).ToList();
+            && (a.TargetId != null ? ids.Contains(a.TargetId) : includeLegends && d is IProjectWideAnnotation)).ToList();
         var res = new List<RenderResult>();
         foreach (var d in DependencyOrder(deps))
         {
@@ -70,7 +87,7 @@ public sealed class MarkingService
     public MarkingGeometry BuildGeometry(MarkingDefinition def, out double baseZ, List<string>? warnings = null, View? view = null)
     {
         var ctx = PluginContext.BuildContext(def.Output.Drape && def.Output.Mode == OutputMode.Modelo3D,
-            view?.Scale ?? 100, id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList());
+            view?.Scale ?? 100, id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList(), OtherGeometry);
         if (def.Path == null)
         {
             baseZ = def.PointZ ?? 0;
@@ -83,7 +100,7 @@ public sealed class MarkingService
         if (path == null || path.Chains.Count == 0) return MarkingBuilder.Build(def, null, ctx);
 
         // Rampas e moderadores usam apenas os extremos do primeiro trecho.
-        if (def is RampDefinition or TrafficCalmingDefinition) return MarkingBuilder.Build(def, path.Main, ctx);
+        if (def is RampDefinition or TrafficCalmingDefinition or CulDeSacDefinition or CurbExtensionDefinition) return MarkingBuilder.Build(def, path.Main, ctx);
 
         var geo = new MarkingGeometry();
         foreach (var chain in path.Chains)
@@ -514,6 +531,7 @@ public sealed class MarkingService
                                 _ => HorizontalTextAlignment.Center,
                             },
                             VerticalAlignment = VerticalTextAlignment.Top,
+                            Rotation = t.Rotation,
                         };
                         var pos = new XYZ(UnitConv.Ft(t.Position.X), UnitConv.Ft(t.Position.Y), zFt);
                         res.Add(TextNote.Create(_doc, view.Id, pos, t.Text.Replace("\n", "\r"), opt));
@@ -541,6 +559,7 @@ public sealed class MarkingService
             SharedParameters.Set(e, SharedParameters.Codigo, info.Code);
             SharedParameters.Set(e, SharedParameters.Descricao, info.Name);
             SharedParameters.Set(e, SharedParameters.Grupo, QuantityRow.GroupLabel(info.Group));
+            SharedParameters.Set(e, SharedParameters.Categoria, def is IAnnotationDefinition ? "Detalhamento" : QuantityRow.CategoryLabel(QuantityRow.Categorize(def, info.Group)));
             SharedParameters.Set(e, SharedParameters.Cor, StyleService.ColorName(color));
             SharedParameters.Set(e, SharedParameters.Material, material);
             SharedParameters.Set(e, SharedParameters.Area, UnitConv.Ft2(areaM2));

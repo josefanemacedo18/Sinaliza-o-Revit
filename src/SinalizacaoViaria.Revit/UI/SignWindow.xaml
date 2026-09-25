@@ -22,13 +22,23 @@
         <DockPanel Margin="0,0,12,0">
             <TextBlock DockPanel.Dock="Top" Text="Placa" Style="{StaticResource Title}"/>
             <ComboBox DockPanel.Dock="Top" x:Name="CbCategory" SelectionChanged="CategoryChanged"/>
+            <TextBox DockPanel.Dock="Top" x:Name="TbSearch" Margin="0,4,0,0" TextChanged="SearchChanged" ToolTip="Pesquisar por código ou nome (ex.: R-6, bicicleta, curva)"/>
             <Border DockPanel.Dock="Bottom" Background="{StaticResource Panel}" Padding="8" Margin="0,6,0,0">
                 <StackPanel>
                     <TextBlock x:Name="TxtDescription" TextWrapping="Wrap"/>
                     <TextBlock x:Name="TxtReference" Style="{StaticResource Hint}" FontStyle="Italic"/>
                 </StackPanel>
             </Border>
-            <ListBox x:Name="LbTypes" SelectionChanged="TypeChanged" Margin="0,4,0,0"/>
+            <ListBox x:Name="LbTypes" SelectionChanged="TypeChanged" Margin="0,4,0,0" VirtualizingPanel.IsVirtualizing="True">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <Image Width="40" Height="40" Margin="0,1,8,1" Source="{Binding Converter={x:Static ui:SignThumbConverter.Instance}}"/>
+                            <TextBlock Text="{Binding}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="250"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </DockPanel>
         <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
             <StackPanel>

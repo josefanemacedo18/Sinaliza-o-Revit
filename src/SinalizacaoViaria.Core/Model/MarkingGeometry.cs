@@ -124,7 +124,11 @@ public sealed record AnnotationLine(IReadOnlyList<Vec2> Points, MarkingColor Col
 public enum TextAlign { Left, Center, Right }
 
 /// <summary>Texto de anotação: posição do topo do bloco de texto; altura em mm de papel.</summary>
-public sealed record AnnotationText(Vec2 Position, string Text, double PaperHeightMm = 2.5, TextAlign Align = TextAlign.Center) : Annotation2D;
+public sealed record AnnotationText(Vec2 Position, string Text, double PaperHeightMm = 2.5, TextAlign Align = TextAlign.Center) : Annotation2D
+{
+    /// <summary>Rotação do texto (rad, anti-horário) – cotas alinhadas.</summary>
+    public double Rotation { get; init; }
+}
 
 /// <summary>
 /// Perfil desenhado em um plano vertical e extrudado horizontalmente.

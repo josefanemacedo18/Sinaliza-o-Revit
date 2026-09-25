@@ -203,6 +203,73 @@ public static class IconFactory
                 }
                 dc.DrawEllipse(null, P(Asphalt, 4), new Point(16, 16), 8, 8);
                 break;
+            case "cotasecao":
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 14, 30, 17));
+                dc.DrawLine(P(White, 1.5), new Point(16, 14), new Point(16, 31));
+                dc.DrawLine(P(Asphalt, 1), new Point(2, 7), new Point(30, 7));
+                foreach (var x in new[] { 3.0, 16.0, 29.0 })
+                {
+                    dc.DrawLine(P(Asphalt, 1), new Point(x, 4), new Point(x, 13));
+                    dc.DrawLine(P(Asphalt, 1.5), new Point(x - 2, 9), new Point(x + 2, 5));
+                }
+                break;
+            case "detalhetipico":
+                dc.DrawRectangle(B(White), P(Asphalt, 1), new Rect(1, 1, 30, 30));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(3, 14, 26, 8));
+                dc.DrawRectangle(B(White), null, new Rect(5, 17, 9, 2.5));
+                dc.DrawRectangle(B(White), null, new Rect(19, 17, 9, 2.5));
+                dc.DrawLine(P(Red, 1), new Point(5, 9), new Point(14, 9));
+                dc.DrawLine(P(Red, 1), new Point(5, 6), new Point(5, 12));
+                dc.DrawLine(P(Red, 1), new Point(14, 6), new Point(14, 12));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(4, 25, 18, 2));
+                break;
+            case "quadroqtd":
+            case "quadroplacas":
+                dc.DrawRectangle(B(White), P(Asphalt, 1.5), new Rect(2, 3, 28, 26));
+                for (int i = 0; i < 4; i++) dc.DrawLine(P(Asphalt, 0.8), new Point(2, 9 + i * 5), new Point(30, 9 + i * 5));
+                dc.DrawLine(P(Asphalt, 0.8), new Point(11, 9), new Point(11, 29));
+                if (key == "quadroplacas")
+                    for (int i = 0; i < 4; i++) dc.DrawEllipse(B(Red), null, new Point(6.5, 11.5 + i * 5), 2, 2);
+                else
+                    dc.DrawLine(P(Asphalt, 0.8), new Point(24, 9), new Point(24, 29));
+                break;
+            case "notas":
+                dc.DrawRectangle(B(White), P(Asphalt, 1.5), new Rect(4, 2, 24, 28));
+                for (int i = 0; i < 5; i++) dc.DrawRectangle(B(Muted), null, new Rect(8, 8 + i * 4.5, i % 2 == 0 ? 16 : 12, 1.6));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(9, 4, 14, 1.8));
+                break;
+            case "norte":
+                dc.DrawEllipse(null, P(Asphalt, 1.5), new Point(16, 18), 11, 11);
+                dc.DrawGeometry(B(Asphalt), null, Close(Poly(new Point(16, 7), new Point(16, 23), new Point(11, 27))));
+                dc.DrawGeometry(null, P(Asphalt, 1), Close(Poly(new Point(16, 7), new Point(21, 27), new Point(16, 23))));
+                Text(dc, "N", 7, Asphalt, new Point(16, -1), true);
+                break;
+            case "orelha":
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 1, 30, 30));
+                dc.DrawRectangle(B(Color.FromRgb(200, 198, 190)), null, new Rect(1, 1, 30, 9));
+                dc.DrawGeometry(B(Color.FromRgb(200, 198, 190)), P(White, 1), Close(Poly(new Point(5, 10), new Point(10, 20), new Point(22, 20), new Point(27, 10))));
+                dc.DrawEllipse(B(Color.FromRgb(98, 160, 72)), null, new Point(16, 14), 4, 3);
+                dc.DrawRectangle(B(White), null, new Rect(3, 26, 6, 1.5));
+                dc.DrawRectangle(B(White), null, new Rect(23, 26, 6, 1.5));
+                break;
+            case "areacalcada":
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 1, 30, 30));
+                dc.DrawGeometry(B(Color.FromRgb(200, 198, 190)), P(White, 1.2), Close(Poly(new Point(4, 4), new Point(24, 4), new Point(28, 12), new Point(22, 27), new Point(4, 27))));
+                dc.DrawRectangle(B(Red), null, new Rect(8, 8, 5, 16));
+                break;
+            case "canteiro":
+                dc.DrawRectangle(B(Color.FromRgb(200, 198, 190)), null, new Rect(1, 1, 30, 30));
+                for (int i = 0; i < 3; i++)
+                {
+                    dc.DrawRectangle(B(Color.FromRgb(98, 160, 72)), P(Color.FromRgb(120, 120, 110), 1), new Rect(3 + i * 10, 11, 7, 10));
+                    dc.DrawEllipse(B(Color.FromRgb(60, 120, 50)), null, new Point(6.5 + i * 10, 16), 3, 3);
+                }
+                break;
+            case "culdesac":
+                dc.DrawRectangle(B(Color.FromRgb(200, 198, 190)), null, new Rect(1, 1, 30, 30));
+                dc.DrawGeometry(B(Asphalt), null, Close(Poly(new Point(12, 31), new Point(12, 20), new Point(6, 14), new Point(6, 8), new Point(10, 3), new Point(22, 3), new Point(26, 8), new Point(26, 14), new Point(20, 20), new Point(20, 31))));
+                dc.DrawEllipse(B(Color.FromRgb(98, 160, 72)), null, new Point(16, 10), 4, 4);
+                break;
             case "detalheplaca":
                 dc.DrawRectangle(B(White), P(Color.FromRgb(160, 166, 174), 1), new Rect(1, 1, 30, 30));
                 dc.DrawLine(P(Red, 1.5), new Point(7, 26), new Point(17, 16));

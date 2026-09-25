@@ -130,7 +130,10 @@ public sealed class GeometryPreview : FrameworkElement
                 {
                     TextAlignment = t.Align switch { TextAlign.Left => TextAlignment.Left, TextAlign.Right => TextAlignment.Right, _ => TextAlignment.Center },
                 };
-                dc.DrawText(ft, map(t.Position));
+                var at = map(t.Position);
+                if (Math.Abs(t.Rotation) > 1e-6) dc.PushTransform(new RotateTransform(-t.Rotation * 180 / Math.PI, at.X, at.Y));
+                dc.DrawText(ft, at);
+                if (Math.Abs(t.Rotation) > 1e-6) dc.Pop();
             }
         }
     }

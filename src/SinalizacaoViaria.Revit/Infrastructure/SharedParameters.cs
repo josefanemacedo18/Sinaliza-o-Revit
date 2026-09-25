@@ -22,7 +22,9 @@ public static class SharedParameters
     public static readonly Def Referencia = new("SV_Referencia", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B09"), SpecTypeId.String.Text, "Referência normativa.");
     public static readonly Def Id = new("SV_Id", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B0A"), SpecTypeId.String.Text, "Identificador do conjunto de sinalização.");
 
-    public static IReadOnlyList<Def> All { get; } = new[] { Codigo, Descricao, Grupo, Cor, Material, Area, Extensao, Quantidade, Referencia, Id };
+    public static readonly Def Categoria = new("SV_Categoria", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B0B"), SpecTypeId.String.Text, "Categoria do quantitativo: sinalização horizontal, vertical, dispositivos, acessibilidade, calçadas...");
+
+    public static IReadOnlyList<Def> All { get; } = new[] { Codigo, Descricao, Grupo, Cor, Material, Area, Extensao, Quantidade, Referencia, Id, Categoria };
 
     private const string GroupName = "Sinalizacao Viaria";
 

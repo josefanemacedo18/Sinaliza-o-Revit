@@ -38,23 +38,33 @@ public sealed class CmdQuantitativos : CommandBase
         }
         var rows = QuantityCalculator.Compute(items, PluginContext.Catalog, PluginContext.Settings.DefaultMaterial);
         var w = new QuantitiesWindow(rows, doc.Title);
-        if (UiHelpers.ShowModal(w) == true && w.CreateSchedule)
+        if (UiHelpers.ShowModal(w) == true)
         {
-            var view = CreateSchedule(doc);
+            ViewSchedule? view = null;
+            if (w.CreateSchedule) view = CreateSchedule(doc, null);
+            if (w.SchedulesByCategory)
+            {
+                foreach (var c in w.Categories)
+                {
+                    var v = CreateSchedule(doc, c);
+                    view ??= v;
+                }
+            }
             if (view != null) uidoc.ActiveView = view;
         }
         return Result.Succeeded;
     }
 
-    private static ViewSchedule? CreateSchedule(Document doc)
+    private static ViewSchedule? CreateSchedule(Document doc, CategoriaQuantitativo? category)
     {
         using var t = new Transaction(doc, "SV - Tabela de quantitativos");
         t.Start();
         SharedParameters.Ensure(doc);
         var sched = ViewSchedule.CreateSchedule(doc, new ElementId(BuiltInCategory.OST_GenericModel));
-        var name = ScheduleName;
+        var name = category is { } cc ? $"SV - {QuantityRow.CategoryLabel(cc)}" : ScheduleName;
+        var baseName = name;
         var existing = new FilteredElementCollector(doc).OfClass(typeof(ViewSchedule)).Cast<ViewSchedule>().Select(v => v.Name).ToHashSet();
-        for (int i = 2; existing.Contains(name); i++) name = $"{ScheduleName} ({i})";
+        for (int i = 2; existing.Contains(name); i++) name = $"{baseName} ({i})";
         sched.Name = name;
 
         var def = sched.Definition;
@@ -70,6 +80,7 @@ public sealed class CmdQuantitativos : CommandBase
             return field;
         }
 
+        var categoria = Add(SharedParameters.Categoria);
         var grupo = Add(SharedParameters.Grupo);
         var codigo = Add(SharedParameters.Codigo);
         Add(SharedParameters.Descricao);
@@ -82,6 +93,13 @@ public sealed class CmdQuantitativos : CommandBase
         if (codigo != null)
         {
             def.AddFilter(new ScheduleFilter(codigo.FieldId, ScheduleFilterType.HasValue));
+            if (categoria != null)
+            {
+                if (category is { } c) def.AddFilter(new ScheduleFilter(categoria.FieldId, ScheduleFilterType.Equal, QuantityRow.CategoryLabel(c)));
+                // Agrupado por categoria, com cabeçalho e subtotal.
+                def.AddSortGroupField(new ScheduleSortGroupField(categoria.FieldId) { ShowHeader = true, ShowFooter = true, ShowBlankLine = true });
+                if (category != null) categoria.IsHidden = true;
+            }
             if (grupo != null) def.AddSortGroupField(new ScheduleSortGroupField(grupo.FieldId));
             def.AddSortGroupField(new ScheduleSortGroupField(codigo.FieldId));
             if (cor != null) def.AddSortGroupField(new ScheduleSortGroupField(cor.FieldId));

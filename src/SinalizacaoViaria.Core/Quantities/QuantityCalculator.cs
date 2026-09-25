@@ -6,6 +6,18 @@ using SinalizacaoViaria.Core.Model;
 
 namespace SinalizacaoViaria.Core.Quantities;
 
+/// <summary>Categorias do quantitativo (separação para orçamento e pesquisa).</summary>
+public enum CategoriaQuantitativo
+{
+    SinalizacaoHorizontal,
+    SinalizacaoVertical,
+    DispositivosSegregacao,
+    Acessibilidade,
+    CalcadasUrbanizacao,
+    ModeracaoTrafego,
+    MobiliarioUrbano,
+}
+
 /// <summary>Uma linha do quadro de quantidades.</summary>
 public sealed class QuantityRow
 {
@@ -24,7 +36,49 @@ public sealed class QuantityRow
     public double GlassBeadsKg { get; set; }
     public string Reference { get; set; } = "";
 
+    public CategoriaQuantitativo Category { get; set; }
+
     public string GroupName => GroupLabel(Group);
+    public string CategoryName => CategoryLabel(Category);
+
+    /// <summary>Quantidade principal na unidade de medição do item (m², m ou un).</summary>
+    public double MainQuantity => Unit switch
+    {
+        "m²" => Area,
+        "m" => PaintedLength,
+        _ => Units,
+    };
+
+    /// <summary>Área em planta: pintada (tintas) ou ocupada (concreto, grama, metal...).</summary>
+    public string AreaKind => MarkingColors.IsPaint(Color) ? "pintada" : "em planta";
+
+    public static string CategoryLabel(CategoriaQuantitativo c) => c switch
+    {
+        CategoriaQuantitativo.SinalizacaoHorizontal => "1. Sinalização horizontal",
+        CategoriaQuantitativo.SinalizacaoVertical => "2. Sinalização vertical",
+        CategoriaQuantitativo.DispositivosSegregacao => "3. Dispositivos auxiliares e segregação física",
+        CategoriaQuantitativo.Acessibilidade => "4. Acessibilidade (rampas e piso tátil)",
+        CategoriaQuantitativo.CalcadasUrbanizacao => "5. Calçadas, meios-fios e urbanização",
+        CategoriaQuantitativo.ModeracaoTrafego => "6. Moderação de tráfego",
+        CategoriaQuantitativo.MobiliarioUrbano => "7. Mobiliário e elementos urbanos",
+        _ => c.ToString(),
+    };
+
+    /// <summary>Categoria de uma marca (a partir do grupo e do tipo).</summary>
+    public static CategoriaQuantitativo Categorize(MarkingDefinition def, GrupoMarca group) => def switch
+    {
+        RampDefinition => CategoriaQuantitativo.Acessibilidade,
+        _ => group switch
+        {
+            GrupoMarca.SinalizacaoVertical => CategoriaQuantitativo.SinalizacaoVertical,
+            GrupoMarca.Dispositivo => CategoriaQuantitativo.DispositivosSegregacao,
+            GrupoMarca.Acessibilidade => CategoriaQuantitativo.Acessibilidade,
+            GrupoMarca.Urbanizacao => CategoriaQuantitativo.CalcadasUrbanizacao,
+            GrupoMarca.Moderacao => CategoriaQuantitativo.ModeracaoTrafego,
+            GrupoMarca.Mobiliario => CategoriaQuantitativo.MobiliarioUrbano,
+            _ => CategoriaQuantitativo.SinalizacaoHorizontal,
+        },
+    };
 
     public static string GroupLabel(GrupoMarca g) => g switch
     {
@@ -66,7 +120,8 @@ public static class QuantityCalculator
                 {
                     row = new QuantityRow
                     {
-                        Code = info.Code, Name = info.Name, Group = info.Group, Color = color, Material = matName,
+                        Code = info.Code, Name = info.Name, Group = info.Group, Color = color, Material = MarkingColors.IsPaint(color) ? matName : "",
+                        Category = QuantityRow.Categorize(def, info.Group),
                         Unit = info.Unit, Reference = info.Reference, ConsumptionUnit = mat?.UnidadeConsumo ?? "",
                     };
                     rows[key] = row;
@@ -89,13 +144,33 @@ public static class QuantityCalculator
             }
         }
         return rows.Values
-            .OrderBy(r => r.Group).ThenBy(r => r.Code, StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Color)
+            .OrderBy(r => r.Category).ThenBy(r => r.Group).ThenBy(r => r.Code, StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Color)
             .ToList();
     }
 
-    /// <summary>Totais por cor e material (resumo de compra).</summary>
+    /// <summary>Totais por categoria (área, extensão e unidades).</summary>
+    public static List<QuantityRow> CategorySummary(IEnumerable<QuantityRow> rows) =>
+        rows.GroupBy(r => r.Category)
+            .Select(g => new QuantityRow
+            {
+                Code = "SUBTOTAL",
+                Name = QuantityRow.CategoryLabel(g.Key),
+                Category = g.Key,
+                Area = g.Sum(r => r.Area),
+                PaintedLength = g.Sum(r => r.PaintedLength),
+                Units = g.Sum(r => r.Units),
+                Elements = g.Sum(r => r.Elements),
+                MaterialConsumption = g.Sum(r => r.MaterialConsumption),
+                GlassBeadsKg = g.Sum(r => r.GlassBeadsKg),
+                Unit = "m²",
+            })
+            .OrderBy(r => r.Category).ToList();
+
+    /// <summary>Totais por cor e material (resumo de compra de tinta).</summary>
     public static List<QuantityRow> Summary(IEnumerable<QuantityRow> rows) =>
-        rows.GroupBy(r => (r.Color, r.Material))
+        rows.Where(r => MarkingColors.IsPaint(r.Color) && r.Category is CategoriaQuantitativo.SinalizacaoHorizontal or CategoriaQuantitativo.Acessibilidade
+                                                       or CategoriaQuantitativo.ModeracaoTrafego or CategoriaQuantitativo.CalcadasUrbanizacao)
+            .GroupBy(r => (r.Color, r.Material))
             .Select(g => new QuantityRow
             {
                 Code = "TOTAL",
@@ -113,22 +188,39 @@ public static class QuantityCalculator
             })
             .OrderBy(r => r.Color).ToList();
 
-    /// <summary>CSV no padrão brasileiro (separador ";" e vírgula decimal), pronto para o Excel.</summary>
+    /// <summary>CSV no padrão brasileiro (separador ";" e vírgula decimal), pronto para o Excel – separado por categoria.</summary>
     public static string ToCsv(IEnumerable<QuantityRow> rows, IEnumerable<QuantityRow>? summary = null)
     {
         var pt = CultureInfo.GetCultureInfo("pt-BR");
         var sb = new StringBuilder();
-        sb.AppendLine("Grupo;Código;Descrição;Cor;Material;Área pintada (m²);Extensão (m);Unidades;Elementos;Consumo estimado;Unidade consumo;Microesferas (kg);Referência");
+        const string header = "Categoria;Grupo;Código;Descrição;Cor;Material;Quantidade;Unidade;Área (m²);Extensão (m);Unidades;Elementos;Consumo estimado;Unidade consumo;Microesferas (kg);Referência";
         void Row(QuantityRow r) => sb.AppendLine(string.Join(";",
-            Esc(r.GroupName), Esc(r.Code), Esc(r.Name), r.Color, Esc(r.Material),
+            Esc(r.CategoryName), Esc(r.GroupName), Esc(r.Code), Esc(r.Name), r.Color, Esc(r.Material),
+            r.MainQuantity.ToString("0.00", pt), Esc(r.Unit),
             r.Area.ToString("0.00", pt), r.PaintedLength.ToString("0.00", pt), r.Units, r.Elements,
             r.MaterialConsumption.ToString("0.00", pt), Esc(r.ConsumptionUnit), r.GlassBeadsKg.ToString("0.00", pt), Esc(r.Reference)));
-        foreach (var r in rows) Row(r);
+        var list = rows.ToList();
+        foreach (var g in list.GroupBy(r => r.Category).OrderBy(g => g.Key))
+        {
+            sb.AppendLine(Esc(QuantityRow.CategoryLabel(g.Key).ToUpperInvariant()));
+            sb.AppendLine(header);
+            foreach (var r in g) Row(r);
+            var sub = CategorySummary(g).First();
+            sb.AppendLine(string.Join(";", "", "", "SUBTOTAL", "", "", "", "", "", sub.Area.ToString("0.00", pt), sub.PaintedLength.ToString("0.00", pt),
+                sub.Units, sub.Elements, sub.MaterialConsumption.ToString("0.00", pt), "", sub.GlassBeadsKg.ToString("0.00", pt), ""));
+            sb.AppendLine();
+        }
+        sb.AppendLine("RESUMO POR CATEGORIA");
+        sb.AppendLine("Categoria;Área (m²);Extensão (m);Unidades;Elementos");
+        foreach (var c in CategorySummary(list))
+            sb.AppendLine(string.Join(";", Esc(c.Name), c.Area.ToString("0.00", pt), c.PaintedLength.ToString("0.00", pt), c.Units, c.Elements));
         if (summary != null)
         {
             sb.AppendLine();
-            sb.AppendLine("RESUMO POR COR E MATERIAL");
-            foreach (var r in summary) Row(r);
+            sb.AppendLine("RESUMO DE PINTURA POR COR E MATERIAL");
+            sb.AppendLine("Cor;Material;Área (m²);Consumo estimado;Unidade consumo;Microesferas (kg)");
+            foreach (var r in summary)
+                sb.AppendLine(string.Join(";", r.Color, Esc(r.Material), r.Area.ToString("0.00", pt), r.MaterialConsumption.ToString("0.00", pt), Esc(r.ConsumptionUnit), r.GlassBeadsKg.ToString("0.00", pt)));
         }
         return sb.ToString();
     }

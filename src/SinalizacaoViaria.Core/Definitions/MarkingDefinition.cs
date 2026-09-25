@@ -88,6 +88,15 @@ public sealed class PathReference
 [JsonDerivedType(typeof(SignPlanDetailDefinition), "detalhe-placa")]
 [JsonDerivedType(typeof(LabelDefinition), "anotacao")]
 [JsonDerivedType(typeof(LegendDefinition), "quadro-legenda")]
+[JsonDerivedType(typeof(CurbExtensionDefinition), "orelha")]
+[JsonDerivedType(typeof(SidewalkAreaDefinition), "area-calcada")]
+[JsonDerivedType(typeof(PlanterDefinition), "canteiro")]
+[JsonDerivedType(typeof(CulDeSacDefinition), "cul-de-sac")]
+[JsonDerivedType(typeof(SectionDimensionDefinition), "cota-secao")]
+[JsonDerivedType(typeof(TypicalDetailDefinition), "detalhe-tipico")]
+[JsonDerivedType(typeof(QuantityTableDefinition), "quadro-quantitativo")]
+[JsonDerivedType(typeof(NotesDefinition), "notas")]
+[JsonDerivedType(typeof(NorthArrowDefinition), "norte")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;
@@ -483,12 +492,190 @@ public sealed class TrafficCalmingDefinition : MarkingDefinition
     public override void SetPath(PathReference path) => PathRef = path;
 }
 
+public enum TipoTransicao
+{
+    /// <summary>Curvas reversas tangentes (raio configurável).</summary>
+    Curva,
+    /// <summary>Chanfro reto (comprimento de transição configurável).</summary>
+    Chanfro,
+}
+
+/// <summary>
+/// Orelha (avanço) de calçada sobre a faixa de estacionamento: desenhada ao longo da face do meio-fio,
+/// com transições curvas ou em chanfro, meio-fio novo e canteiro/árvores opcionais.
+/// </summary>
+public sealed class CurbExtensionDefinition : MarkingDefinition
+{
+    public PathReference PathRef { get; set; } = new();
+    /// <summary>Avanço sobre a pista (m) – normalmente a largura da faixa de estacionamento.</summary>
+    public double Depth { get; set; } = 2.20;
+    public TipoTransicao Transition { get; set; } = TipoTransicao.Curva;
+    /// <summary>Raio das curvas de transição (ou comprimento do chanfro).</summary>
+    public double Radius { get; set; } = 1.50;
+    /// <summary>Verdadeiro quando a calçada existente fica à esquerda do sentido de desenho.</summary>
+    public bool SidewalkOnLeft { get; set; } = true;
+    public double Height { get; set; } = 0.15;
+    public double CurbWidth { get; set; } = 0.15;
+    public bool Planter { get; set; }
+    public double PlanterWidth { get; set; } = 1.00;
+    public double PlanterMargin { get; set; } = 0.50;
+    public int Trees { get; set; }
+    /// <summary>Recorta as marcas da pista (vagas, linhas) sob a orelha.</summary>
+    public bool CutRoadMarkings { get; set; } = true;
+
+    public override string KindName => "Orelha de calçada";
+    public override string DisplayCode => "ORELHA";
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) => PathRef = path;
+}
+
+public enum TipoAreaCalcada
+{
+    /// <summary>Calçada/avanço elevado em concreto.</summary>
+    Calcada,
+    /// <summary>Canteiro gramado elevado.</summary>
+    Canteiro,
+    /// <summary>Ciclovia no nível da calçada (pintura vermelha).</summary>
+    Ciclovia,
+    /// <summary>Área de estar / parklet em deck.</summary>
+    Deck,
+    /// <summary>Pavimento (asfalto) – ilhas, alargamentos.</summary>
+    Pavimento,
+    /// <summary>Faixa de serviço/ajardinada no nível da calçada.</summary>
+    FaixaServico,
+}
+
+/// <summary>Área livre de calçada/canteiro definida por um contorno fechado (esquinas, avanços, ilhas).</summary>
+public sealed class SidewalkAreaDefinition : MarkingDefinition
+{
+    public PathReference PathRef { get; set; } = new() { Closed = true };
+    public TipoAreaCalcada Type { get; set; } = TipoAreaCalcada.Calcada;
+    public double Height { get; set; } = 0.15;
+    public bool Curb { get; set; } = true;
+    public double CurbWidth { get; set; } = 0.15;
+    /// <summary>Arredonda todos os cantos do contorno (m). 0 = cantos vivos.</summary>
+    public double FilletRadius { get; set; }
+    /// <summary>Recorta calçadas/gramados existentes sob a área.</summary>
+    public bool CutExisting { get; set; }
+
+    public override string KindName => "Área de calçada";
+    public override string DisplayCode => Type switch
+    {
+        TipoAreaCalcada.Canteiro => "CANT-AREA",
+        TipoAreaCalcada.Ciclovia => "CICLO-CALC",
+        TipoAreaCalcada.Deck => "PARKLET",
+        TipoAreaCalcada.Pavimento => "PAVIMENTO",
+        TipoAreaCalcada.FaixaServico => "FX-SERVICO",
+        _ => "AVANCO",
+    };
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) { PathRef = path; PathRef.Closed = true; }
+}
+
+public enum TipoCanteiroCalcada
+{
+    /// <summary>Canteiro gramado no nível da calçada, com guia de contorno.</summary>
+    Gramado,
+    /// <summary>Jardineira elevada com mureta.</summary>
+    Jardineira,
+    /// <summary>Grelha de proteção de árvore (piso metálico).</summary>
+    GrelhaArvore,
+}
+
+/// <summary>Canteiros, jardineiras e grelhas de árvore distribuídos ao longo de uma linha na calçada.</summary>
+public sealed class PlanterDefinition : MarkingDefinition
+{
+    public PathReference PathRef { get; set; } = new();
+    public TipoCanteiroCalcada Type { get; set; } = TipoCanteiroCalcada.Gramado;
+    /// <summary>Comprimento de cada canteiro (m).</summary>
+    public double Length { get; set; } = 2.00;
+    public double Width { get; set; } = 1.00;
+    /// <summary>Distância entre centros (m). 0 = faixa contínua.</summary>
+    public double Spacing { get; set; } = 6.00;
+    /// <summary>Deslocamento lateral do eixo dos canteiros (+ à esquerda).</summary>
+    public double Offset { get; set; }
+    /// <summary>Altura da superfície da calçada (topo do gramado/grelha).</summary>
+    public double SurfaceHeight { get; set; } = 0.15;
+    public double BorderWidth { get; set; } = 0.08;
+    /// <summary>Altura da mureta da jardineira acima da calçada.</summary>
+    public double BorderHeight { get; set; } = 0.40;
+    public bool Trees { get; set; } = true;
+    public bool CutSidewalk { get; set; } = true;
+
+    public override string KindName => "Canteiro na calçada";
+    public override string DisplayCode => Type switch
+    {
+        TipoCanteiroCalcada.Jardineira => "JARDINEIRA",
+        TipoCanteiroCalcada.GrelhaArvore => "GRELHA-ARV",
+        _ => "CANT-GRAMA",
+    };
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) => PathRef = path;
+}
+
+public enum TipoCulDeSac
+{
+    Circular,
+    ExcentricoEsquerda,
+    ExcentricoDireita,
+    /// <summary>Em "T" (martelo) – manobra em três movimentos.</summary>
+    Martelo,
+    /// <summary>Em "Y".</summary>
+    EmY,
+    EmLEsquerda,
+    EmLDireita,
+    /// <summary>Gota (balão alongado).</summary>
+    Gota,
+}
+
+/// <summary>Balão de retorno (cul-de-sac) no fim de uma via: pavimento, meio-fio, calçada, ilha e linha de bordo.</summary>
+public sealed class CulDeSacDefinition : MarkingDefinition
+{
+    /// <summary>1º ponto: início do balão no eixo; 2º ponto: centro do balão / fim da via.</summary>
+    public PathReference PathRef { get; set; } = new();
+    public TipoCulDeSac Type { get; set; } = TipoCulDeSac.Circular;
+    public double RoadWidth { get; set; } = 7.00;
+    /// <summary>Raio do balão até a face do meio-fio (m).</summary>
+    public double BulbRadius { get; set; } = 10.00;
+    /// <summary>Raio de concordância entre o bordo da via e o balão.</summary>
+    public double TransitionRadius { get; set; } = 6.00;
+    /// <summary>Martelo: comprimento total da cabeça do "T" (m).</summary>
+    public double HeadLength { get; set; } = 20.00;
+    /// <summary>"Y" e "L": comprimento dos ramos (m).</summary>
+    public double BranchLength { get; set; } = 10.00;
+    public double BranchAngle { get; set; } = 45;
+    public bool Island { get; set; }
+    public double IslandRadius { get; set; } = 3.00;
+    public double SidewalkWidth { get; set; } = 2.50;
+    public double CurbWidth { get; set; } = 0.15;
+    public double Height { get; set; } = 0.15;
+    public bool Pavement { get; set; } = true;
+    public double PavementThickness { get; set; } = 0.05;
+    public bool EdgeLine { get; set; } = true;
+
+    public override string KindName => "Cul-de-sac";
+    public override string DisplayCode => Type switch
+    {
+        TipoCulDeSac.Martelo => "CDS-T",
+        TipoCulDeSac.EmY => "CDS-Y",
+        TipoCulDeSac.EmLEsquerda or TipoCulDeSac.EmLDireita => "CDS-L",
+        TipoCulDeSac.ExcentricoEsquerda or TipoCulDeSac.ExcentricoDireita => "CDS-EXC",
+        TipoCulDeSac.Gota => "CDS-GOTA",
+        _ => "CDS-CIRC",
+    };
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) => PathRef = path;
+}
+
 /// <summary>Elementos de detalhamento 2D (existem apenas numa vista; não entram em quantitativos).</summary>
 public interface IAnnotationDefinition
 {
     /// <summary>Marca à qual o detalhe se refere (nulo = independente).</summary>
     string? TargetId { get; }
 }
+
+/// <summary>Detalhe que depende de todo o projeto (legenda, quadros, cotas) – regenerado quando as marcas mudam.</summary>
+public interface IProjectWideAnnotation : IAnnotationDefinition { }
 
 /// <summary>
 /// Detalhe de placa em planta: a face da placa desenhada em escala de papel, afastada do suporte,
@@ -505,6 +692,8 @@ public sealed class SignPlanDetailDefinition : MarkingDefinition, IAnnotationDef
     public bool Label { get; set; } = true;
     public bool ShowName { get; set; } = true;
     public bool Leader { get; set; } = true;
+    /// <summary>Número da placa no projeto (ex.: P01) – aparece no símbolo e no quadro de placas.</summary>
+    public string? Number { get; set; }
 
     public string? TargetId => SignId;
     public override string KindName => "Detalhe de placa";
@@ -532,7 +721,7 @@ public sealed class LabelDefinition : MarkingDefinition, IAnnotationDefinition
 }
 
 /// <summary>Quadro de legenda com amostra e descrição de cada tipo de sinalização usada no projeto.</summary>
-public sealed class LegendDefinition : MarkingDefinition, IAnnotationDefinition
+public sealed class LegendDefinition : MarkingDefinition, IProjectWideAnnotation
 {
     /// <summary>Canto superior esquerdo (m).</summary>
     public Vec2 Position { get; set; }
@@ -549,4 +738,101 @@ public sealed class LegendDefinition : MarkingDefinition, IAnnotationDefinition
     public override void Translate(Vec2 delta, double dz) => Position += delta;
     public override string KindName => "Quadro de legenda";
     public override string DisplayCode => "LEGENDA";
+}
+
+/// <summary>Cotagem automática da seção transversal: mede faixas, linhas, canteiros e calçadas cortados pela linha.</summary>
+public sealed class SectionDimensionDefinition : MarkingDefinition, IProjectWideAnnotation
+{
+    public Vec2 Start { get; set; }
+    public Vec2 End { get; set; }
+    /// <summary>Distância da linha de cota ao alinhamento clicado (mm de papel, + à esquerda de início→fim).</summary>
+    public double OffsetMm { get; set; } = 10;
+    public double TextMm { get; set; } = 2.0;
+    /// <summary>Linhas pintadas estreitas são cotadas pelo eixo (padrão de projeto: largura de faixa eixo a eixo).</summary>
+    public bool LineAxes { get; set; } = true;
+    /// <summary>Largura máxima (m) considerada "linha" para cotar pelo eixo.</summary>
+    public double AxisMaxWidth { get; set; } = 0.35;
+    public bool IncludeEnds { get; set; } = true;
+    public bool Total { get; set; } = true;
+    public bool Horizontal { get; set; } = true;
+    public bool Physical { get; set; } = true;
+
+    public string? TargetId => null;
+    public override void Translate(Vec2 delta, double dz) { Start += delta; End += delta; }
+    public override string KindName => "Cota de seção";
+    public override string DisplayCode => "COTA-SEC";
+}
+
+/// <summary>Detalhe típico cotado (em escala ampliada) de uma marca do projeto: linha, zebrado, vaga ou placa em elevação.</summary>
+public sealed class TypicalDetailDefinition : MarkingDefinition, IAnnotationDefinition
+{
+    public string MarkingTargetId { get; set; } = "";
+    /// <summary>Canto superior esquerdo (m).</summary>
+    public Vec2 Position { get; set; }
+    /// <summary>Escala do detalhe (ex.: 20 para 1:20).</summary>
+    public double DetailScale { get; set; } = 20;
+    public double TextMm { get; set; } = 2.0;
+    public string? Title { get; set; }
+
+    public string? TargetId => MarkingTargetId;
+    public override void Translate(Vec2 delta, double dz) => Position += delta;
+    public override string KindName => "Detalhe típico";
+    public override string DisplayCode => "DET-TIP";
+}
+
+/// <summary>Quadro de quantitativos (ou de placas) desenhado na prancha, separado por categoria.</summary>
+public sealed class QuantityTableDefinition : MarkingDefinition, IProjectWideAnnotation
+{
+    public Vec2 Position { get; set; }
+    public string Title { get; set; } = "QUADRO DE QUANTITATIVOS – SINALIZAÇÃO VIÁRIA";
+    /// <summary>Categoria (nome do enum CategoriaQuantitativo) ou nulo para todas.</summary>
+    public string? Category { get; set; }
+    /// <summary>Quadro de placas: símbolo, numeração, código, descrição, dimensões e quantidade.</summary>
+    public bool SignsOnly { get; set; }
+    public double RowMm { get; set; } = 6;
+    public double TextMm { get; set; } = 2.0;
+
+    public string? TargetId => null;
+    public override void Translate(Vec2 delta, double dz) => Position += delta;
+    public override string KindName => SignsOnly ? "Quadro de placas" : "Quadro de quantitativos";
+    public override string DisplayCode => SignsOnly ? "QUADRO-PLACAS" : "QUADRO-QTD";
+}
+
+/// <summary>Bloco de notas gerais do projeto de sinalização.</summary>
+public sealed class NotesDefinition : MarkingDefinition, IAnnotationDefinition
+{
+    public const string DefaultText =
+        "Cotas em metros, salvo indicação em contrário.\n" +
+        "A sinalização horizontal e vertical segue o Manual Brasileiro de Sinalização de Trânsito (CONTRAN) e as resoluções vigentes.\n" +
+        "Pintura: tinta/termoplástico conforme especificação do projeto, com microesferas de vidro (tipos I-B e II-A) conforme ABNT NBR 16184.\n" +
+        "Placas: chapa, película retrorrefletiva e suportes conforme ABNT NBR 11904, NBR 14644 e especificação do órgão com circunscrição sobre a via.\n" +
+        "Altura livre mínima sob as placas de 2,10 m em calçadas; afastamento lateral mínimo de 0,30 m do meio-fio.\n" +
+        "Rebaixamentos de calçada e piso tátil conforme ABNT NBR 9050 e NBR 16537.\n" +
+        "Conferir as interferências (redes, acessos, arborização) em campo antes da execução.";
+
+    public Vec2 Position { get; set; }
+    public string Title { get; set; } = "NOTAS GERAIS";
+    public string Text { get; set; } = DefaultText;
+    public double WidthMm { get; set; } = 130;
+    public double TextMm { get; set; } = 2.0;
+    public bool Numbered { get; set; } = true;
+
+    public string? TargetId => null;
+    public override void Translate(Vec2 delta, double dz) => Position += delta;
+    public override string KindName => "Notas gerais";
+    public override string DisplayCode => "NOTAS";
+}
+
+/// <summary>Indicação de norte.</summary>
+public sealed class NorthArrowDefinition : MarkingDefinition, IAnnotationDefinition
+{
+    public Vec2 Position { get; set; }
+    public double SizeMm { get; set; } = 16;
+    /// <summary>Ângulo do norte em relação ao eixo Y do projeto (graus, anti-horário).</summary>
+    public double AngleDeg { get; set; }
+
+    public string? TargetId => null;
+    public override void Translate(Vec2 delta, double dz) => Position += delta;
+    public override string KindName => "Norte";
+    public override string DisplayCode => "NORTE";
 }

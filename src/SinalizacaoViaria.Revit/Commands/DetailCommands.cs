@@ -61,10 +61,18 @@ public sealed class CmdDetalharPlacas : CommandBase
         var existing = all.OfType<SignPlanDetailDefinition>().Where(d => d.Output.ViewId == view.UniqueId)
             .GroupBy(d => d.SignId).ToDictionary(g => g.Key, g => g.First());
         var defs = new List<MarkingDefinition>();
-        foreach (var s in targets)
+        // Numeração em ordem de leitura da planta: de cima para baixo, da esquerda para a direita (faixas de 10 m).
+        var ordered = targets.OrderByDescending(s => Math.Round(s.Position.Y / 10)).ThenBy(s => s.Position.X).ToList();
+        var number = w.NumberStart;
+        foreach (var s in ordered)
         {
             var d = (SignPlanDetailDefinition)w.Result.CloneWithNewId();
-            if (existing.TryGetValue(s.Id, out var old)) d.Id = old.Id;
+            if (existing.TryGetValue(s.Id, out var old))
+            {
+                d.Id = old.Id;
+                if (!w.Numbering) d.Number = old.Number;
+            }
+            d.Number = w.Numbering ? $"{w.NumberPrefix}{number++:00}" : d.Number;
             d.SignId = s.Id;
             DetailHelpers.PrepareOutput(d, view);
             defs.Add(d);

@@ -53,7 +53,8 @@ public static class MarkingCreator
     public static void SetPath(MarkingDefinition def, PathReference path) => def.SetPath(path);
 
     /// <summary>Obtém o caminho conforme o modo escolhido e gera uma (ou várias) marcas a partir do modelo.</summary>
-    public static Result CreateAlongPath(UIDocument uidoc, MarkingDefinition template, PathMode mode, string action, bool closed = false)
+    public static Result CreateAlongPath(UIDocument uidoc, MarkingDefinition template, PathMode mode, string action, bool closed = false,
+        Action<MarkingDefinition>? afterEach = null)
     {
         var results = new List<RenderResult>();
         switch (mode)
@@ -67,6 +68,7 @@ public static class MarkingCreator
                 var def = template.CloneWithNewId();
                 SetPath(def, PathReference.FromElements(curves.Select(c => c.UniqueId)));
                 results.AddRange(Commit(uidoc, new[] { def }, $"SV - {action}"));
+                    afterEach?.Invoke(def);
                 break;
             }
             case PathMode.Desenhar:
@@ -77,6 +79,7 @@ public static class MarkingCreator
                 var def = template.CloneWithNewId();
                 SetPath(def, PathReference.FromElements(uids));
                 results.AddRange(Commit(uidoc, new[] { def }, $"SV - {action}"));
+                    afterEach?.Invoke(def);
                 break;
             }
             case PathMode.DoisPontos:
@@ -91,6 +94,7 @@ public static class MarkingCreator
                     var def = template.CloneWithNewId();
                     SetPath(def, PathReference.FromPoints(pts, z));
                     results.AddRange(Commit(uidoc, new[] { def }, $"SV - {action}"));
+                    afterEach?.Invoke(def);
                 }
                 if (results.Count == 0) return Result.Cancelled;
                 break;

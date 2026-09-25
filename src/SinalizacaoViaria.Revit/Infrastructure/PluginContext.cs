@@ -43,7 +43,8 @@ public static class PluginContext
     }
 
     public static BuildContext BuildContext(bool drape, double viewScale = 100,
-        Func<string, MarkingDefinition?>? lookup = null, Func<IReadOnlyList<MarkingDefinition>>? all = null) => new()
+        Func<string, MarkingDefinition?>? lookup = null, Func<IReadOnlyList<MarkingDefinition>>? all = null,
+        Func<MarkingDefinition, SinalizacaoViaria.Core.Model.MarkingGeometry?>? geometryOf = null) => new()
     {
         Catalog = Catalog,
         Glyphs = Glyphs,
@@ -51,5 +52,6 @@ public static class PluginContext
         ViewScale = viewScale > 0 ? viewScale : 100,
         Lookup = lookup,
         AllDefinitions = all,
+        GeometryOf = geometryOf,
     };
 }

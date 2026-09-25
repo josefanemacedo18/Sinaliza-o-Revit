@@ -80,7 +80,7 @@ public sealed class MarkingUpdater : IUpdater
                 try { service.Render(def); }
                 catch (Exception ex) { Log.Error($"Updater {def.DisplayCode}", ex); }
             }
-            service.RenderDependents(affected.Select(d => d.Id), includeLegends: false);
+            service.RenderDependents(affected.Select(d => d.Id), includeLegends: true);
         }
         catch (Exception ex)
         {

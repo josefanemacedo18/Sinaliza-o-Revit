@@ -264,6 +264,8 @@ public enum FormaPlaca
     Losango,
     Retangulo,
     Quadrado,
+    /// <summary>Cruz de Santo André (A-41) – duas travessas cruzadas.</summary>
+    CruzSantoAndre,
 }
 
 /// <summary>Categoria da sinalização vertical (MBST Vol. I a III e sinalização de obras).</summary>
@@ -302,7 +304,40 @@ public sealed class PlacaDef
     public double[] Tamanhos { get; set; } = Array.Empty<double>();
     public string Descricao { get; set; } = "";
     public string Referencia { get; set; } = "";
+    /// <summary>Desenho interno (pictograma) em unidades da área útil da placa (−0,5…0,5, Y para cima).</summary>
+    public List<PictoItem>? Pictograma { get; set; }
+    /// <summary>Tarja diagonal vermelha de proibição sobre o pictograma (R-4a, R-9...).</summary>
+    public bool Proibicao { get; set; }
     public override string ToString() => $"{Codigo} – {Nome}";
+}
+
+/// <summary>
+/// Elemento do pictograma de uma placa. Tipos: "linha" (pts, w), "seta" (pts, w, cabeca), "poligono" (pts),
+/// "circulo" (c, r), "anel" (c, r, w), "retangulo" (pts = [min, max]), "texto" (c, texto, h, editavel),
+/// "silhueta" (nome, c, k, rot, espelhar). Coordenadas na área útil: −0,5…0,5.
+/// </summary>
+public sealed class PictoItem
+{
+    public string Tipo { get; set; } = "linha";
+    public double[][]? Pts { get; set; }
+    public double[]? C { get; set; }
+    public double W { get; set; } = 0.08;
+    public double R { get; set; } = 0.1;
+    /// <summary>Tamanho da ponta da seta (múltiplo da largura da haste).</summary>
+    public double Cabeca { get; set; } = 3.0;
+    /// <summary>Ponta também no início (seta dupla).</summary>
+    public bool Dupla { get; set; }
+    public string? Texto { get; set; }
+    public double H { get; set; } = 0.3;
+    /// <summary>Texto substituído pela legenda editável da placa (ex.: 3,0 m; 10 t).</summary>
+    public bool Editavel { get; set; }
+    public string? Nome { get; set; }
+    public double K { get; set; } = 1;
+    public double Rot { get; set; }
+    public bool Espelhar { get; set; }
+    /// <summary>Pinta com a cor de fundo (vazado).</summary>
+    public bool Vazado { get; set; }
+    public MarkingColor? Cor { get; set; }
 }
 
 /// <summary>Tipos de mobiliário/elementos urbanísticos viários.</summary>

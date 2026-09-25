@@ -10,7 +10,7 @@ namespace SinalizacaoViaria.Core.Generators;
 /// Ferramentas de detalhamento 2D: símbolos de placas em planta com chamada, anotações de
 /// sinalização e quadro de legenda. Dimensões em mm de papel, convertidas pela escala da vista.
 /// </summary>
-public static class DetailGenerator
+public static partial class DetailGenerator
 {
     private static readonly CultureInfo Pt = CultureInfo.GetCultureInfo("pt-BR");
     private static string F(double v, string fmt = "0.00") => v.ToString(fmt, Pt);
@@ -31,7 +31,8 @@ public static class DetailGenerator
     {
         var layers = SignGenerator.Face(p, w, h, 0, legend, glyphs);
         var res = new List<(Polygon2, MarkingColor)>();
-        for (int layer = 0; layer <= 2; layer++)
+        var maxLayer = layers.Count == 0 ? 0 : layers.Max(l => l.Layer);
+        for (int layer = 0; layer <= maxLayer; layer++)
         {
             var mine = layers.Where(l => l.Layer == layer).ToList();
             var above = layers.Where(l => l.Layer > layer).Select(l => l.Shape).ToList();
@@ -77,7 +78,7 @@ public static class DetailGenerator
         }
         if (d.Label)
         {
-            var text = placa.Codigo + (d.ShowName ? "\n" + placa.Nome : "");
+            var text = (string.IsNullOrWhiteSpace(d.Number) ? "" : d.Number + " – ") + placa.Codigo + (d.ShowName ? "\n" + placa.Nome : "");
             if (!string.IsNullOrWhiteSpace(sign.Legend) && sign.Legend != "-" && placa.Codigo.StartsWith("R-19")) text += $" – {sign.Legend} km/h";
             // Texto ao lado do símbolo, do lado oposto ao suporte, para não cruzar a chamada.
             var side = d.OffsetMm.X < -1e-6 ? -1.0 : 1.0;
@@ -146,7 +147,8 @@ public static class DetailGenerator
     private static bool Include(MarkingDefinition d, LegendDefinition lg)
     {
         if (d is IAnnotationDefinition) return false;
-        var physical = d is DeviceMarkingDefinition or UrbanElementDefinition or RampDefinition or TrafficCalmingDefinition;
+        var physical = d is DeviceMarkingDefinition or UrbanElementDefinition or RampDefinition or TrafficCalmingDefinition
+            or CurbExtensionDefinition or SidewalkAreaDefinition or PlanterDefinition or CulDeSacDefinition;
         if (d is SignDefinition) return lg.Vertical;
         if (physical) return lg.Physical;
         if (d is LinearMarkingDefinition l && l.Code is "CALCADA" or "GRAMADO" or "SARJETA" or "SARJETAO" || d is LinearMarkingDefinition l2 && l2.Code.StartsWith("MEIO-FIO"))
@@ -272,6 +274,15 @@ public static class DetailGenerator
                 return MarkingBuilder.Build(rp, new Polyline2(new[] { Vec2.Zero, new Vec2(0, 1) }), local);
             case TrafficCalmingDefinition tc:
                 return MarkingBuilder.Build(tc, new Polyline2(new[] { Vec2.Zero, new Vec2(0, 4) }), local);
+            case CurbExtensionDefinition ce:
+                return MarkingBuilder.Build(ce, Straight(12), local);
+            case SidewalkAreaDefinition sa:
+                return MarkingBuilder.Build(sa, new Polyline2(new[] { Vec2.Zero, new Vec2(8, 0), new Vec2(8, 5), new Vec2(0, 5) }, true), local);
+            case PlanterDefinition pl:
+                pl.Offset = 0;
+                return MarkingBuilder.Build(pl, Straight(12), local);
+            case CulDeSacDefinition cd:
+                return MarkingBuilder.Build(cd, new Polyline2(new[] { Vec2.Zero, new Vec2(0, 18) }), local);
             default:
                 return new MarkingGeometry();
         }
@@ -300,7 +311,7 @@ public static class DetailGenerator
                 target.Pieces.Add(new MarkingPiece(u, group.Key));
     }
 
-    private static (Vec2 Min, Vec2 Max) Bounds(IEnumerable<Polygon2> polys)
+    internal static (Vec2 Min, Vec2 Max) Bounds(IEnumerable<Polygon2> polys)
     {
         double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
         foreach (var p in polys)

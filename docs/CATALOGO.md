@@ -118,10 +118,44 @@ transversal; a `espessura` é a altura do elemento.
   "orla": 0.10, "legenda": "40", "corLegenda": "Preta", "tamanhos": [0.40, 0.50, 0.75] }
 ```
 
-`forma`: `Circulo`, `Octogono`, `TrianguloInvertido`, `Losango`, `Retangulo`, `Quadrado`.
+`forma`: `Circulo`, `Octogono`, `TrianguloInvertido`, `Losango`, `Retangulo`, `Quadrado`, `CruzSantoAndre`.
 `categoria`: `Regulamentacao`, `Advertencia`, `Indicacao`, `Educativa`, `Servicos`, `Turistica`, `Obras`.
-`orla` é a largura da borda em fração da largura. Os pictogramas internos não são desenhados – apenas
-forma, cores e legenda de texto; o código aparece nos parâmetros e nas tabelas.
+`orla` é a largura da borda em fração da largura.
+
+### Pictogramas
+
+`pictograma` é uma lista de elementos desenhados, em ordem (cada um fica por cima do anterior), em
+coordenadas da **área útil** da placa: −0,5 a 0,5, Y para cima. `proibicao: true` acrescenta a tarja
+diagonal vermelha por cima de tudo.
+
+```json
+"pictograma": [
+  { "tipo": "seta", "pts": [[0.12, -0.42], [0.12, 0.02], [-0.42, 0.22]], "w": 0.09, "cabeca": 2.8 },
+  { "tipo": "silhueta", "nome": "caminhao", "c": [0, 0.04], "k": 0.85 },
+  { "tipo": "texto", "c": [0, 0], "texto": "3,0 m", "h": 0.3, "w": 0.84, "editavel": true },
+  { "tipo": "retangulo", "pts": [[-0.4, -0.1], [0.4, 0.1]], "cor": "Branca" }
+],
+"proibicao": true
+```
+
+| Tipo | Campos |
+|---|---|
+| `linha` | `pts`, `w` (espessura) |
+| `seta` | `pts` (eixo), `w`, `cabeca` (ponta = w × cabeca), `dupla` |
+| `poligono` | `pts` |
+| `retangulo` | `pts` = [canto, canto oposto] |
+| `circulo` / `anel` | `c`, `r` (e `w` no anel) |
+| `texto` | `c` (centro), `texto`, `h` (altura), `w` (largura máxima), `editavel` (usa a legenda da placa) |
+| `silhueta` | `nome`, `c`, `k` (escala), `rot` (graus), `espelhar` |
+
+Todos aceitam `cor` (padrão: `corLegenda`) e `vazado` (pinta com a cor de fundo). Silhuetas
+disponíveis: `carro`, `carroTopo`, `caminhao`, `onibus`, `moto`, `bicicleta`, `pedestre`, `crianca`,
+`criancas`, `trator`, `animal`, `cervo`, `carroca`, `trem`, `bonde`, `aviao`, `cadeirante`,
+`trabalhador`, `carrodemao`, `cruz`, `bomba`, `talheres`, `cama`, `telefone`, `chave`, `pneu`, `taxi`,
+`informacao`, `buzina`, `corrente`, `vento`, `pedras`, `cascalho`, `arvore`, `barco`, `policia`,
+`banheiro`.
+
+A série padrão é gerada pelo script `tools/gerar_placas.py` (Python 3), que pode ser adaptado.
 
 ## `mobiliario` – elementos urbanísticos
 

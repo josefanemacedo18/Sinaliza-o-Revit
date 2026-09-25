@@ -45,6 +45,16 @@ public static class RibbonBuilder
         Large(mod, typeof(CmdModeracao), "Quebra-mola\ne Lombadas", "quebramola",
             "Ondulações transversais tipo A e B, faixa elevada para travessia e lombada invertida, com volume 3D e pintura.");
 
+        var calc = app.CreateRibbonPanel(TabName, "Calçadas");
+        Large(calc, typeof(CmdOrelha), "Orelha de\nCalçada", "orelha",
+            "Avanço de calçada sobre a faixa de estacionamento, com transições curvas ou em chanfro, meio-fio, canteiro e árvores – recorta vagas e linhas da pista.");
+        Large(calc, typeof(CmdAreaCalcada), "Área de\nCalçada", "areacalcada",
+            "Contorno livre (esquinas, avanços, ilhas, parklets, ciclovia no nível da calçada, faixa de serviço) com meio-fio e cantos arredondados.");
+        Large(calc, typeof(CmdCanteiro), "Canteiros", "canteiro",
+            "Canteiros gramados, jardineiras elevadas e grelhas de árvore distribuídos na faixa de serviço, com árvores – recortam a calçada.");
+        Large(calc, typeof(CmdCulDeSac), "Cul-de-sac", "culdesac",
+            "Balão de retorno circular, excêntrico, em gota, em T, Y ou L, com pavimento, meio-fio, calçada, ilha central e linha de bordo.");
+
         var urb = app.CreateRibbonPanel(TabName, "Urbanismo");
         Large(urb, typeof(CmdRampa), "Rampas", "rampa",
             "Rebaixamentos de calçada (NBR 9050) com abas e piso tátil, e guias rebaixadas de veículos – recortam a calçada automaticamente.");
@@ -80,14 +90,23 @@ public static class RibbonBuilder
             "Chamada com texto automático para qualquer sinalização (código, nome, largura, padrão, espaçamento, dimensões) – atualizada quando a marca é editada.");
         Large(det, typeof(CmdQuadroLegenda), "Quadro de\nLegenda", "quadrolegenda",
             "Quadro de legenda com amostra desenhada e descrição de cada tipo de sinalização usado no projeto.");
-        Large(det, typeof(CmdEixos), "Mostrar/Ocultar\nEixos", "eixos",
-            "Mostra ou oculta na vista ativa as linhas 'SV - Eixo de sinalização' usadas como caminho das marcas.");
+        Large(det, typeof(CmdCotarSecao), "Cotar\nSeção", "cotasecao",
+            "Cadeia de cotas automática atravessando a via: larguras de faixas (eixo a eixo das linhas), canteiros, meios-fios e calçadas, com cota total – atualizada quando a sinalização muda.");
+        Large(det, typeof(CmdDetalheTipico), "Detalhe\nTípico", "detalhetipico",
+            "Detalhe ampliado e cotado de uma marca: traço/espaço e larguras das linhas, zebrados, vagas e placa em elevação (altura livre, dimensões, suporte).");
+        Stack(det,
+            Data(typeof(CmdQuadroQuantitativos), "Quadro de Quantitativos", "quadroqtd", "Tabela de quantidades por categoria desenhada na prancha (m², m, un), atualizada automaticamente."),
+            Data(typeof(CmdQuadroPlacas), "Quadro de Placas", "quadroplacas", "Símbolo, numeração, código, descrição, dimensões e quantidade de cada placa do projeto."),
+            Data(typeof(CmdNotas), "Notas Gerais", "notas", "Bloco de notas numeradas do projeto (texto padrão editável)."));
+        Stack(det,
+            Data(typeof(CmdNorte), "Norte", "norte", "Indicação de norte."),
+            Data(typeof(CmdEixos), "Mostrar/Ocultar Eixos", "eixos", "Mostra ou oculta na vista ativa as linhas 'SV - Eixo de sinalização' usadas como caminho das marcas."),
+            Data(typeof(CmdAlternar2D3D), "Alternar 2D/3D", "alternar", "Converte as marcas selecionadas entre modelo 3D e detalhe 2D (vista ativa)."));
 
         var edit = app.CreateRibbonPanel(TabName, "Editar");
         Large(edit, typeof(CmdEditar), "Editar", "editar", "Edita os parâmetros de uma marca existente e a regenera.");
-        Stack(edit,
+        StackTwo(edit,
             Data(typeof(CmdAtualizarTodas), "Atualizar Todas", "atualizar", "Regenera todas as marcas do projeto (após mudar o catálogo ou as superfícies)."),
-            Data(typeof(CmdAlternar2D3D), "Alternar 2D/3D", "alternar", "Converte as marcas selecionadas entre modelo 3D e detalhe 2D (vista ativa)."),
             Data(typeof(CmdSelecionarConjunto), "Selecionar Conjunto", "selecionar", "Seleciona todos os elementos da mesma marca ou do mesmo grupo (ex.: toda a via)."));
 
         var rep = app.CreateRibbonPanel(TabName, "Relatórios");
@@ -117,4 +136,7 @@ public static class RibbonBuilder
 
     private static void Stack(RibbonPanel panel, PushButtonData a, PushButtonData b, PushButtonData c) =>
         panel.AddStackedItems(a, b, c);
+
+    private static void StackTwo(RibbonPanel panel, PushButtonData a, PushButtonData b) =>
+        panel.AddStackedItems(a, b);
 }

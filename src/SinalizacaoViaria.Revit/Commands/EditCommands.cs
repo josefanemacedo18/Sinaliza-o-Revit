@@ -56,6 +56,17 @@ public sealed class CmdEditar : CommandBase
     {
         var stored = MarkingPicker.PickOne(uidoc, "Selecione a marca a editar");
         if (stored == null) return Result.Cancelled;
+        if ((SidewalkForms.ForEdit(stored.Definition) ?? DetailForms.ForEdit(uidoc, stored.Definition)) is { } form)
+        {
+            if (UiHelpers.ShowModal(form.Window) != true) return Result.Cancelled;
+            var def = form.Working;
+            def.Id = stored.MarkingId;
+            EnsureDetailView(uidoc, def.Output, keepExistingView: true);
+            var r = MarkingCreator.Commit(uidoc, new[] { def }, $"SV - Editar {def.DisplayCode}");
+            FootprintCutter.ApplyFor(uidoc, def);
+            Report("Edição", r);
+            return Result.Succeeded;
+        }
         MarkingDefinition? edited = stored.Definition switch
         {
             LinearMarkingDefinition l => Show(new LinearWindow("Editar marca linear", Enum.GetValues<GrupoMarca>(), l), w => w.Result),

@@ -29,6 +29,9 @@ public partial class SignDetailWindow : Window
     private readonly bool _loading;
 
     public SignPlanDetailDefinition? Result { get; private set; }
+    public bool Numbering => CkNumber.IsChecked == true;
+    public string NumberPrefix => TbPrefix.Text.Trim();
+    public int NumberStart => (int)Math.Max(0, UiHelpers.ParseOpt(TbStart.Text) ?? 1);
     public Scope SelectedScope => (CbScope.SelectedItem as Option<Scope>)?.Value ?? Scope.NaVista;
 
     /// <param name="sample">Placa usada na pré-visualização.</param>
@@ -55,6 +58,9 @@ public partial class SignDetailWindow : Window
             CbScope.Visibility = Visibility.Collapsed;
             LbScope.Visibility = Visibility.Collapsed;
             Title = "Editar detalhe de placa";
+            GbNumbering.Visibility = Visibility.Collapsed;
+            GrNumber.Visibility = Visibility.Visible;
+            TbNumber.Text = existing.Number ?? "";
             BtnOk.Content = "Aplicar";
         }
         foreach (var d in Directions) CbDirection.Items.Add(new Option<Vec2>(d.Label, d.Dir));
@@ -78,6 +84,8 @@ public partial class SignDetailWindow : Window
         UpdatePreview();
     }
 
+    private int NumberStartPreview => (int)Math.Max(0, UiHelpers.ParseOpt(TbStart?.Text) ?? 1);
+
     private void AnyChanged(object sender, RoutedEventArgs e) => UpdatePreview();
 
     private SignPlanDetailDefinition BuildDefinition()
@@ -91,6 +99,8 @@ public partial class SignDetailWindow : Window
         d.Leader = CkLeader.IsChecked == true;
         d.Label = CkLabel.IsChecked == true;
         d.ShowName = CkName.IsChecked == true;
+        if (_existing != null) d.Number = string.IsNullOrWhiteSpace(TbNumber.Text) ? null : TbNumber.Text.Trim();
+        else if (CkNumber.IsChecked == true) d.Number = $"{TbPrefix.Text.Trim()}{NumberStartPreview:00}";
         return d;
     }
 

@@ -83,11 +83,17 @@ public partial class SignWindow : Window
     {
         var sel = Plate;
         var cat = (CbCategory.SelectedItem as Option<CategoriaPlaca?>)?.Value;
+        var q = TbSearch?.Text?.Trim() ?? "";
         LbTypes.Items.Clear();
-        foreach (var p in _cat.Placas.Where(p => cat == null || p.Categoria == cat)) LbTypes.Items.Add(p);
+        foreach (var p in _cat.Placas.Where(p => (cat == null || p.Categoria == cat) && (q.Length == 0
+                     || p.Codigo.Contains(q, StringComparison.OrdinalIgnoreCase) || p.Nome.Contains(q, StringComparison.OrdinalIgnoreCase)
+                     || p.Descricao.Contains(q, StringComparison.OrdinalIgnoreCase))))
+            LbTypes.Items.Add(p);
         if (sel != null && LbTypes.Items.Contains(sel)) LbTypes.SelectedItem = sel;
         else if (LbTypes.Items.Count > 0) LbTypes.SelectedIndex = 0;
     }
+
+    private void SearchChanged(object sender, TextChangedEventArgs e) => CategoryChanged(sender, null!);
 
     private void TypeChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -102,7 +108,7 @@ public partial class SignWindow : Window
         foreach (var t in p.Tamanhos.DefaultIfEmpty(p.Largura)) CbSize.Items.Add(UiHelpers.F(t, "0.###"));
         CbSize.Text = UiHelpers.F(p.Largura, "0.###");
         TbHeight.Text = UiHelpers.F(p.Altura, "0.###");
-        TbHeight.IsEnabled = p.Forma == FormaPlaca.Retangulo;
+        TbHeight.IsEnabled = p.Forma is FormaPlaca.Retangulo or FormaPlaca.CruzSantoAndre;
         TbLegend.Text = "";
         _loading = was;
         UpdatePreview();
