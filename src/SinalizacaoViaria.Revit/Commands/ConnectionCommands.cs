@@ -54,6 +54,17 @@ public sealed class CmdConexao : CommandBase
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
         var doc = uidoc.Document;
+        // Uma só ferramenta: tratar a conexão clicada ou todas as interseções do projeto.
+        var scope = PluginContext.Settings.Get("conexao:escopo") != "todas";
+        var w0 = new FormWindow("Conexões", "Conexões do sistema viário",
+                "Interseção, rotatória ou cul-de-sac. As vias já se conectam sozinhas ao puxar a ponta do eixo até outra via – " +
+                "use esta ferramenta para trocar o tipo de uma conexão ou ajustar todas as interseções de uma vez.",
+                null, null, false, "Continuar", 600, 300)
+            .Choice("Aplicar em", new[] { ("Uma conexão (clicar no encontro de vias, rotatória ou ponta de via)", true), ("Todas as interseções do projeto", false) },
+                () => scope, v => scope = v);
+        if (UiHelpers.ShowModal(w0) != true) return Result.Cancelled;
+        PluginContext.Settings.Set("conexao:escopo", scope ? "uma" : "todas");
+        if (!scope) return CmdIntersecao.RunTool(uidoc, true);
         var pick = Picking.PickPoint(uidoc, "Clique no encontro de vias, na rotatória ou na ponta livre de uma via");
         if (pick == null) return Result.Cancelled;
         var svc0 = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));

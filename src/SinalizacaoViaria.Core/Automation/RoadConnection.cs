@@ -1,3 +1,4 @@
+using SinalizacaoViaria.Core.Catalog;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
@@ -297,5 +298,79 @@ public static class RoadConnection
             if (d <= reach && d < bestD) { bestD = d; best = p; }
         }
         return best;
+    }
+
+    /// <summary>
+    /// Montagem da via passo a passo: posição de um elemento colocado junto ao bordo da pista (lado esquerdo = +).
+    /// Meio-fio, calçada e grama são empilhados para fora a partir do que já existe; sarjeta e linhas pintadas ficam
+    /// dentro da pista, junto ao bordo. Atualiza a seção registrada no pavimento (larguras de calçada / sarjetas) para
+    /// que as interseções refaçam também esses elementos.
+    /// </summary>
+    public static double PlaceAtEdge(RoadPavementDefinition pav, bool left, LinearMarkingDefinition line, Catalogo cat)
+    {
+        var w = RoadSectionInference.Width(line, cat);
+        var side = left ? 1 : -1;
+        var edge = left ? pav.LeftWidth : pav.RightWidth;
+        double offset;
+        if (line.Code is "SARJETA" or "SARJETAO")
+        {
+            // Sarjetas já existentes neste bordo empurram a nova para dentro.
+            var inner = pav.Gaps.Where(g => !g.Median && Math.Sign(g.Offset) == side).Select(g => Math.Abs(g.Offset) - g.Width / 2).DefaultIfEmpty(edge).Min();
+            offset = side * (inner - w / 2);
+            pav.Gaps.Add(new PavementGap(offset, w, Median: false));
+        }
+        else if (RoadSectionInference.IsPhysical(line.Code))
+        {
+            var walk = left ? pav.LeftSidewalk : pav.RightSidewalk;
+            offset = side * (edge + walk + w / 2);
+            if (left) pav.LeftSidewalk = walk + w; else pav.RightSidewalk = walk + w;
+            if (line.Code.StartsWith("MEIO-FIO") && walk < 0.01) pav.CurbWidth = w;
+        }
+        else
+        {
+            var gutter = pav.Gaps.Where(g => !g.Median && Math.Sign(g.Offset) == side).Select(g => Math.Abs(g.Offset) - g.Width / 2).DefaultIfEmpty(edge).Min();
+            offset = side * (gutter - 0.10 - w / 2);
+        }
+        line.Offset = offset;
+        line.Alignment = null;
+        line.GroupId = pav.GroupId;
+        line.Hierarchy = pav.Hierarchy;
+        line.SetPath(CopyPath(pav.PathRef));
+        return offset;
+    }
+
+    public static PathReference CopyPath(PathReference p) => new()
+    {
+        ElementIds = new List<string>(p.ElementIds),
+        Points = new List<Vec2>(p.Points),
+        Z = p.Z,
+        Closed = p.Closed,
+    };
+
+    /// <summary>Pista simples (só o pavimento) – o ponto de partida para montar a via elemento por elemento.</summary>
+    public static List<MarkingDefinition> BuildCarriageway(RoadPavementDefinition template, PathReference path, OutputSettings output,
+        string? centerLine, bool edgeLines, double speed)
+    {
+        var groupId = Guid.NewGuid().ToString("N");
+        var pav = (RoadPavementDefinition)template.CloneWithNewId();
+        pav.GroupId = groupId;
+        pav.Output = output.Clone();
+        pav.RightSidewalk = 0;
+        pav.LeftSidewalk = 0;
+        pav.Gaps.Clear();
+        pav.Exclusions.Clear();
+        pav.SetPath(CopyPath(path));
+        var res = new List<MarkingDefinition> { pav };
+        LinearMarkingDefinition Line(string code, double offset) => new()
+        {
+            Code = code, Speed = speed, Offset = offset, PathRef = CopyPath(path), GroupId = groupId, Output = output.Clone(), Hierarchy = pav.Hierarchy,
+        };
+        if (!string.IsNullOrEmpty(centerLine) && pav.TwoWay) res.Add(Line(centerLine, 0));
+        if (edgeLines)
+        {
+            res.Add(Line("LBO", pav.LeftWidth - 0.10 - 0.05));
+            res.Add(Line("LBO", -(pav.RightWidth - 0.10 - 0.05)));
+        }
+        return res;
     }
 }

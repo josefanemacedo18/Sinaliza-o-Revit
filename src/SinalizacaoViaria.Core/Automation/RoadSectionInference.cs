@@ -30,7 +30,7 @@ public static class RoadSectionInference
         return lin.Select(l => PathKey(l.Path)).Distinct().Count() == 1;
     }
 
-    private static double Width(LinearMarkingDefinition l, Catalogo cat)
+    public static double Width(LinearMarkingDefinition l, Catalogo cat)
     {
         if (l.WidthOverride is > 0) return l.WidthOverride.Value;
         var t = cat.Linear(l.Code);

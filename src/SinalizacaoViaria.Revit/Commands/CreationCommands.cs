@@ -29,49 +29,17 @@ public class CmdSinalizarVia : CommandBase
         EnsureDetailView(uidoc, w.OutputSettings);
         if (w.PickSurfaces && MarkingCreator.PickSurfaces(uidoc) is { } s) w.OutputSettings.SurfaceIds = s;
 
-        PathReference path;
         var snapped = new List<string>();
-        if (w.DrawPath)
-        {
-            var svc = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
-            var existing = w.Snap ? svc.Roads() : new List<IntersectionRoad>();
-            var rbs = w.Snap ? MarkingStorage.Definitions(doc).OfType<RoundaboutDefinition>().Select(r => (r.Center, r.OuterRadius)).ToList() : new();
-            (XYZ, string?) Snap(XYZ p)
-            {
-                if (!w.Snap) return (p, null);
-                var sn = RoadConnection.SnapPoint(UnitConv.ToVec2(p), existing, 4.0, rbs);
-                return sn.Kind == TipoEncaixe.Livre ? (p, null) : (new XYZ(UnitConv.Ft(sn.Point.X), UnitConv.Ft(sn.Point.Y), p.Z), sn.Describe);
-            }
-            var picked = Picking.PickRoadAxis(uidoc, Snap);
-            if (picked == null) return Result.Cancelled;
-            var (pts, info) = picked.Value;
-            snapped.AddRange(info.Where(i => i != null)!);
-            var pieces = RoadConnection.Fillet(pts.Select(UnitConv.ToVec2).ToList(), w.CurveRadius);
-            List<ElementId> ids;
-            using (var t = new Transaction(doc, "SV - Eixo da via"))
-            {
-                t.Start();
-                ids = Picking.CreateAxis(doc, uidoc.ActiveView, pieces, pts[0].Z);
-                t.Commit();
-            }
-            path = PathReference.FromElements(ids.Select(id => doc.GetElement(id).UniqueId));
-        }
-        else
-        {
-            var curves = Picking.PickCurves(uidoc, "Selecione as linhas do EIXO da via (no sentido de referência) e clique em Concluir");
-            if (curves == null) return Result.Cancelled;
-            path = PathReference.FromElements(curves.Select(c => c.UniqueId));
-        }
+        var path = RoadAxisInput.Get(uidoc, w.DrawPath, w.Snap, w.CurveRadius, snapped);
+        if (path == null) return Result.Cancelled;
 
         var defs = w.BuildDefinitions(path);
         var results = MarkingCreator.Commit(uidoc, defs, "SV - Sinalizar via");
         if (w.Setup.Warnings.Count > 0 && results.Count > 0) results[0].Warnings.InsertRange(0, w.Setup.Warnings);
         if (defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav && (w.AutoIntersect || w.FreeEnds != Core.Automation.FimLivre.Nenhum))
         {
-            var template = UiHelpers.Remembered<IntersectionDefinition>("Intersecao") ?? new IntersectionDefinition();
+            var template = IntersectionService.AutoTemplate(w.IntersectionCrosswalks);
             template.CornerRadius = w.CornerRadius ?? template.CornerRadius;
-            template.Crosswalks = w.IntersectionCrosswalks;
-            template.StopLines = w.IntersectionCrosswalks;
             template.Ramps = w.IntersectionRamps && w.IntersectionCrosswalks;
             template.Output = w.OutputSettings.Clone();
             var rb = UiHelpers.Remembered<RoundaboutDefinition>("Rotatoria") ?? new RoundaboutDefinition();
@@ -96,6 +64,127 @@ public class CmdSinalizarVia : CommandBase
     }
 }
 
+/// <summary>Obtém o eixo de uma via: desenhado por pontos (com encaixe e curvas) ou linhas selecionadas.</summary>
+internal static class RoadAxisInput
+{
+    public static PathReference? Get(UIDocument uidoc, bool draw, bool snap, double curveRadius, List<string> snapped)
+    {
+        var doc = uidoc.Document;
+        if (!draw)
+        {
+            var curves = Picking.PickCurves(uidoc, "Selecione as linhas do EIXO da via (no sentido de referência) e clique em Concluir");
+            if (curves == null) return null;
+            // As linhas escolhidas passam a usar o estilo de eixo (identificação visual).
+            using (var t = new Transaction(doc, "SV - Estilo de eixo"))
+            {
+                t.Start();
+                var styles = new StyleService(doc);
+                foreach (var c in curves) try { c.LineStyle = styles.AxisLineStyle(); } catch { /* opcional */ }
+                t.Commit();
+            }
+            return PathReference.FromElements(curves.Select(c => c.UniqueId));
+        }
+        var svc = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
+        var existing = snap ? svc.Roads() : new List<IntersectionRoad>();
+        var rbs = snap ? MarkingStorage.Definitions(doc).OfType<RoundaboutDefinition>().Select(r => (r.Center, r.OuterRadius)).ToList() : new();
+        (XYZ, string?) Snap(XYZ p)
+        {
+            if (!snap) return (p, null);
+            var sn = RoadConnection.SnapPoint(UnitConv.ToVec2(p), existing, 4.0, rbs);
+            return sn.Kind == TipoEncaixe.Livre ? (p, null) : (new XYZ(UnitConv.Ft(sn.Point.X), UnitConv.Ft(sn.Point.Y), p.Z), sn.Describe);
+        }
+        var picked = Picking.PickRoadAxis(uidoc, Snap);
+        if (picked == null) return null;
+        var (pts, info) = picked.Value;
+        snapped.AddRange(info.Where(i => i != null)!);
+        var pieces = RoadConnection.Fillet(pts.Select(UnitConv.ToVec2).ToList(), curveRadius);
+        List<ElementId> ids;
+        using (var t = new Transaction(doc, "SV - Eixo da via"))
+        {
+            t.Start();
+            ids = Picking.CreateAxis(doc, uidoc.ActiveView, pieces, pts[0].Z);
+            t.Commit();
+        }
+        return PathReference.FromElements(ids.Select(id => doc.GetElement(id).UniqueId));
+    }
+}
+
+/// <summary>
+/// Pista: só a parte dos veículos (asfalto, bloquete ou concreto), já conectada às vias existentes. Depois a via é
+/// montada passo a passo com Meio-fio / Calçada / Sarjeta no modo "Junto ao bordo de uma via".
+/// </summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdPista : CommandBase
+{
+    protected override Result Run(UIApplication app, UIDocument uidoc)
+    {
+        var st = PluginContext.Settings;
+        var d = UiHelpers.Remembered<RoadPavementDefinition>("Pista") ?? new RoadPavementDefinition { Hierarchy = HierarquiaViaria.Local, Output = st.NewOutput() };
+        var h = d.Hierarchy ?? HierarquiaViaria.Local;
+        var center = st.Get("pista:eixo") ?? "LFO-2";
+        var edges = st.Get("pista:bordos") == "1";
+        var draw = st.LastDrawRoad;
+        var snap = true;
+        var radius = st.LastCurveRadius;
+        var connect = st.Get("pista:conectar") != "0";
+        var crosswalks = st.AutoCrosswalks;
+        var w = new FormWindow("Pista", "Pista (parte dos veículos)",
+                "Cria só o pavimento da pista, já ligado às vias existentes. Depois monte a via elemento por elemento com " +
+                "Meio-fio e Sarjeta / Calçadas no modo \"Junto ao bordo de uma via\" – eles passam a fazer parte da via e das conexões.",
+                d, () =>
+                {
+                    var c = (RoadPavementDefinition)MarkingDefinition.FromJson(d.ToJson())!;
+                    c.Hierarchy = h;
+                    var axis = new Core.Geometry.Polyline2(new[] { new Core.Geometry.Vec2(0, 0), new Core.Geometry.Vec2(40, 0) });
+                    var ctx = new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs };
+                    var geo = new Core.Model.MarkingGeometry();
+                    foreach (var m in RoadConnection.BuildCarriageway(c, PathReference.FromPoints(axis.Points, 0), new OutputSettings(), center == "-" ? null : center, edges, Hierarquia.DefaultSpeed(h)))
+                        geo.Merge(MarkingBuilder.Build(m, axis, ctx));
+                    return new FormPreview(geo, null, new[] { axis.Points }, $"Largura da pista: {UiHelpers.F(c.LeftWidth + c.RightWidth)} m");
+                }, true, "Criar", 1000, 700)
+            .Choice("Hierarquia viária (CTB art. 60)", Hierarquia.Definidas.Select(x => (Hierarquia.Label(x), x)), () => h, v => h = v)
+            .Choice("Pavimento", new[] { ("Asfalto (CBUQ)", TipoPavimento.Asfalto), ("Bloquete / intertravado", TipoPavimento.Bloquete), ("Concreto", TipoPavimento.Concreto) },
+                () => d.Material, v => d.Material = v)
+            .Number("Largura à direita do eixo (m)", () => d.RightWidth, v => d.RightWidth = v, 1, 30)
+            .Number("Largura à esquerda do eixo (m)", () => d.LeftWidth, v => d.LeftWidth = v, 0, 30)
+            .Check("Mão dupla", () => d.TwoWay, v => d.TwoWay = v)
+            .Choice("Linha de eixo", new[] { ("LFO-2 – seccionada", "LFO-2"), ("LFO-1 – contínua", "LFO-1"), ("LFO-3 – dupla contínua", "LFO-3"), ("Sem linha", "-") },
+                () => center, v => center = v)
+            .Check("Linhas de bordo (LBO)", () => edges, v => edges = v)
+            .Section("Caminho e conexões")
+            .Choice("Eixo", new[] { ("Desenhar por pontos (encaixa nas vias existentes)", true), ("Selecionar linhas existentes", false) }, () => draw, v => draw = v)
+            .Number("Raio das curvas ao desenhar (m)", () => radius, v => radius = v, 0, 5000)
+            .Check("Conectar às vias existentes (interseção simples)", () => connect, v => connect = v)
+            .Check("Faixas de pedestres nas interseções", () => crosswalks, v => crosswalks = v);
+        if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
+        d.Hierarchy = h;
+        UiHelpers.Remember("Pista", d);
+        st.Set("pista:eixo", center);
+        st.Set("pista:bordos", edges ? "1" : "0");
+        st.Set("pista:conectar", connect ? "1" : "0");
+        st.LastDrawRoad = draw;
+        st.LastCurveRadius = radius;
+        PluginContext.SaveSettings();
+        var output = d.Output;
+        EnsureDetailView(uidoc, output);
+
+        var snapped = new List<string>();
+        var path = RoadAxisInput.Get(uidoc, draw, snap, radius, snapped);
+        if (path == null) return Result.Cancelled;
+        var defs = RoadConnection.BuildCarriageway(d, path, output, center == "-" ? null : center, edges, Hierarquia.DefaultSpeed(h));
+        var results = MarkingCreator.Commit(uidoc, defs, "SV - Pista");
+        if (connect && defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav)
+        {
+            var template = IntersectionService.AutoTemplate(crosswalks);
+            results.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões da pista", sv =>
+                sv.Connect(pav, TipoConexao.Intersecao, FimLivre.Nenhum, template, new RoundaboutDefinition(), new CulDeSacDefinition(), radiusByHierarchy: true))
+                .Where(r => r.Warnings.Count > 0));
+        }
+        Report("Pista", results.Where(r => r.Warnings.Count > 0).ToList());
+        return Result.Succeeded;
+    }
+}
+
 /// <summary>Nova via desenhada por pontos, conectada naturalmente às vias existentes.</summary>
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdNovaVia : CmdSinalizarVia
@@ -103,18 +192,57 @@ public sealed class CmdNovaVia : CmdSinalizarVia
     protected override bool DrawByDefault => true;
 }
 
-/// <summary>Desenha um eixo/caminho de referência por pontos.</summary>
+/// <summary>
+/// Desenha eixos/caminhos: com a ferramenta nativa "Linha de modelo" do Revit (reta, arco, spline, cadeia, deslocamento,
+/// retângulo... com todos os snaps) ou por pontos com encaixe nas vias existentes e curvas concordadas.
+/// </summary>
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdDesenharEixo : CommandBase
 {
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
-        var pl = Picking.PickPolyline(uidoc, "Desenhar eixo", false, keepAsModelLines: true);
-        if (pl == null) return Result.Cancelled;
-        uidoc.Selection.SetElementIds(pl.Value.Lines);
-        TaskDialog.Show(AppTitle, $"Eixo criado com {pl.Value.Lines.Count} segmento(s) no estilo \"{StyleService.AxisLineStyleName}\".\n" +
-                                  "Use-o como caminho das marcas; editar o eixo atualiza a sinalização automaticamente.\n" +
-                                  "Dica: arcos e splines podem ser desenhados com a ferramenta Linha de modelo do Revit.");
+        var doc = uidoc.Document;
+        var st = PluginContext.Settings;
+        var native = st.Get("eixo:modo") != "pontos";
+        var radius = st.LastCurveRadius;
+        var w = new FormWindow("Desenhar eixo", "Desenhar eixo / caminho",
+                "Os eixos são linhas de modelo comuns: selecione-os depois no Sinalizar Via, na Pista ou em qualquer ferramenta. " +
+                "Editar o eixo (alças, Mover, Deslocar) atualiza a sinalização e as conexões automaticamente.",
+                null, null, false, "Desenhar", 620, 320)
+            .Choice("Forma de desenho", new[]
+                {
+                    ("Ferramenta nativa do Revit – reta, arco, spline, cadeia, deslocamento e snaps", true),
+                    ("Por pontos – encaixa nas vias existentes e concorda as curvas", false),
+                }, () => native, v => native = v)
+            .Number("Raio das curvas (por pontos, m)", () => radius, v => radius = v, 0, 5000);
+        if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
+        st.Set("eixo:modo", native ? "nativo" : "pontos");
+        st.LastCurveRadius = radius;
+        PluginContext.SaveSettings();
+
+        if (native)
+        {
+            // Garante o estilo "SV - Eixo" para ser escolhido na lista de estilos de linha da ferramenta nativa.
+            using (var t = new Transaction(doc, "SV - Estilo de eixo"))
+            {
+                t.Start();
+                new StyleService(doc).AxisLineStyle();
+                t.Commit();
+            }
+            var id = RevitCommandId.LookupPostableCommandId(PostableCommand.ModelLine);
+            if (id == null || !app.CanPostCommand(id))
+            {
+                TaskDialog.Show(AppTitle, "Não foi possível abrir a ferramenta Linha de modelo nesta vista – use uma vista em planta.");
+                return Result.Cancelled;
+            }
+            TaskDialog.Show(AppTitle, "A ferramenta Linha de modelo do Revit será aberta: escolha a forma (reta, arco, spline, cadeia...) e, " +
+                                      $"em Estilo de linha, \"{StyleService.AxisLineStyleName}\" (opcional).\n\nDepois use Sinalizar Via ou Pista → Selecionar linhas existentes.");
+            app.PostCommand(id);
+            return Result.Succeeded;
+        }
+        var path = RoadAxisInput.Get(uidoc, true, true, radius, new List<string>());
+        if (path == null) return Result.Cancelled;
+        uidoc.Selection.SetElementIds(path.ElementIds.Select(u => doc.GetElement(u)?.Id).Where(i => i != null).Cast<ElementId>().ToList());
         return Result.Succeeded;
     }
 }

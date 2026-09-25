@@ -14,6 +14,8 @@ public enum PathMode
     Linhas,
     Desenhar,
     DoisPontos,
+    /// <summary>Junto ao bordo de uma via existente (montagem da via passo a passo).</summary>
+    BordoDaVia,
 }
 
 /// <summary>Janela genérica para marcas lineares (longitudinais, transversais, tachas, piso tátil, ciclovia).</summary>
@@ -60,6 +62,7 @@ public partial class LinearWindow : Window
             RbCurves.IsChecked = defaultMode == PathMode.Linhas;
             RbDraw.IsChecked = defaultMode == PathMode.Desenhar;
             RbTwoPoints.IsChecked = defaultMode == PathMode.DoisPontos;
+            RbRoadEdge.IsChecked = defaultMode == PathMode.BordoDaVia;
             var last = PluginContext.Settings.Get(_settingsKey);
             LbTypes.SelectedItem = _types.FirstOrDefault(t => t.Codigo == last) ?? _types.FirstOrDefault();
         }
@@ -193,7 +196,8 @@ public partial class LinearWindow : Window
         try
         {
             Result = BuildDefinition();
-            PathMode = RbDraw.IsChecked == true ? PathMode.Desenhar : RbTwoPoints.IsChecked == true ? PathMode.DoisPontos : PathMode.Linhas;
+            PathMode = RbDraw.IsChecked == true ? PathMode.Desenhar : RbTwoPoints.IsChecked == true ? PathMode.DoisPontos
+                : RbRoadEdge.IsChecked == true ? PathMode.BordoDaVia : PathMode.Linhas;
             PluginContext.Settings.Set(_settingsKey, Result.Code);
             DialogResult = true;
         }

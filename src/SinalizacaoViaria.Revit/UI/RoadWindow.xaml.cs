@@ -101,6 +101,8 @@ public partial class RoadWindow : Window
         Select(CbConnection, st.LastConnection);
         Select(CbFreeEnds, st.LastFreeEnds);
         TbCurveRadius.Text = UiHelpers.F(st.LastCurveRadius, "0.#");
+        CkIntCrosswalks.IsChecked = st.AutoCrosswalks;
+        CkIntRamps.IsChecked = st.AutoCrosswalks;
 
         var types = Enum.GetValues<TipoElementoSecao>().Select(t => new TypeOption(t, ElementoSecao.Rotulo(t))).ToList();
         ColTypeRight.ItemsSource = types;
@@ -108,8 +110,7 @@ public partial class RoadWindow : Window
         GridRight.ItemsSource = _right;
         GridLeft.ItemsSource = _left;
 
-        foreach (var t in RoadTemplates.All) CbTemplate.Items.Add(t);
-        CbTemplate.SelectedIndex = 0;
+        FillTemplates(null);
 
         CbCenter.Items.Add(new Option<CenterTreatment>("LFO-2 – seccionada (ultrapassagem permitida)", CenterTreatment.LFO2));
         CbCenter.Items.Add(new Option<CenterTreatment>("LFO-1 – contínua simples", CenterTreatment.LFO1));
@@ -150,9 +151,14 @@ public partial class RoadWindow : Window
         _right.CollectionChanged += (_, _) => UpdatePreview();
         _left.CollectionChanged += (_, _) => UpdatePreview();
 
-        LoadSetup(RoadTemplates.All[Math.Min(2, RoadTemplates.All.Count - 1)].Create());
-        CbTemplate.SelectedIndex = Math.Min(2, RoadTemplates.All.Count - 1);
-        TbSpeed.Text = UiHelpers.F(PluginContext.Settings.DefaultSpeed, "0");
+        // Reabre com a última seção usada (ou a avenida, na primeira vez).
+        var last = RoadTemplates.FromJson(PluginContext.Settings.LastRoadSetup);
+        LoadSetup(last ?? RoadTemplates.All[Math.Min(2, RoadTemplates.All.Count - 1)].Create());
+        if (last == null)
+        {
+            CbTemplate.SelectedIndex = Math.Min(2, RoadTemplates.All.Count - 1);
+            TbSpeed.Text = UiHelpers.F(PluginContext.Settings.DefaultSpeed, "0");
+        }
         _loading = false;
         ShowDetails(null);
         UpdatePreview();
@@ -312,6 +318,55 @@ public partial class RoadWindow : Window
         var median = Selected<CenterTreatment>(CbCenter) == CenterTreatment.Canteiro;
         TbMedian.IsEnabled = median;
         CbMedianType.IsEnabled = median;
+    }
+
+    private void FillTemplates(string? select)
+    {
+        CbTemplate.Items.Clear();
+        foreach (var t in PluginContext.Settings.CustomRoadTemplates)
+        {
+            var json = t.Json;
+            CbTemplate.Items.Add(new RoadTemplates.Template("★ " + t.Name, () => RoadTemplates.FromJson(json) ?? new RoadSetup()));
+        }
+        foreach (var t in RoadTemplates.All) CbTemplate.Items.Add(t);
+        CbTemplate.SelectedItem = CbTemplate.Items.Cast<RoadTemplates.Template>().FirstOrDefault(t => t.Name == select) ?? CbTemplate.Items[0];
+    }
+
+    private void SaveTemplateClick(object sender, RoutedEventArgs e)
+    {
+        RoadSetup s;
+        try
+        {
+            GridRight.CommitEdit(DataGridEditingUnit.Row, true);
+            GridLeft.CommitEdit(DataGridEditingUnit.Row, true);
+            s = BuildSetup();
+        }
+        catch (FormatException ex) { UiHelpers.Error(ex.Message); return; }
+        var current = CbTemplate.SelectedItem is RoadTemplates.Template { Name: var n } && n.StartsWith("★ ") ? n[2..] : "";
+        var name = current;
+        var w = new FormWindow("Salvar modelo de via", "Salvar modelo de via",
+                "O modelo guarda toda a seção. Use o mesmo nome para substituir um modelo existente.", null, null, false, "Salvar", 520, 240)
+            .Text("Nome do modelo", () => name, v => name = v?.Trim() ?? "");
+        w.Owner = this;
+        if (w.ShowDialog() != true || string.IsNullOrWhiteSpace(name)) return;
+        var list = PluginContext.Settings.CustomRoadTemplates;
+        list.RemoveAll(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+        list.Insert(0, new Core.Settings.CustomRoadTemplate { Name = name, Json = RoadTemplates.ToJson(s) });
+        PluginContext.SaveSettings();
+        FillTemplates("★ " + name);
+    }
+
+    private void DeleteTemplateClick(object sender, RoutedEventArgs e)
+    {
+        if (CbTemplate.SelectedItem is not RoadTemplates.Template { Name: var n } || !n.StartsWith("★ "))
+        {
+            UiHelpers.Error("Selecione um modelo personalizado (★) para excluir.");
+            return;
+        }
+        if (MessageBox.Show(this, $"Excluir o modelo \"{n[2..]}\"?", "SinalizaBIM", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        PluginContext.Settings.CustomRoadTemplates.RemoveAll(t => t.Name == n[2..]);
+        PluginContext.SaveSettings();
+        FillTemplates(null);
     }
 
     private void ApplyTemplateClick(object sender, RoutedEventArgs e)
@@ -484,6 +539,8 @@ public partial class RoadWindow : Window
             Snap = CkSnap.IsChecked == true;
             CurveRadius = UiHelpers.Parse(TbCurveRadius, 0, "Raio das curvas", 0, 5000);
             var st = PluginContext.Settings;
+            st.LastRoadSetup = RoadTemplates.ToJson(Setup);
+            st.AutoCrosswalks = CkIntCrosswalks.IsChecked == true;
             st.LastConnection = Connection;
             st.LastFreeEnds = FreeEnds;
             st.LastCurveRadius = CurveRadius;

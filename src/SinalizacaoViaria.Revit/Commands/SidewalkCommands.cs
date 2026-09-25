@@ -81,6 +81,11 @@ internal static class FootprintCutter
 /// <summary>Formulários das ferramentas de calçada (criação e edição).</summary>
 internal static class SidewalkForms
 {
+    private static readonly (string, TipoTransicao)[] Kinds =
+    {
+        ("Curvas reversas", TipoTransicao.Curva), ("Chanfro reto", TipoTransicao.Chanfro), ("Reta – acompanha a calçada / travessia", TipoTransicao.Reta),
+    };
+
     private static readonly Polyline2 Straight = new(new[] { Vec2.Zero, new Vec2(12, 0) });
 
     private static MarkingGeometry Build(MarkingDefinition d, Polyline2 path) =>
@@ -125,8 +130,11 @@ internal static class SidewalkForms
             }, okText: edit ? "Aplicar" : "Inserir");
         w.Check("Prévia: orelha de esquina", () => corner, v => corner = v)
          .Number("Avanço sobre a pista (m)", () => d.Depth, v => d.Depth = v, 0.3, 10, tooltip: "Normalmente a largura da faixa de estacionamento (2,00–2,50 m).")
-         .Choice("Transição", new[] { ("Curvas reversas", TipoTransicao.Curva), ("Chanfro reto", TipoTransicao.Chanfro) }, () => d.Transition, v => d.Transition = v)
-         .Number("Raio / comprimento da transição (m)", () => d.Radius, v => d.Radius = v, 0.1, 20)
+         .Choice("Ponta inicial", Kinds, () => d.Transition, v => d.Transition = v,
+             tooltip: "Curva / chanfro: volta ao meio-fio junto ao estacionamento. Reta: ponta perpendicular, acompanhando a calçada ou a travessia.")
+         .Number("Raio / comprimento da ponta inicial (m)", () => d.Radius, v => d.Radius = v, 0.1, 20)
+         .Choice("Ponta final", Kinds, () => d.EndTransition ?? d.Transition, v => d.EndTransition = v)
+         .Number("Raio / comprimento da ponta final (m)", () => d.EndRadius ?? d.Radius, v => d.EndRadius = v, 0.1, 20)
          .Number("Raio mínimo na esquina (m)", () => d.CornerRadius, v => d.CornerRadius = v, 0, 40,
              tooltip: "0 = acompanha a esquina (raio da esquina + avanço). Valores maiores suavizam o meio-fio da orelha.")
          .Number("Altura do meio-fio (m)", () => d.Height, v => d.Height = v, 0.02, 0.5)

@@ -95,6 +95,7 @@
                         <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas existentes (associativo)" IsChecked="True"/>
                         <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar eixo por pontos (cria linhas associativas)"/>
                         <RadioButton x:Name="RbTwoPoints" GroupName="path" Content="Dois cliques (repete até ESC)"/>
+                        <RadioButton x:Name="RbRoadEdge" GroupName="path" Content="Junto ao bordo de uma via (clique ao lado da via; empilha a partir do bordo – faz parte da via e das conexões)"/>
                     </StackPanel>
                 </GroupBox>
                 <ui:OutputPanel x:Name="Output"/>

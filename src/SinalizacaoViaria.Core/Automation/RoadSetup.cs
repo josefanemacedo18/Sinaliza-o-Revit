@@ -3,6 +3,7 @@ using SinalizacaoViaria.Core.Catalog;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Core.Model;
+using SinalizacaoViaria.Core.Serialization;
 
 namespace SinalizacaoViaria.Core.Automation;
 
@@ -573,6 +574,16 @@ public static class RoadTemplates
     }
 
     private const TipoElementoSecao R = TipoElementoSecao.FaixaRolamento;
+
+    /// <summary>Seção em JSON (modelos personalizados).</summary>
+    public static string ToJson(RoadSetup s) => System.Text.Json.JsonSerializer.Serialize(s, JsonConfig.Options);
+
+    public static RoadSetup? FromJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return System.Text.Json.JsonSerializer.Deserialize<RoadSetup>(json, JsonConfig.Options); }
+        catch { return null; }
+    }
 
     public static IReadOnlyList<Template> All { get; } = new List<Template>
     {

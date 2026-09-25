@@ -729,10 +729,28 @@ public static class IntersectionGenerator
         for (int i = 0; i < L.Roads.Count; i++)
         {
             var r = L.Roads[i];
-            var paint = new List<Polygon2>(PolygonOps.Intersect(pav, core0));
-            var parking = new List<Polygon2>(paint);
+            var paint = new List<Polygon2>();
+            var parking = new List<Polygon2>();
+            // Via preferencial que atravessa o nó (sem semáforo): as linhas dela seguem contínuas; só o bordo é
+            // interrompido na boca das outras vias (e as vagas a 5 m dela).
+            var through = i == L.Main && L.Legs.Count >= 3 && L.Legs.Count(l => l.Road == i) >= 2
+                          && d.Control != ControleIntersecao.Semaforo && !L.Features.Any(f => f.Leg.Road == i);
+            if (through)
+            {
+                var mouth = PolygonOps.Difference(PolygonOps.Intersect(pav, core0), own[i]);
+                // Entra na pista o bastante para cortar o bordo (inclusive com acostamento), sem chegar ao eixo.
+                var reachIn = Math.Max(0.8, 0.45 * Math.Min(r.Def.RightWidth, r.Def.LeftWidth));
+                paint.AddRange(PolygonOps.Offset(mouth, reachIn, true));
+                parking.AddRange(PolygonOps.Offset(mouth, 5.0, true));
+            }
+            else
+            {
+                paint.AddRange(PolygonOps.Intersect(pav, core0));
+                parking.AddRange(paint);
+            }
             foreach (var leg in L.Legs.Where(l => l.Road == i))
             {
+                if (through && !d.Crosswalks) continue;
                 var s0 = leg.NodeStation;
                 var s1 = Math.Clamp(leg.StationAt(leg.Clear + stopFar), 0, r.Axis.Length);
                 var s1p = Math.Clamp(leg.StationAt(leg.Clear + stopFar + 5.0), 0, r.Axis.Length);

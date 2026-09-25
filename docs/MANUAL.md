@@ -11,6 +11,18 @@ Convenções usadas em todo o plugin:
 * **Circulação pela direita** (Brasil) para posicionar linhas de retenção.
 * O **sentido do tráfego** de setas e legendas é indicado pelo 2º clique.
 
+### Organização da faixa de opções
+
+| Painel | Ferramentas |
+|---|---|
+| **Vias** | **Via** (Nova Via · Sinalizar Via · Pista · Desenhar Eixo) · **Conexões** (interseções, rotatórias, cul-de-sac – uma ou todas) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Orelha · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · Elementos Urbanos · Mostrar/Ocultar Eixos |
+| **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (tachas · piso tátil · ciclovia · quebra-mola) |
+| **Sinalização Vertical** | **Placas** (placas · detalhar placas · quadro de placas · quadro de legenda) · **Segregação** (bloqueios físicos · guard rail) |
+| **Detalhamento** | **Detalhar** (anotar · cotar seção · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
+| **Editar** | Editar · Atualizar Todas · Selecionar Conjunto · Alternar 2D/3D · Configurações · Catálogo · Normas |
+
+Os botões com seta (▾) agrupam ferramentas afins; o botão mostra a última usada do grupo.
+
 ---
 
 ## 1. Caminhos (eixos) e associatividade
@@ -29,15 +41,25 @@ independente (o plugin avisa).
 > Dica: coloque o estilo *SV - Eixo de sinalização* como invisível nas vistas de prancha
 > (Visibilidade/Gráficos → Linhas) para imprimir apenas a sinalização.
 
-**Desenhar Eixo** cria apenas o eixo por pontos, para uso posterior.
+**Desenhar Eixo** cria apenas o eixo, para uso posterior, de duas formas:
+
+* **Ferramenta nativa do Revit** (*Linha de modelo*): reta, arco, spline, cadeia, deslocamento,
+  retângulo e todos os snaps do Revit. Escolha o estilo *SV - Eixo de sinalização* (opcional) e depois
+  selecione as linhas no Sinalizar Via, na Pista ou em qualquer ferramenta (elas passam a usar o estilo de eixo).
+* **Por pontos**: com encaixe nas vias existentes e curvas concordadas com o raio informado.
+
+Todas as ferramentas que pedem pontos usam os snaps do Revit (pontas, meios, interseções, perpendicular,
+centros, mais próximo).
 
 ---
 
 ## 2. Sinalizar Via – seção transversal completa
 
 1. Escolha um **modelo pronto** (via local, coletora, avenida com canteiro, corredor de ônibus,
-   faixa preferencial, ciclofaixa segregada, canteiros laterais, rodovias, mão única) e clique
-   *Aplicar* – ou monte a seção do zero.
+   faixa preferencial, ciclofaixa segregada, canteiros laterais, rodovias, mão única) ou um **modelo
+   personalizado ★** e clique *Aplicar* – ou monte a seção do zero. **Salvar como modelo…** guarda a seção
+   atual com um nome (use o mesmo nome para substituir); **Excluir modelo** remove um personalizado. A
+   janela reabre sempre com a **última seção usada**.
 2. **Mão dupla** (o eixo divide os sentidos) ou **mão única** (todas as faixas no sentido do eixo).
 3. **Eixo / canteiro central**: LFO-1/2/3/4, sem marca ou canteiro central **físico** (meios-fios +
    grama) ou **pintado** (zebrado amarelo), com dispositivo opcional sobre o eixo (ex.: New Jersey,
@@ -124,7 +146,21 @@ Depois de criada, a via continua ligada: mover ou editar o eixo refaz interseç�
 **rotatória** para escolher *Interseção*, *Rotatória* ou *Sem tratamento*, ou na **ponta livre** de uma via
 para *Cul-de-sac* ou *Sem tratamento*. A geometria e a sinalização das vias são refeitas.
 
-## 2.3 Bloqueios físicos
+## 2.3 Pista – montagem da via passo a passo
+
+**Via ▾ → Pista** cria só a **parte dos veículos** (asfalto, bloquete ou concreto) com a hierarquia, as
+larguras à direita e à esquerda do eixo, mão dupla/única e, opcionalmente, linha de eixo e linhas de
+bordo – já **conectada** às vias existentes (interseção simples). Depois monte o restante elemento por
+elemento com **Calçadas ▾ → Meio-fio, Calçada e Sarjeta** no caminho **Junto ao bordo de uma via**:
+clique ao lado da via, no lado desejado, e o elemento é colocado encostado no bordo:
+
+* **meio-fio, calçada, grama** são empilhados para fora (o 2º elemento vai depois do 1º, e assim por diante);
+* **sarjeta** fica dentro da pista, junto ao bordo; **linhas pintadas** logo depois dela.
+
+Esses elementos passam a fazer parte da via (mesmo grupo) e a seção registrada no pavimento é atualizada –
+as interseções, rotatórias e cul-de-sacs refazem também as calçadas e meios-fios acrescentados.
+
+## 2.4 Bloqueios físicos
 
 Comando **Bloqueios Físicos** (painel *Segregação Física*): escolha o dispositivo, ajuste
 dimensões, espaçamento entre centros (0 = contínuo), deslocamento e recuos, e selecione/desenhe o
@@ -205,6 +241,12 @@ As barras da FTP-1 são sempre inteiras e centralizadas entre os bordos.
 
 Painel **Representação no Revit** (em todas as janelas):
 
+* **Pisos do Revit**: pavimento da pista (asfalto, bloquete, concreto), **calçadas, meios-fios, sarjetas e
+  grama** – das vias, interseções, rotatórias, cul-de-sacs, orelhas, áreas de calçada e canteiros – são
+  criados como **Piso** (tipos *SV - {material} {espessura}*, com o material da sinalização), editáveis com
+  as ferramentas nativas (tipo, material, estrutura). Se você trocar o tipo de um piso, a troca é mantida
+  quando a via é regenerada. Desligue em **Configurações** para voltar à forma direta. A sinalização
+  pintada e os dispositivos continuam como modelo genérico.
 * **Modelo 3D**: sólido fino (Modelos genéricos). A espessura padrão é a do material, com mínimo
   modelável de 3 mm (configurável) – películas de tinta reais são finas demais para sólidos do Revit.
   Os quantitativos usam sempre a **área**, independentemente da espessura.
@@ -359,8 +401,9 @@ em uma vista dedicada.
   do avanço – em linha reta (meio de quadra) ou **contornando a esquina** (selecione as linhas/arco da
   esquina ou desenhe os pontos em volta dela; o meio-fio da orelha acompanha a esquina com raio =
   raio da esquina + avanço, ou com o *raio mínimo na esquina* informado), com a calçada à esquerda do sentido do desenho (ou desmarque a opção). Parâmetros:
-  avanço sobre a pista (largura do estacionamento, ex.: 2,20 m), transição em **curvas reversas**
-  (raio) ou **chanfro**, altura e largura do meio-fio, **canteiro** gramado com margens e árvores.
+  avanço sobre a pista (largura do estacionamento, ex.: 2,20 m), e **cada ponta com sua transição**:
+  **curvas reversas** (raio), **chanfro** ou **reta** – ponta perpendicular que acompanha a calçada / a
+  travessia, como nas orelhas de esquina –, altura e largura do meio-fio, **canteiro** gramado com margens e árvores.
   As vagas e linhas da pista sob a orelha são recortadas automaticamente (e restauradas se a orelha
   for apagada + **Atualizar Todas**). Se o trecho for curto para o raio, o raio é reduzido e um aviso
   é mostrado.
@@ -393,13 +436,19 @@ calçadas), usada pelas interseções e rotatórias – por isso "Nenhum" desati
 
 ## 19. Interseções
 
+> **Conexões automáticas são sempre simples**: esquinas com o raio da hierarquia, **PARE** (linha de
+> retenção, legenda e placa R-1) na via secundária e as **linhas da via principal contínuas** – só o bordo é
+> interrompido na boca da outra via. Faixas de pedestres automáticas são opcionais (Configurações ou janela
+> da via). Ilhas, bolsões, alargamentos e zebrados (tipos II a IV) só são aplicados quando você escolhe a
+> interseção em **Conexões** – nunca nas conexões automáticas.
+
 As interseções são criadas **automaticamente, direto nas linhas (eixos)**: ao criar uma via que **cruza**
 outra (ou que **termina** junto a outra – entroncamento em T) e também ao **desenhar, mover ou editar um
 eixo** já sinalizado, o plugin cria ou ajusta o cruzamento. Quando as vias deixam de se cruzar, a
 interseção é removida e a sinalização volta a ser contínua. O comportamento pode ser desligado em
 **Configurações → Criar/atualizar interseções automaticamente**.
 
-A ferramenta **Via → Interseção** abre os parâmetros (raio, faixa, retenção, rampas) e a opção
+A ferramenta **Conexões** (opção *Todas as interseções do projeto*, ou clicando numa conexão → *Interseção*) abre os parâmetros (raio, faixa, retenção, rampas) e a opção
 *Aplicar em*:
 
 * **Todos os cruzamentos e entroncamentos do projeto** – resolve de uma vez todas as vias que se

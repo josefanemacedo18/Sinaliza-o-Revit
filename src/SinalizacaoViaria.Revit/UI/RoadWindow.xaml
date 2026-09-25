@@ -24,11 +24,17 @@
                 <TextBlock Text="Seção transversal" Style="{StaticResource Title}"/>
                 <TextBlock Style="{StaticResource Hint}" Text="Selecione (ou desenhe) o EIXO da via. Monte cada lado do eixo para fora: faixas, ciclofaixa, estacionamento, canteiros, calçada... O lado direito é o da direita de quem percorre o eixo no sentido em que foi desenhado."/>
 
-                <GroupBox Header="Modelo pronto">
-                    <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="Aplicar" Click="ApplyTemplateClick"/>
-                        <ComboBox x:Name="CbTemplate"/>
-                    </DockPanel>
+                <GroupBox Header="Modelo (prontos e personalizados ★)">
+                    <StackPanel>
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Aplicar" Click="ApplyTemplateClick"/>
+                            <ComboBox x:Name="CbTemplate"/>
+                        </DockPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <Button Content="Salvar como modelo…" Click="SaveTemplateClick" Margin="0" ToolTip="Guarda a seção atual (faixas, calçadas, linhas, pavimento, hierarquia e conexões) com um nome – fica disponível nas próximas vezes."/>
+                            <Button Content="Excluir modelo" Click="DeleteTemplateClick" ToolTip="Exclui o modelo personalizado selecionado (★)."/>
+                        </StackPanel>
+                    </StackPanel>
                 </GroupBox>
 
                 <GroupBox Header="Hierarquia viária (CTB art. 60) – obrigatória">
@@ -195,8 +201,8 @@
                         <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbFreeEnds" ToolTip="Cul-de-sac: usa o tipo e as medidas da ferramenta Cul-de-sac, ajustados à largura da via."/>
                         <TextBlock Grid.Row="2" Text="Raio das esquinas (m, vazio = pela hierarquia)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbCornerRadius" Text="" ToolTip="Vazio: 6 m (local), 8 m (coletora), 10 m (arterial), 15 m (rodovias/trânsito rápido)."/>
-                        <CheckBox Grid.Row="3" Grid.ColumnSpan="2" x:Name="CkIntCrosswalks" Content="Faixas de pedestres e linhas de retenção nas interseções" IsChecked="True"/>
-                        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkIntRamps" Content="Rebaixamentos de calçada nas travessias (NBR 9050)" IsChecked="True"/>
+                        <CheckBox Grid.Row="3" Grid.ColumnSpan="2" x:Name="CkIntCrosswalks" Content="Faixas de pedestres nas interseções (a retenção e o PARE são sempre criados)" IsChecked="False"/>
+                        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkIntRamps" Content="Rebaixamentos de calçada nas travessias (NBR 9050)" IsChecked="False"/>
                     </Grid>
                 </GroupBox>
 

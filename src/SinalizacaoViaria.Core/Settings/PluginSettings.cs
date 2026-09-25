@@ -26,10 +26,18 @@ public sealed class PluginSettings
     public bool AutoIntersect { get; set; } = true;
     /// <summary>Ímã de conexão: pontas de eixo soltas sobre outra via vão para o eixo dela (e vias ligadas acompanham).</summary>
     public bool AutoConnect { get; set; } = true;
+    /// <summary>Interseções automáticas (ímã, criação de vias): faixas de pedestres e rebaixamentos.</summary>
+    public bool AutoCrosswalks { get; set; }
+    /// <summary>Pavimento, calçada, meio-fio, sarjeta e grama gerados como Piso do Revit (em vez de forma direta).</summary>
+    public bool PhysicalAsFloors { get; set; } = true;
     public Automation.TipoConexao LastConnection { get; set; } = Automation.TipoConexao.Intersecao;
     public Automation.FimLivre LastFreeEnds { get; set; } = Automation.FimLivre.Nenhum;
     public double LastCurveRadius { get; set; } = 30;
     public bool LastDrawRoad { get; set; } = true;
+    /// <summary>Modelos de via salvos pelo usuário (seção completa em JSON).</summary>
+    public List<CustomRoadTemplate> CustomRoadTemplates { get; set; } = new();
+    /// <summary>Última seção usada no "Sinalizar via" (reaberta na próxima vez).</summary>
+    public string? LastRoadSetup { get; set; }
 
     public double DefaultSpeed { get; set; } = 60;
     public string FontFamily { get; set; } = "Arial";
@@ -78,4 +86,11 @@ public sealed class PluginSettings
         Drape = DrapeByDefault,
         Thickness = thicknessOverride ?? 0,
     };
+}
+
+/// <summary>Modelo de via personalizado.</summary>
+public sealed class CustomRoadTemplate
+{
+    public string Name { get; set; } = "";
+    public string Json { get; set; } = "";
 }

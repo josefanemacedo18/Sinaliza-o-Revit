@@ -47,6 +47,8 @@
                     <StackPanel>
                         <CheckBox x:Name="CkAuto" Content="Atualizar marcas automaticamente quando as linhas de referência mudarem"/>
                         <CheckBox x:Name="CkAutoIntersect" Content="Criar/atualizar interseções automaticamente quando as vias se cruzam" IsChecked="True"/>
+                        <CheckBox x:Name="CkFloors" Content="Pavimento, calçada, meio-fio, sarjeta e grama como Piso do Revit (editáveis com as ferramentas nativas)" IsChecked="True"/>
+                        <CheckBox x:Name="CkAutoCrosswalks" Content="Interseções automáticas com faixas de pedestres e rebaixamentos" IsChecked="False"/>
                         <CheckBox x:Name="CkAutoConnect" Content="Ímã de conexão: ponta de via solta sobre outra via encaixa no eixo dela (e vias ligadas acompanham)" IsChecked="True"/>
                         <CheckBox x:Name="CkBoundary" Content="Contorno visível nas regiões 2D (recomendado para marcas brancas)"/>
                     </StackPanel>

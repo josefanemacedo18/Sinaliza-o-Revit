@@ -509,6 +509,8 @@ public enum TipoTransicao
     Curva,
     /// <summary>Chanfro reto (comprimento de transição configurável).</summary>
     Chanfro,
+    /// <summary>Ponta reta, perpendicular ao meio-fio (acompanha a calçada / a travessia).</summary>
+    Reta,
 }
 
 /// <summary>
@@ -521,8 +523,11 @@ public sealed class CurbExtensionDefinition : MarkingDefinition
     /// <summary>Avanço sobre a pista (m) – normalmente a largura da faixa de estacionamento.</summary>
     public double Depth { get; set; } = 2.20;
     public TipoTransicao Transition { get; set; } = TipoTransicao.Curva;
-    /// <summary>Raio das curvas de transição (ou comprimento do chanfro).</summary>
+    /// <summary>Raio das curvas de transição (ou comprimento do chanfro) – ponta inicial.</summary>
     public double Radius { get; set; } = 1.50;
+    /// <summary>Transição da ponta final (nulo = igual à inicial).</summary>
+    public TipoTransicao? EndTransition { get; set; }
+    public double? EndRadius { get; set; }
     /// <summary>Verdadeiro quando a calçada existente fica à esquerda do sentido de desenho.</summary>
     public bool SidewalkOnLeft { get; set; } = true;
     public double Height { get; set; } = 0.15;

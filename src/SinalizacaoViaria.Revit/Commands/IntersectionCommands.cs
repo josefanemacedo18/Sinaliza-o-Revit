@@ -165,15 +165,19 @@ internal static class IntersectionRunner
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdIntersecao : CommandBase
 {
-    protected override Result Run(UIApplication app, UIDocument uidoc)
+    protected override Result Run(UIApplication app, UIDocument uidoc) => RunTool(uidoc, null);
+
+    /// <summary>Janela de interseção aplicada a todas (<paramref name="forceAll"/> = true) ou à clicada.</summary>
+    internal static Result RunTool(UIDocument uidoc, bool? forceAll)
     {
         var doc = uidoc.Document;
         var d = UiHelpers.Remembered<IntersectionDefinition>("Intersecao") ?? new IntersectionDefinition();
-        var all = true;
+        var all = forceAll ?? true;
         var w = IntersectionForms.Intersection(d, false);
-        w.Section("Aplicar em")
-         .Choice("Cruzamentos", new[] { ("Todos os cruzamentos e entroncamentos do projeto", true), ("Somente o cruzamento que eu clicar", false) },
-             () => all, v => all = v);
+        if (forceAll == null)
+            w.Section("Aplicar em")
+             .Choice("Cruzamentos", new[] { ("Todos os cruzamentos e entroncamentos do projeto", true), ("Somente o cruzamento que eu clicar", false) },
+                 () => all, v => all = v);
         if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
         UiHelpers.Remember("Intersecao", d);
         PluginContext.SaveSettings();

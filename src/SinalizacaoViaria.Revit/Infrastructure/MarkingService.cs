@@ -206,10 +206,36 @@ public sealed class MarkingService
             ? def.Output.Thickness
             : Math.Max(settings.MinModelThickness, (material?.EspessuraMm ?? 0.6) / 1000.0);
 
-        var groups = geo.Pieces.GroupBy(p => p.Color)
-            .OrderByDescending(g => g.Sum(p => p.Shape.Area)).ToList();
         var keep = new HashSet<ElementId>();
         var primary = true;
+        var solidPieces = geo.Pieces;
+
+        // Pavimento, calçada, meio-fio, sarjeta e grama como Piso do Revit (editáveis com as ferramentas nativas).
+        if (def.Output.Mode == OutputMode.Modelo3D && settings.PhysicalAsFloors && !def.Output.Drape)
+        {
+            var floorPieces = geo.Pieces.Where(p => FloorEligible(def, p)).ToList();
+            if (floorPieces.Count > 0)
+            {
+                // Tipo de piso escolhido pelo usuário em pisos anteriores (por cor) é mantido.
+                var userTypes = existing.Where(r => r.Element is Floor).GroupBy(r => r.Color)
+                    .ToDictionary(g => g.Key, g => g.First().Element.GetTypeId());
+                foreach (var old in existing.Where(r => r.Element is Floor)) SafeDelete(old.Element.Id);
+                existing.RemoveAll(r => r.Element is Floor);
+                var failed = new List<MarkingPiece>();
+                foreach (var piece in floorPieces)
+                {
+                    var f = CreateFloor(piece, baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(piece.Color));
+                    if (f == null) { failed.Add(piece); continue; }
+                    try { f.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set($"SV {info.Code}"); } catch { /* opcional */ }
+                    Tag(f, def, info, piece.Color, StyleService.ColorName(piece.Color), piece.Shape.Area, geo, primary);
+                    keep.Add(f.Id);
+                    primary = false;
+                }
+                solidPieces = geo.Pieces.Where(p => !floorPieces.Contains(p) || failed.Contains(p)).ToList();
+            }
+        }
+        var groups = solidPieces.GroupBy(p => p.Color)
+            .OrderByDescending(g => g.Sum(p => p.Shape.Area)).ToList();
 
         if (def.Output.Mode == OutputMode.Modelo3D)
         {
@@ -475,6 +501,69 @@ public sealed class MarkingService
         for (int i = 0; i < pts.Count; i++)
             loop.Append(Line.CreateBound(pts[i], pts[(i + 1) % pts.Count]));
         return loop;
+    }
+
+    // ------------------------------------------------------------------ pisos
+
+    private static bool FloorEligible(MarkingDefinition def, MarkingPiece p) =>
+        p.Solid == null && p.Profile == null && p.Thickness >= 0.005 && p.Shape.Area > 0.01
+        && p.Color is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto or MarkingColor.Concreto or MarkingColor.Grama
+        && def is RoadPavementDefinition or LinearMarkingDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition
+            or SidewalkAreaDefinition or CurbExtensionDefinition or PlanterDefinition;
+
+    private readonly Dictionary<(MarkingColor, int), ElementId> _floorTypes = new();
+    private List<Level>? _levels;
+
+    /// <summary>Tipo de piso "SV - {material} {espessura}" (uma camada com o material da sinalização).</summary>
+    private ElementId FloorType(MarkingColor color, double thicknessM)
+    {
+        var mm = (int)Math.Round(thicknessM * 1000);
+        if (_floorTypes.TryGetValue((color, mm), out var id)) return id;
+        var name = $"SV - {StyleService.ColorName(color)} {mm / 10.0:0.#} cm";
+        var types = new FilteredElementCollector(_doc).OfClass(typeof(FloorType)).Cast<FloorType>().ToList();
+        var ft = types.FirstOrDefault(t => t.Name == name);
+        if (ft == null)
+        {
+            var baseType = types.FirstOrDefault(t => !t.IsFoundationSlab) ?? types.FirstOrDefault();
+            if (baseType == null) return ElementId.InvalidElementId;
+            ft = (FloorType)baseType.Duplicate(name);
+            var cs = CompoundStructure.CreateSingleLayerCompoundStructure(MaterialFunctionAssignment.Structure, UnitConv.Ft(thicknessM), Styles.Material(color));
+            ft.SetCompoundStructure(cs);
+        }
+        _floorTypes[(color, mm)] = ft.Id;
+        return ft.Id;
+    }
+
+    private Level? LevelFor(double zFt)
+    {
+        _levels ??= new FilteredElementCollector(_doc).OfClass(typeof(Level)).Cast<Level>().OrderBy(l => l.ProjectElevation).ToList();
+        if (_levels.Count == 0) return null;
+        return _levels.LastOrDefault(l => l.ProjectElevation <= zFt + 0.01) ?? _levels[0];
+    }
+
+    /// <summary>Cria um piso para a peça (topo na cota da peça). Nulo se o Revit recusar o contorno.</summary>
+    private Floor? CreateFloor(MarkingPiece piece, double baseZm, ElementId? userType)
+    {
+        try
+        {
+            var topFt = UnitConv.Ft(baseZm + piece.Elevation + piece.Thickness);
+            var level = LevelFor(topFt);
+            if (level == null) return null;
+            var shape = piece.Shape.Simplified(0.005) ?? piece.Shape;
+            var loops = ToCurveLoops(shape, level.ProjectElevation);
+            if (loops.Count == 0) return null;
+            var typeId = userType != null && userType != ElementId.InvalidElementId && _doc.GetElement(userType) is FloorType
+                ? userType : FloorType(piece.Color, piece.Thickness);
+            if (typeId == ElementId.InvalidElementId) return null;
+            var f = Floor.Create(_doc, loops, typeId, level.Id, false, null, 0.0);
+            f.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)?.Set(topFt - level.ProjectElevation);
+            return f;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Floor.Create", ex);
+            return null;
+        }
     }
 
     // ------------------------------------------------------------------ 2D

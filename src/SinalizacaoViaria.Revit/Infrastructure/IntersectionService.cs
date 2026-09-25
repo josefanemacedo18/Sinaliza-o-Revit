@@ -22,6 +22,25 @@ public sealed class IntersectionService
     }
 
     /// <summary>
+    /// Interseção das conexões automáticas (ímã, criação de vias): sempre simples – esquinas com raio pela hierarquia,
+    /// PARE na via secundária e linhas da principal contínuas; sem ilhas, bolsões ou alargamentos (esses só pela
+    /// ferramenta Conexões, na interseção escolhida).
+    /// </summary>
+    public static IntersectionDefinition AutoTemplate(bool? crosswalks = null)
+    {
+        var cw = crosswalks ?? PluginContext.Settings.AutoCrosswalks;
+        return new IntersectionDefinition
+        {
+            Control = ControleIntersecao.Pare,
+            StopLines = true,
+            Signs = true,
+            Crosswalks = cw,
+            Ramps = cw,
+            Output = PluginContext.Settings.NewOutput(),
+        };
+    }
+
+    /// <summary>
     /// Vias do projeto e seus eixos. Vias sem pavimento registrado (criadas em versões anteriores ou com pavimento
     /// "Nenhum") têm a seção reconstruída a partir das suas marcas; com <paramref name="createMissing"/> o pavimento
     /// é criado e gravado (exige transação aberta).
@@ -498,6 +517,35 @@ public sealed class IntersectionService
             }
         }
         return res;
+    }
+
+    /// <summary>
+    /// Acrescenta um elemento linear (meio-fio, calçada, grama, sarjeta, linha) junto ao bordo da via mais próxima do
+    /// ponto, do lado clicado. O elemento passa a fazer parte da via (grupo) e a seção do pavimento é atualizada, de
+    /// modo que as interseções, rotatórias e cul-de-sacs da via o refaçam também.
+    /// </summary>
+    public List<RenderResult> AddAtRoadEdge(MarkingDefinition template, Vec2 p)
+    {
+        var results = new List<RenderResult>();
+        if (template is not LinearMarkingDefinition lt) return results;
+        var roads = Roads(createMissing: true);
+        var best = roads.Select(r => (r, pr: IntersectionGenerator.Project(r.Axis, p)))
+            .Where(x => x.pr.Distance <= Math.Max(x.r.Def.TotalLeft, x.r.Def.TotalRight) + 12)
+            .OrderBy(x => x.pr.Distance).FirstOrDefault();
+        if (best.r == null) return results;
+        var road = best.r;
+        var left = road.Axis.TangentAt(best.pr.Station).Cross(p - best.pr.Point) > 0;
+        var line = (LinearMarkingDefinition)lt.CloneWithNewId();
+        line.Exclusions.Clear();
+        RoadConnection.PlaceAtEdge(road.Def, left, line, PluginContext.Catalog);
+        results.Add(_service.Render(line));
+        results.Add(_service.Render(road.Def));
+        _service.Invalidate();
+        var changed = new List<MarkingDefinition> { road.Def, line };
+        foreach (var it in DependentOn(changed)) results.AddRange(Refresh(it));
+        foreach (var rb in RoundaboutsDependentOn(changed)) results.AddRange(Refresh(rb));
+        foreach (var c in CulDeSacsDependentOn(changed)) results.AddRange(Refresh(c));
+        return results;
     }
 
     /// <summary>Regenera todas as marcas das vias (grupos) indicadas.</summary>

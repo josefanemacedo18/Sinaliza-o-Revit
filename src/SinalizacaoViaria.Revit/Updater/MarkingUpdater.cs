@@ -106,7 +106,7 @@ public sealed class MarkingUpdater : IUpdater
                 // Eixo movido/editado: cruzamentos novos viram interseções automaticamente.
                 try
                 {
-                    var template = UI.UiHelpers.Remembered<Core.Definitions.IntersectionDefinition>("Intersecao") ?? new Core.Definitions.IntersectionDefinition();
+                    var template = IntersectionService.AutoTemplate();
                     inter.AutoIntersectGroups(affected.Select(d => d.GroupId ?? ""), template, out processed, radiusByHierarchy: true);
                     // Via puxada até uma rotatória: ela ganha o ramo.
                     var roads = inter.Roads();

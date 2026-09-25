@@ -33,7 +33,11 @@ public static class SharedParameters
     /// <summary>Garante os parâmetros no documento. Deve ser chamado dentro de uma transação.</summary>
     public static void Ensure(Document doc)
     {
-        if (All.All(d => SharedParameterElement.Lookup(doc, d.Guid) != null)) return;
+        if (All.All(d => SharedParameterElement.Lookup(doc, d.Guid) != null))
+        {
+            EnsureFloorBinding(doc);
+            return;
+        }
 
         var app = doc.Application;
         var original = app.SharedParametersFilename;
@@ -49,6 +53,7 @@ public static class SharedParameters
             var cats = app.Create.NewCategorySet();
             cats.Insert(Category.GetCategory(doc, BuiltInCategory.OST_GenericModel));
             cats.Insert(Category.GetCategory(doc, BuiltInCategory.OST_DetailComponents));
+            cats.Insert(Category.GetCategory(doc, BuiltInCategory.OST_Floors));
             var binding = app.Create.NewInstanceBinding(cats);
 
             foreach (var d in All)
@@ -74,6 +79,32 @@ public static class SharedParameters
         finally
         {
             try { app.SharedParametersFilename = original; } catch { /* sem arquivo original */ }
+        }
+    }
+
+    private static readonly HashSet<int> FloorBound = new();
+
+    /// <summary>Projetos antigos: os parâmetros SV_* passam a valer também para Pisos (elementos físicos como piso).</summary>
+    private static void EnsureFloorBinding(Document doc)
+    {
+        var key = doc.GetHashCode();
+        if (!FloorBound.Add(key)) return;
+        try
+        {
+            var floors = Category.GetCategory(doc, BuiltInCategory.OST_Floors);
+            if (floors == null) return;
+            foreach (var d in All)
+            {
+                if (SharedParameterElement.Lookup(doc, d.Guid) is not { } spe) continue;
+                var def = spe.GetDefinition();
+                if (doc.ParameterBindings.get_Item(def) is not InstanceBinding b || b.Categories.Contains(floors)) continue;
+                b.Categories.Insert(floors);
+                doc.ParameterBindings.ReInsert(def, b, GroupTypeId.Data);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("SharedParameters.EnsureFloorBinding", ex);
         }
     }
 

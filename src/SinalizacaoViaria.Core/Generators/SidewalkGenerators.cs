@@ -38,48 +38,70 @@ public static class SidewalkGenerator
 
     // ------------------------------------------------------------------ orelha de calçada
 
-    /// <summary>Perfil lateral (x ao longo do meio-fio, o = avanço) de uma orelha de comprimento L.</summary>
+    /// <summary>Perfil lateral (x ao longo do meio-fio, o = avanço) de uma orelha de comprimento L – cada ponta com sua transição.</summary>
     public static List<Vec2> EarProfile(CurbExtensionDefinition d, double L, List<string>? warnings = null)
     {
         var D = Math.Max(0.1, d.Depth);
-        var half = new List<Vec2>();
-        double lt;
-        if (d.Transition == TipoTransicao.Chanfro)
-        {
-            lt = Math.Max(0.05, d.Radius);
-            if (2 * lt > L) { lt = L / 2; warnings?.Add("Orelha curta para o chanfro: transições reduzidas."); }
-            half.Add(new Vec2(0, 0));
-            half.Add(new Vec2(lt, D));
-        }
-        else
-        {
-            var R = Math.Max(0.1, d.Radius);
-            double Lt(double r) => D <= 2 * r ? Math.Sqrt(4 * r * D - D * D) : 2 * r;
-            lt = Lt(R);
-            if (2 * lt > L)
-            {
-                R = D <= L / 2 ? (L * L / 4 + D * D) / (4 * D) : L / 4;
-                lt = Math.Min(Lt(R), L / 2);
-                warnings?.Add($"Orelha curta para o raio pedido: raio de transição reduzido para {R:0.00} m.");
-            }
-            var theta = D <= 2 * R ? Math.Acos(1 - D / (2 * R)) : Math.PI / 2;
-            const int n = 10;
-            for (int i = 0; i <= n; i++)
-            {
-                var t = theta * i / n;
-                half.Add(new Vec2(R * Math.Sin(t), R * (1 - Math.Cos(t))));
-            }
-            for (int i = n; i >= 0; i--)
-            {
-                var t = theta * i / n;
-                half.Add(new Vec2(lt - R * Math.Sin(t), D - R * (1 - Math.Cos(t))));
-            }
-        }
-        var res = new List<Vec2>(half);
+        var startKind = d.Transition;
+        var endKind = d.EndTransition ?? d.Transition;
+        var startR = d.Radius;
+        var endR = d.EndRadius ?? d.Radius;
+        var head = Half(startKind, startR, D, L / 2, warnings);
+        var tail = Half(endKind, endR, D, L / 2, warnings);
+        var lt0 = head[^1].X;
+        var lt1 = tail[^1].X;
+        var res = new List<Vec2>(head);
         // Trecho reto, amostrado para acompanhar meios-fios curvos.
-        for (var x = lt + Sample; x < L - lt - 1e-6; x += Sample) res.Add(new Vec2(x, D));
-        res.AddRange(Enumerable.Reverse(half).Select(v => new Vec2(L - v.X, v.Y)));
+        for (var x = lt0 + Sample; x < L - lt1 - 1e-6; x += Sample) res.Add(new Vec2(x, D));
+        res.AddRange(Enumerable.Reverse(tail).Select(v => new Vec2(L - v.X, v.Y)));
         return res;
+    }
+
+    /// <summary>Meia transição (da face do meio-fio até o avanço D), com no máximo <paramref name="avail"/> m de comprimento.</summary>
+    private static List<Vec2> Half(TipoTransicao kind, double radius, double D, double avail, List<string>? warnings)
+    {
+        var half = new List<Vec2>();
+        switch (kind)
+        {
+            case TipoTransicao.Reta:
+                half.Add(new Vec2(0, 0));
+                half.Add(new Vec2(0.001, D));
+                return half;
+            case TipoTransicao.Chanfro:
+            {
+                var lt = Math.Max(0.05, radius);
+                if (lt > avail) { lt = avail; warnings?.Add("Orelha curta para o chanfro: transição reduzida."); }
+                half.Add(new Vec2(0, 0));
+                half.Add(new Vec2(lt, D));
+                return half;
+            }
+            default:
+            {
+                var R = Math.Max(0.1, radius);
+                double Lt(double r) => D <= 2 * r ? Math.Sqrt(4 * r * D - D * D) : 2 * r;
+                var lt = Lt(R);
+                if (lt > avail)
+                {
+                    var L = 2 * avail;
+                    R = D <= L / 2 ? (L * L / 4 + D * D) / (4 * D) : L / 4;
+                    lt = Math.Min(Lt(R), avail);
+                    warnings?.Add($"Orelha curta para o raio pedido: raio de transição reduzido para {R:0.00} m.");
+                }
+                var theta = D <= 2 * R ? Math.Acos(1 - D / (2 * R)) : Math.PI / 2;
+                const int n = 10;
+                for (int i = 0; i <= n; i++)
+                {
+                    var t = theta * i / n;
+                    half.Add(new Vec2(R * Math.Sin(t), R * (1 - Math.Cos(t))));
+                }
+                for (int i = n; i >= 0; i--)
+                {
+                    var t = theta * i / n;
+                    half.Add(new Vec2(lt - R * Math.Sin(t), D - R * (1 - Math.Cos(t))));
+                }
+                return half;
+            }
+        }
     }
 
     private static Func<Vec2, Vec2> StationMap(Polyline2 path, bool sidewalkOnLeft)

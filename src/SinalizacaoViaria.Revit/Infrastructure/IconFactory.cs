@@ -203,6 +203,13 @@ public static class IconFactory
                 }
                 dc.DrawEllipse(null, P(Asphalt, 4), new Point(16, 16), 8, 8);
                 break;
+            case "pista":
+                dc.DrawRectangle(B(Color.FromRgb(200, 198, 190)), null, new Rect(1, 1, 30, 30));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(7, 1, 18, 30));
+                dc.DrawLine(P(Muted, 1), new Point(6.5, 1), new Point(6.5, 31));
+                dc.DrawLine(P(Muted, 1), new Point(25.5, 1), new Point(25.5, 31));
+                dc.DrawGeometry(B(White), null, Close(Poly(new Point(16, 5), new Point(21, 11), new Point(18, 11), new Point(18, 17), new Point(14, 17), new Point(14, 11), new Point(11, 11))));
+                break;
             case "novavia":
                 dc.DrawRectangle(B(Color.FromRgb(200, 198, 190)), null, new Rect(1, 1, 30, 30));
                 dc.DrawRectangle(B(Asphalt), null, new Rect(1, 19, 30, 9));

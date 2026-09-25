@@ -15,7 +15,7 @@ public sealed class CurveSelectionFilter : ISelectionFilter
 /// <summary>Filtro de seleção: elementos de sinalização gerados pelo plugin.</summary>
 public sealed class MarkingSelectionFilter : ISelectionFilter
 {
-    public bool AllowElement(Element elem) => (elem is DirectShape || elem is FilledRegion || elem is TextNote || elem is CurveElement) && MarkingStorage.IsMarking(elem);
+    public bool AllowElement(Element elem) => (elem is DirectShape || elem is Floor || elem is FilledRegion || elem is TextNote || elem is CurveElement) && MarkingStorage.IsMarking(elem);
     public bool AllowReference(Reference reference, XYZ position) => false;
 }
 

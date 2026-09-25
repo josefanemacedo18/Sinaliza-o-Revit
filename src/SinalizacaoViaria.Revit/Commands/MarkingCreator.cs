@@ -99,6 +99,27 @@ public static class MarkingCreator
                 if (results.Count == 0) return Result.Cancelled;
                 break;
             }
+            case PathMode.BordoDaVia:
+            {
+                // Montagem passo a passo: cada clique ao lado de uma via acrescenta o elemento junto ao bordo dela.
+                var any = false;
+                while (true)
+                {
+                    var p = Picking.PickPoint(uidoc, $"{action}: clique AO LADO da via, no lado em que o elemento será colocado – ESC encerra");
+                    if (p == null) break;
+                    var pt = UnitConv.ToVec2(p);
+                    var r = IntersectionRunner.Run(uidoc, $"SV - {action}", s => s.AddAtRoadEdge(template, pt));
+                    if (r.Count == 0)
+                    {
+                        TaskDialog.Show(CommandBase.AppTitle, "Nenhuma via (Sinalizar via / Pista) perto do ponto clicado.");
+                        continue;
+                    }
+                    any = true;
+                    results.AddRange(r.Where(x => x.Warnings.Count > 0));
+                }
+                if (!any) return Result.Cancelled;
+                break;
+            }
         }
         CommandBase_Report(action, results);
         return Result.Succeeded;
