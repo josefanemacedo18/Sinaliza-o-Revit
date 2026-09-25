@@ -61,12 +61,13 @@ public static class DeviceGenerator
         Vec2 PointAt(double s) => off.PointAtParam(p.ParamAt(s));
 
         // Elementos contínuos
-        if (spacing <= 0 || def.Forma == FormaDispositivo.Defensa)
+        var guardRail = def.Forma is FormaDispositivo.Defensa or FormaDispositivo.DefensaDupla;
+        if (spacing <= 0 || guardRail)
         {
             var layers = def.Forma switch
             {
                 FormaDispositivo.NewJersey => NewJerseyLayers,
-                FormaDispositivo.Defensa => Array.Empty<Layer>(),
+                FormaDispositivo.Defensa or FormaDispositivo.DefensaDupla => Array.Empty<Layer>(),
                 _ => new[] { new Layer(1, 0, 1) },
             };
             foreach (var (c0, c1) in LinearPatternGenerator.Chunk(a, b, opt.MaxPieceLength))
@@ -74,20 +75,24 @@ public static class DeviceGenerator
                 var pts = off.SubPoints(p.ParamAt(c0), p.ParamAt(c1));
                 foreach (var layer in layers)
                     AddStrip(geo, pts, W * layer.WidthFactor, color, H * (layer.Z1 - layer.Z0), H * layer.Z0);
-                if (def.Forma == FormaDispositivo.Defensa)
+                if (guardRail)
                 {
-                    // Lâmina (perfil W) no terço superior, afastada do eixo dos postes.
-                    var rail = new Polyline2(pts).Offset(W / 2 - 0.05).Points;
-                    AddStrip(geo, rail, 0.10, color, H * 0.40, H * 0.60);
+                    // Lâmina (perfil W) no terço superior, afastada do eixo dos postes; na dupla, dos dois lados.
+                    var sides = def.Forma == FormaDispositivo.DefensaDupla ? new[] { 1.0, -1.0 } : new[] { 1.0 };
+                    foreach (var side in sides)
+                    {
+                        var rail = new Polyline2(pts).Offset(side * (W / 2 - 0.05)).Points;
+                        AddStrip(geo, rail, 0.10, color, H * 0.40, H * 0.60);
+                    }
                 }
             }
             geo.PaintedLength = b - a;
 
-            if (def.Forma != FormaDispositivo.Defensa) return geo;
+            if (!guardRail) return geo;
         }
 
         // Unidades espaçadas (centradas no trecho disponível)
-        var step = def.Forma == FormaDispositivo.Defensa ? Math.Max(0.5, spacing) : spacing;
+        var step = guardRail ? Math.Max(0.5, spacing) : spacing;
         var len = b - a;
         var n = Math.Max(1, (int)Math.Floor((len - L) / step + 1e-9) + 1);
         var used = (n - 1) * step;
@@ -99,7 +104,7 @@ public static class DeviceGenerator
             foreach (var (shape, z0, h) in Unit(def.Forma, L, W, H))
                 geo.Pieces.Add(new MarkingPiece(frame.ToWorld(shape), color) { Thickness = h, Elevation = z0, IsUnit = true });
         }
-        if (def.Forma != FormaDispositivo.Defensa)
+        if (!guardRail)
         {
             geo.UnitCount = n;
             geo.PaintedLength = len;
@@ -148,6 +153,7 @@ public static class DeviceGenerator
                     yield return (Rect(W * layer.WidthFactor, L), H * layer.Z0, H * (layer.Z1 - layer.Z0));
                 break;
             case FormaDispositivo.Defensa:
+            case FormaDispositivo.DefensaDupla:
                 // Poste
                 yield return (Rect(Math.Min(0.15, W), Math.Min(0.15, L)), 0, H);
                 break;

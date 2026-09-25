@@ -6,7 +6,7 @@
     <UseWPF>true</UseWPF>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <RootNamespace>SinalizacaoViaria.Revit</RootNamespace>
-    <AssemblyName>SinalizacaoViaria</AssemblyName>
+    <AssemblyName>SinalizaBIM</AssemblyName>
     <PlatformTarget>x64</PlatformTarget>
     <!-- DLL única: sem .deps.json nem dependências soltas. -->
     <GenerateDependencyFile>false</GenerateDependencyFile>
@@ -41,12 +41,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="SinalizacaoViaria.addin" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="SinalizaBIM.addin" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Compilação Release: atualiza a pasta Instalar\Revit2027 (DLL + .addin) -->
   <Target Name="PackageAddin" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
-    <Copy SourceFiles="$(TargetPath);$(TargetDir)SinalizacaoViaria.addin" DestinationFolder="$(PackageDir)" />
+    <Copy SourceFiles="$(TargetPath);$(TargetDir)SinalizaBIM.addin" DestinationFolder="$(PackageDir)" />
     <Message Importance="high" Text="Pacote pronto em $(PackageDir)" />
   </Target>
 
@@ -55,7 +55,7 @@
     <PropertyGroup>
       <AddinRoot>$(AppData)\Autodesk\Revit\Addins\$(RevitVersion)</AddinRoot>
     </PropertyGroup>
-    <Copy SourceFiles="$(TargetPath);$(TargetDir)SinalizacaoViaria.addin" DestinationFolder="$(AddinRoot)" SkipUnchangedFiles="true" ContinueOnError="true" />
+    <Copy SourceFiles="$(TargetPath);$(TargetDir)SinalizaBIM.addin" DestinationFolder="$(AddinRoot)" SkipUnchangedFiles="true" ContinueOnError="true" />
     <Message Importance="high" Text="Plugin copiado para $(AddinRoot)" />
   </Target>
 

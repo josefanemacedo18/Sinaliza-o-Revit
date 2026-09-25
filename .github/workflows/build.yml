@@ -19,8 +19,8 @@ jobs:
       - name: Publicar pacote
         uses: actions/upload-artifact@v4
         with:
-          name: SinalizacaoViaria-Revit2027
+          name: SinalizaBIM-Revit2027
           path: |
-            Instalar/Revit2027/SinalizacaoViaria.dll
-            Instalar/Revit2027/SinalizacaoViaria.addin
+            Instalar/Revit2027/SinalizaBIM.dll
+            Instalar/Revit2027/SinalizaBIM.addin
             Instalar/LEIA-ME.txt

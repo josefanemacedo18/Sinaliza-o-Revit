@@ -2,6 +2,7 @@ using System.Globalization;
 using SinalizacaoViaria.Core.Catalog;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Geometry;
+using SinalizacaoViaria.Core.Model;
 
 namespace SinalizacaoViaria.Core.Automation;
 
@@ -44,6 +45,8 @@ public enum TipoElementoSecao
     CanteiroFisico,
     CanteiroPintado,
     Calcada,
+    /// <summary>Faixa de caminhada de pedestres pintada na pista (azul ou verde).</summary>
+    FaixaCaminhada,
 }
 
 /// <summary>Um elemento da seção transversal (faixa, canteiro, calçada...).</summary>
@@ -79,6 +82,30 @@ public sealed class ElementoSecao
     /// <summary>Dispositivo físico do catálogo implantado na divisa interna do elemento (segregação). Vazio = nenhum.</summary>
     public string? Dispositivo { get; set; }
 
+    // ---- Ciclofaixa: medidas personalizáveis
+    /// <summary>Largura da linha de delimitação da ciclofaixa (m).</summary>
+    public double LarguraLinha { get; set; } = 0.20;
+    /// <summary>Linha de delimitação seccionada.</summary>
+    public bool LinhaSeccionada { get; set; }
+    public double TracoLinha { get; set; } = 1.0;
+    public double EspacoLinha { get; set; } = 1.0;
+    /// <summary>Comprimento do símbolo da bicicleta (m).</summary>
+    public double TamanhoSimbolo { get; set; } = 1.50;
+    /// <summary>Comprimento da seta de sentido (m).</summary>
+    public double TamanhoSeta { get; set; } = 1.50;
+    /// <summary>Distância entre o símbolo e a seta (m).</summary>
+    public double DistanciaSeta { get; set; } = 3.0;
+    /// <summary>Linha central amarela em ciclofaixas bidirecionais.</summary>
+    public bool LinhaCentral { get; set; } = true;
+
+    // ---- Calçada
+    /// <summary>Largura da sarjeta junto ao meio-fio, dentro da pista (m). 0 = sem sarjeta.</summary>
+    public double Sarjeta { get; set; } = 0.30;
+
+    // ---- Faixa de caminhada
+    /// <summary>Cor da faixa de caminhada (Azul ou Verde).</summary>
+    public MarkingColor CorCaminhada { get; set; } = MarkingColor.Azul;
+
     public ElementoSecao Clone() => (ElementoSecao)MemberwiseClone();
 
     public static string Rotulo(TipoElementoSecao t) => t switch
@@ -93,6 +120,7 @@ public sealed class ElementoSecao
         TipoElementoSecao.CanteiroFisico => "Canteiro lateral físico",
         TipoElementoSecao.CanteiroPintado => "Canteiro lateral pintado",
         TipoElementoSecao.Calcada => "Calçada",
+        TipoElementoSecao.FaixaCaminhada => "Faixa de caminhada (pedestres)",
         _ => t.ToString(),
     };
 
@@ -109,6 +137,7 @@ public sealed class ElementoSecao
         TipoElementoSecao.CanteiroFisico => 1.50,
         TipoElementoSecao.CanteiroPintado => 1.00,
         TipoElementoSecao.Calcada => 3.00,
+        TipoElementoSecao.FaixaCaminhada => 1.50,
         _ => 3.0,
     };
 
@@ -297,21 +326,40 @@ public sealed class RoadSetup
 
                     case TipoElementoSecao.Ciclofaixa:
                         if (e.PinturaFundo) Line("CIC-FD", sigma * c, width: w);
+                        if (e.Bidirecional && e.LinhaCentral)
+                            Line("CIC-LC", sigma * c, variant: "Seccionada 0,10 m (1 × 1 m)");
                         if (Inscriptions && e.Espacamento > 0)
                         {
+                            var start = Math.Max(5, StartSetback + 3);
                             Add(new RepeatedMarkingDefinition
                             {
-                                SymbolCode = "SIC", Length = Math.Min(1.8, w * 1.1), Offset = sigma * c, Spacing = e.Espacamento,
-                                Reverse = reverseTraffic, StartOffset = Math.Max(5, StartSetback + 3), EndSetback = EndSetback + 3,
+                                SymbolCode = "SIC", Length = Math.Max(0.3, e.TamanhoSimbolo), Offset = sigma * (e.Bidirecional ? a + w / 4 : c),
+                                Spacing = e.Espacamento, Reverse = reverseTraffic, StartOffset = start, EndSetback = EndSetback + 3,
                             });
-                            if (!e.Bidirecional)
+                            if (!e.Bidirecional && e.TamanhoSeta > 0)
                                 Add(new RepeatedMarkingDefinition
                                 {
-                                    SymbolCode = "CIC-SETA", Length = 1.5, Offset = sigma * c, Spacing = e.Espacamento,
-                                    Reverse = reverseTraffic, StartOffset = Math.Max(5, StartSetback + 3) + 3.0, EndSetback = EndSetback + 3,
+                                    SymbolCode = "CIC-SETA", Length = e.TamanhoSeta, Offset = sigma * c, Spacing = e.Espacamento,
+                                    Reverse = reverseTraffic, StartOffset = start + e.TamanhoSimbolo + Math.Max(0, e.DistanciaSeta), EndSetback = EndSetback + 3,
                                 });
                         }
                         break;
+
+                    case TipoElementoSecao.FaixaCaminhada:
+                    {
+                        var edge = 0.10;
+                        Add(new LinearMarkingDefinition { Code = "FCA", Offset = sigma * c, WidthOverride = Math.Max(0.1, w - 2 * edge),
+                            ColorOverride = e.CorCaminhada, StartSetback = StartSetback, EndSetback = EndSetback });
+                        Add(new LinearMarkingDefinition { Code = "FCA-BD", Offset = sigma * (a + edge / 2), StartSetback = StartSetback, EndSetback = EndSetback });
+                        Add(new LinearMarkingDefinition { Code = "FCA-BD", Offset = sigma * (b - edge / 2), StartSetback = StartSetback, EndSetback = EndSetback });
+                        if (Inscriptions && e.Espacamento > 0)
+                            Add(new RepeatedMarkingDefinition
+                            {
+                                SymbolCode = "SPE", Length = Math.Min(1.5, w * 0.9), Offset = sigma * c, Spacing = e.Espacamento,
+                                Reverse = reverseTraffic, StartOffset = Math.Max(5, StartSetback + 3), EndSetback = EndSetback + 3,
+                            });
+                        break;
+                    }
 
                     case TipoElementoSecao.Estacionamento:
                     {
@@ -378,12 +426,18 @@ public sealed class RoadSetup
             }
             if ((li && to == TipoElementoSecao.Ciclofaixa) || (lo && ti == TipoElementoSecao.Ciclofaixa))
             {
-                Line("CIC-LD", sigma * at, variant: "Contínua 0,20 m");
+                var bike = to == TipoElementoSecao.Ciclofaixa ? outer : inner;
+                var line = Line("CIC-LD", sigma * at, variant: bike.LinhaSeccionada ? "Seccionada 0,20 m (1 × 1 m)" : "Contínua 0,20 m",
+                    width: Math.Abs(bike.LarguraLinha - 0.20) > 1e-6 ? bike.LarguraLinha : null);
+                if (bike.LinhaSeccionada) line.PatternOverride = new[] { Math.Max(0.1, bike.TracoLinha), Math.Max(0, bike.EspacoLinha) };
                 return;
             }
+            // Sarjeta da calçada: ocupa a borda da pista; a linha de bordo fica além dela.
+            var gutter = to == TipoElementoSecao.Calcada && PhysicalElements ? Math.Max(0, outer.Sarjeta) : 0;
+            if (gutter > 0.01) Physical("SARJETA", sigma * (at - gutter / 2), gutter);
             if (!EdgeLines) return;
             static bool EdgeLike(TipoElementoSecao t) => t is TipoElementoSecao.Acostamento or TipoElementoSecao.CanteiroFisico or TipoElementoSecao.Calcada;
-            if (li && EdgeLike(to)) Line(EdgeCode, sigma * (at - EdgeInset));
+            if (li && EdgeLike(to)) Line(EdgeCode, sigma * (at - gutter - EdgeInset));
             else if (lo && EdgeLike(ti)) Line(EdgeCode, sigma * (at + EdgeInset));
         }
 

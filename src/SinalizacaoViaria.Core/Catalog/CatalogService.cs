@@ -65,6 +65,8 @@ public static class CatalogService
         MergeList(target.Vagas, user.Vagas, v => v.Codigo);
         MergeList(target.Materiais, user.Materiais, m => m.Nome);
         MergeList(target.Dispositivos, user.Dispositivos, d => d.Codigo);
+        MergeList(target.Placas, user.Placas, d => d.Codigo);
+        MergeList(target.Mobiliario, user.Mobiliario, d => d.Codigo);
     }
 
     private static void MergeList<T>(List<T> target, List<T>? user, Func<T, string> key)

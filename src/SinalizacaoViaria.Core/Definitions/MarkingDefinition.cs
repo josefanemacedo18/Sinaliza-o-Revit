@@ -81,6 +81,10 @@ public sealed class PathReference
 [JsonDerivedType(typeof(ParkingMarkingDefinition), "vagas")]
 [JsonDerivedType(typeof(RepeatedMarkingDefinition), "repetida")]
 [JsonDerivedType(typeof(DeviceMarkingDefinition), "dispositivo")]
+[JsonDerivedType(typeof(SignDefinition), "placa")]
+[JsonDerivedType(typeof(UrbanElementDefinition), "mobiliario")]
+[JsonDerivedType(typeof(RampDefinition), "rampa")]
+[JsonDerivedType(typeof(TrafficCalmingDefinition), "moderacao")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;
@@ -105,6 +109,12 @@ public abstract class MarkingDefinition
     public abstract string DisplayCode { get; }
 
     public virtual PathReference? Path => null;
+
+    /// <summary>Elevação (m) das marcas posicionadas por ponto (sem caminho).</summary>
+    public virtual double? PointZ => null;
+
+    /// <summary>Áreas recortadas da marca (ex.: rebaixamentos de calçada). Coordenadas em metros.</summary>
+    public List<ExclusionZone> Exclusions { get; set; } = new();
 
     /// <summary>Substitui o caminho de referência (marcas baseadas em caminho).</summary>
     public virtual void SetPath(PathReference path) => throw new NotSupportedException($"{KindName} não usa caminho.");
@@ -198,6 +208,7 @@ public sealed class SymbolMarkingDefinition : MarkingDefinition
 
     public override string KindName => "Símbolo";
     public override string DisplayCode => Code;
+    public override double? PointZ => Z;
     public override void Translate(Vec2 delta, double dz) { Position += delta; Z += dz; }
 }
 
@@ -218,6 +229,7 @@ public sealed class TextMarkingDefinition : MarkingDefinition
 
     public override string KindName => "Legenda";
     public override string DisplayCode => "LEG";
+    public override double? PointZ => Z;
     public override void Translate(Vec2 delta, double dz) { Position += delta; Z += dz; }
 }
 
@@ -303,6 +315,158 @@ public sealed class DeviceMarkingDefinition : MarkingDefinition
 
     public override string KindName => "Dispositivo físico";
     public override string DisplayCode => Code;
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) => PathRef = path;
+}
+
+/// <summary>Área recortada de uma marca, com a marca que a originou (para limpeza automática).</summary>
+public sealed class ExclusionZone
+{
+    public string? SourceId { get; set; }
+    public List<Vec2> Points { get; set; } = new();
+}
+
+public enum TipoSuporte
+{
+    /// <summary>Coluna simples.</summary>
+    Simples,
+    /// <summary>Duas colunas (placas largas).</summary>
+    Duplo,
+    /// <summary>Sem suporte (fixada em poste/parede existente).</summary>
+    Nenhum,
+}
+
+/// <summary>Placa de sinalização vertical com suporte.</summary>
+public sealed class SignDefinition : MarkingDefinition
+{
+    public string Code { get; set; } = "R-1";
+    public Vec2 Position { get; set; }
+    /// <summary>Sentido do tráfego que lê a placa (a face fica voltada para o condutor que se aproxima).</summary>
+    public Vec2 Direction { get; set; } = Vec2.UnitY;
+    public double Z { get; set; }
+    public double? Width { get; set; }
+    public double? Height { get; set; }
+    /// <summary>Altura livre sob a placa (m). Vias urbanas: 2,10 m.</summary>
+    public double MountHeight { get; set; } = 2.10;
+    public TipoSuporte Support { get; set; } = TipoSuporte.Simples;
+    public double PostDiameter { get; set; } = 0.063;
+    /// <summary>Legenda substituta (vazio = a do catálogo; "-" = sem legenda).</summary>
+    public string? Legend { get; set; }
+    /// <summary>Deslocamento lateral da placa em relação ao suporte (m, + à direita do condutor).</summary>
+    public double LateralOffset { get; set; }
+
+    public override string KindName => "Placa";
+    public override string DisplayCode => Code;
+    public override double? PointZ => Z;
+    public override void Translate(Vec2 delta, double dz) { Position += delta; Z += dz; }
+}
+
+/// <summary>Elemento urbanístico viário (banco, poste, árvore, abrigo...), por ponto ou distribuído ao longo de um caminho.</summary>
+public sealed class UrbanElementDefinition : MarkingDefinition
+{
+    public string Code { get; set; } = "BANCO";
+    public bool UsePath { get; set; }
+    public PathReference PathRef { get; set; } = new();
+    public Vec2 Position { get; set; }
+    /// <summary>Direção para a qual o elemento está voltado.</summary>
+    public Vec2 Direction { get; set; } = Vec2.UnitY;
+    public double Z { get; set; }
+    public double? Spacing { get; set; }
+    public double Offset { get; set; }
+    public double StartOffset { get; set; } = 2;
+    public double EndSetback { get; set; } = 1;
+    /// <summary>Rotação em relação ao caminho (graus): 90 = voltado para a esquerda do caminho.</summary>
+    public double RotationDeg { get; set; } = 90;
+    public double? Length { get; set; }
+    public double? Width { get; set; }
+    public double? Height { get; set; }
+    public MarkingColor? Color { get; set; }
+
+    public override string KindName => "Elemento urbano";
+    public override string DisplayCode => Code;
+    public override PathReference? Path => UsePath ? PathRef : null;
+    public override double? PointZ => UsePath ? null : Z;
+    public override void SetPath(PathReference path) { PathRef = path; UsePath = true; }
+    public override void Translate(Vec2 delta, double dz) { Position += delta; Z += dz; }
+}
+
+public enum TipoRampa
+{
+    /// <summary>Rebaixamento de calçada com abas laterais (NBR 9050).</summary>
+    RebaixamentoComAbas,
+    /// <summary>Rebaixamento sem abas (laterais protegidas por canteiro/mobiliário).</summary>
+    RebaixamentoSemAbas,
+    /// <summary>Guia rebaixada / rampa de acesso de veículos.</summary>
+    AcessoVeiculos,
+}
+
+/// <summary>
+/// Rampa em calçada. O caminho tem 2 pontos: o 1º no meio-fio (face voltada para a pista) e o 2º
+/// para dentro da calçada, indicando o sentido da subida.
+/// </summary>
+public sealed class RampDefinition : MarkingDefinition
+{
+    public TipoRampa Type { get; set; } = TipoRampa.RebaixamentoComAbas;
+    public PathReference PathRef { get; set; } = new();
+    public double Width { get; set; } = 1.50;
+    public double Height { get; set; } = 0.15;
+    /// <summary>Inclinação da rampa (8,33 % = 0,0833).</summary>
+    public double Slope { get; set; } = 0.0833;
+    /// <summary>Inclinação das abas laterais (10 %).</summary>
+    public double FlareSlope { get; set; } = 0.10;
+    public bool Tactile { get; set; } = true;
+    public double TactileWidth { get; set; } = 0.40;
+    public MarkingColor TactileColor { get; set; } = MarkingColor.Amarela;
+    /// <summary>Recortar automaticamente calçadas/meios-fios sob a rampa.</summary>
+    public bool CutSidewalk { get; set; } = true;
+
+    public override string KindName => "Rampa";
+    public override string DisplayCode => Type switch
+    {
+        TipoRampa.AcessoVeiculos => "RAMPA-VEIC",
+        TipoRampa.RebaixamentoSemAbas => "RAMPA-PED",
+        _ => "RAMPA-ABAS",
+    };
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) => PathRef = path;
+}
+
+public enum TipoModeracao
+{
+    /// <summary>Ondulação transversal tipo A (quebra-mola).</summary>
+    OndulacaoA,
+    /// <summary>Ondulação transversal tipo B.</summary>
+    OndulacaoB,
+    /// <summary>Faixa elevada para travessia de pedestres.</summary>
+    FaixaElevada,
+    /// <summary>Lombada invertida (valeta/depressão transversal).</summary>
+    LombadaInvertida,
+}
+
+/// <summary>Dispositivo de moderação de tráfego atravessando a pista (caminho = bordo A → bordo B).</summary>
+public sealed class TrafficCalmingDefinition : MarkingDefinition
+{
+    public TipoModeracao Type { get; set; } = TipoModeracao.OndulacaoA;
+    public PathReference PathRef { get; set; } = new();
+    /// <summary>Extensão no sentido do tráfego (m). Nulo = padrão do tipo.</summary>
+    public double? Length { get; set; }
+    /// <summary>Altura (ou profundidade da lombada invertida) em m.</summary>
+    public double? Height { get; set; }
+    /// <summary>Faixa elevada: comprimento de cada rampa (m).</summary>
+    public double? RampLength { get; set; }
+    public bool Marking { get; set; } = true;
+    public MarkingColor? MarkingColor { get; set; }
+    /// <summary>Faixa elevada: pintar faixa de pedestres zebrada no platô.</summary>
+    public bool Crosswalk { get; set; } = true;
+
+    public override string KindName => "Moderação de tráfego";
+    public override string DisplayCode => Type switch
+    {
+        TipoModeracao.OndulacaoA => "OND-A",
+        TipoModeracao.OndulacaoB => "OND-B",
+        TipoModeracao.FaixaElevada => "FX-ELEV",
+        _ => "LOMB-INV",
+    };
     public override PathReference? Path => PathRef;
     public override void SetPath(PathReference path) => PathRef = path;
 }

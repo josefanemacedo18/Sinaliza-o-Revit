@@ -90,7 +90,7 @@ public static class LinearPatternGenerator
                     var pts = offPath.SubPoints(p.ParamAt(c0), p.ParamAt(c1));
                     if (pts.Count < 2) continue;
                     var polys = PolygonOps.Strip(pts, stripe.Largura);
-                    geo.AddRange(polys, color, type.Espessura, type.Unidades);
+                    geo.AddRange(polys, color, stripe.Espessura > 0 ? stripe.Espessura : type.Espessura, type.Unidades);
                 }
             }
 

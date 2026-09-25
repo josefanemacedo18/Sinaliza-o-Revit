@@ -1,0 +1,62 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.CalmingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
+        Title="Moderação de tráfego – quebra-molas, faixa elevada, lombada invertida" Width="1000" Height="660" MinWidth="820" MinHeight="540">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizaBIM;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="380"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+            <StackPanel>
+                <TextBlock Text="Dispositivo" Style="{StaticResource Title}"/>
+                <TextBlock Style="{StaticResource Hint}" Text="Clique os dois bordos da pista no eixo do dispositivo (repete até ESC), ou selecione uma linha atravessando a pista."/>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <TextBlock Text="Tipo" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox Grid.Column="1" x:Name="CbType" SelectionChanged="TypeChanged"/>
+                    <TextBlock Grid.Row="1" Text="Extensão no sentido do tráfego (m)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbLength" TextChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="2" Text="Altura / profundidade (m)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbHeight" TextChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="3" Text="Rampa da faixa elevada (m)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbRamp" TextChanged="AnyChanged"/>
+                    <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkMarking" Content="Pintura sobre o dispositivo" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                    <TextBlock Grid.Row="5" Text="Cor da pintura" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox Grid.Row="5" Grid.Column="1" x:Name="CbColor" SelectionChanged="AnyChanged"/>
+                    <CheckBox Grid.Row="6" Grid.ColumnSpan="2" x:Name="CkCrosswalk" Content="Faixa de pedestres zebrada no platô" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                </Grid>
+                <GroupBox x:Name="GbPath" Header="Posição">
+                    <StackPanel>
+                        <RadioButton x:Name="RbTwoPoints" GroupName="path" Content="Dois cliques nos bordos da pista" IsChecked="True"/>
+                        <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linha atravessando a pista (associativo)"/>
+                    </StackPanel>
+                </GroupBox>
+                <ui:OutputPanel x:Name="Output"/>
+            </StackPanel>
+        </ScrollViewer>
+        <DockPanel Grid.Column="1">
+            <TextBlock DockPanel.Dock="Top" Text="Pré-visualização (pista de 7 m, tráfego horizontal)" Style="{StaticResource Title}"/>
+            <TextBlock DockPanel.Dock="Bottom" x:Name="TxtWarnings" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
+                <ui:GeometryPreview x:Name="Preview"/>
+            </Border>
+        </DockPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="BtnOk" Content="Inserir" Style="{StaticResource Primary}" Click="OkClick" IsDefault="True"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

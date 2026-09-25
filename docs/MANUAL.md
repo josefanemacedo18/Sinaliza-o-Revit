@@ -1,6 +1,6 @@
-# Manual de uso
+# Manual de uso – SinalizaBIM
 
-Todos os comandos ficam na guia **Sinalização Viária** da faixa de opções. As janelas mostram uma
+Todos os comandos ficam na guia **SinalizaBIM** da faixa de opções. As janelas mostram uma
 **pré-visualização ao vivo** (com área pintada e extensão) gerada pelo mesmo motor que cria os
 elementos no Revit, e avisos quando uma dimensão sai do intervalo de referência do MBST.
 
@@ -198,5 +198,41 @@ Painel **Representação no Revit** (em todas as janelas):
 * **Catálogo**: abre o JSON para edição, recarrega ou restaura o padrão. Formato em
   [CATALOGO.md](CATALOGO.md).
 
-Arquivos do usuário ficam em `%AppData%\SinalizacaoViaria\` (configurações, catálogo, parâmetros
+Arquivos do usuário ficam em `%AppData%\SinalizaBIM\` (configurações, catálogo, parâmetros
 compartilhados e `log.txt`).
+
+## 12. Sinalização vertical (Placas)
+
+Escolha a categoria e a placa, ajuste o tamanho (lista com os tamanhos usuais ou valor livre),
+a legenda (ex.: velocidade na R-19; "-" remove a legenda), o suporte (coluna simples, duas colunas
+ou sem suporte) e a altura livre sob a placa (2,10 m em calçadas). 1º clique: posição do suporte;
+2º clique: sentido do tráfego que lê a placa – a face fica voltada para quem se aproxima. A vista
+frontal da janela mostra a placa como o condutor a vê.
+
+## 13. Urbanismo e drenagem
+
+* **Meio-fio e Sarjeta**: meios-fios de vários tipos, sarjetas, sarjetões (clique os dois bordos),
+  calçadas, gramados e faixas de caminhada azuis/verdes ao longo de qualquer linha. No meio-fio com
+  sarjeta conjugada, desenhe na face do meio-fio com a calçada à esquerda.
+* **Sinalizar Via**: a calçada tem a opção **Sarjeta** (padrão 0,30 m) – a linha de bordo é afastada
+  automaticamente; a **Faixa de caminhada** é um elemento da seção (azul ou verde, bordas brancas e
+  símbolo de pedestre repetido).
+* **Rampas**: 1º clique no centro da rampa, na face do meio-fio; 2º clique para dentro da calçada.
+  A rampa, as abas e o piso tátil são gerados em 3D e a calçada, o meio-fio e o gramado sob ela são
+  recortados. Excluir a rampa e usar **Atualizar Todas** restaura a calçada.
+* **Elementos urbanos**: por ponto (posição + direção) ou distribuídos ao longo de linhas com
+  espaçamento, deslocamento e rotação (ex.: árvores a cada 8 m, postes a cada 30 m).
+
+## 14. Moderação de tráfego
+
+Quebra-molas tipo A (3,70 m × 0,08 m) e tipo B (1,50 m × 0,06 m), faixa elevada (platô + rampas de
+1,50 m, 0,15 m de altura, zebrado no platô) e lombada invertida. Clique os dois bordos da pista.
+As dimensões padrão devem ser conferidas com as resoluções do CONTRAN vigentes; lembre-se da
+sinalização vertical obrigatória (ex.: A-18).
+
+## 15. Ciclofaixa com medidas personalizadas
+
+No **Sinalizar Via**, selecione a ciclofaixa para ajustar: largura, largura da linha de delimitação,
+linha contínua ou seccionada (traço/espaço), tamanho do símbolo da bicicleta e da seta, distância
+entre eles, espaçamento das inscrições, pintura vermelha, bidirecional com linha central amarela e
+segregação física.

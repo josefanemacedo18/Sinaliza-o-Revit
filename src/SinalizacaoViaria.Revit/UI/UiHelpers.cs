@@ -82,5 +82,5 @@ public static class UiHelpers
 
     public static MarkingColor? SelectedColor(ComboBox cb) => (cb.SelectedItem as ColorItem)?.Color;
 
-    public static void Error(string msg) => MessageBox.Show(msg, "Sinalização Viária", MessageBoxButton.OK, MessageBoxImage.Warning);
+    public static void Error(string msg) => MessageBox.Show(msg, "SinalizaBIM", MessageBoxButton.OK, MessageBoxImage.Warning);
 }

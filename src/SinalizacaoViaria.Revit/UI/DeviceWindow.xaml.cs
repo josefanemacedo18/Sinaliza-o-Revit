@@ -18,7 +18,7 @@ public partial class DeviceWindow : Window
     public PathMode PathMode { get; private set; }
     public bool PickSurfaces => Output.PickSurfaces;
 
-    public DeviceWindow(DeviceMarkingDefinition? existing = null)
+    public DeviceWindow(DeviceMarkingDefinition? existing = null, string? initialCode = null)
     {
         InitializeComponent();
         _existing = existing;
@@ -48,7 +48,7 @@ public partial class DeviceWindow : Window
         else
         {
             Output.Load(PluginContext.Settings.NewOutput());
-            LbTypes.SelectedItem = _cat.Dispositivo(PluginContext.Settings.Get("device")) ?? _cat.Dispositivos.FirstOrDefault();
+            LbTypes.SelectedItem = _cat.Dispositivo(initialCode ?? PluginContext.Settings.Get("device")) ?? _cat.Dispositivos.FirstOrDefault();
         }
         _loading = false;
         UpdatePreview();

@@ -100,6 +100,8 @@ public partial class RoadWindow : Window
             CbDispositivo.Items.Add(new Option<string?>(d.Nome, d.Codigo));
         }
         foreach (var v in _cat.Vagas) CbVaga.Items.Add(new Option<string>(v.Nome, v.Codigo));
+        CbCorCaminhada.Items.Add(new Option<MarkingColor>("Azul", MarkingColor.Azul));
+        CbCorCaminhada.Items.Add(new Option<MarkingColor>("Verde", MarkingColor.Verde));
 
         foreach (var t in _cat.LinearesDoGrupo(GrupoMarca.Longitudinal).Where(t => t.Codigo.StartsWith("LMS") || t.Codigo.StartsWith("LCO")))
             CbDivider.Items.Add(t.Codigo);
@@ -352,6 +354,10 @@ public partial class RoadWindow : Window
             Show(walk, LblServico, TbServico, LblAcesso, TbAcesso, CkGramado);
             Show(bike, CkFundo, CkBidirecional);
             Show(t is not (TipoElementoSecao.Calcada or TipoElementoSecao.FaixaSeguranca), LblDisp, CbDispositivo);
+            Show(walk, LblSarjeta, TbSarjeta);
+            Show(t == TipoElementoSecao.FaixaCaminhada, LblCorCaminhada, CbCorCaminhada, LblEsp, TbEspacamento);
+            if (bus || bike) Show(true, LblEsp, TbEspacamento);
+            Show(bike, LblLarguraLinha, TbLarguraLinha, CkSeccionada, LblTraco, PanelTraco, LblSimbolo, PanelSimbolo, LblDistSeta, TbDistSeta, CkLinhaCentral);
 
             Select(CbVaga, e.Vaga);
             TbLegenda.Text = e.Legenda;
@@ -362,6 +368,16 @@ public partial class RoadWindow : Window
             CkFundo.IsChecked = e.PinturaFundo;
             CkBidirecional.IsChecked = e.Bidirecional;
             Select(CbDispositivo, e.Dispositivo);
+            TbSarjeta.Text = UiHelpers.F(e.Sarjeta);
+            Select(CbCorCaminhada, e.CorCaminhada);
+            TbLarguraLinha.Text = UiHelpers.F(e.LarguraLinha);
+            CkSeccionada.IsChecked = e.LinhaSeccionada;
+            TbTraco.Text = UiHelpers.F(e.TracoLinha);
+            TbEspacoLinha.Text = UiHelpers.F(e.EspacoLinha);
+            TbTamSimbolo.Text = UiHelpers.F(e.TamanhoSimbolo);
+            TbTamSeta.Text = UiHelpers.F(e.TamanhoSeta);
+            TbDistSeta.Text = UiHelpers.F(e.DistanciaSeta);
+            CkLinhaCentral.IsChecked = e.LinhaCentral;
         }
         finally
         {
@@ -387,6 +403,17 @@ public partial class RoadWindow : Window
         el.PinturaFundo = CkFundo.IsChecked == true;
         el.Bidirecional = CkBidirecional.IsChecked == true;
         el.Dispositivo = Selected<string?>(CbDispositivo);
+        double Num(TextBox tb, double current, double min = 0) => UiHelpers.ParseOpt(tb.Text) is { } v && v >= min ? v : current;
+        el.Sarjeta = Num(TbSarjeta, el.Sarjeta);
+        if (CbCorCaminhada.SelectedItem is Option<MarkingColor> cc) el.CorCaminhada = cc.Value;
+        el.LarguraLinha = Num(TbLarguraLinha, el.LarguraLinha, 0.02);
+        el.LinhaSeccionada = CkSeccionada.IsChecked == true;
+        el.TracoLinha = Num(TbTraco, el.TracoLinha, 0.05);
+        el.EspacoLinha = Num(TbEspacoLinha, el.EspacoLinha);
+        el.TamanhoSimbolo = Num(TbTamSimbolo, el.TamanhoSimbolo, 0.2);
+        el.TamanhoSeta = Num(TbTamSeta, el.TamanhoSeta);
+        el.DistanciaSeta = Num(TbDistSeta, el.DistanciaSeta);
+        el.LinhaCentral = CkLinhaCentral.IsChecked == true;
         SchedulePreview();
     }
 

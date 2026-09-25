@@ -51,6 +51,7 @@ public static class SymbolBuilder
             FormaSimbolo.DePreferencia => YieldTriangle(L, widthFactor),
             FormaSimbolo.CruzSantoAndre => SaintAndrew(L, widthFactor),
             FormaSimbolo.ServicoSaude => HealthCross(L),
+            FormaSimbolo.Pedestre => Pedestrian(L),
             _ => StraightArrow(L, widthFactor),
         };
 
@@ -218,6 +219,19 @@ public static class SymbolBuilder
         var parts = new List<Polygon2>();
         parts.AddRange(PolygonOps.Strip(new[] { new Vec2(-hx, 0), new Vec2(hx, L) }, w));
         parts.AddRange(PolygonOps.Strip(new[] { new Vec2(hx, 0), new Vec2(-hx, L) }, w));
+        return PolygonOps.Union(parts);
+    }
+
+    private static List<Polygon2> Pedestrian(double L)
+    {
+        Vec2 P(double u, double v) => new(u * L, v * L);
+        var parts = new List<Polygon2> { new(CurveTools.Circle(P(0.02, 0.90), 0.07 * L)) };
+        void S(double w, params Vec2[] pts) => parts.AddRange(PolygonOps.Strip(pts, w * L, roundJoins: true));
+        S(0.09, P(0, 0.78), P(-0.02, 0.45));
+        S(0.075, P(-0.02, 0.47), P(-0.16, 0.25), P(-0.14, 0.02));
+        S(0.075, P(-0.02, 0.47), P(0.10, 0.25), P(0.20, 0.04));
+        S(0.06, P(0, 0.74), P(-0.15, 0.58), P(-0.20, 0.45));
+        S(0.06, P(0, 0.74), P(0.12, 0.60), P(0.20, 0.55));
         return PolygonOps.Union(parts);
     }
 

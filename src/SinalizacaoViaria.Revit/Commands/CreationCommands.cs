@@ -90,9 +90,11 @@ public sealed class CmdFaixaPedestres : CommandBase
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdZebrado : CommandBase
 {
-    protected override Result Run(UIApplication app, UIDocument uidoc)
+    protected override Result Run(UIApplication app, UIDocument uidoc) => RunWith(uidoc, null);
+
+    internal static Result RunWith(UIDocument uidoc, string? initialCode)
     {
-        var w = new HatchWindow();
+        var w = new HatchWindow(null, initialCode);
         if (UiHelpers.ShowModal(w) != true || w.Result == null) return Result.Cancelled;
         PluginContext.SaveSettings();
         var def = w.Result;

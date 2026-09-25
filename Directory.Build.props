@@ -3,9 +3,9 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>1.0.0</Version>
+    <Version>2.0.0</Version>
     <Company>Sinalização Viária Revit</Company>
-    <Product>SinalizaViaria – Sinalização Horizontal para Revit 2027</Product>
+    <Product>SinalizaBIM – Sinalização viária e urbanização para Revit 2027</Product>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 </Project>

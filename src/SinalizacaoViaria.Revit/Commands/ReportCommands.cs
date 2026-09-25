@@ -161,8 +161,8 @@ public sealed class CmdSobre : CommandBase
         var version = Assembly.GetExecutingAssembly().GetName().Version;
         var td = new TaskDialog(AppTitle)
         {
-            MainInstruction = $"Sinalização Viária Horizontal para Revit 2027 – versão {version}",
-            MainContent = "Projeto paramétrico de sinalização horizontal: marcas longitudinais e transversais, canalização, " +
+            MainInstruction = $"SinalizaBIM para Revit 2027 – versão {version}",
+            MainContent = "Projeto paramétrico de sinalização viária horizontal e vertical, urbanização, moderação de tráfego, dispositivos físicos e mobiliário urbano, " +
                           "inscrições, estacionamento, dispositivos e acessibilidade, com atualização automática e quantitativos.\n\n" + cat.Aviso,
             ExpandedContent = "NORMAS DE REFERÊNCIA\n" + sb + "\nCORES (MBST)\n" + colors,
             FooterText = $"Configurações e registro: {PluginPaths.Root}",

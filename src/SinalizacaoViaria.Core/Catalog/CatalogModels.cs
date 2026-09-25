@@ -17,6 +17,9 @@ public enum GrupoMarca
     Ciclovia,
     /// <summary>Calçadas, meios-fios e canteiros (elementos físicos da seção transversal).</summary>
     Urbanizacao,
+    SinalizacaoVertical,
+    Mobiliario,
+    Moderacao,
 }
 
 /// <summary>Como o padrão tracejado é posicionado ao longo do caminho.</summary>
@@ -50,11 +53,14 @@ public sealed class FaixaDef
     /// <summary>Cor específica da faixa (senão usa a cor da marca).</summary>
     public MarkingColor? Cor { get; set; }
 
+    /// <summary>Altura/espessura específica da faixa (m). 0 = a do tipo.</summary>
+    public double Espessura { get; set; }
+
     public bool Continua => Padrao.Length == 0;
 
     public FaixaDef Clone() => new()
     {
-        Deslocamento = Deslocamento, Largura = Largura, Padrao = (double[])Padrao.Clone(), Repetir = Repetir, Cor = Cor,
+        Deslocamento = Deslocamento, Largura = Largura, Padrao = (double[])Padrao.Clone(), Repetir = Repetir, Cor = Cor, Espessura = Espessura,
     };
 }
 
@@ -157,6 +163,7 @@ public enum FormaSimbolo
     DePreferencia,
     CruzSantoAndre,
     ServicoSaude,
+    Pedestre,
 }
 
 public sealed class SimboloDef
@@ -243,6 +250,90 @@ public enum FormaDispositivo
     NewJersey,
     /// <summary>Postes a cada espaçamento + lâmina contínua (defensa metálica).</summary>
     Defensa,
+    /// <summary>Defensa dupla (lâminas nos dois lados dos postes – canteiros centrais).</summary>
+    DefensaDupla,
+}
+
+/// <summary>Formato da chapa de uma placa de sinalização vertical.</summary>
+public enum FormaPlaca
+{
+    Circulo,
+    Octogono,
+    TrianguloInvertido,
+    Losango,
+    Retangulo,
+    Quadrado,
+}
+
+/// <summary>Categoria da sinalização vertical (MBST Vol. I a III e sinalização de obras).</summary>
+public enum CategoriaPlaca
+{
+    Regulamentacao,
+    Advertencia,
+    Indicacao,
+    Educativa,
+    Servicos,
+    Turistica,
+    Obras,
+}
+
+/// <summary>Placa de sinalização vertical.</summary>
+public sealed class PlacaDef
+{
+    public string Codigo { get; set; } = "";
+    public string Nome { get; set; } = "";
+    public CategoriaPlaca Categoria { get; set; }
+    public FormaPlaca Forma { get; set; } = FormaPlaca.Circulo;
+    /// <summary>Largura / diâmetro / lado (m).</summary>
+    public double Largura { get; set; } = 0.50;
+    /// <summary>Altura (m) – usada em retângulos.</summary>
+    public double Altura { get; set; } = 0.50;
+    /// <summary>Cor de fundo (área interna).</summary>
+    public MarkingColor CorFundo { get; set; } = MarkingColor.Branca;
+    /// <summary>Cor da orla (borda).</summary>
+    public MarkingColor CorOrla { get; set; } = MarkingColor.Vermelha;
+    /// <summary>Largura da orla em fração da largura da placa.</summary>
+    public double Orla { get; set; } = 0.10;
+    /// <summary>Legenda aplicada sobre a placa (ex.: PARE, 40). Vazio = sem legenda.</summary>
+    public string? Legenda { get; set; }
+    public MarkingColor CorLegenda { get; set; } = MarkingColor.Preta;
+    /// <summary>Tamanhos alternativos (largura em m) oferecidos na interface.</summary>
+    public double[] Tamanhos { get; set; } = Array.Empty<double>();
+    public string Descricao { get; set; } = "";
+    public string Referencia { get; set; } = "";
+    public override string ToString() => $"{Codigo} – {Nome}";
+}
+
+/// <summary>Tipos de mobiliário/elementos urbanísticos viários.</summary>
+public enum FormaMobiliario
+{
+    Banco,
+    Lixeira,
+    PosteIluminacao,
+    Arvore,
+    AbrigoOnibus,
+    Paraciclo,
+    Hidrante,
+    Floreira,
+    PlacaLogradouro,
+    Semaforo,
+}
+
+/// <summary>Elemento urbanístico viário (mobiliário urbano).</summary>
+public sealed class MobiliarioDef
+{
+    public string Codigo { get; set; } = "";
+    public string Nome { get; set; } = "";
+    public FormaMobiliario Forma { get; set; }
+    public double Comprimento { get; set; } = 1.0;
+    public double Largura { get; set; } = 0.5;
+    public double Altura { get; set; } = 1.0;
+    public MarkingColor Cor { get; set; } = MarkingColor.Metal;
+    /// <summary>Espaçamento padrão ao distribuir ao longo de um caminho (m).</summary>
+    public double Espacamento { get; set; } = 10;
+    public string Descricao { get; set; } = "";
+    public string Referencia { get; set; } = "";
+    public override string ToString() => $"{Codigo} – {Nome}";
 }
 
 /// <summary>Dispositivo físico de bloqueio, segregação ou canalização implantado junto à sinalização horizontal.</summary>
@@ -302,6 +393,14 @@ public sealed class Catalogo
     public List<VagaDef> Vagas { get; set; } = new();
     public List<MaterialDef> Materiais { get; set; } = new();
     public List<DispositivoDef> Dispositivos { get; set; } = new();
+    public List<PlacaDef> Placas { get; set; } = new();
+    public List<MobiliarioDef> Mobiliario { get; set; } = new();
+
+    public PlacaDef? Placa(string? codigo) =>
+        Placas.FirstOrDefault(d => string.Equals(d.Codigo, codigo, StringComparison.OrdinalIgnoreCase));
+
+    public MobiliarioDef? Movel(string? codigo) =>
+        Mobiliario.FirstOrDefault(d => string.Equals(d.Codigo, codigo, StringComparison.OrdinalIgnoreCase));
 
     public DispositivoDef? Dispositivo(string? codigo) =>
         Dispositivos.FirstOrDefault(d => string.Equals(d.Codigo, codigo, StringComparison.OrdinalIgnoreCase));

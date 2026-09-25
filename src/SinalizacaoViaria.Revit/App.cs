@@ -18,7 +18,7 @@ public sealed class App : IExternalApplication
         catch (Exception ex)
         {
             Log.Error("OnStartup", ex);
-            TaskDialog.Show("Sinalização Viária", "Falha ao iniciar o plugin: " + ex.Message);
+            TaskDialog.Show("SinalizaBIM", "Falha ao iniciar o plugin: " + ex.Message);
             return Result.Failed;
         }
     }

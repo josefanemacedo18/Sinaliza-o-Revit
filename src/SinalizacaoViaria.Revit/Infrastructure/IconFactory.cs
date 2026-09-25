@@ -116,6 +116,47 @@ public static class IconFactory
                     dc.DrawEllipse(B(Yellow), null, new Point(x, 26), 4, 1.8);
                 }
                 break;
+            case "placa":
+                dc.DrawRectangle(B(Color.FromRgb(140, 146, 154)), null, new Rect(15, 14, 2.5, 17));
+                dc.DrawEllipse(B(Red), null, new Point(16, 10), 9, 9);
+                dc.DrawEllipse(B(White), null, new Point(16, 10), 6.5, 6.5);
+                Text(dc, "40", 8, Asphalt, new Point(16, 4.5), true);
+                break;
+            case "quebramola":
+                RoadBackground(dc);
+                dc.DrawGeometry(B(Color.FromRgb(90, 94, 100)), null, Close(Poly(new Point(2, 24), new Point(8, 16), new Point(16, 13), new Point(24, 16), new Point(30, 24))));
+                for (int x = 5; x < 29; x += 5) dc.DrawLine(P(Yellow, 2), new Point(x, 23), new Point(x + 3, 15));
+                break;
+            case "rampa":
+                dc.DrawRectangle(B(Color.FromRgb(200, 198, 190)), null, new Rect(1, 4, 30, 14));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 18, 30, 12));
+                dc.DrawGeometry(B(Color.FromRgb(225, 223, 215)), P(Asphalt, 0.8), Close(Poly(new Point(6, 18), new Point(26, 18), new Point(21, 8), new Point(11, 8))));
+                dc.DrawRectangle(B(Yellow), null, new Rect(10.5, 15.5, 11, 2.5));
+                break;
+            case "mobiliario":
+                dc.DrawEllipse(B(Color.FromRgb(98, 158, 74)), null, new Point(10, 10), 8, 8);
+                dc.DrawRectangle(B(Color.FromRgb(120, 78, 44)), null, new Rect(9, 16, 2.5, 13));
+                dc.DrawRectangle(B(Color.FromRgb(120, 78, 44)), null, new Rect(16, 21, 14, 3));
+                dc.DrawRectangle(B(Color.FromRgb(140, 146, 154)), null, new Rect(17, 24, 2, 6));
+                dc.DrawRectangle(B(Color.FromRgb(140, 146, 154)), null, new Rect(27, 24, 2, 6));
+                break;
+            case "conflito":
+                RoadBackground(dc);
+                dc.PushClip(new RectangleGeometry(new Rect(5, 5, 22, 22)));
+                for (int i = -24; i < 30; i += 6)
+                {
+                    dc.DrawLine(P(Yellow, 1.5), new Point(i, 5), new Point(i + 22, 27));
+                    dc.DrawLine(P(Yellow, 1.5), new Point(i + 22, 5), new Point(i, 27));
+                }
+                dc.Pop();
+                dc.DrawRectangle(null, P(Yellow, 1.5), new Rect(5, 5, 22, 22));
+                break;
+            case "guardrail":
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 24, 30, 7));
+                for (int x = 4; x < 30; x += 12) dc.DrawRectangle(B(Color.FromRgb(120, 126, 134)), null, new Rect(x, 10, 3, 15));
+                dc.DrawRectangle(B(Color.FromRgb(175, 182, 190)), P(Asphalt, 0.6), new Rect(1, 11, 30, 6));
+                dc.DrawLine(P(Color.FromRgb(120, 126, 134), 1), new Point(1, 14), new Point(31, 14));
+                break;
             case "tatil":
                 dc.DrawRoundedRectangle(B(Yellow), null, new Rect(2, 2, 28, 28), 3, 3);
                 for (int x = 7; x < 30; x += 6)

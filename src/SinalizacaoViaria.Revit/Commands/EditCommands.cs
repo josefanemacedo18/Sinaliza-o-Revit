@@ -65,6 +65,10 @@ public sealed class CmdEditar : CommandBase
             ParkingMarkingDefinition p => Show(new ParkingWindow(p), w => w.Result),
             RepeatedMarkingDefinition r => Show(new RepeatedWindow(r), w => w.Result),
             DeviceMarkingDefinition dv => Show(new DeviceWindow(dv), w => w.Result),
+            SignDefinition sg => Show(new SignWindow(sg), w => w.Result),
+            UrbanElementDefinition ue => Show(new UrbanWindow(ue), w => w.Result),
+            RampDefinition rp => Show(new RampWindow(rp), w => w.Result),
+            TrafficCalmingDefinition tc => Show(new CalmingWindow(tc), w => w.Result),
             _ => null,
         };
         if (edited == null) return Result.Cancelled;
@@ -72,6 +76,7 @@ public sealed class CmdEditar : CommandBase
         edited.Id = stored.MarkingId;
         EnsureDetailView(uidoc, edited.Output, keepExistingView: true);
         var results = MarkingCreator.Commit(uidoc, new[] { edited }, $"SV - Editar {edited.DisplayCode}");
+        if (edited is RampDefinition ramp) RampCutter.Apply(uidoc, ramp);
         Report("Edição", results);
         return Result.Succeeded;
     }

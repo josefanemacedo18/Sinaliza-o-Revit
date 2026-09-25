@@ -14,6 +14,14 @@ public enum MarkingColor
     Grama,
     /// <summary>Metal (defensas, balizadores metálicos) – elemento físico.</summary>
     Metal,
+    /// <summary>Verde (faixa de caminhada, placas de indicação).</summary>
+    Verde,
+    /// <summary>Laranja (sinalização de obras).</summary>
+    Laranja,
+    /// <summary>Marrom (placas de atrativos turísticos, madeira de mobiliário).</summary>
+    Marrom,
+    /// <summary>Pavimento asfáltico (volumes de quebra-molas e faixas elevadas) – elemento físico.</summary>
+    Asfalto,
 }
 
 public readonly record struct Rgb(byte R, byte G, byte B)
@@ -37,7 +45,8 @@ public static class MarkingColors
     };
 
     /// <summary>Verdadeiro para cores de demarcação (tinta); falso para materiais físicos.</summary>
-    public static bool IsPaint(MarkingColor c) => c <= MarkingColor.Preta;
+    public static bool IsPaint(MarkingColor c) =>
+        c is not (MarkingColor.Concreto or MarkingColor.Grama or MarkingColor.Metal or MarkingColor.Asfalto);
 
     /// <summary>Cor RGB aproximada para exibição no Revit (materiais e regiões preenchidas).</summary>
     public static Rgb Display(MarkingColor c) => c switch
@@ -50,6 +59,10 @@ public static class MarkingColors
         MarkingColor.Concreto => new Rgb(188, 186, 180),
         MarkingColor.Grama => new Rgb(98, 158, 74),
         MarkingColor.Metal => new Rgb(148, 156, 166),
+        MarkingColor.Verde => new Rgb(0, 128, 72),
+        MarkingColor.Laranja => new Rgb(240, 120, 20),
+        MarkingColor.Marrom => new Rgb(120, 78, 44),
+        MarkingColor.Asfalto => new Rgb(72, 74, 78),
         _ => new Rgb(128, 128, 128),
     };
 
@@ -64,6 +77,10 @@ public static class MarkingColors
         MarkingColor.Concreto => "Calçadas, meios-fios, barreiras e dispositivos de concreto.",
         MarkingColor.Grama => "Canteiros e faixas de serviço ajardinadas.",
         MarkingColor.Metal => "Defensas e dispositivos metálicos.",
+        MarkingColor.Verde => "Faixas de caminhada e placas de indicação.",
+        MarkingColor.Laranja => "Sinalização temporária de obras.",
+        MarkingColor.Marrom => "Placas de atrativos turísticos e mobiliário em madeira.",
+        MarkingColor.Asfalto => "Volumes de quebra-molas, lombadas e faixas elevadas.",
         _ => "",
     };
 

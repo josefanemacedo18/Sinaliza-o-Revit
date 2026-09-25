@@ -5,10 +5,10 @@ using SinalizacaoViaria.Revit.Infrastructure;
 
 namespace SinalizacaoViaria.Revit;
 
-/// <summary>Monta a guia "Sinalização Viária" na faixa de opções.</summary>
+/// <summary>Monta a guia "SinalizaBIM" na faixa de opções.</summary>
 public static class RibbonBuilder
 {
-    public const string TabName = "Sinalização Viária";
+    public const string TabName = "SinalizaBIM";
     private static readonly string AssemblyPath = Assembly.GetExecutingAssembly().Location;
 
     public static void Build(UIControlledApplication app)
@@ -20,8 +20,8 @@ public static class RibbonBuilder
             "Monta a seção transversal completa a partir do eixo: faixas de rolamento, exclusivas e preferenciais, ciclofaixas, estacionamento, acostamentos, faixas de segurança, canteiros centrais e laterais, calçadas e dispositivos de segregação – com toda a sinalização.");
         Large(via, typeof(CmdLinhaLongitudinal), "Linha\nLongitudinal", "linha",
             "LFO-1 a LFO-4, LMS-1/2, LBO, LCO, faixas exclusivas, LCA e LPP ao longo de linhas do modelo.");
-        Large(via, typeof(CmdCalcadas), "Calçada e\nCanteiro", "calcada",
-            "Calçadas, meios-fios e canteiros gramados ao longo de qualquer linha (elementos físicos 3D).");
+        Large(via, typeof(CmdCalcadas), "Meio-fio e\nSarjeta", "calcada",
+            "Meios-fios (vários tipos), sarjetas, sarjetões, calçadas, canteiros gramados e faixas de caminhada azuis/verdes ao longo de qualquer linha.");
         Large(via, typeof(CmdDesenharEixo), "Desenhar\nEixo", "eixo",
             "Desenha um eixo/caminho por pontos com o estilo de linha 'SV - Eixo de sinalização'.");
 
@@ -34,6 +34,22 @@ public static class RibbonBuilder
         var areas = app.CreateRibbonPanel(TabName, "Canalização");
         Large(areas, typeof(CmdZebrado), "Zebrado", "zebrado",
             "Zebrados (ZPA), chevrons, áreas de conflito e lombadas em qualquer contorno fechado, com linha de canalização.");
+        Large(areas, typeof(CmdAreaConflito), "Área de\nConflito", "conflito",
+            "Marcação de área de conflito (quadriculado amarelo) em cruzamentos que não devem ser bloqueados.");
+
+        var vert = app.CreateRibbonPanel(TabName, "Sinalização Vertical");
+        Large(vert, typeof(CmdPlacas), "Placas", "placa",
+            "Placas de regulamentação, advertência, indicação, educativas, turísticas e de obras, com suporte, altura livre e legenda – em 3D.");
+
+        var mod = app.CreateRibbonPanel(TabName, "Moderação de Tráfego");
+        Large(mod, typeof(CmdModeracao), "Quebra-mola\ne Lombadas", "quebramola",
+            "Ondulações transversais tipo A e B, faixa elevada para travessia e lombada invertida, com volume 3D e pintura.");
+
+        var urb = app.CreateRibbonPanel(TabName, "Urbanismo");
+        Large(urb, typeof(CmdRampa), "Rampas", "rampa",
+            "Rebaixamentos de calçada (NBR 9050) com abas e piso tátil, e guias rebaixadas de veículos – recortam a calçada automaticamente.");
+        Large(urb, typeof(CmdMobiliario), "Elementos\nUrbanos", "mobiliario",
+            "Bancos, lixeiras, postes de iluminação, árvores, abrigos de ônibus, paraciclos, hidrantes, floreiras, placas de rua e semáforos.");
 
         var insc = app.CreateRibbonPanel(TabName, "Inscrições");
         Large(insc, typeof(CmdSimbolos), "Setas e\nSímbolos", "seta",
@@ -52,6 +68,8 @@ public static class RibbonBuilder
             Data(typeof(CmdCiclovia), "Ciclovia", "ciclo", "Linhas de ciclofaixa, pintura vermelha e cruzamento rodocicloviário (MCC)."));
 
         var seg = app.CreateRibbonPanel(TabName, "Segregação Física");
+        Large(seg, typeof(CmdGuardRail), "Guard\nRail", "guardrail",
+            "Defensas metálicas simples, duplas e de cabos ao longo de bordos, canteiros e obras de arte.");
         Large(seg, typeof(CmdDispositivos), "Bloqueios\nFísicos", "bloqueio",
             "Segregadores (tartarugas), tachões, balizadores flexíveis, cilindros, pilaretes, prismas, barreiras New Jersey e modulares, separadores e defensas metálicas.");
 

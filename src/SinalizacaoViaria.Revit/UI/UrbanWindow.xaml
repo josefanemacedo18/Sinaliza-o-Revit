@@ -1,0 +1,87 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.UrbanWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
+        Title="Elementos urbanísticos viários" Width="1100" Height="700" MinWidth="900" MinHeight="580">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizaBIM;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280"/>
+            <ColumnDefinition Width="330"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <DockPanel Margin="0,0,12,0">
+            <TextBlock DockPanel.Dock="Top" Text="Elemento" Style="{StaticResource Title}"/>
+            <Border DockPanel.Dock="Bottom" Background="{StaticResource Panel}" Padding="8" Margin="0,6,0,0">
+                <StackPanel>
+                    <TextBlock x:Name="TxtDescription" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TxtReference" Style="{StaticResource Hint}" FontStyle="Italic"/>
+                </StackPanel>
+            </Border>
+            <ListBox x:Name="LbTypes" SelectionChanged="TypeChanged"/>
+        </DockPanel>
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+            <StackPanel>
+                <TextBlock Text="Parâmetros" Style="{StaticResource Title}"/>
+                <GroupBox Header="Dimensões">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Comprimento (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Column="1" x:Name="TbLength" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="1" Text="Largura (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbWidth" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="2" Text="Altura (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbHeight" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="3" Text="Cor / material" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="3" Grid.Column="1" x:Name="CbColor" SelectionChanged="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox x:Name="GbPlacement" Header="Inserção">
+                    <StackPanel>
+                        <RadioButton x:Name="RbPoint" GroupName="mode" Content="Por ponto: posição + direção (2 cliques, repete)" IsChecked="True" Checked="AnyChanged"/>
+                        <RadioButton x:Name="RbPath" GroupName="mode" Content="Distribuir ao longo de linhas (associativo)" Checked="AnyChanged"/>
+                        <RadioButton x:Name="RbDraw" GroupName="mode" Content="Distribuir ao longo de um caminho desenhado" Checked="AnyChanged"/>
+                        <Grid x:Name="PanelPath" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <TextBlock Text="Espaçamento (m)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" x:Name="TbSpacing" TextChanged="AnyChanged"/>
+                            <TextBlock Grid.Row="1" Text="Deslocamento lateral (m)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbOffset" Text="0" TextChanged="AnyChanged"/>
+                            <TextBlock Grid.Row="2" Text="Início / recuo final (m)" Style="{StaticResource FieldLabel}"/>
+                            <Grid Grid.Row="2" Grid.Column="1">
+                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="6"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                <TextBox x:Name="TbStart" Text="2" TextChanged="AnyChanged"/>
+                                <TextBox Grid.Column="2" x:Name="TbEnd" Text="1" TextChanged="AnyChanged"/>
+                            </Grid>
+                            <TextBlock Grid.Row="3" Text="Rotação em relação ao caminho (°)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbRotation" Text="90" TextChanged="AnyChanged" ToolTip="90 = voltado para a esquerda do caminho; -90 = para a direita"/>
+                        </Grid>
+                    </StackPanel>
+                </GroupBox>
+                <ui:OutputPanel x:Name="Output"/>
+            </StackPanel>
+        </ScrollViewer>
+        <DockPanel Grid.Column="2">
+            <TextBlock DockPanel.Dock="Top" Text="Pré-visualização em planta" Style="{StaticResource Title}"/>
+            <TextBlock DockPanel.Dock="Bottom" x:Name="TxtWarnings" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
+                <ui:GeometryPreview x:Name="Preview"/>
+            </Border>
+        </DockPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="BtnOk" Content="Inserir" Style="{StaticResource Primary}" Click="OkClick" IsDefault="True"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

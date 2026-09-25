@@ -1,6 +1,6 @@
-# Sinalização Viária Horizontal para Revit 2027
+# SinalizaBIM – Sinalização viária e urbanização para Revit 2027
 
-Plugin para projetar **sinalização viária horizontal paramétrica** dentro do **Autodesk Revit 2027**,
+**SinalizaBIM** é um plugin para projetar **sinalização viária horizontal e vertical paramétrica, urbanização e moderação de tráfego** dentro do **Autodesk Revit 2027**,
 com base no *Manual Brasileiro de Sinalização de Trânsito – Vol. IV (CONTRAN/SENATRAN)*, nas
 normas ABNT de acessibilidade (NBR 9050, NBR 16537) e nas práticas do DNIT. Faz no Revit o que
 ferramentas como o *SinC* fazem no Civil 3D: você desenha o eixo, escolhe a marca e o plugin gera,
@@ -17,7 +17,7 @@ que o plugin usa dentro do Revit.*
 
 ## O que o plugin faz
 
-| Guia **Sinalização Viária** | Recursos |
+| Guia **SinalizaBIM** | Recursos |
 |---|---|
 | **Sinalizar Via** | Monta a **seção transversal completa** a partir do eixo, com modelos prontos: faixas de rolamento, **exclusivas e preferenciais** de ônibus (linha MFE + legenda ÔNIBUS repetida), **ciclofaixas** (pintura vermelha, bicicletas, setas, segregadores), **faixa de estacionamento** (vagas de qualquer tipo), **acostamento**, **faixa de segurança/transição** zebrada, **canteiros central e laterais** (físicos ou pintados), **calçadas** (meio-fio, faixa de serviço, faixa livre NBR 9050, faixa de acesso) e dispositivos de segregação. As linhas entre os elementos (LFO, LMS, MFE, CIC-LD, LBO) são escolhidas automaticamente pela velocidade. |
 | **Linha Longitudinal** | LFO-1…4, LMS-1/2, LBO, LCO, faixa exclusiva, faixa reversível, LCA, LPP – ao longo de linhas, arcos e splines. Deslocamento lateral, fase, alinhamento do tracejado (início/fim/centro/ajuste), recuos, inversão de lados (LFO-4). |
@@ -29,6 +29,13 @@ que o plugin usa dentro do Revit.*
 | **Vagas** | Vagas paralelas ou a 30/45/60/90°, PcD com faixa adicional zebrada e SIA, idoso, moto, carga e descarga, ônibus, táxi, ambulância. Preenche o meio-fio automaticamente ou quantidade fixa. |
 | **Calçada e Canteiro** | Calçadas, meios-fios e canteiros gramados (3D, 0,15 m de altura) ao longo de qualquer linha. |
 | **Bloqueios Físicos** | Segregadores (tartarugas), tachões, balizadores flexíveis, cilindros delimitadores, pilaretes/frades, prismas de concreto, separador contínuo, barreira New Jersey (contínua ou modular "gelo baiano"), barreira plástica e defensa metálica – em 3D com altura real, contados por unidade ou metro. |
+| **Placas** (Sinalização Vertical) | Placas de regulamentação (R-1, R-2, R-19...), advertência (A-18, A-32b...), indicação, serviços, turísticas, educativas e de obras, em 3D com coluna simples ou dupla, altura livre de 2,10 m, orla, fundo e legenda editável (ex.: velocidade). Face voltada automaticamente para o tráfego. |
+| **Meio-fio e Sarjeta** | Meios-fios (0,15, 0,12, alto, rebaixado, com sarjeta conjugada), sarjetas, sarjetões (travessia de águas), calçadas, gramados e **faixas de caminhada azuis ou verdes**. |
+| **Rampas** | Rebaixamentos de calçada NBR 9050 (com ou sem abas, inclinação 8,33 %, abas 10 %, piso tátil de alerta) e guias rebaixadas de veículos – **recortam a calçada e o meio-fio automaticamente**. |
+| **Quebra-mola e Lombadas** | Ondulações transversais tipo A e B, faixa elevada para travessia (com zebrado no platô e triângulos nas rampas) e lombada invertida – volume 3D com a pintura acompanhando o perfil. |
+| **Área de Conflito** | Quadriculado amarelo em cruzamentos. |
+| **Elementos Urbanos** | Bancos, lixeiras, postes de iluminação, árvores com canteiro, abrigos de ônibus, paraciclos, hidrantes, floreiras, placas de rua e semáforos – por ponto ou distribuídos ao longo de um caminho. |
+| **Guard Rail** | Defensas metálicas simples, duplas e de cabos. |
 | **Complementos** | Tachas e tachões (contagem automática), piso tátil de alerta/direcional (NBR 16537), ciclofaixa (linha, pintura vermelha, MCC). |
 | **Editar / Atualizar / 2D-3D / Selecionar conjunto** | Toda marca guarda sua definição: editar reabre a janela com os valores e regenera; converter entre 3D e 2D; selecionar a marca ou o grupo (ex.: a via inteira). |
 | **Quantitativos** | Área pintada por código, cor e material, extensão, unidades, consumo estimado de tinta/termoplástico e microesferas, exportação **CSV** (Excel) e **tabela nativa** do Revit. |
@@ -63,8 +70,8 @@ A pasta **[`Instalar/Revit2027`](Instalar/Revit2027)** já traz o plugin compila
 
 | Arquivo | O que é |
 |---|---|
-| `SinalizacaoViaria.addin` | Manifesto que o Revit lê ao iniciar |
-| `SinalizacaoViaria.dll` | O plugin completo (núcleo e bibliotecas incluídos numa única DLL) |
+| `SinalizaBIM.addin` | Manifesto que o Revit lê ao iniciar |
+| `SinalizaBIM.dll` | O plugin completo (núcleo e bibliotecas incluídos numa única DLL) |
 
 1. Feche o Revit.
 2. Copie os **dois arquivos** para `%AppData%\Autodesk\Revit\Addins\2027`
@@ -122,8 +129,8 @@ src/SinalizacaoViaria.Core     Núcleo independente do Revit (net10.0): geometri
 src/SinalizacaoViaria.Revit    Plugin (net10.0-windows, WPF): faixa de opções, comandos, janelas,
                                renderização DirectShape/FilledRegion, Extensible Storage, DMU.
                                Compila o núcleo junto, gerando uma DLL única.
-Instalar/Revit2027             Pacote pronto: SinalizacaoViaria.dll + SinalizacaoViaria.addin.
-tests/SinalizacaoViaria.Core.Tests   85 testes xUnit do núcleo.
+Instalar/Revit2027             Pacote pronto: SinalizaBIM.dll + SinalizaBIM.addin.
+tests/SinalizacaoViaria.Core.Tests   105 testes xUnit do núcleo.
 ```
 
 ```bash

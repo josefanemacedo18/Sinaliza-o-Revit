@@ -21,7 +21,36 @@ public sealed record MarkingInfo(string Code, string Name, GrupoMarca Group, str
 /// <summary>Ponto único que transforma qualquer <see cref="MarkingDefinition"/> em geometria.</summary>
 public static class MarkingBuilder
 {
-    public static MarkingGeometry Build(MarkingDefinition def, Polyline2? path, BuildContext ctx) => def switch
+    public static MarkingGeometry Build(MarkingDefinition def, Polyline2? path, BuildContext ctx)
+    {
+        var geo = BuildRaw(def, path, ctx);
+        return def.Exclusions.Count == 0 ? geo : ApplyExclusions(geo, def.Exclusions);
+    }
+
+    /// <summary>Recorta as peças pelas zonas de exclusão (ex.: calçada sob um rebaixamento).</summary>
+    public static MarkingGeometry ApplyExclusions(MarkingGeometry geo, IEnumerable<ExclusionZone> zones)
+    {
+        var holes = zones.Where(z => z.Points.Count >= 3).Select(z => new Polygon2(z.Points)).ToList();
+        if (holes.Count == 0) return geo;
+        var res = new MarkingGeometry { PaintedLength = geo.PaintedLength, PathLength = geo.PathLength, UnitCount = geo.UnitCount };
+        res.Warnings.AddRange(geo.Warnings);
+        foreach (var p in geo.Pieces)
+        {
+            if (p.Profile != null)
+            {
+                if (!holes.Any(h => h.Contains(p.Shape.Centroid))) res.Pieces.Add(p);
+                continue;
+            }
+            foreach (var part in PolygonOps.Difference(new[] { p.Shape }, holes))
+            {
+                var s = part.Simplified();
+                if (s != null) res.Pieces.Add(p with { Shape = s });
+            }
+        }
+        return res;
+    }
+
+    private static MarkingGeometry BuildRaw(MarkingDefinition def, Polyline2? path, BuildContext ctx) => def switch
     {
         LinearMarkingDefinition l => BuildLinear(l, path, ctx),
         HatchMarkingDefinition h => BuildHatch(h, path, ctx),
@@ -30,6 +59,10 @@ public static class MarkingBuilder
         ParkingMarkingDefinition p => BuildParking(p, path, ctx),
         RepeatedMarkingDefinition r => BuildRepeated(r, path, ctx),
         DeviceMarkingDefinition dv => BuildDevice(dv, path, ctx),
+        SignDefinition sg => BuildSign(sg, ctx),
+        UrbanElementDefinition ue => BuildUrban(ue, path, ctx),
+        RampDefinition rp => path == null || path.Points.Count < 2 ? Missing("Pontos da rampa não encontrados.") : RampGenerator.Generate(rp, path),
+        TrafficCalmingDefinition tc => path == null || path.Points.Count < 2 ? Missing("Bordos da pista não encontrados.") : TrafficCalmingGenerator.Generate(tc, path, ctx.Catalog),
         _ => throw new NotSupportedException(def.GetType().Name),
     };
 
@@ -199,6 +232,27 @@ public static class MarkingBuilder
         });
     }
 
+    private static MarkingGeometry Missing(string msg)
+    {
+        var g = new MarkingGeometry();
+        g.Warnings.Add(msg);
+        return g;
+    }
+
+    public static MarkingGeometry BuildSign(SignDefinition d, BuildContext ctx)
+    {
+        var p = ctx.Catalog.Placa(d.Code);
+        return p == null ? Missing($"Placa {d.Code} não existe no catálogo.") : SignGenerator.Generate(d, p, ctx.Glyphs);
+    }
+
+    public static MarkingGeometry BuildUrban(UrbanElementDefinition d, Polyline2? path, BuildContext ctx)
+    {
+        var m = ctx.Catalog.Movel(d.Code);
+        if (m == null) return Missing($"Elemento {d.Code} não existe no catálogo.");
+        if (d.UsePath && path == null) return Missing("Caminho do elemento não encontrado.");
+        return UrbanGenerator.Generate(d, m, path);
+    }
+
     public static MarkingGeometry BuildSymbol(SymbolMarkingDefinition d, BuildContext ctx)
     {
         var def = ctx.Catalog.Simbolo(d.Code);
@@ -293,6 +347,31 @@ public static class MarkingBuilder
                 var continuous = (dv.Spacing ?? t?.Espacamento ?? 1) <= 0;
                 return new MarkingInfo(dv.Code, t?.Nome ?? dv.Code, GrupoMarca.Dispositivo, t?.Referencia ?? "", continuous ? "m" : "un");
             }
+            case SignDefinition sg:
+            {
+                var t = cat.Placa(sg.Code);
+                return new MarkingInfo(sg.Code, t?.Nome ?? sg.Code, GrupoMarca.SinalizacaoVertical, t?.Referencia ?? "", "un");
+            }
+            case UrbanElementDefinition ue:
+            {
+                var t = cat.Movel(ue.Code);
+                return new MarkingInfo(ue.Code, t?.Nome ?? ue.Code, GrupoMarca.Mobiliario, t?.Referencia ?? "", "un");
+            }
+            case RampDefinition rp:
+                return new MarkingInfo(rp.DisplayCode, rp.Type switch
+                {
+                    TipoRampa.AcessoVeiculos => "Rampa de acesso de veículos (guia rebaixada)",
+                    TipoRampa.RebaixamentoSemAbas => "Rebaixamento de calçada sem abas",
+                    _ => "Rebaixamento de calçada com abas laterais",
+                }, GrupoMarca.Urbanizacao, "ABNT NBR 9050 / NBR 16537", "un");
+            case TrafficCalmingDefinition tc:
+                return new MarkingInfo(tc.DisplayCode, tc.Type switch
+                {
+                    TipoModeracao.OndulacaoA => "Ondulação transversal tipo A (quebra-mola)",
+                    TipoModeracao.OndulacaoB => "Ondulação transversal tipo B (quebra-mola)",
+                    TipoModeracao.FaixaElevada => "Faixa elevada para travessia de pedestres",
+                    _ => "Lombada invertida (valeta transversal)",
+                }, GrupoMarca.Moderacao, "Resoluções CONTRAN sobre ondulações transversais e faixas elevadas (conferir versão vigente)", "un");
             default:
                 return new MarkingInfo(def.DisplayCode, def.KindName, GrupoMarca.Longitudinal, "", "");
         }

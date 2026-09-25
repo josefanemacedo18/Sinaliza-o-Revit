@@ -2,7 +2,7 @@
 
 O plugin traz um catálogo padrão embutido (`src/SinalizacaoViaria.Core/Catalog/catalogo-padrao.json`).
 Pelo comando **Catálogo → Abrir o catálogo para edição**, uma cópia é criada em
-`%AppData%\SinalizacaoViaria\catalogo.json`. Ao recarregar:
+`%AppData%\SinalizaBIM\catalogo.json`. Ao recarregar:
 
 * itens do usuário com o **mesmo código** (ou nome, para materiais/tamanhos) **substituem** os padrões;
 * itens com código novo são **acrescentados**;
@@ -109,6 +109,31 @@ distância entre postes. Cores físicas: `Concreto`, `Grama`, `Metal` (sem consu
 
 Os tipos lineares do grupo `Urbanizacao` (`CALCADA`, `MEIO-FIO`, `GRAMADO`) são usados pela seção
 transversal; a `espessura` é a altura do elemento.
+
+## `placas` – sinalização vertical
+
+```json
+{ "codigo": "R-19", "nome": "Velocidade máxima permitida", "categoria": "Regulamentacao",
+  "forma": "Circulo", "largura": 0.50, "altura": 0.50, "corFundo": "Branca", "corOrla": "Vermelha",
+  "orla": 0.10, "legenda": "40", "corLegenda": "Preta", "tamanhos": [0.40, 0.50, 0.75] }
+```
+
+`forma`: `Circulo`, `Octogono`, `TrianguloInvertido`, `Losango`, `Retangulo`, `Quadrado`.
+`categoria`: `Regulamentacao`, `Advertencia`, `Indicacao`, `Educativa`, `Servicos`, `Turistica`, `Obras`.
+`orla` é a largura da borda em fração da largura. Os pictogramas internos não são desenhados – apenas
+forma, cores e legenda de texto; o código aparece nos parâmetros e nas tabelas.
+
+## `mobiliario` – elementos urbanísticos
+
+```json
+{ "codigo": "POSTE", "nome": "Poste de iluminação", "forma": "PosteIluminacao",
+  "comprimento": 1.80, "largura": 0.20, "altura": 8.00, "cor": "Metal", "espacamento": 30 }
+```
+
+`forma`: `Banco`, `Lixeira`, `PosteIluminacao`, `Arvore`, `AbrigoOnibus`, `Paraciclo`, `Hidrante`,
+`Floreira`, `PlacaLogradouro`, `Semaforo`.
+
+Cores adicionais: `Verde`, `Laranja`, `Marrom` (tinta/placas) e `Asfalto` (volumes).
 
 ## `materiais`
 

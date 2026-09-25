@@ -4,7 +4,7 @@
         xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
         Title="Faixa de travessia de pedestres" Width="1040" Height="680" MinWidth="860" MinHeight="560">
     <Window.Resources>
-        <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
+        <ResourceDictionary Source="pack://application:,,,/SinalizaBIM;component/UI/Styles.xaml"/>
     </Window.Resources>
     <Window.Style>
         <StaticResource ResourceKey="SvWindow"/>

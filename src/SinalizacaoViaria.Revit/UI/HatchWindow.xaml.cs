@@ -19,7 +19,7 @@ public partial class HatchWindow : Window
     public bool PickReferenceDirection { get; private set; }
     public bool PickSurfaces => Output.PickSurfaces;
 
-    public HatchWindow(HatchMarkingDefinition? existing = null)
+    public HatchWindow(HatchMarkingDefinition? existing = null, string? initialCode = null)
     {
         InitializeComponent();
         _existing = existing;
@@ -41,7 +41,7 @@ public partial class HatchWindow : Window
         else
         {
             Output.Load(PluginContext.Settings.NewOutput());
-            LbTypes.SelectedItem = _cat.Hachura(PluginContext.Settings.Get("hatch")) ?? _cat.Hachuras.FirstOrDefault();
+            LbTypes.SelectedItem = _cat.Hachura(initialCode ?? PluginContext.Settings.Get("hatch")) ?? _cat.Hachuras.FirstOrDefault();
         }
         _loading = false;
         UpdatePreview();

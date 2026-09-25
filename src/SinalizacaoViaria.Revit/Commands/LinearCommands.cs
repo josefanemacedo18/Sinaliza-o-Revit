@@ -69,6 +69,6 @@ public sealed class CmdCiclovia : LinearCommandBase
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdCalcadas : LinearCommandBase
 {
-    protected override string WindowTitle => "Calçadas, meios-fios e canteiros";
+    protected override string WindowTitle => "Urbanização – meios-fios, sarjetas, sarjetões, calçadas, canteiros e faixas de caminhada";
     protected override GrupoMarca[] Groups => new[] { GrupoMarca.Urbanizacao };
 }

@@ -4,7 +4,7 @@
         xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
         Title="Setas e símbolos" Width="1040" Height="660" MinWidth="860" MinHeight="540">
     <Window.Resources>
-        <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
+        <ResourceDictionary Source="pack://application:,,,/SinalizaBIM;component/UI/Styles.xaml"/>
     </Window.Resources>
     <Window.Style>
         <StaticResource ResourceKey="SvWindow"/>

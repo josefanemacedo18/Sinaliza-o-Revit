@@ -4,7 +4,7 @@
         xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
         Title="Zebrados e marcações de área" Width="1100" Height="700" MinWidth="880" MinHeight="580">
     <Window.Resources>
-        <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
+        <ResourceDictionary Source="pack://application:,,,/SinalizaBIM;component/UI/Styles.xaml"/>
     </Window.Resources>
     <Window.Style>
         <StaticResource ResourceKey="SvWindow"/>

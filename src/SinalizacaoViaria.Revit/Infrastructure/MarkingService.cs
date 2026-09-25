@@ -45,20 +45,19 @@ public sealed class MarkingService
     public MarkingGeometry BuildGeometry(MarkingDefinition def, out double baseZ, List<string>? warnings = null)
     {
         var ctx = PluginContext.BuildContext(def.Output.Drape && def.Output.Mode == OutputMode.Modelo3D);
-        switch (def)
+        if (def.Path == null)
         {
-            case SymbolMarkingDefinition s:
-                baseZ = s.Z;
-                return MarkingBuilder.Build(def, null, ctx);
-            case TextMarkingDefinition t:
-                baseZ = t.Z;
-                return MarkingBuilder.Build(def, null, ctx);
+            baseZ = def.PointZ ?? 0;
+            return MarkingBuilder.Build(def, null, ctx);
         }
 
         var path = PathResolver.Resolve(_doc, def.Path);
         baseZ = path?.Z ?? 0;
         if (path != null) warnings?.AddRange(path.Warnings);
         if (path == null || path.Chains.Count == 0) return MarkingBuilder.Build(def, null, ctx);
+
+        // Rampas e moderadores usam apenas os extremos do primeiro trecho.
+        if (def is RampDefinition or TrafficCalmingDefinition) return MarkingBuilder.Build(def, path.Main, ctx);
 
         var geo = new MarkingGeometry();
         foreach (var chain in path.Chains)
@@ -93,6 +92,7 @@ public sealed class MarkingService
     {
         var result = new RenderResult();
         var existing = MarkingStorage.ById(_doc, def.Id);
+        PruneExclusions(def);
 
         MarkingGeometry geo;
         double baseZ;
@@ -199,6 +199,14 @@ public sealed class MarkingService
         return result;
     }
 
+    /// <summary>Remove recortes cuja marca de origem (ex.: rampa) não existe mais.</summary>
+    private void PruneExclusions(MarkingDefinition def)
+    {
+        if (def.Exclusions.Count == 0) return;
+        var ids = MarkingStorage.All(_doc).Select(r => r.MarkingId).ToHashSet();
+        def.Exclusions.RemoveAll(z => !string.IsNullOrEmpty(z.SourceId) && !ids.Contains(z.SourceId!));
+    }
+
     public void Delete(string markingId)
     {
         foreach (var r in MarkingStorage.ById(_doc, markingId)) SafeDelete(r.Element.Id);
@@ -257,6 +265,11 @@ public sealed class MarkingService
                     z = sz + UnitConv.Ft(0.001);
                     normal = n;
                 }
+                if (piece.Profile is { } prof)
+                {
+                    res.Add(ProfileSolidGeometry(prof, z + lift, options));
+                    continue;
+                }
                 // Peças empilhadas (barreiras, balizadores) começam acima da base.
                 var loops = ToCurveLoops(piece.Shape, z + lift);
                 if (loops.Count == 0) { failures++; continue; }
@@ -281,6 +294,44 @@ public sealed class MarkingService
         }
         if (failures > 0) warnings.Add($"{failures} peça(s) não puderam ser modeladas (geometria muito pequena ou inválida).");
         return res;
+    }
+
+    /// <summary>Sólido de perfil vertical: contorno no plano (XDir, Z) extrudado ao longo de ExtrudeDir.</summary>
+    private Solid ProfileSolidGeometry(ProfileSolid p, double zBaseFt, SolidOptions options)
+    {
+        var x = p.XDir.Normalized();
+        var e = p.ExtrudeDir.Normalized();
+        var depth = p.Depth;
+        if (depth < 0) { depth = -depth; e = -e; }
+        XYZ Map(Vec2 v)
+        {
+            var plan = p.Origin + x * v.X;
+            return new XYZ(UnitConv.Ft(plan.X), UnitConv.Ft(plan.Y), zBaseFt + UnitConv.Ft(v.Y));
+        }
+        var loops = new List<CurveLoop>();
+        var outer = ToCurveLoop3D(p.Profile.Outer.Select(Map).ToList());
+        if (outer == null) throw new InvalidOperationException("Perfil inválido.");
+        loops.Add(outer);
+        foreach (var h in p.Profile.Holes)
+        {
+            var hl = ToCurveLoop3D(h.Select(Map).ToList());
+            if (hl != null) loops.Add(hl);
+        }
+        var dir = new XYZ(e.X, e.Y, 0);
+        return GeometryCreationUtilities.CreateExtrusionGeometry(loops, dir, UnitConv.Ft(Math.Max(0.001, depth)), options);
+    }
+
+    private CurveLoop? ToCurveLoop3D(List<XYZ> raw)
+    {
+        var tol = _doc.Application.ShortCurveTolerance * 1.5;
+        var pts = new List<XYZ>();
+        foreach (var p in raw)
+            if (pts.Count == 0 || pts[^1].DistanceTo(p) > tol) pts.Add(p);
+        while (pts.Count > 2 && pts[0].DistanceTo(pts[^1]) <= tol) pts.RemoveAt(pts.Count - 1);
+        if (pts.Count < 3) return null;
+        var loop = new CurveLoop();
+        for (int i = 0; i < pts.Count; i++) loop.Append(Line.CreateBound(pts[i], pts[(i + 1) % pts.Count]));
+        return loop;
     }
 
     private IList<CurveLoop> ToCurveLoops(Polygon2 poly, double zFt)

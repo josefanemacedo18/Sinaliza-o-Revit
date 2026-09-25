@@ -1,0 +1,525 @@
+using SinalizacaoViaria.Core.Catalog;
+using SinalizacaoViaria.Core.Definitions;
+using SinalizacaoViaria.Core.Geometry;
+using SinalizacaoViaria.Core.Model;
+
+namespace SinalizacaoViaria.Core.Generators;
+
+/// <summary>Construção de volumes simples em coordenadas locais de um <see cref="LocalFrame"/>.</summary>
+internal sealed class VolumeBuilder
+{
+    private readonly LocalFrame _f;
+    public MarkingGeometry Geo { get; } = new();
+
+    public VolumeBuilder(LocalFrame frame) => _f = frame;
+
+    private Vec2 W(double x, double y) => _f.ToWorld(new Vec2(x, y));
+    private Vec2 Right => _f.Forward.Normalized().PerpRight;
+    private Vec2 Fwd => _f.Forward.Normalized();
+
+    /// <summary>Caixa centrada em (x, y) com dimensões sx (lateral) × sy (frente), da elevação z0 com altura h.</summary>
+    public void Box(double x, double y, double sx, double sy, double z0, double h, MarkingColor c, bool unit = false)
+    {
+        var poly = new Polygon2(new[] { W(x - sx / 2, y - sy / 2), W(x + sx / 2, y - sy / 2), W(x + sx / 2, y + sy / 2), W(x - sx / 2, y + sy / 2) });
+        Geo.Pieces.Add(new MarkingPiece(poly, c) { Thickness = h, Elevation = z0, IsUnit = unit });
+    }
+
+    public void Cylinder(double x, double y, double d, double z0, double h, MarkingColor c)
+    {
+        var center = W(x, y);
+        Geo.Pieces.Add(new MarkingPiece(new Polygon2(CurveTools.Circle(center, d / 2, 0.003)), c) { Thickness = h, Elevation = z0 });
+    }
+
+    /// <summary>Anel quadrado (canteiro de árvore).</summary>
+    public void Ring(double size, double wall, double h, MarkingColor c)
+    {
+        var o = size / 2;
+        var i = o - wall;
+        var outer = new[] { W(-o, -o), W(o, -o), W(o, o), W(-o, o) };
+        var inner = new[] { W(-i, -i), W(i, -i), W(i, i), W(-i, i) };
+        Geo.Pieces.Add(new MarkingPiece(new Polygon2(outer, new[] { inner }), c) { Thickness = h });
+    }
+
+    /// <summary>Perfil vertical no plano "lateral × altura" passando por y, extrudado para a frente.</summary>
+    public void ProfileFacingForward(Polygon2 profileXZ, double y, double depth, MarkingColor c)
+    {
+        var origin = W(0, y);
+        var p = new ProfileSolid(origin, Right, profileXZ, Fwd, depth);
+        Geo.Pieces.Add(ProfileSolid.Piece(p, c));
+    }
+
+    /// <summary>Perfil vertical no plano "frente × altura" passando por x, extrudado lateralmente.</summary>
+    public void ProfileSideways(Polygon2 profileYZ, double x, double depth, MarkingColor c)
+    {
+        var origin = W(x, 0);
+        var p = new ProfileSolid(origin, Fwd, profileYZ, Right, depth);
+        Geo.Pieces.Add(ProfileSolid.Piece(p, c));
+    }
+}
+
+/// <summary>Placas de sinalização vertical (chapa com orla, fundo e legenda) e seus suportes.</summary>
+public static class SignGenerator
+{
+    public const double PlateThickness = 0.02;
+
+    /// <summary>Contorno da chapa no plano da placa: X lateral (centrado), Y = altura acima do solo.</summary>
+    public static Polygon2 Outline(FormaPlaca forma, double w, double h, double bottom)
+    {
+        switch (forma)
+        {
+            case FormaPlaca.Circulo:
+                return new Polygon2(CurveTools.Circle(new Vec2(0, bottom + w / 2), w / 2, 0.002));
+            case FormaPlaca.Octogono:
+            {
+                var r = w / 2 / Math.Cos(Math.PI / 8);
+                var c = new Vec2(0, bottom + w / 2);
+                return new Polygon2(Enumerable.Range(0, 8).Select(i => c + Vec2.FromAngle(Math.PI / 8 + i * Math.PI / 4) * r));
+            }
+            case FormaPlaca.TrianguloInvertido:
+            {
+                var th = w * Math.Sqrt(3) / 2;
+                return new Polygon2(new[] { new Vec2(0, bottom), new Vec2(w / 2, bottom + th), new Vec2(-w / 2, bottom + th) });
+            }
+            case FormaPlaca.Losango:
+            {
+                var d = w * Math.Sqrt(2);
+                return new Polygon2(new[] { new Vec2(0, bottom), new Vec2(d / 2, bottom + d / 2), new Vec2(0, bottom + d), new Vec2(-d / 2, bottom + d / 2) });
+            }
+            case FormaPlaca.Quadrado:
+                return Polygon2.Rectangle(new Vec2(-w / 2, bottom), new Vec2(w / 2, bottom + w));
+            default:
+                return Polygon2.Rectangle(new Vec2(-w / 2, bottom), new Vec2(w / 2, bottom + h));
+        }
+    }
+
+    /// <summary>Altura total ocupada pela chapa.</summary>
+    public static double PlateHeight(FormaPlaca forma, double w, double h) => forma switch
+    {
+        FormaPlaca.Circulo or FormaPlaca.Octogono or FormaPlaca.Quadrado => w,
+        FormaPlaca.TrianguloInvertido => w * Math.Sqrt(3) / 2,
+        FormaPlaca.Losango => w * Math.Sqrt(2),
+        _ => h,
+    };
+
+    /// <summary>
+    /// Face da placa em "elevação" (X lateral, Y altura): peças de orla, fundo e legenda –
+    /// usada tanto para o 3D quanto para a pré-visualização.
+    /// </summary>
+    public static List<(Polygon2 Shape, MarkingColor Color, int Layer)> Face(PlacaDef p, double w, double h, double bottom, string? legend, IGlyphOutlineProvider glyphs)
+    {
+        var res = new List<(Polygon2, MarkingColor, int)>();
+        var outline = Outline(p.Forma, w, h, bottom);
+        var border = p.Orla * w;
+        List<Polygon2> inner;
+        if (border > 0.002)
+        {
+            res.Add((outline, p.CorOrla, 0));
+            inner = PolygonOps.Offset(new[] { outline }, -border);
+            foreach (var i in inner) res.Add((i, p.CorFundo, 1));
+        }
+        else
+        {
+            res.Add((outline, p.CorFundo, 0));
+            inner = new List<Polygon2> { outline };
+        }
+
+        var text = legend ?? p.Legenda;
+        if (!string.IsNullOrWhiteSpace(text) && text != "-" && inner.Count > 0)
+        {
+            var (mn, mx) = inner[0].Bounds;
+            var availW = (mx.X - mn.X) * (p.Forma is FormaPlaca.Losango or FormaPlaca.TrianguloInvertido ? 0.5 : 0.8);
+            var availH = (mx.Y - mn.Y) * 0.8;
+            var lines = text.Split('\n').Length;
+            var th = Math.Min(availH / lines * 0.75, p.Forma == FormaPlaca.Octogono ? w * 0.28 : w * 0.40);
+            var cy = p.Forma == FormaPlaca.TrianguloInvertido ? mn.Y + (mx.Y - mn.Y) * 0.62 : (mn.Y + mx.Y) / 2;
+            for (int attempt = 0; attempt < 6; attempt++)
+            {
+                var total = lines * th + (lines - 1) * th * 0.4;
+                var frame = new LocalFrame(new Vec2(0, cy - total / 2), Vec2.UnitY);
+                var g = TextGenerator.Generate(text, new TextOptions { Height = th, WidthFactor = 0.62, LetterSpacing = th * 0.08, LineSpacing = th * 0.4, BottomToTop = false }, frame, p.CorLegenda, glyphs);
+                var b = g.Bounds;
+                if (b == null) break;
+                if (b.Value.Max.X - b.Value.Min.X <= availW || attempt == 5)
+                {
+                    foreach (var piece in g.Pieces) res.Add((piece.Shape, piece.Color, 2));
+                    break;
+                }
+                th *= availW / (b.Value.Max.X - b.Value.Min.X) * 0.98;
+            }
+        }
+        return res;
+    }
+
+    public static MarkingGeometry Generate(SignDefinition d, PlacaDef p, IGlyphOutlineProvider glyphs)
+    {
+        var geo = new MarkingGeometry();
+        var w = d.Width ?? p.Largura;
+        var h = d.Height ?? p.Altura;
+        var plateH = PlateHeight(p.Forma, w, h);
+        var f = d.Direction.Length < 1e-9 ? Vec2.UnitY : d.Direction.Normalized();
+        var right = f.PerpRight;            // direita do condutor = eixo X da face
+        var toDriver = -f;                  // a face aponta para quem chega
+        var postR = d.Support == TipoSuporte.Nenhum ? 0.01 : d.PostDiameter / 2;
+        var center = d.Position + right * d.LateralOffset;
+        var backPlane = center + toDriver * (postR + 0.002);
+        var bottom = d.MountHeight;
+
+        foreach (var (shape, color, layer) in Face(p, w, h, bottom, d.Legend, glyphs))
+        {
+            var offset = layer switch { 0 => 0.0, 1 => PlateThickness, _ => PlateThickness + 0.002 };
+            var depth = layer == 0 ? PlateThickness : layer == 1 ? 0.002 : 0.001;
+            var origin = backPlane + toDriver * offset;
+            geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(origin, right, shape, toDriver, depth), color));
+        }
+
+        var postTop = bottom + plateH;
+        void Post(Vec2 at) => geo.Pieces.Add(new MarkingPiece(new Polygon2(CurveTools.Circle(at, d.PostDiameter / 2, 0.002)), MarkingColor.Metal)
+        {
+            Thickness = postTop,
+        });
+        switch (d.Support)
+        {
+            case TipoSuporte.Simples: Post(d.Position); break;
+            case TipoSuporte.Duplo:
+                Post(center - right * (w / 3));
+                Post(center + right * (w / 3));
+                break;
+        }
+        geo.UnitCount = 1;
+        geo.PathLength = 0;
+        if (bottom < 2.0 && d.Support != TipoSuporte.Nenhum)
+            geo.Warnings.Add($"Altura livre de {bottom:0.00} m – em calçadas o MBST recomenda no mínimo 2,10 m sob a placa.");
+        return geo;
+    }
+}
+
+/// <summary>Mobiliário e elementos urbanísticos viários (volumes esquemáticos, com dimensões reais).</summary>
+public static class UrbanGenerator
+{
+    public static MarkingGeometry BuildAt(MobiliarioDef m, LocalFrame frame, double? lOverride, double? wOverride, double? hOverride, MarkingColor? colorOverride)
+    {
+        var L = lOverride ?? m.Comprimento;
+        var W = wOverride ?? m.Largura;
+        var H = hOverride ?? m.Altura;
+        var c = colorOverride ?? m.Cor;
+        var v = new VolumeBuilder(frame);
+        switch (m.Forma)
+        {
+            case FormaMobiliario.Banco:
+                v.Box(-(L / 2 - 0.15), 0, 0.08, W * 0.8, 0, 0.42, MarkingColor.Concreto);
+                v.Box(L / 2 - 0.15, 0, 0.08, W * 0.8, 0, 0.42, MarkingColor.Concreto);
+                v.Box(0, 0.03, L, 0.45, 0.42, 0.05, c);
+                v.Box(0, -W / 2 + 0.05, L, 0.05, 0.50, Math.Max(0.2, H - 0.50), c);
+                break;
+            case FormaMobiliario.Lixeira:
+                v.Cylinder(0, -W / 2 - 0.03, 0.05, 0, H, MarkingColor.Metal);
+                v.Cylinder(0, 0, W, H * 0.45, H * 0.5, c);
+                break;
+            case FormaMobiliario.PosteIluminacao:
+                v.Cylinder(0, 0, W * 1.8, 0, 0.5, MarkingColor.Concreto);
+                v.Cylinder(0, 0, W, 0.5, H - 0.5, c);
+                v.Box(0, L / 2, 0.08, L, H - 0.30, 0.08, c);
+                v.Box(0, L, 0.30, 0.60, H - 0.45, 0.15, c);
+                break;
+            case FormaMobiliario.Arvore:
+            {
+                v.Ring(W, 0.10, 0.12, MarkingColor.Concreto);
+                var trunkH = Math.Max(1.2, H * 0.40);
+                v.Cylinder(0, 0, 0.25, 0, trunkH + 0.3, MarkingColor.Marrom);
+                var crown = H - trunkH;
+                v.Cylinder(0, 0, L * 0.70, trunkH, crown * 0.25, c);
+                v.Cylinder(0, 0, L, trunkH + crown * 0.25, crown * 0.45, c);
+                v.Cylinder(0, 0, L * 0.55, trunkH + crown * 0.70, crown * 0.30, c);
+                break;
+            }
+            case FormaMobiliario.AbrigoOnibus:
+                // Frente (+Y) voltada para a pista.
+                v.Box(0, 0, L, W, H - 0.10, 0.10, c);
+                v.Box(-(L / 2 - 0.08), -W / 2 + 0.10, 0.08, 0.08, 0, H - 0.10, c);
+                v.Box(L / 2 - 0.08, -W / 2 + 0.10, 0.08, 0.08, 0, H - 0.10, c);
+                v.Box(0, -W / 2 + 0.10, L - 0.2, 0.03, 0.15, 2.0, c);
+                v.Box(0, -W / 2 + 0.40, L * 0.6, 0.40, 0.45, 0.05, MarkingColor.Marrom);
+                break;
+            case FormaMobiliario.Paraciclo:
+            {
+                // U invertido no plano lateral × altura.
+                var r = L / 2;
+                var pts = new List<Vec2> { new(-r, 0), new(-r, H - r) };
+                pts.AddRange(CurveTools.Arc(new Vec2(0, H - r), r, Math.PI, -Math.PI, 0.002).Skip(1));
+                pts.Add(new Vec2(r, 0));
+                foreach (var poly in PolygonOps.Strip(pts, 0.05, roundJoins: true))
+                    v.ProfileFacingForward(poly, -0.025, 0.05, c);
+                break;
+            }
+            case FormaMobiliario.Hidrante:
+                v.Cylinder(0, 0, W, 0, H * 0.85, c);
+                v.Cylinder(0, 0, W * 1.25, H * 0.85, H * 0.15, c);
+                v.Box(0, W / 2 + 0.04, 0.08, 0.10, H * 0.5, 0.08, c);
+                break;
+            case FormaMobiliario.Floreira:
+                v.Box(0, 0, L, W, 0, H, c);
+                v.Box(0, 0, L - 0.10, W - 0.10, H, 0.04, MarkingColor.Grama);
+                break;
+            case FormaMobiliario.PlacaLogradouro:
+                v.Cylinder(0, 0, 0.06, 0, H, MarkingColor.Metal);
+                v.ProfileFacingForward(Polygon2.Rectangle(new Vec2(-L / 2, H - W - 0.02), new Vec2(L / 2, H - 0.02)), 0.035, 0.015, c);
+                v.ProfileSideways(Polygon2.Rectangle(new Vec2(-L / 2, H - 2 * W - 0.06), new Vec2(L / 2, H - W - 0.06)), 0.035, 0.015, c);
+                break;
+            case FormaMobiliario.Semaforo:
+            {
+                v.Cylinder(0, 0, 0.11, 0, H, MarkingColor.Metal);
+                // Grupo focal voltado para o tráfego que se aproxima (−Y).
+                v.Box(0, -0.18, 0.32, 0.25, H - 0.95, 0.95, c);
+                double[] lenses = { H - 0.25, H - 0.50, H - 0.75 };
+                MarkingColor[] colors = { MarkingColor.Vermelha, MarkingColor.Amarela, MarkingColor.Verde };
+                for (int i = 0; i < 3; i++)
+                {
+                    var lens = new Polygon2(CurveTools.Circle(new Vec2(0, lenses[i] - 0.05), 0.10, 0.002));
+                    v.ProfileFacingForward(lens, -0.315, 0.01, colors[i]);
+                }
+                break;
+            }
+        }
+        v.Geo.UnitCount = 1;
+        return v.Geo;
+    }
+
+    public static MarkingGeometry Generate(UrbanElementDefinition d, MobiliarioDef m, Polyline2? path)
+    {
+        if (!d.UsePath || path == null)
+        {
+            var frame = new LocalFrame(d.Position, d.Direction.Length < 1e-9 ? Vec2.UnitY : d.Direction);
+            return BuildAt(m, frame, d.Length, d.Width, d.Height, d.Color);
+        }
+        var spacing = d.Spacing ?? (m.Espacamento > 0 ? m.Espacamento : 10);
+        var geo = new MarkingGeometry();
+        var off = path.Offset(d.Offset);
+        var end = path.Length - Math.Max(0, d.EndSetback);
+        int n = 0;
+        for (var s = Math.Max(0, d.StartOffset); s <= end + 1e-6 && n < 5000; s += Math.Max(0.3, spacing))
+        {
+            var t = path.TangentAt(s);
+            var frame = new LocalFrame(off.PointAtParam(path.ParamAt(s)), t.Rotate(Angles.ToRad(d.RotationDeg)));
+            var g = BuildAt(m, frame, d.Length, d.Width, d.Height, d.Color);
+            g.UnitCount = 0;
+            geo.Merge(g);
+            n++;
+        }
+        geo.UnitCount = n;
+        geo.PathLength = path.Length;
+        if (n == 0) geo.Warnings.Add("O trecho é curto demais para o espaçamento informado.");
+        return geo;
+    }
+}
+
+/// <summary>Rampas de calçada (NBR 9050) e de acesso de veículos.</summary>
+public static class RampGenerator
+{
+    public readonly record struct Frame(Vec2 Curb, Vec2 Up, Vec2 Side);
+
+    public static Frame FrameOf(Polyline2 path)
+    {
+        var a = path.Points[0];
+        var b = path.Points[^1];
+        var up = (b - a).Normalized();
+        if (up.Length < 0.5) up = Vec2.UnitY;
+        return new Frame(a, up, up.PerpLeft);
+    }
+
+    public static (double Width, double Length, double Flare) Dimensions(RampDefinition d)
+    {
+        var slope = d.Type == TipoRampa.AcessoVeiculos ? Math.Max(d.Slope, 0.20) : Math.Max(0.01, d.Slope);
+        var length = d.Height / slope;
+        var flare = d.Type == TipoRampa.RebaixamentoComAbas ? d.Height / Math.Max(0.01, d.FlareSlope) : 0;
+        return (d.Width, length, flare);
+    }
+
+    /// <summary>Área ocupada em planta (usada para recortar a calçada).</summary>
+    public static Polygon2 Footprint(RampDefinition d, Polyline2 path)
+    {
+        var f = FrameOf(path);
+        var (w, len, flare) = Dimensions(d);
+        var p0 = f.Curb - f.Up * 0.05;
+        var hw = w / 2;
+        return new Polygon2(new[]
+        {
+            p0 - f.Side * (hw + flare), p0 + f.Side * (hw + flare),
+            f.Curb + f.Up * len + f.Side * hw, f.Curb + f.Up * len - f.Side * hw,
+        });
+    }
+
+    public static MarkingGeometry Generate(RampDefinition d, Polyline2 path)
+    {
+        var geo = new MarkingGeometry();
+        var f = FrameOf(path);
+        var (w, len, flare) = Dimensions(d);
+        var h = d.Height;
+        var hw = w / 2;
+
+        // Rampa principal: perfil (subida × altura) extrudado lateralmente.
+        var ramp = new Polygon2(new[] { new Vec2(0, 0), new Vec2(len, h), new Vec2(len, 0) });
+        geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(f.Curb - f.Side * hw, f.Up, ramp, f.Side, w), MarkingColor.Concreto));
+
+        // Abas laterais em fatias (superfície inclinada ≤ 10 %).
+        if (flare > 0)
+        {
+            const int slices = 8;
+            for (int k = 0; k < slices; k++)
+            {
+                var x0 = len * k / slices;
+                var x1 = len * (k + 1) / slices;
+                var xm = (x0 + x1) / 2;
+                var zr = xm / len * h;
+                var extent = flare * (1 - xm / len);
+                if (extent < 0.02) continue;
+                var profile = new Polygon2(new[] { new Vec2(0, 0), new Vec2(0, zr), new Vec2(extent, h), new Vec2(extent, 0) });
+                foreach (var s in new[] { 1.0, -1.0 })
+                {
+                    var origin = f.Curb + f.Up * x0 + f.Side * (s * hw);
+                    geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(origin, f.Side * s, profile, f.Up, x1 - x0), MarkingColor.Concreto));
+                }
+            }
+        }
+
+        // Piso tátil de alerta junto à pista, acompanhando a inclinação.
+        if (d.Tactile && d.Type != TipoRampa.AcessoVeiculos)
+        {
+            var tw = Math.Min(d.TactileWidth, len);
+            var z1 = tw / len * h;
+            var tactile = new Polygon2(new[] { new Vec2(0, 0), new Vec2(tw, z1), new Vec2(tw, z1 + 0.005), new Vec2(0, 0.005) });
+            geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(f.Curb - f.Side * hw, f.Up, tactile, f.Side, w), d.TactileColor));
+        }
+
+        geo.UnitCount = 1;
+        geo.PathLength = w;
+        if (d.Type != TipoRampa.AcessoVeiculos)
+        {
+            if (d.Slope > 0.0833 + 1e-6) geo.Warnings.Add($"Inclinação de {d.Slope * 100:0.##} % acima do máximo de 8,33 % (NBR 9050).");
+            if (w < 1.50 - 1e-6) geo.Warnings.Add($"Largura de {w:0.00} m abaixo da mínima recomendada de 1,50 m para rebaixamentos (NBR 9050).");
+            if (d.Type == TipoRampa.RebaixamentoComAbas && d.FlareSlope > 0.10 + 1e-6) geo.Warnings.Add("Abas laterais com inclinação acima de 10 % (NBR 9050).");
+        }
+        return geo;
+    }
+}
+
+/// <summary>Quebra-molas (ondulações A/B), faixas elevadas e lombadas invertidas.</summary>
+public static class TrafficCalmingGenerator
+{
+    public static (double Length, double Height, double Ramp) Defaults(TipoModeracao t) => t switch
+    {
+        TipoModeracao.OndulacaoA => (3.70, 0.08, 0),
+        TipoModeracao.OndulacaoB => (1.50, 0.06, 0),
+        TipoModeracao.FaixaElevada => (8.00, 0.15, 1.50),
+        _ => (2.50, 0.10, 0),
+    };
+
+    public static MarkingGeometry Generate(TrafficCalmingDefinition d, Polyline2 path, Catalogo cat)
+    {
+        var geo = new MarkingGeometry();
+        var a = path.Points[0];
+        var b = path.Points[^1];
+        var width = a.DistanceTo(b);
+        if (width < 0.5) { geo.Warnings.Add("Largura da pista muito pequena."); return geo; }
+        var u = (b - a) / width;             // através da pista
+        var t = u.PerpRight;                 // sentido do tráfego
+        var (dl, dh, dr) = Defaults(d.Type);
+        var L = d.Length ?? dl;
+        var H = d.Height ?? dh;
+        var R = Math.Min(d.RampLength ?? dr, L / 2 - 0.1);
+        var dip = d.Type == TipoModeracao.LombadaInvertida;
+
+        double Z(double x) // x em [-L/2, L/2]
+        {
+            var ax = Math.Abs(x);
+            if (ax >= L / 2) return 0;
+            if (d.Type == TipoModeracao.FaixaElevada)
+                return ax <= L / 2 - R ? H : H * (L / 2 - ax) / R;
+            var k = 2 * ax / L;
+            var z = H * (1 - k * k);
+            return dip ? -z : z;
+        }
+
+        // Volume
+        const int n = 32;
+        var top = new List<Vec2>();
+        for (int i = 0; i <= n; i++)
+        {
+            var x = -L / 2 + L * i / n;
+            top.Add(new Vec2(x, Z(x)));
+        }
+        List<Vec2> ring;
+        if (dip)
+        {
+            ring = new List<Vec2>(top);
+            for (int i = n; i >= 0; i--) ring.Add(new Vec2(top[i].X, top[i].Y - 0.10));
+        }
+        else
+        {
+            // O perfil começa e termina em z = 0: a base fecha o contorno.
+            ring = new List<Vec2>(top);
+        }
+        var profile = PolygonOps.FromContours(new[] { (IReadOnlyList<Vec2>)ring });
+        foreach (var p in profile)
+            geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(a, t, p, u, width), dip ? MarkingColor.Concreto : MarkingColor.Asfalto));
+
+        // Pintura sobre a superfície
+        if (d.Marking)
+        {
+            var footprint = new Polygon2(new[] { a - t * (L / 2), b - t * (L / 2), b + t * (L / 2), a + t * (L / 2) });
+            var paint = new List<(Polygon2 Shape, MarkingColor Color)>();
+            if (d.Type == TipoModeracao.FaixaElevada)
+            {
+                var white = d.MarkingColor ?? MarkingColor.Branca;
+                // Rampas: triângulos apontando para o platô.
+                foreach (var side in new[] { -1.0, 1.0 })
+                {
+                    for (double s = 0.5; s + 0.5 <= width; s += 1.0)
+                    {
+                        var baseC = a + u * (s + 0.25) + t * (side * L / 2);
+                        var apex = baseC - t * (side * R * 0.9);
+                        paint.Add((new Polygon2(new[] { baseC - u * 0.25, baseC + u * 0.25, apex }), white));
+                    }
+                }
+                if (d.Crosswalk && cat.Linear("FTP-1") is { } ftp)
+                {
+                    var plateau = L - 2 * R;
+                    var zebra = LinearPatternGenerator.Generate(new Polyline2(new[] { a, b }), ftp, ftp.Variantes[0],
+                        new LinearOptions { WidthOverride = Math.Max(1, plateau - 0.6) });
+                    foreach (var pc in zebra.Pieces)
+                        geo.Pieces.Add(pc with { Elevation = H + 0.001, Thickness = 0.003 });
+                }
+            }
+            else if (!dip && cat.Hachura("MOT") is { } mot)
+            {
+                var h = HatchGenerator.Generate(footprint, mot, new HatchOptions { ReferenceDirection = u, BorderWidth = 0, BarColor = d.MarkingColor });
+                paint.AddRange(h.Pieces.Select(p => (p.Shape, p.Color)));
+            }
+            geo.Pieces.AddRange(DrapeOnProfile(paint, a, t, Z, -L / 2, L / 2));
+        }
+
+        geo.UnitCount = 1;
+        geo.PathLength = width;
+        return geo;
+    }
+
+    /// <summary>Fatia polígonos de pintura em faixas estreitas, elevando cada fatia até a superfície do perfil.</summary>
+    public static IEnumerable<MarkingPiece> DrapeOnProfile(IEnumerable<(Polygon2 Shape, MarkingColor Color)> paint, Vec2 origin, Vec2 t,
+        Func<double, double> z, double x0, double x1, double band = 0.20)
+    {
+        var list = paint.ToList();
+        if (list.Count == 0) yield break;
+        var n = t.PerpLeft;
+        for (var x = x0; x < x1 - 1e-9; x += band)
+        {
+            var xe = Math.Min(x1, x + band);
+            var strip = new Polygon2(new[] { origin + t * x - n * 1e4, origin + t * xe - n * 1e4, origin + t * xe + n * 1e4, origin + t * x + n * 1e4 });
+            var elev = Math.Max(z(x), Math.Max(z(xe), z((x + xe) / 2))) + 0.001;
+            foreach (var group in list.GroupBy(p => p.Color))
+                foreach (var piece in PolygonOps.Intersect(group.Select(g => g.Shape), new[] { strip }))
+                {
+                    var s = piece.Simplified();
+                    if (s != null) yield return new MarkingPiece(s, group.Key) { Elevation = elev, Thickness = 0.003 };
+                }
+        }
+    }
+}

@@ -12,7 +12,7 @@ namespace SinalizacaoViaria.Revit.Commands;
 [Regeneration(RegenerationOption.Manual)]
 public abstract class CommandBase : IExternalCommand
 {
-    public const string AppTitle = "Sinalização Viária";
+    public const string AppTitle = "SinalizaBIM";
 
     public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
     {
