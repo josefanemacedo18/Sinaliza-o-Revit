@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
-        Title="Sinalizar via – geração automática" Width="1100" Height="720" MinWidth="880" MinHeight="600">
+        Title="Sinalizar via – seção transversal completa" Width="1280" Height="820" MinWidth="980" MinHeight="640">
     <Window.Resources>
         <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
     </Window.Resources>
@@ -11,47 +11,117 @@
     </Window.Style>
     <Grid Margin="12">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="380"/>
+            <ColumnDefinition Width="470"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+
         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
             <StackPanel>
                 <TextBlock Text="Seção transversal" Style="{StaticResource Title}"/>
-                <TextBlock Style="{StaticResource Hint}" Text="Selecione (ou desenhe) o EIXO da via. Em mão dupla o eixo é a divisão dos sentidos; em mão única é o centro da pista. O lado direito é o da direita de quem percorre o eixo no sentido em que foi desenhado."/>
+                <TextBlock Style="{StaticResource Hint}" Text="Selecione (ou desenhe) o EIXO da via. Monte cada lado do eixo para fora: faixas, ciclofaixa, estacionamento, canteiros, calçada... O lado direito é o da direita de quem percorre o eixo no sentido em que foi desenhado."/>
+
+                <GroupBox Header="Modelo pronto">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Aplicar" Click="ApplyTemplateClick"/>
+                        <ComboBox x:Name="CbTemplate"/>
+                    </DockPanel>
+                </GroupBox>
+
                 <StackPanel Orientation="Horizontal">
                     <RadioButton x:Name="RbTwoWay" Content="Mão dupla" IsChecked="True" Checked="AnyChanged"/>
-                    <RadioButton x:Name="RbOneWay" Content="Mão única" Checked="AnyChanged"/>
+                    <RadioButton x:Name="RbOneWay" Content="Mão única (todas as faixas no sentido do eixo)" Checked="AnyChanged"/>
                 </StackPanel>
-                <GroupBox x:Name="GbTwoWay" Header="Faixas por sentido">
+
+                <GroupBox x:Name="GbCenter" Header="Eixo / canteiro central">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <TextBlock Text="Lado direito – larguras (m)" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Column="1" x:Name="TbRight" Text="3,50" TextChanged="AnyChanged" ToolTip="Do eixo para fora, separadas por ';'. Ex.: 3,50; 3,30"/>
-                        <TextBlock Grid.Row="1" Text="Lado esquerdo – larguras (m)" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbLeft" Text="3,50" TextChanged="AnyChanged"/>
-                        <TextBlock Grid.Row="2" Text="Eixo central" Style="{StaticResource FieldLabel}"/>
-                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CbCenter" SelectionChanged="AnyChanged"/>
-                        <TextBlock Grid.Row="3" Text="Largura do canteiro (m)" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbMedian" Text="2,00" TextChanged="AnyChanged"/>
+                        <TextBlock Text="Tratamento do eixo" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Column="1" x:Name="CbCenter" SelectionChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="1" Text="Canteiro central – largura (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbMedian" Text="2,00" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="2" Text="Tipo de canteiro" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CbMedianType" SelectionChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="3" Text="Dispositivo no eixo" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="3" Grid.Column="1" x:Name="CbMedianDevice" SelectionChanged="AnyChanged" ToolTip="Ex.: barreira New Jersey sobre o canteiro, balizadores sobre a LFO."/>
                         <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkInvertCenter" Content="LFO-4: contínua do lado direito" Checked="AnyChanged" Unchecked="AnyChanged"/>
                     </Grid>
                 </GroupBox>
-                <GroupBox x:Name="GbOneWay" Header="Faixas (mão única)" Visibility="Collapsed">
-                    <Grid>
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <TextBlock Text="Larguras, esq. → dir. (m)" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Column="1" x:Name="TbOneWay" Text="3,50; 3,50" TextChanged="AnyChanged"/>
-                    </Grid>
+
+                <GroupBox Header="Lado direito (do eixo para fora)">
+                    <StackPanel>
+                        <DataGrid x:Name="GridRight" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
+                                  HeadersVisibility="Column" Height="150" SelectionMode="Single" SelectionChanged="GridSelectionChanged" CellEditEnding="CellEdited">
+                            <DataGrid.Columns>
+                                <DataGridComboBoxColumn x:Name="ColTypeRight" Header="Elemento" Width="*" SelectedValueBinding="{Binding Tipo}" SelectedValuePath="Value" DisplayMemberPath="Label"/>
+                                <DataGridTextColumn Header="Largura (m)" Width="90" Binding="{Binding LarguraTexto}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <Button Content="+ Adicionar" Tag="R" Click="AddClick" Margin="0"/>
+                            <Button Content="Remover" Tag="R" Click="RemoveClick"/>
+                            <Button Content="▲" Tag="R" Click="UpClick" MinWidth="32"/>
+                            <Button Content="▼" Tag="R" Click="DownClick" MinWidth="32"/>
+                            <Button Content="Copiar p/ esquerdo" Tag="R" Click="MirrorClick"/>
+                        </StackPanel>
+                    </StackPanel>
                 </GroupBox>
-                <GroupBox Header="Linhas">
+
+                <GroupBox Header="Lado esquerdo (do eixo para fora)">
+                    <StackPanel>
+                        <DataGrid x:Name="GridLeft" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
+                                  HeadersVisibility="Column" Height="150" SelectionMode="Single" SelectionChanged="GridSelectionChanged" CellEditEnding="CellEdited">
+                            <DataGrid.Columns>
+                                <DataGridComboBoxColumn x:Name="ColTypeLeft" Header="Elemento" Width="*" SelectedValueBinding="{Binding Tipo}" SelectedValuePath="Value" DisplayMemberPath="Label"/>
+                                <DataGridTextColumn Header="Largura (m)" Width="90" Binding="{Binding LarguraTexto}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <Button Content="+ Adicionar" Tag="L" Click="AddClick" Margin="0"/>
+                            <Button Content="Remover" Tag="L" Click="RemoveClick"/>
+                            <Button Content="▲" Tag="L" Click="UpClick" MinWidth="32"/>
+                            <Button Content="▼" Tag="L" Click="DownClick" MinWidth="32"/>
+                            <Button Content="Copiar p/ direito" Tag="L" Click="MirrorClick"/>
+                        </StackPanel>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox x:Name="GbDetails" Header="Elemento selecionado">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtSelected" Style="{StaticResource Hint}" Text="Selecione um elemento em uma das listas."/>
+                        <Grid x:Name="PanelDetails">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock x:Name="LblVaga" Text="Tipo de vaga" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="CbVaga" Grid.Column="1" SelectionChanged="DetailChanged"/>
+                            <TextBlock x:Name="LblLegenda" Grid.Row="1" Text="Legenda repetida" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbLegenda" Grid.Row="1" Grid.Column="1" TextChanged="DetailChanged" CharacterCasing="Upper" ToolTip="Vazio = sem legenda"/>
+                            <TextBlock x:Name="LblEsp" Grid.Row="2" Text="Repetir a cada (m)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbEspacamento" Grid.Row="2" Grid.Column="1" TextChanged="DetailChanged" ToolTip="0 = sem inscrições"/>
+                            <TextBlock x:Name="LblServico" Grid.Row="3" Text="Faixa de serviço c/ meio-fio (m)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbServico" Grid.Row="3" Grid.Column="1" TextChanged="DetailChanged"/>
+                            <TextBlock x:Name="LblAcesso" Grid.Row="4" Text="Faixa de acesso (m)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbAcesso" Grid.Row="4" Grid.Column="1" TextChanged="DetailChanged"/>
+                            <CheckBox x:Name="CkGramado" Grid.Row="5" Grid.ColumnSpan="2" Content="Faixa de serviço gramada" Checked="DetailChanged" Unchecked="DetailChanged"/>
+                            <CheckBox x:Name="CkFundo" Grid.Row="6" Grid.ColumnSpan="2" Content="Pintura vermelha de fundo" Checked="DetailChanged" Unchecked="DetailChanged"/>
+                            <CheckBox x:Name="CkBidirecional" Grid.Row="7" Grid.ColumnSpan="2" Content="Ciclofaixa bidirecional (sem setas)" Checked="DetailChanged" Unchecked="DetailChanged"/>
+                            <TextBlock x:Name="LblDisp" Grid.Row="8" Text="Segregação física (divisa interna)" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="CbDispositivo" Grid.Row="8" Grid.Column="1" SelectionChanged="DetailChanged"/>
+                        </Grid>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Header="Linhas e opções">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Text="Velocidade regulamentada (km/h)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Column="1" x:Name="TbSpeed" Text="60" TextChanged="AnyChanged"/>
                         <TextBlock Grid.Row="1" Text="Entre faixas de mesmo sentido" Style="{StaticResource FieldLabel}"/>
@@ -68,8 +138,11 @@
                         </Grid>
                         <CheckBox Grid.Row="5" x:Name="CkStuds" Content="Tachas no eixo" Checked="AnyChanged" Unchecked="AnyChanged"/>
                         <ComboBox Grid.Row="5" Grid.Column="1" x:Name="CbStuds" SelectionChanged="AnyChanged"/>
+                        <CheckBox Grid.Row="6" Grid.ColumnSpan="2" x:Name="CkInscriptions" Content="Legendas e símbolos repetidos (ÔNIBUS, bicicletas, setas)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="7" Grid.ColumnSpan="2" x:Name="CkPhysical" Content="Gerar calçadas, meios-fios e canteiros físicos (3D)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
                     </Grid>
                 </GroupBox>
+
                 <GroupBox Header="Caminho (eixo)">
                     <StackPanel>
                         <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas existentes" IsChecked="True"/>
@@ -79,15 +152,17 @@
                 <ui:OutputPanel x:Name="Output"/>
             </StackPanel>
         </ScrollViewer>
+
         <DockPanel Grid.Column="1">
-            <TextBlock DockPanel.Dock="Top" Text="Pré-visualização" Style="{StaticResource Title}"/>
+            <TextBlock DockPanel.Dock="Top" Text="Pré-visualização (trecho reto de 50 m – eixo em magenta)" Style="{StaticResource Title}"/>
             <TextBlock DockPanel.Dock="Bottom" x:Name="TxtSummary" TextWrapping="Wrap" Margin="0,6,0,0"/>
             <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
                 <ui:GeometryPreview x:Name="Preview"/>
             </Border>
         </DockPanel>
+
         <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button Content="Criar" Style="{StaticResource Primary}" Click="OkClick" IsDefault="True"/>
+            <Button Content="Criar" Style="{StaticResource Primary}" Click="OkClick"/>
             <Button Content="Cancelar" IsCancel="True"/>
         </StackPanel>
     </Grid>

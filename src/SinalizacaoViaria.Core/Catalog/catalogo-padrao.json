@@ -258,6 +258,24 @@
         { "nome": "Faixa 0,25 m", "faixas": [ { "deslocamento": 0, "largura": 0.25 } ] },
         { "nome": "Faixa 0,40 m", "faixas": [ { "deslocamento": 0, "largura": 0.40 } ] }
       ]
+    },
+    {
+      "codigo": "CALCADA", "nome": "Calçada – pavimento (faixa livre / de acesso)", "grupo": "Urbanizacao", "cor": "Concreto", "espessura": 0.15,
+      "descricao": "Faixa de calçada em concreto, 0,15 m acima do pavimento da pista. A faixa livre deve ter no mínimo 1,20 m (NBR 9050).",
+      "referencia": "ABNT NBR 9050 – calçadas (faixa de serviço, faixa livre e faixa de acesso)", "larguraMin": 0.50, "larguraMax": 20.0,
+      "variantes": [ { "nome": "Largura 2,00 m", "faixas": [ { "deslocamento": 0, "largura": 2.00 } ] } ]
+    },
+    {
+      "codigo": "MEIO-FIO", "nome": "Meio-fio (guia)", "grupo": "Urbanizacao", "cor": "Concreto", "espessura": 0.15,
+      "descricao": "Guia de concreto com 0,15 m de largura e 0,15 m de altura acima do pavimento.",
+      "referencia": "Prática usual de projeto viário", "larguraMin": 0.10, "larguraMax": 0.30,
+      "variantes": [ { "nome": "0,15 × 0,15 m", "faixas": [ { "deslocamento": 0, "largura": 0.15 } ] } ]
+    },
+    {
+      "codigo": "GRAMADO", "nome": "Canteiro / faixa gramada", "grupo": "Urbanizacao", "cor": "Grama", "espessura": 0.15,
+      "descricao": "Área ajardinada de canteiros e faixa de serviço de calçadas.",
+      "referencia": "Prática usual de projeto viário", "larguraMin": 0.20, "larguraMax": 50.0,
+      "variantes": [ { "nome": "Largura 1,00 m", "faixas": [ { "deslocamento": 0, "largura": 1.00 } ] } ]
     }
   ],
   "hachuras": [
@@ -350,6 +368,30 @@
     { "codigo": "ONI-0", "nome": "Parada de ônibus (2,80 × 15,00 m)", "tipo": "Onibus", "angulo": 0, "largura": 2.80, "comprimento": 15.00, "larguraLinha": 0.15, "cor": "Amarela", "legenda": "ÔNIBUS", "referencia": "MBST Vol. IV – MVE" },
     { "codigo": "TAXI-0", "nome": "Ponto de táxi paralelo", "tipo": "Taxi", "angulo": 0, "largura": 2.20, "comprimento": 5.50, "larguraLinha": 0.10, "cor": "Amarela", "legenda": "TÁXI", "referencia": "MBST Vol. IV – MVE" },
     { "codigo": "AMB-0", "nome": "Vaga de ambulância paralela", "tipo": "Ambulancia", "angulo": 0, "largura": 2.50, "comprimento": 7.00, "larguraLinha": 0.10, "cor": "Amarela", "legenda": "AMBULÂNCIA", "referencia": "MBST Vol. IV – MVE" }
+  ],
+  "dispositivos": [
+    { "codigo": "SEG-CIC", "nome": "Segregador de ciclofaixa (tartaruga)", "forma": "Tartaruga", "cor": "Amarela", "comprimento": 0.40, "largura": 0.25, "altura": 0.08, "espacamento": 1.50,
+      "descricao": "Calota de segregação física entre ciclofaixa e faixa de veículos.", "referencia": "Prática usual (manuais municipais de ciclofaixas)" },
+    { "codigo": "TACHAO-SEG", "nome": "Tachão de segregação", "forma": "Caixa", "cor": "Amarela", "comprimento": 0.25, "largura": 0.15, "altura": 0.05, "espacamento": 2.00,
+      "descricao": "Tachões em sequência para canalização e segregação leve.", "referencia": "MBST Vol. IV – Dispositivos auxiliares" },
+    { "codigo": "BAL-FLEX", "nome": "Balizador / delineador flexível", "forma": "Balizador", "cor": "Amarela", "comprimento": 0.08, "largura": 0.08, "altura": 0.75, "espacamento": 2.00,
+      "descricao": "Haste flexível com base fixada ao pavimento (segregação de faixas exclusivas, ciclofaixas e canalizações).", "referencia": "MBST – Dispositivos auxiliares / prática usual" },
+    { "codigo": "CIL", "nome": "Cilindro delimitador", "forma": "Cilindro", "cor": "Amarela", "comprimento": 0.30, "largura": 0.30, "altura": 0.75, "espacamento": 2.50,
+      "descricao": "Cilindros canalizadores para delimitação provisória ou permanente.", "referencia": "MBST – Dispositivos de canalização" },
+    { "codigo": "PIL", "nome": "Pilarete / frade de concreto", "forma": "Cilindro", "cor": "Concreto", "comprimento": 0.20, "largura": 0.20, "altura": 0.80, "espacamento": 1.50,
+      "descricao": "Bloqueio de acesso de veículos a calçadas, praças e áreas de pedestres. Mantenha vão livre acessível entre pilaretes.", "referencia": "ABNT NBR 9050 / prática usual" },
+    { "codigo": "PRI", "nome": "Prisma de concreto (bloqueio)", "forma": "Prisma", "cor": "Concreto", "comprimento": 0.50, "largura": 0.50, "altura": 0.40, "espacamento": 1.20,
+      "descricao": "Blocos de concreto para bloqueio físico de acessos e áreas.", "referencia": "Prática usual" },
+    { "codigo": "SEP-CONC", "nome": "Separador contínuo de concreto (mureta baixa)", "forma": "Caixa", "cor": "Concreto", "comprimento": 1.00, "largura": 0.20, "altura": 0.15, "espacamento": 0,
+      "descricao": "Separador físico contínuo entre fluxos, faixas exclusivas ou ciclovias.", "referencia": "Prática usual" },
+    { "codigo": "NJ", "nome": "Barreira New Jersey de concreto (contínua)", "forma": "NewJersey", "cor": "Concreto", "comprimento": 1.00, "largura": 0.60, "altura": 0.81, "espacamento": 0,
+      "descricao": "Barreira rígida de concreto com perfil New Jersey.", "referencia": "DNIT – dispositivos de contenção (prática usual)" },
+    { "codigo": "NJ-MOD", "nome": "Barreira modular de concreto (\"gelo baiano\") 2,00 m", "forma": "NewJersey", "cor": "Concreto", "comprimento": 2.00, "largura": 0.60, "altura": 0.80, "espacamento": 2.05,
+      "descricao": "Módulos pré-moldados de 2,00 m justapostos.", "referencia": "Prática usual" },
+    { "codigo": "BAR-PLAST", "nome": "Barreira plástica modular (lastro de água)", "forma": "NewJersey", "cor": "Branca", "comprimento": 1.20, "largura": 0.45, "altura": 0.80, "espacamento": 1.25,
+      "descricao": "Barreira provisória para obras e canalizações temporárias (usualmente alternando cores).", "referencia": "Prática usual / sinalização de obras" },
+    { "codigo": "DEF", "nome": "Defensa metálica", "forma": "Defensa", "cor": "Metal", "comprimento": 0.15, "largura": 0.35, "altura": 0.75, "espacamento": 4.00,
+      "descricao": "Postes a cada 4,00 m com lâmina contínua (espaçamento = distância entre postes).", "referencia": "DNIT / ABNT – defensas metálicas (prática usual)" }
   ],
   "materiais": [
     { "nome": "Tinta acrílica base solvente", "descricao": "Demarcação provisória/definitiva de baixo custo, vida útil curta.", "espessuraMm": 0.6, "consumo": 0.60, "unidadeConsumo": "L/m²", "microesferasKgM2": 0.25, "referencia": "ABNT NBR 15405 / ABNT NBR 11862" },

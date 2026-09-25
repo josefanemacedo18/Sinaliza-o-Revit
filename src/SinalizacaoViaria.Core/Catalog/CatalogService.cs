@@ -64,6 +64,7 @@ public static class CatalogService
         MergeList(target.TamanhosLetra, user.TamanhosLetra, t => t.Nome);
         MergeList(target.Vagas, user.Vagas, v => v.Codigo);
         MergeList(target.Materiais, user.Materiais, m => m.Nome);
+        MergeList(target.Dispositivos, user.Dispositivos, d => d.Codigo);
     }
 
     private static void MergeList<T>(List<T> target, List<T>? user, Func<T, string> key)
@@ -99,6 +100,11 @@ public static class CatalogService
         foreach (var h in c.Hachuras)
         {
             if (h.LarguraBarra <= 0 || h.Espacamento < 0) msgs.Add($"{h.Codigo}: dimensões de barra inválidas.");
+        }
+        foreach (var d in c.Dispositivos)
+        {
+            if (d.Largura <= 0 || d.Altura <= 0 || d.Comprimento <= 0) msgs.Add($"{d.Codigo}: dimensões inválidas.");
+            if (!d.Continuo && d.Espacamento < d.Comprimento) msgs.Add($"{d.Codigo}: espaçamento menor que o comprimento.");
         }
         var dups = c.Lineares.GroupBy(l => l.Codigo, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key);
         msgs.AddRange(dups.Select(d => $"Código duplicado: {d}"));

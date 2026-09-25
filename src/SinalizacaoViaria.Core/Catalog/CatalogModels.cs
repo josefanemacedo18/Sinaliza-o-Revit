@@ -15,6 +15,8 @@ public enum GrupoMarca
     Dispositivo,
     Acessibilidade,
     Ciclovia,
+    /// <summary>Calçadas, meios-fios e canteiros (elementos físicos da seção transversal).</summary>
+    Urbanizacao,
 }
 
 /// <summary>Como o padrão tracejado é posicionado ao longo do caminho.</summary>
@@ -224,6 +226,46 @@ public sealed class VagaDef
     public override string ToString() => $"{Codigo} – {Nome}";
 }
 
+/// <summary>Forma 3D de um dispositivo físico.</summary>
+public enum FormaDispositivo
+{
+    /// <summary>Paralelepípedo (tachão, bloco, separador contínuo).</summary>
+    Caixa,
+    /// <summary>Cilindro (pilarete, frade, cilindro delimitador).</summary>
+    Cilindro,
+    /// <summary>Base circular larga + haste (balizador/delineador flexível).</summary>
+    Balizador,
+    /// <summary>Calota elíptica baixa (segregador "tartaruga").</summary>
+    Tartaruga,
+    /// <summary>Tronco de pirâmide escalonado (prisma de concreto).</summary>
+    Prisma,
+    /// <summary>Perfil New Jersey escalonado (barreira de concreto ou plástica).</summary>
+    NewJersey,
+    /// <summary>Postes a cada espaçamento + lâmina contínua (defensa metálica).</summary>
+    Defensa,
+}
+
+/// <summary>Dispositivo físico de bloqueio, segregação ou canalização implantado junto à sinalização horizontal.</summary>
+public sealed class DispositivoDef
+{
+    public string Codigo { get; set; } = "";
+    public string Nome { get; set; } = "";
+    public FormaDispositivo Forma { get; set; }
+    public MarkingColor Cor { get; set; } = MarkingColor.Amarela;
+    /// <summary>Dimensão ao longo do caminho (m). Cilindros usam a largura como diâmetro.</summary>
+    public double Comprimento { get; set; } = 0.25;
+    /// <summary>Dimensão transversal (m) – diâmetro nos cilindros.</summary>
+    public double Largura { get; set; } = 0.15;
+    public double Altura { get; set; } = 0.05;
+    /// <summary>Distância entre centros (m). 0 = contínuo.</summary>
+    public double Espacamento { get; set; } = 2.0;
+    public string Descricao { get; set; } = "";
+    public string Referencia { get; set; } = "";
+
+    public bool Continuo => Espacamento <= 0;
+    public override string ToString() => $"{Codigo} – {Nome}";
+}
+
 public sealed class MaterialDef
 {
     public string Nome { get; set; } = "";
@@ -259,6 +301,10 @@ public sealed class Catalogo
     public List<TamanhoLetraDef> TamanhosLetra { get; set; } = new();
     public List<VagaDef> Vagas { get; set; } = new();
     public List<MaterialDef> Materiais { get; set; } = new();
+    public List<DispositivoDef> Dispositivos { get; set; } = new();
+
+    public DispositivoDef? Dispositivo(string? codigo) =>
+        Dispositivos.FirstOrDefault(d => string.Equals(d.Codigo, codigo, StringComparison.OrdinalIgnoreCase));
 
     public TipoLinearDef? Linear(string? codigo) =>
         Lineares.FirstOrDefault(l => string.Equals(l.Codigo, codigo, StringComparison.OrdinalIgnoreCase));

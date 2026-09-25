@@ -63,6 +63,8 @@ public sealed class CmdEditar : CommandBase
             SymbolMarkingDefinition s => Show(new SymbolWindow(s), w => w.Result),
             TextMarkingDefinition t => Show(new TextWindow(t), w => w.Result),
             ParkingMarkingDefinition p => Show(new ParkingWindow(p), w => w.Result),
+            RepeatedMarkingDefinition r => Show(new RepeatedWindow(r), w => w.Result),
+            DeviceMarkingDefinition dv => Show(new DeviceWindow(dv), w => w.Result),
             _ => null,
         };
         if (edited == null) return Result.Cancelled;

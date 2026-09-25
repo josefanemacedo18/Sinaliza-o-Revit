@@ -17,9 +17,11 @@ public static class RibbonBuilder
 
         var via = app.CreateRibbonPanel(TabName, "Via");
         Large(via, typeof(CmdSinalizarVia), "Sinalizar\nVia", "via",
-            "Gera automaticamente toda a sinalização longitudinal (eixo LFO, divisórias LMS e bordos LBO) a partir do eixo e da seção transversal.");
+            "Monta a seção transversal completa a partir do eixo: faixas de rolamento, exclusivas e preferenciais, ciclofaixas, estacionamento, acostamentos, faixas de segurança, canteiros centrais e laterais, calçadas e dispositivos de segregação – com toda a sinalização.");
         Large(via, typeof(CmdLinhaLongitudinal), "Linha\nLongitudinal", "linha",
             "LFO-1 a LFO-4, LMS-1/2, LBO, LCO, faixas exclusivas, LCA e LPP ao longo de linhas do modelo.");
+        Large(via, typeof(CmdCalcadas), "Calçada e\nCanteiro", "calcada",
+            "Calçadas, meios-fios e canteiros gramados ao longo de qualquer linha (elementos físicos 3D).");
         Large(via, typeof(CmdDesenharEixo), "Desenhar\nEixo", "eixo",
             "Desenha um eixo/caminho por pontos com o estilo de linha 'SV - Eixo de sinalização'.");
 
@@ -48,6 +50,10 @@ public static class RibbonBuilder
             Data(typeof(CmdTachas), "Tachas", "tacha", "Tachas e tachões refletivos ao longo de linhas, com contagem automática."),
             Data(typeof(CmdPisoTatil), "Piso Tátil", "tatil", "Piso tátil de alerta e direcional (ABNT NBR 16537)."),
             Data(typeof(CmdCiclovia), "Ciclovia", "ciclo", "Linhas de ciclofaixa, pintura vermelha e cruzamento rodocicloviário (MCC)."));
+
+        var seg = app.CreateRibbonPanel(TabName, "Segregação Física");
+        Large(seg, typeof(CmdDispositivos), "Bloqueios\nFísicos", "bloqueio",
+            "Segregadores (tartarugas), tachões, balizadores flexíveis, cilindros, pilaretes, prismas, barreiras New Jersey e modulares, separadores e defensas metálicas.");
 
         var edit = app.CreateRibbonPanel(TabName, "Editar");
         Large(edit, typeof(CmdEditar), "Editar", "editar", "Edita os parâmetros de uma marca existente e a regenera.");

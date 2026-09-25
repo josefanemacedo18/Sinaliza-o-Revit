@@ -8,6 +8,12 @@ public enum MarkingColor
     Vermelha,
     Azul,
     Preta,
+    /// <summary>Concreto (calçadas, meios-fios, barreiras) – elemento físico, não é tinta.</summary>
+    Concreto,
+    /// <summary>Grama/ajardinamento de canteiros – elemento físico.</summary>
+    Grama,
+    /// <summary>Metal (defensas, balizadores metálicos) – elemento físico.</summary>
+    Metal,
 }
 
 public readonly record struct Rgb(byte R, byte G, byte B)
@@ -30,6 +36,9 @@ public static class MarkingColors
         _ => "",
     };
 
+    /// <summary>Verdadeiro para cores de demarcação (tinta); falso para materiais físicos.</summary>
+    public static bool IsPaint(MarkingColor c) => c <= MarkingColor.Preta;
+
     /// <summary>Cor RGB aproximada para exibição no Revit (materiais e regiões preenchidas).</summary>
     public static Rgb Display(MarkingColor c) => c switch
     {
@@ -38,6 +47,9 @@ public static class MarkingColors
         MarkingColor.Vermelha => new Rgb(196, 30, 36),
         MarkingColor.Azul => new Rgb(0, 72, 150),
         MarkingColor.Preta => new Rgb(25, 25, 25),
+        MarkingColor.Concreto => new Rgb(188, 186, 180),
+        MarkingColor.Grama => new Rgb(98, 158, 74),
+        MarkingColor.Metal => new Rgb(148, 156, 166),
         _ => new Rgb(128, 128, 128),
     };
 
@@ -49,6 +61,9 @@ public static class MarkingColors
         MarkingColor.Vermelha => "Ciclovias/ciclofaixas e símbolo de serviços de saúde.",
         MarkingColor.Azul => "Inscrições em áreas de estacionamento para pessoas com deficiência.",
         MarkingColor.Preta => "Contraste/realce entre a marca e o pavimento.",
+        MarkingColor.Concreto => "Calçadas, meios-fios, barreiras e dispositivos de concreto.",
+        MarkingColor.Grama => "Canteiros e faixas de serviço ajardinadas.",
+        MarkingColor.Metal => "Defensas e dispositivos metálicos.",
         _ => "",
     };
 

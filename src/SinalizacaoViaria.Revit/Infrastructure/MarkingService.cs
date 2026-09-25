@@ -63,7 +63,7 @@ public sealed class MarkingService
         var geo = new MarkingGeometry();
         foreach (var chain in path.Chains)
         {
-            if (def is HatchMarkingDefinition && chain.Points.Count < 3) continue;
+            if (def is HatchMarkingDefinition { IsStrip: false } && chain.Points.Count < 3) continue;
             geo.Merge(MarkingBuilder.Build(def, chain, ctx));
         }
         return geo;
@@ -249,6 +249,7 @@ public sealed class MarkingService
             {
                 var t = UnitConv.Ft(piece.Thickness > 0 ? piece.Thickness : thickness);
                 var z = zBaseFt;
+                var lift = UnitConv.Ft(piece.Elevation);
                 XYZ? normal = null;
                 var c = piece.Shape.Centroid;
                 if (sampler is { IsAvailable: true } && sampler.TrySample(UnitConv.Ft(c.X), UnitConv.Ft(c.Y), zBaseFt, out var sz, out var n))
@@ -256,7 +257,8 @@ public sealed class MarkingService
                     z = sz + UnitConv.Ft(0.001);
                     normal = n;
                 }
-                var loops = ToCurveLoops(piece.Shape, z);
+                // Peças empilhadas (barreiras, balizadores) começam acima da base.
+                var loops = ToCurveLoops(piece.Shape, z + lift);
                 if (loops.Count == 0) { failures++; continue; }
                 var solid = GeometryCreationUtilities.CreateExtrusionGeometry(loops, XYZ.BasisZ, t, options);
                 if (normal != null && normal.Z < 0.9999)
@@ -320,6 +322,8 @@ public sealed class MarkingService
         var typeId = Styles.FilledRegionType(color);
         ElementId? lineStyle = PluginContext.Settings.VisibleBoundary2D ? null : Styles.InvisibleLineStyle();
 
+        // Em planta as peças empilhadas/sobrepostas da mesma cor são unidas (regiões não podem se sobrepor).
+        shapes = PolygonOps.Union(shapes);
         // Tenta uma única região com todas as peças; se falhar, uma região por peça.
         var all = shapes.SelectMany(s => ToCurveLoops(s, zFt)).ToList();
         if (all.Count == 0) return res;

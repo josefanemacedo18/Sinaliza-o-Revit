@@ -10,6 +10,9 @@ public sealed record MarkingPiece(Polygon2 Shape, MarkingColor Color)
 
     /// <summary>Peça conta como unidade (ex.: tacha) nos quantitativos.</summary>
     public bool IsUnit { get; init; }
+
+    /// <summary>Altura da base da peça acima do pavimento (m) – permite empilhar volumes (barreiras, balizadores).</summary>
+    public double Elevation { get; init; }
 }
 
 /// <summary>Resultado de um gerador: peças + grandezas para quantitativos.</summary>

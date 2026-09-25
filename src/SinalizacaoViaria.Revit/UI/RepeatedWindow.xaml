@@ -1,0 +1,62 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.RepeatedWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
+        Title="Editar inscrições repetidas" Width="900" Height="600" MinWidth="720" MinHeight="480">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="340"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+            <StackPanel>
+                <TextBlock Text="Inscrição" Style="{StaticResource Title}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <TextBlock Text="Símbolo" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox Grid.Column="1" x:Name="CbSymbol" SelectionChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="1" Text="ou legenda" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbText" CharacterCasing="Upper" TextChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="2" Text="Tamanho (m)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbSize" TextChanged="AnyChanged" ToolTip="Comprimento do símbolo ou altura das letras"/>
+                    <TextBlock Grid.Row="3" Text="Repetir a cada (m)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbSpacing" TextChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="4" Text="Início / recuo final (m)" Style="{StaticResource FieldLabel}"/>
+                    <Grid Grid.Row="4" Grid.Column="1">
+                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="6"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <TextBox x:Name="TbStart" TextChanged="AnyChanged"/>
+                        <TextBox Grid.Column="2" x:Name="TbEnd" TextChanged="AnyChanged"/>
+                    </Grid>
+                    <TextBlock Grid.Row="5" Text="Deslocamento lateral (m)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="5" Grid.Column="1" x:Name="TbOffset" TextChanged="AnyChanged"/>
+                    <CheckBox Grid.Row="6" Grid.ColumnSpan="2" x:Name="CkReverse" Content="Tráfego no sentido contrário ao caminho" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                    <TextBlock Grid.Row="7" Text="Cor" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox Grid.Row="7" Grid.Column="1" x:Name="CbColor" SelectionChanged="AnyChanged"/>
+                </Grid>
+                <ui:OutputPanel x:Name="Output"/>
+            </StackPanel>
+        </ScrollViewer>
+        <DockPanel Grid.Column="1">
+            <TextBlock DockPanel.Dock="Top" Text="Pré-visualização (trecho de 60 m)" Style="{StaticResource Title}"/>
+            <TextBlock DockPanel.Dock="Bottom" x:Name="TxtWarnings" Foreground="{StaticResource Warn}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
+                <ui:GeometryPreview x:Name="Preview"/>
+            </Border>
+        </DockPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="Aplicar" Style="{StaticResource Primary}" Click="OkClick" IsDefault="True"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

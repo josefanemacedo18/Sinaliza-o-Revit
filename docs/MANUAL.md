@@ -33,23 +33,47 @@ independente (o plugin avisa).
 
 ---
 
-## 2. Sinalizar Via (automação)
+## 2. Sinalizar Via – seção transversal completa
 
-1. Escolha **mão dupla** (o eixo é a divisão dos sentidos) ou **mão única** (o eixo é o centro da pista).
-2. Informe as larguras das faixas: `3,50; 3,30` (do eixo para fora em mão dupla; da esquerda para a
-   direita em mão única).
-3. Escolha o eixo central: LFO-2, LFO-1, LFO-3, LFO-4 (opção de contínua à direita), canteiro central
-   (gera bordos dos dois lados) ou nenhum.
-4. Linhas entre faixas (LMS-2, LMS-1, LCO, MFE), linhas de bordo (LBO ou delimitação de ciclofaixa)
-   e afastamento do bordo.
-5. **Velocidade regulamentada**: define largura e tracejado de cada linha pela variante do catálogo
-   (ex.: LFO-2 a 60 km/h = 0,10 m, 2 × 4 m; acima de 80 km/h = 0,15 m, 4 × 12 m).
-6. Opcional: recuos no início/fim (aproximação de interseções) e tachas sobre o eixo.
+1. Escolha um **modelo pronto** (via local, coletora, avenida com canteiro, corredor de ônibus,
+   faixa preferencial, ciclofaixa segregada, canteiros laterais, rodovias, mão única) e clique
+   *Aplicar* – ou monte a seção do zero.
+2. **Mão dupla** (o eixo divide os sentidos) ou **mão única** (todas as faixas no sentido do eixo).
+3. **Eixo / canteiro central**: LFO-1/2/3/4, sem marca ou canteiro central **físico** (meios-fios +
+   grama) ou **pintado** (zebrado amarelo), com dispositivo opcional sobre o eixo (ex.: New Jersey,
+   balizadores).
+4. Monte cada lado **do eixo para fora** (botões *Adicionar, Remover, ▲▼, Copiar para o outro lado*),
+   escolhendo o elemento e a largura:
 
-Todas as linhas geradas pertencem ao mesmo **grupo** e são associadas ao eixo. Use
-**Selecionar Conjunto → Todo o grupo** para selecionar a via inteira.
+| Elemento | O que é gerado |
+|---|---|
+| Faixa de rolamento | Linhas LMS entre faixas; LBO junto a acostamento, canteiro ou calçada. |
+| Faixa exclusiva (ônibus) | Linha MFE contínua na divisa com as faixas comuns + legenda repetida (ÔNIBUS). |
+| Faixa preferencial (ônibus) | Linha MFE seccionada + legenda repetida. |
+| Ciclofaixa | Linha CIC-LD, pintura vermelha, bicicletas e setas repetidas; segregação física opcional. |
+| Faixa de estacionamento | Vagas do tipo escolhido (paralelas, em ângulo, PcD, carga e descarga...) com linha de fundo no lado da pista. |
+| Acostamento | LBO no bordo da faixa. |
+| Faixa de segurança / transição | Zebrado com linhas de canalização (buffer entre fluxos, ciclofaixa etc.). |
+| Canteiro lateral físico / pintado | Meios-fios + grama (0,15 m) ou zebrado. |
+| Calçada | Meio-fio, faixa de serviço (gramada ou em concreto), faixa livre e faixa de acesso; aviso se a faixa livre for menor que 1,20 m (NBR 9050). |
 
----
+5. **Elemento selecionado**: opções do elemento (tipo de vaga, legenda e espaçamento, faixas da
+   calçada, pintura da ciclofaixa, **segregação física** na divisa interna – tartarugas, balizadores,
+   tachões, New Jersey...).
+6. **Linhas e opções**: velocidade (define largura e tracejado), divisórias, bordos, recuos, tachas no
+   eixo, inscrições repetidas e elementos físicos.
+
+Todos os elementos são associados ao eixo e pertencem ao mesmo **grupo**: mover o eixo atualiza a via
+inteira; **Selecionar Conjunto → Todo o grupo** seleciona tudo. Cada elemento pode ser ajustado
+depois com **Editar**.
+
+## 2.1 Bloqueios físicos
+
+Comando **Bloqueios Físicos** (painel *Segregação Física*): escolha o dispositivo, ajuste
+dimensões, espaçamento entre centros (0 = contínuo), deslocamento e recuos, e selecione/desenhe o
+caminho. Os dispositivos são modelados em 3D com altura real (a barreira New Jersey em camadas que
+reproduzem o perfil; a defensa com postes e lâmina) e aparecem nos quantitativos em unidades ou
+metros.
 
 ## 3. Linha Longitudinal / Transversal / Complementos
 

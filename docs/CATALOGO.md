@@ -96,6 +96,20 @@ código, cor ou comprimento (ex.: `CIC-SETA`).
 `tipo`: `Comum`, `PessoaComDeficiencia`, `Idoso`, `Motocicleta`, `CargaDescarga`, `Onibus`, `Taxi`,
 `Ambulancia`, `Viatura`. Vagas PcD recebem o símbolo SIA; as demais usam `legenda`.
 
+## `dispositivos` – bloqueios e segregação física
+
+```json
+{ "codigo": "BAL-FLEX", "nome": "Balizador flexível", "forma": "Balizador", "cor": "Amarela",
+  "comprimento": 0.08, "largura": 0.08, "altura": 0.75, "espacamento": 2.00 }
+```
+
+`forma`: `Caixa`, `Cilindro`, `Balizador`, `Tartaruga`, `Prisma`, `NewJersey`, `Defensa`.
+`espacamento` é a distância entre centros; `0` = contínuo (barreira, separador). Na defensa, é a
+distância entre postes. Cores físicas: `Concreto`, `Grama`, `Metal` (sem consumo de tinta).
+
+Os tipos lineares do grupo `Urbanizacao` (`CALCADA`, `MEIO-FIO`, `GRAMADO`) são usados pela seção
+transversal; a `espessura` é a altura do elemento.
+
 ## `materiais`
 
 ```json

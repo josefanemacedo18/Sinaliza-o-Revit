@@ -65,3 +65,10 @@ public sealed class CmdCiclovia : LinearCommandBase
     protected override string WindowTitle => "Ciclovias e ciclofaixas";
     protected override GrupoMarca[] Groups => new[] { GrupoMarca.Ciclovia };
 }
+
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdCalcadas : LinearCommandBase
+{
+    protected override string WindowTitle => "Calçadas, meios-fios e canteiros";
+    protected override GrupoMarca[] Groups => new[] { GrupoMarca.Urbanizacao };
+}

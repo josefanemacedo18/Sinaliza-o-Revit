@@ -1,4 +1,9 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Threading;
 using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Catalog;
 using SinalizacaoViaria.Core.Definitions;
@@ -8,69 +13,176 @@ using SinalizacaoViaria.Revit.Infrastructure;
 
 namespace SinalizacaoViaria.Revit.UI;
 
-/// <summary>Configuração da seção transversal para gerar toda a sinalização longitudinal de uma via.</summary>
+/// <summary>Linha editável da seção transversal (envolve um <see cref="ElementoSecao"/>).</summary>
+public sealed class SectionRow : INotifyPropertyChanged
+{
+    public ElementoSecao Element { get; }
+    public SectionRow(ElementoSecao e) => Element = e;
+
+    public TipoElementoSecao Tipo
+    {
+        get => Element.Tipo;
+        set
+        {
+            if (Element.Tipo == value) return;
+            Element.Tipo = value;
+            Element.Largura = ElementoSecao.LarguraPadrao(value);
+            if (value == TipoElementoSecao.Ciclofaixa) Element.Espacamento = 30;
+            OnChanged();
+            OnChanged(nameof(LarguraTexto));
+        }
+    }
+
+    public string LarguraTexto
+    {
+        get => UiHelpers.F(Element.Largura);
+        set
+        {
+            var v = UiHelpers.ParseOpt(value);
+            if (v is > 0.05 and < 100) Element.Largura = v.Value;
+            OnChanged();
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnChanged([CallerMemberName] string? n = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
+}
+
+/// <summary>Monta a seção transversal completa e gera toda a via (sinalização + calçadas, canteiros e dispositivos).</summary>
 public partial class RoadWindow : Window
 {
     private readonly Catalogo _cat = PluginContext.Catalog;
+    private readonly ObservableCollection<SectionRow> _right = new();
+    private readonly ObservableCollection<SectionRow> _left = new();
+    private SectionRow? _selected;
     private bool _loading = true;
+    private bool _loadingDetails;
 
     public RoadSetup? Setup { get; private set; }
     public OutputSettings? OutputSettings { get; private set; }
     public bool DrawPath { get; private set; }
     public bool PickSurfaces => Output.PickSurfaces;
 
-    private sealed record Option(string Label, CenterTreatment Value)
+    private sealed record Option<T>(string Label, T Value)
     {
         public override string ToString() => Label;
     }
 
+    public sealed record TypeOption(TipoElementoSecao Value, string Label);
+
     public RoadWindow()
     {
         InitializeComponent();
-        CbCenter.Items.Add(new Option("LFO-2 – seccionada (ultrapassagem permitida)", CenterTreatment.LFO2));
-        CbCenter.Items.Add(new Option("LFO-1 – contínua simples", CenterTreatment.LFO1));
-        CbCenter.Items.Add(new Option("LFO-3 – dupla contínua", CenterTreatment.LFO3));
-        CbCenter.Items.Add(new Option("LFO-4 – contínua/seccionada", CenterTreatment.LFO4));
-        CbCenter.Items.Add(new Option("Canteiro central (bordos)", CenterTreatment.Canteiro));
-        CbCenter.Items.Add(new Option("Sem marca no eixo", CenterTreatment.Nenhum));
-        CbCenter.SelectedIndex = 0;
 
-        foreach (var t in _cat.LinearesDoGrupo(GrupoMarca.Longitudinal).Where(t => t.Codigo.StartsWith("LMS") || t.Codigo.StartsWith("LCO") || t.Codigo == "MFE"))
+        var types = Enum.GetValues<TipoElementoSecao>().Select(t => new TypeOption(t, ElementoSecao.Rotulo(t))).ToList();
+        ColTypeRight.ItemsSource = types;
+        ColTypeLeft.ItemsSource = types;
+        GridRight.ItemsSource = _right;
+        GridLeft.ItemsSource = _left;
+
+        foreach (var t in RoadTemplates.All) CbTemplate.Items.Add(t);
+        CbTemplate.SelectedIndex = 0;
+
+        CbCenter.Items.Add(new Option<CenterTreatment>("LFO-2 – seccionada (ultrapassagem permitida)", CenterTreatment.LFO2));
+        CbCenter.Items.Add(new Option<CenterTreatment>("LFO-1 – contínua simples", CenterTreatment.LFO1));
+        CbCenter.Items.Add(new Option<CenterTreatment>("LFO-3 – dupla contínua", CenterTreatment.LFO3));
+        CbCenter.Items.Add(new Option<CenterTreatment>("LFO-4 – contínua/seccionada", CenterTreatment.LFO4));
+        CbCenter.Items.Add(new Option<CenterTreatment>("Canteiro central", CenterTreatment.Canteiro));
+        CbCenter.Items.Add(new Option<CenterTreatment>("Sem marca no eixo", CenterTreatment.Nenhum));
+        CbMedianType.Items.Add(new Option<TipoCanteiro>("Físico (meio-fio + grama)", TipoCanteiro.Fisico));
+        CbMedianType.Items.Add(new Option<TipoCanteiro>("Pintado (zebrado amarelo)", TipoCanteiro.Pintado));
+
+        CbMedianDevice.Items.Add(new Option<string?>("Nenhum", null));
+        CbDispositivo.Items.Add(new Option<string?>("Nenhuma", null));
+        foreach (var d in _cat.Dispositivos)
+        {
+            CbMedianDevice.Items.Add(new Option<string?>(d.Nome, d.Codigo));
+            CbDispositivo.Items.Add(new Option<string?>(d.Nome, d.Codigo));
+        }
+        foreach (var v in _cat.Vagas) CbVaga.Items.Add(new Option<string>(v.Nome, v.Codigo));
+
+        foreach (var t in _cat.LinearesDoGrupo(GrupoMarca.Longitudinal).Where(t => t.Codigo.StartsWith("LMS") || t.Codigo.StartsWith("LCO")))
             CbDivider.Items.Add(t.Codigo);
-        CbDivider.SelectedItem = "LMS-2";
         foreach (var t in _cat.LinearesDoGrupo(GrupoMarca.Longitudinal, GrupoMarca.Ciclovia).Where(t => t.Codigo == "LBO" || t.Codigo.StartsWith("CIC-LD")))
             CbEdge.Items.Add(t.Codigo);
-        CbEdge.SelectedItem = "LBO";
         foreach (var t in _cat.LinearesDoGrupo(GrupoMarca.Dispositivo))
             foreach (var v in t.Variantes) CbStuds.Items.Add($"{t.Codigo} | {v.Nome}");
         if (CbStuds.Items.Count > 0) CbStuds.SelectedIndex = 0;
 
-        TbSpeed.Text = UiHelpers.F(PluginContext.Settings.DefaultSpeed, "0");
         Output.Load(PluginContext.Settings.NewOutput());
         Output.Changed += (_, _) => UpdatePreview();
+        _right.CollectionChanged += (_, _) => UpdatePreview();
+        _left.CollectionChanged += (_, _) => UpdatePreview();
+
+        LoadSetup(RoadTemplates.All[Math.Min(2, RoadTemplates.All.Count - 1)].Create());
+        CbTemplate.SelectedIndex = Math.Min(2, RoadTemplates.All.Count - 1);
+        TbSpeed.Text = UiHelpers.F(PluginContext.Settings.DefaultSpeed, "0");
         _loading = false;
+        ShowDetails(null);
         UpdatePreview();
     }
 
-    private void AnyChanged(object sender, RoutedEventArgs e)
+    // ------------------------------------------------------------------ carregar / montar
+
+    private void LoadSetup(RoadSetup s)
     {
-        if (_loading || GbTwoWay == null || GbOneWay == null) return;
-        var two = RbTwoWay.IsChecked == true;
-        GbTwoWay.Visibility = two ? Visibility.Visible : Visibility.Collapsed;
-        GbOneWay.Visibility = two ? Visibility.Collapsed : Visibility.Visible;
-        UpdatePreview();
+        var was = _loading;
+        _loading = true;
+        RbTwoWay.IsChecked = s.TwoWay;
+        RbOneWay.IsChecked = !s.TwoWay;
+        Select(CbCenter, s.Center);
+        TbMedian.Text = UiHelpers.F(s.MedianWidth);
+        Select(CbMedianType, s.MedianType);
+        Select(CbMedianDevice, s.MedianDevice);
+        CkInvertCenter.IsChecked = s.InvertCenter;
+        TbSpeed.Text = UiHelpers.F(s.Speed, "0");
+        CbDivider.SelectedItem = s.LaneDividerCode;
+        CbEdge.SelectedItem = s.EdgeCode;
+        CkEdges.IsChecked = s.EdgeLines;
+        TbEdgeInset.Text = UiHelpers.F(s.EdgeInset);
+        CkStuds.IsChecked = !string.IsNullOrEmpty(s.CenterStudsCode);
+        if (!string.IsNullOrEmpty(s.CenterStudsCode))
+            CbStuds.SelectedItem = CbStuds.Items.Cast<string>().FirstOrDefault(x => x.StartsWith(s.CenterStudsCode + " | ") && (s.CenterStudsVariant == null || x.EndsWith(s.CenterStudsVariant))) ?? CbStuds.SelectedItem;
+        _right.Clear();
+        foreach (var e in s.Right) Attach(_right, e.Clone());
+        _left.Clear();
+        foreach (var e in s.Left) Attach(_left, e.Clone());
+        _loading = was;
+        UpdateCenterEnabled();
     }
+
+    private void Attach(ObservableCollection<SectionRow> list, ElementoSecao e, int index = -1)
+    {
+        var row = new SectionRow(e);
+        row.PropertyChanged += (_, a) =>
+        {
+            if (a.PropertyName == nameof(SectionRow.Tipo) && row == _selected) ShowDetails(row);
+            SchedulePreview();
+        };
+        if (index < 0 || index > list.Count) list.Add(row); else list.Insert(index, row);
+    }
+
+    private static void Select<T>(ComboBox cb, T value)
+    {
+        foreach (var item in cb.Items)
+            if (item is Option<T> o && EqualityComparer<T>.Default.Equals(o.Value, value)) { cb.SelectedItem = item; return; }
+        if (cb.Items.Count > 0) cb.SelectedIndex = 0;
+    }
+
+    private static T? Selected<T>(ComboBox cb) => cb.SelectedItem is Option<T> o ? o.Value : default;
 
     private RoadSetup BuildSetup()
     {
         var s = new RoadSetup
         {
             TwoWay = RbTwoWay.IsChecked == true,
-            RightLanes = RoadSetup.ParseWidths(TbRight.Text),
-            LeftLanes = RoadSetup.ParseWidths(TbLeft.Text),
-            OneWayLanes = RoadSetup.ParseWidths(TbOneWay.Text),
-            Center = (CbCenter.SelectedItem as Option)?.Value ?? CenterTreatment.LFO2,
-            MedianWidth = UiHelpers.Parse(TbMedian, 2, "Canteiro", 0, 100),
+            Right = _right.Select(r => r.Element.Clone()).ToList(),
+            Left = _left.Select(r => r.Element.Clone()).ToList(),
+            Center = Selected<CenterTreatment>(CbCenter),
+            MedianWidth = UiHelpers.Parse(TbMedian, 2, "Canteiro central", 0.1, 100),
+            MedianType = Selected<TipoCanteiro>(CbMedianType),
+            MedianDevice = Selected<string?>(CbMedianDevice),
+            InvertCenter = CkInvertCenter.IsChecked == true,
             LaneDividerCode = CbDivider.SelectedItem as string ?? "LMS-2",
             EdgeLines = CkEdges.IsChecked == true,
             EdgeCode = CbEdge.SelectedItem as string ?? "LBO",
@@ -78,9 +190,10 @@ public partial class RoadWindow : Window
             Speed = UiHelpers.Parse(TbSpeed, 60, "Velocidade", 10, 200),
             StartSetback = UiHelpers.Parse(TbStart, 0, "Recuo inicial", 0, 10000),
             EndSetback = UiHelpers.Parse(TbEnd, 0, "Recuo final", 0, 10000),
+            Inscriptions = CkInscriptions.IsChecked == true,
+            PhysicalElements = CkPhysical.IsChecked == true,
         };
-        if (s.TwoWay && (s.RightLanes.Count == 0 || s.LeftLanes.Count == 0)) throw new FormatException("Informe ao menos uma faixa em cada sentido.");
-        if (!s.TwoWay && s.OneWayLanes.Count == 0) throw new FormatException("Informe ao menos uma faixa.");
+        if (s.Right.Count == 0 && s.Left.Count == 0) throw new FormatException("Adicione ao menos um elemento à seção.");
         if (CkStuds.IsChecked == true && CbStuds.SelectedItem is string st)
         {
             var parts = st.Split(" | ");
@@ -90,12 +203,18 @@ public partial class RoadWindow : Window
         return s;
     }
 
-    private List<LinearMarkingDefinition> Build(RoadSetup s, OutputSettings o)
+    /// <summary>Gera as definições para o caminho escolhido (os avisos ficam em <see cref="RoadSetup.Warnings"/>).</summary>
+    public List<MarkingDefinition> BuildDefinitions(PathReference path) => Setup!.Build(path, OutputSettings!, _cat);
+
+    // ------------------------------------------------------------------ prévia
+
+    private DispatcherOperation? _pending;
+
+    private void SchedulePreview()
     {
-        var defs = s.Build(new PathReference(), o);
-        if (CkInvertCenter.IsChecked == true)
-            foreach (var d in defs.Where(d => d.Code == "LFO-4")) d.InvertSides = true;
-        return defs;
+        if (_loading) return;
+        _pending?.Abort();
+        _pending = Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(UpdatePreview));
     }
 
     private void UpdatePreview()
@@ -105,17 +224,21 @@ public partial class RoadWindow : Window
         {
             var s = BuildSetup();
             var o = Output.Save();
-            var sample = new Polyline2(new[] { new Vec2(0, 0), new Vec2(48, 0) });
-            var ctx = new BuildContext { Catalog = _cat };
+            var sample = new Polyline2(new[] { new Vec2(0, 0), new Vec2(50, 0) });
+            var ctx = new BuildContext { Catalog = _cat, Glyphs = PluginContext.Glyphs };
             var geo = new MarkingGeometry();
-            foreach (var d in Build(s, o)) geo.Merge(MarkingBuilder.Build(d, sample, ctx));
-            var half = s.TwoWay ? s.LeftLanes.Sum() + (s.Center == CenterTreatment.Canteiro ? s.MedianWidth / 2 : 0) : s.OneWayLanes.Sum() / 2;
-            var halfR = s.TwoWay ? s.RightLanes.Sum() + (s.Center == CenterTreatment.Canteiro ? s.MedianWidth / 2 : 0) : s.OneWayLanes.Sum() / 2;
-            var pav = Polygon2.Rectangle(new Vec2(0, -halfR), new Vec2(48, half));
-            Preview.Show(geo, new[] { sample.Points }, new[] { pav }, "Trecho reto de 48 m (eixo tracejado em magenta)");
-            var codes = Build(s, o).GroupBy(d => d.Code).Select(g => $"{g.Count()}× {g.Key}");
-            TxtSummary.Text = $"Largura total da pista: {UiHelpers.F(s.TotalWidth)} m.  Linhas geradas: {string.Join(", ", codes)}.";
-            TxtSummary.Foreground = System.Windows.Media.Brushes.Black;
+            var defs = s.Build(new PathReference(), o, _cat);
+            foreach (var d in defs) geo.Merge(MarkingBuilder.Build(d, sample, ctx));
+            var half = s.TwoWay && s.Center == CenterTreatment.Canteiro ? s.MedianWidth / 2 : 0;
+            var pav = Polygon2.Rectangle(new Vec2(0, -(s.SideWidth(s.Right) + half)), new Vec2(50, s.SideWidth(s.Left) + half));
+            Preview.Show(geo, new[] { sample.Points }, new[] { pav });
+
+            var counts = defs.GroupBy(d => d.DisplayCode).Select(g => $"{g.Count()}× {g.Key}");
+            var warnings = s.Warnings.Concat(geo.Warnings).Distinct().ToList();
+            TxtSummary.Text = $"Largura total: {UiHelpers.F(s.TotalWidth)} m  (pista: {UiHelpers.F(s.CarriagewayWidth)} m).  " +
+                              $"Elementos gerados: {string.Join(", ", counts)}." +
+                              (warnings.Count > 0 ? "\n⚠ " + string.Join("\n⚠ ", warnings) : "");
+            TxtSummary.Foreground = warnings.Count > 0 ? System.Windows.Media.Brushes.SaddleBrown : System.Windows.Media.Brushes.Black;
         }
         catch (Exception ex)
         {
@@ -124,20 +247,155 @@ public partial class RoadWindow : Window
         }
     }
 
-    public List<LinearMarkingDefinition> BuildDefinitions(PathReference path)
+    // ------------------------------------------------------------------ eventos gerais
+
+    private void AnyChanged(object sender, RoutedEventArgs e)
     {
-        var defs = Build(Setup!, OutputSettings!);
-        foreach (var d in defs)
+        if (_loading) return;
+        UpdateCenterEnabled();
+        UpdatePreview();
+    }
+
+    private void UpdateCenterEnabled()
+    {
+        if (GbCenter == null) return;
+        GbCenter.IsEnabled = RbTwoWay.IsChecked == true;
+        var median = Selected<CenterTreatment>(CbCenter) == CenterTreatment.Canteiro;
+        TbMedian.IsEnabled = median;
+        CbMedianType.IsEnabled = median;
+    }
+
+    private void ApplyTemplateClick(object sender, RoutedEventArgs e)
+    {
+        if (CbTemplate.SelectedItem is not RoadTemplates.Template t) return;
+        LoadSetup(t.Create());
+        ShowDetails(null);
+        UpdatePreview();
+    }
+
+    private void CellEdited(object? sender, DataGridCellEditEndingEventArgs e) => SchedulePreview();
+
+    private ObservableCollection<SectionRow> ListOf(object sender) => (sender as FrameworkElement)?.Tag as string == "L" ? _left : _right;
+    private DataGrid GridOf(object sender) => (sender as FrameworkElement)?.Tag as string == "L" ? GridLeft : GridRight;
+
+    private void AddClick(object sender, RoutedEventArgs e)
+    {
+        var list = ListOf(sender);
+        var grid = GridOf(sender);
+        var idx = grid.SelectedIndex >= 0 ? grid.SelectedIndex + 1 : list.Count;
+        if (grid.SelectedIndex < 0 && list.Count > 0 && list[^1].Tipo == TipoElementoSecao.Calcada) idx = list.Count - 1;
+        Attach(list, new ElementoSecao { Tipo = TipoElementoSecao.FaixaRolamento, Largura = 3.50 }, idx);
+        grid.SelectedIndex = idx;
+    }
+
+    private void RemoveClick(object sender, RoutedEventArgs e)
+    {
+        var list = ListOf(sender);
+        var grid = GridOf(sender);
+        if (grid.SelectedItem is SectionRow r) list.Remove(r);
+    }
+
+    private void UpClick(object sender, RoutedEventArgs e) => Move(sender, -1);
+    private void DownClick(object sender, RoutedEventArgs e) => Move(sender, +1);
+
+    private void Move(object sender, int delta)
+    {
+        var list = ListOf(sender);
+        var grid = GridOf(sender);
+        var i = grid.SelectedIndex;
+        var j = i + delta;
+        if (i < 0 || j < 0 || j >= list.Count) return;
+        list.Move(i, j);
+        grid.SelectedIndex = j;
+    }
+
+    private void MirrorClick(object sender, RoutedEventArgs e)
+    {
+        var from = ListOf(sender);
+        var to = from == _right ? _left : _right;
+        to.Clear();
+        foreach (var r in from) Attach(to, r.Element.Clone());
+    }
+
+    // ------------------------------------------------------------------ detalhes do elemento
+
+    private void GridSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not DataGrid g || g.SelectedItem is not SectionRow row) return;
+        // Uma seleção por vez entre as duas listas.
+        if (g == GridRight) GridLeft.UnselectAll(); else GridRight.UnselectAll();
+        ShowDetails(row);
+    }
+
+    private void ShowDetails(SectionRow? row)
+    {
+        _selected = row;
+        _loadingDetails = true;
+        try
         {
-            d.PathRef = new PathReference { ElementIds = new List<string>(path.ElementIds), Points = new List<Vec2>(path.Points), Z = path.Z };
+            PanelDetails.Visibility = row == null ? Visibility.Collapsed : Visibility.Visible;
+            if (row == null)
+            {
+                TxtSelected.Text = "Selecione um elemento em uma das listas para ver suas opções.";
+                return;
+            }
+            var e = row.Element;
+            var t = e.Tipo;
+            TxtSelected.Text = $"{ElementoSecao.Rotulo(t)} – {UiHelpers.F(e.Largura)} m";
+            bool parking = t == TipoElementoSecao.Estacionamento;
+            bool bus = t is TipoElementoSecao.FaixaExclusiva or TipoElementoSecao.FaixaPreferencial;
+            bool bike = t == TipoElementoSecao.Ciclofaixa;
+            bool walk = t == TipoElementoSecao.Calcada;
+            Show(parking, LblVaga, CbVaga);
+            Show(bus, LblLegenda, TbLegenda);
+            Show(bus || bike, LblEsp, TbEspacamento);
+            Show(walk, LblServico, TbServico, LblAcesso, TbAcesso, CkGramado);
+            Show(bike, CkFundo, CkBidirecional);
+            Show(t is not (TipoElementoSecao.Calcada or TipoElementoSecao.FaixaSeguranca), LblDisp, CbDispositivo);
+
+            Select(CbVaga, e.Vaga);
+            TbLegenda.Text = e.Legenda;
+            TbEspacamento.Text = UiHelpers.F(e.Espacamento, "0.#");
+            TbServico.Text = UiHelpers.F(e.FaixaServico);
+            TbAcesso.Text = UiHelpers.F(e.FaixaAcesso);
+            CkGramado.IsChecked = e.ServicoGramado;
+            CkFundo.IsChecked = e.PinturaFundo;
+            CkBidirecional.IsChecked = e.Bidirecional;
+            Select(CbDispositivo, e.Dispositivo);
         }
-        return defs;
+        finally
+        {
+            _loadingDetails = false;
+        }
+    }
+
+    private static void Show(bool visible, params UIElement[] elements)
+    {
+        foreach (var el in elements) el.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void DetailChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loadingDetails || _selected == null) return;
+        var el = _selected.Element;
+        if (CbVaga.SelectedItem is Option<string> v) el.Vaga = v.Value;
+        el.Legenda = TbLegenda.Text.Trim();
+        el.Espacamento = UiHelpers.ParseOpt(TbEspacamento.Text) is { } sp and >= 0 ? sp : el.Espacamento;
+        el.FaixaServico = UiHelpers.ParseOpt(TbServico.Text) is { } fs and >= 0 ? fs : el.FaixaServico;
+        el.FaixaAcesso = UiHelpers.ParseOpt(TbAcesso.Text) is { } fa and >= 0 ? fa : el.FaixaAcesso;
+        el.ServicoGramado = CkGramado.IsChecked == true;
+        el.PinturaFundo = CkFundo.IsChecked == true;
+        el.Bidirecional = CkBidirecional.IsChecked == true;
+        el.Dispositivo = Selected<string?>(CbDispositivo);
+        SchedulePreview();
     }
 
     private void OkClick(object sender, RoutedEventArgs e)
     {
         try
         {
+            GridRight.CommitEdit(DataGridEditingUnit.Row, true);
+            GridLeft.CommitEdit(DataGridEditingUnit.Row, true);
             Setup = BuildSetup();
             OutputSettings = Output.Save();
             DrawPath = RbDraw.IsChecked == true;

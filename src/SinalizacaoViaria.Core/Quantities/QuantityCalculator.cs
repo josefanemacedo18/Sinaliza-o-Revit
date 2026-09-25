@@ -33,9 +33,10 @@ public sealed class QuantityRow
         GrupoMarca.Canalizacao => "Marcas de canalização",
         GrupoMarca.Estacionamento => "Estacionamento e parada",
         GrupoMarca.Inscricao => "Inscrições no pavimento",
-        GrupoMarca.Dispositivo => "Dispositivos auxiliares",
+        GrupoMarca.Dispositivo => "Dispositivos auxiliares e físicos",
         GrupoMarca.Acessibilidade => "Acessibilidade",
         GrupoMarca.Ciclovia => "Ciclovias e ciclofaixas",
+        GrupoMarca.Urbanizacao => "Calçadas, meios-fios e canteiros",
         _ => g.ToString(),
     };
 }
@@ -66,7 +67,8 @@ public static class QuantityCalculator
                     rows[key] = row;
                 }
                 row.Area += area;
-                if (mat != null)
+                // Consumo de tinta apenas para demarcação (não para calçadas, canteiros e dispositivos físicos).
+                if (mat != null && MarkingColors.IsPaint(color) && def is not DeviceMarkingDefinition)
                 {
                     row.MaterialConsumption += area * mat.Consumo;
                     row.GlassBeadsKg += area * mat.MicroesferasKgM2;

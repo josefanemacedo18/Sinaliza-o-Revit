@@ -34,7 +34,9 @@ public sealed class CmdSinalizarVia : CommandBase
             path = PathReference.FromElements(curves.Select(c => c.UniqueId));
         }
 
-        var results = MarkingCreator.Commit(uidoc, w.BuildDefinitions(path), "SV - Sinalizar via");
+        var defs = w.BuildDefinitions(path);
+        var results = MarkingCreator.Commit(uidoc, defs, "SV - Sinalizar via");
+        if (w.Setup.Warnings.Count > 0 && results.Count > 0) results[0].Warnings.InsertRange(0, w.Setup.Warnings);
         Report("Sinalizar via", results);
         return Result.Succeeded;
     }
@@ -226,5 +228,20 @@ internal static class Placement
             results.AddRange(MarkingCreator.Commit(uidoc, new[] { def }, $"SV - {label}"));
         }
         return results;
+    }
+}
+
+/// <summary>Dispositivos físicos de bloqueio, segregação e canalização.</summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdDispositivos : CommandBase
+{
+    protected override Result Run(UIApplication app, UIDocument uidoc)
+    {
+        var w = new DeviceWindow();
+        if (UiHelpers.ShowModal(w) != true || w.Result == null) return Result.Cancelled;
+        PluginContext.SaveSettings();
+        EnsureDetailView(uidoc, w.Result.Output);
+        if (w.PickSurfaces && MarkingCreator.PickSurfaces(uidoc) is { } s) w.Result.Output.SurfaceIds = s;
+        return MarkingCreator.CreateAlongPath(uidoc, w.Result, w.PathMode, w.Result.Code);
     }
 }

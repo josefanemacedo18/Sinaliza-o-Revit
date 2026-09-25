@@ -99,6 +99,23 @@ public static class IconFactory
                 dc.DrawLine(P(Yellow, 2), new Point(16, 2), new Point(16, 30));
                 for (int y = 5; y < 30; y += 8) dc.DrawRectangle(B(Color.FromRgb(255, 230, 120)), P(Yellow, 1), new Rect(19, y, 5, 4));
                 break;
+            case "calcada":
+                RoadBackground(dc);
+                dc.DrawRectangle(B(Color.FromRgb(200, 198, 190)), null, new Rect(1, 1, 30, 11));
+                dc.DrawRectangle(B(Color.FromRgb(98, 158, 74)), null, new Rect(1, 12, 30, 4));
+                dc.DrawRectangle(B(Color.FromRgb(160, 158, 150)), null, new Rect(1, 16, 30, 2));
+                for (int x = 3; x < 30; x += 9) dc.DrawLine(P(White, 2), new Point(x, 25), new Point(x + 5, 25));
+                break;
+            case "bloqueio":
+                RoadBackground(dc);
+                dc.DrawLine(P(White, 1.5), new Point(1, 27), new Point(31, 27));
+                for (int x = 6; x < 30; x += 10)
+                {
+                    dc.DrawRectangle(B(Yellow), null, new Rect(x - 2, 8, 4, 18));
+                    dc.DrawRectangle(B(Asphalt), null, new Rect(x - 2, 13, 4, 3));
+                    dc.DrawEllipse(B(Yellow), null, new Point(x, 26), 4, 1.8);
+                }
+                break;
             case "tatil":
                 dc.DrawRoundedRectangle(B(Yellow), null, new Rect(2, 2, 28, 28), 3, 3);
                 for (int x = 7; x < 30; x += 6)

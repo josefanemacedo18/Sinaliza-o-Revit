@@ -19,7 +19,7 @@ que o plugin usa dentro do Revit.*
 
 | Guia **Sinalização Viária** | Recursos |
 |---|---|
-| **Sinalizar Via** | Gera toda a sinalização longitudinal a partir do eixo e da seção transversal: eixo (LFO-1/2/3/4 ou canteiro), divisórias LMS e bordos LBO, com as dimensões escolhidas pela **velocidade regulamentada**. Mão dupla ou única, larguras de faixa diferentes, recuos, tachas no eixo. |
+| **Sinalizar Via** | Monta a **seção transversal completa** a partir do eixo, com modelos prontos: faixas de rolamento, **exclusivas e preferenciais** de ônibus (linha MFE + legenda ÔNIBUS repetida), **ciclofaixas** (pintura vermelha, bicicletas, setas, segregadores), **faixa de estacionamento** (vagas de qualquer tipo), **acostamento**, **faixa de segurança/transição** zebrada, **canteiros central e laterais** (físicos ou pintados), **calçadas** (meio-fio, faixa de serviço, faixa livre NBR 9050, faixa de acesso) e dispositivos de segregação. As linhas entre os elementos (LFO, LMS, MFE, CIC-LD, LBO) são escolhidas automaticamente pela velocidade. |
 | **Linha Longitudinal** | LFO-1…4, LMS-1/2, LBO, LCO, faixa exclusiva, faixa reversível, LCA, LPP – ao longo de linhas, arcos e splines. Deslocamento lateral, fase, alinhamento do tracejado (início/fim/centro/ajuste), recuos, inversão de lados (LFO-4). |
 | **Faixa de Pedestres** | FTP-1 (zebrada) e FTP-2 (paralela) por dois cliques nos bordos, com **linhas de retenção automáticas** a 1,60 m (editável), em meia pista (mão dupla) ou pista inteira. Barras sempre inteiras e centralizadas. |
 | **Linha Transversal** | LRE, LDP, LRV (sequência decrescente de espaçamentos), MCC, FTP… por dois cliques (repete até ESC). |
@@ -27,6 +27,8 @@ que o plugin usa dentro do Revit.*
 | **Setas e Símbolos** | Setas PEM (frente, direita, esquerda, combinadas, retorno), mudança obrigatória de faixa, SIA, bicicleta, "Dê a preferência", cruz de Santo André, serviço de saúde. Comprimentos 5,0 / 7,5 m ou livre. |
 | **Legendas** | PARE, ÔNIBUS, ESCOLA, SÓ ÔNIBUS, TÁXI… com **qualquer fonte instalada**, letras alongadas (1,60 / 2,40 / 4,00 m) e ordem de leitura de baixo para cima. |
 | **Vagas** | Vagas paralelas ou a 30/45/60/90°, PcD com faixa adicional zebrada e SIA, idoso, moto, carga e descarga, ônibus, táxi, ambulância. Preenche o meio-fio automaticamente ou quantidade fixa. |
+| **Calçada e Canteiro** | Calçadas, meios-fios e canteiros gramados (3D, 0,15 m de altura) ao longo de qualquer linha. |
+| **Bloqueios Físicos** | Segregadores (tartarugas), tachões, balizadores flexíveis, cilindros delimitadores, pilaretes/frades, prismas de concreto, separador contínuo, barreira New Jersey (contínua ou modular "gelo baiano"), barreira plástica e defensa metálica – em 3D com altura real, contados por unidade ou metro. |
 | **Complementos** | Tachas e tachões (contagem automática), piso tátil de alerta/direcional (NBR 16537), ciclofaixa (linha, pintura vermelha, MCC). |
 | **Editar / Atualizar / 2D-3D / Selecionar conjunto** | Toda marca guarda sua definição: editar reabre a janela com os valores e regenera; converter entre 3D e 2D; selecionar a marca ou o grupo (ex.: a via inteira). |
 | **Quantitativos** | Área pintada por código, cor e material, extensão, unidades, consumo estimado de tinta/termoplástico e microesferas, exportação **CSV** (Excel) e **tabela nativa** do Revit. |
@@ -121,7 +123,7 @@ src/SinalizacaoViaria.Revit    Plugin (net10.0-windows, WPF): faixa de opções,
                                renderização DirectShape/FilledRegion, Extensible Storage, DMU.
                                Compila o núcleo junto, gerando uma DLL única.
 Instalar/Revit2027             Pacote pronto: SinalizacaoViaria.dll + SinalizacaoViaria.addin.
-tests/SinalizacaoViaria.Core.Tests   77 testes xUnit do núcleo.
+tests/SinalizacaoViaria.Core.Tests   85 testes xUnit do núcleo.
 ```
 
 ```bash

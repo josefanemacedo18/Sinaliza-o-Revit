@@ -23,6 +23,9 @@ public sealed class StyleService
         MarkingColor.Vermelha => "Vermelha",
         MarkingColor.Azul => "Azul",
         MarkingColor.Preta => "Preta",
+        MarkingColor.Concreto => "Concreto",
+        MarkingColor.Grama => "Grama",
+        MarkingColor.Metal => "Metal",
         _ => c.ToString(),
     };
 
@@ -45,7 +48,7 @@ public sealed class StyleService
     public ElementId Material(MarkingColor color)
     {
         if (_materials.TryGetValue(color, out var id)) return id;
-        var name = $"{Prefix}Sinalização {ColorName(color)}";
+        var name = MarkingColors.IsPaint(color) ? $"{Prefix}Sinalização {ColorName(color)}" : $"{Prefix}{ColorName(color)}";
         var mat = new FilteredElementCollector(_doc).OfClass(typeof(Material)).Cast<Material>().FirstOrDefault(m => m.Name == name);
         if (mat == null)
         {
@@ -53,8 +56,8 @@ public sealed class StyleService
             mat = (Material)_doc.GetElement(mid);
             var c = RevitColor(color);
             mat.Color = c;
-            mat.MaterialClass = "Pintura";
-            mat.MaterialCategory = "Sinalização viária";
+            mat.MaterialClass = MarkingColors.IsPaint(color) ? "Pintura" : color == MarkingColor.Grama ? "Vegetação" : color == MarkingColor.Metal ? "Metal" : "Concreto";
+            mat.MaterialCategory = MarkingColors.IsPaint(color) ? "Sinalização viária" : "Elementos viários";
             var solid = SolidFillPattern();
             if (solid != ElementId.InvalidElementId)
             {

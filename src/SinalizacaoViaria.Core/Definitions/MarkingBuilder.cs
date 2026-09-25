@@ -28,6 +28,8 @@ public static class MarkingBuilder
         SymbolMarkingDefinition s => BuildSymbol(s, ctx),
         TextMarkingDefinition t => BuildText(t, ctx),
         ParkingMarkingDefinition p => BuildParking(p, path, ctx),
+        RepeatedMarkingDefinition r => BuildRepeated(r, path, ctx),
+        DeviceMarkingDefinition dv => BuildDevice(dv, path, ctx),
         _ => throw new NotSupportedException(def.GetType().Name),
     };
 
@@ -72,6 +74,11 @@ public static class MarkingBuilder
         var geo = new MarkingGeometry();
         var preset = ctx.Catalog.Hachura(d.Code);
         if (preset == null) { geo.Warnings.Add($"Código {d.Code} não existe no catálogo."); return geo; }
+        if (d.IsStrip)
+        {
+            if (path == null) { geo.Warnings.Add("Caminho da faixa não encontrado."); return geo; }
+            return BuildHatchStrip(d, preset, path, ctx);
+        }
         if (path == null || path.Points.Count < 3) { geo.Warnings.Add("Contorno da área não encontrado ou aberto."); return geo; }
 
         var pts = path.Points.ToList();
@@ -97,6 +104,99 @@ public static class MarkingBuilder
         }
         if (regions.Count == 0) geo.Warnings.Add("O contorno selecionado não forma uma área válida.");
         return geo;
+    }
+
+    /// <summary>
+    /// Zebrado em faixa ao longo do caminho (canteiro pintado, faixa de segurança): dividido em trechos
+    /// para que as barras mantenham o ângulo em relação ao eixo mesmo em curvas; contorno contínuo.
+    /// </summary>
+    public static MarkingGeometry BuildHatchStrip(HatchMarkingDefinition d, HachuraDef preset, Polyline2 path, BuildContext ctx)
+    {
+        var geo = new MarkingGeometry();
+        var width = d.StripWidth!.Value;
+        var border = d.BorderWidth ?? preset.LarguraBorda;
+        var borderColor = d.BorderColor ?? preset.CorBorda;
+        var axis = path.Offset(d.StripOffset);
+        geo.PathLength = path.Length;
+
+        if (border > 0 && width > 2 * border)
+        {
+            foreach (var side in new[] { 1.0, -1.0 })
+            {
+                var edge = path.Offset(d.StripOffset + side * (width / 2 - border / 2));
+                foreach (var (c0, c1) in LinearPatternGenerator.Chunk(0, path.Length, ctx.MaxPieceLength))
+                    geo.AddRange(PolygonOps.Strip(edge.SubPoints(path.ParamAt(c0), path.ParamAt(c1)), border), borderColor);
+            }
+            geo.PaintedLength += 2 * path.Length;
+        }
+
+        var inner = Math.Max(0, width - 2 * border);
+        if (inner < 0.05) return geo;
+        const double chunk = 12.0;
+        double phase = d.Phase;
+        foreach (var (c0, c1) in LinearPatternGenerator.Chunk(0, path.Length, chunk))
+        {
+            var pts = axis.SubPoints(path.ParamAt(c0), path.ParamAt(c1));
+            if (pts.Count < 2) continue;
+            var regions = PolygonOps.Strip(pts, inner);
+            var dir = path.TangentAt((c0 + c1) / 2);
+            foreach (var region in regions)
+            {
+                var g = HatchGenerator.Generate(region, preset, new HatchOptions
+                {
+                    BarWidth = d.BarWidth, Gap = d.Gap, AngleDeg = d.AngleDeg, BorderWidth = 0,
+                    Chevron = d.Chevron, Crossed = d.Crossed, BarColor = d.BarColor,
+                    ReferenceDirection = dir, AxisPoint = path.PointAt(0) , Phase = phase,
+                });
+                geo.Merge(g);
+            }
+        }
+        return geo;
+    }
+
+    public static MarkingGeometry BuildRepeated(RepeatedMarkingDefinition d, Polyline2? path, BuildContext ctx)
+    {
+        if (path == null)
+        {
+            var g = new MarkingGeometry();
+            g.Warnings.Add("Caminho das inscrições não encontrado.");
+            return g;
+        }
+        var symbol = string.IsNullOrWhiteSpace(d.SymbolCode) ? null : ctx.Catalog.Simbolo(d.SymbolCode);
+        if (symbol != null)
+        {
+            return RepeatedGenerator.Generate(path, d.Offset, d.Spacing, d.StartOffset, d.EndSetback, d.Reverse,
+                f => SymbolBuilder.Build(symbol, d.Length, f, d.Color), d.Length);
+        }
+        var text = string.IsNullOrWhiteSpace(d.Text) ? "ÔNIBUS" : d.Text!;
+        var opt = new TextOptions
+        {
+            Height = d.TextHeight, WidthFactor = d.WidthFactor, LetterSpacing = d.LetterSpacing, LineSpacing = d.LineSpacing,
+            FontFamily = d.FontFamily, Bold = d.Bold, BottomToTop = true,
+        };
+        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
+        var total = lines * d.TextHeight + (lines - 1) * d.LineSpacing;
+        var geo = RepeatedGenerator.Generate(path, d.Offset, d.Spacing, d.StartOffset, d.EndSetback, d.Reverse,
+            f => TextGenerator.Generate(text, opt, f, d.Color ?? MarkingColor.Branca, ctx.Glyphs), total);
+        // Avisos de largura se repetem em cada inscrição: mantém apenas um.
+        var distinct = geo.Warnings.Distinct().ToList();
+        geo.Warnings.Clear();
+        geo.Warnings.AddRange(distinct);
+        return geo;
+    }
+
+    public static MarkingGeometry BuildDevice(DeviceMarkingDefinition d, Polyline2? path, BuildContext ctx)
+    {
+        var geo = new MarkingGeometry();
+        var def = ctx.Catalog.Dispositivo(d.Code);
+        if (def == null) { geo.Warnings.Add($"Dispositivo {d.Code} não existe no catálogo."); return geo; }
+        if (path == null) { geo.Warnings.Add("Caminho dos dispositivos não encontrado."); return geo; }
+        return DeviceGenerator.Generate(path, def, new DeviceOptions
+        {
+            Offset = d.Offset, Spacing = d.Spacing, StartSetback = d.StartSetback, EndSetback = d.EndSetback,
+            Length = d.LengthOverride, Width = d.WidthOverride, Height = d.HeightOverride, Color = d.Color,
+            Reverse = d.Reverse, MaxPieceLength = ctx.MaxPieceLength,
+        });
     }
 
     public static MarkingGeometry BuildSymbol(SymbolMarkingDefinition d, BuildContext ctx)
@@ -180,6 +280,18 @@ public static class MarkingBuilder
             {
                 var t = cat.Vaga(p.Code);
                 return new MarkingInfo(p.Code, t?.Nome ?? p.Code, GrupoMarca.Estacionamento, t?.Referencia ?? "", "vaga");
+            }
+            case RepeatedMarkingDefinition r:
+            {
+                var t = string.IsNullOrWhiteSpace(r.SymbolCode) ? null : cat.Simbolo(r.SymbolCode);
+                var name = t != null ? $"{t.Nome} (a cada {r.Spacing:0.#} m)" : $"Legenda \"{(r.Text ?? "").Replace("\n", " ")}\" (a cada {r.Spacing:0.#} m)";
+                return new MarkingInfo(r.DisplayCode, name, GrupoMarca.Inscricao, t?.Referencia ?? "MBST Vol. IV – Inscrições no pavimento", "un");
+            }
+            case DeviceMarkingDefinition dv:
+            {
+                var t = cat.Dispositivo(dv.Code);
+                var continuous = (dv.Spacing ?? t?.Espacamento ?? 1) <= 0;
+                return new MarkingInfo(dv.Code, t?.Nome ?? dv.Code, GrupoMarca.Dispositivo, t?.Referencia ?? "", continuous ? "m" : "un");
             }
             default:
                 return new MarkingInfo(def.DisplayCode, def.KindName, GrupoMarca.Longitudinal, "", "");

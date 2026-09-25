@@ -79,6 +79,8 @@ public sealed class PathReference
 [JsonDerivedType(typeof(SymbolMarkingDefinition), "simbolo")]
 [JsonDerivedType(typeof(TextMarkingDefinition), "legenda")]
 [JsonDerivedType(typeof(ParkingMarkingDefinition), "vagas")]
+[JsonDerivedType(typeof(RepeatedMarkingDefinition), "repetida")]
+[JsonDerivedType(typeof(DeviceMarkingDefinition), "dispositivo")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;
@@ -165,10 +167,20 @@ public sealed class HatchMarkingDefinition : MarkingDefinition
     public Vec2? AxisPoint { get; set; }
     public double Phase { get; set; }
 
+    /// <summary>
+    /// Modo "faixa": em vez de um contorno fechado, a área é uma faixa de largura <see cref="StripWidth"/>
+    /// ao longo do caminho (deslocada de <see cref="StripOffset"/>) – usada em canteiros pintados e faixas de segurança.
+    /// </summary>
+    public double? StripWidth { get; set; }
+    public double StripOffset { get; set; }
+
+    [JsonIgnore]
+    public bool IsStrip => StripWidth is > 0;
+
     public override string KindName => "Área";
     public override string DisplayCode => Code;
     public override PathReference? Path => Boundary;
-    public override void SetPath(PathReference path) { path.Closed = true; Boundary = path; }
+    public override void SetPath(PathReference path) { if (!IsStrip) path.Closed = true; Boundary = path; }
     public override void Translate(Vec2 delta, double dz) { if (AxisPoint is { } a) AxisPoint = a + delta; }
 }
 
@@ -231,6 +243,65 @@ public sealed class ParkingMarkingDefinition : MarkingDefinition
     public double LegendHeight { get; set; } = 0.50;
 
     public override string KindName => "Estacionamento";
+    public override string DisplayCode => Code;
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) => PathRef = path;
+}
+
+/// <summary>
+/// Símbolo ou legenda repetido ao longo de um caminho (ex.: "ÔNIBUS" a cada 50 m numa faixa exclusiva,
+/// bicicletas numa ciclofaixa). Associativo: acompanha o eixo.
+/// </summary>
+public sealed class RepeatedMarkingDefinition : MarkingDefinition
+{
+    public PathReference PathRef { get; set; } = new();
+
+    /// <summary>Código do símbolo do catálogo. Se vazio, usa <see cref="Text"/>.</summary>
+    public string? SymbolCode { get; set; }
+    public string? Text { get; set; }
+
+    /// <summary>Comprimento do símbolo (m).</summary>
+    public double Length { get; set; } = 1.5;
+
+    public double Offset { get; set; }
+    public double Spacing { get; set; } = 50;
+    public double StartOffset { get; set; } = 10;
+    public double EndSetback { get; set; } = 5;
+
+    /// <summary>Tráfego no sentido contrário ao caminho (faixas do lado esquerdo em vias de mão dupla).</summary>
+    public bool Reverse { get; set; }
+
+    public double TextHeight { get; set; } = 1.60;
+    public double WidthFactor { get; set; } = 0.30;
+    public double LetterSpacing { get; set; } = 0.05;
+    public double LineSpacing { get; set; } = 1.00;
+    public string FontFamily { get; set; } = "Arial";
+    public bool Bold { get; set; } = true;
+    public MarkingColor? Color { get; set; }
+
+    public override string KindName => "Inscrições repetidas";
+    public override string DisplayCode => string.IsNullOrWhiteSpace(SymbolCode) ? "LEG" : SymbolCode!;
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) => PathRef = path;
+}
+
+/// <summary>Dispositivos físicos (segregadores, balizadores, pilaretes, barreiras, defensas) ao longo de um caminho.</summary>
+public sealed class DeviceMarkingDefinition : MarkingDefinition
+{
+    public string Code { get; set; } = "SEG-CIC";
+    public PathReference PathRef { get; set; } = new();
+    public double Offset { get; set; }
+    /// <summary>Distância entre centros (m). Nulo = do catálogo; 0 = contínuo.</summary>
+    public double? Spacing { get; set; }
+    public double StartSetback { get; set; }
+    public double EndSetback { get; set; }
+    public double? LengthOverride { get; set; }
+    public double? WidthOverride { get; set; }
+    public double? HeightOverride { get; set; }
+    public MarkingColor? Color { get; set; }
+    public bool Reverse { get; set; }
+
+    public override string KindName => "Dispositivo físico";
     public override string DisplayCode => Code;
     public override PathReference? Path => PathRef;
     public override void SetPath(PathReference path) => PathRef = path;
