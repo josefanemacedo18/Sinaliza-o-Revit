@@ -15,7 +15,16 @@ public static class UiHelpers
 
     public static bool? ShowModal(Window w)
     {
-        if (RevitHandle != IntPtr.Zero) new WindowInteropHelper(w).Owner = RevitHandle;
+        // WindowStartupLocation não é propriedade de dependência: não pode ficar no estilo XAML.
+        if (RevitHandle != IntPtr.Zero)
+        {
+            new WindowInteropHelper(w).Owner = RevitHandle;
+            w.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        }
+        else
+        {
+            w.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        }
         return w.ShowDialog();
     }
 
