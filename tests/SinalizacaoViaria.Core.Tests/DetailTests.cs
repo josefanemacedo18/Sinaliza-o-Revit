@@ -95,10 +95,11 @@ public class DetailTests
         var lg = new LegendDefinition { Position = new Vec2(0, 0) };
         defs.Add(lg);
         var geo = MarkingBuilder.Build(lg, null, Ctx(defs, 100));
-        Assert.Equal(6, geo.UnitCount);
+        Assert.Equal(2, geo.UnitCount);                          // só as placas
         var texts = geo.Annotations.OfType<AnnotationText>().Select(t => t.Text).ToList();
         Assert.Contains(texts, t => t.StartsWith("R-1"));
-        Assert.Contains(texts, t => t.StartsWith("ZPA"));
+        Assert.DoesNotContain(texts, t => t.StartsWith("ZPA") || t.StartsWith("LFO"));
+        Assert.True(texts.FindIndex(t => t.StartsWith("R-1")) < texts.FindIndex(t => t.StartsWith("A-18")));
         Assert.DoesNotContain(texts, t => t.StartsWith("LEGENDA –") && t != lg.Title);
         Assert.Contains(geo.Pieces, p => p.Color == MarkingColor.Vermelha);   // amostra da placa R-1
         // Tudo dentro do quadro (canto superior esquerdo na origem).

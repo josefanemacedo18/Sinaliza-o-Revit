@@ -742,7 +742,7 @@ public sealed class LegendDefinition : MarkingDefinition, IProjectWideAnnotation
 {
     /// <summary>Canto superior esquerdo (m).</summary>
     public Vec2 Position { get; set; }
-    public string Title { get; set; } = "LEGENDA – SINALIZAÇÃO VIÁRIA";
+    public string Title { get; set; } = "LEGENDA – SINALIZAÇÃO VERTICAL";
     public double RowMm { get; set; } = 10;
     public double SampleMm { get; set; } = 24;
     public double TextColumnMm { get; set; } = 110;

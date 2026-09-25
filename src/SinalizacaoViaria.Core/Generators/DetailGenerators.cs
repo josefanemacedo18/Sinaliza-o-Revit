@@ -144,18 +144,14 @@ public static partial class DetailGenerator
         _ => d.DisplayCode,
     };
 
-    private static bool Include(MarkingDefinition d, LegendDefinition lg)
+    /// <summary>O quadro de legenda lista apenas a sinalização vertical (placas) do projeto.</summary>
+    private static bool Include(MarkingDefinition d, LegendDefinition lg) => d is SignDefinition;
+
+    /// <summary>Regulamentação, advertência, indicação e demais placas, nessa ordem.</summary>
+    private static int SignOrder(string code) => code.Length == 0 ? 9 : char.ToUpperInvariant(code[0]) switch
     {
-        if (d is IAnnotationDefinition or IntersectionDefinition) return false;
-        var physical = d is DeviceMarkingDefinition or UrbanElementDefinition or RampDefinition or TrafficCalmingDefinition
-            or CurbExtensionDefinition or SidewalkAreaDefinition or PlanterDefinition or CulDeSacDefinition
-            or RoadPavementDefinition or RoundaboutDefinition or TactileRouteDefinition;
-        if (d is SignDefinition) return lg.Vertical;
-        if (physical) return lg.Physical;
-        if (d is LinearMarkingDefinition l && l.Code is "CALCADA" or "GRAMADO" or "SARJETA" or "SARJETAO" || d is LinearMarkingDefinition l2 && l2.Code.StartsWith("MEIO-FIO"))
-            return lg.Physical;
-        return lg.Horizontal;
-    }
+        'R' => 0, 'A' => 1, 'I' => 2, 'S' => 3, 'E' => 4, 'T' => 5, 'O' => 6, _ => 7,
+    };
 
     public static MarkingGeometry Legend(LegendDefinition lg, BuildContext ctx)
     {
@@ -164,7 +160,7 @@ public static partial class DetailGenerator
         var rows = all.Where(d => Include(d, lg))
             .GroupBy(RowKey).Select(g => g.First())
             .Select(d => (Def: d, Info: MarkingBuilder.Describe(d, ctx.Catalog)))
-            .OrderBy(r => r.Info.Group).ThenBy(r => r.Info.Code, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(r => SignOrder(r.Info.Code)).ThenBy(r => r.Info.Code, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         var x0 = lg.Position.X;
@@ -184,7 +180,7 @@ public static partial class DetailGenerator
         if (rows.Count > 0) Line(x0 + sampleW, y0 - titleH, x0 + sampleW, y0 - totalH);
         geo.Annotations.Add(new AnnotationText(new Vec2(x0 + totalW / 2, y0 - (titleH - ctx.Mm(lg.TextMm * 1.2)) / 2), lg.Title, lg.TextMm * 1.2));
         if (rows.Count == 0)
-            geo.Annotations.Add(new AnnotationText(new Vec2(x0 + totalW / 2, y0 - titleH - rowH * 0.3), "Nenhuma sinalização no projeto.", lg.TextMm));
+            geo.Annotations.Add(new AnnotationText(new Vec2(x0 + totalW / 2, y0 - titleH - rowH * 0.3), "Nenhuma placa no projeto.", lg.TextMm));
 
         var pad = ctx.Mm(1.5);
         for (int i = 0; i < rows.Count; i++)

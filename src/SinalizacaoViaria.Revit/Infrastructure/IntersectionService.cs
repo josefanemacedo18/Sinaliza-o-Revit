@@ -357,6 +357,11 @@ public sealed class IntersectionService
         IntersectionDefinition itTemplate, RoundaboutDefinition rbTemplate, CulDeSacDefinition cdsTemplate, bool radiusByHierarchy)
     {
         var results = new List<RenderResult>();
+        if (PluginContext.Settings.AutoConnect && road.GroupId != null)
+        {
+            var moved = MagnetGroups(new[] { road.GroupId });
+            if (moved.Count > 0) results.AddRange(RenderGroups(moved));
+        }
         var roads = Roads(createMissing: true);
         var me = roads.FirstOrDefault(r => r.Def.Id == road.Id);
         if (me == null) return results;
@@ -418,6 +423,95 @@ public sealed class IntersectionService
         rb.Legs = RoundaboutGenerator.LegsFromRoads(node, roads, rb.OuterRadius + 25);
         if (rb.Legs.Count < 2) return new List<RenderResult>();
         return Refresh(rb);
+    }
+
+    /// <summary>
+    /// Ímã de conexão (InfraWorks): as pontas dos eixos das vias indicadas que caíram sobre outra via vão para o eixo
+    /// dela (ou para a ponta dela / centro da rotatória). Devolve os grupos cujos eixos foram alterados.
+    /// </summary>
+    public HashSet<string> MagnetGroups(IEnumerable<string> groupIds)
+    {
+        var moved = new HashSet<string>();
+        var set = groupIds.Where(g => !string.IsNullOrEmpty(g)).ToHashSet();
+        if (set.Count == 0) return moved;
+        var roads = Roads();
+        var rbs = MarkingStorage.Definitions(_doc).OfType<RoundaboutDefinition>().Select(r => (r.Center, r.OuterRadius)).ToList();
+        foreach (var me in roads.Where(r => r.Def.GroupId != null && set.Contains(r.Def.GroupId)))
+        {
+            if (me.Def.Path == null) continue;
+            var others = roads.Where(r => r.Def.GroupId != me.Def.GroupId).ToList();
+            var (a, b) = RoadConnection.MagnetEnds(me.Axis, others, rbs);
+            var changed = false;
+            if (a is { } ma) changed |= AxisEditor.MoveEnd(_doc, me.Def.Path, me.Axis.Points[0], ma.Point);
+            if (b is { } mb) changed |= AxisEditor.MoveEnd(_doc, me.Def.Path, me.Axis.Points[^1], mb.Point);
+            if (changed) moved.Add(me.Def.GroupId!);
+        }
+        return moved;
+    }
+
+    /// <summary>
+    /// Vias ligadas a uma via que foi movida acompanham a nova posição: a ponta que estava no nó da interseção vai
+    /// para o novo eixo (ao longo da própria direção). Devolve os grupos alterados.
+    /// </summary>
+    public HashSet<string> FollowConnections(IEnumerable<string> movedGroups)
+    {
+        var res = new HashSet<string>();
+        var set = movedGroups.Where(g => !string.IsNullOrEmpty(g)).ToHashSet();
+        if (set.Count == 0) return res;
+        var roads = Roads();
+        var movedRoads = roads.Where(r => r.Def.GroupId != null && set.Contains(r.Def.GroupId)).ToList();
+        if (movedRoads.Count == 0) return res;
+        var movedIds = movedRoads.Select(r => r.Def.Id).ToHashSet();
+        foreach (var it in MarkingStorage.Definitions(_doc).OfType<IntersectionDefinition>().Where(i => i.RoadIds.Any(movedIds.Contains)))
+        {
+            foreach (var r in roads.Where(r => it.RoadIds.Contains(r.Def.Id) && !movedIds.Contains(r.Def.Id)))
+            {
+                if (r.Def.Path == null) continue;
+                foreach (var atEnd in new[] { false, true })
+                {
+                    var e = atEnd ? r.Axis.Points[^1] : r.Axis.Points[0];
+                    if (e.DistanceTo(it.Node) > 1.0) continue;         // esta ponta não estava ligada ao nó
+                    var targets = movedRoads.Where(m => it.RoadIds.Contains(m.Def.Id)).ToList();
+                    var (a, b) = RoadConnection.MagnetEnds(r.Axis, targets, null, 0);
+                    var m1 = atEnd ? b : a;
+                    Vec2? target = m1?.Point;
+                    if (target == null)
+                    {
+                        // Fora do alcance do ímã: prolonga/apara ao longo da própria direção até o novo eixo.
+                        var prev = atEnd ? r.Axis.PointAt(Math.Max(0, r.Axis.Length - 5)) : r.Axis.PointAt(Math.Min(r.Axis.Length, 5));
+                        var dir = (e - prev).Normalized();
+                        var best = double.MaxValue;
+                        foreach (var m in targets)
+                        {
+                            var (_, dist, q) = IntersectionGenerator.Project(m.Axis, e);
+                            if (dist < best && dist < 60) { best = dist; target = q; }
+                            for (var t = -60.0; t <= 60; t += 0.5)
+                            {
+                                var p = e + dir * t;
+                                var (_, d2, q2) = IntersectionGenerator.Project(m.Axis, p);
+                                if (d2 < 0.3 && Math.Abs(t) < best) { best = Math.Abs(t); target = q2; }
+                            }
+                        }
+                    }
+                    if (target is { } tg && tg.DistanceTo(e) > 0.01 && AxisEditor.MoveEnd(_doc, r.Def.Path, e, tg)) res.Add(r.Def.GroupId!);
+                }
+            }
+        }
+        return res;
+    }
+
+    /// <summary>Regenera todas as marcas das vias (grupos) indicadas.</summary>
+    public List<RenderResult> RenderGroups(IEnumerable<string> groups)
+    {
+        var set = groups.ToHashSet();
+        var results = new List<RenderResult>();
+        _service.Invalidate();
+        foreach (var d in MarkingService.DependencyOrder(MarkingStorage.Definitions(_doc).Where(d => d.GroupId != null && set.Contains(d.GroupId))))
+        {
+            try { results.Add(_service.Render(d)); }
+            catch (Exception ex) { Log.Error("Regenerar via", ex); }
+        }
+        return results;
     }
 
     /// <summary>Interseções que dependem das marcas (grupos de via) indicadas.</summary>

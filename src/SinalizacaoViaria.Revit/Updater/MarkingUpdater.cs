@@ -75,6 +75,25 @@ public sealed class MarkingUpdater : IUpdater
             if (affected.Count == 0) return;
 
             var service = new MarkingService(doc, null, interactive: false);
+            if (PluginContext.Settings.AutoConnect && !MarkingService.IsRendering)
+            {
+                // Ímã de conexão (InfraWorks): ponta solta sobre outra via encaixa no eixo dela; vias ligadas a uma
+                // via movida acompanham. Os eixos alterados entram na regeneração.
+                try
+                {
+                    var conn = new IntersectionService(doc, service);
+                    var groups = affected.Select(d => d.GroupId).Where(g => g != null).Cast<string>().ToHashSet();
+                    var moved = conn.MagnetGroups(groups);
+                    moved.UnionWith(conn.FollowConnections(groups));
+                    if (moved.Count > 0)
+                    {
+                        var ids = affected.Select(d => d.Id).ToHashSet();
+                        affected.AddRange(MarkingStorage.Definitions(doc).Where(d => d.GroupId != null && moved.Contains(d.GroupId) && !ids.Contains(d.Id)));
+                        service.Invalidate();
+                    }
+                }
+                catch (Exception ex) { Log.Error("Updater – ímã de conexão", ex); }
+            }
             foreach (var def in affected)
             {
                 try { service.Render(def); }
@@ -88,7 +107,12 @@ public sealed class MarkingUpdater : IUpdater
                 try
                 {
                     var template = UI.UiHelpers.Remembered<Core.Definitions.IntersectionDefinition>("Intersecao") ?? new Core.Definitions.IntersectionDefinition();
-                    inter.AutoIntersectGroups(affected.Select(d => d.GroupId ?? ""), template, out processed);
+                    inter.AutoIntersectGroups(affected.Select(d => d.GroupId ?? ""), template, out processed, radiusByHierarchy: true);
+                    // Via puxada até uma rotatória: ela ganha o ramo.
+                    var roads = inter.Roads();
+                    foreach (var g in affected.Select(d => d.GroupId).Where(g => g != null).Distinct())
+                        foreach (var r in roads.Where(r => r.Def.GroupId == g))
+                            foreach (var rb in inter.RoundaboutsTouching(r)) inter.Refresh(rb);
                 }
                 catch (Exception ex) { Log.Error("Updater – interseções automáticas", ex); }
             }

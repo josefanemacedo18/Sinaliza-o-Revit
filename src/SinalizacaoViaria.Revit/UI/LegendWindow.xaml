@@ -21,7 +21,7 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
             <StackPanel>
                 <TextBlock Text="Legenda automática" Style="{StaticResource Title}"/>
-                <TextBlock Style="{StaticResource Hint}" Text="Monta um quadro com uma amostra desenhada e a descrição de cada tipo de sinalização existente no projeto. O quadro se atualiza quando novas marcas são criadas ou com 'Atualizar Todas'. Depois de confirmar, clique o canto superior esquerdo do quadro."/>
+                <TextBlock Style="{StaticResource Hint}" Text="Monta um quadro com o desenho e a descrição de cada tipo de PLACA (sinalização vertical) existente no projeto – regulamentação, advertência, indicação... O quadro se atualiza quando novas marcas são criadas ou com 'Atualizar Todas'. Depois de confirmar, clique o canto superior esquerdo do quadro."/>
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -36,7 +36,7 @@
                     <TextBlock Grid.Row="4" Text="Altura do texto (mm)" Style="{StaticResource FieldLabel}"/>
                     <TextBox Grid.Row="4" Grid.Column="1" x:Name="TbText" TextChanged="AnyChanged"/>
                 </Grid>
-                <GroupBox Header="Incluir">
+                <GroupBox Header="Incluir" Visibility="Collapsed">
                     <StackPanel>
                         <CheckBox x:Name="CkHorizontal" Content="Sinalização horizontal" Checked="AnyChanged" Unchecked="AnyChanged"/>
                         <CheckBox x:Name="CkVertical" Content="Sinalização vertical (placas)" Checked="AnyChanged" Unchecked="AnyChanged"/>

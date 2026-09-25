@@ -24,6 +24,8 @@ public sealed class PluginSettings
 
     /// <summary>Cria/atualiza interseções automaticamente quando vias passam a se cruzar (criação ou edição de eixos).</summary>
     public bool AutoIntersect { get; set; } = true;
+    /// <summary>Ímã de conexão: pontas de eixo soltas sobre outra via vão para o eixo dela (e vias ligadas acompanham).</summary>
+    public bool AutoConnect { get; set; } = true;
     public Automation.TipoConexao LastConnection { get; set; } = Automation.TipoConexao.Intersecao;
     public Automation.FimLivre LastFreeEnds { get; set; } = Automation.FimLivre.Nenhum;
     public double LastCurveRadius { get; set; } = 30;

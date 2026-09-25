@@ -218,4 +218,84 @@ public static class RoadConnection
         cut.AddRange(PolygonOps.Strip(new[] { b - outward * 0.5, b + outward * 2 }, r.TotalLeft + r.TotalRight + 1));
         return PolygonOps.Union(cut);
     }
+
+    /// <summary>Encaixe de uma ponta de eixo: novo ponto e o que foi encontrado.</summary>
+    public readonly record struct EndMagnet(Vec2 Point, TipoEncaixe Kind);
+
+    /// <summary>
+    /// "Ímã" das pontas do eixo (como no InfraWorks): a ponta solta perto de outra via vai para o eixo dela – ao longo
+    /// da própria direção, mantendo o ângulo e aparando a sobra que passou do eixo –, para a ponta dela (continuação)
+    /// ou para o centro de uma rotatória. Devolve o novo ponto de cada ponta (nulo = sem alteração).
+    /// </summary>
+    public static (EndMagnet? Start, EndMagnet? End) MagnetEnds(Polyline2 axis, IReadOnlyList<IntersectionRoad> others,
+        IReadOnlyList<(Vec2 Center, double Radius)>? roundabouts = null, double endTolerance = 6.0)
+    {
+        if (axis.Points.Count < 2 || axis.Length < 5) return (null, null);
+        EndMagnet? One(bool atEnd)
+        {
+            var e = atEnd ? axis.Points[^1] : axis.Points[0];
+            var prev = atEnd ? axis.PointAt(Math.Max(0, axis.Length - Math.Min(5, axis.Length / 2))) : axis.PointAt(Math.Min(axis.Length, Math.Min(5, axis.Length / 2)));
+            var dir = (e - prev).Normalized();
+            if (roundabouts != null)
+                foreach (var (c, r) in roundabouts)
+                    if (c.DistanceTo(e) <= r + 2) return c.DistanceTo(e) < 0.01 ? null : new EndMagnet(c, TipoEncaixe.Rotatoria);
+            // Ponta de outra via: continuação.
+            var bestEnd = (d: double.MaxValue, p: e);
+            foreach (var o in others)
+                foreach (var oe in new[] { o.Axis.Points[0], o.Axis.Points[^1] })
+                {
+                    var dd = oe.DistanceTo(e);
+                    if (dd <= endTolerance && dd < bestEnd.d) bestEnd = (dd, oe);
+                }
+            if (bestEnd.d < double.MaxValue) return bestEnd.d < 0.01 ? null : new EndMagnet(bestEnd.p, TipoEncaixe.PontaDeVia);
+            // Eixo de outra via: a ponta caiu sobre a pista/calçada dela (ou passou um pouco do eixo).
+            EndMagnet? best = null;
+            var bestMove = double.MaxValue;
+            foreach (var o in others)
+            {
+                var half = Math.Max(o.Def.TotalLeft, o.Def.TotalRight);
+                var (_, dist, q) = IntersectionGenerator.Project(o.Axis, e);
+                if (dist > half + 1.5) continue;
+                if (dist < 0.01) return null;                       // já está no eixo
+                // Ao longo da própria direção (prolonga ou apara), limitado; senão, projeção.
+                var target = q;
+                var reach = Math.Min(40, (half + 2) * 3);
+                var hit = RayHit(prev, dir, o.Axis, e, reach);
+                if (hit is { } h) target = h;
+                var move = target.DistanceTo(e);
+                if (move < bestMove) { bestMove = move; best = new EndMagnet(target, TipoEncaixe.EixoDeVia); }
+            }
+            if (best is { } b)
+            {
+                // Não encurta a via a ponto de sumir.
+                var other = atEnd ? axis.Points[0] : axis.Points[^1];
+                if (b.Point.DistanceTo(other) < 3) return null;
+            }
+            return best;
+        }
+        return (One(false), One(true));
+    }
+
+    /// <summary>Cruzamento da reta (p0 + t·dir) com o eixo, o mais perto de <paramref name="near"/> (até <paramref name="reach"/> m).</summary>
+    private static Vec2? RayHit(Vec2 p0, Vec2 dir, Polyline2 axis, Vec2 near, double reach)
+    {
+        Vec2? best = null;
+        var bestD = double.MaxValue;
+        var a = p0 - dir * 1000;
+        var r = dir * 2000;
+        for (int j = 0; j + 1 < axis.Points.Count; j++)
+        {
+            var q = axis.Points[j];
+            var sv = axis.Points[j + 1] - q;
+            var den = r.Cross(sv);
+            if (Math.Abs(den) < 1e-9) continue;
+            var t = (q - a).Cross(sv) / den;
+            var u = (q - a).Cross(r) / den;
+            if (t < 0 || t > 1 || u < -1e-9 || u > 1 + 1e-9) continue;
+            var p = a + r * t;
+            var d = p.DistanceTo(near);
+            if (d <= reach && d < bestD) { bestD = d; best = p; }
+        }
+        return best;
+    }
 }

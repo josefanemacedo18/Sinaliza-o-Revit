@@ -88,6 +88,19 @@ interseções, rotatórias e cul-de-sacs dessas vias são atualizados.
 
 ## 2.2 Nova via – conexão natural com o sistema viário
 
+### Ímã de conexão (como no InfraWorks)
+
+Não é preciso nenhuma ferramenta para ligar vias: **puxe a ponta do eixo** de uma via (alça de arraste do
+Revit, *Mover* ou editando a linha) **até o meio de outra via** – basta soltar sobre a pista ou a calçada
+dela. A ponta vai sozinha para o **eixo** da outra via, **mantendo a direção da via** (prolonga ou apara a
+sobra que passou do eixo), e a interseção se forma em qualquer ângulo, com todo o desenho das duas vias
+ajustado. Soltando perto da **ponta** de outra via, as duas se emendam (continuação); dentro de uma
+**rotatória**, a via vira um novo ramo. Afastando a ponta, a interseção é desfeita.
+
+Quando uma via ligada é **movida**, as vias que chegam nela **acompanham**: a ponta que estava no
+cruzamento é levada ao novo eixo. O mesmo ímã vale ao criar a via (desenhada ou por linhas
+selecionadas). Pode ser desligado em **Configurações → Ímã de conexão**.
+
 **Via → Nova Via** (ou *Sinalizar Via* com *Desenhar a via por pontos*) desenha a via clicando os pontos do
 eixo, como no InfraWorks, e o sistema viário se ajusta sozinho:
 
@@ -328,29 +341,9 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   texto deve ficar. O texto automático traz código e nome e, opcionalmente, detalhes (variante/
   largura da linha, barras e espaçamento do zebrado, dimensões da vaga, espaçamento dos
   dispositivos, inclinação da rampa...). Um texto livre pode substituir o automático.
-* **Quadro de Legenda**: clique o canto superior esquerdo. Uma linha por tipo de sinalização do
-  projeto, com amostra desenhada (linha no padrão real, zebrado, símbolo, placa, dispositivo...) e
-  "código – nome". Escolha incluir horizontal, vertical e/ou elementos físicos. O quadro se
-  atualiza ao criar novas marcas e com **Atualizar Todas**.
-* **Detalhar Placas → Numerar**: numera as placas (P01, P02... de cima para baixo, da esquerda para
-  a direita). O número aparece junto ao símbolo e no Quadro de Placas; para trocar um número, use
-  **Editar** sobre o símbolo.
-* **Cotar Seção**: clique dois pontos atravessando a via. O plugin encontra as linhas, faixas,
-  canteiros, meios-fios e calçadas cortados e cria a cadeia de cotas – linhas pintadas estreitas são
-  cotadas pelo eixo (larguras de faixa eixo a eixo) – e a cota total. A cota se atualiza quando a
-  sinalização muda.
-* **Detalhe Típico**: selecione uma marca e clique a posição. Desenha a marca ampliada (escala do
-  detalhe, ex.: 1:20) e cotada: traço/espaço e larguras/afastamentos das linhas; barras e
-  espaçamento do zebrado; dimensões das vagas; **placa em elevação** com suporte, altura livre e
-  altura total. Traz notas com as especificações.
-* **Quadro de Quantitativos**: tabela na prancha por categoria (código, descrição, unidade,
-  quantidade), de todas as categorias ou só de uma.
-* **Quadro de Placas**: símbolo, numeração, código, descrição, dimensões e quantidade de cada placa.
-* **Notas Gerais**: bloco de notas numeradas com texto padrão editável (normas, materiais, altura
-  livre das placas, acessibilidade...).
-* **Norte**: indicação de norte (com ângulo).
-* **Mostrar/Ocultar Eixos**: alterna a visibilidade das linhas "SV - Eixo de sinalização" na vista
-  (se a vista usa um modelo de vista, altere-o em V/G).
+* **Quadro de Legenda**: clique o canto superior esquerdo. Lista **somente as placas** (sinalização
+  vertical) do projeto – uma linha por tipo de placa, com o desenho e a descrição, em ordem:
+  regulamentação, advertência, indicação e demais. Atualiza-se quando placas são criadas ou removidas.
 
 Legenda, quadros e cotas de seção acompanham o projeto: são regenerados quando as marcas são
 criadas, editadas ou quando os eixos mudam (e com **Atualizar Todas**). Todos podem ser editados com
