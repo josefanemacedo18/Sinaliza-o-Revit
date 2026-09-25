@@ -5267,9 +5267,9 @@
       "comprimento": 1.8,
       "largura": 0.6,
       "altura": 0.85,
-      "cor": "Marrom",
+      "cor": "Madeira",
       "espacamento": 15,
-      "descricao": "Assento de madeira sobre apoios de concreto.",
+      "descricao": "Banco com assento e encosto em ripas de madeira sobre apoios de aço com braços.",
       "referencia": "ABNT NBR 9050 (assentos em espaços públicos)"
     },
     {
@@ -5281,7 +5281,7 @@
       "altura": 0.95,
       "cor": "Laranja",
       "espacamento": 25,
-      "descricao": "Cesto em poste.",
+      "descricao": "Cesto cônico com tampa em poste metálico.",
       "referencia": "Padrão municipal"
     },
     {
@@ -5293,7 +5293,7 @@
       "altura": 8.0,
       "cor": "Metal",
       "espacamento": 30,
-      "descricao": "Poste com braço e luminária (comprimento = braço).",
+      "descricao": "Base de concreto, poste cônico de aço, braço curvo e luminária LED com difusor (comprimento = braço).",
       "referencia": "Projeto luminotécnico / concessionária"
     },
     {
@@ -5303,9 +5303,9 @@
       "comprimento": 4.0,
       "largura": 1.2,
       "altura": 6.0,
-      "cor": "Grama",
+      "cor": "Folhagem",
       "espacamento": 8,
-      "descricao": "Copa (comprimento = diâmetro), tronco e canteiro quadrado (largura).",
+      "descricao": "Tronco, galhos e copa em lóbulos (comprimento = diâmetro da copa); canteiro com guia e grama (largura).",
       "referencia": "Plano de arborização urbana"
     },
     {
@@ -5317,7 +5317,7 @@
       "altura": 2.6,
       "cor": "Metal",
       "espacamento": 0,
-      "descricao": "Cobertura, painel de fundo e banco. Posicione com o 2º clique apontando para a pista.",
+      "descricao": "Cobertura, pilares, fundo e lateral em vidro, painel e banco de madeira. 2º clique apontando para a pista.",
       "referencia": "Padrão municipal / NBR 9050"
     },
     {
@@ -5353,7 +5353,7 @@
       "altura": 0.5,
       "cor": "Concreto",
       "espacamento": 3,
-      "descricao": "Floreira (também usada como bloqueio leve).",
+      "descricao": "Floreira de concreto com terra e arbustos (também usada como bloqueio leve).",
       "referencia": "Prática usual"
     },
     {
@@ -5379,6 +5379,42 @@
       "espacamento": 0,
       "descricao": "Coluna com grupo focal de 3 lentes voltado para o tráfego.",
       "referencia": "MBST Vol. V – Sinalização semafórica"
+    },
+    {
+      "codigo": "POSTE-PED",
+      "nome": "Poste de iluminação de pedestres",
+      "forma": "PostePedestre",
+      "comprimento": 0.4,
+      "largura": 0.12,
+      "altura": 4.5,
+      "cor": "Metal",
+      "espacamento": 15,
+      "descricao": "Poste baixo com luminária de topo para calçadas, praças e ciclovias.",
+      "referencia": "Projeto luminotécnico"
+    },
+    {
+      "codigo": "PALMEIRA",
+      "nome": "Palmeira",
+      "forma": "Palmeira",
+      "comprimento": 4.0,
+      "largura": 1.0,
+      "altura": 7.0,
+      "cor": "Folhagem",
+      "espacamento": 8,
+      "descricao": "Estipe e folhas (comprimento = diâmetro da copa).",
+      "referencia": "Plano de arborização urbana"
+    },
+    {
+      "codigo": "ARBUSTO",
+      "nome": "Arbusto / forração alta",
+      "forma": "Arbusto",
+      "comprimento": 1.2,
+      "largura": 1.2,
+      "altura": 1.0,
+      "cor": "Folhagem",
+      "espacamento": 1.5,
+      "descricao": "Maciço arbustivo (canteiros, ilhas, rotatórias).",
+      "referencia": "Projeto paisagístico"
     }
   ],
   "materiais": [

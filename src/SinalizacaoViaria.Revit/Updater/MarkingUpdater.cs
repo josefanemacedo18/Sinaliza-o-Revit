@@ -80,6 +80,17 @@ public sealed class MarkingUpdater : IUpdater
                 try { service.Render(def); }
                 catch (Exception ex) { Log.Error($"Updater {def.DisplayCode}", ex); }
             }
+            var inter = new IntersectionService(doc, service);
+            foreach (var it in inter.DependentOn(affected))
+            {
+                try { inter.Refresh(it); }
+                catch (Exception ex) { Log.Error("Updater interseção", ex); }
+            }
+            foreach (var rb in inter.RoundaboutsDependentOn(affected))
+            {
+                try { inter.Refresh(rb); }
+                catch (Exception ex) { Log.Error("Updater rotatória", ex); }
+            }
             service.RenderDependents(affected.Select(d => d.Id), includeLegends: true);
         }
         catch (Exception ex)

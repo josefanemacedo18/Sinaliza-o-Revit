@@ -203,6 +203,22 @@ public static class IconFactory
                 }
                 dc.DrawEllipse(null, P(Asphalt, 4), new Point(16, 16), 8, 8);
                 break;
+            case "intersecao":
+                dc.DrawRectangle(B(Color.FromRgb(200, 198, 190)), null, new Rect(1, 1, 30, 30));
+                dc.DrawGeometry(B(Asphalt), null, Close(Poly(new Point(11, 1), new Point(21, 1), new Point(21, 8), new Point(24, 11), new Point(31, 11), new Point(31, 21),
+                    new Point(24, 21), new Point(21, 24), new Point(21, 31), new Point(11, 31), new Point(11, 24), new Point(8, 21), new Point(1, 21), new Point(1, 11), new Point(8, 11), new Point(11, 8))));
+                for (int i = 0; i < 4; i++) dc.DrawRectangle(B(White), null, new Rect(12 + i * 2.5, 4, 1.4, 4));
+                for (int i = 0; i < 4; i++) dc.DrawRectangle(B(White), null, new Rect(24, 12 + i * 2.5, 4, 1.4));
+                break;
+            case "rotatoria":
+                dc.DrawRectangle(B(Color.FromRgb(200, 198, 190)), null, new Rect(1, 1, 30, 30));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(12, 1, 8, 30));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 12, 30, 8));
+                dc.DrawEllipse(B(Asphalt), null, new Point(16, 16), 12, 12);
+                dc.DrawEllipse(B(Color.FromRgb(160, 118, 96)), null, new Point(16, 16), 6.5, 6.5);
+                dc.DrawEllipse(B(Color.FromRgb(98, 160, 72)), null, new Point(16, 16), 5, 5);
+                dc.DrawGeometry(null, P(White, 1.2), Arc(new Point(16, 16), 9, 20, 160));
+                break;
             case "cotasecao":
                 dc.DrawRectangle(B(Asphalt), null, new Rect(1, 14, 30, 17));
                 dc.DrawLine(P(White, 1.5), new Point(16, 14), new Point(16, 31));

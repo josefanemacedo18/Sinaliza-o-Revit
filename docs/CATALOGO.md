@@ -164,10 +164,11 @@ A série padrão é gerada pelo script `tools/gerar_placas.py` (Python 3), que p
   "comprimento": 1.80, "largura": 0.20, "altura": 8.00, "cor": "Metal", "espacamento": 30 }
 ```
 
-`forma`: `Banco`, `Lixeira`, `PosteIluminacao`, `Arvore`, `AbrigoOnibus`, `Paraciclo`, `Hidrante`,
-`Floreira`, `PlacaLogradouro`, `Semaforo`.
+`forma`: `Banco`, `Lixeira`, `PosteIluminacao`, `PostePedestre`, `Arvore`, `Palmeira`, `Arbusto`,
+`AbrigoOnibus`, `Paraciclo`, `Hidrante`, `Floreira`, `PlacaLogradouro`, `Semaforo`.
 
-Cores adicionais: `Verde`, `Laranja`, `Marrom` (tinta/placas) e `Asfalto` (volumes).
+Cores adicionais: `Verde`, `Laranja`, `Marrom` (tinta/placas) e materiais físicos `Asfalto`, `Bloquete`,
+`PavimentoConcreto`, `Folhagem`, `Vidro`, `Madeira` e `RelevoTatil`.
 
 ## `materiais`
 

@@ -1,6 +1,7 @@
 using Autodesk.Revit.DB;
 using SinalizacaoViaria.Core.Catalog;
 using SinalizacaoViaria.Core.Definitions;
+using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Core.Model;
 using SinalizacaoViaria.Core.Quantities;
@@ -45,6 +46,13 @@ public sealed class MarkingService
 
     private readonly Dictionary<string, MarkingGeometry?> _geometryCache = new();
 
+    /// <summary>Invalida o cache de definições (após gravar outras marcas na mesma transação).</summary>
+    public void Invalidate()
+    {
+        _definitions = null;
+        _geometryCache.Clear();
+    }
+
     /// <summary>Geometria sem detalhes (null para detalhes ou em caso de erro) – prévias de quadros.</summary>
     public MarkingGeometry? BuildGeometryOrNull(MarkingDefinition d) => OtherGeometry(d);
 
@@ -87,7 +95,8 @@ public sealed class MarkingService
     public MarkingGeometry BuildGeometry(MarkingDefinition def, out double baseZ, List<string>? warnings = null, View? view = null)
     {
         var ctx = PluginContext.BuildContext(def.Output.Drape && def.Output.Mode == OutputMode.Modelo3D,
-            view?.Scale ?? 100, id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList(), OtherGeometry);
+            view?.Scale ?? 100, id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList(), OtherGeometry,
+            d => PathResolver.Resolve(_doc, d.Path)?.Main);
         if (def.Path == null)
         {
             baseZ = def.PointZ ?? 0;
@@ -101,6 +110,13 @@ public sealed class MarkingService
 
         // Rampas e moderadores usam apenas os extremos do primeiro trecho.
         if (def is RampDefinition or TrafficCalmingDefinition or CulDeSacDefinition or CurbExtensionDefinition) return MarkingBuilder.Build(def, path.Main, ctx);
+
+        if (def is TactileRouteDefinition route)
+        {
+            // Todas as linhas juntas: as junções entre trechos recebem alerta.
+            var g = TactileGenerator.Route(route, path.Chains, route.Elevation);
+            return route.Exclusions.Count == 0 ? g : MarkingBuilder.ApplyExclusions(g, route.Exclusions);
+        }
 
         var geo = new MarkingGeometry();
         foreach (var chain in path.Chains)

@@ -97,6 +97,10 @@ public sealed class PathReference
 [JsonDerivedType(typeof(QuantityTableDefinition), "quadro-quantitativo")]
 [JsonDerivedType(typeof(NotesDefinition), "notas")]
 [JsonDerivedType(typeof(NorthArrowDefinition), "norte")]
+[JsonDerivedType(typeof(RoadPavementDefinition), "pavimento-via")]
+[JsonDerivedType(typeof(IntersectionDefinition), "intersecao")]
+[JsonDerivedType(typeof(RoundaboutDefinition), "rotatoria")]
+[JsonDerivedType(typeof(TactileRouteDefinition), "rota-tatil")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;
@@ -366,6 +370,8 @@ public sealed class SignDefinition : MarkingDefinition
     public string? Legend { get; set; }
     /// <summary>Deslocamento lateral da placa em relação ao suporte (m, + à direita do condutor).</summary>
     public double LateralOffset { get; set; }
+    /// <summary>Nível do terreno onde o suporte é fincado, acima do ponto clicado (0,15 m = topo da calçada).</summary>
+    public double BaseElevation { get; set; } = 0.15;
 
     public override string KindName => "Placa";
     public override string DisplayCode => Code;
@@ -393,6 +399,8 @@ public sealed class UrbanElementDefinition : MarkingDefinition
     public double? Width { get; set; }
     public double? Height { get; set; }
     public MarkingColor? Color { get; set; }
+    /// <summary>Nível de assentamento acima do ponto/caminho (0,15 m = topo da calçada).</summary>
+    public double BaseElevation { get; set; } = 0.15;
 
     public override string KindName => "Elemento urbano";
     public override string DisplayCode => Code;
@@ -522,6 +530,8 @@ public sealed class CurbExtensionDefinition : MarkingDefinition
     public int Trees { get; set; }
     /// <summary>Recorta as marcas da pista (vagas, linhas) sob a orelha.</summary>
     public bool CutRoadMarkings { get; set; } = true;
+    /// <summary>Raio mínimo do meio-fio da orelha nas esquinas (0 = acompanha a esquina com raio igual ao avanço).</summary>
+    public double CornerRadius { get; set; }
 
     public override string KindName => "Orelha de calçada";
     public override string DisplayCode => "ORELHA";
@@ -835,4 +845,163 @@ public sealed class NorthArrowDefinition : MarkingDefinition, IAnnotationDefinit
     public override void Translate(Vec2 delta, double dz) => Position += delta;
     public override string KindName => "Norte";
     public override string DisplayCode => "NORTE";
+}
+
+public enum TipoPavimento
+{
+    Nenhum,
+    Asfalto,
+    /// <summary>Pavimento intertravado (bloquete / paver).</summary>
+    Bloquete,
+    Concreto,
+}
+
+/// <summary>Faixa (offset do eixo e largura) sem pavimento – canteiros elevados e sarjetas.</summary>
+public sealed record PavementGap(double Offset, double Width, bool Median = true);
+
+/// <summary>
+/// Pavimento da pista gerado pelo "Sinalizar via". Também registra a seção transversal (larguras da pista e das
+/// calçadas) usada para montar interseções e rotatórias com as outras vias.
+/// </summary>
+public sealed class RoadPavementDefinition : MarkingDefinition
+{
+    public PathReference PathRef { get; set; } = new();
+    public TipoPavimento Material { get; set; } = TipoPavimento.Asfalto;
+    /// <summary>Espessura (m). Nulo = padrão do material.</summary>
+    public double? Thickness { get; set; }
+    /// <summary>Distância do eixo ao bordo da pista do lado direito (face do meio-fio).</summary>
+    public double RightWidth { get; set; } = 3.5;
+    public double LeftWidth { get; set; } = 3.5;
+    /// <summary>Largura da calçada (com meio-fio) em cada lado; 0 = sem calçada.</summary>
+    public double RightSidewalk { get; set; }
+    public double LeftSidewalk { get; set; }
+    public double CurbWidth { get; set; } = 0.15;
+    public double CurbHeight { get; set; } = 0.15;
+    /// <summary>Mão dupla (falso = todas as faixas no sentido do eixo).</summary>
+    public bool TwoWay { get; set; } = true;
+    /// <summary>Faixas sem pavimento (canteiros físicos, sarjetas), offset + à esquerda.</summary>
+    public List<PavementGap> Gaps { get; set; } = new();
+    public double StartSetback { get; set; }
+    public double EndSetback { get; set; }
+
+    public double DefaultThickness => Material switch { TipoPavimento.Bloquete => 0.08, TipoPavimento.Concreto => 0.15, _ => 0.05 };
+    public double ActualThickness => Thickness is > 0 ? Thickness.Value : DefaultThickness;
+    public double TotalRight => RightWidth + RightSidewalk;
+    public double TotalLeft => LeftWidth + LeftSidewalk;
+
+    public MarkingColor Color => Material switch
+    {
+        TipoPavimento.Bloquete => MarkingColor.Bloquete,
+        TipoPavimento.Concreto => MarkingColor.PavimentoConcreto,
+        _ => MarkingColor.Asfalto,
+    };
+
+    public override string KindName => "Pavimento da via";
+    public override string DisplayCode => Material switch
+    {
+        TipoPavimento.Bloquete => "PAV-BLQ",
+        TipoPavimento.Concreto => "PAV-CON",
+        _ => "PAV-ASF",
+    };
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) => PathRef = path;
+}
+
+/// <summary>Interseção entre vias do "Sinalizar via": esquinas arredondadas, meio-fio, recortes e travessias.</summary>
+public sealed class IntersectionDefinition : MarkingDefinition
+{
+    /// <summary>Ponto de cruzamento dos eixos (m).</summary>
+    public Vec2 Node { get; set; }
+    public double Z { get; set; }
+    /// <summary>Ids das definições de pavimento das vias que se cruzam.</summary>
+    public List<string> RoadIds { get; set; } = new();
+    /// <summary>Raio das esquinas na face do meio-fio (m).</summary>
+    public double CornerRadius { get; set; } = 6.0;
+    public bool Crosswalks { get; set; } = true;
+    public double CrosswalkWidth { get; set; } = 4.0;
+    /// <summary>Recuo da faixa de pedestres em relação ao fim da curva da esquina (m).</summary>
+    public double CrosswalkSetback { get; set; } = 1.0;
+    public bool StopLines { get; set; } = true;
+    public bool Ramps { get; set; } = true;
+    /// <summary>Ids das marcas criadas pela interseção (faixas, retenções, rampas) – regeneradas com ela.</summary>
+    public List<string> ChildIds { get; set; } = new();
+
+    public override double? PointZ => Z;
+    public override void Translate(Vec2 delta, double dz) { Node += delta; Z += dz; }
+    public override string KindName => "Interseção";
+    public override string DisplayCode => "INTERSECAO";
+}
+
+/// <summary>Um ramo da rotatória (direção a partir do centro).</summary>
+public sealed class RoundaboutLeg
+{
+    /// <summary>Ângulo do ramo (graus, anti-horário a partir do eixo X do projeto).</summary>
+    public double AngleDeg { get; set; }
+    /// <summary>Largura da pista do ramo (m).</summary>
+    public double Width { get; set; } = 7.0;
+    public double Sidewalk { get; set; } = 2.5;
+    /// <summary>Pavimento da via ligada a este ramo (opcional).</summary>
+    public string? RoadId { get; set; }
+}
+
+/// <summary>Rotatória com ilha central, pista giratória, faixa galgável e ramos com ilhas separadoras.</summary>
+public sealed class RoundaboutDefinition : MarkingDefinition
+{
+    public Vec2 Center { get; set; }
+    public double Z { get; set; }
+    /// <summary>Raio da ilha central (face do meio-fio).</summary>
+    public double IslandRadius { get; set; } = 8.0;
+    /// <summary>Faixa galgável (apron) em torno da ilha, para veículos longos.</summary>
+    public double ApronWidth { get; set; } = 1.5;
+    public int Lanes { get; set; } = 1;
+    public double LaneWidth { get; set; } = 5.0;
+    public double SidewalkWidth { get; set; } = 2.5;
+    public double EntryRadius { get; set; } = 12.0;
+    public double CurbWidth { get; set; } = 0.15;
+    public double CurbHeight { get; set; } = 0.15;
+    public TipoPavimento Pavement { get; set; } = TipoPavimento.Asfalto;
+    public List<RoundaboutLeg> Legs { get; set; } = new();
+    /// <summary>Ilhas separadoras (gota) nos ramos.</summary>
+    public bool SplitterIslands { get; set; } = true;
+    public double SplitterLength { get; set; } = 12.0;
+    public double SplitterWidth { get; set; } = 2.5;
+    public bool Markings { get; set; } = true;
+    public bool Crosswalks { get; set; } = true;
+    public bool Signs { get; set; } = true;
+    public bool Landscaping { get; set; } = true;
+    public List<string> ChildIds { get; set; } = new();
+
+    public double OuterRadius => IslandRadius + ApronWidth + Lanes * LaneWidth;
+    public override double? PointZ => Z;
+    public override void Translate(Vec2 delta, double dz) { Center += delta; Z += dz; }
+    public override string KindName => "Rotatória";
+    public override string DisplayCode => "ROTATORIA";
+}
+
+/// <summary>Rota tátil (NBR 16537): piso direcional ao longo do percurso e alerta nas mudanças de direção, extremos e junções.</summary>
+public sealed class TactileRouteDefinition : MarkingDefinition
+{
+    public PathReference PathRef { get; set; } = new();
+    /// <summary>Lado da placa (módulo) – 0,25 m ou 0,40 m.</summary>
+    public double Module { get; set; } = 0.25;
+    /// <summary>Número de placas na largura da faixa direcional.</summary>
+    public int Rows { get; set; } = 1;
+    public MarkingColor Color { get; set; } = MarkingColor.Amarela;
+    public bool AlertAtTurns { get; set; } = true;
+    public bool AlertAtEnds { get; set; } = true;
+    public bool AlertAtJunctions { get; set; } = true;
+    /// <summary>Lado do quadrado de alerta em módulos (no mínimo a largura da direcional).</summary>
+    public int AlertModules { get; set; } = 1;
+    /// <summary>Extremos: profundidade da faixa de alerta em módulos.</summary>
+    public int EndAlertModules { get; set; } = 1;
+    /// <summary>Somente alerta ao longo do caminho (faixa de alerta), sem direcional.</summary>
+    public bool AlertOnly { get; set; }
+    public bool Relief { get; set; } = true;
+    /// <summary>Nível do piso onde as placas são assentadas (m acima da pista – topo da calçada).</summary>
+    public double Elevation { get; set; } = 0.15;
+
+    public override string KindName => "Rota tátil";
+    public override string DisplayCode => AlertOnly ? "PTA" : "ROTA-TATIL";
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) => PathRef = path;
 }

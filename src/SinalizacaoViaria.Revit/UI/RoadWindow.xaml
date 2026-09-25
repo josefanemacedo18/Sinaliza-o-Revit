@@ -167,6 +167,22 @@
                     </Grid>
                 </GroupBox>
 
+                <GroupBox Header="Pavimento e interseções">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Pavimento da pista" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Column="1" x:Name="CbPavement" SelectionChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="1" Text="Espessura (m, vazio = padrão)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbPavThickness" TextChanged="AnyChanged" ToolTip="Padrão: asfalto 0,05 m; bloquete 0,08 m; concreto 0,15 m (indicativo – confira o dimensionamento)."/>
+                        <CheckBox Grid.Row="2" Grid.ColumnSpan="2" x:Name="CkAutoIntersect" Content="Ajustar às vias existentes que se cruzam (interseções)" IsChecked="True"/>
+                        <TextBlock Grid.Row="3" Text="Raio das esquinas (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbCornerRadius" Text="6,00"/>
+                        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkIntCrosswalks" Content="Faixas de pedestres e linhas de retenção nas interseções" IsChecked="True"/>
+                        <CheckBox Grid.Row="5" Grid.ColumnSpan="2" x:Name="CkIntRamps" Content="Rebaixamentos de calçada nas travessias (NBR 9050)" IsChecked="True"/>
+                    </Grid>
+                </GroupBox>
+
                 <GroupBox Header="Caminho (eixo)">
                     <StackPanel>
                         <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas existentes" IsChecked="True"/>

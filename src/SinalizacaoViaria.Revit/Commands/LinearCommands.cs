@@ -1,6 +1,7 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.UI;
 using SinalizacaoViaria.Core.Catalog;
+using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Revit.Infrastructure;
 using SinalizacaoViaria.Revit.UI;
 
@@ -52,11 +53,10 @@ public sealed class CmdTachas : LinearCommandBase
 }
 
 [Transaction(TransactionMode.Manual)]
-public sealed class CmdPisoTatil : LinearCommandBase
+public sealed class CmdPisoTatil : CommandBase
 {
-    protected override string WindowTitle => "Sinalização tátil no piso (NBR 16537)";
-    protected override GrupoMarca[] Groups => new[] { GrupoMarca.Acessibilidade };
-    protected override PathMode DefaultMode => PathMode.Desenhar;
+    protected override Result Run(UIApplication app, UIDocument uidoc) =>
+        SidewalkCommandRunner.Run(uidoc, SidewalkCommandRunner.Last<TactileRouteDefinition>(), d => SidewalkForms.Tactile((TactileRouteDefinition)d, false));
 }
 
 [Transaction(TransactionMode.Manual)]

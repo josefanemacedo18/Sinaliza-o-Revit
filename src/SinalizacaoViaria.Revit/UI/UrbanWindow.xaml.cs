@@ -43,6 +43,7 @@ public partial class UrbanWindow : Window
             TbOffset.Text = UiHelpers.F(existing.Offset, "0.##");
             TbStart.Text = UiHelpers.F(existing.StartOffset, "0.##");
             TbEnd.Text = UiHelpers.F(existing.EndSetback, "0.##");
+            TbBase.Text = UiHelpers.F(existing.BaseElevation, "0.##");
             TbRotation.Text = UiHelpers.F(existing.RotationDeg, "0.#");
             UiHelpers.SelectColor(CbColor, existing.Color);
             Output.Load(existing.Output);
@@ -97,6 +98,7 @@ public partial class UrbanWindow : Window
         d.Height = Opt(TbHeight, m.Altura, "Altura");
         d.Spacing = UiHelpers.Parse(TbSpacing, m.Espacamento > 0 ? m.Espacamento : 10, "Espaçamento", 0.3, 1000);
         d.Offset = UiHelpers.Parse(TbOffset, 0, "Deslocamento", -100, 100);
+        d.BaseElevation = UiHelpers.Parse(TbBase, 0.15, "Nível de assentamento", -5, 50);
         d.StartOffset = UiHelpers.Parse(TbStart, 2, "Início", 0, 10000);
         d.EndSetback = UiHelpers.Parse(TbEnd, 1, "Recuo final", 0, 10000);
         d.RotationDeg = UiHelpers.Parse(TbRotation, 90, "Rotação", -360, 360);

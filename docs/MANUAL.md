@@ -315,7 +315,9 @@ em uma vista dedicada.
 ## 17. Calçadas
 
 * **Orelha de Calçada**: desenhe (ou clique dois pontos) na **face do meio-fio** existente, no trecho
-  do avanço, com a calçada à esquerda do sentido do desenho (ou desmarque a opção). Parâmetros:
+  do avanço – em linha reta (meio de quadra) ou **contornando a esquina** (selecione as linhas/arco da
+  esquina ou desenhe os pontos em volta dela; o meio-fio da orelha acompanha a esquina com raio =
+  raio da esquina + avanço, ou com o *raio mínimo na esquina* informado), com a calçada à esquerda do sentido do desenho (ou desmarque a opção). Parâmetros:
   avanço sobre a pista (largura do estacionamento, ex.: 2,20 m), transição em **curvas reversas**
   (raio) ou **chanfro**, altura e largura do meio-fio, **canteiro** gramado com margens e árvores.
   As vagas e linhas da pista sob a orelha são recortadas automaticamente (e restauradas se a orelha
@@ -336,3 +338,66 @@ em uma vista dedicada.
 
 Todas as ferramentas de calçada são paramétricas: **Editar** reabre a janela com pré-visualização e
 o elemento é regenerado (com os recortes atualizados).
+
+## 18. Pavimento da via
+
+O **Sinalizar Via** gera o **pavimento da pista** (grupo *Pavimento e interseções* da janela):
+**asfalto (CBUQ)**, **bloquete / pavimento intertravado** ou **concreto**, com espessura padrão de
+0,05 / 0,08 / 0,15 m (indicativa – confira o dimensionamento do pavimento). O topo do pavimento fica no
+nível do eixo; a sinalização fica por cima e as calçadas/meios-fios 0,15 m acima. Canteiros físicos e
+sarjetas ficam sem pavimento. O pavimento também **registra a seção da via** (larguras da pista e das
+calçadas), usada pelas interseções e rotatórias – por isso "Nenhum" desativa o ajuste automático.
+
+## 19. Interseções
+
+Ao criar uma via que **cruza** outra (ou que **termina** junto a outra – entroncamento em T), o
+plugin ajusta o cruzamento automaticamente (opção *Ajustar às vias existentes*); também é possível usar
+**Via → Interseção** clicando perto do cruzamento. A interseção:
+
+* torna o pavimento contínuo no miolo e arredonda as **esquinas** com o **raio** informado (na face do
+  meio-fio), com **meio-fio curvo**;
+* refaz as **calçadas** junto à esquina e as **pontas dos canteiros centrais** (com meio-fio);
+* interrompe a sinalização horizontal das vias no cruzamento e na aproximação (até depois da linha de
+  retenção) e remove as **vagas a 5 m da esquina**;
+* cria em cada ramo **faixa de pedestres**, **linha de retenção** (meia pista na mão dupla; pista inteira
+  na mão única, só no ramo de chegada) e **rebaixamentos de calçada** nas duas pontas da travessia.
+
+Tudo é regenerado quando um eixo é movido, ao editar a interseção (**Editar** → raio, largura e recuo da
+faixa, retenções, rampas) e com **Atualizar Todas**. Travessias e rampas da interseção são recriadas nessas
+ocasiões (ajustes manuais nelas são perdidos).
+
+## 20. Rotatórias
+
+**Via → Rotatória**: clique o centro (o ponto é encaixado no cruzamento de vias mais próximo). Os ramos
+são detectados das vias que passam pelo centro (ou informados por ângulo, para uma rotatória isolada).
+Parâmetros: raio da **ilha central** (ajardinada, com árvores opcionais), **faixa galgável** em bloquete
+para ônibus e caminhões, número e largura das **faixas da pista giratória** (linha divisória quando há 2
+ou mais), **raio de entrada/saída**, calçada em volta e pavimento. Em cada ramo: **ilha separadora** em
+gota com **zebrado** de aproximação, **linha de dê a preferência** e **símbolo "Dê a preferência"** na
+entrada (circulação anti-horária), **travessia de pedestres** passando pela ilha, **rebaixamentos** e
+placas **R-2** e **R-33**. As vias ligadas são recortadas e a interseção existente no mesmo nó é
+substituída. Confira as dimensões com o manual do DNIT / órgão local e com o veículo de projeto.
+
+## 21. Piso tátil (NBR 16537)
+
+**Complementos → Piso Tátil** desenha a **rota tátil** com placas moduladas de 0,25, 0,30 ou 0,40 m e
+**relevo** (visível em 3D e em planta):
+
+* **direcional**: barras paralelas ao sentido do deslocamento;
+* **alerta**: domos em malha ortogonal, colocados automaticamente nas **mudanças de direção**, nas
+  **extremidades** e nas **junções em T** entre trechos (selecione ou desenhe vários trechos de uma vez);
+* largura em fileiras de placas, cor contrastante, lado do quadrado de alerta e profundidade do alerta
+  nos extremos; opção *Somente faixa de alerta* (junto a rebaixamentos, desníveis, obstáculos);
+* as placas são assentadas no topo da calçada (0,15 m, ajustável).
+
+Os rebaixamentos (rampas) também usam placas com relevo acompanhando a inclinação. Confira dimensões e
+distribuição com a ABNT NBR 16537 vigente.
+
+## 22. Mobiliário, árvores e placas sobre a calçada
+
+Os elementos urbanos foram redesenhados: **árvore** com tronco, galhos, copa em lóbulos (contorno
+orgânico em planta) e canteiro com guia; **palmeira**; **arbusto**; **banco** com ripas de madeira e
+apoios de aço com braços; **lixeira** cônica com tampa; **poste** cônico com braço curvo e luminária LED;
+**poste de pedestres**; **abrigo de ônibus** com vidro, painel e banco; **paraciclo** tubular; **hidrante**;
+**floreira** com arbustos; **placa de rua** e **semáforo** com anteparo e pestanas. Elementos urbanos e
+placas são assentados no **topo da calçada** (nível da base 0,15 m, ajustável na janela; 0 = nível da pista).

@@ -353,6 +353,10 @@ public enum FormaMobiliario
     Floreira,
     PlacaLogradouro,
     Semaforo,
+    /// <summary>Poste baixo de iluminação de pedestres.</summary>
+    PostePedestre,
+    Palmeira,
+    Arbusto,
 }
 
 /// <summary>Elemento urbanístico viário (mobiliário urbano).</summary>

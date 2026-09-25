@@ -58,7 +58,7 @@
                 <GroupBox Header="Suporte">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Text="Tipo de suporte" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Column="1" x:Name="CbSupport" SelectionChanged="AnyChanged"/>
                         <TextBlock Grid.Row="1" Text="Altura livre sob a placa (m)" Style="{StaticResource FieldLabel}"/>
@@ -67,6 +67,8 @@
                         <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbPost" Text="0,063" TextChanged="AnyChanged"/>
                         <TextBlock Grid.Row="3" Text="Deslocamento da placa (m)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbLateral" Text="0" TextChanged="AnyChanged" ToolTip="+ à direita do condutor"/>
+                        <TextBlock Grid.Row="4" Text="Nível da base (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="4" Grid.Column="1" x:Name="TbBase" Text="0,15" TextChanged="AnyChanged" ToolTip="Acima do ponto clicado: 0,15 = topo da calçada; 0 = nível da pista."/>
                     </Grid>
                 </GroupBox>
                 <GroupBox x:Name="GbPlacement" Header="Inserção">

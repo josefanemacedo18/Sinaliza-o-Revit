@@ -28,6 +28,8 @@ public sealed class StyleService
         MarkingColor.Concreto => "Concreto",
         MarkingColor.Grama => "Grama",
         MarkingColor.Metal => "Metal",
+        MarkingColor.PavimentoConcreto => "Pavimento de concreto",
+        MarkingColor.RelevoTatil => "Relevo tátil",
         _ => c.ToString(),
     };
 
@@ -58,7 +60,17 @@ public sealed class StyleService
             mat = (Material)_doc.GetElement(mid);
             var c = RevitColor(color);
             mat.Color = c;
-            mat.MaterialClass = MarkingColors.IsPaint(color) ? "Pintura" : color == MarkingColor.Grama ? "Vegetação" : color == MarkingColor.Metal ? "Metal" : "Concreto";
+            mat.MaterialClass = MarkingColors.IsPaint(color) ? "Pintura" : color switch
+            {
+                MarkingColor.Grama or MarkingColor.Folhagem => "Vegetação",
+                MarkingColor.Metal => "Metal",
+                MarkingColor.Vidro => "Vidro",
+                MarkingColor.Madeira => "Madeira",
+                MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto => "Pavimento",
+                _ => "Concreto",
+            };
+            if (color == MarkingColor.Vidro) mat.Transparency = 60;
+            if (color == MarkingColor.Metal) mat.Shininess = 90;
             mat.MaterialCategory = MarkingColors.IsPaint(color) ? "Sinalização viária" : "Elementos viários";
             var solid = SolidFillPattern();
             if (solid != ElementId.InvalidElementId)

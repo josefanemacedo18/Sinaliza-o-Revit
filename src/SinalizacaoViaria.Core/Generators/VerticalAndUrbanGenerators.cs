@@ -215,93 +215,8 @@ public static class SignGenerator
 /// <summary>Mobiliário e elementos urbanísticos viários (volumes esquemáticos, com dimensões reais).</summary>
 public static class UrbanGenerator
 {
-    public static MarkingGeometry BuildAt(MobiliarioDef m, LocalFrame frame, double? lOverride, double? wOverride, double? hOverride, MarkingColor? colorOverride)
-    {
-        var L = lOverride ?? m.Comprimento;
-        var W = wOverride ?? m.Largura;
-        var H = hOverride ?? m.Altura;
-        var c = colorOverride ?? m.Cor;
-        var v = new VolumeBuilder(frame);
-        switch (m.Forma)
-        {
-            case FormaMobiliario.Banco:
-                v.Box(-(L / 2 - 0.15), 0, 0.08, W * 0.8, 0, 0.42, MarkingColor.Concreto);
-                v.Box(L / 2 - 0.15, 0, 0.08, W * 0.8, 0, 0.42, MarkingColor.Concreto);
-                v.Box(0, 0.03, L, 0.45, 0.42, 0.05, c);
-                v.Box(0, -W / 2 + 0.05, L, 0.05, 0.50, Math.Max(0.2, H - 0.50), c);
-                break;
-            case FormaMobiliario.Lixeira:
-                v.Cylinder(0, -W / 2 - 0.03, 0.05, 0, H, MarkingColor.Metal);
-                v.Cylinder(0, 0, W, H * 0.45, H * 0.5, c);
-                break;
-            case FormaMobiliario.PosteIluminacao:
-                v.Cylinder(0, 0, W * 1.8, 0, 0.5, MarkingColor.Concreto);
-                v.Cylinder(0, 0, W, 0.5, H - 0.5, c);
-                v.Box(0, L / 2, 0.08, L, H - 0.30, 0.08, c);
-                v.Box(0, L, 0.30, 0.60, H - 0.45, 0.15, c);
-                break;
-            case FormaMobiliario.Arvore:
-            {
-                v.Ring(W, 0.10, 0.12, MarkingColor.Concreto);
-                var trunkH = Math.Max(1.2, H * 0.40);
-                v.Cylinder(0, 0, 0.25, 0, trunkH + 0.3, MarkingColor.Marrom);
-                var crown = H - trunkH;
-                v.Cylinder(0, 0, L * 0.70, trunkH, crown * 0.25, c);
-                v.Cylinder(0, 0, L, trunkH + crown * 0.25, crown * 0.45, c);
-                v.Cylinder(0, 0, L * 0.55, trunkH + crown * 0.70, crown * 0.30, c);
-                break;
-            }
-            case FormaMobiliario.AbrigoOnibus:
-                // Frente (+Y) voltada para a pista.
-                v.Box(0, 0, L, W, H - 0.10, 0.10, c);
-                v.Box(-(L / 2 - 0.08), -W / 2 + 0.10, 0.08, 0.08, 0, H - 0.10, c);
-                v.Box(L / 2 - 0.08, -W / 2 + 0.10, 0.08, 0.08, 0, H - 0.10, c);
-                v.Box(0, -W / 2 + 0.10, L - 0.2, 0.03, 0.15, 2.0, c);
-                v.Box(0, -W / 2 + 0.40, L * 0.6, 0.40, 0.45, 0.05, MarkingColor.Marrom);
-                break;
-            case FormaMobiliario.Paraciclo:
-            {
-                // U invertido no plano lateral × altura.
-                var r = L / 2;
-                var pts = new List<Vec2> { new(-r, 0), new(-r, H - r) };
-                pts.AddRange(CurveTools.Arc(new Vec2(0, H - r), r, Math.PI, -Math.PI, 0.002).Skip(1));
-                pts.Add(new Vec2(r, 0));
-                foreach (var poly in PolygonOps.Strip(pts, 0.05, roundJoins: true))
-                    v.ProfileFacingForward(poly, -0.025, 0.05, c);
-                break;
-            }
-            case FormaMobiliario.Hidrante:
-                v.Cylinder(0, 0, W, 0, H * 0.85, c);
-                v.Cylinder(0, 0, W * 1.25, H * 0.85, H * 0.15, c);
-                v.Box(0, W / 2 + 0.04, 0.08, 0.10, H * 0.5, 0.08, c);
-                break;
-            case FormaMobiliario.Floreira:
-                v.Box(0, 0, L, W, 0, H, c);
-                v.Box(0, 0, L - 0.10, W - 0.10, H, 0.04, MarkingColor.Grama);
-                break;
-            case FormaMobiliario.PlacaLogradouro:
-                v.Cylinder(0, 0, 0.06, 0, H, MarkingColor.Metal);
-                v.ProfileFacingForward(Polygon2.Rectangle(new Vec2(-L / 2, H - W - 0.02), new Vec2(L / 2, H - 0.02)), 0.035, 0.015, c);
-                v.ProfileSideways(Polygon2.Rectangle(new Vec2(-L / 2, H - 2 * W - 0.06), new Vec2(L / 2, H - W - 0.06)), 0.035, 0.015, c);
-                break;
-            case FormaMobiliario.Semaforo:
-            {
-                v.Cylinder(0, 0, 0.11, 0, H, MarkingColor.Metal);
-                // Grupo focal voltado para o tráfego que se aproxima (−Y).
-                v.Box(0, -0.18, 0.32, 0.25, H - 0.95, 0.95, c);
-                double[] lenses = { H - 0.25, H - 0.50, H - 0.75 };
-                MarkingColor[] colors = { MarkingColor.Vermelha, MarkingColor.Amarela, MarkingColor.Verde };
-                for (int i = 0; i < 3; i++)
-                {
-                    var lens = new Polygon2(CurveTools.Circle(new Vec2(0, lenses[i] - 0.05), 0.10, 0.002));
-                    v.ProfileFacingForward(lens, -0.315, 0.01, colors[i]);
-                }
-                break;
-            }
-        }
-        v.Geo.UnitCount = 1;
-        return v.Geo;
-    }
+    public static MarkingGeometry BuildAt(MobiliarioDef m, LocalFrame frame, double? lOverride, double? wOverride, double? hOverride, MarkingColor? colorOverride) =>
+        UrbanDesigns.Build(m, frame, lOverride ?? m.Comprimento, wOverride ?? m.Largura, hOverride ?? m.Altura, colorOverride ?? m.Cor);
 
     public static MarkingGeometry Generate(UrbanElementDefinition d, MobiliarioDef m, Polyline2? path)
     {
@@ -407,7 +322,7 @@ public static class RampGenerator
             {
                 var t0 = d.TactileSetback;
                 var t1 = t0 + d.TactileWidth;
-                geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(new[] { f.P(-hw, t0), f.P(hw, t0), f.P(hw, t1), f.P(-hw, t1) }, _ => 0.005, _ => 0.010), d.TactileColor));
+                TactileGenerator.AddTiles(geo, TactileGenerator.Rect(f.P(-hw + 0.01, t0), f.Up, t1 - t0, 2 * hw - 0.02, 0.25, true), d.TactileColor, 0.005);
             }
             Annotate(geo, f, w, depth, $"i ≤ {d.Slope * 100:0.##} %  (rebaixamento total)", arrowAlongSide: true, flare);
             return Finish(geo, d, w);
@@ -445,16 +360,19 @@ public static class RampGenerator
         {
             var t0 = Math.Clamp(d.TactileSetback, 0, len);
             var t1 = Math.Clamp(t0 + d.TactileWidth, 0, len);
-            if (t1 - t0 > 0.02)
+            // Placas moduladas de 0,25 m com relevo, assentadas sobre o plano inclinado.
+            void Sloped(IEnumerable<TactileGenerator.Tile> tiles)
             {
-                var poly = new[] { f.P(-hw + 0.01, t0), f.P(hw - 0.01, t0), f.P(hw - 0.01, t1), f.P(-hw + 0.01, t1) };
-                geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(poly, RampZ, p => RampZ(p) + 0.005), d.TactileColor));
+                foreach (var t in tiles)
+                {
+                    geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(t.Shape.Outer, RampZ, p => RampZ(p) + TactileGenerator.TileThickness), d.TactileColor));
+                    foreach (var r in t.Relief)
+                        geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(r.Outer, p => RampZ(p) + TactileGenerator.TileThickness,
+                            p => RampZ(p) + TactileGenerator.TileThickness + TactileGenerator.ReliefHeight), MarkingColor.RelevoTatil));
+                }
             }
-            if (d.DirectionalTactile && len - t1 > 0.1)
-            {
-                var poly = new[] { f.P(-0.125, t1), f.P(0.125, t1), f.P(0.125, len), f.P(-0.125, len) };
-                geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(poly, RampZ, p => RampZ(p) + 0.005), d.TactileColor));
-            }
+            if (t1 - t0 > 0.02) Sloped(TactileGenerator.Rect(f.P(-hw + 0.01, t0), f.Up, t1 - t0, 2 * hw - 0.02, 0.25, true));
+            if (d.DirectionalTactile && len - t1 > 0.1) Sloped(TactileGenerator.Rect(f.P(-0.125, t1), f.Up, len - t1, 0.25, 0.25, false));
         }
 
         Annotate(geo, f, w, len, d.Type == TipoRampa.AcessoVeiculos ? $"Guia rebaixada  i = {slope * 100:0.#} %" : $"i = {slope * 100:0.##} %", false, flare);

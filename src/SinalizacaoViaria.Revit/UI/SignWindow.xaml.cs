@@ -64,6 +64,7 @@ public partial class SignWindow : Window
             TbMount.Text = UiHelpers.F(existing.MountHeight);
             TbPost.Text = UiHelpers.F(existing.PostDiameter, "0.###");
             TbLateral.Text = UiHelpers.F(existing.LateralOffset, "0.##");
+            TbBase.Text = UiHelpers.F(existing.BaseElevation, "0.##");
             foreach (var item in CbSupport.Items)
                 if (item is Option<TipoSuporte> o && o.Value == existing.Support) CbSupport.SelectedItem = item;
             Output.Load(existing.Output);
@@ -131,6 +132,7 @@ public partial class SignWindow : Window
         d.MountHeight = UiHelpers.Parse(TbMount, 2.10, "Altura livre", 0, 10);
         d.PostDiameter = UiHelpers.Parse(TbPost, 0.063, "Diâmetro da coluna", 0.02, 0.5);
         d.LateralOffset = UiHelpers.Parse(TbLateral, 0, "Deslocamento", -10, 10);
+        d.BaseElevation = UiHelpers.Parse(TbBase, 0.15, "Nível da base", -5, 50);
         d.Output = Output.Save(d.Output);
         return d;
     }

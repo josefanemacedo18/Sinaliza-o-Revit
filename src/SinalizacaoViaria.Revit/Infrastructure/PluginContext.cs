@@ -44,7 +44,8 @@ public static class PluginContext
 
     public static BuildContext BuildContext(bool drape, double viewScale = 100,
         Func<string, MarkingDefinition?>? lookup = null, Func<IReadOnlyList<MarkingDefinition>>? all = null,
-        Func<MarkingDefinition, SinalizacaoViaria.Core.Model.MarkingGeometry?>? geometryOf = null) => new()
+        Func<MarkingDefinition, SinalizacaoViaria.Core.Model.MarkingGeometry?>? geometryOf = null,
+        Func<MarkingDefinition, SinalizacaoViaria.Core.Geometry.Polyline2?>? pathOf = null) => new()
     {
         Catalog = Catalog,
         Glyphs = Glyphs,
@@ -53,5 +54,6 @@ public static class PluginContext
         Lookup = lookup,
         AllDefinitions = all,
         GeometryOf = geometryOf,
+        PathOf = pathOf,
     };
 }

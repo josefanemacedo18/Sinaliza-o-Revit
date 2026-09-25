@@ -18,6 +18,10 @@ public static class RibbonBuilder
         var via = app.CreateRibbonPanel(TabName, "Via");
         Large(via, typeof(CmdSinalizarVia), "Sinalizar\nVia", "via",
             "Monta a seção transversal completa a partir do eixo: faixas de rolamento, exclusivas e preferenciais, ciclofaixas, estacionamento, acostamentos, faixas de segurança, canteiros centrais e laterais, calçadas e dispositivos de segregação – com toda a sinalização.");
+        Large(via, typeof(CmdIntersecao), "Interseção", "intersecao",
+            "Ajusta o cruzamento/entroncamento de vias: pavimento contínuo, esquinas com raio, calçadas e canteiros refeitos, sinalização interrompida, faixas de pedestres, retenções e rampas. Também é feito automaticamente ao criar uma via que cruza outra.");
+        Large(via, typeof(CmdRotatoria), "Rotatória", "rotatoria",
+            "Rotatória com ilha central ajardinada, faixa galgável, pista giratória (1 a 4 faixas), ramos com ilhas separadoras, dê a preferência, travessias e placas R-2/R-33 – liga-se às vias existentes.");
         Large(via, typeof(CmdLinhaLongitudinal), "Linha\nLongitudinal", "linha",
             "LFO-1 a LFO-4, LMS-1/2, LBO, LCO, faixas exclusivas, LCA e LPP ao longo de linhas do modelo.");
         Large(via, typeof(CmdCalcadas), "Meio-fio e\nSarjeta", "calcada",

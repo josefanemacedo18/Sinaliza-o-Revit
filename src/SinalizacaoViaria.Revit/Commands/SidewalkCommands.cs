@@ -95,15 +95,39 @@ internal static class SidewalkForms
         return new FormPreview(geo, new[] { road }, new[] { path.Points });
     }
 
+    private static Polyline2 CornerCurb()
+    {
+        var pts = new List<Vec2> { new(-16, 0), new(-6, 0) };
+        pts.AddRange(CurveTools.Arc(new Vec2(-6, 6), 6, -Math.PI / 2, Math.PI / 2, 0.02).Skip(1));
+        pts.Add(new Vec2(0, 16));
+        return new Polyline2(pts);
+    }
+
     public static FormWindow? CurbExtension(CurbExtensionDefinition d, bool edit)
     {
+        var corner = false;
         var w = new FormWindow(edit ? "Editar orelha de calçada" : "Orelha de calçada", "Orelha / avanço de calçada",
-            "Desenhe ao longo da FACE DO MEIO-FIO existente, no trecho do avanço. A calçada fica à esquerda do sentido do desenho " +
-            "(ou marque o contrário). A orelha avança sobre a faixa de estacionamento, encurta a travessia e recebe meio-fio novo.",
-            d, () => Street(d, Straight, d.SidewalkOnLeft ? 1 : -1), okText: edit ? "Aplicar" : "Inserir");
-        w.Number("Avanço sobre a pista (m)", () => d.Depth, v => d.Depth = v, 0.3, 10, tooltip: "Normalmente a largura da faixa de estacionamento (2,00–2,50 m).")
+            "Desenhe ou selecione a FACE DO MEIO-FIO existente no trecho do avanço – em linha reta (meio de quadra) ou contornando a " +
+            "ESQUINA (selecione as linhas/arco da esquina ou desenhe os pontos em volta dela). A calçada fica à esquerda do sentido do " +
+            "desenho (ou desmarque a opção). A orelha avança sobre o estacionamento, encurta a travessia e recebe meio-fio novo.",
+            d, () =>
+            {
+                var path = corner ? CornerCurb() : Straight;
+                if (!corner) return Street(d, path, d.SidewalkOnLeft ? 1 : -1);
+                var geo = new MarkingGeometry();
+                var block = new Polygon2(path.Points.Concat(new[] { new Vec2(0, 20), new Vec2(-20, 20), new Vec2(-20, 0) }));
+                geo.Pieces.Add(new MarkingPiece(block, MarkingColor.Concreto));
+                var c = (CurbExtensionDefinition)MarkingDefinition.FromJson(d.ToJson())!;
+                c.SidewalkOnLeft = true;
+                geo.Merge(Build(c, path));
+                return new FormPreview(geo, new[] { Polygon2.Rectangle(new Vec2(-20, -9), new Vec2(9, 20)) }, new[] { path.Points });
+            }, okText: edit ? "Aplicar" : "Inserir");
+        w.Check("Prévia: orelha de esquina", () => corner, v => corner = v)
+         .Number("Avanço sobre a pista (m)", () => d.Depth, v => d.Depth = v, 0.3, 10, tooltip: "Normalmente a largura da faixa de estacionamento (2,00–2,50 m).")
          .Choice("Transição", new[] { ("Curvas reversas", TipoTransicao.Curva), ("Chanfro reto", TipoTransicao.Chanfro) }, () => d.Transition, v => d.Transition = v)
          .Number("Raio / comprimento da transição (m)", () => d.Radius, v => d.Radius = v, 0.1, 20)
+         .Number("Raio mínimo na esquina (m)", () => d.CornerRadius, v => d.CornerRadius = v, 0, 40,
+             tooltip: "0 = acompanha a esquina (raio da esquina + avanço). Valores maiores suavizam o meio-fio da orelha.")
          .Number("Altura do meio-fio (m)", () => d.Height, v => d.Height = v, 0.02, 0.5)
          .Number("Largura do meio-fio (m)", () => d.CurbWidth, v => d.CurbWidth = v, 0.05, 0.5)
          .Check("Calçada existente à esquerda do sentido do desenho", () => d.SidewalkOnLeft, v => d.SidewalkOnLeft = v)
@@ -113,7 +137,9 @@ internal static class SidewalkForms
          .Number("Margem ao meio-fio e às transições (m)", () => d.PlanterMargin, v => d.PlanterMargin = v, 0, 5)
          .Integer("Árvores no canteiro", () => d.Trees, v => d.Trees = v, 0, 20)
          .Check("Recortar vagas e linhas da pista sob a orelha", () => d.CutRoadMarkings, v => d.CutRoadMarkings = v);
-        if (!edit) w.Modes(("Selecionar a linha da face do meio-fio", PathMode.Linhas), ("Dois cliques na face do meio-fio (início e fim)", PathMode.DoisPontos));
+        if (!edit) w.Modes(("Selecionar as linhas da face do meio-fio (reta, esquina ou arco)", PathMode.Linhas),
+            ("Desenhar a face do meio-fio por pontos (contornando a esquina)", PathMode.Desenhar),
+            ("Dois cliques na face do meio-fio (trecho reto)", PathMode.DoisPontos));
         return w;
     }
 
@@ -205,6 +231,38 @@ internal static class SidewalkForms
         return w;
     }
 
+    public static FormWindow? Tactile(TactileRouteDefinition d, bool edit)
+    {
+        var main = new Polyline2(new[] { new Vec2(0, 0), new Vec2(6, 0), new Vec2(6, 4), new Vec2(10, 7) });
+        var branch = new Polyline2(new[] { new Vec2(3, -3), new Vec2(3, 0) });
+        var w = new FormWindow(edit ? "Editar piso tátil" : "Piso tátil (NBR 16537)", "Sinalização tátil no piso",
+            "Desenhe o percurso (eixo da faixa). Placas moduladas com relevo: direcional (barras no sentido do deslocamento) e alerta " +
+            "(domos) nas mudanças de direção, nos extremos e nas junções entre trechos (selecione ou desenhe vários trechos de uma vez). " +
+            "Confira as dimensões e a distribuição com a ABNT NBR 16537 vigente.",
+            d, () =>
+            {
+                var chains = d.AlertOnly ? new[] { main } : new[] { main, branch };
+                var geo = TactileGenerator.Route(d, chains, 0);
+                return new FormPreview(geo, new[] { Polygon2.Rectangle(new Vec2(-2, -5), new Vec2(12, 9)) }, chains.Select(c => c.Points),
+                    $"{geo.UnitCount} placa(s) de {UiHelpers.F(d.Module)} m");
+            }, okText: edit ? "Aplicar" : "Inserir");
+        w.Check("Somente faixa de alerta (sem direcional)", () => d.AlertOnly, v => d.AlertOnly = v, "Ex.: alerta junto a rebaixamentos, obstáculos suspensos, desníveis.")
+         .Choice("Placa (módulo)", new[] { ("0,25 × 0,25 m", 0.25), ("0,40 × 0,40 m", 0.40), ("0,30 × 0,30 m", 0.30) }, () => d.Module, v => d.Module = v)
+         .Integer("Fileiras (largura da faixa)", () => d.Rows, v => d.Rows = v, 1, 6, "Largura = fileiras × módulo (direcional usual: 0,25 a 0,60 m).")
+         .Choice("Cor (contrastante com o piso)", UiHelpers.ColorItems().Skip(1).Where(c => c.Color is { } cc && MarkingColors.IsPaint(cc))
+                .Select(c => (c.Label, c.Color!.Value)), () => d.Color, v => d.Color = v)
+         .Check("Relevo (domos e barras) em 3D e planta", () => d.Relief, v => d.Relief = v, "Desative em projetos muito grandes para aliviar o modelo.")
+         .Number("Nível de assentamento (m acima da pista)", () => d.Elevation, v => d.Elevation = v, -1, 3, tooltip: "Topo da calçada (0,15 m usual).")
+         .Section("Alertas")
+         .Check("Nas mudanças de direção", () => d.AlertAtTurns, v => d.AlertAtTurns = v)
+         .Check("No início e no fim do percurso", () => d.AlertAtEnds, v => d.AlertAtEnds = v)
+         .Check("Nas junções entre trechos (T)", () => d.AlertAtJunctions, v => d.AlertAtJunctions = v)
+         .Integer("Lado do quadrado de alerta (placas)", () => d.AlertModules, v => d.AlertModules = v, 1, 6, "No mínimo a largura da direcional.")
+         .Integer("Profundidade do alerta nos extremos (placas)", () => d.EndAlertModules, v => d.EndAlertModules = v, 1, 6);
+        if (!edit) w.Modes(("Desenhar o percurso por pontos", PathMode.Desenhar), ("Selecionar linhas (vários trechos)", PathMode.Linhas), ("Dois cliques", PathMode.DoisPontos));
+        return w;
+    }
+
     /// <summary>Janela de edição para as definições de calçada (null se o tipo não for daqui).</summary>
     public static (FormWindow Window, MarkingDefinition Working)? ForEdit(MarkingDefinition def)
     {
@@ -215,6 +273,7 @@ internal static class SidewalkForms
             SidewalkAreaDefinition sa => Area(sa, true),
             PlanterDefinition pl => Planter(pl, true),
             CulDeSacDefinition cd => CulDeSac(cd, true),
+            TactileRouteDefinition tr => Tactile(tr, true),
             _ => null,
         };
         return w == null ? null : (w, working);

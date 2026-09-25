@@ -107,7 +107,8 @@ public static partial class DetailGenerator
 
     private static bool SectionIncludes(MarkingDefinition d, SectionDimensionDefinition sd)
     {
-        if (d is IAnnotationDefinition or SignDefinition or UrbanElementDefinition or SymbolMarkingDefinition or TextMarkingDefinition or RepeatedMarkingDefinition)
+        if (d is IAnnotationDefinition or SignDefinition or UrbanElementDefinition or SymbolMarkingDefinition or TextMarkingDefinition or RepeatedMarkingDefinition
+            or RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or TactileRouteDefinition)
             return false;
         var physical = d is DeviceMarkingDefinition or RampDefinition or TrafficCalmingDefinition or CurbExtensionDefinition or SidewalkAreaDefinition
             or PlanterDefinition or CulDeSacDefinition
@@ -125,6 +126,7 @@ public static partial class DetailGenerator
         foreach (var g in geometries)
             foreach (var p in g.Pieces)
             {
+                if (MarkingColors.IsPavement(p.Color) || p.Elevation > 0.5) continue;   // pavimento e volumes altos (árvores, placas) não definem cotas
                 var (mn, mx) = p.Shape.Bounds;
                 if (Math.Max(a.X, b.X) < mn.X || Math.Min(a.X, b.X) > mx.X || Math.Max(a.Y, b.Y) < mn.Y || Math.Min(a.Y, b.Y) > mx.Y) continue;
                 intervals.AddRange(SegmentIntervals(p.Shape, a, b).Select(i => (i.T0 * L, i.T1 * L)));

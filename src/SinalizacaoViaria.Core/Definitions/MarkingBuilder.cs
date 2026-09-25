@@ -23,6 +23,9 @@ public sealed class BuildContext
     /// <summary>Todas as marcas do projeto (quadro de legenda).</summary>
     public Func<IReadOnlyList<MarkingDefinition>>? AllDefinitions { get; init; }
 
+    /// <summary>Eixo (primeiro trecho) de outra marca – interseções e rotatórias.</summary>
+    public Func<MarkingDefinition, Polyline2?>? PathOf { get; init; }
+
     /// <summary>Geometria de outra marca do projeto (cotas de seção, quadros de quantitativos).</summary>
     public Func<MarkingDefinition, MarkingGeometry?>? GeometryOf { get; init; }
 
@@ -85,6 +88,10 @@ public static class MarkingBuilder
         QuantityTableDefinition qt => DetailGenerator.QuantityTable(qt, ctx),
         NotesDefinition nt => DetailGenerator.Notes(nt, ctx),
         NorthArrowDefinition na => DetailGenerator.NorthArrow(na, ctx),
+        RoadPavementDefinition rp2 => path == null ? Missing("Eixo da via não encontrado.") : RoadGenerator.Pavement(rp2, path),
+        IntersectionDefinition it => IntersectionGenerator.Build(it, ctx),
+        TactileRouteDefinition tr => path == null ? Missing("Caminho da rota tátil não encontrado.") : TactileGenerator.Route(tr, new[] { path }, tr.Elevation),
+        RoundaboutDefinition rb => RoundaboutGenerator.Build(rb, ctx),
         CurbExtensionDefinition ce => path == null ? Missing("Linha da face do meio-fio não encontrada.") : SidewalkGenerator.CurbExtension(ce, path, ctx),
         SidewalkAreaDefinition sa => path == null ? Missing("Contorno da área não encontrado.") : SidewalkGenerator.Area(sa, path),
         PlanterDefinition pl => path == null ? Missing("Linha dos canteiros não encontrada.") : SidewalkGenerator.Planter(pl, path, ctx),
@@ -101,6 +108,13 @@ public static class MarkingBuilder
         if (path == null) { geo.Warnings.Add("Caminho da marca não encontrado (a linha de referência foi excluída?)."); return geo; }
         var variant = ResolveVariant(type, d.Variant, d.Speed);
         if (variant == null) { geo.Warnings.Add($"{d.Code}: nenhuma variante no catálogo."); return geo; }
+        if (d.Code is "PTA" or "PTD")
+        {
+            // Piso tátil: placas moduladas com relevo (NBR 16537), assentadas no topo da calçada.
+            var w = d.WidthOverride ?? variant.Faixas.Max(f => f.Largura);
+            var trimmed = RoadGenerator.Trimmed(path, d.StartSetback, d.EndSetback);
+            return TactileGenerator.Linear(trimmed, w, d.Code == "PTA", d.ColorOverride ?? type.Cor, d.Offset);
+        }
 
         return LinearPatternGenerator.Generate(path, type, variant, new LinearOptions
         {
@@ -269,7 +283,7 @@ public static class MarkingBuilder
     public static MarkingGeometry BuildSign(SignDefinition d, BuildContext ctx)
     {
         var p = ctx.Catalog.Placa(d.Code);
-        return p == null ? Missing($"Placa {d.Code} não existe no catálogo.") : SignGenerator.Generate(d, p, ctx.Glyphs);
+        return p == null ? Missing($"Placa {d.Code} não existe no catálogo.") : Lift(SignGenerator.Generate(d, p, ctx.Glyphs), d.BaseElevation);
     }
 
     public static MarkingGeometry BuildUrban(UrbanElementDefinition d, Polyline2? path, BuildContext ctx)
@@ -277,7 +291,15 @@ public static class MarkingBuilder
         var m = ctx.Catalog.Movel(d.Code);
         if (m == null) return Missing($"Elemento {d.Code} não existe no catálogo.");
         if (d.UsePath && path == null) return Missing("Caminho do elemento não encontrado.");
-        return UrbanGenerator.Generate(d, m, path);
+        return Lift(UrbanGenerator.Generate(d, m, path), d.BaseElevation);
+    }
+
+    /// <summary>Eleva todas as peças (elementos assentados sobre a calçada).</summary>
+    public static MarkingGeometry Lift(MarkingGeometry geo, double dz)
+    {
+        if (Math.Abs(dz) < 1e-9) return geo;
+        for (int i = 0; i < geo.Pieces.Count; i++) geo.Pieces[i] = geo.Pieces[i] with { Elevation = geo.Pieces[i].Elevation + dz };
+        return geo;
     }
 
     public static MarkingGeometry BuildSymbol(SymbolMarkingDefinition d, BuildContext ctx)
@@ -392,6 +414,22 @@ public static class MarkingBuilder
                     TipoRampa.RebaixamentoTotal => "Rebaixamento total da calçada com rampas laterais",
                     _ => "Rebaixamento de calçada com abas laterais",
                 }, GrupoMarca.Urbanizacao, "ABNT NBR 9050 / NBR 16537", "un");
+            case TactileRouteDefinition tr:
+                return new MarkingInfo(tr.DisplayCode, tr.AlertOnly ? "Piso tátil de alerta (placas com domos)"
+                    : $"Rota tátil – direcional {tr.Rows * tr.Module:0.00} m com alertas (NBR 16537)", GrupoMarca.Acessibilidade, "ABNT NBR 16537 / NBR 9050", "m");
+            case RoadPavementDefinition pv:
+                return new MarkingInfo(pv.DisplayCode, pv.Material switch
+                {
+                    TipoPavimento.Bloquete => "Pavimento intertravado (bloquete)",
+                    TipoPavimento.Concreto => "Pavimento de concreto",
+                    _ => "Pavimento asfáltico (CBUQ)",
+                } + $" – e = {pv.ActualThickness * 100:0} cm", GrupoMarca.Urbanizacao, "Projeto de pavimentação (espessura indicativa – conferir dimensionamento)", "m²");
+            case RoundaboutDefinition rb:
+                return new MarkingInfo("ROTATORIA", $"Rotatória – ilha central Ø {2 * rb.IslandRadius:0.0} m, {rb.Lanes} faixa(s), {rb.Legs.Count} ramo(s)",
+                    GrupoMarca.Urbanizacao, "Projeto geométrico – interseções em rotatória (conferir manual do DNIT / órgão local)", "un");
+            case IntersectionDefinition:
+                return new MarkingInfo("INTERSECAO", "Interseção – esquinas, meio-fio e calçadas do cruzamento", GrupoMarca.Urbanizacao,
+                    "Projeto geométrico viário (raios de esquina)", "un");
             case CurbExtensionDefinition:
                 return new MarkingInfo("ORELHA", "Orelha (avanço) de calçada", GrupoMarca.Urbanizacao, "Projeto urbano – desenho de calçadas / NBR 9050", "un");
             case SidewalkAreaDefinition sa:

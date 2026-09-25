@@ -37,6 +37,28 @@ public sealed class CmdSinalizarVia : CommandBase
         var defs = w.BuildDefinitions(path);
         var results = MarkingCreator.Commit(uidoc, defs, "SV - Sinalizar via");
         if (w.Setup.Warnings.Count > 0 && results.Count > 0) results[0].Warnings.InsertRange(0, w.Setup.Warnings);
+        if (w.AutoIntersect && defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav)
+        {
+            var template = new IntersectionDefinition
+            {
+                CornerRadius = w.CornerRadius,
+                Crosswalks = w.IntersectionCrosswalks,
+                StopLines = w.IntersectionCrosswalks,
+                Ramps = w.IntersectionRamps && w.IntersectionCrosswalks,
+                Output = w.OutputSettings.Clone(),
+            };
+            try
+            {
+                var extra = IntersectionRunner.Run(uidoc, "SV - Interseções", s => s.AutoIntersect(pav, template));
+                results.AddRange(extra.Where(r => r.Warnings.Count > 0));
+            }
+            catch (Exception ex)
+            {
+                Log.Error("AutoIntersect", ex);
+                results.Add(new RenderResult { Geometry = null });
+                results[^1].Warnings.Add("Não foi possível ajustar as interseções automaticamente: " + ex.Message);
+            }
+        }
         Report("Sinalizar via", results);
         return Result.Succeeded;
     }

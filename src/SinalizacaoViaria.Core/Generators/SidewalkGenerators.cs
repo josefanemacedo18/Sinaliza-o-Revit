@@ -92,16 +92,98 @@ public static class SidewalkGenerator
         };
     }
 
+    /// <summary>Avanço (o) em função da estação (x), interpolado do perfil.</summary>
+    private static double OffsetAt(List<Vec2> profile, double x)
+    {
+        if (x <= profile[0].X) return profile[0].Y;
+        for (int i = 1; i < profile.Count; i++)
+            if (x <= profile[i].X + 1e-9)
+            {
+                var a = profile[i - 1];
+                var b = profile[i];
+                var t = b.X - a.X < 1e-9 ? 1 : (x - a.X) / (b.X - a.X);
+                return a.Y + (b.Y - a.Y) * t;
+            }
+        return profile[^1].Y;
+    }
+
+    /// <summary>
+    /// Bordo externo da orelha ao longo da face do meio-fio, contornando esquinas: nos vértices convexos (lado externo da
+    /// curva) insere um arco com o avanço como raio; nos côncavos, o ponto de encontro dos deslocamentos.
+    /// </summary>
+    public static List<Vec2> EarOuterEdge(CurbExtensionDefinition d, Polyline2 path, List<string>? warnings = null)
+    {
+        var pts = path.Points;
+        var L = path.Length;
+        var profile = EarProfile(d, L, warnings);
+        var sign = d.SidewalkOnLeft ? -1.0 : 1.0;
+        var stations = new List<double> { 0 };
+        for (int i = 1; i < pts.Count; i++) stations.Add(stations[^1] + pts[i].DistanceTo(pts[i - 1]));
+        Vec2 Normal(int seg) => (pts[seg + 1] - pts[seg]).Normalized().PerpLeft * sign;
+        int SegOf(double x)
+        {
+            for (int k = 0; k + 1 < stations.Count; k++) if (x <= stations[k + 1] + 1e-9) return k;
+            return stations.Count - 2;
+        }
+        Vec2 At(int seg, double x, double o)
+        {
+            var t = (x - stations[seg]) / Math.Max(1e-9, stations[seg + 1] - stations[seg]);
+            return pts[seg] + (pts[seg + 1] - pts[seg]) * t + Normal(seg) * o;
+        }
+        var res = new List<Vec2>();
+        var prevSeg = -1;
+        foreach (var v in profile)
+        {
+            var seg = SegOf(v.X);
+            while (prevSeg >= 0 && prevSeg < seg)
+            {
+                // Vértice interno entre prevSeg e prevSeg + 1.
+                var vi = prevSeg + 1;
+                var o = OffsetAt(profile, stations[vi]);
+                var n0 = Normal(prevSeg);
+                var n1 = Normal(vi);
+                var t0 = (pts[vi] - pts[vi - 1]).Normalized();
+                var t1 = (pts[vi + 1] - pts[vi]).Normalized();
+                var turn = t0.Cross(t1) * -sign;   // > 0: o lado da orelha é externo à curva
+                if (o > 1e-3)
+                {
+                    if (turn > 1e-6)
+                    {
+                        var a0 = Math.Atan2(n0.Y, n0.X);
+                        var a1 = Math.Atan2(n1.Y, n1.X);
+                        var da = a1 - a0;
+                        while (da > Math.PI) da -= 2 * Math.PI;
+                        while (da < -Math.PI) da += 2 * Math.PI;
+                        var nArc = Math.Max(2, (int)Math.Ceiling(Math.Abs(da) / (Math.PI / 24)));
+                        for (int k = 0; k <= nArc; k++) res.Add(pts[vi] + Vec2.FromAngle(a0 + da * k / nArc) * o);
+                    }
+                    else if (turn < -1e-6)
+                    {
+                        var bis = (n0 + n1).Normalized();
+                        var cos = Math.Max(0.2, bis.Dot(n0));
+                        res.Add(pts[vi] + bis * (o / cos));
+                    }
+                }
+                prevSeg++;
+            }
+            prevSeg = seg;
+            res.Add(At(seg, v.X, v.Y));
+        }
+        return res;
+    }
+
     /// <summary>Contorno em planta da orelha (usado também para recortar as marcas da pista).</summary>
     public static Polygon2? EarFootprint(CurbExtensionDefinition d, Polyline2 path)
     {
         var L = path.Length;
         if (L < 0.5) return null;
-        var map = StationMap(path, d.SidewalkOnLeft);
-        var outer = EarProfile(d, L).Select(map).ToList();
-        var back = new List<Vec2>();
-        for (var x = L; x > 0; x -= Sample) back.Add(map(new Vec2(x, 0)));
-        return PolygonOps.Union(new[] { new Polygon2(outer.Concat(back)) }).OrderByDescending(p => p.Area).FirstOrDefault();
+        var outer = EarOuterEdge(d, path);
+        var back = Enumerable.Reverse(path.Points).ToList();
+        var fp = PolygonOps.Union(new[] { new Polygon2(outer.Concat(back)) }).OrderByDescending(p => p.Area).FirstOrDefault();
+        var rc = d.CornerRadius;
+        if (fp != null && rc > d.Depth + 0.05)
+            fp = PolygonOps.Offset(PolygonOps.Offset(new[] { fp }, -rc, true), rc, true).OrderByDescending(p => p.Area).FirstOrDefault() ?? fp;
+        return fp;
     }
 
     public static MarkingGeometry CurbExtension(CurbExtensionDefinition d, Polyline2 path, BuildContext ctx)
@@ -112,13 +194,13 @@ public static class SidewalkGenerator
         var fp = EarFootprint(d, path);
         if (fp == null) return Fail("Não foi possível montar o contorno da orelha.");
         EarProfile(d, L, geo.Warnings);
-        var map = StationMap(path, d.SidewalkOnLeft);
+        var sign = d.SidewalkOnLeft ? -1.0 : 1.0;
         var cw = Math.Max(0.05, d.CurbWidth);
 
         var inner = PolygonOps.Offset(new[] { fp }, -cw);
         var ring = PolygonOps.Difference(new[] { fp }, inner);
         // O meio-fio existente permanece: remove a faixa junto à face original.
-        var alongFace = PolygonOps.Strip(Enumerable.Range(0, (int)Math.Ceiling(L / Sample) + 1).Select(i => map(new Vec2(Math.Min(L, i * Sample), 0))).ToList(), 2 * cw + 0.02);
+        var alongFace = PolygonOps.Strip(path.Points, 2 * cw + 0.02, roundJoins: true);
         var curb = PolygonOps.Difference(ring, alongFace);
 
         var planter = new List<Polygon2>();
@@ -132,19 +214,15 @@ public static class SidewalkGenerator
             var o0 = Math.Max(0.6, o1 - d.PlanterWidth);
             if (x1 - x0 > 0.3 && o1 - o0 > 0.2)
             {
-                var pts = new List<Vec2>();
-                for (var x = x0; x <= x1 + 1e-6; x += Sample) pts.Add(map(new Vec2(Math.Min(x, x1), o0)));
-                for (var x = x1; x >= x0 - 1e-6; x -= Sample) pts.Add(map(new Vec2(Math.Max(x, x0), o1)));
-                planter = PolygonOps.Union(new[] { new Polygon2(pts) });
-                if (d.Trees > 0)
-                {
-                    var om = (o0 + o1) / 2;
+                // Faixa paralela à face do meio-fio (contorna a esquina com juntas arredondadas).
+                var axis = new Polyline2(path.SubPoints(x0, x1)).Offset(sign * (o0 + o1) / 2);
+                planter = PolygonOps.Intersect(PolygonOps.Strip(axis.Points, o1 - o0, roundJoins: true), PolygonOps.Offset(new[] { fp }, -(cw + d.PlanterMargin)));
+                if (d.Trees > 0 && axis.Length > 0.1)
                     AddTrees(geo, ctx.Catalog, Enumerable.Range(0, d.Trees).Select(i =>
                     {
-                        var x = x0 + (x1 - x0) * (i + 0.5) / d.Trees;
-                        return (map(new Vec2(x, om)), path.TangentAt(Math.Clamp(x, 0, L)));
+                        var s = axis.Length * (i + 0.5) / d.Trees;
+                        return (axis.PointAt(s), axis.TangentAt(s));
                     }), d.Height);
-                }
             }
             else geo.Warnings.Add("Orelha pequena demais para o canteiro com as margens indicadas.");
         }

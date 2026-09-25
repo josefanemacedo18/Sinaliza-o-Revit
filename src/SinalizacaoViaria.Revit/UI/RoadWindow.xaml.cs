@@ -59,6 +59,15 @@ public partial class RoadWindow : Window
     private bool _loadingDetails;
 
     public RoadSetup? Setup { get; private set; }
+    public bool AutoIntersect => CkAutoIntersect.IsChecked == true;
+    public double CornerRadius => UiHelpers.ParseOpt(TbCornerRadius.Text) is { } r && r >= 0 ? r : 6.0;
+    public bool IntersectionCrosswalks => CkIntCrosswalks.IsChecked == true;
+    public bool IntersectionRamps => CkIntRamps.IsChecked == true;
+
+    private sealed record PavementOption(string Label, TipoPavimento Value)
+    {
+        public override string ToString() => Label;
+    }
     public OutputSettings? OutputSettings { get; private set; }
     public bool DrawPath { get; private set; }
     public bool PickSurfaces => Output.PickSurfaces;
@@ -110,6 +119,12 @@ public partial class RoadWindow : Window
         foreach (var t in _cat.LinearesDoGrupo(GrupoMarca.Dispositivo))
             foreach (var v in t.Variantes) CbStuds.Items.Add($"{t.Codigo} | {v.Nome}");
         if (CbStuds.Items.Count > 0) CbStuds.SelectedIndex = 0;
+
+        CbPavement.Items.Add(new PavementOption("Asfalto (CBUQ)", TipoPavimento.Asfalto));
+        CbPavement.Items.Add(new PavementOption("Bloquete / pavimento intertravado", TipoPavimento.Bloquete));
+        CbPavement.Items.Add(new PavementOption("Concreto", TipoPavimento.Concreto));
+        CbPavement.Items.Add(new PavementOption("Nenhum (pista já modelada)", TipoPavimento.Nenhum));
+        CbPavement.SelectedIndex = 0;
 
         Output.Load(PluginContext.Settings.NewOutput());
         Output.Changed += (_, _) => UpdatePreview();
@@ -194,6 +209,8 @@ public partial class RoadWindow : Window
             EndSetback = UiHelpers.Parse(TbEnd, 0, "Recuo final", 0, 10000),
             Inscriptions = CkInscriptions.IsChecked == true,
             PhysicalElements = CkPhysical.IsChecked == true,
+            Pavement = (CbPavement.SelectedItem as PavementOption)?.Value ?? TipoPavimento.Asfalto,
+            PavementThickness = UiHelpers.ParseNullable(TbPavThickness, "Espessura do pavimento", 0.01, 2),
         };
         if (s.Right.Count == 0 && s.Left.Count == 0) throw new FormatException("Adicione ao menos um elemento à seção.");
         if (CkStuds.IsChecked == true && CbStuds.SelectedItem is string st)

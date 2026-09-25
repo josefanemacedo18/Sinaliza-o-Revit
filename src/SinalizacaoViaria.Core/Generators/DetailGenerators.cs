@@ -146,9 +146,10 @@ public static partial class DetailGenerator
 
     private static bool Include(MarkingDefinition d, LegendDefinition lg)
     {
-        if (d is IAnnotationDefinition) return false;
+        if (d is IAnnotationDefinition or IntersectionDefinition) return false;
         var physical = d is DeviceMarkingDefinition or UrbanElementDefinition or RampDefinition or TrafficCalmingDefinition
-            or CurbExtensionDefinition or SidewalkAreaDefinition or PlanterDefinition or CulDeSacDefinition;
+            or CurbExtensionDefinition or SidewalkAreaDefinition or PlanterDefinition or CulDeSacDefinition
+            or RoadPavementDefinition or RoundaboutDefinition or TactileRouteDefinition;
         if (d is SignDefinition) return lg.Vertical;
         if (physical) return lg.Physical;
         if (d is LinearMarkingDefinition l && l.Code is "CALCADA" or "GRAMADO" or "SARJETA" or "SARJETAO" || d is LinearMarkingDefinition l2 && l2.Code.StartsWith("MEIO-FIO"))
@@ -283,6 +284,21 @@ public static partial class DetailGenerator
                 return MarkingBuilder.Build(pl, Straight(12), local);
             case CulDeSacDefinition cd:
                 return MarkingBuilder.Build(cd, new Polyline2(new[] { Vec2.Zero, new Vec2(0, 18) }), local);
+            case RoadPavementDefinition pv:
+            {
+                var g = new MarkingGeometry();
+                g.Pieces.Add(new MarkingPiece(Polygon2.Rectangle(Vec2.Zero, new Vec2(8, 3)), pv.Color));
+                return g;
+            }
+            case TactileRouteDefinition tr:
+                return TactileGenerator.Route(tr, new[] { new Polyline2(new[] { new Vec2(0, 0.2), new Vec2(2.2, 0.2), new Vec2(2.2, 1.4) }) }, 0);
+            case RoundaboutDefinition rb:
+            {
+                var c = (RoundaboutDefinition)MarkingDefinition.FromJson(rb.ToJson())!;
+                c.Center = Vec2.Zero;
+                c.Landscaping = false;
+                return RoundaboutGenerator.Build(c, local);
+            }
             default:
                 return new MarkingGeometry();
         }

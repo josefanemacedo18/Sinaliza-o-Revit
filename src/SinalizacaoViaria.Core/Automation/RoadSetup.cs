@@ -198,7 +198,56 @@ public sealed class RoadSetup
     /// <summary>Gera calçadas, meios-fios e canteiros físicos (senão, apenas a sinalização).</summary>
     public bool PhysicalElements { get; set; } = true;
 
+    /// <summary>Pavimento da pista (gerado sob a sinalização).</summary>
+    public TipoPavimento Pavement { get; set; } = TipoPavimento.Asfalto;
+    public double? PavementThickness { get; set; }
+
     public List<string> Warnings { get; } = new();
+
+    /// <summary>Largura da pista, calçada e faixas sem pavimento de um lado (do eixo para fora).</summary>
+    private (double Carriage, double Sidewalk, List<PavementGap> Gaps) SideInfo(List<ElementoSecao> side, int sigma)
+    {
+        var gaps = new List<PavementGap>();
+        double a = MedianHalf;
+        foreach (var e in side)
+        {
+            var w = Math.Max(0.05, e.Largura);
+            if (e.Tipo == TipoElementoSecao.Calcada)
+            {
+                var gutter = PhysicalElements ? Math.Max(0, e.Sarjeta) : 0;
+                if (gutter > 0.01) gaps.Add(new PavementGap(sigma * (a - gutter / 2), gutter, Median: false));
+                return (a, w, gaps);
+            }
+            if (e.Tipo == TipoElementoSecao.CanteiroFisico && PhysicalElements) gaps.Add(new PavementGap(sigma * (a + w / 2), w));
+            a += w;
+        }
+        return (a, 0, gaps);
+    }
+
+    /// <summary>Pavimento + registro da seção (usado por interseções e rotatórias).</summary>
+    public RoadPavementDefinition PavementDefinition()
+    {
+        var (rc, rs, rg) = SideInfo(Right, -1);
+        var (lc, ls, lg) = SideInfo(Left, +1);
+        var d = new RoadPavementDefinition
+        {
+            Material = Pavement,
+            Thickness = PavementThickness,
+            RightWidth = rc,
+            LeftWidth = lc,
+            RightSidewalk = rs,
+            LeftSidewalk = ls,
+            CurbWidth = CurbWidth,
+            TwoWay = TwoWay,
+            StartSetback = StartSetback,
+            EndSetback = EndSetback,
+        };
+        d.Gaps.AddRange(rg);
+        d.Gaps.AddRange(lg);
+        if (TwoWay && Center == CenterTreatment.Canteiro && MedianType == TipoCanteiro.Fisico && PhysicalElements)
+            d.Gaps.Add(new PavementGap(0, MedianWidth));
+        return d;
+    }
 
     private double MedianHalf => TwoWay && Center == CenterTreatment.Canteiro ? MedianWidth / 2 : 0;
 
@@ -253,6 +302,9 @@ public sealed class RoadSetup
             StripOffset = offset,
             StripWidth = width,
         });
+
+        // ------------------------------------------------ pavimento (sempre registrado: guarda a seção para interseções)
+        if (Pavement != TipoPavimento.Nenhum) Add(PavementDefinition());
 
         // ------------------------------------------------ eixo central
         var half = MedianHalf;

@@ -22,6 +22,18 @@ public enum MarkingColor
     Marrom,
     /// <summary>Pavimento asfáltico (volumes de quebra-molas e faixas elevadas) – elemento físico.</summary>
     Asfalto,
+    /// <summary>Pavimento intertravado (bloquete de concreto).</summary>
+    Bloquete,
+    /// <summary>Pavimento de concreto (placas).</summary>
+    PavimentoConcreto,
+    /// <summary>Copa de árvores e arbustos.</summary>
+    Folhagem,
+    /// <summary>Vidro (abrigos de ônibus) – material semitransparente.</summary>
+    Vidro,
+    /// <summary>Madeira (bancos, decks).</summary>
+    Madeira,
+    /// <summary>Relevo do piso tátil (domos e barras) – tom escuro para contraste em planta.</summary>
+    RelevoTatil,
 }
 
 public readonly record struct Rgb(byte R, byte G, byte B)
@@ -46,7 +58,11 @@ public static class MarkingColors
 
     /// <summary>Verdadeiro para cores de demarcação (tinta); falso para materiais físicos.</summary>
     public static bool IsPaint(MarkingColor c) =>
-        c is not (MarkingColor.Concreto or MarkingColor.Grama or MarkingColor.Metal or MarkingColor.Asfalto);
+        c is not (MarkingColor.Concreto or MarkingColor.Grama or MarkingColor.Metal or MarkingColor.Asfalto or MarkingColor.Bloquete
+            or MarkingColor.PavimentoConcreto or MarkingColor.Folhagem or MarkingColor.Vidro or MarkingColor.Madeira or MarkingColor.RelevoTatil);
+
+    /// <summary>Materiais de pavimento da pista.</summary>
+    public static bool IsPavement(MarkingColor c) => c is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto;
 
     /// <summary>Cor RGB aproximada para exibição no Revit (materiais e regiões preenchidas).</summary>
     public static Rgb Display(MarkingColor c) => c switch
@@ -63,6 +79,12 @@ public static class MarkingColors
         MarkingColor.Laranja => new Rgb(240, 120, 20),
         MarkingColor.Marrom => new Rgb(120, 78, 44),
         MarkingColor.Asfalto => new Rgb(72, 74, 78),
+        MarkingColor.Bloquete => new Rgb(146, 112, 98),
+        MarkingColor.PavimentoConcreto => new Rgb(168, 168, 162),
+        MarkingColor.Folhagem => new Rgb(70, 132, 62),
+        MarkingColor.Vidro => new Rgb(176, 208, 226),
+        MarkingColor.Madeira => new Rgb(164, 116, 66),
+        MarkingColor.RelevoTatil => new Rgb(150, 92, 22),
         _ => new Rgb(128, 128, 128),
     };
 
@@ -80,7 +102,13 @@ public static class MarkingColors
         MarkingColor.Verde => "Faixas de caminhada e placas de indicação.",
         MarkingColor.Laranja => "Sinalização temporária de obras.",
         MarkingColor.Marrom => "Placas de atrativos turísticos e mobiliário em madeira.",
-        MarkingColor.Asfalto => "Volumes de quebra-molas, lombadas e faixas elevadas.",
+        MarkingColor.Asfalto => "Pavimento asfáltico da pista, quebra-molas, lombadas e faixas elevadas.",
+        MarkingColor.Bloquete => "Pavimento intertravado (bloquete de concreto).",
+        MarkingColor.PavimentoConcreto => "Pavimento de concreto (placas).",
+        MarkingColor.Folhagem => "Copas de árvores e arbustos.",
+        MarkingColor.Vidro => "Painéis de vidro (abrigos).",
+        MarkingColor.Madeira => "Bancos, decks e parklets em madeira.",
+        MarkingColor.RelevoTatil => "Relevo (domos e barras) do piso tátil.",
         _ => "",
     };
 

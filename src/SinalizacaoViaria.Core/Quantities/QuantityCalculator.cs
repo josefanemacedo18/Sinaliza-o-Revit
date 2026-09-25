@@ -16,6 +16,7 @@ public enum CategoriaQuantitativo
     CalcadasUrbanizacao,
     ModeracaoTrafego,
     MobiliarioUrbano,
+    PavimentacaoGeometria,
 }
 
 /// <summary>Uma linha do quadro de quantidades.</summary>
@@ -61,13 +62,15 @@ public sealed class QuantityRow
         CategoriaQuantitativo.CalcadasUrbanizacao => "5. Calçadas, meios-fios e urbanização",
         CategoriaQuantitativo.ModeracaoTrafego => "6. Moderação de tráfego",
         CategoriaQuantitativo.MobiliarioUrbano => "7. Mobiliário e elementos urbanos",
+        CategoriaQuantitativo.PavimentacaoGeometria => "8. Pavimentação e geometria viária",
         _ => c.ToString(),
     };
 
     /// <summary>Categoria de uma marca (a partir do grupo e do tipo).</summary>
     public static CategoriaQuantitativo Categorize(MarkingDefinition def, GrupoMarca group) => def switch
     {
-        RampDefinition => CategoriaQuantitativo.Acessibilidade,
+        RampDefinition or TactileRouteDefinition => CategoriaQuantitativo.Acessibilidade,
+        RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition => CategoriaQuantitativo.PavimentacaoGeometria,
         _ => group switch
         {
             GrupoMarca.SinalizacaoVertical => CategoriaQuantitativo.SinalizacaoVertical,
@@ -128,7 +131,8 @@ public static class QuantityCalculator
                 }
                 row.Area += area;
                 // Consumo de tinta apenas para demarcação (não para calçadas, canteiros e dispositivos físicos).
-                if (mat != null && MarkingColors.IsPaint(color) && def is not (DeviceMarkingDefinition or SignDefinition or UrbanElementDefinition or RampDefinition))
+                if (mat != null && MarkingColors.IsPaint(color) && def is not (DeviceMarkingDefinition or SignDefinition or UrbanElementDefinition or RampDefinition or TactileRouteDefinition)
+                    && !(def is LinearMarkingDefinition { Code: "PTA" or "PTD" }))
                 {
                     row.MaterialConsumption += area * mat.Consumo;
                     row.GlassBeadsKg += area * mat.MicroesferasKgM2;

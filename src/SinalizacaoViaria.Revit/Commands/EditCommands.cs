@@ -56,6 +56,19 @@ public sealed class CmdEditar : CommandBase
     {
         var stored = MarkingPicker.PickOne(uidoc, "Selecione a marca a editar");
         if (stored == null) return Result.Cancelled;
+        if (stored.Definition is RoundaboutDefinition rb)
+        {
+            var hasRoads = rb.Legs.Any(l => l.RoadId != null);
+            if (UiHelpers.ShowModal(RoundaboutForms.Roundabout(rb, true, hasRoads)) != true) return Result.Cancelled;
+            Report("Rotatória", IntersectionRunner.Run(uidoc, "SV - Editar rotatória", s => s.Refresh(rb)).Where(r => r.Warnings.Count > 0).ToList());
+            return Result.Succeeded;
+        }
+        if (stored.Definition is IntersectionDefinition inter)
+        {
+            if (UiHelpers.ShowModal(IntersectionForms.Intersection(inter, true)) != true) return Result.Cancelled;
+            Report("Interseção", IntersectionRunner.Run(uidoc, "SV - Editar interseção", s => s.Refresh(inter)).Where(r => r.Warnings.Count > 0).ToList());
+            return Result.Succeeded;
+        }
         if ((SidewalkForms.ForEdit(stored.Definition) ?? DetailForms.ForEdit(uidoc, stored.Definition)) is { } form)
         {
             if (UiHelpers.ShowModal(form.Window) != true) return Result.Cancelled;
@@ -130,7 +143,18 @@ public sealed class CmdAtualizarTodas : CommandBase
         {
             t.Start();
             var service = new MarkingService(doc, uidoc.ActiveView);
-            foreach (var d in MarkingService.DependencyOrder(defs)) results.Add(service.Render(d));
+            foreach (var d in MarkingService.DependencyOrder(defs.Where(d => d is not (IntersectionDefinition or RoundaboutDefinition)))) results.Add(service.Render(d));
+            var inter = new IntersectionService(doc, service);
+            foreach (var it in MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>())
+            {
+                try { results.AddRange(inter.Refresh(it).Where(r => r.Warnings.Count > 0)); }
+                catch (Exception ex) { Log.Error("Refresh interseção", ex); }
+            }
+            foreach (var rb in MarkingStorage.Definitions(doc).OfType<RoundaboutDefinition>())
+            {
+                try { results.AddRange(inter.Refresh(rb).Where(r => r.Warnings.Count > 0)); }
+                catch (Exception ex) { Log.Error("Refresh rotatória", ex); }
+            }
             t.Commit();
         }
         Report("Atualização", results, alwaysShow: true);
