@@ -73,6 +73,16 @@ public static class RibbonBuilder
         Large(seg, typeof(CmdDispositivos), "Bloqueios\nFísicos", "bloqueio",
             "Segregadores (tartarugas), tachões, balizadores flexíveis, cilindros, pilaretes, prismas, barreiras New Jersey e modulares, separadores e defensas metálicas.");
 
+        var det = app.CreateRibbonPanel(TabName, "Detalhamento");
+        Large(det, typeof(CmdDetalharPlacas), "Detalhar\nPlacas", "detalheplaca",
+            "Na planta, desenha cada placa ampliada ao lado do suporte com linha de chamada e código/nome (ex.: R-1 Parada obrigatória). Tamanhos em mm de papel; acompanha a edição da placa.");
+        Large(det, typeof(CmdAnotar), "Anotar", "anotar",
+            "Chamada com texto automático para qualquer sinalização (código, nome, largura, padrão, espaçamento, dimensões) – atualizada quando a marca é editada.");
+        Large(det, typeof(CmdQuadroLegenda), "Quadro de\nLegenda", "quadrolegenda",
+            "Quadro de legenda com amostra desenhada e descrição de cada tipo de sinalização usado no projeto.");
+        Large(det, typeof(CmdEixos), "Mostrar/Ocultar\nEixos", "eixos",
+            "Mostra ou oculta na vista ativa as linhas 'SV - Eixo de sinalização' usadas como caminho das marcas.");
+
         var edit = app.CreateRibbonPanel(TabName, "Editar");
         Large(edit, typeof(CmdEditar), "Editar", "editar", "Edita os parâmetros de uma marca existente e a regenera.");
         Stack(edit,

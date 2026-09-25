@@ -85,6 +85,9 @@ public sealed class PathReference
 [JsonDerivedType(typeof(UrbanElementDefinition), "mobiliario")]
 [JsonDerivedType(typeof(RampDefinition), "rampa")]
 [JsonDerivedType(typeof(TrafficCalmingDefinition), "moderacao")]
+[JsonDerivedType(typeof(SignPlanDetailDefinition), "detalhe-placa")]
+[JsonDerivedType(typeof(LabelDefinition), "anotacao")]
+[JsonDerivedType(typeof(LegendDefinition), "quadro-legenda")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;
@@ -398,6 +401,8 @@ public enum TipoRampa
     RebaixamentoSemAbas,
     /// <summary>Guia rebaixada / rampa de acesso de veículos.</summary>
     AcessoVeiculos,
+    /// <summary>Rebaixamento total da calçada (calçadas estreitas): platô no nível da pista e rampas laterais ao longo do meio-fio.</summary>
+    RebaixamentoTotal,
 }
 
 /// <summary>
@@ -417,6 +422,12 @@ public sealed class RampDefinition : MarkingDefinition
     public bool Tactile { get; set; } = true;
     public double TactileWidth { get; set; } = 0.40;
     public MarkingColor TactileColor { get; set; } = MarkingColor.Amarela;
+    /// <summary>Afastamento do piso tátil em relação à face do meio-fio (m).</summary>
+    public double TactileSetback { get; set; }
+    /// <summary>Profundidade da calçada rebaixada (m) – rebaixamento total.</summary>
+    public double SidewalkDepth { get; set; } = 1.80;
+    /// <summary>Piso tátil direcional no eixo da rampa, até o fim da subida.</summary>
+    public bool DirectionalTactile { get; set; }
     /// <summary>Recortar automaticamente calçadas/meios-fios sob a rampa.</summary>
     public bool CutSidewalk { get; set; } = true;
 
@@ -425,6 +436,7 @@ public sealed class RampDefinition : MarkingDefinition
     {
         TipoRampa.AcessoVeiculos => "RAMPA-VEIC",
         TipoRampa.RebaixamentoSemAbas => "RAMPA-PED",
+        TipoRampa.RebaixamentoTotal => "RAMPA-TOTAL",
         _ => "RAMPA-ABAS",
     };
     public override PathReference? Path => PathRef;
@@ -469,4 +481,72 @@ public sealed class TrafficCalmingDefinition : MarkingDefinition
     };
     public override PathReference? Path => PathRef;
     public override void SetPath(PathReference path) => PathRef = path;
+}
+
+/// <summary>Elementos de detalhamento 2D (existem apenas numa vista; não entram em quantitativos).</summary>
+public interface IAnnotationDefinition
+{
+    /// <summary>Marca à qual o detalhe se refere (nulo = independente).</summary>
+    string? TargetId { get; }
+}
+
+/// <summary>
+/// Detalhe de placa em planta: a face da placa desenhada em escala de papel, afastada do suporte,
+/// com linha de chamada até o poste e identificação (código e nome).
+/// </summary>
+public sealed class SignPlanDetailDefinition : MarkingDefinition, IAnnotationDefinition
+{
+    public string SignId { get; set; } = "";
+    /// <summary>Deslocamento do centro do símbolo em relação ao suporte (mm de papel, X = leste, Y = norte).</summary>
+    public Vec2 OffsetMm { get; set; } = new(0, 20);
+    /// <summary>Largura do símbolo da placa no papel (mm).</summary>
+    public double SymbolMm { get; set; } = 12;
+    public double TextMm { get; set; } = 2.0;
+    public bool Label { get; set; } = true;
+    public bool ShowName { get; set; } = true;
+    public bool Leader { get; set; } = true;
+
+    public string? TargetId => SignId;
+    public override string KindName => "Detalhe de placa";
+    public override string DisplayCode => "DET-PLACA";
+}
+
+/// <summary>Anotação com linha de chamada para qualquer sinalização.</summary>
+public sealed class LabelDefinition : MarkingDefinition, IAnnotationDefinition
+{
+    public string MarkingTargetId { get; set; } = "";
+    /// <summary>Ponto sobre a marca (m).</summary>
+    public Vec2 Anchor { get; set; }
+    /// <summary>Posição do texto (m).</summary>
+    public Vec2 LabelPosition { get; set; }
+    public double TextMm { get; set; } = 2.0;
+    /// <summary>Texto livre (substitui o automático).</summary>
+    public string? CustomText { get; set; }
+    public bool ShowName { get; set; } = true;
+    public bool ShowDetails { get; set; } = true;
+
+    public string? TargetId => MarkingTargetId;
+    public override void Translate(Vec2 delta, double dz) { Anchor += delta; LabelPosition += delta; }
+    public override string KindName => "Anotação";
+    public override string DisplayCode => "ANOT";
+}
+
+/// <summary>Quadro de legenda com amostra e descrição de cada tipo de sinalização usada no projeto.</summary>
+public sealed class LegendDefinition : MarkingDefinition, IAnnotationDefinition
+{
+    /// <summary>Canto superior esquerdo (m).</summary>
+    public Vec2 Position { get; set; }
+    public string Title { get; set; } = "LEGENDA – SINALIZAÇÃO VIÁRIA";
+    public double RowMm { get; set; } = 10;
+    public double SampleMm { get; set; } = 24;
+    public double TextColumnMm { get; set; } = 110;
+    public double TextMm { get; set; } = 2.0;
+    public bool Horizontal { get; set; } = true;
+    public bool Vertical { get; set; } = true;
+    public bool Physical { get; set; } = true;
+
+    public string? TargetId => null;
+    public override void Translate(Vec2 delta, double dz) => Position += delta;
+    public override string KindName => "Quadro de legenda";
+    public override string DisplayCode => "LEGENDA";
 }

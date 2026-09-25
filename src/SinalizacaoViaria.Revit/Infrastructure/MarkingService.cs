@@ -37,14 +37,40 @@ public sealed class MarkingService
     }
 
     private StyleService Styles => _styles ??= new StyleService(_doc);
+    private Dictionary<string, MarkingDefinition>? _definitions;
+
+    /// <summary>Definições do documento (cache por geração – detalhes e legendas consultam as demais marcas).</summary>
+    private Dictionary<string, MarkingDefinition> Definitions =>
+        _definitions ??= MarkingStorage.Definitions(_doc).GroupBy(d => d.Id).ToDictionary(g => g.Key, g => g.First());
+
+    /// <summary>Ordena para gerar primeiro as marcas e depois os detalhes/anotações que dependem delas.</summary>
+    public static List<MarkingDefinition> DependencyOrder(IEnumerable<MarkingDefinition> defs) =>
+        defs.OrderBy(d => d is LegendDefinition ? 2 : d is IAnnotationDefinition ? 1 : 0).ToList();
+
+    /// <summary>Regenera os detalhes/anotações que apontam para as marcas indicadas (e os quadros de legenda).</summary>
+    public List<RenderResult> RenderDependents(IEnumerable<string> markingIds, bool includeLegends)
+    {
+        var ids = markingIds.ToHashSet();
+        _definitions = null;
+        var deps = Definitions.Values.Where(d => d is IAnnotationDefinition a && !ids.Contains(d.Id)
+            && (a.TargetId != null ? ids.Contains(a.TargetId) : includeLegends && d is LegendDefinition)).ToList();
+        var res = new List<RenderResult>();
+        foreach (var d in DependencyOrder(deps))
+        {
+            try { res.Add(Render(d)); }
+            catch (Exception ex) { Log.Error($"RenderDependents {d.DisplayCode}", ex); }
+        }
+        return res;
+    }
     private static Catalogo Catalog => PluginContext.Catalog;
 
     // ------------------------------------------------------------------ geometria
 
     /// <summary>Gera a geometria (sem tocar no modelo) – usado também em quantitativos e prévias.</summary>
-    public MarkingGeometry BuildGeometry(MarkingDefinition def, out double baseZ, List<string>? warnings = null)
+    public MarkingGeometry BuildGeometry(MarkingDefinition def, out double baseZ, List<string>? warnings = null, View? view = null)
     {
-        var ctx = PluginContext.BuildContext(def.Output.Drape && def.Output.Mode == OutputMode.Modelo3D);
+        var ctx = PluginContext.BuildContext(def.Output.Drape && def.Output.Mode == OutputMode.Modelo3D,
+            view?.Scale ?? 100, id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList());
         if (def.Path == null)
         {
             baseZ = def.PointZ ?? 0;
@@ -91,14 +117,28 @@ public sealed class MarkingService
     public RenderResult Render(MarkingDefinition def)
     {
         var result = new RenderResult();
+        _definitions = null;
         var existing = MarkingStorage.ById(_doc, def.Id);
         PruneExclusions(def);
+
+        // Detalhes, anotações e legendas existem somente na vista.
+        if (def is IAnnotationDefinition) def.Output.Mode = OutputMode.Detalhe2D;
+        View? view = null;
+        if (def.Output.Mode == OutputMode.Detalhe2D)
+        {
+            view = ResolveView(def, result);
+            if (view == null)
+            {
+                result.Elements.AddRange(existing.Select(e => e.Element.Id));
+                return result;
+            }
+        }
 
         MarkingGeometry geo;
         double baseZ;
         try
         {
-            geo = BuildGeometry(def, out baseZ, result.Warnings);
+            geo = BuildGeometry(def, out baseZ, result.Warnings, view);
         }
         catch (Exception ex)
         {
@@ -109,7 +149,14 @@ public sealed class MarkingService
         result.Geometry = geo;
         result.Warnings.AddRange(geo.Warnings);
 
-        if (geo.Pieces.Count == 0)
+        if (def is IAnnotationDefinition { TargetId: not null } && geo.Warnings.Any(w => w.StartsWith(Core.Generators.DetailGenerator.MissingTarget)))
+        {
+            // A marca de referência foi excluída: o detalhe também é removido.
+            foreach (var old in existing) SafeDelete(old.Element.Id);
+            return result;
+        }
+
+        if (geo.Pieces.Count == 0 && geo.Annotations.Count == 0)
         {
             // Mantém os elementos antigos (ex.: caminho excluído) para não perder o trabalho.
             result.Warnings.Add($"{def.DisplayCode}: nenhuma peça gerada.");
@@ -169,26 +216,30 @@ public sealed class MarkingService
         }
         else
         {
-            var view = ResolveView(def, result);
-            if (view == null)
-            {
-                result.Elements.AddRange(existing.Select(e => e.Element.Id));
-                return result;
-            }
-            var z = PlaneZ(view);
-            // Regiões preenchidas não podem ser remodeladas: remove e recria.
-            foreach (var old in existing.Where(r => r.Element is FilledRegion)) SafeDelete(old.Element.Id);
-            existing.RemoveAll(r => r.Element is FilledRegion);
+            var z = PlaneZ(view!);
+            // Regiões, textos e linhas de detalhe não são remodelados: remove e recria.
+            foreach (var old in existing.Where(r => r.Element is not DirectShape)) SafeDelete(old.Element.Id);
+            existing.RemoveAll(r => r.Element is not DirectShape);
 
             foreach (var g in groups)
             {
-                var regions = CreateRegions(view, g.Key, g.Select(p => p.Shape).ToList(), z, result.Warnings);
+                var regions = CreateRegions(view!, g.Key, g.Select(p => p.Shape).ToList(), z, result.Warnings);
                 foreach (var fr in regions)
                 {
                     Tag(fr, def, info, g.Key, materialName, fr == regions[0] ? g.Sum(p => p.Shape.Area) : 0, geo, primary);
                     keep.Add(fr.Id);
                     primary = false;
                 }
+            }
+            foreach (var e in CreateAnnotations(view!, geo.Annotations, z, result.Warnings))
+            {
+                if (primary)
+                {
+                    Tag(e, def, info, MarkingColor.Preta, materialName, 0, geo, true);
+                    primary = false;
+                }
+                else MarkingStorage.Write(e, def, MarkingColor.Preta);
+                keep.Add(e.Id);
             }
         }
 
@@ -265,6 +316,11 @@ public sealed class MarkingService
                     z = sz + UnitConv.Ft(0.001);
                     normal = n;
                 }
+                if (piece.Solid is { } poly)
+                {
+                    res.AddRange(PolyhedronGeometry(poly, z + lift, materialId));
+                    continue;
+                }
                 if (piece.Profile is { } prof)
                 {
                     res.Add(ProfileSolidGeometry(prof, z + lift, options));
@@ -294,6 +350,29 @@ public sealed class MarkingService
         }
         if (failures > 0) warnings.Add($"{failures} peça(s) não puderam ser modeladas (geometria muito pequena ou inválida).");
         return res;
+    }
+
+    /// <summary>Poliedro (rampas, abas) via TessellatedShapeBuilder – sólido quando possível, senão malha.</summary>
+    private static IList<GeometryObject> PolyhedronGeometry(Polyhedron p, double zBaseFt, ElementId materialId)
+    {
+        var b = new TessellatedShapeBuilder { Target = TessellatedShapeBuilderTarget.AnyGeometry, Fallback = TessellatedShapeBuilderFallback.Mesh };
+        b.OpenConnectedFaceSet(true);
+        foreach (var f in p.Faces)
+        {
+            var pts = new List<XYZ>();
+            foreach (var v in f)
+            {
+                var x = new XYZ(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), zBaseFt + UnitConv.Ft(v.Z));
+                if (pts.Count == 0 || !pts[^1].IsAlmostEqualTo(x)) pts.Add(x);
+            }
+            while (pts.Count > 3 && pts[0].IsAlmostEqualTo(pts[^1])) pts.RemoveAt(pts.Count - 1);
+            if (pts.Count < 3) continue;
+            b.AddFace(new TessellatedFace(pts, materialId));
+        }
+        b.CloseConnectedFaceSet();
+        b.Build();
+        var r = b.GetBuildResult();
+        return r.GetGeometricalObjects();
     }
 
     /// <summary>Sólido de perfil vertical: contorno no plano (XDir, Z) extrudado ao longo de ExtrudeDir.</summary>
@@ -395,6 +474,59 @@ public sealed class MarkingService
         if (lineStyle != null)
             foreach (var fr in res)
                 try { fr.SetLineStyleId(lineStyle); } catch { /* estilo opcional */ }
+        return res;
+    }
+
+    /// <summary>Textos (TextNote) e linhas de chamada (linhas de detalhe) do detalhamento.</summary>
+    private List<Element> CreateAnnotations(View view, List<Annotation2D> annotations, double zFt, List<string> warnings)
+    {
+        var res = new List<Element>();
+        var tol = _doc.Application.ShortCurveTolerance * 1.05;
+        int failures = 0;
+        foreach (var a in annotations)
+        {
+            try
+            {
+                switch (a)
+                {
+                    case AnnotationLine l:
+                    {
+                        var style = Styles.LeaderLineStyle(l.Color);
+                        for (int i = 0; i + 1 < l.Points.Count; i++)
+                        {
+                            var p0 = new XYZ(UnitConv.Ft(l.Points[i].X), UnitConv.Ft(l.Points[i].Y), zFt);
+                            var p1 = new XYZ(UnitConv.Ft(l.Points[i + 1].X), UnitConv.Ft(l.Points[i + 1].Y), zFt);
+                            if (p0.DistanceTo(p1) < tol) continue;
+                            var dc = _doc.Create.NewDetailCurve(view, Line.CreateBound(p0, p1));
+                            dc.LineStyle = style;
+                            res.Add(dc);
+                        }
+                        break;
+                    }
+                    case AnnotationText t when !string.IsNullOrWhiteSpace(t.Text):
+                    {
+                        var opt = new TextNoteOptions(Styles.TextType(t.PaperHeightMm))
+                        {
+                            HorizontalAlignment = t.Align switch
+                            {
+                                TextAlign.Left => HorizontalTextAlignment.Left,
+                                TextAlign.Right => HorizontalTextAlignment.Right,
+                                _ => HorizontalTextAlignment.Center,
+                            },
+                            VerticalAlignment = VerticalTextAlignment.Top,
+                        };
+                        var pos = new XYZ(UnitConv.Ft(t.Position.X), UnitConv.Ft(t.Position.Y), zFt);
+                        res.Add(TextNote.Create(_doc, view.Id, pos, t.Text.Replace("\n", "\r"), opt));
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (failures++ == 0) Log.Error("CreateAnnotations", ex);
+            }
+        }
+        if (failures > 0) warnings.Add($"{failures} texto(s)/linha(s) de detalhamento não puderam ser criados.");
         return res;
     }
 

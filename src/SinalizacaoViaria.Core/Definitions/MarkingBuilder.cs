@@ -13,6 +13,18 @@ public sealed class BuildContext
 
     /// <summary>Comprimento máximo das peças (m) – usado ao projetar sobre superfícies. 0 = sem divisão.</summary>
     public double MaxPieceLength { get; init; }
+
+    /// <summary>Escala da vista (ex.: 100 para 1:100) – dimensões de detalhamento em mm de papel.</summary>
+    public double ViewScale { get; init; } = 100;
+
+    /// <summary>Busca outra marca do projeto pelo identificador (detalhes e anotações).</summary>
+    public Func<string, MarkingDefinition?>? Lookup { get; init; }
+
+    /// <summary>Todas as marcas do projeto (quadro de legenda).</summary>
+    public Func<IReadOnlyList<MarkingDefinition>>? AllDefinitions { get; init; }
+
+    /// <summary>Converte mm de papel em metros de modelo.</summary>
+    public double Mm(double paperMm) => paperMm * ViewScale / 1000.0;
 }
 
 /// <summary>Dados descritivos de uma marca para parâmetros e tabelas.</summary>
@@ -36,7 +48,7 @@ public static class MarkingBuilder
         res.Warnings.AddRange(geo.Warnings);
         foreach (var p in geo.Pieces)
         {
-            if (p.Profile != null)
+            if (p.Profile != null || p.Solid != null)
             {
                 if (!holes.Any(h => h.Contains(p.Shape.Centroid))) res.Pieces.Add(p);
                 continue;
@@ -62,6 +74,9 @@ public static class MarkingBuilder
         SignDefinition sg => BuildSign(sg, ctx),
         UrbanElementDefinition ue => BuildUrban(ue, path, ctx),
         RampDefinition rp => path == null || path.Points.Count < 2 ? Missing("Pontos da rampa não encontrados.") : RampGenerator.Generate(rp, path),
+        SignPlanDetailDefinition sd => DetailGenerator.SignDetail(sd, ctx),
+        LabelDefinition lb => DetailGenerator.Label(lb, ctx),
+        LegendDefinition lg => DetailGenerator.Legend(lg, ctx),
         TrafficCalmingDefinition tc => path == null || path.Points.Count < 2 ? Missing("Bordos da pista não encontrados.") : TrafficCalmingGenerator.Generate(tc, path, ctx.Catalog),
         _ => throw new NotSupportedException(def.GetType().Name),
     };
@@ -372,6 +387,8 @@ public static class MarkingBuilder
                     TipoModeracao.FaixaElevada => "Faixa elevada para travessia de pedestres",
                     _ => "Lombada invertida (valeta transversal)",
                 }, GrupoMarca.Moderacao, "Resoluções CONTRAN sobre ondulações transversais e faixas elevadas (conferir versão vigente)", "un");
+            case IAnnotationDefinition:
+                return new MarkingInfo(def.DisplayCode, def.KindName, GrupoMarca.Detalhamento, "", "");
             default:
                 return new MarkingInfo(def.DisplayCode, def.KindName, GrupoMarca.Longitudinal, "", "");
         }

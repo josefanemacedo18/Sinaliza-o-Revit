@@ -40,6 +40,7 @@ public sealed class QuantityRow
         GrupoMarca.SinalizacaoVertical => "Sinalização vertical",
         GrupoMarca.Mobiliario => "Mobiliário e elementos urbanos",
         GrupoMarca.Moderacao => "Moderação de tráfego",
+        GrupoMarca.Detalhamento => "Detalhamento",
         _ => g.ToString(),
     };
 }
@@ -52,6 +53,7 @@ public static class QuantityCalculator
         var rows = new Dictionary<(string, MarkingColor, string), QuantityRow>();
         foreach (var (def, geo) in items)
         {
+            if (def is IAnnotationDefinition) continue;
             var info = MarkingBuilder.Describe(def, catalog);
             var matName = def.Output.Material ?? defaultMaterial ?? catalog.Materiais.FirstOrDefault()?.Nome ?? "";
             var mat = catalog.Material(matName);

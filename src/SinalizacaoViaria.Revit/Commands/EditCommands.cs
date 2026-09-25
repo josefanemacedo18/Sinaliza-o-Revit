@@ -69,6 +69,10 @@ public sealed class CmdEditar : CommandBase
             UrbanElementDefinition ue => Show(new UrbanWindow(ue), w => w.Result),
             RampDefinition rp => Show(new RampWindow(rp), w => w.Result),
             TrafficCalmingDefinition tc => Show(new CalmingWindow(tc), w => w.Result),
+            SignPlanDetailDefinition sp => Show(new SignDetailWindow(DetailScale(uidoc, sp),
+                MarkingStorage.ById(uidoc.Document, sp.SignId).FirstOrDefault()?.Definition as SignDefinition, sp), w => w.Result),
+            LabelDefinition lb => Show(new LabelWindow(lb), w => w.Result),
+            LegendDefinition lg => Show(new LegendWindow(DetailScale(uidoc, lg), MarkingStorage.Definitions(uidoc.Document), lg), w => w.Result),
             _ => null,
         };
         if (edited == null) return Result.Cancelled;
@@ -80,6 +84,9 @@ public sealed class CmdEditar : CommandBase
         Report("Edição", results);
         return Result.Succeeded;
     }
+
+    private static double DetailScale(UIDocument uidoc, MarkingDefinition d) =>
+        (!string.IsNullOrEmpty(d.Output.ViewId) ? uidoc.Document.GetElement(d.Output.ViewId) as View : null)?.Scale ?? uidoc.ActiveView.Scale;
 
     private static MarkingDefinition? Show<TW>(TW w, Func<TW, MarkingDefinition?> result) where TW : System.Windows.Window =>
         UiHelpers.ShowModal(w) == true ? result(w) : null;
@@ -112,7 +119,7 @@ public sealed class CmdAtualizarTodas : CommandBase
         {
             t.Start();
             var service = new MarkingService(doc, uidoc.ActiveView);
-            foreach (var d in defs) results.Add(service.Render(d));
+            foreach (var d in MarkingService.DependencyOrder(defs)) results.Add(service.Render(d));
             t.Commit();
         }
         Report("Atualização", results, alwaysShow: true);

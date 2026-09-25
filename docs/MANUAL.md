@@ -218,8 +218,14 @@ frontal da janela mostra a placa como o condutor a vê.
   automaticamente; a **Faixa de caminhada** é um elemento da seção (azul ou verde, bordas brancas e
   símbolo de pedestre repetido).
 * **Rampas**: 1º clique no centro da rampa, na face do meio-fio; 2º clique para dentro da calçada.
-  A rampa, as abas e o piso tátil são gerados em 3D e a calçada, o meio-fio e o gramado sob ela são
-  recortados. Excluir a rampa e usar **Atualizar Todas** restaura a calçada.
+  A rampa é um sólido inclinado (0 na pista → altura do meio-fio no topo, com a inclinação
+  escolhida), as abas são cunhas triangulares com a inclinação das abas e o piso tátil de alerta
+  acompanha a rampa (afastamento do meio-fio configurável; direcional opcional no eixo). Tipos:
+  com abas, sem abas (laterais protegidas), **rebaixamento total** (calçada estreita: plataforma
+  rebaixada na largura da travessia com rampas laterais; informe a profundidade da calçada) e guia
+  rebaixada de veículos. A calçada, o meio-fio e o gramado sob a rampa são recortados. Excluir a
+  rampa e usar **Atualizar Todas** restaura a calçada. Em 2D, a rampa mostra a seta de subida e a
+  inclinação; a janela avisa quando a inclinação ou a largura não atendem à NBR 9050.
 * **Elementos urbanos**: por ponto (posição + direção) ou distribuídos ao longo de linhas com
   espaçamento, deslocamento e rotação (ex.: árvores a cada 8 m, postes a cada 30 m).
 
@@ -236,3 +242,30 @@ No **Sinalizar Via**, selecione a ciclofaixa para ajustar: largura, largura da l
 linha contínua ou seccionada (traço/espaço), tamanho do símbolo da bicicleta e da seta, distância
 entre eles, espaçamento das inscrições, pintura vermelha, bidirecional com linha central amarela e
 segregação física.
+
+## 16. Detalhamento (pranchas de sinalização)
+
+Todos os comandos trabalham na **vista ativa** (planta de piso/implantação ou vista de desenho). As
+medidas são em **milímetros de papel**: o desenho acompanha a escala da vista (12 mm a 1:200 =
+2,40 m no modelo). Os elementos (regiões, textos "SV - Texto x mm" e linhas "SV - Chamada") ficam
+ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la remove o detalhe.
+
+* **Detalhar Placas**: escolha as placas (selecionadas, visíveis na vista ou todas), a largura do
+  símbolo, a distância e a direção em relação ao suporte, e se haverá linha de chamada e
+  código/nome. O símbolo é a face da placa (forma, orla, fundo e legenda) desenhada na planta; o
+  ponto vermelho marca o suporte. Rodar de novo o comando atualiza os detalhes existentes na vista
+  (não duplica). Para ajustar só um símbolo, use **Editar** sobre ele.
+* **Anotar**: clique sobre qualquer sinalização (o ponto clicado recebe a chamada) e depois onde o
+  texto deve ficar. O texto automático traz código e nome e, opcionalmente, detalhes (variante/
+  largura da linha, barras e espaçamento do zebrado, dimensões da vaga, espaçamento dos
+  dispositivos, inclinação da rampa...). Um texto livre pode substituir o automático.
+* **Quadro de Legenda**: clique o canto superior esquerdo. Uma linha por tipo de sinalização do
+  projeto, com amostra desenhada (linha no padrão real, zebrado, símbolo, placa, dispositivo...) e
+  "código – nome". Escolha incluir horizontal, vertical e/ou elementos físicos. O quadro se
+  atualiza ao criar novas marcas e com **Atualizar Todas**.
+* **Mostrar/Ocultar Eixos**: alterna a visibilidade das linhas "SV - Eixo de sinalização" na vista
+  (se a vista usa um modelo de vista, altere-o em V/G).
+
+Dica: para pranchas, combine a sinalização em 3D (vista de planta com os sólidos) com os detalhes
+de placas e o quadro de legenda – ou converta a sinalização horizontal para 2D (**Alternar 2D/3D**)
+em uma vista dedicada.

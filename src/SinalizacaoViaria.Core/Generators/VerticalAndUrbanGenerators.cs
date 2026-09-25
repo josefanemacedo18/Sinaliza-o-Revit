@@ -312,10 +312,18 @@ public static class UrbanGenerator
     }
 }
 
-/// <summary>Rampas de calçada (NBR 9050) e de acesso de veículos.</summary>
+/// <summary>
+/// Rampas de calçada (NBR 9050): superfícies planas inclinadas contínuas (rampa central, abas laterais
+/// triangulares), piso tátil de alerta e direcional acompanhando a inclinação, guias rebaixadas de
+/// veículos e rebaixamento total para calçadas estreitas.
+/// </summary>
 public static class RampGenerator
 {
-    public readonly record struct Frame(Vec2 Curb, Vec2 Up, Vec2 Side);
+    /// <summary>Referencial: origem no meio-fio (centro da rampa), Up = subida (para dentro da calçada), Side = lateral.</summary>
+    public readonly record struct Frame(Vec2 Curb, Vec2 Up, Vec2 Side)
+    {
+        public Vec2 P(double side, double up) => Curb + Side * side + Up * up;
+    }
 
     public static Frame FrameOf(Polyline2 path)
     {
@@ -326,12 +334,18 @@ public static class RampGenerator
         return new Frame(a, up, up.PerpLeft);
     }
 
+    /// <summary>Largura, comprimento da subida e comprimento de cada aba (ou das rampas laterais no rebaixamento total).</summary>
     public static (double Width, double Length, double Flare) Dimensions(RampDefinition d)
     {
-        var slope = d.Type == TipoRampa.AcessoVeiculos ? Math.Max(d.Slope, 0.20) : Math.Max(0.01, d.Slope);
-        var length = d.Height / slope;
-        var flare = d.Type == TipoRampa.RebaixamentoComAbas ? d.Height / Math.Max(0.01, d.FlareSlope) : 0;
-        return (d.Width, length, flare);
+        var slope = Math.Max(0.01, d.Type == TipoRampa.AcessoVeiculos ? Math.Max(d.Slope, 0.10) : d.Slope);
+        var run = d.Height / slope;
+        return d.Type switch
+        {
+            TipoRampa.RebaixamentoComAbas => (d.Width, run, d.Height / Math.Max(0.01, d.FlareSlope)),
+            TipoRampa.AcessoVeiculos => (d.Width, run, Math.Min(0.60, run)),
+            TipoRampa.RebaixamentoTotal => (d.Width, d.SidewalkDepth, run),
+            _ => (d.Width, run, 0),
+        };
     }
 
     /// <summary>Área ocupada em planta (usada para recortar a calçada).</summary>
@@ -339,13 +353,11 @@ public static class RampGenerator
     {
         var f = FrameOf(path);
         var (w, len, flare) = Dimensions(d);
-        var p0 = f.Curb - f.Up * 0.05;
         var hw = w / 2;
-        return new Polygon2(new[]
-        {
-            p0 - f.Side * (hw + flare), p0 + f.Side * (hw + flare),
-            f.Curb + f.Up * len + f.Side * hw, f.Curb + f.Up * len - f.Side * hw,
-        });
+        const double e = 0.05; // avança sobre a face do meio-fio para garantir o recorte da guia
+        if (d.Type == TipoRampa.RebaixamentoTotal)
+            return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw + flare, len), f.P(-hw - flare, len) });
+        return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw, len), f.P(-hw, len) });
     }
 
     public static MarkingGeometry Generate(RampDefinition d, Polyline2 path)
@@ -355,41 +367,108 @@ public static class RampGenerator
         var (w, len, flare) = Dimensions(d);
         var h = d.Height;
         var hw = w / 2;
+        var slope = h / Math.Max(1e-6, len);
+        const MarkingColor concrete = MarkingColor.Concreto;
 
-        // Rampa principal: perfil (subida × altura) extrudado lateralmente.
-        var ramp = new Polygon2(new[] { new Vec2(0, 0), new Vec2(len, h), new Vec2(len, 0) });
-        geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(f.Curb - f.Side * hw, f.Up, ramp, f.Side, w), MarkingColor.Concreto));
-
-        // Abas laterais em fatias (superfície inclinada ≤ 10 %).
-        if (flare > 0)
+        if (d.Type == TipoRampa.RebaixamentoTotal)
         {
-            const int slices = 8;
-            for (int k = 0; k < slices; k++)
+            // Platô no nível da pista (placa fina) + rampas laterais subindo ao longo do meio-fio.
+            var depth = len;
+            geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(new[] { f.P(-hw, 0), f.P(hw, 0), f.P(hw, depth), f.P(-hw, depth) }, _ => 0, _ => 0.005), concrete));
+            foreach (var s in new[] { 1.0, -1.0 })
             {
-                var x0 = len * k / slices;
-                var x1 = len * (k + 1) / slices;
-                var xm = (x0 + x1) / 2;
-                var zr = xm / len * h;
-                var extent = flare * (1 - xm / len);
-                if (extent < 0.02) continue;
-                var profile = new Polygon2(new[] { new Vec2(0, 0), new Vec2(0, zr), new Vec2(extent, h), new Vec2(extent, 0) });
-                foreach (var s in new[] { 1.0, -1.0 })
+                var a0 = f.P(s * hw, 0);
+                var a1 = f.P(s * (hw + flare), 0);
+                var a2 = f.P(s * (hw + flare), depth);
+                var a3 = f.P(s * hw, depth);
+                double Top(Vec2 p) => Math.Clamp(Math.Abs((p - f.Curb).Dot(f.Side)) - hw, 0, flare) / flare * h;
+                geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(new[] { a0, a1, a2, a3 }, _ => 0, Top), concrete));
+            }
+            if (d.Tactile)
+            {
+                var t0 = d.TactileSetback;
+                var t1 = t0 + d.TactileWidth;
+                geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(new[] { f.P(-hw, t0), f.P(hw, t0), f.P(hw, t1), f.P(-hw, t1) }, _ => 0.005, _ => 0.010), d.TactileColor));
+            }
+            Annotate(geo, f, w, depth, $"i ≤ {d.Slope * 100:0.##} %  (rebaixamento total)", arrowAlongSide: true, flare);
+            return Finish(geo, d, w);
+        }
+
+        // Rampa central: plano inclinado do meio-fio (z = 0) até o fim da subida (z = h).
+        double RampZ(Vec2 p) => Math.Clamp((p - f.Curb).Dot(f.Up), 0, len) * slope;
+        var main = Polyhedron.Prism(new[] { f.P(-hw, 0), f.P(hw, 0), f.P(hw, len), f.P(-hw, len) }, _ => 0, RampZ);
+        geo.Pieces.Add(Polyhedron.Piece(main, concrete));
+
+        // Abas laterais: triângulos com superfície plana passando por (meio-fio, 0), (aba, h) e (fim da rampa, h).
+        if (flare > 0.01)
+        {
+            foreach (var s in new[] { 1.0, -1.0 })
+            {
+                var p1 = f.P(s * hw, 0);
+                var p2 = f.P(s * (hw + flare), 0);
+                var p3 = f.P(s * hw, len);
+                var top = new[] { Vec3.At(p1, 0), Vec3.At(p2, h), Vec3.At(p3, h) };
+                var bottom = new[] { Vec3.At(p1, 0), Vec3.At(p2, 0), Vec3.At(p3, 0) };
+                var faces = new List<IEnumerable<Vec3>>
                 {
-                    var origin = f.Curb + f.Up * x0 + f.Side * (s * hw);
-                    geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(origin, f.Side * s, profile, f.Up, x1 - x0), MarkingColor.Concreto));
-                }
+                    bottom,
+                    top,
+                    new[] { Vec3.At(p1, 0), Vec3.At(p2, 0), Vec3.At(p2, h) },                    // face no meio-fio
+                    new[] { Vec3.At(p2, 0), Vec3.At(p3, 0), Vec3.At(p3, h), Vec3.At(p2, h) },    // face encostada na calçada
+                    new[] { Vec3.At(p3, 0), Vec3.At(p1, 0), Vec3.At(p3, h) },                    // face encostada na rampa
+                };
+                geo.Pieces.Add(Polyhedron.Piece(new Polyhedron(faces), concrete));
             }
         }
 
-        // Piso tátil de alerta junto à pista, acompanhando a inclinação.
+        // Piso tátil de alerta sobre a rampa, acompanhando a inclinação (5 mm acima da superfície).
         if (d.Tactile && d.Type != TipoRampa.AcessoVeiculos)
         {
-            var tw = Math.Min(d.TactileWidth, len);
-            var z1 = tw / len * h;
-            var tactile = new Polygon2(new[] { new Vec2(0, 0), new Vec2(tw, z1), new Vec2(tw, z1 + 0.005), new Vec2(0, 0.005) });
-            geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(f.Curb - f.Side * hw, f.Up, tactile, f.Side, w), d.TactileColor));
+            var t0 = Math.Clamp(d.TactileSetback, 0, len);
+            var t1 = Math.Clamp(t0 + d.TactileWidth, 0, len);
+            if (t1 - t0 > 0.02)
+            {
+                var poly = new[] { f.P(-hw + 0.01, t0), f.P(hw - 0.01, t0), f.P(hw - 0.01, t1), f.P(-hw + 0.01, t1) };
+                geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(poly, RampZ, p => RampZ(p) + 0.005), d.TactileColor));
+            }
+            if (d.DirectionalTactile && len - t1 > 0.1)
+            {
+                var poly = new[] { f.P(-0.125, t1), f.P(0.125, t1), f.P(0.125, len), f.P(-0.125, len) };
+                geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(poly, RampZ, p => RampZ(p) + 0.005), d.TactileColor));
+            }
         }
 
+        Annotate(geo, f, w, len, d.Type == TipoRampa.AcessoVeiculos ? $"Guia rebaixada  i = {slope * 100:0.#} %" : $"i = {slope * 100:0.##} %", false, flare);
+        return Finish(geo, d, w);
+    }
+
+    /// <summary>Seta de subida e indicação da inclinação (visíveis na representação 2D).</summary>
+    private static void Annotate(MarkingGeometry geo, Frame f, double w, double len, string text, bool arrowAlongSide, double flare)
+    {
+        if (!arrowAlongSide)
+        {
+            var a = f.P(0, len * 0.15);
+            var b = f.P(0, len * 0.85);
+            geo.Annotations.Add(new AnnotationLine(new[] { a, b }, MarkingColor.Preta));
+            geo.Annotations.Add(new AnnotationLine(new[] { b + f.Side * 0.12 - f.Up * 0.2, b, b - f.Side * 0.12 - f.Up * 0.2 }, MarkingColor.Preta));
+            geo.Annotations.Add(new AnnotationText(f.P(0, len + 0.65), text, 2.0));
+        }
+        else
+        {
+            foreach (var s in new[] { 1.0, -1.0 })
+            {
+                var a = f.P(s * (w / 2 + 0.1), len / 2);
+                var b = f.P(s * (w / 2 + flare - 0.1), len / 2);
+                geo.Annotations.Add(new AnnotationLine(new[] { a, b }, MarkingColor.Preta));
+                var dir = (b - a).Normalized();
+                geo.Annotations.Add(new AnnotationLine(new[] { b - dir * 0.2 + dir.PerpLeft * 0.12, b, b - dir * 0.2 - dir.PerpLeft * 0.12 }, MarkingColor.Preta));
+            }
+            geo.Annotations.Add(new AnnotationText(f.P(0, len + 0.65), text, 2.0));
+        }
+    }
+
+    private static MarkingGeometry Finish(MarkingGeometry geo, RampDefinition d, double w)
+    {
         geo.UnitCount = 1;
         geo.PathLength = w;
         if (d.Type != TipoRampa.AcessoVeiculos)

@@ -1,0 +1,59 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.LegendWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
+        Title="Quadro de legenda" Width="980" Height="640" MinWidth="820" MinHeight="500">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizaBIM;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="340"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+            <StackPanel>
+                <TextBlock Text="Legenda automática" Style="{StaticResource Title}"/>
+                <TextBlock Style="{StaticResource Hint}" Text="Monta um quadro com uma amostra desenhada e a descrição de cada tipo de sinalização existente no projeto. O quadro se atualiza quando novas marcas são criadas ou com 'Atualizar Todas'. Depois de confirmar, clique o canto superior esquerdo do quadro."/>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <TextBlock Text="Título" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Column="1" x:Name="TbTitle" TextChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="1" Text="Altura da linha (mm)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbRow" TextChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="2" Text="Coluna da amostra (mm)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbSample" TextChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="3" Text="Coluna da descrição (mm)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbColumn" TextChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="4" Text="Altura do texto (mm)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="4" Grid.Column="1" x:Name="TbText" TextChanged="AnyChanged"/>
+                </Grid>
+                <GroupBox Header="Incluir">
+                    <StackPanel>
+                        <CheckBox x:Name="CkHorizontal" Content="Sinalização horizontal" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox x:Name="CkVertical" Content="Sinalização vertical (placas)" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox x:Name="CkPhysical" Content="Dispositivos, rampas, moderadores e urbanização" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                    </StackPanel>
+                </GroupBox>
+            </StackPanel>
+        </ScrollViewer>
+        <DockPanel Grid.Column="1">
+            <TextBlock DockPanel.Dock="Top" x:Name="TxtPreview" Text="Pré-visualização" Style="{StaticResource Title}"/>
+            <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
+                <ui:GeometryPreview x:Name="Preview"/>
+            </Border>
+        </DockPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="BtnOk" Content="Inserir" Style="{StaticResource Primary}" Click="OkClick" IsDefault="True"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

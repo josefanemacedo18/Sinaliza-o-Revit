@@ -30,6 +30,7 @@ public partial class RampWindow : Window
         _existing = existing;
         CbType.Items.Add(new Option("Rebaixamento com abas laterais (pedestres)", TipoRampa.RebaixamentoComAbas));
         CbType.Items.Add(new Option("Rebaixamento sem abas (laterais protegidas)", TipoRampa.RebaixamentoSemAbas));
+        CbType.Items.Add(new Option("Rebaixamento total da calçada (calçada estreita)", TipoRampa.RebaixamentoTotal));
         CbType.Items.Add(new Option("Guia rebaixada / acesso de veículos", TipoRampa.AcessoVeiculos));
         foreach (var c in UiHelpers.ColorItems().Skip(1)) CbTactileColor.Items.Add(c);
         UiHelpers.SelectColor(CbTactileColor, MarkingColor.Amarela);
@@ -45,6 +46,9 @@ public partial class RampWindow : Window
         TbTactile.Text = UiHelpers.F(d.TactileWidth);
         UiHelpers.SelectColor(CbTactileColor, d.TactileColor);
         CkCut.IsChecked = d.CutSidewalk;
+        TbDepth.Text = UiHelpers.F(d.SidewalkDepth);
+        TbSetback.Text = UiHelpers.F(d.TactileSetback);
+        CkDirectional.IsChecked = d.DirectionalTactile;
         Output.Load(existing?.Output ?? PluginContext.Settings.NewOutput());
         if (existing != null) { Title = "Editar rampa"; BtnOk.Content = "Aplicar"; }
         _loading = false;
@@ -56,7 +60,7 @@ public partial class RampWindow : Window
         if (_loading || CbType.SelectedItem is not Option o) return;
         _loading = true;
         var vehicle = o.Value == TipoRampa.AcessoVeiculos;
-        TbWidth.Text = UiHelpers.F(vehicle ? 3.0 : 1.50);
+        TbWidth.Text = UiHelpers.F(vehicle ? 3.0 : o.Value == TipoRampa.RebaixamentoTotal ? 2.40 : 1.50);
         TbSlope.Text = vehicle ? "25" : "8,33";
         CkTactile.IsChecked = !vehicle;
         _loading = false;
@@ -77,6 +81,9 @@ public partial class RampWindow : Window
         d.TactileWidth = UiHelpers.Parse(TbTactile, 0.40, "Largura do piso tátil", 0.1, 2);
         d.TactileColor = UiHelpers.SelectedColor(CbTactileColor) ?? MarkingColor.Amarela;
         d.CutSidewalk = CkCut.IsChecked == true;
+        d.SidewalkDepth = UiHelpers.Parse(TbDepth, 1.80, "Profundidade da calçada", 0.5, 10);
+        d.TactileSetback = UiHelpers.Parse(TbSetback, 0, "Afastamento do piso tátil", 0, 2);
+        d.DirectionalTactile = CkDirectional.IsChecked == true;
         d.Output = Output.Save(d.Output);
         return d;
     }

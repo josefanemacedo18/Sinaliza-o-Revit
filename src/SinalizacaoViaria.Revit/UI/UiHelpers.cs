@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using SinalizacaoViaria.Core.Model;
+using SinalizacaoViaria.Revit.Infrastructure;
 
 namespace SinalizacaoViaria.Revit.UI;
 
@@ -81,6 +82,23 @@ public static class UiHelpers
     }
 
     public static MarkingColor? SelectedColor(ComboBox cb) => (cb.SelectedItem as ColorItem)?.Color;
+
+    /// <summary>Lembra as últimas opções de uma janela (definição completa em JSON).</summary>
+    public static void Remember(string key, Core.Definitions.MarkingDefinition def) =>
+        PluginContext.Settings.Set("def:" + key, def.ToJson());
+
+    public static T? Remembered<T>(string key) where T : Core.Definitions.MarkingDefinition
+    {
+        try
+        {
+            var json = PluginContext.Settings.Get("def:" + key);
+            return json == null ? null : Core.Definitions.MarkingDefinition.FromJson(json) as T;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     public static void Error(string msg) => MessageBox.Show(msg, "SinalizaBIM", MessageBoxButton.OK, MessageBoxImage.Warning);
 }

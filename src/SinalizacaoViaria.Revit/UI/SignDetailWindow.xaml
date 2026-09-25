@@ -1,0 +1,56 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.SignDetailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
+        Title="Detalhar placas em planta" Width="860" Height="560" MinWidth="720" MinHeight="460">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizaBIM;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="360"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+            <StackPanel>
+                <TextBlock Text="Símbolo da placa na planta" Style="{StaticResource Title}"/>
+                <TextBlock Style="{StaticResource Hint}" Text="Desenha a face da placa ampliada ao lado do suporte, com linha de chamada e código/nome – como nas pranchas de sinalização. As medidas são em milímetros de papel (acompanham a escala da vista) e o detalhe se atualiza quando a placa é editada."/>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <TextBlock x:Name="LbScope" Text="Placas" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox Grid.Column="1" x:Name="CbScope"/>
+                    <TextBlock Grid.Row="1" Text="Largura do símbolo (mm)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbSymbol" Text="12" TextChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="2" Text="Distância ao suporte (mm)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbDistance" Text="20" TextChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="3" Text="Direção" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox Grid.Row="3" Grid.Column="1" x:Name="CbDirection" SelectionChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="4" Text="Altura do texto (mm)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="4" Grid.Column="1" x:Name="TbText" Text="2" TextChanged="AnyChanged"/>
+                </Grid>
+                <CheckBox x:Name="CkLeader" Content="Linha de chamada até o suporte" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                <CheckBox x:Name="CkLabel" Content="Código da placa abaixo do símbolo" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                <CheckBox x:Name="CkName" Content="Incluir o nome (ex.: R-1 Parada obrigatória)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                <TextBlock Style="{StaticResource Hint}" Text="Dica: para mover um símbolo, edite-o (Editar) e altere distância/direção. Detalhes de placas já detalhadas nesta vista são atualizados, não duplicados."/>
+            </StackPanel>
+        </ScrollViewer>
+        <DockPanel Grid.Column="1">
+            <TextBlock DockPanel.Dock="Top" x:Name="TxtPreview" Text="Pré-visualização" Style="{StaticResource Title}"/>
+            <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
+                <ui:GeometryPreview x:Name="Preview"/>
+            </Border>
+        </DockPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="BtnOk" Content="Detalhar" Style="{StaticResource Primary}" Click="OkClick" IsDefault="True"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

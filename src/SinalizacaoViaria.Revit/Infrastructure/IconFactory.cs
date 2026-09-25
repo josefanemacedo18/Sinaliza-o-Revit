@@ -15,6 +15,7 @@ public static class IconFactory
     private static readonly Color Yellow = Color.FromRgb(255, 184, 28);
     private static readonly Color Blue = Color.FromRgb(31, 95, 168);
     private static readonly Color Red = Color.FromRgb(196, 30, 36);
+    private static readonly Color Muted = Color.FromRgb(120, 128, 138);
     private static readonly Color Magenta = Color.FromRgb(200, 0, 160);
 
     public static ImageSource Large(string key) => Render(key, 32);
@@ -201,6 +202,39 @@ public static class IconFactory
                     dc.DrawLine(P(Asphalt, 4), new Point(16 + 9 * Math.Cos(a), 16 + 9 * Math.Sin(a)), new Point(16 + 13 * Math.Cos(a), 16 + 13 * Math.Sin(a)));
                 }
                 dc.DrawEllipse(null, P(Asphalt, 4), new Point(16, 16), 8, 8);
+                break;
+            case "detalheplaca":
+                dc.DrawRectangle(B(White), P(Color.FromRgb(160, 166, 174), 1), new Rect(1, 1, 30, 30));
+                dc.DrawLine(P(Red, 1.5), new Point(7, 26), new Point(17, 16));
+                dc.DrawEllipse(B(Red), null, new Point(7, 26), 2.2, 2.2);
+                dc.DrawGeometry(B(Red), null, Close(Poly(new Point(17, 3), new Point(28.5, 8.5), new Point(28.5, 17), new Point(17, 22.5), new Point(12, 17), new Point(12, 8.5))));
+                Text(dc, "PARE", 4.5, White, new Point(20.3, 10), true);
+                break;
+            case "anotar":
+                dc.DrawRectangle(B(White), P(Color.FromRgb(160, 166, 174), 1), new Rect(1, 1, 30, 30));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(2, 18, 12, 12));
+                dc.DrawLine(P(White, 2), new Point(8, 18), new Point(8, 30));
+                dc.DrawLine(P(Red, 1.5), new Point(8, 24), new Point(16, 10));
+                dc.DrawLine(P(Red, 1.5), new Point(16, 10), new Point(30, 10));
+                dc.DrawEllipse(B(Red), null, new Point(8, 24), 2, 2);
+                dc.DrawRectangle(B(Asphalt), null, new Rect(17, 5, 12, 2));
+                dc.DrawRectangle(B(Muted), null, new Rect(17, 12.5, 9, 1.5));
+                break;
+            case "quadrolegenda":
+                dc.DrawRectangle(B(White), P(Asphalt, 1.5), new Rect(2, 3, 28, 26));
+                dc.DrawLine(P(Asphalt, 1), new Point(2, 9), new Point(30, 9));
+                dc.DrawLine(P(Asphalt, 1), new Point(12, 9), new Point(12, 29));
+                dc.DrawEllipse(B(Red), null, new Point(7, 14), 3, 3);
+                dc.DrawRectangle(B(Yellow), null, new Rect(4, 19.5, 6, 2));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(4, 24, 6, 3));
+                for (int i = 0; i < 3; i++) dc.DrawRectangle(B(Muted), null, new Rect(14, 13 + i * 5.5, 13 - i * 2, 1.6));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(7, 5, 18, 1.6));
+                break;
+            case "eixos":
+                dc.DrawGeometry(null, new Pen(B(Magenta), 2) { DashStyle = DashStyles.Dash }, Poly(new Point(3, 26), new Point(14, 12), new Point(29, 8)));
+                dc.DrawEllipse(B(White), P(Asphalt, 1.5), new Point(20, 22), 8, 5);
+                dc.DrawEllipse(B(Asphalt), null, new Point(20, 22), 2.5, 2.5);
+                dc.DrawLine(P(Red, 2), new Point(12, 28), new Point(28, 16));
                 break;
             case "catalogo":
                 dc.DrawRectangle(B(Blue), null, new Rect(5, 3, 22, 26));

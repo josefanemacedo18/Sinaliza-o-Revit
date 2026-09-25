@@ -31,12 +31,13 @@ que o plugin usa dentro do Revit.*
 | **Bloqueios Físicos** | Segregadores (tartarugas), tachões, balizadores flexíveis, cilindros delimitadores, pilaretes/frades, prismas de concreto, separador contínuo, barreira New Jersey (contínua ou modular "gelo baiano"), barreira plástica e defensa metálica – em 3D com altura real, contados por unidade ou metro. |
 | **Placas** (Sinalização Vertical) | Placas de regulamentação (R-1, R-2, R-19...), advertência (A-18, A-32b...), indicação, serviços, turísticas, educativas e de obras, em 3D com coluna simples ou dupla, altura livre de 2,10 m, orla, fundo e legenda editável (ex.: velocidade). Face voltada automaticamente para o tráfego. |
 | **Meio-fio e Sarjeta** | Meios-fios (0,15, 0,12, alto, rebaixado, com sarjeta conjugada), sarjetas, sarjetões (travessia de águas), calçadas, gramados e **faixas de caminhada azuis ou verdes**. |
-| **Rampas** | Rebaixamentos de calçada NBR 9050 (com ou sem abas, inclinação 8,33 %, abas 10 %, piso tátil de alerta) e guias rebaixadas de veículos – **recortam a calçada e o meio-fio automaticamente**. |
+| **Rampas** | Rebaixamentos de calçada NBR 9050 modelados como **sólidos inclinados reais** (rampa com a inclinação exata, abas triangulares a 10 %, piso tátil de alerta acompanhando a rampa, direcional opcional), **rebaixamento total** da calçada com rampas laterais e guias rebaixadas de veículos – **recortam a calçada e o meio-fio automaticamente**. Em 2D mostram a seta de subida e a inclinação. |
 | **Quebra-mola e Lombadas** | Ondulações transversais tipo A e B, faixa elevada para travessia (com zebrado no platô e triângulos nas rampas) e lombada invertida – volume 3D com a pintura acompanhando o perfil. |
 | **Área de Conflito** | Quadriculado amarelo em cruzamentos. |
 | **Elementos Urbanos** | Bancos, lixeiras, postes de iluminação, árvores com canteiro, abrigos de ônibus, paraciclos, hidrantes, floreiras, placas de rua e semáforos – por ponto ou distribuídos ao longo de um caminho. |
 | **Guard Rail** | Defensas metálicas simples, duplas e de cabos. |
 | **Complementos** | Tachas e tachões (contagem automática), piso tátil de alerta/direcional (NBR 16537), ciclofaixa (linha, pintura vermelha, MCC). |
+| **Detalhamento** | **Detalhar Placas**: na planta, cada placa aparece ampliada ao lado do suporte, com linha de chamada vermelha e código/nome (ex.: *R-1 Parada obrigatória*) – tamanhos em mm de papel, acompanhando a escala da vista e a edição da placa. **Anotar**: chamada com texto automático para qualquer sinalização (código, nome, largura, padrão, espaçamento…). **Quadro de Legenda**: amostra desenhada + descrição de cada tipo usado no projeto, atualizado automaticamente. **Mostrar/Ocultar Eixos** na vista ativa. |
 | **Editar / Atualizar / 2D-3D / Selecionar conjunto** | Toda marca guarda sua definição: editar reabre a janela com os valores e regenera; converter entre 3D e 2D; selecionar a marca ou o grupo (ex.: a via inteira). |
 | **Quantitativos** | Área pintada por código, cor e material, extensão, unidades, consumo estimado de tinta/termoplástico e microesferas, exportação **CSV** (Excel) e **tabela nativa** do Revit. |
 | **Configurações / Catálogo / Normas** | Preferências, catálogo normativo em JSON editável e referências normativas. |
@@ -57,6 +58,7 @@ que o plugin usa dentro do Revit.*
 |---|---|---|
 | **Modelo 3D** (padrão) | *DirectShape* na categoria **Modelos genéricos**, sólido fino com material por cor (preenchimento sólido visível em planta) | Plantas, cortes, 3D, renderização, tabelas, filtros de vista. Pode **acompanhar Toposolid/pisos/topografia** (projeção sobre o greide). |
 | **Detalhe 2D** | **Região preenchida** na vista ativa (tipos "SV - Branca", "SV - Amarela"...) | Pranchas de sinalização em vistas de planta ou de desenho. |
+| **Detalhamento** | Regiões preenchidas + **textos** (tipos "SV - Texto 2.0 mm"...) + **linhas de detalhe** (estilo "SV - Chamada") na vista | Símbolos de placas, anotações e quadro de legenda – sempre ligados à marca de origem. |
 
 Parâmetros compartilhados de instância (**SV_Codigo, SV_Descricao, SV_Grupo, SV_Cor, SV_Material,
 SV_Area, SV_Extensao, SV_Quantidade, SV_Referencia, SV_Id**) são criados automaticamente, permitindo

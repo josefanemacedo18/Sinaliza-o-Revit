@@ -16,6 +16,12 @@ public sealed class GeometryPreview : FrameworkElement
     private readonly List<Polygon2> _pavement = new();
     private string? _message;
 
+    /// <summary>Fundo branco (folha) – usado nas prévias de detalhamento.</summary>
+    public bool Paper { get; set; }
+
+    /// <summary>Escala da vista usada para dimensionar os textos de detalhamento na prévia.</summary>
+    public double ViewScale { get; set; } = 100;
+
     private static readonly Brush Asphalt = Freeze(new SolidColorBrush(Color.FromRgb(62, 66, 72)));
     private static readonly Brush Surround = Freeze(new SolidColorBrush(Color.FromRgb(214, 219, 206)));
     private static readonly Pen GuidePen = Freeze(new Pen(new SolidColorBrush(Color.FromArgb(200, 230, 90, 210)), 1) { DashStyle = DashStyles.Dash });
@@ -39,10 +45,14 @@ public sealed class GeometryPreview : FrameworkElement
         var w = ActualWidth;
         var h = ActualHeight;
         if (w < 10 || h < 10) return;
-        dc.DrawRectangle(_pavement.Count > 0 ? Surround : Asphalt, null, new Rect(0, 0, w, h));
+        dc.DrawRectangle(Paper ? Brushes.White : _pavement.Count > 0 ? Surround : Asphalt, null, new Rect(0, 0, w, h));
 
         var pts = new List<Vec2>();
         if (_geometry != null) foreach (var p in _geometry.Pieces) pts.AddRange(p.Shape.Outer);
+        if (_geometry != null)
+            foreach (var a in _geometry.Annotations)
+                if (a is AnnotationLine l) pts.AddRange(l.Points);
+                else if (a is AnnotationText t) pts.AddRange(TextBox(t));
         foreach (var g in _guides) pts.AddRange(g);
         foreach (var p in _pavement) pts.AddRange(p.Outer);
         if (pts.Count == 0)
@@ -75,7 +85,9 @@ public sealed class GeometryPreview : FrameworkElement
         {
             for (int i = 1; i < g.Count; i++) dc.DrawLine(GuidePen, P(g[i - 1]), P(g[i]));
         }
+        if (_geometry != null) DrawAnnotations(dc, s, P);
 
+        if (Paper) return;
         DrawScaleBar(dc, s, h);
         if (_message != null) DrawText(dc, _message, new Point(8, 6), Brushes.White, 11);
         if (_geometry != null)
@@ -83,6 +95,43 @@ public sealed class GeometryPreview : FrameworkElement
             var info = $"Área pintada: {UiHelpers.F(_geometry.TotalArea)} m²   Extensão: {UiHelpers.F(_geometry.PaintedLength)} m" +
                        (_geometry.UnitCount > 0 ? $"   Unidades: {_geometry.UnitCount}" : "");
             DrawText(dc, info, new Point(8, h - 20), Brushes.White, 11);
+        }
+    }
+
+    private double TextModelHeight(AnnotationText t) => t.PaperHeightMm * ViewScale / 1000.0;
+
+    /// <summary>Caixa aproximada do texto (m) para o enquadramento.</summary>
+    private IEnumerable<Vec2> TextBox(AnnotationText t)
+    {
+        var th = TextModelHeight(t);
+        var lines = t.Text.Split('\n');
+        var tw = lines.Max(l => l.Length) * th * 0.62;
+        var x0 = t.Align switch { TextAlign.Left => t.Position.X, TextAlign.Right => t.Position.X - tw, _ => t.Position.X - tw / 2 };
+        yield return new Vec2(x0, t.Position.Y);
+        yield return new Vec2(x0 + tw, t.Position.Y - lines.Length * th * 1.5);
+    }
+
+    private void DrawAnnotations(DrawingContext dc, double s, Func<Vec2, Point> map)
+    {
+        foreach (var a in _geometry!.Annotations)
+        {
+            if (a is AnnotationLine l)
+            {
+                var rgb = MarkingColors.Display(l.Color);
+                var pen = new Pen(new SolidColorBrush(Color.FromRgb(rgb.R, rgb.G, rgb.B)), 1);
+                pen.Freeze();
+                for (int i = 1; i < l.Points.Count; i++) dc.DrawLine(pen, map(l.Points[i - 1]), map(l.Points[i]));
+            }
+            else if (a is AnnotationText t)
+            {
+                var size = Math.Max(4, TextModelHeight(t) * s * 1.35);
+                var ft = new FormattedText(t.Text, UiHelpers.PtBr, FlowDirection.LeftToRight, new Typeface("Arial"), size,
+                    Paper ? Brushes.Black : Brushes.White, VisualTreeHelper.GetDpi(this).PixelsPerDip)
+                {
+                    TextAlignment = t.Align switch { TextAlign.Left => TextAlignment.Left, TextAlign.Right => TextAlignment.Right, _ => TextAlignment.Center },
+                };
+                dc.DrawText(ft, map(t.Position));
+            }
         }
     }
 

@@ -20,6 +20,7 @@ public enum GrupoMarca
     SinalizacaoVertical,
     Mobiliario,
     Moderacao,
+    Detalhamento,
 }
 
 /// <summary>Como o padrão tracejado é posicionado ao longo do caminho.</summary>

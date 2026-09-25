@@ -24,7 +24,7 @@
                 <TextBlock Style="{StaticResource Hint}" Text="1º clique: centro da rampa na FACE DO MEIO-FIO (divisa com a pista). 2º clique: um ponto para dentro da calçada (sentido da subida). Repete até ESC."/>
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <TextBlock Text="Tipo" Style="{StaticResource FieldLabel}"/>
                     <ComboBox Grid.Column="1" x:Name="CbType" SelectionChanged="TypeChanged"/>
                     <TextBlock Grid.Row="1" Text="Largura (m)" Style="{StaticResource FieldLabel}"/>
@@ -35,16 +35,22 @@
                     <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbSlope" TextChanged="AnyChanged"/>
                     <TextBlock Grid.Row="4" Text="Inclinação das abas (%)" Style="{StaticResource FieldLabel}"/>
                     <TextBox Grid.Row="4" Grid.Column="1" x:Name="TbFlare" Text="10" TextChanged="AnyChanged"/>
+                    <TextBlock Grid.Row="5" Text="Profundidade da calçada rebaixada (m)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="5" Grid.Column="1" x:Name="TbDepth" Text="1,80" TextChanged="AnyChanged"/>
                 </Grid>
+                <TextBlock Style="{StaticResource Hint}" Text="Rebaixamento total: toda a largura da calçada é rebaixada ao nível da faixa de travessia, com rampas laterais (uso quando a calçada é estreita). A profundidade só vale para este tipo."/>
                 <GroupBox Header="Piso tátil de alerta (NBR 16537)">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <CheckBox Grid.ColumnSpan="2" x:Name="CkTactile" Content="Incluir piso tátil de alerta junto à pista" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
                         <TextBlock Grid.Row="1" Text="Largura (m)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbTactile" Text="0,40" TextChanged="AnyChanged"/>
                         <TextBlock Grid.Row="2" Text="Cor" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CbTactileColor" SelectionChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="3" Text="Afastamento do meio-fio (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbSetback" Text="0" TextChanged="AnyChanged"/>
+                        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkDirectional" Content="Piso tátil direcional no eixo da rampa" Checked="AnyChanged" Unchecked="AnyChanged"/>
                     </Grid>
                 </GroupBox>
                 <CheckBox x:Name="CkCut" Content="Recortar calçada, meio-fio e grama existentes sob a rampa" IsChecked="True"/>

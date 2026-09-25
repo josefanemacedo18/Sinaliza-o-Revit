@@ -42,10 +42,14 @@ public static class PluginContext
         catch (Exception ex) { Log.Error("SaveSettings", ex); }
     }
 
-    public static BuildContext BuildContext(bool drape) => new()
+    public static BuildContext BuildContext(bool drape, double viewScale = 100,
+        Func<string, MarkingDefinition?>? lookup = null, Func<IReadOnlyList<MarkingDefinition>>? all = null) => new()
     {
         Catalog = Catalog,
         Glyphs = Glyphs,
         MaxPieceLength = drape ? Math.Max(0.5, Settings.DrapePieceLength) : 0,
+        ViewScale = viewScale > 0 ? viewScale : 100,
+        Lookup = lookup,
+        AllDefinitions = all,
     };
 }

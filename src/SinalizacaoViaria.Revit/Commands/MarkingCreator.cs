@@ -19,7 +19,8 @@ public static class MarkingCreator
         using var t = new Transaction(doc, transactionName);
         t.Start();
         var service = new MarkingService(doc, uidoc.ActiveView);
-        foreach (var d in defs)
+        var ordered = MarkingService.DependencyOrder(defs);
+        foreach (var d in ordered)
         {
             try
             {
@@ -32,6 +33,16 @@ public static class MarkingCreator
                 failed.Warnings.Add($"{d.DisplayCode}: falha ao gerar – {ex.Message}");
                 results.Add(failed);
             }
+        }
+        // Detalhes de placas e anotações acompanham as marcas editadas; legendas acompanham tipos novos.
+        try
+        {
+            var targets = ordered.Where(d => d is not IAnnotationDefinition).Select(d => d.Id).ToList();
+            if (targets.Count > 0) results.AddRange(service.RenderDependents(targets, includeLegends: true).Where(r => r.Warnings.Count > 0));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("RenderDependents", ex);
         }
         t.Commit();
         var ids = results.SelectMany(r => r.Elements).Where(id => doc.GetElement(id) != null).ToList();

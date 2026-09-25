@@ -21,8 +21,15 @@ public sealed class MarkingUpdater : IUpdater
         UpdaterRegistry.RegisterUpdater(updater, true);
         UpdaterRegistry.AddTrigger(updater.GetUpdaterId(), new ElementClassFilter(typeof(CurveElement)), Element.GetChangeTypeGeometry());
         // Cópias de elementos de sinalização (copiar/colar) tornam-se marcas independentes.
-        var markingClasses = new LogicalOrFilter(new ElementClassFilter(typeof(DirectShape)), new ElementClassFilter(typeof(FilledRegion)));
+        var markingClasses = new LogicalOrFilter(new List<ElementFilter>
+        {
+            new ElementClassFilter(typeof(DirectShape)), new ElementClassFilter(typeof(FilledRegion)),
+            new ElementClassFilter(typeof(TextNote)), new ElementClassFilter(typeof(CurveElement)),
+        });
         UpdaterRegistry.AddTrigger(updater.GetUpdaterId(), markingClasses, Element.GetChangeTypeElementAddition());
+        // Placa/marca apagada: remove os detalhes e anotações que apontavam para ela.
+        UpdaterRegistry.AddTrigger(updater.GetUpdaterId(), new ElementClassFilter(typeof(DirectShape)), Element.GetChangeTypeElementDeletion());
+        UpdaterRegistry.AddTrigger(updater.GetUpdaterId(), new ElementClassFilter(typeof(FilledRegion)), Element.GetChangeTypeElementDeletion());
     }
 
     public static void Unregister(AddInId addInId)
@@ -42,6 +49,15 @@ public sealed class MarkingUpdater : IUpdater
         catch (Exception ex)
         {
             Log.Error("CopyHandler", ex);
+        }
+
+        try
+        {
+            if (data.GetDeletedElementIds().Count > 0 && !MarkingService.IsRendering) RemoveOrphanDetails(doc);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("RemoveOrphanDetails", ex);
         }
 
         if (!PluginContext.Settings.AutoUpdate) return;
@@ -64,11 +80,22 @@ public sealed class MarkingUpdater : IUpdater
                 try { service.Render(def); }
                 catch (Exception ex) { Log.Error($"Updater {def.DisplayCode}", ex); }
             }
+            service.RenderDependents(affected.Select(d => d.Id), includeLegends: false);
         }
         catch (Exception ex)
         {
             Log.Error("MarkingUpdater", ex);
         }
+    }
+
+    private static void RemoveOrphanDetails(Document doc)
+    {
+        var all = MarkingStorage.All(doc);
+        var ids = all.Where(r => r.Definition is not Core.Definitions.IAnnotationDefinition).Select(r => r.MarkingId).ToHashSet();
+        var orphans = all.Where(r => r.Definition is Core.Definitions.IAnnotationDefinition { TargetId: { } t } && !ids.Contains(t))
+            .Select(r => r.Element.Id).ToList();
+        foreach (var id in orphans)
+            try { doc.Delete(id); } catch { /* já removido */ }
     }
 
     public UpdaterId GetUpdaterId() => _id;

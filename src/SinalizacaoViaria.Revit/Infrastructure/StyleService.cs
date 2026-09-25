@@ -13,6 +13,8 @@ public sealed class StyleService
     private readonly Dictionary<MarkingColor, ElementId> _materials = new();
     private readonly Dictionary<MarkingColor, ElementId> _regionTypes = new();
     private ElementId? _solidFill;
+    private readonly Dictionary<MarkingColor, GraphicsStyle> _leaderStyles = new();
+    private readonly Dictionary<double, ElementId> _textTypes = new();
 
     public StyleService(Document doc) => _doc = doc;
 
@@ -126,5 +128,53 @@ public sealed class StyleService
         {
             return null;
         }
+    }
+
+    /// <summary>Subcategoria de linhas existente (ou null).</summary>
+    public Category? LineSubcategory(string name)
+    {
+        var lines = Category.GetCategory(_doc, BuiltInCategory.OST_Lines);
+        foreach (Category c in lines.SubCategories)
+            if (c.Name == name) return c;
+        return null;
+    }
+
+    /// <summary>Estilo de linha das chamadas/quadros do detalhamento ("SV - Chamada Vermelha" etc.).</summary>
+    public GraphicsStyle LeaderLineStyle(MarkingColor color)
+    {
+        if (_leaderStyles.TryGetValue(color, out var gs)) return gs;
+        var name = color == MarkingColor.Vermelha ? $"{Prefix}Chamada" : $"{Prefix}Detalhamento {ColorName(color)}";
+        var sub = LineSubcategory(name);
+        if (sub == null)
+        {
+            var lines = Category.GetCategory(_doc, BuiltInCategory.OST_Lines);
+            sub = _doc.Settings.Categories.NewSubcategory(lines, name);
+            sub.LineColor = RevitColor(color);
+            sub.SetLineWeight(color == MarkingColor.Vermelha ? 1 : 2, GraphicsStyleType.Projection);
+        }
+        gs = sub.GetGraphicsStyle(GraphicsStyleType.Projection);
+        _leaderStyles[color] = gs;
+        return gs;
+    }
+
+    /// <summary>Tipo de texto "SV - Texto 2.5 mm" (altura em mm de papel, fonte Arial, fundo transparente).</summary>
+    public ElementId TextType(double paperMm)
+    {
+        paperMm = Math.Round(Math.Max(0.5, paperMm), 1);
+        if (_textTypes.TryGetValue(paperMm, out var id)) return id;
+        var name = $"{Prefix}Texto {paperMm.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)} mm";
+        var types = new FilteredElementCollector(_doc).OfClass(typeof(TextNoteType)).Cast<TextNoteType>().ToList();
+        var tt = types.FirstOrDefault(t => t.Name == name);
+        if (tt == null)
+        {
+            var baseType = types.FirstOrDefault() ?? throw new InvalidOperationException("O projeto não possui nenhum tipo de texto para duplicar.");
+            tt = (TextNoteType)baseType.Duplicate(name);
+            tt.get_Parameter(BuiltInParameter.TEXT_SIZE)?.Set(paperMm / 304.8);
+            try { tt.get_Parameter(BuiltInParameter.TEXT_FONT)?.Set("Arial"); } catch { /* opcional */ }
+            try { tt.get_Parameter(BuiltInParameter.TEXT_BACKGROUND)?.Set(1); } catch { /* 1 = transparente */ }
+            try { tt.get_Parameter(BuiltInParameter.LEADER_ARROWHEAD)?.Set(ElementId.InvalidElementId); } catch { /* opcional */ }
+        }
+        _textTypes[paperMm] = tt.Id;
+        return tt.Id;
     }
 }
