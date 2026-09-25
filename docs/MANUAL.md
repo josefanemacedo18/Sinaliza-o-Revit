@@ -370,15 +370,62 @@ automaticamente. A interseção:
 
 * torna o pavimento contínuo no miolo e arredonda as **esquinas** com o **raio** informado (na face do
   meio-fio), com **meio-fio curvo**;
-* refaz as **calçadas** junto à esquina e as **pontas dos canteiros centrais** (com meio-fio);
+* refaz as **calçadas** junto à esquina e as **pontas dos canteiros centrais** (nariz com meio-fio,
+  terminando 1 m antes da pista transversal; a travessia corta o canteiro formando **refúgio** no nível da
+  pista);
 * interrompe a sinalização horizontal das vias no cruzamento e na aproximação (até depois da linha de
-  retenção) e remove as **vagas a 5 m da esquina**;
-* cria em cada ramo **faixa de pedestres**, **linha de retenção** (meia pista na mão dupla; pista inteira
-  na mão única, só no ramo de chegada) e **rebaixamentos de calçada** nas duas pontas da travessia.
+  retenção) e remove as **vagas a 5 m da esquina**; os demais trechos das vias ficam intactos, qualquer
+  que seja o ângulo;
+* cria em cada ramo **faixa de pedestres** e **rebaixamentos de calçada** nas duas pontas da travessia.
 
-Tudo é regenerado quando um eixo é movido, ao editar a interseção (**Editar** → raio, largura e recuo da
-faixa, retenções, rampas) e com **Atualizar Todas**. Travessias e rampas da interseção são recriadas nessas
-ocasiões (ajustes manuais nelas são perdidos).
+Funciona para **qualquer geometria**: cruzamentos ortogonais ou oblíquos, entroncamentos em **T** e em
+**Y**, vias curvas e nós com vários ramos. Em ângulos agudos as esquinas continuam arredondadas.
+
+### 19.1 Via principal e controle
+
+A **via principal** (preferencial) é escolhida automaticamente – a que atravessa o nó (dois ramos), depois
+a mais larga e a mais longa – e pode ser trocada em **Editar**. O **controle** define a sinalização das
+aproximações:
+
+| Controle | Via secundária | Via principal |
+|---|---|---|
+| **PARE** (padrão) | LRE, legenda **PARE** e placa **R-1** | só travessia |
+| **Dê a preferência** | LDP, símbolo **SDP** e placa **R-2** | só travessia |
+| **Semáforo** | LRE | LRE |
+| **Sem controle** | só travessia | só travessia |
+
+Na mão dupla a retenção ocupa a meia pista de chegada (até o eixo, o canteiro ou a ilha); na mão única, a
+pista inteira, só no ramo por onde o tráfego chega.
+
+### 19.2 Tipos de interseção (MBST / DNIT)
+
+Os tipos podem ser combinados na mesma interseção:
+
+* **Tipo I – sem refúgio**: só as esquinas com raio (padrão).
+* **Tipo II – ilha separadora (gota) na via secundária**: ilha **física** (meio-fio, núcleo em concreto
+  ou grama) ou **pintada** (zebrado amarelo ZPA-A), com cabeça arredondada junto à via principal. A pista
+  é **alargada** em volta da ilha (com teiper de volta à largura normal) e as linhas da via são refeitas
+  deslocadas; a travessia passa por um refúgio no nível da pista; LFO-1 ao lado da ilha e zebrado à
+  frente da cauda. Não é aplicada em ramos quase paralelos a outro (< 25°).
+* **Tipo III – faixa de conversão livre à direita**: a esquina recebe curva de **raio maior** (a tangente
+  não passa do raio pedido, então esquinas agudas ficam com raio proporcional) e uma **ilha triangular**
+  física ou pintada (ZPA branco) separa a conversão do cruzamento. A calçada acompanha a curva. Escolha
+  **todas as esquinas**, **só as agudas** (< 75°) ou **só as obtusas** (> 105°). Com todas as esquinas
+  de um cruzamento ortogonal obtém-se a interseção "com ilhas".
+* **Tipo IV – bolsão de conversão à esquerda na via principal**: com **canteiro central ≥ 3 m** o bolsão
+  é recortado do canteiro (armazenamento + teiper; LMS-1/LMS-2 junto às faixas de passagem, LFO-1 do lado
+  do fluxo oposto); **sem canteiro**, a pista é alargada dos dois lados e o bolsão fica entre linhas LFO-1 e
+  LMS-1, com **zebrado amarelo** no teiper, como no desenho do Tipo IV. Seta **PEM-E** no bolsão.
+
+A janela mostra uma **pré-visualização** ao vivo: na criação, um exemplo (cruzamento, T, oblíquo 60° ou
+Y 45°, com via local, coletora ou avenida); na edição, as vias reais da interseção.
+
+### 19.3 Atualização
+
+Tudo é regenerado quando um eixo é movido, ao editar a interseção (**Editar**) e com **Atualizar Todas**.
+Travessias, retenções, placas, zebrados e linhas deslocadas da interseção são recriados nessas ocasiões
+(ajustes manuais neles são perdidos). A ferramenta **Interseção** com *Todos os cruzamentos* aplica os
+tipos e o controle escolhidos a todas as interseções do projeto.
 
 ## 20. Rotatórias
 

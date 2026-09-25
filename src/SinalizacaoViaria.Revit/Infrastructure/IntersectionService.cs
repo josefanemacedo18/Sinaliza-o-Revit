@@ -78,15 +78,28 @@ public sealed class IntersectionService
                 it.Z = roads[ids[0]].Def.Path?.Z ?? 0;
                 it.Output = roads[ids[0]].Def.Output.Clone();
             }
-            else if (near != null)
+            else
             {
-                // Ajustes pedidos na janela valem para a interseção existente.
+                // Ajustes pedidos na janela valem também para as interseções existentes.
                 it.CornerRadius = template.CornerRadius;
                 it.Crosswalks = template.Crosswalks;
                 it.CrosswalkWidth = template.CrosswalkWidth;
                 it.CrosswalkSetback = template.CrosswalkSetback;
                 it.StopLines = template.StopLines;
                 it.Ramps = template.Ramps;
+                it.Control = template.Control;
+                it.Signs = template.Signs;
+                it.SplitterIslands = template.SplitterIslands;
+                it.SplitterLength = template.SplitterLength;
+                it.SplitterWidth = template.SplitterWidth;
+                it.RightTurnIslands = template.RightTurnIslands;
+                it.RightTurnCorners = template.RightTurnCorners;
+                it.RightTurnRadius = template.RightTurnRadius;
+                it.RightTurnLaneWidth = template.RightTurnLaneWidth;
+                it.LeftTurnPockets = template.LeftTurnPockets;
+                it.PocketLength = template.PocketLength;
+                it.PocketTaper = template.PocketTaper;
+                it.PocketWidth = template.PocketWidth;
             }
             foreach (var i in ids) if (!it.RoadIds.Contains(roads[i].Def.Id)) it.RoadIds.Add(roads[i].Def.Id);
             results.AddRange(Refresh(it));
@@ -159,9 +172,11 @@ public sealed class IntersectionService
         results.Add(_service.Render(it));
 
         // 2. Travessias e rampas (recriadas).
+        var oldIds = it.ChildIds.ToHashSet();
         foreach (var old in it.ChildIds) _service.Delete(old);
         var z = it.Z;
-        var children = layout.Pavement.Count > 0 ? IntersectionGenerator.Children(it, layout, it.Output, z) : new List<MarkingDefinition>();
+        var members = roads.Select(r => (IReadOnlyCollection<MarkingDefinition>)all.Where(d => d.GroupId != null && d.GroupId == r.Def.GroupId).ToList()).ToList();
+        var children = layout.Pavement.Count > 0 ? IntersectionGenerator.Children(it, layout, it.Output, z, members) : new List<MarkingDefinition>();
         foreach (var c in children) results.Add(_service.Render(c));
         it.ChildIds = children.Select(c => c.Id).ToList();
         results.Add(_service.Render(it));   // grava a lista de filhos
@@ -176,7 +191,7 @@ public sealed class IntersectionService
             if (gid == null) continue;
             foreach (var m in all.Where(d => d.GroupId == gid))
             {
-                m.Exclusions.RemoveAll(e => e.SourceId == it.Id || (e.SourceId != null && e.SourceId.StartsWith(it.Id + ":")));
+                m.Exclusions.RemoveAll(e => e.SourceId == it.Id || (e.SourceId != null && (e.SourceId.StartsWith(it.Id + ":") || oldIds.Contains(e.SourceId))));
                 foreach (var cut in IntersectionGenerator.CutsFor(m, k, layout))
                     m.Exclusions.Add(new ExclusionZone { SourceId = it.Id, Points = cut.Outer.ToList() });
                 if (IntersectionGenerator.IsPhysical(m))

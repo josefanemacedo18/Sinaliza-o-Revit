@@ -923,6 +923,32 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public double CrosswalkSetback { get; set; } = 1.0;
     public bool StopLines { get; set; } = true;
     public bool Ramps { get; set; } = true;
+
+    /// <summary>Via preferencial (pavimento). Nulo = automática (a que atravessa o nó, mais larga e mais longa).</summary>
+    public string? MainRoadId { get; set; }
+    /// <summary>Controle do direito de passagem: define retenções, legendas e placas das aproximações.</summary>
+    public ControleIntersecao Control { get; set; } = ControleIntersecao.Pare;
+    /// <summary>Placas R-1/R-2 e legenda "PARE"/símbolo "Dê a preferência" nas aproximações secundárias.</summary>
+    public bool Signs { get; set; } = true;
+
+    /// <summary>Tipo II – ilha separadora (gota) nas aproximações das vias secundárias, com alargamento da pista.</summary>
+    public TipoIlha SplitterIslands { get; set; } = TipoIlha.Nenhuma;
+    public double SplitterLength { get; set; } = 15.0;
+    public double SplitterWidth { get; set; } = 2.0;
+
+    /// <summary>Tipo III – faixa de conversão livre à direita com ilha triangular (canalização das esquinas).</summary>
+    public TipoIlha RightTurnIslands { get; set; } = TipoIlha.Nenhuma;
+    public EsquinasCanalizadas RightTurnCorners { get; set; } = EsquinasCanalizadas.Todas;
+    /// <summary>Raio da face externa da faixa de conversão (m).</summary>
+    public double RightTurnRadius { get; set; } = 25.0;
+    public double RightTurnLaneWidth { get; set; } = 5.0;
+
+    /// <summary>Tipo IV – bolsão de conversão à esquerda na via principal (no canteiro central ou com alargamento).</summary>
+    public bool LeftTurnPockets { get; set; }
+    public double PocketLength { get; set; } = 30.0;
+    public double PocketTaper { get; set; } = 20.0;
+    public double PocketWidth { get; set; } = 3.0;
+
     /// <summary>Ids das marcas criadas pela interseção (faixas, retenções, rampas) – regeneradas com ela.</summary>
     public List<string> ChildIds { get; set; } = new();
 
@@ -930,6 +956,39 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public override void Translate(Vec2 delta, double dz) { Node += delta; Z += dz; }
     public override string KindName => "Interseção";
     public override string DisplayCode => "INTERSECAO";
+}
+
+/// <summary>Controle do direito de passagem na interseção.</summary>
+public enum ControleIntersecao
+{
+    /// <summary>Parada obrigatória (R-1) nas aproximações das vias secundárias.</summary>
+    Pare,
+    /// <summary>Dê a preferência (R-2) nas aproximações das vias secundárias.</summary>
+    DePreferencia,
+    /// <summary>Semafórica: linha de retenção em todas as aproximações.</summary>
+    Semaforo,
+    /// <summary>Sem sinalização de controle (apenas travessias).</summary>
+    Nenhum,
+}
+
+/// <summary>Ilhas de canalização.</summary>
+public enum TipoIlha
+{
+    Nenhuma,
+    /// <summary>Ilha elevada com meio-fio.</summary>
+    Fisica,
+    /// <summary>Ilha pintada (zebrado com linha de canalização).</summary>
+    Pintada,
+}
+
+/// <summary>Esquinas que recebem faixa de conversão livre (canalização).</summary>
+public enum EsquinasCanalizadas
+{
+    Todas,
+    /// <summary>Esquinas com ângulo agudo (&lt; 75°) – conversões fechadas, comuns em entroncamentos oblíquos.</summary>
+    Agudas,
+    /// <summary>Esquinas com ângulo obtuso (&gt; 105°).</summary>
+    Obtusas,
 }
 
 /// <summary>Um ramo da rotatória (direção a partir do centro).</summary>

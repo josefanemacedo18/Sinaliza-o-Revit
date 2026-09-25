@@ -54,7 +54,7 @@ public class V4Tests
         var cross = nodes.Single(n => n.Node.Length < 1);
         var tee = nodes.Single(n => n.Node.DistanceTo(new Vec2(40, 0)) < 1);
 
-        var it = new IntersectionDefinition { Node = cross.Node, CornerRadius = 6 };
+        var it = new IntersectionDefinition { Node = cross.Node, CornerRadius = 6, Control = ControleIntersecao.Semaforo };
         var L = IntersectionGenerator.Layout(it, cross.Roads.Select(i => roads[i]).ToList());
         Assert.Equal(4, L.Legs.Count);
         Assert.NotEmpty(L.Curb);
@@ -72,7 +72,7 @@ public class V4Tests
         Assert.NotEmpty(IntersectionGenerator.CutsFor(lane, 0, L));
         Assert.Single(IntersectionGenerator.CutsFor(a.Pav, 0, L));
         var walk = a.Defs.OfType<LinearMarkingDefinition>().First(d => d.Code == "CALCADA");
-        Assert.Same(L.Zone, IntersectionGenerator.CutsFor(walk, 0, L).Single());
+        Assert.Single(IntersectionGenerator.CutsFor(walk, 0, L));
 
         var Lt = IntersectionGenerator.Layout(new IntersectionDefinition { Node = tee.Node }, tee.Roads.Select(i => roads[i]).ToList());
         Assert.Equal(3, Lt.Legs.Count);

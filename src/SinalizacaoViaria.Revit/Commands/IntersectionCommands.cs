@@ -1,6 +1,7 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Revit.Infrastructure;
@@ -10,18 +11,138 @@ namespace SinalizacaoViaria.Revit.Commands;
 
 internal static class IntersectionForms
 {
-    public static FormWindow Intersection(IntersectionDefinition d, bool edit) =>
-        new FormWindow(edit ? "Editar interseção" : "Interseção", "Interseção de vias",
-                "Ajusta o cruzamento/entroncamento das vias do \"Sinalizar via\": pavimento contínuo no miolo, esquinas com raio na face do " +
-                "meio-fio, calçadas e pontas de canteiro reconstruídas, sinalização das vias interrompida antes da travessia e vagas " +
-                "removidas a 5 m da esquina. Travessias, linhas de retenção e rebaixamentos são criados em cada ramo.",
-                d, null, false, edit ? "Aplicar" : "Criar", 620, 600)
-            .Number("Raio das esquinas (m)", () => d.CornerRadius, v => d.CornerRadius = v, 0, 40, tooltip: "Na face do meio-fio. Vias locais 5–6 m; coletoras/arteriais 8–12 m; veículos pesados até 15 m.")
-            .Check("Faixas de pedestres em cada ramo", () => d.Crosswalks, v => d.Crosswalks = v)
-            .Number("Largura da faixa de pedestres (m)", () => d.CrosswalkWidth, v => d.CrosswalkWidth = v, 3, 10)
-            .Number("Recuo da faixa em relação à esquina (m)", () => d.CrosswalkSetback, v => d.CrosswalkSetback = v, 0, 20)
-            .Check("Linhas de retenção (LRE)", () => d.StopLines, v => d.StopLines = v)
-            .Check("Rebaixamentos de calçada nas travessias (NBR 9050)", () => d.Ramps, v => d.Ramps = v);
+    /// <summary>Via disponível para ser a preferencial (edição).</summary>
+    public sealed record RoadOption(string Id, string Label);
+
+    /// <summary>Cena real para a pré-visualização da edição (vias da interseção, já resolvidas).</summary>
+    public sealed record RealScene(List<IntersectionRoad> Roads, List<List<MarkingDefinition>> Groups, Dictionary<string, Core.Geometry.Polyline2> Paths);
+
+    public static FormWindow Intersection(IntersectionDefinition d, bool edit, IReadOnlyList<RoadOption>? roads = null, RealScene? real = null)
+    {
+        var example = 0;
+        var exampleRoad = 1;
+        var ctx = new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs };
+        FormPreview? Preview()
+        {
+            var c = (IntersectionDefinition)MarkingDefinition.FromJson(d.ToJson())!;
+            IntersectionDemo.Scene scene;
+            string info;
+            if (real != null)
+            {
+                // Cópias das marcas das vias (os recortes da prévia não alteram o projeto).
+                var groups = real.Groups.Select(g => g.Select(m =>
+                {
+                    var k = MarkingDefinition.FromJson(m.ToJson())!;
+                    k.Exclusions.RemoveAll(e => e.SourceId != null && (e.SourceId == c.Id || c.ChildIds.Contains(e.SourceId)));
+                    return k;
+                }).ToList()).ToList();
+                var byId = groups.SelectMany(g => g).ToDictionary(m => m.Id);
+                var roadsCopy = real.Roads.Select(r => r with { Def = byId.GetValueOrDefault(r.Def.Id) as RoadPavementDefinition ?? r.Def }).ToList();
+                scene = IntersectionDemo.Create(c, roadsCopy, groups, real.Paths);
+                info = "Pré-visualização com as vias do projeto.";
+            }
+            else
+            {
+                var (ang, tee) = example switch { 1 => (90.0, true), 2 => (60.0, false), 3 => (45.0, true), _ => (90.0, false) };
+                var main = exampleRoad switch { 0 => 0, 2 => 2, _ => 1 };
+                scene = IntersectionDemo.Create(c, PluginContext.Catalog, main, 0, ang, tee);
+                info = "Exemplo ilustrativo – a interseção se adapta às vias reais do projeto.";
+            }
+            var geo = IntersectionDemo.Build(scene, ctx, signs: false);
+            var R = Math.Max(45, scene.Layout.Radius + 20);
+            if (scene.Layout.Features.Count > 0) R = Math.Max(R, scene.Layout.Features.Max(f => f.TEnd) + 5);
+            var node = scene.Layout.Node;
+            geo.Pieces.RemoveAll(p => p.Shape.Centroid.DistanceTo(node) > R);
+            return new FormPreview(geo, null, null, info, ViewScale: 250);
+        }
+
+        var w = new FormWindow(edit ? "Editar interseção" : "Interseção", "Interseção de vias",
+                "Ajusta cruzamentos e entroncamentos (T, Y, oblíquos, com qualquer número de ramos) das vias do \"Sinalizar via\": " +
+                "pavimento contínuo, esquinas com raio na face do meio-fio, calçadas e canteiros refeitos, sinalização interrompida e vagas " +
+                "removidas a 5 m da esquina. Combine os tipos: I – sem refúgio; II – ilha gota na secundária; III – faixa de conversão " +
+                "livre à direita com ilhas; IV – bolsão de conversão à esquerda na principal.",
+                d, Preview, false, edit ? "Aplicar" : "Criar", 1120, 760)
+            .Number("Raio das esquinas (m)", () => d.CornerRadius, v => d.CornerRadius = v, 0, 40, tooltip: "Na face do meio-fio. Vias locais 5–6 m; coletoras/arteriais 8–12 m; veículos pesados até 15 m.");
+
+        w.Section("Controle e sinalização");
+        w.Choice("Controle", new[]
+            {
+                ("PARE na via secundária (R-1 + legenda + retenção)", ControleIntersecao.Pare),
+                ("Dê a preferência na via secundária (R-2 + LDP)", ControleIntersecao.DePreferencia),
+                ("Semáforo (retenção em todas as aproximações)", ControleIntersecao.Semaforo),
+                ("Sem controle (somente travessias)", ControleIntersecao.Nenhum),
+            }, () => d.Control, v => d.Control = v, tooltip: "A via principal (preferencial) não recebe retenção com PARE / Dê a preferência.");
+        if (roads is { Count: > 1 })
+            w.Choice("Via principal", new[] { ("Automática (a que atravessa o nó, mais larga)", (string?)null) }
+                    .Concat(roads.Select(r => (r.Label, (string?)r.Id))), () => d.MainRoadId, v => d.MainRoadId = v);
+        w.Check("Placas R-1/R-2 e legenda PARE / símbolo de dê a preferência", () => d.Signs, v => d.Signs = v)
+         .Check("Linhas de retenção / dê a preferência", () => d.StopLines, v => d.StopLines = v)
+         .Check("Faixas de pedestres em cada ramo", () => d.Crosswalks, v => d.Crosswalks = v)
+         .Number("Largura da faixa de pedestres (m)", () => d.CrosswalkWidth, v => d.CrosswalkWidth = v, 3, 10)
+         .Number("Recuo da faixa em relação à esquina (m)", () => d.CrosswalkSetback, v => d.CrosswalkSetback = v, 0, 20)
+         .Check("Rebaixamentos de calçada nas travessias (NBR 9050)", () => d.Ramps, v => d.Ramps = v);
+
+        var ilhas = new[] { ("Nenhuma", TipoIlha.Nenhuma), ("Física (meio-fio)", TipoIlha.Fisica), ("Pintada (zebrado)", TipoIlha.Pintada) };
+        w.Section("Tipo II – ilha separadora (gota) na via secundária", "A pista é alargada em volta da ilha; a travessia passa por um refúgio no nível da pista.")
+         .Choice("Ilha gota", ilhas, () => d.SplitterIslands, v => d.SplitterIslands = v)
+         .Number("Comprimento da ilha (m)", () => d.SplitterLength, v => d.SplitterLength = v, 6, 60)
+         .Number("Largura da ilha (m)", () => d.SplitterWidth, v => d.SplitterWidth = v, 1, 8, tooltip: "Refúgio de pedestres: mínimo 1,20 m (NBR 9050); recomendado 2,00 m.");
+        w.Section("Tipo III – faixa de conversão livre à direita (ilhas nas esquinas)", "Curva de raio maior com ilha triangular separando a conversão do cruzamento.")
+         .Choice("Ilhas de canalização", ilhas, () => d.RightTurnIslands, v => d.RightTurnIslands = v)
+         .Choice("Esquinas", new[] { ("Todas", EsquinasCanalizadas.Todas), ("Só ângulos agudos (< 75°)", EsquinasCanalizadas.Agudas), ("Só ângulos obtusos (> 105°)", EsquinasCanalizadas.Obtusas) },
+             () => d.RightTurnCorners, v => d.RightTurnCorners = v)
+         .Number("Raio da faixa de conversão (m)", () => d.RightTurnRadius, v => d.RightTurnRadius = v, 8, 80)
+         .Number("Largura da faixa de conversão (m)", () => d.RightTurnLaneWidth, v => d.RightTurnLaneWidth = v, 3.5, 8);
+        w.Section("Tipo IV – bolsão de conversão à esquerda na via principal", "Recortado do canteiro central (≥ 3 m) ou, sem canteiro, com alargamento da pista e zebrado amarelo.")
+         .Check("Bolsão de conversão à esquerda", () => d.LeftTurnPockets, v => d.LeftTurnPockets = v)
+         .Number("Comprimento de armazenamento (m)", () => d.PocketLength, v => d.PocketLength = v, 5, 120)
+         .Number("Comprimento do teiper (m)", () => d.PocketTaper, v => d.PocketTaper = v, 5, 80)
+         .Number("Largura do bolsão (m)", () => d.PocketWidth, v => d.PocketWidth = v, 2.5, 5);
+        if (real == null)
+            w.Section("Pré-visualização")
+             .Choice("Exemplo", new[] { ("Cruzamento ortogonal", 0), ("Entroncamento em T", 1), ("Cruzamento oblíquo (60°)", 2), ("Entroncamento em Y (45°)", 3) },
+                 () => example, v => example = v)
+             .Choice("Via principal do exemplo", new[] { ("Via local", 0), ("Via coletora (2 + 2 faixas)", 1), ("Avenida com canteiro central", 2) },
+                 () => exampleRoad, v => exampleRoad = v);
+        return w;
+    }
+
+    /// <summary>Vias da interseção (para escolher a principal) e cena real da pré-visualização.</summary>
+    public static (List<RoadOption>, RealScene?) ForEdit(UIDocument uidoc, IntersectionDefinition it)
+    {
+        var doc = uidoc.Document;
+        try
+        {
+            var svc = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
+            var roads = svc.Roads().Where(r => it.RoadIds.Contains(r.Def.Id)).ToList();
+            var all = MarkingStorage.Definitions(doc);
+            var options = roads.Select((r, k) =>
+            {
+                var w = r.Def.RightWidth + r.Def.LeftWidth;
+                var med = r.Def.Gaps.Any(g => g.Median) ? ", canteiro central" : "";
+                var dir = r.Def.TwoWay ? "" : ", mão única";
+                return new RoadOption(r.Def.Id, $"Via {k + 1} – pista {UiHelpers.F(w, "0.00")} m{med}{dir}");
+            }).ToList();
+            var groups = new List<List<MarkingDefinition>>();
+            var paths = new Dictionary<string, Core.Geometry.Polyline2>();
+            foreach (var r in roads)
+            {
+                var g = all.Where(m => m.GroupId != null && m.GroupId == r.Def.GroupId && m is not RoadPavementDefinition).ToList();
+                g.Add(r.Def);
+                var key = RoadSectionInference.PathKey(r.Def.Path);
+                foreach (var m in g)
+                    if (m.Path != null && RoadSectionInference.PathKey(m.Path) == key) paths[m.Id] = r.Axis;
+                    else if (m.Path != null && PathResolver.Resolve(doc, m.Path)?.Main is { } p) paths[m.Id] = p;
+                groups.Add(g);
+            }
+            return (options, roads.Count >= 2 ? new RealScene(roads, groups, paths) : null);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Pré-visualização da interseção", ex);
+            return (new List<RoadOption>(), null);
+        }
+    }
 }
 
 internal static class IntersectionRunner

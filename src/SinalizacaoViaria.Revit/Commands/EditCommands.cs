@@ -65,7 +65,8 @@ public sealed class CmdEditar : CommandBase
         }
         if (stored.Definition is IntersectionDefinition inter)
         {
-            if (UiHelpers.ShowModal(IntersectionForms.Intersection(inter, true)) != true) return Result.Cancelled;
+            var (options, real) = IntersectionForms.ForEdit(uidoc, inter);
+            if (UiHelpers.ShowModal(IntersectionForms.Intersection(inter, true, options, real)) != true) return Result.Cancelled;
             Report("Interseção", IntersectionRunner.Run(uidoc, "SV - Editar interseção", s => s.Refresh(inter)).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;
         }
