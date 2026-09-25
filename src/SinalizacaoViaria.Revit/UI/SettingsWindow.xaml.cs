@@ -27,6 +27,7 @@ public partial class SettingsWindow : Window
         CkDrape.IsChecked = s.DrapeByDefault;
         TbPiece.Text = UiHelpers.F(s.DrapePieceLength, "0.##");
         CkAuto.IsChecked = s.AutoUpdate;
+        CkAutoIntersect.IsChecked = s.AutoIntersect;
         CkBoundary.IsChecked = s.VisibleBoundary2D;
         TbCatalog.Text = PluginContext.UserCatalogPath;
         UpdateStatus();
@@ -88,6 +89,7 @@ public partial class SettingsWindow : Window
             s.DrapeByDefault = CkDrape.IsChecked == true;
             s.DrapePieceLength = UiHelpers.Parse(TbPiece, 2, "Comprimento das peças", 0.5, 50);
             s.AutoUpdate = CkAuto.IsChecked == true;
+            s.AutoIntersect = CkAutoIntersect.IsChecked == true;
             s.VisibleBoundary2D = CkBoundary.IsChecked == true;
             s.UserCatalogPath = string.Equals(TbCatalog.Text, PluginPaths.DefaultUserCatalog, StringComparison.OrdinalIgnoreCase) ? null : TbCatalog.Text;
             PluginContext.SaveSettings();

@@ -81,7 +81,18 @@ public sealed class MarkingUpdater : IUpdater
                 catch (Exception ex) { Log.Error($"Updater {def.DisplayCode}", ex); }
             }
             var inter = new IntersectionService(doc, service);
-            foreach (var it in inter.DependentOn(affected))
+            var processed = new HashSet<string>();
+            if (PluginContext.Settings.AutoIntersect)
+            {
+                // Eixo movido/editado: cruzamentos novos viram interseções automaticamente.
+                try
+                {
+                    var template = UI.UiHelpers.Remembered<Core.Definitions.IntersectionDefinition>("Intersecao") ?? new Core.Definitions.IntersectionDefinition();
+                    inter.AutoIntersectGroups(affected.Select(d => d.GroupId ?? ""), template, out processed);
+                }
+                catch (Exception ex) { Log.Error("Updater – interseções automáticas", ex); }
+            }
+            foreach (var it in inter.DependentOn(affected).Where(i => !processed.Contains(i.Id)))
             {
                 try { inter.Refresh(it); }
                 catch (Exception ex) { Log.Error("Updater interseção", ex); }

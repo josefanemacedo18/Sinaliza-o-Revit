@@ -40,43 +40,42 @@ internal static class IntersectionRunner
     }
 }
 
-/// <summary>Cria ou atualiza a interseção mais próxima do ponto clicado.</summary>
+/// <summary>Cria ou atualiza as interseções: todas as do projeto ou a do cruzamento clicado.</summary>
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdIntersecao : CommandBase
 {
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
         var doc = uidoc.Document;
-        var pick = Picking.PickPoint(uidoc, "Clique próximo ao cruzamento/entroncamento das vias (criadas com \"Sinalizar via\")");
-        if (pick == null) return Result.Cancelled;
-        var p = DetailHelpers.ToCore(pick);
-        var svc = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
-        var roads = svc.Roads();
-        if (roads.Count < 2)
-            throw new UserMessageException("São necessárias duas vias com pavimento criadas pelo \"Sinalizar via\" (a seção fica registrada no pavimento).");
-        var nodes = IntersectionGenerator.FindNodes(roads);
-        if (nodes.Count == 0) throw new UserMessageException("Os eixos das vias não se cruzam nem se encontram (entroncamento).");
-        var (node, ids) = nodes.OrderBy(n => n.Node.DistanceTo(p)).First();
-        if (node.DistanceTo(p) > 60) throw new UserMessageException("Nenhum cruzamento de vias perto do ponto clicado.");
-
-        var existing = MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>()
-            .FirstOrDefault(e => e.Node.DistanceTo(node) < IntersectionGenerator.NodeMergeDistance * 2);
-        var d = existing ?? UiHelpers.Remembered<IntersectionDefinition>("Intersecao") ?? new IntersectionDefinition();
-        if (existing == null)
-        {
-            d = (IntersectionDefinition)d.CloneWithNewId();
-            d.ChildIds.Clear();
-            d.RoadIds.Clear();
-            d.Node = node;
-            d.Z = roads[ids[0]].Def.Path?.Z ?? 0;
-            d.Output = roads[ids[0]].Def.Output.Clone();
-        }
-        foreach (var i in ids) if (!d.RoadIds.Contains(roads[i].Def.Id)) d.RoadIds.Add(roads[i].Def.Id);
-        if (UiHelpers.ShowModal(IntersectionForms.Intersection(d, existing != null)) != true) return Result.Cancelled;
+        var d = UiHelpers.Remembered<IntersectionDefinition>("Intersecao") ?? new IntersectionDefinition();
+        var all = true;
+        var w = IntersectionForms.Intersection(d, false);
+        w.Section("Aplicar em")
+         .Choice("Cruzamentos", new[] { ("Todos os cruzamentos e entroncamentos do projeto", true), ("Somente o cruzamento que eu clicar", false) },
+             () => all, v => all = v);
+        if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
         UiHelpers.Remember("Intersecao", d);
         PluginContext.SaveSettings();
-        var results = IntersectionRunner.Run(uidoc, "SV - Interseção", s => s.Refresh(d));
-        Report("Interseção", results.Where(r => r.Warnings.Count > 0).ToList());
+
+        Core.Geometry.Vec2? near = null;
+        if (!all)
+        {
+            var pick = Picking.PickPoint(uidoc, "Clique próximo ao cruzamento/entroncamento das vias");
+            if (pick == null) return Result.Cancelled;
+            near = DetailHelpers.ToCore(pick);
+        }
+        var results = IntersectionRunner.Run(uidoc, "SV - Interseções", s => s.IntersectAll(d, near));
+        if (results.Count == 0)
+        {
+            TaskDialog.Show(AppTitle, near == null
+                ? "Nenhum cruzamento encontrado. Os eixos das vias do \"Sinalizar via\" precisam se cruzar, ou uma via deve terminar junto à outra (entroncamento em T)."
+                : "Nenhum cruzamento de vias perto do ponto clicado (até 60 m).");
+            return Result.Cancelled;
+        }
+        var count = MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().Count();
+        var warnings = results.Where(r => r.Warnings.Count > 0).ToList();
+        if (warnings.Count > 0) Report("Interseções", warnings);
+        else TaskDialog.Show(AppTitle, $"Interseções ajustadas. O projeto tem {count} interseção(ões).");
         return Result.Succeeded;
     }
 }

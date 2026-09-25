@@ -1,4 +1,5 @@
 using Autodesk.Revit.DB;
+using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
@@ -20,43 +21,112 @@ public sealed class IntersectionService
         _service = service;
     }
 
-    /// <summary>Vias com pavimento (seção registrada) e seus eixos.</summary>
-    public List<IntersectionRoad> Roads()
+    /// <summary>
+    /// Vias do projeto e seus eixos. Vias sem pavimento registrado (criadas em versões anteriores ou com pavimento
+    /// "Nenhum") têm a seção reconstruída a partir das suas marcas; com <paramref name="createMissing"/> o pavimento
+    /// é criado e gravado (exige transação aberta).
+    /// </summary>
+    public List<IntersectionRoad> Roads(bool createMissing = false)
     {
         var res = new List<IntersectionRoad>();
-        foreach (var d in MarkingStorage.Definitions(_doc).OfType<RoadPavementDefinition>())
+        var all = MarkingStorage.Definitions(_doc);
+        var pavs = all.OfType<RoadPavementDefinition>().ToList();
+        var withPavement = pavs.Select(p => p.GroupId).Where(g => g != null).ToHashSet();
+        foreach (var g in all.Where(d => d.GroupId != null && !withPavement.Contains(d.GroupId)).GroupBy(d => d.GroupId!))
+        {
+            var inferred = RoadSectionInference.Infer(g.ToList(), PluginContext.Catalog);
+            if (inferred == null) continue;
+            if (createMissing)
+            {
+                try { _service.Render(inferred); }
+                catch (Exception ex) { Log.Error("Pavimento de via existente", ex); continue; }
+            }
+            pavs.Add(inferred);
+        }
+        foreach (var d in pavs)
         {
             var axis = PathResolver.Resolve(_doc, d.Path)?.Main;
             if (axis != null && axis.Points.Count >= 2) res.Add(new IntersectionRoad(d, axis));
         }
+        if (createMissing) _service.Invalidate();
         return res;
     }
 
-    /// <summary>Cria (ou atualiza) as interseções que envolvem a via indicada.</summary>
-    public List<RenderResult> AutoIntersect(RoadPavementDefinition road, IntersectionDefinition template)
+    /// <summary>Cria/atualiza todas as interseções do projeto (ou só a mais próxima de <paramref name="near"/>).</summary>
+    public List<RenderResult> IntersectAll(IntersectionDefinition template, Vec2? near = null, double maxDistance = 60)
     {
         var results = new List<RenderResult>();
-        var roads = Roads();
-        var idx = roads.FindIndex(r => r.Def.Id == road.Id);
-        if (idx < 0) return results;
+        var roads = Roads(createMissing: true);
+        var nodes = IntersectionGenerator.FindNodes(roads);
+        if (near is { } p)
+        {
+            var best = nodes.Where(n => n.Node.DistanceTo(p) <= maxDistance).OrderBy(n => n.Node.DistanceTo(p)).Take(1).ToList();
+            nodes = best;
+        }
         var existing = MarkingStorage.Definitions(_doc).OfType<IntersectionDefinition>().ToList();
         var roundabouts = MarkingStorage.Definitions(_doc).OfType<RoundaboutDefinition>().ToList();
-        foreach (var (node, ids) in IntersectionGenerator.FindNodes(roads).Where(n => n.Roads.Contains(idx)))
+        foreach (var (node, ids) in nodes)
         {
-            if (roundabouts.Any(r => r.Center.DistanceTo(node) < r.OuterRadius + 5)) continue;   // o nó já é uma rotatória
-            var roadIds = ids.Select(i => roads[i].Def.Id).ToList();
+            if (roundabouts.Any(r => r.Center.DistanceTo(node) < r.OuterRadius + 5)) continue;
             var it = existing.FirstOrDefault(e => e.Node.DistanceTo(node) < IntersectionGenerator.NodeMergeDistance * 2);
             if (it == null)
             {
                 it = (IntersectionDefinition)template.CloneWithNewId();
-                it.Node = node;
-                it.Z = roads[idx].Def.Path?.Z ?? 0;
                 it.ChildIds.Clear();
+                it.RoadIds.Clear();
+                it.Node = node;
+                it.Z = roads[ids[0]].Def.Path?.Z ?? 0;
+                it.Output = roads[ids[0]].Def.Output.Clone();
             }
-            foreach (var id in roadIds) if (!it.RoadIds.Contains(id)) it.RoadIds.Add(id);
-            it.Output.Mode = road.Output.Mode;
-            it.Output.ViewId = road.Output.ViewId;
+            else if (near != null)
+            {
+                // Ajustes pedidos na janela valem para a interseção existente.
+                it.CornerRadius = template.CornerRadius;
+                it.Crosswalks = template.Crosswalks;
+                it.CrosswalkWidth = template.CrosswalkWidth;
+                it.CrosswalkSetback = template.CrosswalkSetback;
+                it.StopLines = template.StopLines;
+                it.Ramps = template.Ramps;
+            }
+            foreach (var i in ids) if (!it.RoadIds.Contains(roads[i].Def.Id)) it.RoadIds.Add(roads[i].Def.Id);
             results.AddRange(Refresh(it));
+        }
+        return results;
+    }
+
+    /// <summary>Cria (ou atualiza) as interseções que envolvem a via indicada.</summary>
+    public List<RenderResult> AutoIntersect(RoadPavementDefinition road, IntersectionDefinition template) =>
+        AutoIntersectGroups(new[] { road.GroupId ?? "" }, template, out _);
+
+    /// <summary>Cria/atualiza as interseções das vias (grupos) indicadas com as demais vias do projeto.</summary>
+    public List<RenderResult> AutoIntersectGroups(IEnumerable<string> groupIds, IntersectionDefinition template, out HashSet<string> processed)
+    {
+        processed = new HashSet<string>();
+        var results = new List<RenderResult>();
+        var set = groupIds.Where(g => !string.IsNullOrEmpty(g)).ToHashSet();
+        if (set.Count == 0) return results;
+        var roads = Roads(createMissing: true);
+        var idx = roads.Select((r, i) => (r, i)).Where(x => x.r.Def.GroupId != null && set.Contains(x.r.Def.GroupId)).Select(x => x.i).ToHashSet();
+        if (idx.Count == 0) return results;
+        var existing = MarkingStorage.Definitions(_doc).OfType<IntersectionDefinition>().ToList();
+        var roundabouts = MarkingStorage.Definitions(_doc).OfType<RoundaboutDefinition>().ToList();
+        foreach (var (node, ids) in IntersectionGenerator.FindNodes(roads).Where(n => n.Roads.Any(idx.Contains)))
+        {
+            if (roundabouts.Any(r => r.Center.DistanceTo(node) < r.OuterRadius + 5)) continue;   // o nó já é uma rotatória
+            var it = existing.FirstOrDefault(e => e.Node.DistanceTo(node) < IntersectionGenerator.NodeMergeDistance * 4);
+            if (it == null)
+            {
+                it = (IntersectionDefinition)template.CloneWithNewId();
+                it.Node = node;
+                it.Z = roads[ids[0]].Def.Path?.Z ?? 0;
+                it.ChildIds.Clear();
+                it.RoadIds.Clear();
+                it.Output = roads[ids[0]].Def.Output.Clone();
+            }
+            else it.Node = node;
+            foreach (var i in ids) if (!it.RoadIds.Contains(roads[i].Def.Id)) it.RoadIds.Add(roads[i].Def.Id);
+            results.AddRange(Refresh(it));
+            processed.Add(it.Id);
         }
         return results;
     }
@@ -74,6 +144,15 @@ public sealed class IntersectionService
             if (axis != null && axis.Points.Count >= 2) roads.Add(new IntersectionRoad(pv, axis));
         }
         it.RoadIds = roads.Select(r => r.Def.Id).ToList();
+
+        // As vias ainda se cruzam aqui? (eixos movidos): acompanha o nó ou remove a interseção.
+        var node = roads.Count >= 2 ? IntersectionGenerator.FindNodes(roads).OrderBy(n => n.Node.DistanceTo(it.Node)).FirstOrDefault() : default;
+        if (roads.Count < 2 || node.Roads == null || node.Node.DistanceTo(it.Node) > 15)
+        {
+            Remove(it);
+            return results;
+        }
+        it.Node = node.Node;
         var layout = IntersectionGenerator.Layout(it, roads);
 
         // 1. A interseção (precisa existir antes dos recortes, que apontam para ela).
@@ -126,6 +205,7 @@ public sealed class IntersectionService
         var all = MarkingStorage.Definitions(_doc);
         var roadIds = rb.Legs.Select(l => l.RoadId).Where(i => i != null).ToHashSet();
         var groups = all.OfType<RoadPavementDefinition>().Where(p => roadIds.Contains(p.Id)).Select(p => p.GroupId).Where(g => g != null).ToHashSet();
+        foreach (var g in rb.Legs.Select(l => l.GroupId)) if (g != null) groups.Add(g);
         foreach (var m in all.Where(d => d.GroupId != null && groups.Contains(d.GroupId) || d.Exclusions.Any(e => e.SourceId == rb.Id)))
         {
             if (m.Id == rb.Id || children.Any(c => c.Id == m.Id)) continue;
@@ -143,7 +223,22 @@ public sealed class IntersectionService
         var groups = changed.Select(d => d.GroupId).Where(g => g != null).ToHashSet();
         var all = MarkingStorage.Definitions(_doc);
         var roadIds = all.OfType<RoadPavementDefinition>().Where(p => groups.Contains(p.GroupId)).Select(p => p.Id).ToHashSet();
-        return all.OfType<RoundaboutDefinition>().Where(r => r.Legs.Any(l => l.RoadId != null && roadIds.Contains(l.RoadId))).ToList();
+        return all.OfType<RoundaboutDefinition>().Where(r => r.Legs.Any(l => l.RoadId != null && roadIds.Contains(l.RoadId)
+            || l.GroupId != null && groups.Contains(l.GroupId))).ToList();
+    }
+
+    /// <summary>Apaga a interseção, suas travessias/rampas e os recortes que ela fazia nas vias.</summary>
+    public void Remove(IntersectionDefinition it)
+    {
+        foreach (var c in it.ChildIds) _service.Delete(c);
+        _service.Delete(it.Id);
+        _service.Invalidate();
+        foreach (var m in MarkingStorage.Definitions(_doc).Where(d => d.Exclusions.Any(e => e.SourceId == it.Id)))
+        {
+            m.Exclusions.RemoveAll(e => e.SourceId == it.Id);
+            try { _service.Render(m); }
+            catch (Exception ex) { Log.Error("Remover interseção", ex); }
+        }
     }
 
     /// <summary>Interseções que dependem das marcas (grupos de via) indicadas.</summary>

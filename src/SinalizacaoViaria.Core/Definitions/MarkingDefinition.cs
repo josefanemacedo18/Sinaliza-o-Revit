@@ -942,6 +942,8 @@ public sealed class RoundaboutLeg
     public double Sidewalk { get; set; } = 2.5;
     /// <summary>Pavimento da via ligada a este ramo (opcional).</summary>
     public string? RoadId { get; set; }
+    /// <summary>Grupo (Sinalizar via) da via ligada – recebe o recorte da rotatória.</summary>
+    public string? GroupId { get; set; }
 }
 
 /// <summary>Rotatória com ilha central, pista giratória, faixa galgável e ramos com ilhas separadoras.</summary>

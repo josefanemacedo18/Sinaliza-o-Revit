@@ -350,9 +350,23 @@ calçadas), usada pelas interseções e rotatórias – por isso "Nenhum" desati
 
 ## 19. Interseções
 
-Ao criar uma via que **cruza** outra (ou que **termina** junto a outra – entroncamento em T), o
-plugin ajusta o cruzamento automaticamente (opção *Ajustar às vias existentes*); também é possível usar
-**Via → Interseção** clicando perto do cruzamento. A interseção:
+As interseções são criadas **automaticamente, direto nas linhas (eixos)**: ao criar uma via que **cruza**
+outra (ou que **termina** junto a outra – entroncamento em T) e também ao **desenhar, mover ou editar um
+eixo** já sinalizado, o plugin cria ou ajusta o cruzamento. Quando as vias deixam de se cruzar, a
+interseção é removida e a sinalização volta a ser contínua. O comportamento pode ser desligado em
+**Configurações → Criar/atualizar interseções automaticamente**.
+
+A ferramenta **Via → Interseção** abre os parâmetros (raio, faixa, retenção, rampas) e a opção
+*Aplicar em*:
+
+* **Todos os cruzamentos e entroncamentos do projeto** – resolve de uma vez todas as vias que se
+  sobrepõem (recomendado ao abrir projetos antigos);
+* **Somente o cruzamento que eu clicar** – aplica os parâmetros apenas ao cruzamento mais próximo do
+  ponto clicado.
+
+Vias criadas por versões anteriores (ou com pavimento *Nenhum*) funcionam também: a seção transversal
+é reconstruída a partir dos meios-fios, calçadas e linhas do grupo, e o pavimento é criado
+automaticamente. A interseção:
 
 * torna o pavimento contínuo no miolo e arredonda as **esquinas** com o **raio** informado (na face do
   meio-fio), com **meio-fio curvo**;

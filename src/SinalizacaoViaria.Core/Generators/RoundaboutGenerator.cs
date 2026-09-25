@@ -251,6 +251,7 @@ public static class RoundaboutGenerator
                     Width = r.Def.RightWidth + r.Def.LeftWidth,
                     Sidewalk = Math.Max(r.Def.RightSidewalk, r.Def.LeftSidewalk),
                     RoadId = r.Def.Id,
+                    GroupId = r.Def.GroupId,
                 });
             }
         }

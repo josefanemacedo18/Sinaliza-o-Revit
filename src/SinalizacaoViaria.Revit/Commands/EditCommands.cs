@@ -58,7 +58,7 @@ public sealed class CmdEditar : CommandBase
         if (stored == null) return Result.Cancelled;
         if (stored.Definition is RoundaboutDefinition rb)
         {
-            var hasRoads = rb.Legs.Any(l => l.RoadId != null);
+            var hasRoads = rb.Legs.Any(l => l.RoadId != null || l.GroupId != null);
             if (UiHelpers.ShowModal(RoundaboutForms.Roundabout(rb, true, hasRoads)) != true) return Result.Cancelled;
             Report("Rotatória", IntersectionRunner.Run(uidoc, "SV - Editar rotatória", s => s.Refresh(rb)).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;

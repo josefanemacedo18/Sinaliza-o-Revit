@@ -22,6 +22,9 @@ public sealed class PluginSettings
     /// <summary>Atualiza automaticamente as marcas quando as linhas de referência mudam.</summary>
     public bool AutoUpdate { get; set; } = true;
 
+    /// <summary>Cria/atualiza interseções automaticamente quando vias passam a se cruzar (criação ou edição de eixos).</summary>
+    public bool AutoIntersect { get; set; } = true;
+
     public double DefaultSpeed { get; set; } = 60;
     public string FontFamily { get; set; } = "Arial";
     public bool FontBold { get; set; } = true;
