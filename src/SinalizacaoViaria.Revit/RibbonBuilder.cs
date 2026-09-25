@@ -18,6 +18,12 @@ public static class RibbonBuilder
         var via = app.CreateRibbonPanel(TabName, "Via");
         Large(via, typeof(CmdSinalizarVia), "Sinalizar\nVia", "via",
             "Monta a seção transversal completa a partir do eixo: faixas de rolamento, exclusivas e preferenciais, ciclofaixas, estacionamento, acostamentos, faixas de segurança, canteiros centrais e laterais, calçadas e dispositivos de segregação – com toda a sinalização.");
+        Large(via, typeof(CmdNovaVia), "Nova\nVia", "novavia",
+            "Desenha uma via nova por pontos (com curvas concordadas) que se conecta às vias existentes: clique sobre uma via para criar um entroncamento/cruzamento, perto da ponta para continuá-la ou numa rotatória para um novo ramo. O sistema viário se ajusta sozinho (interseção ou rotatória) e as pontas livres podem receber cul-de-sac.");
+        Large(via, typeof(CmdConexao), "Conexão", "conexao",
+            "Troca o tratamento de uma conexão: num encontro de vias, interseção, rotatória ou nenhum; numa ponta livre, cul-de-sac ou nenhum.");
+        Large(via, typeof(CmdHierarquia), "Hierarquia\nViária", "hierarquia",
+            "Define a hierarquia viária (CTB art. 60) de vias existentes – usada nos quantitativos e na via preferencial das interseções.");
         Large(via, typeof(CmdIntersecao), "Interseção", "intersecao",
             "Ajusta o cruzamento/entroncamento de vias: pavimento contínuo, esquinas com raio, calçadas e canteiros refeitos, sinalização interrompida, faixas de pedestres, retenções e rampas. Também é feito automaticamente ao criar uma via que cruza outra.");
         Large(via, typeof(CmdRotatoria), "Rotatória", "rotatoria",

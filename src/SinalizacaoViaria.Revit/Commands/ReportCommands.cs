@@ -81,6 +81,7 @@ public sealed class CmdQuantitativos : CommandBase
         }
 
         var categoria = Add(SharedParameters.Categoria);
+        var hierarquia = Add(SharedParameters.Hierarquia);
         var grupo = Add(SharedParameters.Grupo);
         var codigo = Add(SharedParameters.Codigo);
         Add(SharedParameters.Descricao);
@@ -100,6 +101,7 @@ public sealed class CmdQuantitativos : CommandBase
                 def.AddSortGroupField(new ScheduleSortGroupField(categoria.FieldId) { ShowHeader = true, ShowFooter = true, ShowBlankLine = true });
                 if (category != null) categoria.IsHidden = true;
             }
+            if (hierarquia != null) def.AddSortGroupField(new ScheduleSortGroupField(hierarquia.FieldId));
             if (grupo != null) def.AddSortGroupField(new ScheduleSortGroupField(grupo.FieldId));
             def.AddSortGroupField(new ScheduleSortGroupField(codigo.FieldId));
             if (cor != null) def.AddSortGroupField(new ScheduleSortGroupField(cor.FieldId));

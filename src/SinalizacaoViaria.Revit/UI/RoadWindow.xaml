@@ -31,6 +31,13 @@
                     </DockPanel>
                 </GroupBox>
 
+                <GroupBox Header="Hierarquia viária (CTB art. 60) – obrigatória">
+                    <StackPanel>
+                        <ComboBox x:Name="CbHierarchy" SelectionChanged="HierarchyChanged"/>
+                        <TextBlock Style="{StaticResource Hint}" Text="Gravada em todos os elementos da via (parâmetro SV_Hierarquia) e usada nos quantitativos, na escolha da via preferencial das interseções e na velocidade padrão (CTB art. 61)."/>
+                    </StackPanel>
+                </GroupBox>
+
                 <StackPanel Orientation="Horizontal">
                     <RadioButton x:Name="RbTwoWay" Content="Mão dupla" IsChecked="True" Checked="AnyChanged"/>
                     <RadioButton x:Name="RbOneWay" Content="Mão única (todas as faixas no sentido do eixo)" Checked="AnyChanged"/>
@@ -167,26 +174,43 @@
                     </Grid>
                 </GroupBox>
 
-                <GroupBox Header="Pavimento e interseções">
+                <GroupBox Header="Pavimento">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Text="Pavimento da pista" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Column="1" x:Name="CbPavement" SelectionChanged="AnyChanged"/>
                         <TextBlock Grid.Row="1" Text="Espessura (m, vazio = padrão)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbPavThickness" TextChanged="AnyChanged" ToolTip="Padrão: asfalto 0,05 m; bloquete 0,08 m; concreto 0,15 m (indicativo – confira o dimensionamento)."/>
-                        <CheckBox Grid.Row="2" Grid.ColumnSpan="2" x:Name="CkAutoIntersect" Content="Ajustar às vias existentes que se cruzam (interseções)" IsChecked="True"/>
-                        <TextBlock Grid.Row="3" Text="Raio das esquinas (m)" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbCornerRadius" Text="6,00"/>
-                        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkIntCrosswalks" Content="Faixas de pedestres e linhas de retenção nas interseções" IsChecked="True"/>
-                        <CheckBox Grid.Row="5" Grid.ColumnSpan="2" x:Name="CkIntRamps" Content="Rebaixamentos de calçada nas travessias (NBR 9050)" IsChecked="True"/>
+                    </Grid>
+                </GroupBox>
+
+                <GroupBox Header="Conexão com as vias existentes">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Onde encontrar outra via" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Column="1" x:Name="CbConnection" ToolTip="Interseção: usa os tipos e o controle escolhidos na ferramenta Interseção. Rotatória: usa os parâmetros da ferramenta Rotatória."/>
+                        <TextBlock Grid.Row="1" Text="Pontas livres da via" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbFreeEnds" ToolTip="Cul-de-sac: usa o tipo e as medidas da ferramenta Cul-de-sac, ajustados à largura da via."/>
+                        <TextBlock Grid.Row="2" Text="Raio das esquinas (m, vazio = pela hierarquia)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbCornerRadius" Text="" ToolTip="Vazio: 6 m (local), 8 m (coletora), 10 m (arterial), 15 m (rodovias/trânsito rápido)."/>
+                        <CheckBox Grid.Row="3" Grid.ColumnSpan="2" x:Name="CkIntCrosswalks" Content="Faixas de pedestres e linhas de retenção nas interseções" IsChecked="True"/>
+                        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkIntRamps" Content="Rebaixamentos de calçada nas travessias (NBR 9050)" IsChecked="True"/>
                     </Grid>
                 </GroupBox>
 
                 <GroupBox Header="Caminho (eixo)">
                     <StackPanel>
-                        <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas existentes" IsChecked="True"/>
-                        <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar o eixo por pontos"/>
+                        <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar a via por pontos (conecta-se às vias existentes)" IsChecked="True"/>
+                        <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas existentes"/>
+                        <CheckBox x:Name="CkSnap" Content="Encaixar nas pontas e nos eixos das vias existentes" IsChecked="True" Margin="18,3,0,3"
+                                  ToolTip="Clique sobre uma via para ligar a nova via ao eixo dela (entroncamento/cruzamento) ou perto da ponta para continuá-la."/>
+                        <Grid Margin="18,0,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Raio das curvas horizontais (m, 0 = cantos vivos)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" x:Name="TbCurveRadius" Text="30" ToolTip="Concorda os vértices clicados com arcos (reduzido onde não couber)."/>
+                        </Grid>
                     </StackPanel>
                 </GroupBox>
                 <ui:OutputPanel x:Name="Output"/>

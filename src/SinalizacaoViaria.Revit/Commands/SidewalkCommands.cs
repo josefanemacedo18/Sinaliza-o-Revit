@@ -1,5 +1,6 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.UI;
+using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
@@ -325,6 +326,30 @@ public sealed class CmdCanteiro : CommandBase
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdCulDeSac : CommandBase
 {
-    protected override Result Run(UIApplication app, UIDocument uidoc) =>
-        SidewalkCommandRunner.Run(uidoc, SidewalkCommandRunner.Last<CulDeSacDefinition>(), d => SidewalkForms.CulDeSac((CulDeSacDefinition)d, false));
+    protected override Result Run(UIApplication app, UIDocument uidoc)
+    {
+        // Na ponta de uma via: o balão se liga a ela (acompanha o eixo e recorta a via). Senão, posicionamento livre.
+        var doc = uidoc.Document;
+        var pick = Picking.PickPoint(uidoc, "Clique perto da PONTA da via que receberá o balão (ESC: posicionar livremente por dois cliques)");
+        if (pick != null)
+        {
+            var svc = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
+            var target = ConnectionPicker.Nearest(doc, svc, UnitConv.ToVec2(pick));
+            if (target is { Kind: "ponta", Road: not null })
+            {
+                var d = target.CulDeSac != null
+                    ? (CulDeSacDefinition)MarkingDefinition.FromJson(target.CulDeSac.ToJson())!
+                    : SidewalkCommandRunner.Last<CulDeSacDefinition>();
+                RoadConnection.FitCulDeSac(d, target.Road, 0);
+                var form = SidewalkForms.CulDeSac(d, true);
+                if (form == null || UiHelpers.ShowModal(form) != true) return Result.Cancelled;
+                UiHelpers.Remember(nameof(CulDeSacDefinition), d);
+                PluginContext.SaveSettings();
+                Report("Cul-de-sac", IntersectionRunner.Run(uidoc, "SV - Cul-de-sac", s => s.AddCulDeSac(target.Road, target.AtEnd, d)).Where(r => r.Warnings.Count > 0).ToList());
+                return Result.Succeeded;
+            }
+            TaskDialog.Show(AppTitle, "Nenhuma ponta livre de via perto do ponto clicado – posicione o balão por dois cliques.");
+        }
+        return SidewalkCommandRunner.Run(uidoc, SidewalkCommandRunner.Last<CulDeSacDefinition>(), d => SidewalkForms.CulDeSac((CulDeSacDefinition)d, false));
+    }
 }

@@ -92,6 +92,7 @@ public static class RoadSectionInference
                    || group.OfType<DeviceMarkingDefinition>().Any(dv => Math.Abs(dv.Offset) < 0.01);
         var first = lin[0];
         d.GroupId = first.GroupId;
+        d.Hierarchy = group.Select(m => m.Hierarchy).FirstOrDefault(h => h != null);
         d.Output = first.Output.Clone();
         d.SetPath(new PathReference
         {

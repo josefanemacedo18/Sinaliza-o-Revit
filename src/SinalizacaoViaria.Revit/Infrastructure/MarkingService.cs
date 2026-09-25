@@ -576,6 +576,7 @@ public sealed class MarkingService
             SharedParameters.Set(e, SharedParameters.Descricao, info.Name);
             SharedParameters.Set(e, SharedParameters.Grupo, QuantityRow.GroupLabel(info.Group));
             SharedParameters.Set(e, SharedParameters.Categoria, def is IAnnotationDefinition ? "Detalhamento" : QuantityRow.CategoryLabel(QuantityRow.Categorize(def, info.Group)));
+            SharedParameters.Set(e, SharedParameters.Hierarquia, def is IAnnotationDefinition ? "" : Core.Definitions.Hierarquia.Label(def.Hierarchy));
             SharedParameters.Set(e, SharedParameters.Cor, StyleService.ColorName(color));
             SharedParameters.Set(e, SharedParameters.Material, material);
             SharedParameters.Set(e, SharedParameters.Area, UnitConv.Ft2(areaM2));

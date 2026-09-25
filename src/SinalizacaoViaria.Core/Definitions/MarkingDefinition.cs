@@ -115,6 +115,9 @@ public abstract class MarkingDefinition
 
     public OutputSettings Output { get; set; } = new();
 
+    /// <summary>Hierarquia viária (CTB art. 60) da via a que a marca pertence – entra nos quantitativos.</summary>
+    public HierarquiaViaria? Hierarchy { get; set; }
+
     /// <summary>Observações do projetista.</summary>
     public string? Notes { get; set; }
 
@@ -662,6 +665,10 @@ public sealed class CulDeSacDefinition : MarkingDefinition
     public bool Pavement { get; set; } = true;
     public double PavementThickness { get; set; } = 0.05;
     public bool EdgeLine { get; set; } = true;
+    /// <summary>Pavimento da via a cuja ponta o balão está ligado (segue o eixo e recorta a via). Nulo = avulso.</summary>
+    public string? RoadId { get; set; }
+    /// <summary>Ligado ao fim (true) ou ao início (false) do eixo da via.</summary>
+    public bool AtRoadEnd { get; set; } = true;
 
     public override string KindName => "Cul-de-sac";
     public override string DisplayCode => Type switch

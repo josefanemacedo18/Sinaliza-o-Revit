@@ -70,6 +70,13 @@ public sealed class CmdEditar : CommandBase
             Report("Interseção", IntersectionRunner.Run(uidoc, "SV - Editar interseção", s => s.Refresh(inter)).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;
         }
+        if (stored.Definition is CulDeSacDefinition { RoadId: not null } linked)
+        {
+            var form0 = SidewalkForms.CulDeSac(linked, true);
+            if (form0 == null || UiHelpers.ShowModal(form0) != true) return Result.Cancelled;
+            Report("Cul-de-sac", IntersectionRunner.Run(uidoc, "SV - Editar cul-de-sac", s => s.Refresh(linked)).Where(r => r.Warnings.Count > 0).ToList());
+            return Result.Succeeded;
+        }
         if ((SidewalkForms.ForEdit(stored.Definition) ?? DetailForms.ForEdit(uidoc, stored.Definition)) is { } form)
         {
             if (UiHelpers.ShowModal(form.Window) != true) return Result.Cancelled;
@@ -155,6 +162,11 @@ public sealed class CmdAtualizarTodas : CommandBase
             {
                 try { results.AddRange(inter.Refresh(rb).Where(r => r.Warnings.Count > 0)); }
                 catch (Exception ex) { Log.Error("Refresh rotatória", ex); }
+            }
+            foreach (var cds in MarkingStorage.Definitions(doc).OfType<CulDeSacDefinition>().Where(c => c.RoadId != null).ToList())
+            {
+                try { results.AddRange(inter.Refresh(cds).Where(r => r.Warnings.Count > 0)); }
+                catch (Exception ex) { Log.Error("Refresh cul-de-sac", ex); }
             }
             t.Commit();
         }

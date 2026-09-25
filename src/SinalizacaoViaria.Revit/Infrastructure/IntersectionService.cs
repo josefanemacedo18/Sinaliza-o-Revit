@@ -68,6 +68,7 @@ public sealed class IntersectionService
         foreach (var (node, ids) in nodes)
         {
             if (roundabouts.Any(r => r.Center.DistanceTo(node) < r.OuterRadius + 5)) continue;
+            if (!IntersectionGenerator.NeedsIntersection(ids.Select(i => roads[i]).ToList(), node)) continue;
             var it = existing.FirstOrDefault(e => e.Node.DistanceTo(node) < IntersectionGenerator.NodeMergeDistance * 2);
             if (it == null)
             {
@@ -112,7 +113,8 @@ public sealed class IntersectionService
         AutoIntersectGroups(new[] { road.GroupId ?? "" }, template, out _);
 
     /// <summary>Cria/atualiza as interseções das vias (grupos) indicadas com as demais vias do projeto.</summary>
-    public List<RenderResult> AutoIntersectGroups(IEnumerable<string> groupIds, IntersectionDefinition template, out HashSet<string> processed)
+    public List<RenderResult> AutoIntersectGroups(IEnumerable<string> groupIds, IntersectionDefinition template, out HashSet<string> processed,
+        bool radiusByHierarchy = false)
     {
         processed = new HashSet<string>();
         var results = new List<RenderResult>();
@@ -126,6 +128,7 @@ public sealed class IntersectionService
         foreach (var (node, ids) in IntersectionGenerator.FindNodes(roads).Where(n => n.Roads.Any(idx.Contains)))
         {
             if (roundabouts.Any(r => r.Center.DistanceTo(node) < r.OuterRadius + 5)) continue;   // o nó já é uma rotatória
+            if (!IntersectionGenerator.NeedsIntersection(ids.Select(i => roads[i]).ToList(), node)) continue;
             var it = existing.FirstOrDefault(e => e.Node.DistanceTo(node) < IntersectionGenerator.NodeMergeDistance * 4);
             if (it == null)
             {
@@ -134,7 +137,13 @@ public sealed class IntersectionService
                 it.Z = roads[ids[0]].Def.Path?.Z ?? 0;
                 it.ChildIds.Clear();
                 it.RoadIds.Clear();
+                it.MainRoadId = null;
                 it.Output = roads[ids[0]].Def.Output.Clone();
+                if (radiusByHierarchy)
+                {
+                    var hs = ids.Select(i => roads[i].Def.Hierarchy).OrderByDescending(Hierarquia.Rank).ToList();
+                    it.CornerRadius = Hierarquia.CornerRadius(hs[0], hs.Count > 1 ? hs[1] : hs[0]);
+                }
             }
             else it.Node = node;
             foreach (var i in ids) if (!it.RoadIds.Contains(roads[i].Def.Id)) it.RoadIds.Add(roads[i].Def.Id);
@@ -167,6 +176,7 @@ public sealed class IntersectionService
         }
         it.Node = node.Node;
         var layout = IntersectionGenerator.Layout(it, roads);
+        if (layout.Roads.Count > 0) it.Hierarchy = layout.Roads[layout.Main].Def.Hierarchy;
 
         // 1. A interseção (precisa existir antes dos recortes, que apontam para ela).
         results.Add(_service.Render(it));
@@ -208,11 +218,27 @@ public sealed class IntersectionService
     public List<RenderResult> Refresh(RoundaboutDefinition rb)
     {
         var results = new List<RenderResult>();
+        // Rotatória ligada às vias: acompanha o nó (eixos movidos) e ganha/perde ramos conforme as vias que chegam.
+        if (rb.Legs.Any(l => l.GroupId != null || l.RoadId != null))
+        {
+            var roads = Roads();
+            var near = roads.Where(r => IntersectionGenerator.Project(r.Axis, rb.Center).Distance <= Math.Max(r.Def.TotalLeft, r.Def.TotalRight) + rb.OuterRadius).ToList();
+            var node = IntersectionGenerator.FindNodes(near).OrderBy(n => n.Node.DistanceTo(rb.Center)).FirstOrDefault();
+            if (node.Roads != null && node.Node.DistanceTo(rb.Center) < 20) rb.Center = node.Node;
+            var legs = RoundaboutGenerator.LegsFromRoads(rb.Center, roads, rb.OuterRadius + 25);
+            if (legs.Count >= 2) rb.Legs = legs;
+            var hs = legs.Select(l => roads.FirstOrDefault(r => r.Def.Id == l.RoadId)?.Def.Hierarchy).OrderByDescending(Hierarquia.Rank).FirstOrDefault();
+            if (hs != null) rb.Hierarchy = hs;
+        }
         var layout = RoundaboutGenerator.Layout(rb);
         results.Add(_service.Render(rb));
         foreach (var old in rb.ChildIds) _service.Delete(old);
         var children = RoundaboutGenerator.Children(rb, layout, rb.Output, rb.Z);
-        foreach (var c in children) results.Add(_service.Render(c));
+        foreach (var c in children)
+        {
+            c.Hierarchy = rb.Hierarchy;
+            results.Add(_service.Render(c));
+        }
         rb.ChildIds = children.Select(c => c.Id).ToList();
         results.Add(_service.Render(rb));
 
@@ -254,6 +280,144 @@ public sealed class IntersectionService
             try { _service.Render(m); }
             catch (Exception ex) { Log.Error("Remover interseção", ex); }
         }
+    }
+
+    /// <summary>Apaga a rotatória, sua sinalização e os recortes que ela fazia nas vias.</summary>
+    public void Remove(RoundaboutDefinition rb)
+    {
+        foreach (var c in rb.ChildIds) _service.Delete(c);
+        _service.Delete(rb.Id);
+        _service.Invalidate();
+        foreach (var m in MarkingStorage.Definitions(_doc).Where(d => d.Exclusions.Any(e => e.SourceId == rb.Id)))
+        {
+            m.Exclusions.RemoveAll(e => e.SourceId == rb.Id);
+            try { _service.Render(m); }
+            catch (Exception ex) { Log.Error("Remover rotatória", ex); }
+        }
+    }
+
+    /// <summary>Apaga o cul-de-sac e devolve a via ao traçado original.</summary>
+    public void Remove(CulDeSacDefinition c)
+    {
+        _service.Delete(c.Id);
+        _service.Invalidate();
+        foreach (var m in MarkingStorage.Definitions(_doc).Where(d => d.Exclusions.Any(e => e.SourceId == c.Id)))
+        {
+            m.Exclusions.RemoveAll(e => e.SourceId == c.Id);
+            try { _service.Render(m); }
+            catch (Exception ex) { Log.Error("Remover cul-de-sac", ex); }
+        }
+    }
+
+    /// <summary>
+    /// Cul-de-sac ligado à ponta de uma via: acompanha o eixo, a largura e a calçada da via e recorta a via no trecho
+    /// do balão. Se a ponta passou a encontrar outra via, o balão é removido.
+    /// </summary>
+    public List<RenderResult> Refresh(CulDeSacDefinition c)
+    {
+        var results = new List<RenderResult>();
+        var roads = Roads();
+        var road = roads.FirstOrDefault(r => r.Def.Id == c.RoadId);
+        if (road == null) { Remove(c); return results; }
+        var others = roads.Where(r => r.Def.Id != road.Def.Id).ToList();
+        if (!RoadConnection.FreeEnds(road, others).Any(e => e.AtEnd == c.AtRoadEnd)) { Remove(c); return results; }
+        var cut = RoadConnection.FitCulDeSac(c, road, road.Def.Path?.Z ?? 0);
+        results.Add(_service.Render(c));
+        _service.Invalidate();
+        foreach (var m in MarkingStorage.Definitions(_doc).Where(d => d.GroupId != null && d.GroupId == road.Def.GroupId || d.Exclusions.Any(e => e.SourceId == c.Id)))
+        {
+            if (m.Id == c.Id || m is IAnnotationDefinition) continue;
+            m.Exclusions.RemoveAll(e => e.SourceId == c.Id);
+            if (m.GroupId == road.Def.GroupId)
+                foreach (var p in cut) m.Exclusions.Add(new ExclusionZone { SourceId = c.Id, Points = p.Outer.ToList() });
+            try { results.Add(_service.Render(m)); }
+            catch (Exception ex) { Log.Error($"Cul-de-sac – via {m.DisplayCode}", ex); }
+        }
+        return results;
+    }
+
+    public List<CulDeSacDefinition> CulDeSacsDependentOn(IEnumerable<MarkingDefinition> changed)
+    {
+        var groups = changed.Select(d => d.GroupId).Where(g => g != null).ToHashSet();
+        var all = MarkingStorage.Definitions(_doc);
+        var roadIds = all.OfType<RoadPavementDefinition>().Where(p => groups.Contains(p.GroupId)).Select(p => p.Id).ToHashSet();
+        return all.OfType<CulDeSacDefinition>().Where(c => c.RoadId != null && roadIds.Contains(c.RoadId)).ToList();
+    }
+
+    /// <summary>Rotatórias cujo centro está na ponta (ou sobre o eixo) da via indicada.</summary>
+    public List<RoundaboutDefinition> RoundaboutsTouching(IntersectionRoad road) =>
+        MarkingStorage.Definitions(_doc).OfType<RoundaboutDefinition>()
+            .Where(rb => IntersectionGenerator.Project(road.Axis, rb.Center).Distance < 3).ToList();
+
+    /// <summary>
+    /// Liga a via (recém-criada ou editada) ao sistema viário: cada encontro com outra via vira interseção ou rotatória,
+    /// rotatórias tocadas ganham o novo ramo e as pontas livres recebem cul-de-sac, conforme as opções.
+    /// </summary>
+    public List<RenderResult> Connect(RoadPavementDefinition road, TipoConexao mode, FimLivre ends,
+        IntersectionDefinition itTemplate, RoundaboutDefinition rbTemplate, CulDeSacDefinition cdsTemplate, bool radiusByHierarchy)
+    {
+        var results = new List<RenderResult>();
+        var roads = Roads(createMissing: true);
+        var me = roads.FirstOrDefault(r => r.Def.Id == road.Id);
+        if (me == null) return results;
+
+        // Rotatórias existentes na ponta da via: a via vira um novo ramo.
+        foreach (var rb in RoundaboutsTouching(me)) results.AddRange(Refresh(rb));
+
+        if (mode == TipoConexao.Intersecao)
+            results.AddRange(AutoIntersectGroups(new[] { road.GroupId ?? "" }, itTemplate, out _, radiusByHierarchy));
+        else if (mode == TipoConexao.Rotatoria)
+        {
+            var idx = roads.IndexOf(me);
+            var existingRb = MarkingStorage.Definitions(_doc).OfType<RoundaboutDefinition>().ToList();
+            foreach (var (node, ids) in IntersectionGenerator.FindNodes(roads).Where(n => n.Roads.Contains(idx)))
+            {
+                if (existingRb.Any(r => r.Center.DistanceTo(node) < r.OuterRadius + 5)) continue;
+                if (!IntersectionGenerator.NeedsIntersection(ids.Select(i => roads[i]).ToList(), node)) continue;
+                results.AddRange(ConvertToRoundabout(node, rbTemplate, roads));
+                roads = Roads();
+            }
+        }
+
+        if (ends == FimLivre.CulDeSac)
+        {
+            roads = Roads();
+            me = roads.FirstOrDefault(r => r.Def.Id == road.Id);
+            if (me != null)
+                foreach (var (atEnd, _, _) in RoadConnection.FreeEnds(me, roads.Where(r => r.Def.Id != road.Id).ToList()))
+                    results.AddRange(AddCulDeSac(me, atEnd, cdsTemplate));
+        }
+        return results;
+    }
+
+    /// <summary>Cul-de-sac na ponta indicada da via (substitui um existente na mesma ponta).</summary>
+    public List<RenderResult> AddCulDeSac(IntersectionRoad road, bool atEnd, CulDeSacDefinition template)
+    {
+        foreach (var old in MarkingStorage.Definitions(_doc).OfType<CulDeSacDefinition>().Where(c => c.RoadId == road.Def.Id && c.AtRoadEnd == atEnd).ToList())
+            Remove(old);
+        var c = (CulDeSacDefinition)template.CloneWithNewId();
+        c.RoadId = road.Def.Id;
+        c.AtRoadEnd = atEnd;
+        c.Exclusions.Clear();
+        c.GroupId = null;
+        return Refresh(c);
+    }
+
+    /// <summary>Troca o que houver no nó (interseção) por uma rotatória ligada às vias.</summary>
+    public List<RenderResult> ConvertToRoundabout(Vec2 node, RoundaboutDefinition template, List<IntersectionRoad>? roads = null)
+    {
+        roads ??= Roads(createMissing: true);
+        foreach (var it in MarkingStorage.Definitions(_doc).OfType<IntersectionDefinition>().Where(i => i.Node.DistanceTo(node) < template.OuterRadius + 5).ToList())
+            Remove(it);
+        var rb = (RoundaboutDefinition)template.CloneWithNewId();
+        rb.ChildIds.Clear();
+        rb.Center = node;
+        var first = roads.FirstOrDefault(r => IntersectionGenerator.Project(r.Axis, node).Distance < 3);
+        rb.Z = first?.Def.Path?.Z ?? 0;
+        rb.Output = first?.Def.Output.Clone() ?? rb.Output;
+        rb.Legs = RoundaboutGenerator.LegsFromRoads(node, roads, rb.OuterRadius + 25);
+        if (rb.Legs.Count < 2) return new List<RenderResult>();
+        return Refresh(rb);
     }
 
     /// <summary>Interseções que dependem das marcas (grupos de via) indicadas.</summary>

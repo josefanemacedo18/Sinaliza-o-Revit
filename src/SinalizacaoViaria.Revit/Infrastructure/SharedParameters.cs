@@ -24,7 +24,9 @@ public static class SharedParameters
 
     public static readonly Def Categoria = new("SV_Categoria", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B0B"), SpecTypeId.String.Text, "Categoria do quantitativo: sinalização horizontal, vertical, dispositivos, acessibilidade, calçadas...");
 
-    public static IReadOnlyList<Def> All { get; } = new[] { Codigo, Descricao, Grupo, Cor, Material, Area, Extensao, Quantidade, Referencia, Id, Categoria };
+    public static readonly Def Hierarquia = new("SV_Hierarquia", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B0C"), SpecTypeId.String.Text, "Hierarquia viária (CTB art. 60): trânsito rápido, arterial, coletora, local, rodovia, estrada.");
+
+    public static IReadOnlyList<Def> All { get; } = new[] { Codigo, Descricao, Grupo, Cor, Material, Area, Extensao, Quantidade, Referencia, Id, Categoria, Hierarquia };
 
     private const string GroupName = "Sinalizacao Viaria";
 

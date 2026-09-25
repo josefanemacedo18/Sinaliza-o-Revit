@@ -39,6 +39,13 @@ public sealed class QuantityRow
 
     public CategoriaQuantitativo Category { get; set; }
 
+    /// <summary>Hierarquia viária (CTB art. 60) da via a que os itens pertencem.</summary>
+    public HierarquiaViaria? Hierarchy { get; set; }
+    public string HierarchyName => Hierarquia.Label(Hierarchy);
+
+    /// <summary>Extensão de via (eixo) – só nas linhas de pavimento da via.</summary>
+    public double RoadLength { get; set; }
+
     public string GroupName => GroupLabel(Group);
     public string CategoryName => CategoryLabel(Category);
 
@@ -107,7 +114,7 @@ public static class QuantityCalculator
 {
     public static List<QuantityRow> Compute(IEnumerable<(MarkingDefinition Def, MarkingGeometry Geo)> items, Catalogo catalog, string? defaultMaterial = null)
     {
-        var rows = new Dictionary<(string, MarkingColor, string), QuantityRow>();
+        var rows = new Dictionary<(string, MarkingColor, string, HierarquiaViaria?), QuantityRow>();
         foreach (var (def, geo) in items)
         {
             if (def is IAnnotationDefinition) continue;
@@ -118,13 +125,14 @@ public static class QuantityCalculator
             var first = true;
             foreach (var (color, area) in byColor.OrderByDescending(kv => kv.Value))
             {
-                var key = (info.Code, color, matName);
+                var key = (info.Code, color, matName, def.Hierarchy);
                 if (!rows.TryGetValue(key, out var row))
                 {
                     row = new QuantityRow
                     {
                         Code = info.Code, Name = info.Name, Group = info.Group, Color = color, Material = MarkingColors.IsPaint(color) ? matName : "",
                         Category = QuantityRow.Categorize(def, info.Group),
+                        Hierarchy = def.Hierarchy,
                         Unit = info.Unit, Reference = info.Reference, ConsumptionUnit = mat?.UnidadeConsumo ?? "",
                     };
                     rows[key] = row;
@@ -143,14 +151,32 @@ public static class QuantityCalculator
                     row.PaintedLength += geo.PaintedLength;
                     row.Units += geo.UnitCount;
                     row.Elements += 1;
+                    if (def is RoadPavementDefinition) row.RoadLength += geo.PathLength;
                     first = false;
                 }
             }
         }
         return rows.Values
-            .OrderBy(r => r.Category).ThenBy(r => r.Group).ThenBy(r => r.Code, StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Color)
+            .OrderBy(r => r.Category).ThenBy(r => r.Group).ThenBy(r => r.Code, StringComparer.OrdinalIgnoreCase)
+            .ThenByDescending(r => Hierarquia.Rank(r.Hierarchy)).ThenBy(r => r.Color)
             .ToList();
     }
+
+    /// <summary>Resumo por hierarquia viária: extensão de vias, pavimento, pintura, placas e elementos.</summary>
+    public static List<HierarchySummaryRow> HierarchySummary(IEnumerable<QuantityRow> rows) =>
+        rows.GroupBy(r => r.Hierarchy)
+            .Select(g => new HierarchySummaryRow
+            {
+                Hierarchy = g.Key,
+                RoadLength = g.Sum(r => r.RoadLength),
+                PavementArea = g.Where(r => r.Category == CategoriaQuantitativo.PavimentacaoGeometria && MarkingColors.IsPavement(r.Color)).Sum(r => r.Area),
+                PaintedArea = g.Where(r => MarkingColors.IsPaint(r.Color) && r.Category != CategoriaQuantitativo.SinalizacaoVertical).Sum(r => r.Area),
+                PaintedLength = g.Where(r => r.Category == CategoriaQuantitativo.SinalizacaoHorizontal).Sum(r => r.PaintedLength),
+                Signs = g.Where(r => r.Category == CategoriaQuantitativo.SinalizacaoVertical).Sum(r => r.Units),
+                Elements = g.Sum(r => r.Elements),
+                PaintConsumption = g.Sum(r => r.MaterialConsumption),
+            })
+            .OrderByDescending(r => Hierarquia.Rank(r.Hierarchy)).ToList();
 
     /// <summary>Totais por categoria (área, extensão e unidades).</summary>
     public static List<QuantityRow> CategorySummary(IEnumerable<QuantityRow> rows) =>
@@ -197,9 +223,9 @@ public static class QuantityCalculator
     {
         var pt = CultureInfo.GetCultureInfo("pt-BR");
         var sb = new StringBuilder();
-        const string header = "Categoria;Grupo;Código;Descrição;Cor;Material;Quantidade;Unidade;Área (m²);Extensão (m);Unidades;Elementos;Consumo estimado;Unidade consumo;Microesferas (kg);Referência";
+        const string header = "Categoria;Hierarquia viária;Grupo;Código;Descrição;Cor;Material;Quantidade;Unidade;Área (m²);Extensão (m);Unidades;Elementos;Consumo estimado;Unidade consumo;Microesferas (kg);Referência";
         void Row(QuantityRow r) => sb.AppendLine(string.Join(";",
-            Esc(r.CategoryName), Esc(r.GroupName), Esc(r.Code), Esc(r.Name), r.Color, Esc(r.Material),
+            Esc(r.CategoryName), Esc(r.HierarchyName), Esc(r.GroupName), Esc(r.Code), Esc(r.Name), r.Color, Esc(r.Material),
             r.MainQuantity.ToString("0.00", pt), Esc(r.Unit),
             r.Area.ToString("0.00", pt), r.PaintedLength.ToString("0.00", pt), r.Units, r.Elements,
             r.MaterialConsumption.ToString("0.00", pt), Esc(r.ConsumptionUnit), r.GlassBeadsKg.ToString("0.00", pt), Esc(r.Reference)));
@@ -210,7 +236,7 @@ public static class QuantityCalculator
             sb.AppendLine(header);
             foreach (var r in g) Row(r);
             var sub = CategorySummary(g).First();
-            sb.AppendLine(string.Join(";", "", "", "SUBTOTAL", "", "", "", "", "", sub.Area.ToString("0.00", pt), sub.PaintedLength.ToString("0.00", pt),
+            sb.AppendLine(string.Join(";", "", "", "", "SUBTOTAL", "", "", "", "", "", sub.Area.ToString("0.00", pt), sub.PaintedLength.ToString("0.00", pt),
                 sub.Units, sub.Elements, sub.MaterialConsumption.ToString("0.00", pt), "", sub.GlassBeadsKg.ToString("0.00", pt), ""));
             sb.AppendLine();
         }
@@ -218,6 +244,12 @@ public static class QuantityCalculator
         sb.AppendLine("Categoria;Área (m²);Extensão (m);Unidades;Elementos");
         foreach (var c in CategorySummary(list))
             sb.AppendLine(string.Join(";", Esc(c.Name), c.Area.ToString("0.00", pt), c.PaintedLength.ToString("0.00", pt), c.Units, c.Elements));
+        sb.AppendLine();
+        sb.AppendLine("RESUMO POR HIERARQUIA VIÁRIA (CTB art. 60)");
+        sb.AppendLine("Hierarquia;Extensão de vias (m);Pavimento (m²);Área pintada (m²);Extensão pintada (m);Placas (un);Elementos;Consumo de tinta");
+        foreach (var h in HierarchySummary(list))
+            sb.AppendLine(string.Join(";", Esc(h.Name), h.RoadLength.ToString("0.00", pt), h.PavementArea.ToString("0.00", pt), h.PaintedArea.ToString("0.00", pt),
+                h.PaintedLength.ToString("0.00", pt), h.Signs, h.Elements, h.PaintConsumption.ToString("0.00", pt)));
         if (summary != null)
         {
             sb.AppendLine();
@@ -231,4 +263,18 @@ public static class QuantityCalculator
 
     private static string Esc(string s) =>
         s.Contains(';') || s.Contains('"') || s.Contains('\n') ? "\"" + s.Replace("\"", "\"\"").Replace("\n", " ") + "\"" : s;
+}
+
+/// <summary>Totais de uma hierarquia viária.</summary>
+public sealed class HierarchySummaryRow
+{
+    public HierarquiaViaria? Hierarchy { get; set; }
+    public string Name => Hierarquia.Label(Hierarchy);
+    public double RoadLength { get; set; }
+    public double PavementArea { get; set; }
+    public double PaintedArea { get; set; }
+    public double PaintedLength { get; set; }
+    public int Signs { get; set; }
+    public int Elements { get; set; }
+    public double PaintConsumption { get; set; }
 }

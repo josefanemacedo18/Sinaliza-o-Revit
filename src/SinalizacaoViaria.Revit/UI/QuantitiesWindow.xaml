@@ -13,7 +13,9 @@
         <TextBlock DockPanel.Dock="Top" Style="{StaticResource Hint}" Text="Quantidades calculadas a partir da geometria gerada, separadas por categoria. Área pintada para tintas; área em planta para concreto, grama e demais elementos físicos. Consumos são estimativas com base no catálogo de materiais."/>
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
             <TextBlock Text="Categoria" Style="{StaticResource FieldLabel}"/>
-            <ComboBox x:Name="CbCategory" Width="340" SelectionChanged="FilterChanged"/>
+            <ComboBox x:Name="CbCategory" Width="300" SelectionChanged="FilterChanged"/>
+            <TextBlock Text="Hierarquia" Style="{StaticResource FieldLabel}" Margin="16,3,8,3"/>
+            <ComboBox x:Name="CbHierarchy" Width="220" SelectionChanged="FilterChanged"/>
             <TextBlock Text="Pesquisar" Style="{StaticResource FieldLabel}" Margin="16,3,8,3"/>
             <TextBox x:Name="TbSearch" TextChanged="FilterChanged" ToolTip="Código, descrição, cor ou material"/>
         </DockPanel>
@@ -36,7 +38,8 @@
                         </GroupStyle>
                     </DataGrid.GroupStyle>
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Grupo" Binding="{Binding GroupName}" Width="170"/>
+                        <DataGridTextColumn Header="Hierarquia" Binding="{Binding HierarchyName}" Width="130"/>
+                        <DataGridTextColumn Header="Grupo" Binding="{Binding GroupName}" Width="150"/>
                         <DataGridTextColumn Header="Código" Binding="{Binding Code}" Width="80"/>
                         <DataGridTextColumn Header="Descrição" Binding="{Binding Name}" Width="*"/>
                         <DataGridTextColumn Header="Quantidade" Binding="{Binding MainQuantity, StringFormat=N2, ConverterCulture=pt-BR}" Width="85"/>
@@ -61,6 +64,20 @@
                         <DataGridTextColumn Header="Unidades" Binding="{Binding Units}" Width="90"/>
                         <DataGridTextColumn Header="Elementos" Binding="{Binding Elements}" Width="90"/>
                         <DataGridTextColumn Header="Consumo de tinta" Binding="{Binding MaterialConsumption, StringFormat=N2, ConverterCulture=pt-BR}" Width="120"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+            <TabItem Header="Resumo por hierarquia viária">
+                <DataGrid x:Name="GridHierarchy" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Hierarquia (CTB art. 60)" Binding="{Binding Name}" Width="*"/>
+                        <DataGridTextColumn Header="Extensão de vias (m)" Binding="{Binding RoadLength, StringFormat=N2, ConverterCulture=pt-BR}" Width="130"/>
+                        <DataGridTextColumn Header="Pavimento (m²)" Binding="{Binding PavementArea, StringFormat=N2, ConverterCulture=pt-BR}" Width="110"/>
+                        <DataGridTextColumn Header="Área pintada (m²)" Binding="{Binding PaintedArea, StringFormat=N2, ConverterCulture=pt-BR}" Width="120"/>
+                        <DataGridTextColumn Header="Extensão pintada (m)" Binding="{Binding PaintedLength, StringFormat=N2, ConverterCulture=pt-BR}" Width="130"/>
+                        <DataGridTextColumn Header="Placas" Binding="{Binding Signs}" Width="70"/>
+                        <DataGridTextColumn Header="Elementos" Binding="{Binding Elements}" Width="80"/>
+                        <DataGridTextColumn Header="Consumo de tinta" Binding="{Binding PaintConsumption, StringFormat=N2, ConverterCulture=pt-BR}" Width="120"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </TabItem>

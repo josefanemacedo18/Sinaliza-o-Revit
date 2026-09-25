@@ -240,6 +240,25 @@ public static class IntersectionGenerator
         return nodes;
     }
 
+    /// <summary>
+    /// Falso quando o nó é só a emenda de duas vias alinhadas (continuação em linha reta): cada via termina no nó e
+    /// não há interseção a tratar.
+    /// </summary>
+    public static bool NeedsIntersection(IReadOnlyList<IntersectionRoad> roads, Vec2 node)
+    {
+        var dirs = new List<Vec2>();
+        foreach (var r in roads)
+        {
+            var axis = ExtendTo(r.Axis, node, Math.Max(r.Def.TotalLeft, r.Def.TotalRight) + 3);
+            var (s, dist, _) = Project(axis, node);
+            if (dist > Math.Max(r.Def.TotalLeft, r.Def.TotalRight) + 3) continue;
+            if (axis.Length - s > 3) dirs.Add(axis.TangentAt(Math.Min(axis.Length, s + 1)));
+            if (s > 3) dirs.Add(-axis.TangentAt(Math.Max(0, s - 1)));
+        }
+        if (dirs.Count >= 3) return true;
+        return dirs.Count == 2 && dirs[0].Dot(dirs[1]) > -0.96;
+    }
+
     private static IEnumerable<Vec2> AxisCrossings(Polyline2 a, Polyline2 b)
     {
         for (int i = 0; i + 1 < a.Points.Count; i++)
@@ -273,13 +292,14 @@ public static class IntersectionGenerator
         return a < 0 ? a + 360 : a;
     }
 
-    /// <summary>Via preferencial: a indicada, ou a que atravessa o nó (dois ramos), mais larga e mais longa.</summary>
+    /// <summary>Via preferencial: a indicada, ou a de maior hierarquia; depois a que atravessa o nó (dois ramos), mais larga e mais longa.</summary>
     public static int MainRoad(IntersectionDefinition d, IReadOnlyList<IntersectionRoad> roads, IReadOnlyList<IntersectionLeg> legs)
     {
         var k = d.MainRoadId == null ? -1 : roads.ToList().FindIndex(r => r.Def.Id == d.MainRoadId);
         if (k >= 0) return k;
         return Enumerable.Range(0, roads.Count)
-            .OrderByDescending(i => legs.Count(l => l.Road == i) >= 2)
+            .OrderByDescending(i => Hierarquia.Rank(roads[i].Def.Hierarchy))
+            .ThenByDescending(i => legs.Count(l => l.Road == i) >= 2)
             .ThenByDescending(i => Math.Round(roads[i].Def.RightWidth + roads[i].Def.LeftWidth, 1))
             .ThenByDescending(i => Math.Round(roads[i].Def.TotalLeft + roads[i].Def.TotalRight, 1))
             .ThenByDescending(i => roads[i].Axis.Length)
@@ -705,7 +725,7 @@ public static class IntersectionGenerator
         L.SpanStops.AddRange(L.Obstacles.Concat(L.PaintedMedians).Concat(L.PaintedIslands));
 
         // Recortes da sinalização pintada: miolo + aproximação até depois da retenção + trechos tratados.
-        var stopFar = StopFar(d);
+        var stopFar = L.Legs.Count <= 2 ? 0.3 : StopFar(d);
         for (int i = 0; i < L.Roads.Count; i++)
         {
             var r = L.Roads[i];
@@ -841,16 +861,21 @@ public static class IntersectionGenerator
         IReadOnlyList<IReadOnlyCollection<MarkingDefinition>>? roadMembers = null)
     {
         var res = new List<MarkingDefinition>();
+        HierarquiaViaria? hierarchy = L.Roads.Count > 0 ? L.Roads[L.Main].Def.Hierarchy : null;
         T Add<T>(T def) where T : MarkingDefinition
         {
             def.Output = output.Clone();
             def.GroupId = d.Id;
+            def.Hierarchy = hierarchy;
             res.Add(def);
             return def;
         }
         var stopFar = StopFar(d);
+        // Continuação de uma via na outra (dois ramos): só a geometria, sem travessias nem controle.
+        if (L.Legs.Count <= 2) return res;
         foreach (var leg in L.Legs)
         {
+            hierarchy = L.Roads[leg.Road].Def.Hierarchy;
             var r = L.Roads[leg.Road];
             var f = L.FeatureOf(leg);
             var isMain = leg.Road == L.Main;
@@ -993,6 +1018,7 @@ public static class IntersectionGenerator
         }
 
         // Canalização pintada: ilhas entre fluxos de mesmo sentido (branco) e entre fluxos opostos (amarelo).
+        hierarchy = L.Roads[L.Main].Def.Hierarchy;
         foreach (var p in L.PaintedIslands)
             Add(new HatchMarkingDefinition { Code = "ZPA", Boundary = PathReference.FromPoints(p.Outer, z, true) });
         foreach (var p in L.PaintedMedians)

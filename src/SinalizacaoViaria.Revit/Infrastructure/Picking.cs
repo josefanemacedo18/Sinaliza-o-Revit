@@ -130,6 +130,72 @@ public static class Picking
         }
     }
 
+    /// <summary>
+    /// Desenha o eixo de uma via nova por cliques: cada ponto passa por <paramref name="snap"/> (encaixe nas vias
+    /// existentes) e as linhas provisórias mostram o traçado. ESC conclui. Devolve os pontos (pés) e a descrição do
+    /// encaixe de cada um; nada fica no modelo.
+    /// </summary>
+    public static (List<XYZ> Points, List<string?> Info)? PickRoadAxis(UIDocument uidoc, Func<XYZ, (XYZ Point, string? Info)>? snap)
+    {
+        var doc = uidoc.Document;
+        var view = uidoc.ActiveView;
+        var pts = new List<XYZ>();
+        var info = new List<string?>();
+        using var group = new TransactionGroup(doc, "SV - Desenhar via");
+        group.Start();
+        try
+        {
+            var styles = new StyleService(doc);
+            while (true)
+            {
+                var last = info.Count > 0 && info[^1] != null ? $" – último ponto {info[^1]}" : "";
+                var msg = pts.Count == 0
+                    ? "Nova via: clique o primeiro ponto (sobre uma via existente para conectar) – ESC cancela"
+                    : $"Nova via: próximo ponto ({pts.Count}){last} – ESC para concluir";
+                var p = PickPoint(uidoc, msg);
+                if (p == null) break;
+                string? what = null;
+                if (snap != null) (p, what) = snap(p);
+                if (pts.Count > 0) p = new XYZ(p.X, p.Y, pts[0].Z);
+                if (pts.Count > 0 && p.DistanceTo(pts[^1]) < doc.Application.ShortCurveTolerance) continue;
+                if (pts.Count > 0)
+                {
+                    using var t = new Transaction(doc, "SV - segmento");
+                    t.Start();
+                    CreateLine(doc, view, pts[^1], p, styles);
+                    t.Commit();
+                    uidoc.RefreshActiveView();
+                }
+                pts.Add(p);
+                info.Add(what);
+            }
+            group.RollBack();
+            return pts.Count < 2 ? null : (pts, info);
+        }
+        catch
+        {
+            if (group.HasStarted() && !group.HasEnded()) group.RollBack();
+            throw;
+        }
+    }
+
+    /// <summary>Cria o eixo definitivo (retas e arcos de concordância) como linhas de modelo no estilo de eixo.</summary>
+    public static List<ElementId> CreateAxis(Document doc, View view, IReadOnlyList<Core.Automation.RoadConnection.Piece> pieces, double zFeet)
+    {
+        var styles = new StyleService(doc);
+        var ids = new List<ElementId>();
+        XYZ P(Vec2 v) => new(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), zFeet);
+        foreach (var pc in pieces)
+        {
+            Curve c = pc.Mid is { } m ? Arc.Create(P(pc.A), P(pc.B), P(m)) : Line.CreateBound(P(pc.A), P(pc.B));
+            var sp = SketchPlane.Create(doc, Plane.CreateByNormalAndOrigin(XYZ.BasisZ, P(pc.A)));
+            var mc = doc.Create.NewModelCurve(c, sp);
+            try { mc.LineStyle = styles.AxisLineStyle(); } catch { /* estilo opcional */ }
+            ids.Add(mc.Id);
+        }
+        return ids;
+    }
+
     public static ElementId CreateLine(Document doc, View view, XYZ a, XYZ b, StyleService styles)
     {
         var line = Line.CreateBound(a, b);

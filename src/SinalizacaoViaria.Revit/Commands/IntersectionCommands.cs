@@ -297,13 +297,9 @@ public sealed class CmdRotatoria : CommandBase
 
         var results = IntersectionRunner.Run(uidoc, "SV - Rotatória", s =>
         {
-            // Interseções no mesmo nó deixam de existir (a rotatória as substitui).
-            var service = new MarkingService(doc, uidoc.ActiveView);
-            foreach (var it in MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().Where(i => i.Node.DistanceTo(center) < d.OuterRadius + 5))
-            {
-                foreach (var c in it.ChildIds) service.Delete(c);
-                service.Delete(it.Id);
-            }
+            // Interseções no mesmo nó deixam de existir (a rotatória as substitui), com os recortes que faziam nas vias.
+            foreach (var it in MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().Where(i => i.Node.DistanceTo(center) < d.OuterRadius + 5).ToList())
+                s.Remove(it);
             return s.Refresh(d);
         });
         Report("Rotatória", results.Where(r => r.Warnings.Count > 0).ToList());

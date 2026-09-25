@@ -1,31 +1,60 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Definitions;
+using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Revit.Infrastructure;
 using SinalizacaoViaria.Revit.UI;
 
 namespace SinalizacaoViaria.Revit.Commands;
 
-/// <summary>Gera toda a sinalização longitudinal de uma via a partir do eixo.</summary>
+/// <summary>
+/// Cria a via a partir do eixo (selecionado ou desenhado). Desenhando, os pontos se encaixam nas vias existentes e a
+/// via nova é ligada ao sistema viário: interseções ou rotatórias nos encontros e cul-de-sac nas pontas livres.
+/// </summary>
 [Transaction(TransactionMode.Manual)]
-public sealed class CmdSinalizarVia : CommandBase
+public class CmdSinalizarVia : CommandBase
 {
+    protected virtual bool DrawByDefault => false;
+
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
-        var w = new RoadWindow();
+        var doc = uidoc.Document;
+        var w = new RoadWindow(DrawByDefault || PluginContext.Settings.LastDrawRoad);
         if (UiHelpers.ShowModal(w) != true || w.Setup == null || w.OutputSettings == null) return Result.Cancelled;
+        PluginContext.Settings.LastDrawRoad = w.DrawPath;
         PluginContext.SaveSettings();
         EnsureDetailView(uidoc, w.OutputSettings);
         if (w.PickSurfaces && MarkingCreator.PickSurfaces(uidoc) is { } s) w.OutputSettings.SurfaceIds = s;
 
         PathReference path;
+        var snapped = new List<string>();
         if (w.DrawPath)
         {
-            var pl = Picking.PickPolyline(uidoc, "Eixo da via", false, keepAsModelLines: true);
-            if (pl == null) return Result.Cancelled;
-            path = PathReference.FromElements(pl.Value.Lines.Select(id => uidoc.Document.GetElement(id).UniqueId));
+            var svc = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
+            var existing = w.Snap ? svc.Roads() : new List<IntersectionRoad>();
+            var rbs = w.Snap ? MarkingStorage.Definitions(doc).OfType<RoundaboutDefinition>().Select(r => (r.Center, r.OuterRadius)).ToList() : new();
+            (XYZ, string?) Snap(XYZ p)
+            {
+                if (!w.Snap) return (p, null);
+                var sn = RoadConnection.SnapPoint(UnitConv.ToVec2(p), existing, 4.0, rbs);
+                return sn.Kind == TipoEncaixe.Livre ? (p, null) : (new XYZ(UnitConv.Ft(sn.Point.X), UnitConv.Ft(sn.Point.Y), p.Z), sn.Describe);
+            }
+            var picked = Picking.PickRoadAxis(uidoc, Snap);
+            if (picked == null) return Result.Cancelled;
+            var (pts, info) = picked.Value;
+            snapped.AddRange(info.Where(i => i != null)!);
+            var pieces = RoadConnection.Fillet(pts.Select(UnitConv.ToVec2).ToList(), w.CurveRadius);
+            List<ElementId> ids;
+            using (var t = new Transaction(doc, "SV - Eixo da via"))
+            {
+                t.Start();
+                ids = Picking.CreateAxis(doc, uidoc.ActiveView, pieces, pts[0].Z);
+                t.Commit();
+            }
+            path = PathReference.FromElements(ids.Select(id => doc.GetElement(id).UniqueId));
         }
         else
         {
@@ -37,31 +66,41 @@ public sealed class CmdSinalizarVia : CommandBase
         var defs = w.BuildDefinitions(path);
         var results = MarkingCreator.Commit(uidoc, defs, "SV - Sinalizar via");
         if (w.Setup.Warnings.Count > 0 && results.Count > 0) results[0].Warnings.InsertRange(0, w.Setup.Warnings);
-        if (w.AutoIntersect && defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav)
+        if (defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav && (w.AutoIntersect || w.FreeEnds != Core.Automation.FimLivre.Nenhum))
         {
-            var template = new IntersectionDefinition
-            {
-                CornerRadius = w.CornerRadius,
-                Crosswalks = w.IntersectionCrosswalks,
-                StopLines = w.IntersectionCrosswalks,
-                Ramps = w.IntersectionRamps && w.IntersectionCrosswalks,
-                Output = w.OutputSettings.Clone(),
-            };
+            var template = UiHelpers.Remembered<IntersectionDefinition>("Intersecao") ?? new IntersectionDefinition();
+            template.CornerRadius = w.CornerRadius ?? template.CornerRadius;
+            template.Crosswalks = w.IntersectionCrosswalks;
+            template.StopLines = w.IntersectionCrosswalks;
+            template.Ramps = w.IntersectionRamps && w.IntersectionCrosswalks;
+            template.Output = w.OutputSettings.Clone();
+            var rb = UiHelpers.Remembered<RoundaboutDefinition>("Rotatoria") ?? new RoundaboutDefinition();
+            var cds = UiHelpers.Remembered<CulDeSacDefinition>(nameof(CulDeSacDefinition)) ?? new CulDeSacDefinition();
             try
             {
-                var extra = IntersectionRunner.Run(uidoc, "SV - Interseções", s => s.AutoIntersect(pav, template));
+                var extra = IntersectionRunner.Run(uidoc, "SV - Conexões da via", sv =>
+                    sv.Connect(pav, w.Connection, w.FreeEnds, template, rb, cds, radiusByHierarchy: w.CornerRadius == null));
                 results.AddRange(extra.Where(r => r.Warnings.Count > 0));
             }
             catch (Exception ex)
             {
-                Log.Error("AutoIntersect", ex);
+                Log.Error("Conexões da via", ex);
                 results.Add(new RenderResult { Geometry = null });
-                results[^1].Warnings.Add("Não foi possível ajustar as interseções automaticamente: " + ex.Message);
+                results[^1].Warnings.Add("Não foi possível ligar a via às vias existentes: " + ex.Message);
             }
         }
+        if (snapped.Count > 0 && results.Count > 0)
+            results[0].Warnings.Insert(0, "Conexões: " + string.Join("; ", snapped.Distinct()) + ".");
         Report("Sinalizar via", results);
         return Result.Succeeded;
     }
+}
+
+/// <summary>Nova via desenhada por pontos, conectada naturalmente às vias existentes.</summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdNovaVia : CmdSinalizarVia
+{
+    protected override bool DrawByDefault => true;
 }
 
 /// <summary>Desenha um eixo/caminho de referência por pontos.</summary>

@@ -67,7 +67,51 @@ Todos os elementos são associados ao eixo e pertencem ao mesmo **grupo**: mover
 inteira; **Selecionar Conjunto → Todo o grupo** seleciona tudo. Cada elemento pode ser ajustado
 depois com **Editar**.
 
-## 2.1 Bloqueios físicos
+## 2.1 Hierarquia viária (CTB art. 60)
+
+Toda via criada recebe a sua **hierarquia viária** – campo **obrigatório** no topo da janela (os modelos
+prontos já trazem uma sugestão): **trânsito rápido, arterial, coletora, local** (urbanas), **rodovia** ou
+**estrada** (rurais). Escolher a hierarquia ajusta a velocidade padrão (CTB art. 61: 80, 60, 40 e 30 km/h
+nas urbanas), que pode ser alterada.
+
+A hierarquia é gravada em **todos os elementos** da via e da sua sinalização (parâmetro compartilhado
+**SV_Hierarquia**, útil em tabelas e filtros de vista) e é usada:
+
+* nos **quantitativos** (coluna, filtro e resumo por hierarquia – seção 10);
+* nas **interseções**: a via de maior hierarquia é a **preferencial** (a secundária recebe PARE ou dê a
+  preferência) e o raio das esquinas criadas automaticamente segue a hierarquia (6 m local, 8 m coletora,
+  10 m arterial, 15 m rodovia/trânsito rápido) quando o campo de raio fica vazio.
+
+Para vias já existentes (ou criadas por versões anteriores) use **Via → Hierarquia Viária**: selecione
+elementos das vias e escolha a hierarquia (opcionalmente ajustando a velocidade das linhas); as
+interseções, rotatórias e cul-de-sacs dessas vias são atualizados.
+
+## 2.2 Nova via – conexão natural com o sistema viário
+
+**Via → Nova Via** (ou *Sinalizar Via* com *Desenhar a via por pontos*) desenha a via clicando os pontos do
+eixo, como no InfraWorks, e o sistema viário se ajusta sozinho:
+
+* **Encaixe** (opção *Encaixar nas pontas e nos eixos das vias existentes*): clique **sobre uma via** –
+  na pista ou na calçada – para ligar a nova via ao **eixo** dela (entroncamento em T ou, no meio do
+  traçado, cruzamento); clique **perto da ponta** de uma via para **continuá-la**; clique **dentro de uma
+  rotatória** para criar um **novo ramo**. A barra de status mostra o encaixe de cada ponto.
+* **Curvas horizontais**: os vértices clicados são concordados com arcos do **raio** informado (reduzido
+  onde as tangentes não cabem); o eixo fica com retas e arcos de modelo, editáveis no Revit.
+* **Onde encontrar outra via**: **Interseção** (com os tipos e o controle da ferramenta Interseção),
+  **Rotatória** (com os parâmetros da ferramenta Rotatória) ou **não ajustar**.
+* **Pontas livres da via**: **cul-de-sac** (tipo e medidas da ferramenta Cul-de-sac, ajustados à largura
+  e à calçada da via) ou sem tratamento.
+* **Continuações**: duas vias emendadas em linha reta ficam simplesmente contínuas; emendadas em ângulo,
+  a curva do meio-fio é arredondada, sem faixas, retenções ou placas.
+
+Depois de criada, a via continua ligada: mover ou editar o eixo refaz interseções, rotatórias
+(que acompanham o nó e ganham/perdem ramos) e cul-de-sacs.
+
+**Via → Conexão** muda o tratamento de uma conexão existente: clique num **encontro de vias** ou numa
+**rotatória** para escolher *Interseção*, *Rotatória* ou *Sem tratamento*, ou na **ponta livre** de uma via
+para *Cul-de-sac* ou *Sem tratamento*. A geometria e a sinalização das vias são refeitas.
+
+## 2.3 Bloqueios físicos
 
 Comando **Bloqueios Físicos** (painel *Segregação Física*): escolha o dispositivo, ajuste
 dimensões, espaçamento entre centros (0 = contínuo), deslocamento e recuos, e selecione/desenhe o
@@ -183,15 +227,19 @@ Painel **Representação no Revit** (em todas as janelas):
 * Itens separados por **categoria**: 1. Sinalização horizontal, 2. Sinalização vertical,
   3. Dispositivos auxiliares e segregação física, 4. Acessibilidade (rampas e piso tátil),
   5. Calçadas, meios-fios e urbanização, 6. Moderação de tráfego, 7. Mobiliário e elementos urbanos.
-* Filtro por categoria e **pesquisa** (código, descrição, cor, material); abas *Itens por categoria*,
-  *Resumo por categoria* e *Pintura por cor e material*.
+* Filtro por categoria, por **hierarquia viária** e **pesquisa** (código, descrição, cor, material); abas
+  *Itens por categoria*, *Resumo por categoria*, **Resumo por hierarquia viária** (extensão de vias,
+  pavimento, área e extensão pintadas, placas, elementos e consumo de tinta de cada hierarquia) e
+  *Pintura por cor e material*.
+* Cada item é separado também pela **hierarquia viária** da via a que pertence (coluna *Hierarquia*).
 * Cada linha traz a **quantidade na unidade de medição** do item (m², m ou un), área (pintada para
   tintas, em planta para concreto/grama/metal), extensão, unidades, consumo estimado e referência.
-* **Exportar CSV**: blocos por categoria com subtotais, resumo por categoria e resumo de pintura
+* **Exportar CSV**: blocos por categoria com subtotais (com a coluna de hierarquia), resumo por categoria,
+  **resumo por hierarquia viária** e resumo de pintura
   (separador `;` e vírgula decimal – abre direto no Excel em português). Exporta a categoria/pesquisa
   atual.
 * **Criar tabela no Revit**: *SV - Quantitativos de sinalização* agrupada por **categoria** (com
-  cabeçalho e subtotal), grupo, código e cor. **Tabelas por categoria** cria uma tabela para cada
+  cabeçalho e subtotal), hierarquia viária, grupo, código e cor. **Tabelas por categoria** cria uma tabela para cada
   categoria. O parâmetro compartilhado **SV_Categoria** também pode ser usado em filtros de vista.
 * Para a prancha, use **Detalhamento → Quadro de Quantitativos** (seção 16).
 
@@ -330,8 +378,10 @@ em uma vista dedicada.
 * **Canteiros**: canteiros gramados, **jardineiras elevadas** com mureta e **grelhas de árvore**
   distribuídos ao longo da faixa de serviço (comprimento, largura, espaçamento entre centros ou
   faixa contínua, deslocamento lateral) com árvores; recortam a calçada sob eles.
-* **Cul-de-sac**: 1º clique no início do balão sobre o eixo; 2º clique no centro do balão (ou fim
-  da via). Tipos **circular, excêntrico (esquerda/direita), gota, em "T" (martelo), em "Y" e em
+* **Cul-de-sac**: clique perto da **ponta de uma via** – o balão se liga a ela: fica centrado na ponta do
+  eixo, com a largura, a calçada e a hierarquia da via, recorta a via no trecho do balão e acompanha o eixo
+  quando ele é movido (é removido se a ponta passar a encontrar outra via). Com *ESC*, posicione um balão
+  avulso: 1º clique no início do balão sobre o eixo; 2º clique no centro do balão (ou fim da via). Tipos **circular, excêntrico (esquerda/direita), gota, em "T" (martelo), em "Y" e em
   "L"**. Gera pavimento, meio-fio, calçada, **ilha central** ajardinada e **linha de bordo**, com
   raio de concordância. Avisa quando o raio de giro fica abaixo de 9 m (confira a legislação
   municipal de parcelamento para o raio mínimo exigido).
@@ -437,7 +487,9 @@ ou mais), **raio de entrada/saída**, calçada em volta e pavimento. Em cada ram
 gota com **zebrado** de aproximação, **linha de dê a preferência** e **símbolo "Dê a preferência"** na
 entrada (circulação anti-horária), **travessia de pedestres** passando pela ilha, **rebaixamentos** e
 placas **R-2** e **R-33**. As vias ligadas são recortadas e a interseção existente no mesmo nó é
-substituída. Confira as dimensões com o manual do DNIT / órgão local e com o veículo de projeto.
+substituída (com os recortes que ela fazia). A rotatória ligada às vias **acompanha o nó** quando os eixos
+são movidos e ganha um **ramo novo** quando uma via é desenhada até ela (**Nova Via**, clicando dentro da
+rotatória); também pode ser criada direto na conexão (**Nova Via → Rotatória** ou **Conexão**). Confira as dimensões com o manual do DNIT / órgão local e com o veículo de projeto.
 
 ## 21. Piso tátil (NBR 16537)
 

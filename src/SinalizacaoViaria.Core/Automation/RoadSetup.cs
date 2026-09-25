@@ -157,6 +157,9 @@ public sealed class RoadSetup
     /// <summary>Mão dupla (eixo = divisão de sentidos) ou mão única (todas as faixas no sentido do eixo).</summary>
     public bool TwoWay { get; set; } = true;
 
+    /// <summary>Hierarquia viária (CTB art. 60) – gravada em todas as marcas da via.</summary>
+    public HierarquiaViaria Hierarchy { get; set; } = HierarquiaViaria.NaoDefinida;
+
     /// <summary>Elementos do lado direito do eixo, do eixo para fora.</summary>
     public List<ElementoSecao> Right { get; set; } = new();
 
@@ -270,6 +273,7 @@ public sealed class RoadSetup
         {
             d.Output = output.Clone();
             d.GroupId = groupId;
+            d.Hierarchy = Hierarchy == HierarquiaViaria.NaoDefinida ? null : Hierarchy;
             d.SetPath(Clone(path));
             res.Add(d);
             return d;
@@ -574,61 +578,61 @@ public static class RoadTemplates
     {
         new("Via local – 1 faixa por sentido, estacionamento e calçadas", () => new RoadSetup
         {
-            Speed = 40, Center = CenterTreatment.LFO2,
+            Hierarchy = HierarquiaViaria.Local, Speed = 40, Center = CenterTreatment.LFO2,
             Right = { E(R, 3.00), E(TipoElementoSecao.Estacionamento, 2.20), E(TipoElementoSecao.Calcada, 2.50) },
             Left = { E(R, 3.00), E(TipoElementoSecao.Estacionamento, 2.20), E(TipoElementoSecao.Calcada, 2.50) },
         }),
         new("Via coletora – 2 faixas por sentido e calçadas", () => new RoadSetup
         {
-            Speed = 50, Center = CenterTreatment.LFO1,
+            Hierarchy = HierarquiaViaria.Coletora, Speed = 50, Center = CenterTreatment.LFO1,
             Right = { E(R, 3.30), E(R, 3.50), E(TipoElementoSecao.Calcada, 3.00) },
             Left = { E(R, 3.30), E(R, 3.50), E(TipoElementoSecao.Calcada, 3.00) },
         }),
         new("Avenida – canteiro central, 2 + 2 faixas, estacionamento e calçadas", () => new RoadSetup
         {
-            Speed = 60, Center = CenterTreatment.Canteiro, MedianWidth = 3.0, MedianType = TipoCanteiro.Fisico,
+            Hierarchy = HierarquiaViaria.Arterial, Speed = 60, Center = CenterTreatment.Canteiro, MedianWidth = 3.0, MedianType = TipoCanteiro.Fisico,
             Right = { E(R, 3.30), E(R, 3.50), E(TipoElementoSecao.Estacionamento, 2.20), E(TipoElementoSecao.Calcada, 3.50) },
             Left = { E(R, 3.30), E(R, 3.50), E(TipoElementoSecao.Estacionamento, 2.20), E(TipoElementoSecao.Calcada, 3.50) },
         }),
         new("Corredor de ônibus – faixa exclusiva junto ao canteiro central", () => new RoadSetup
         {
-            Speed = 50, Center = CenterTreatment.Canteiro, MedianWidth = 2.0, MedianType = TipoCanteiro.Fisico,
+            Hierarchy = HierarquiaViaria.Arterial, Speed = 50, Center = CenterTreatment.Canteiro, MedianWidth = 2.0, MedianType = TipoCanteiro.Fisico,
             Right = { E(TipoElementoSecao.FaixaExclusiva, 3.50), E(R, 3.30), E(R, 3.30), E(TipoElementoSecao.Calcada, 3.50) },
             Left = { E(TipoElementoSecao.FaixaExclusiva, 3.50), E(R, 3.30), E(R, 3.30), E(TipoElementoSecao.Calcada, 3.50) },
         }),
         new("Faixa preferencial de ônibus junto à calçada", () => new RoadSetup
         {
-            Speed = 50, Center = CenterTreatment.LFO3,
+            Hierarchy = HierarquiaViaria.Arterial, Speed = 50, Center = CenterTreatment.LFO3,
             Right = { E(R, 3.30), E(TipoElementoSecao.FaixaPreferencial, 3.50), E(TipoElementoSecao.Calcada, 3.00) },
             Left = { E(R, 3.30), E(TipoElementoSecao.FaixaPreferencial, 3.50), E(TipoElementoSecao.Calcada, 3.00) },
         }),
         new("Via com ciclofaixa segregada e faixa de segurança", () => new RoadSetup
         {
-            Speed = 50, Center = CenterTreatment.LFO2,
+            Hierarchy = HierarquiaViaria.Coletora, Speed = 50, Center = CenterTreatment.LFO2,
             Right = { E(R, 3.30), E(TipoElementoSecao.FaixaSeguranca, 0.60), E(TipoElementoSecao.Ciclofaixa, 1.50, e => e.Dispositivo = "SEG-CIC"), E(TipoElementoSecao.Calcada, 2.50) },
             Left = { E(R, 3.30), E(TipoElementoSecao.Calcada, 2.50) },
         }),
         new("Via com canteiros laterais (via marginal / estacionamento)", () => new RoadSetup
         {
-            Speed = 60, Center = CenterTreatment.LFO3,
+            Hierarchy = HierarquiaViaria.Arterial, Speed = 60, Center = CenterTreatment.LFO3,
             Right = { E(R, 3.50), E(R, 3.50), E(TipoElementoSecao.CanteiroFisico, 1.50), E(TipoElementoSecao.Estacionamento, 2.20), E(TipoElementoSecao.Calcada, 3.00) },
             Left = { E(R, 3.50), E(R, 3.50), E(TipoElementoSecao.CanteiroFisico, 1.50), E(TipoElementoSecao.Estacionamento, 2.20), E(TipoElementoSecao.Calcada, 3.00) },
         }),
         new("Rodovia de pista simples com acostamentos", () => new RoadSetup
         {
-            Speed = 80, Center = CenterTreatment.LFO2, CenterStudsCode = "TAC-A", CenterStudsVariant = "Espaçamento 16 m (tangente)",
+            Hierarchy = HierarquiaViaria.Rodovia, Speed = 80, Center = CenterTreatment.LFO2, CenterStudsCode = "TAC-A", CenterStudsVariant = "Espaçamento 16 m (tangente)",
             Right = { E(R, 3.50), E(TipoElementoSecao.Acostamento, 2.50) },
             Left = { E(R, 3.50), E(TipoElementoSecao.Acostamento, 2.50) },
         }),
         new("Rodovia de pista dupla – canteiro central com barreira New Jersey", () => new RoadSetup
         {
-            Speed = 100, Center = CenterTreatment.Canteiro, MedianWidth = 1.20, MedianType = TipoCanteiro.Pintado, MedianDevice = "NJ",
+            Hierarchy = HierarquiaViaria.Rodovia, Speed = 100, Center = CenterTreatment.Canteiro, MedianWidth = 1.20, MedianType = TipoCanteiro.Pintado, MedianDevice = "NJ",
             Right = { E(R, 3.60), E(R, 3.60), E(TipoElementoSecao.Acostamento, 3.00) },
             Left = { E(R, 3.60), E(R, 3.60), E(TipoElementoSecao.Acostamento, 3.00) },
         }),
         new("Via de mão única – 3 faixas e calçadas", () => new RoadSetup
         {
-            TwoWay = false, Speed = 50, Center = CenterTreatment.Nenhum,
+            TwoWay = false, Hierarchy = HierarquiaViaria.Coletora, Speed = 50, Center = CenterTreatment.Nenhum,
             Right = { E(R, 3.50), E(TipoElementoSecao.Calcada, 3.00) },
             Left = { E(R, 3.50), E(R, 3.50), E(TipoElementoSecao.Calcada, 3.00) },
         }),

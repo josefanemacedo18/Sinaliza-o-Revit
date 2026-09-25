@@ -203,6 +203,28 @@ public static class IconFactory
                 }
                 dc.DrawEllipse(null, P(Asphalt, 4), new Point(16, 16), 8, 8);
                 break;
+            case "novavia":
+                dc.DrawRectangle(B(Color.FromRgb(200, 198, 190)), null, new Rect(1, 1, 30, 30));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 19, 30, 9));
+                dc.DrawGeometry(null, new Pen(B(Asphalt), 7), Poly(new Point(16, 21), new Point(16, 12), new Point(24, 4)));
+                for (int x = 2; x < 30; x += 6) dc.DrawLine(P(Yellow, 1.4), new Point(x, 23.5), new Point(x + 3, 23.5));
+                dc.DrawEllipse(B(Magenta), null, new Point(16, 21), 3, 3);
+                dc.DrawEllipse(B(Blue), null, new Point(24, 4), 2.5, 2.5);
+                break;
+            case "conexao":
+                dc.DrawRectangle(B(Color.FromRgb(200, 198, 190)), null, new Rect(1, 1, 30, 30));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 12, 30, 8));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(12, 1, 8, 12));
+                dc.DrawEllipse(null, P(Magenta, 2), new Point(16, 16), 8, 8);
+                dc.DrawGeometry(B(White), null, Close(Poly(new Point(23, 23), new Point(31, 27), new Point(27, 31))));
+                break;
+            case "hierarquia":
+                dc.DrawRectangle(B(Asphalt), null, new Rect(3, 3, 26, 7));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(3, 13, 18, 6));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(3, 22, 10, 5));
+                dc.DrawLine(P(Yellow, 1.5), new Point(5, 6.5), new Point(27, 6.5));
+                dc.DrawLine(P(White, 1), new Point(5, 16), new Point(19, 16));
+                break;
             case "intersecao":
                 dc.DrawRectangle(B(Color.FromRgb(200, 198, 190)), null, new Rect(1, 1, 30, 30));
                 dc.DrawGeometry(B(Asphalt), null, Close(Poly(new Point(11, 1), new Point(21, 1), new Point(21, 8), new Point(24, 11), new Point(31, 11), new Point(31, 21),

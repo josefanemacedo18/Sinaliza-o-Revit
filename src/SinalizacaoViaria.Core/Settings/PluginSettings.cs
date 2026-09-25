@@ -24,6 +24,10 @@ public sealed class PluginSettings
 
     /// <summary>Cria/atualiza interseções automaticamente quando vias passam a se cruzar (criação ou edição de eixos).</summary>
     public bool AutoIntersect { get; set; } = true;
+    public Automation.TipoConexao LastConnection { get; set; } = Automation.TipoConexao.Intersecao;
+    public Automation.FimLivre LastFreeEnds { get; set; } = Automation.FimLivre.Nenhum;
+    public double LastCurveRadius { get; set; } = 30;
+    public bool LastDrawRoad { get; set; } = true;
 
     public double DefaultSpeed { get; set; } = 60;
     public string FontFamily { get; set; } = "Arial";

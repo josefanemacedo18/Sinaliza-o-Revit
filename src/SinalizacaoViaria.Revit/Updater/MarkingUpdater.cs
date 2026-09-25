@@ -102,6 +102,11 @@ public sealed class MarkingUpdater : IUpdater
                 try { inter.Refresh(rb); }
                 catch (Exception ex) { Log.Error("Updater rotatória", ex); }
             }
+            foreach (var cds in inter.CulDeSacsDependentOn(affected))
+            {
+                try { inter.Refresh(cds); }
+                catch (Exception ex) { Log.Error("Updater cul-de-sac", ex); }
+            }
             service.RenderDependents(affected.Select(d => d.Id), includeLegends: true);
         }
         catch (Exception ex)

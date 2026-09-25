@@ -59,8 +59,13 @@ public partial class RoadWindow : Window
     private bool _loadingDetails;
 
     public RoadSetup? Setup { get; private set; }
-    public bool AutoIntersect => CkAutoIntersect.IsChecked == true;
-    public double CornerRadius => UiHelpers.ParseOpt(TbCornerRadius.Text) is { } r && r >= 0 ? r : 6.0;
+    public TipoConexao Connection { get; private set; } = TipoConexao.Intersecao;
+    public FimLivre FreeEnds { get; private set; } = FimLivre.Nenhum;
+    public bool AutoIntersect => Connection != TipoConexao.Nenhuma;
+    public bool Snap { get; private set; } = true;
+    public double CurveRadius { get; private set; }
+    /// <summary>Raio das esquinas (nulo = pela hierarquia das vias que se cruzam).</summary>
+    public double? CornerRadius => UiHelpers.ParseOpt(TbCornerRadius.Text) is { } r && r >= 0 ? r : null;
     public bool IntersectionCrosswalks => CkIntCrosswalks.IsChecked == true;
     public bool IntersectionRamps => CkIntRamps.IsChecked == true;
 
@@ -79,9 +84,23 @@ public partial class RoadWindow : Window
 
     public sealed record TypeOption(TipoElementoSecao Value, string Label);
 
-    public RoadWindow()
+    public RoadWindow(bool draw = true)
     {
         InitializeComponent();
+        RbDraw.IsChecked = draw;
+        RbCurves.IsChecked = !draw;
+        CbHierarchy.Items.Add(new Option<HierarquiaViaria>("— selecione a hierarquia —", HierarquiaViaria.NaoDefinida));
+        foreach (var h in Hierarquia.Definidas)
+            CbHierarchy.Items.Add(new Option<HierarquiaViaria>($"{Hierarquia.Label(h)} (até {Hierarquia.DefaultSpeed(h):0} km/h)", h));
+        CbConnection.Items.Add(new Option<TipoConexao>("Interseção (tipos da ferramenta Interseção)", TipoConexao.Intersecao));
+        CbConnection.Items.Add(new Option<TipoConexao>("Rotatória", TipoConexao.Rotatoria));
+        CbConnection.Items.Add(new Option<TipoConexao>("Não ajustar (vias sobrepostas)", TipoConexao.Nenhuma));
+        CbFreeEnds.Items.Add(new Option<FimLivre>("Sem tratamento", FimLivre.Nenhum));
+        CbFreeEnds.Items.Add(new Option<FimLivre>("Cul-de-sac (balão de retorno)", FimLivre.CulDeSac));
+        var st = PluginContext.Settings;
+        Select(CbConnection, st.LastConnection);
+        Select(CbFreeEnds, st.LastFreeEnds);
+        TbCurveRadius.Text = UiHelpers.F(st.LastCurveRadius, "0.#");
 
         var types = Enum.GetValues<TipoElementoSecao>().Select(t => new TypeOption(t, ElementoSecao.Rotulo(t))).ToList();
         ColTypeRight.ItemsSource = types;
@@ -145,6 +164,7 @@ public partial class RoadWindow : Window
     {
         var was = _loading;
         _loading = true;
+        Select(CbHierarchy, s.Hierarchy);
         RbTwoWay.IsChecked = s.TwoWay;
         RbOneWay.IsChecked = !s.TwoWay;
         Select(CbCenter, s.Center);
@@ -192,6 +212,7 @@ public partial class RoadWindow : Window
     {
         var s = new RoadSetup
         {
+            Hierarchy = Selected<HierarquiaViaria>(CbHierarchy),
             TwoWay = RbTwoWay.IsChecked == true,
             Right = _right.Select(r => r.Element.Clone()).ToList(),
             Left = _left.Select(r => r.Element.Clone()).ToList(),
@@ -272,6 +293,15 @@ public partial class RoadWindow : Window
     {
         if (_loading) return;
         UpdateCenterEnabled();
+        UpdatePreview();
+    }
+
+    /// <summary>A velocidade acompanha a hierarquia escolhida (CTB art. 61) – pode ser alterada depois.</summary>
+    private void HierarchyChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        var h = Selected<HierarquiaViaria>(CbHierarchy);
+        if (h != HierarquiaViaria.NaoDefinida) TbSpeed.Text = UiHelpers.F(Hierarquia.DefaultSpeed(h), "0");
         UpdatePreview();
     }
 
@@ -441,8 +471,22 @@ public partial class RoadWindow : Window
             GridRight.CommitEdit(DataGridEditingUnit.Row, true);
             GridLeft.CommitEdit(DataGridEditingUnit.Row, true);
             Setup = BuildSetup();
+            if (Setup.Hierarchy == HierarquiaViaria.NaoDefinida)
+            {
+                UiHelpers.Error("Defina a hierarquia viária da via (CTB art. 60): trânsito rápido, arterial, coletora, local, rodovia ou estrada.");
+                CbHierarchy.Focus();
+                return;
+            }
             OutputSettings = Output.Save();
             DrawPath = RbDraw.IsChecked == true;
+            Connection = Selected<TipoConexao>(CbConnection);
+            FreeEnds = Selected<FimLivre>(CbFreeEnds);
+            Snap = CkSnap.IsChecked == true;
+            CurveRadius = UiHelpers.Parse(TbCurveRadius, 0, "Raio das curvas", 0, 5000);
+            var st = PluginContext.Settings;
+            st.LastConnection = Connection;
+            st.LastFreeEnds = FreeEnds;
+            st.LastCurveRadius = CurveRadius;
             PluginContext.Settings.DefaultSpeed = Setup.Speed;
             DialogResult = true;
         }
