@@ -1,0 +1,362 @@
+{
+  "versao": "1.0",
+  "aviso": "Valores padrão compilados a partir do Manual Brasileiro de Sinalização de Trânsito – Vol. IV Sinalização Horizontal (aprovado pela Res. CONTRAN nº 236/2007) e de práticas usuais de projeto. Confira sempre a edição vigente do manual, as resoluções do CONTRAN/SENATRAN e as exigências do órgão com circunscrição sobre a via. Todos os valores são editáveis neste arquivo.",
+  "normas": [
+    { "sigla": "MBST Vol. IV", "titulo": "Manual Brasileiro de Sinalização de Trânsito – Sinalização Horizontal (CONTRAN/SENATRAN)", "aplicacao": "Tipos, cores, dimensões e critérios de aplicação de todas as marcas viárias." },
+    { "sigla": "CTB / Resoluções CONTRAN", "titulo": "Código de Trânsito Brasileiro e resoluções complementares (vagas especiais, ondulações transversais etc.)", "aplicacao": "Obrigatoriedade e regulamentação da sinalização." },
+    { "sigla": "DNIT", "titulo": "Manual de Sinalização Rodoviária (DNIT/IPR)", "aplicacao": "Critérios para rodovias federais: padrões de tracejado, tachas, zebrados." },
+    { "sigla": "ABNT NBR 9050", "titulo": "Acessibilidade a edificações, mobiliário, espaços e equipamentos urbanos", "aplicacao": "Vagas reservadas, faixa adicional de circulação, rebaixamento de calçadas e travessias." },
+    { "sigla": "ABNT NBR 16537", "titulo": "Acessibilidade – Sinalização tátil no piso", "aplicacao": "Piso tátil de alerta e direcional em travessias e calçadas." },
+    { "sigla": "ABNT NBR 14723", "titulo": "Sinalização horizontal viária – retrorrefletividade", "aplicacao": "Avaliação do desempenho retrorrefletivo da demarcação (controle de qualidade)." },
+    { "sigla": "ABNT NBR 15405", "titulo": "Sinalização horizontal viária – tintas: execução e avaliação", "aplicacao": "Procedimentos de execução da demarcação com tintas." },
+    { "sigla": "ABNT NBR 15870", "titulo": "Sinalização horizontal viária (materiais)", "aplicacao": "Especificação de materiais de demarcação citada pelo projeto." },
+    { "sigla": "ABNT NBR 14282", "titulo": "Sinalização viária (materiais/dispositivos)", "aplicacao": "Especificação complementar citada pelo projeto." }
+  ],
+  "lineares": [
+    {
+      "codigo": "LFO-1", "nome": "Linha simples contínua – divisão de fluxos opostos", "grupo": "Longitudinal", "cor": "Amarela",
+      "descricao": "Divide fluxos opostos e proíbe a ultrapassagem e os deslocamentos laterais nos dois sentidos.",
+      "referencia": "MBST Vol. IV – Marcas longitudinais (LFO-1)", "larguraMin": 0.10, "larguraMax": 0.15,
+      "variantes": [
+        { "nome": "V ≤ 60 km/h", "velocidadeMax": 60, "faixas": [ { "deslocamento": 0, "largura": 0.10 } ] },
+        { "nome": "60 < V ≤ 80 km/h", "velocidadeMax": 80, "faixas": [ { "deslocamento": 0, "largura": 0.12 } ] },
+        { "nome": "V > 80 km/h", "velocidadeMax": 999, "faixas": [ { "deslocamento": 0, "largura": 0.15 } ] }
+      ]
+    },
+    {
+      "codigo": "LFO-2", "nome": "Linha simples seccionada – divisão de fluxos opostos", "grupo": "Longitudinal", "cor": "Amarela",
+      "descricao": "Divide fluxos opostos permitindo a ultrapassagem e os deslocamentos laterais. Relação traço/espaço entre 1:2 e 1:3.",
+      "referencia": "MBST Vol. IV – Marcas longitudinais (LFO-2)", "larguraMin": 0.10, "larguraMax": 0.15,
+      "variantes": [
+        { "nome": "V ≤ 60 km/h (2 × 4 m)", "velocidadeMax": 60, "faixas": [ { "deslocamento": 0, "largura": 0.10, "padrao": [ 2.0, 4.0 ] } ] },
+        { "nome": "60 < V ≤ 80 km/h (3 × 6 m)", "velocidadeMax": 80, "faixas": [ { "deslocamento": 0, "largura": 0.12, "padrao": [ 3.0, 6.0 ] } ] },
+        { "nome": "V > 80 km/h (4 × 12 m)", "velocidadeMax": 999, "faixas": [ { "deslocamento": 0, "largura": 0.15, "padrao": [ 4.0, 12.0 ] } ] }
+      ]
+    },
+    {
+      "codigo": "LFO-3", "nome": "Linha dupla contínua – divisão de fluxos opostos", "grupo": "Longitudinal", "cor": "Amarela",
+      "descricao": "Duas linhas contínuas paralelas: proíbe a ultrapassagem e a transposição nos dois sentidos.",
+      "referencia": "MBST Vol. IV – Marcas longitudinais (LFO-3)", "larguraMin": 0.10, "larguraMax": 0.15,
+      "variantes": [
+        { "nome": "V ≤ 80 km/h (0,10 + 0,10 + 0,10)", "velocidadeMax": 80, "faixas": [ { "deslocamento": 0.10, "largura": 0.10 }, { "deslocamento": -0.10, "largura": 0.10 } ] },
+        { "nome": "V > 80 km/h (0,15 + 0,15 + 0,15)", "velocidadeMax": 999, "faixas": [ { "deslocamento": 0.15, "largura": 0.15 }, { "deslocamento": -0.15, "largura": 0.15 } ] }
+      ]
+    },
+    {
+      "codigo": "LFO-4", "nome": "Linha dupla contínua/seccionada – divisão de fluxos opostos", "grupo": "Longitudinal", "cor": "Amarela",
+      "descricao": "Uma linha contínua e outra seccionada: permite a ultrapassagem somente para o fluxo adjacente à linha seccionada. Use 'Inverter lados' para trocar.",
+      "referencia": "MBST Vol. IV – Marcas longitudinais (LFO-4)", "larguraMin": 0.10, "larguraMax": 0.15,
+      "variantes": [
+        { "nome": "V ≤ 60 km/h (2 × 4 m)", "velocidadeMax": 60, "faixas": [ { "deslocamento": 0.10, "largura": 0.10 }, { "deslocamento": -0.10, "largura": 0.10, "padrao": [ 2.0, 4.0 ] } ] },
+        { "nome": "60 < V ≤ 80 km/h (3 × 6 m)", "velocidadeMax": 80, "faixas": [ { "deslocamento": 0.11, "largura": 0.12 }, { "deslocamento": -0.11, "largura": 0.12, "padrao": [ 3.0, 6.0 ] } ] },
+        { "nome": "V > 80 km/h (4 × 12 m)", "velocidadeMax": 999, "faixas": [ { "deslocamento": 0.15, "largura": 0.15 }, { "deslocamento": -0.15, "largura": 0.15, "padrao": [ 4.0, 12.0 ] } ] }
+      ]
+    },
+    {
+      "codigo": "LMS-1", "nome": "Linha simples contínua – divisão de fluxos de mesmo sentido", "grupo": "Longitudinal", "cor": "Branca",
+      "descricao": "Separa faixas de mesmo sentido proibindo a transposição (aproximações de interseções, pontes, túneis).",
+      "referencia": "MBST Vol. IV – Marcas longitudinais (LMS-1)", "larguraMin": 0.10, "larguraMax": 0.20,
+      "variantes": [
+        { "nome": "V ≤ 60 km/h", "velocidadeMax": 60, "faixas": [ { "deslocamento": 0, "largura": 0.10 } ] },
+        { "nome": "V > 60 km/h", "velocidadeMax": 999, "faixas": [ { "deslocamento": 0, "largura": 0.15 } ] }
+      ]
+    },
+    {
+      "codigo": "LMS-2", "nome": "Linha simples seccionada – divisão de fluxos de mesmo sentido", "grupo": "Longitudinal", "cor": "Branca",
+      "descricao": "Separa faixas de mesmo sentido permitindo a mudança de faixa.",
+      "referencia": "MBST Vol. IV – Marcas longitudinais (LMS-2)", "larguraMin": 0.10, "larguraMax": 0.20,
+      "variantes": [
+        { "nome": "V ≤ 60 km/h (2 × 4 m)", "velocidadeMax": 60, "faixas": [ { "deslocamento": 0, "largura": 0.10, "padrao": [ 2.0, 4.0 ] } ] },
+        { "nome": "60 < V ≤ 80 km/h (3 × 6 m)", "velocidadeMax": 80, "faixas": [ { "deslocamento": 0, "largura": 0.12, "padrao": [ 3.0, 6.0 ] } ] },
+        { "nome": "V > 80 km/h (4 × 12 m)", "velocidadeMax": 999, "faixas": [ { "deslocamento": 0, "largura": 0.15, "padrao": [ 4.0, 12.0 ] } ] }
+      ]
+    },
+    {
+      "codigo": "LBO", "nome": "Linha de bordo", "grupo": "Longitudinal", "cor": "Branca",
+      "descricao": "Delimita a parte da pista destinada ao deslocamento de veículos (bordo da pista).",
+      "referencia": "MBST Vol. IV – Marcas longitudinais (LBO)", "larguraMin": 0.10, "larguraMax": 0.30,
+      "variantes": [
+        { "nome": "V ≤ 60 km/h", "velocidadeMax": 60, "faixas": [ { "deslocamento": 0, "largura": 0.10 } ] },
+        { "nome": "60 < V ≤ 80 km/h", "velocidadeMax": 80, "faixas": [ { "deslocamento": 0, "largura": 0.15 } ] },
+        { "nome": "V > 80 km/h", "velocidadeMax": 999, "faixas": [ { "deslocamento": 0, "largura": 0.20 } ] }
+      ]
+    },
+    {
+      "codigo": "LCO", "nome": "Linha de continuidade", "grupo": "Longitudinal", "cor": "Branca",
+      "descricao": "Dá continuidade visual a marcas longitudinais em interseções e acessos. Use a mesma largura da linha continuada (e cor amarela quando continuar uma LFO).",
+      "referencia": "MBST Vol. IV – Marcas longitudinais (LCO)", "larguraMin": 0.10, "larguraMax": 0.30,
+      "variantes": [
+        { "nome": "V ≤ 60 km/h (1 × 1 m)", "velocidadeMax": 60, "faixas": [ { "deslocamento": 0, "largura": 0.10, "padrao": [ 1.0, 1.0 ] } ] },
+        { "nome": "V > 60 km/h (2 × 2 m)", "velocidadeMax": 999, "faixas": [ { "deslocamento": 0, "largura": 0.15, "padrao": [ 2.0, 2.0 ] } ] }
+      ]
+    },
+    {
+      "codigo": "MFE", "nome": "Marcação de faixa exclusiva", "grupo": "Longitudinal", "cor": "Branca",
+      "descricao": "Delimita faixa de uso exclusivo (ex.: ônibus). Contínua proíbe a transposição; seccionada permite em trechos de acesso.",
+      "referencia": "MBST Vol. IV – Marcação de faixa exclusiva", "larguraMin": 0.20, "larguraMax": 0.30,
+      "variantes": [
+        { "nome": "Contínua 0,20 m", "faixas": [ { "deslocamento": 0, "largura": 0.20 } ] },
+        { "nome": "Contínua 0,30 m", "faixas": [ { "deslocamento": 0, "largura": 0.30 } ] },
+        { "nome": "Seccionada 0,20 m (1 × 1 m)", "faixas": [ { "deslocamento": 0, "largura": 0.20, "padrao": [ 1.0, 1.0 ] } ] }
+      ]
+    },
+    {
+      "codigo": "MFR", "nome": "Marcação de faixa reversível", "grupo": "Longitudinal", "cor": "Amarela",
+      "descricao": "Linha dupla seccionada que delimita faixa de sentido reversível.",
+      "referencia": "MBST Vol. IV – Marcação de faixa reversível", "larguraMin": 0.10, "larguraMax": 0.15,
+      "variantes": [
+        { "nome": "Dupla seccionada 0,10 m (2 × 4 m)", "faixas": [ { "deslocamento": 0.10, "largura": 0.10, "padrao": [ 2.0, 4.0 ] }, { "deslocamento": -0.10, "largura": 0.10, "padrao": [ 2.0, 4.0 ] } ] }
+      ]
+    },
+    {
+      "codigo": "LCA", "nome": "Linha de canalização", "grupo": "Canalizacao", "cor": "Branca",
+      "descricao": "Contorna áreas de pavimento não utilizáveis (ilhas pintadas, afunilamentos). Amarela quando separa fluxos opostos.",
+      "referencia": "MBST Vol. IV – Marcas de canalização (LCA)", "larguraMin": 0.10, "larguraMax": 0.30,
+      "variantes": [
+        { "nome": "0,15 m", "faixas": [ { "deslocamento": 0, "largura": 0.15 } ] },
+        { "nome": "0,20 m", "faixas": [ { "deslocamento": 0, "largura": 0.20 } ] },
+        { "nome": "0,30 m", "faixas": [ { "deslocamento": 0, "largura": 0.30 } ] }
+      ]
+    },
+    {
+      "codigo": "LPP", "nome": "Linha de indicação de proibição de estacionamento e/ou parada", "grupo": "Estacionamento", "cor": "Amarela",
+      "descricao": "Junto ao meio-fio. Contínua: proibido estacionar e parar. Seccionada: proibido estacionar.",
+      "referencia": "MBST Vol. IV – Marcas de delimitação e controle de estacionamento (LPP)", "larguraMin": 0.10, "larguraMax": 0.20,
+      "variantes": [
+        { "nome": "Contínua – proibido estacionar e parar", "faixas": [ { "deslocamento": 0, "largura": 0.10 } ] },
+        { "nome": "Seccionada – proibido estacionar (1 × 1 m)", "faixas": [ { "deslocamento": 0, "largura": 0.10, "padrao": [ 1.0, 1.0 ] } ] }
+      ]
+    },
+    {
+      "codigo": "LRE", "nome": "Linha de retenção", "grupo": "Transversal", "cor": "Branca", "transversal": true,
+      "descricao": "Indica o local limite de parada (semáforos, PARE, faixas de pedestres).",
+      "referencia": "MBST Vol. IV – Marcas transversais (LRE)", "larguraMin": 0.30, "larguraMax": 0.60,
+      "variantes": [
+        { "nome": "0,40 m", "faixas": [ { "deslocamento": 0, "largura": 0.40 } ] },
+        { "nome": "0,30 m", "faixas": [ { "deslocamento": 0, "largura": 0.30 } ] },
+        { "nome": "0,50 m", "faixas": [ { "deslocamento": 0, "largura": 0.50 } ] },
+        { "nome": "0,60 m", "faixas": [ { "deslocamento": 0, "largura": 0.60 } ] }
+      ]
+    },
+    {
+      "codigo": "LDP", "nome": "Linha de \"Dê a preferência\"", "grupo": "Transversal", "cor": "Branca", "transversal": true,
+      "alinhamento": "Centro",
+      "descricao": "Indica o local limite de parada quando houver sinal R-2 (Dê a preferência).",
+      "referencia": "MBST Vol. IV – Marcas transversais (LDP)", "larguraMin": 0.20, "larguraMax": 0.40,
+      "variantes": [
+        { "nome": "0,30 m (0,50 × 0,50 m)", "faixas": [ { "deslocamento": 0, "largura": 0.30, "padrao": [ 0.50, 0.50 ] } ] },
+        { "nome": "0,40 m (0,60 × 0,60 m)", "faixas": [ { "deslocamento": 0, "largura": 0.40, "padrao": [ 0.60, 0.60 ] } ] },
+        { "nome": "0,20 m (0,50 × 0,50 m)", "faixas": [ { "deslocamento": 0, "largura": 0.20, "padrao": [ 0.50, 0.50 ] } ] }
+      ]
+    },
+    {
+      "codigo": "FTP-1", "nome": "Faixa de travessia de pedestres – zebrada", "grupo": "Transversal", "cor": "Branca", "transversal": true,
+      "alinhamento": "Centro", "descartarParciais": true,
+      "descricao": "Clique os dois bordos da pista no alinhamento da travessia. A 'largura' é a dimensão da faixa no sentido do tráfego (mín. 3,00 m; recomendada 4,00 m). Barras de 0,30 a 0,40 m com espaçamento de 0,30 a 0,80 m.",
+      "referencia": "MBST Vol. IV – Faixa de travessia de pedestres (FTP-1)", "larguraMin": 3.00, "larguraMax": 8.00,
+      "variantes": [
+        { "nome": "4,00 m – barras 0,40 / 0,60 m", "faixas": [ { "deslocamento": 0, "largura": 4.00, "padrao": [ 0.40, 0.60 ] } ] },
+        { "nome": "3,00 m – barras 0,40 / 0,60 m", "faixas": [ { "deslocamento": 0, "largura": 3.00, "padrao": [ 0.40, 0.60 ] } ] },
+        { "nome": "4,00 m – barras 0,40 / 0,40 m", "faixas": [ { "deslocamento": 0, "largura": 4.00, "padrao": [ 0.40, 0.40 ] } ] },
+        { "nome": "5,00 m – barras 0,40 / 0,60 m", "faixas": [ { "deslocamento": 0, "largura": 5.00, "padrao": [ 0.40, 0.60 ] } ] }
+      ]
+    },
+    {
+      "codigo": "FTP-2", "nome": "Faixa de travessia de pedestres – paralela", "grupo": "Transversal", "cor": "Branca", "transversal": true,
+      "descricao": "Duas linhas paralelas ao alinhamento da travessia. Distância interna mínima de 3,00 m (recomendada 4,00 m).",
+      "referencia": "MBST Vol. IV – Faixa de travessia de pedestres (FTP-2)", "larguraMin": 0.30, "larguraMax": 0.60,
+      "variantes": [
+        { "nome": "Interna 4,00 m – linhas 0,40 m", "faixas": [ { "deslocamento": 2.20, "largura": 0.40 }, { "deslocamento": -2.20, "largura": 0.40 } ] },
+        { "nome": "Interna 3,00 m – linhas 0,40 m", "faixas": [ { "deslocamento": 1.70, "largura": 0.40 }, { "deslocamento": -1.70, "largura": 0.40 } ] },
+        { "nome": "Interna 3,00 m – linhas 0,30 m", "faixas": [ { "deslocamento": 1.65, "largura": 0.30 }, { "deslocamento": -1.65, "largura": 0.30 } ] }
+      ]
+    },
+    {
+      "codigo": "MCC", "nome": "Marcação de cruzamento rodocicloviário", "grupo": "Ciclovia", "cor": "Branca", "transversal": true,
+      "alinhamento": "Centro", "descartarParciais": true,
+      "descricao": "Quadrados alinhados nos dois lados da travessia de ciclistas. Clique os bordos da pista no eixo da travessia.",
+      "referencia": "MBST Vol. IV – Marcação de cruzamento rodocicloviário (MCC)", "larguraMin": 0.40, "larguraMax": 0.60,
+      "variantes": [
+        { "nome": "Travessia 2,00 m – quadrados 0,40 m", "faixas": [ { "deslocamento": 1.20, "largura": 0.40, "padrao": [ 0.40, 0.40 ] }, { "deslocamento": -1.20, "largura": 0.40, "padrao": [ 0.40, 0.40 ] } ] },
+        { "nome": "Travessia 2,50 m – quadrados 0,50 m", "faixas": [ { "deslocamento": 1.50, "largura": 0.50, "padrao": [ 0.50, 0.50 ] }, { "deslocamento": -1.50, "largura": 0.50, "padrao": [ 0.50, 0.50 ] } ] }
+      ]
+    },
+    {
+      "codigo": "LRV", "nome": "Linhas de estímulo à redução de velocidade", "grupo": "Transversal", "cor": "Branca",
+      "descricao": "Desenhe o caminho no SENTIDO do tráfego, ao longo da faixa. A 'largura' é a extensão transversal das linhas (largura da faixa de rolamento). Espaçamentos decrescentes – ajuste conforme o estudo de redução de velocidade.",
+      "referencia": "MBST Vol. IV – Marcas transversais (LRV)", "larguraMin": 2.50, "larguraMax": 12.0,
+      "variantes": [
+        { "nome": "Sequência 80 → 40 km/h (exemplo)", "observacao": "Linhas de 0,40 m com espaçamentos decrescentes.", "faixas": [ { "deslocamento": 0, "largura": 3.50, "repetir": false, "padrao": [ 0.40, 8.0, 0.40, 7.0, 0.40, 6.0, 0.40, 5.5, 0.40, 5.0, 0.40, 4.5, 0.40, 4.0, 0.40, 3.5, 0.40, 3.0, 0.40, 3.0, 0.40 ] } ] },
+        { "nome": "Sequência 60 → 30 km/h (exemplo)", "faixas": [ { "deslocamento": 0, "largura": 3.50, "repetir": false, "padrao": [ 0.40, 5.0, 0.40, 4.5, 0.40, 4.0, 0.40, 3.5, 0.40, 3.0, 0.40, 2.5, 0.40, 2.0, 0.40 ] } ] }
+      ]
+    },
+    {
+      "codigo": "CIC-LD", "nome": "Linha de delimitação de ciclofaixa", "grupo": "Ciclovia", "cor": "Branca",
+      "descricao": "Linha contínua que separa a ciclofaixa da faixa de rolamento de veículos automotores.",
+      "referencia": "MBST Vol. IV – Ciclofaixa ao longo da via", "larguraMin": 0.10, "larguraMax": 0.30,
+      "variantes": [
+        { "nome": "Contínua 0,20 m", "faixas": [ { "deslocamento": 0, "largura": 0.20 } ] },
+        { "nome": "Contínua 0,10 m", "faixas": [ { "deslocamento": 0, "largura": 0.10 } ] },
+        { "nome": "Seccionada 0,20 m (1 × 1 m)", "faixas": [ { "deslocamento": 0, "largura": 0.20, "padrao": [ 1.0, 1.0 ] } ] }
+      ]
+    },
+    {
+      "codigo": "CIC-FD", "nome": "Pintura de fundo de ciclofaixa (vermelha)", "grupo": "Ciclovia", "cor": "Vermelha",
+      "descricao": "Pintura de contraste na cor vermelha em toda a largura da ciclofaixa. Desenhe o eixo da ciclofaixa e ajuste a largura.",
+      "referencia": "MBST Vol. IV – Cor vermelha em ciclovias/ciclofaixas", "larguraMin": 1.00, "larguraMax": 3.00,
+      "variantes": [
+        { "nome": "Unidirecional 1,50 m", "faixas": [ { "deslocamento": 0, "largura": 1.50 } ] },
+        { "nome": "Bidirecional 2,50 m", "faixas": [ { "deslocamento": 0, "largura": 2.50 } ] }
+      ]
+    },
+    {
+      "codigo": "TAC-A", "nome": "Tachas refletivas amarelas (bidirecionais)", "grupo": "Dispositivo", "cor": "Amarela",
+      "unidades": true, "espessura": 0.02,
+      "descricao": "Dispositivos auxiliares refletivos sobre linhas de divisão de fluxos opostos. Cada peça é contada como unidade.",
+      "referencia": "MBST Vol. IV – Dispositivos auxiliares / DNIT", "larguraMin": 0.08, "larguraMax": 0.15,
+      "variantes": [
+        { "nome": "Espaçamento 16 m (tangente)", "faixas": [ { "deslocamento": 0, "largura": 0.10, "padrao": [ 0.10, 15.90 ] } ] },
+        { "nome": "Espaçamento 8 m (curvas)", "faixas": [ { "deslocamento": 0, "largura": 0.10, "padrao": [ 0.10, 7.90 ] } ] },
+        { "nome": "Espaçamento 4 m (pontos críticos)", "faixas": [ { "deslocamento": 0, "largura": 0.10, "padrao": [ 0.10, 3.90 ] } ] }
+      ]
+    },
+    {
+      "codigo": "TAC-B", "nome": "Tachas refletivas brancas (monodirecionais)", "grupo": "Dispositivo", "cor": "Branca",
+      "unidades": true, "espessura": 0.02,
+      "descricao": "Tachas sobre linhas de bordo e de divisão de fluxos de mesmo sentido.",
+      "referencia": "MBST Vol. IV – Dispositivos auxiliares / DNIT", "larguraMin": 0.08, "larguraMax": 0.15,
+      "variantes": [
+        { "nome": "Espaçamento 16 m (tangente)", "faixas": [ { "deslocamento": 0, "largura": 0.10, "padrao": [ 0.10, 15.90 ] } ] },
+        { "nome": "Espaçamento 8 m (curvas)", "faixas": [ { "deslocamento": 0, "largura": 0.10, "padrao": [ 0.10, 7.90 ] } ] }
+      ]
+    },
+    {
+      "codigo": "TACHAO", "nome": "Tachões refletivos", "grupo": "Dispositivo", "cor": "Amarela",
+      "unidades": true, "espessura": 0.05,
+      "descricao": "Tachões para canalização e separação física leve de fluxos.",
+      "referencia": "MBST Vol. IV – Dispositivos auxiliares", "larguraMin": 0.15, "larguraMax": 0.25,
+      "variantes": [
+        { "nome": "Espaçamento 2 m", "faixas": [ { "deslocamento": 0, "largura": 0.15, "padrao": [ 0.25, 1.75 ] } ] },
+        { "nome": "Espaçamento 4 m", "faixas": [ { "deslocamento": 0, "largura": 0.15, "padrao": [ 0.25, 3.75 ] } ] }
+      ]
+    },
+    {
+      "codigo": "PTA", "nome": "Piso tátil de alerta", "grupo": "Acessibilidade", "cor": "Amarela", "espessura": 0.005,
+      "descricao": "Sinalização tátil de alerta (NBR 16537) junto a rebaixamentos de calçada e travessias. Cor contrastante com o piso adjacente.",
+      "referencia": "ABNT NBR 16537 / NBR 9050", "larguraMin": 0.25, "larguraMax": 0.60,
+      "variantes": [
+        { "nome": "Faixa 0,25 m", "faixas": [ { "deslocamento": 0, "largura": 0.25 } ] },
+        { "nome": "Faixa 0,40 m", "faixas": [ { "deslocamento": 0, "largura": 0.40 } ] },
+        { "nome": "Faixa 0,60 m", "faixas": [ { "deslocamento": 0, "largura": 0.60 } ] }
+      ]
+    },
+    {
+      "codigo": "PTD", "nome": "Piso tátil direcional", "grupo": "Acessibilidade", "cor": "Amarela", "espessura": 0.005,
+      "descricao": "Sinalização tátil direcional (NBR 16537) indicando o percurso até a travessia.",
+      "referencia": "ABNT NBR 16537", "larguraMin": 0.25, "larguraMax": 0.60,
+      "variantes": [
+        { "nome": "Faixa 0,25 m", "faixas": [ { "deslocamento": 0, "largura": 0.25 } ] },
+        { "nome": "Faixa 0,40 m", "faixas": [ { "deslocamento": 0, "largura": 0.40 } ] }
+      ]
+    }
+  ],
+  "hachuras": [
+    {
+      "codigo": "ZPA", "nome": "Zebrado de preenchimento de área de pavimento não utilizável (branco)", "grupo": "Canalizacao",
+      "descricao": "Áreas de canalização entre fluxos de mesmo sentido (afunilamentos, ilhas pintadas, narizes de acesso).",
+      "referencia": "MBST Vol. IV – Marcas de canalização (ZPA/LCA)",
+      "corBarras": "Branca", "corBorda": "Branca", "larguraBarra": 0.30, "espacamento": 1.10, "angulo": 45, "larguraBorda": 0.15
+    },
+    {
+      "codigo": "ZPA-A", "nome": "Zebrado de preenchimento de área (amarelo – fluxos opostos)", "grupo": "Canalizacao",
+      "descricao": "Áreas de canalização entre fluxos de sentidos opostos.",
+      "referencia": "MBST Vol. IV – Marcas de canalização (ZPA/LCA)",
+      "corBarras": "Amarela", "corBorda": "Amarela", "larguraBarra": 0.30, "espacamento": 1.10, "angulo": 45, "larguraBorda": 0.15
+    },
+    {
+      "codigo": "ZPA-R", "nome": "Zebrado rodoviário (barras 0,40 / 2,40 m)", "grupo": "Canalizacao",
+      "descricao": "Padrão mais espaçado para vias de maior velocidade.",
+      "referencia": "MBST Vol. IV / DNIT",
+      "corBarras": "Branca", "corBorda": "Branca", "larguraBarra": 0.40, "espacamento": 2.40, "angulo": 45, "larguraBorda": 0.20
+    },
+    {
+      "codigo": "ZPA-V", "nome": "Zebrado em chevron (\"V\")", "grupo": "Canalizacao",
+      "descricao": "Barras espelhadas em relação ao eixo da área (divergências e convergências).",
+      "referencia": "MBST Vol. IV – Marcas de canalização",
+      "corBarras": "Branca", "corBorda": "Branca", "larguraBarra": 0.40, "espacamento": 1.50, "angulo": 45, "larguraBorda": 0.15, "chevron": true
+    },
+    {
+      "codigo": "MAC", "nome": "Marcação de área de conflito (quadriculado)", "grupo": "Transversal",
+      "descricao": "Área de cruzamento que não deve ser ocupada por veículos parados.",
+      "referencia": "MBST Vol. IV – Marcação de área de conflito",
+      "corBarras": "Amarela", "corBorda": "Amarela", "larguraBarra": 0.15, "espacamento": 1.50, "angulo": 45, "larguraBorda": 0.15, "cruzado": true
+    },
+    {
+      "codigo": "MOT", "nome": "Marcação de ondulação transversal (lombada)", "grupo": "Transversal",
+      "descricao": "Faixas inclinadas sobre a ondulação transversal. Confira a resolução CONTRAN vigente sobre ondulações transversais.",
+      "referencia": "Resolução CONTRAN sobre ondulações transversais / MBST Vol. IV",
+      "corBarras": "Amarela", "corBorda": "Amarela", "larguraBarra": 0.25, "espacamento": 0.50, "angulo": 45, "larguraBorda": 0.0
+    },
+    {
+      "codigo": "PCD-FA", "nome": "Faixa adicional de circulação (vaga PcD)", "grupo": "Estacionamento",
+      "descricao": "Zebrado da faixa adicional de circulação de 1,20 m junto à vaga reservada.",
+      "referencia": "ABNT NBR 9050 / Resolução CONTRAN sobre vagas reservadas",
+      "corBarras": "Branca", "corBorda": "Branca", "larguraBarra": 0.10, "espacamento": 0.40, "angulo": 45, "larguraBorda": 0.0
+    }
+  ],
+  "simbolos": [
+    { "codigo": "PEM-F", "nome": "Seta – siga em frente", "forma": "SetaFrente", "cor": "Branca", "comprimentos": [ 5.0, 7.5 ], "descricao": "Seta indicativa de posicionamento na pista para execução de movimento.", "referencia": "MBST Vol. IV – Inscrições no pavimento (setas)" },
+    { "codigo": "PEM-D", "nome": "Seta – vire à direita", "forma": "SetaDireita", "cor": "Branca", "comprimentos": [ 5.0, 7.5 ], "referencia": "MBST Vol. IV – Inscrições no pavimento (setas)" },
+    { "codigo": "PEM-E", "nome": "Seta – vire à esquerda", "forma": "SetaEsquerda", "cor": "Branca", "comprimentos": [ 5.0, 7.5 ], "referencia": "MBST Vol. IV – Inscrições no pavimento (setas)" },
+    { "codigo": "PEM-FD", "nome": "Seta – siga em frente ou à direita", "forma": "SetaFrenteDireita", "cor": "Branca", "comprimentos": [ 5.0, 7.5 ], "referencia": "MBST Vol. IV – Inscrições no pavimento (setas)" },
+    { "codigo": "PEM-FE", "nome": "Seta – siga em frente ou à esquerda", "forma": "SetaFrenteEsquerda", "cor": "Branca", "comprimentos": [ 5.0, 7.5 ], "referencia": "MBST Vol. IV – Inscrições no pavimento (setas)" },
+    { "codigo": "PEM-DE", "nome": "Seta – vire à direita ou à esquerda", "forma": "SetaDireitaEsquerda", "cor": "Branca", "comprimentos": [ 5.0, 7.5 ], "referencia": "MBST Vol. IV – Inscrições no pavimento (setas)" },
+    { "codigo": "PEM-RE", "nome": "Seta – retorno à esquerda", "forma": "SetaRetornoEsquerda", "cor": "Branca", "comprimentos": [ 5.0, 7.5 ], "referencia": "MBST Vol. IV – Inscrições no pavimento (setas)" },
+    { "codigo": "PEM-RD", "nome": "Seta – retorno à direita", "forma": "SetaRetornoDireita", "cor": "Branca", "comprimentos": [ 5.0, 7.5 ], "referencia": "MBST Vol. IV – Inscrições no pavimento (setas)" },
+    { "codigo": "SMF-E", "nome": "Seta de mudança obrigatória de faixa – para a esquerda", "forma": "SetaMudancaFaixaEsquerda", "cor": "Branca", "comprimentos": [ 5.0, 7.5 ], "descricao": "Indica o fim de faixa e a necessidade de mudança.", "referencia": "MBST Vol. IV – Inscrições no pavimento (setas)" },
+    { "codigo": "SMF-D", "nome": "Seta de mudança obrigatória de faixa – para a direita", "forma": "SetaMudancaFaixaDireita", "cor": "Branca", "comprimentos": [ 5.0, 7.5 ], "referencia": "MBST Vol. IV – Inscrições no pavimento (setas)" },
+    { "codigo": "CIC-SETA", "nome": "Seta de sentido de ciclofaixa", "forma": "SetaFrente", "cor": "Branca", "comprimentos": [ 1.5, 2.0 ], "referencia": "MBST Vol. IV – Ciclofaixas" },
+    { "codigo": "SIA", "nome": "Símbolo internacional de acesso (vaga PcD)", "forma": "AcessoDeficiente", "cor": "Branca", "corFundo": "Azul", "comprimentos": [ 1.20, 1.50 ], "descricao": "Símbolo branco sobre fundo azul (comprimento = lado do quadrado).", "referencia": "MBST Vol. IV / ABNT NBR 9050" },
+    { "codigo": "SIC", "nome": "Símbolo de bicicleta (ciclovia/ciclofaixa)", "forma": "Bicicleta", "cor": "Branca", "comprimentos": [ 1.50, 1.80 ], "referencia": "MBST Vol. IV – Ciclofaixas" },
+    { "codigo": "SDP", "nome": "Símbolo \"Dê a preferência\" (triângulo)", "forma": "DePreferencia", "cor": "Branca", "comprimentos": [ 3.60, 6.00 ], "descricao": "Triângulo alongado com o vértice voltado para o condutor.", "referencia": "MBST Vol. IV – Símbolos" },
+    { "codigo": "CSA", "nome": "Cruz de Santo André (passagem em nível)", "forma": "CruzSantoAndre", "cor": "Branca", "comprimentos": [ 4.0, 6.0 ], "referencia": "MBST Vol. IV – Símbolos" },
+    { "codigo": "SSA", "nome": "Símbolo de serviços de saúde", "forma": "ServicoSaude", "cor": "Vermelha", "corFundo": "Branca", "comprimentos": [ 1.20, 1.50 ], "referencia": "MBST Vol. IV – Símbolos" }
+  ],
+  "legendas": [
+    { "texto": "PARE" }, { "texto": "DEVAGAR" }, { "texto": "ESCOLA" }, { "texto": "ÔNIBUS" }, { "texto": "SÓ\nÔNIBUS" },
+    { "texto": "FAIXA\nEXCLUSIVA" }, { "texto": "TÁXI" }, { "texto": "IDOSO" }, { "texto": "CARGA E\nDESCARGA" },
+    { "texto": "AMBULÂNCIA" }, { "texto": "BOMBEIROS" }, { "texto": "POLÍCIA" }, { "texto": "PEDESTRE" }, { "texto": "LENTO" },
+    { "texto": "CUIDADO" }, { "texto": "EMBARQUE" }, { "texto": "DESEMBARQUE" }, { "texto": "CICLOFAIXA" }, { "texto": "CICLOVIA" },
+    { "texto": "MOTO" }, { "texto": "VIATURA" }, { "texto": "HOSPITAL" }
+  ],
+  "tamanhosLetra": [
+    { "nome": "Via urbana – letras de 1,60 m", "altura": 1.60, "fatorLargura": 0.40, "entrelinha": 1.00, "espacamento": 0.08 },
+    { "nome": "Via rápida/rodovia – letras de 2,40 m", "altura": 2.40, "fatorLargura": 0.40, "entrelinha": 1.60, "espacamento": 0.12 },
+    { "nome": "Alta velocidade – letras de 4,00 m", "altura": 4.00, "fatorLargura": 0.35, "entrelinha": 2.50, "espacamento": 0.15 },
+    { "nome": "Estacionamento – letras de 0,50 m", "altura": 0.50, "fatorLargura": 0.70, "entrelinha": 0.30, "espacamento": 0.04 }
+  ],
+  "vagas": [
+    { "codigo": "MER-90", "nome": "Vaga comum 90° (2,40 × 5,00 m)", "tipo": "Comum", "angulo": 90, "largura": 2.40, "comprimento": 5.00, "larguraLinha": 0.10, "cor": "Branca", "referencia": "MBST Vol. IV – Marca delimitadora de estacionamento regulamentado (MER)" },
+    { "codigo": "MER-60", "nome": "Vaga comum 60° (2,40 × 5,00 m)", "tipo": "Comum", "angulo": 60, "largura": 2.40, "comprimento": 5.00, "larguraLinha": 0.10, "cor": "Branca", "referencia": "MBST Vol. IV – MER" },
+    { "codigo": "MER-45", "nome": "Vaga comum 45° (2,40 × 5,00 m)", "tipo": "Comum", "angulo": 45, "largura": 2.40, "comprimento": 5.00, "larguraLinha": 0.10, "cor": "Branca", "referencia": "MBST Vol. IV – MER" },
+    { "codigo": "MER-30", "nome": "Vaga comum 30° (2,40 × 5,00 m)", "tipo": "Comum", "angulo": 30, "largura": 2.40, "comprimento": 5.00, "larguraLinha": 0.10, "cor": "Branca", "referencia": "MBST Vol. IV – MER" },
+    { "codigo": "MER-0", "nome": "Vaga comum paralela (2,20 × 5,50 m)", "tipo": "Comum", "angulo": 0, "largura": 2.20, "comprimento": 5.50, "larguraLinha": 0.10, "cor": "Branca", "referencia": "MBST Vol. IV – MER" },
+    { "codigo": "PCD-90", "nome": "Vaga PcD 90° com faixa adicional de 1,20 m", "tipo": "PessoaComDeficiencia", "angulo": 90, "largura": 2.50, "comprimento": 5.00, "larguraLinha": 0.10, "cor": "Branca", "faixaAdicional": 1.20, "referencia": "ABNT NBR 9050 / Resolução CONTRAN sobre vagas reservadas" },
+    { "codigo": "PCD-0", "nome": "Vaga PcD paralela", "tipo": "PessoaComDeficiencia", "angulo": 0, "largura": 2.20, "comprimento": 5.50, "larguraLinha": 0.10, "cor": "Branca", "referencia": "ABNT NBR 9050 / Resolução CONTRAN sobre vagas reservadas" },
+    { "codigo": "IDO-90", "nome": "Vaga idoso 90°", "tipo": "Idoso", "angulo": 90, "largura": 2.50, "comprimento": 5.00, "larguraLinha": 0.10, "cor": "Branca", "legenda": "IDOSO", "referencia": "Resolução CONTRAN sobre vagas reservadas a idosos" },
+    { "codigo": "IDO-0", "nome": "Vaga idoso paralela", "tipo": "Idoso", "angulo": 0, "largura": 2.20, "comprimento": 5.50, "larguraLinha": 0.10, "cor": "Branca", "legenda": "IDOSO", "referencia": "Resolução CONTRAN sobre vagas reservadas a idosos" },
+    { "codigo": "MOTO-90", "nome": "Vaga de motocicleta 90° (1,00 × 2,00 m)", "tipo": "Motocicleta", "angulo": 90, "largura": 1.00, "comprimento": 2.00, "larguraLinha": 0.10, "cor": "Branca", "legenda": "MOTO", "referencia": "MBST Vol. IV – MER" },
+    { "codigo": "CD-0", "nome": "Carga e descarga paralela (2,50 × 10,00 m)", "tipo": "CargaDescarga", "angulo": 0, "largura": 2.50, "comprimento": 10.00, "larguraLinha": 0.10, "cor": "Amarela", "legenda": "CARGA E\nDESCARGA", "referencia": "MBST Vol. IV – Marca delimitadora de parada de veículos específicos (MVE)" },
+    { "codigo": "ONI-0", "nome": "Parada de ônibus (2,80 × 15,00 m)", "tipo": "Onibus", "angulo": 0, "largura": 2.80, "comprimento": 15.00, "larguraLinha": 0.15, "cor": "Amarela", "legenda": "ÔNIBUS", "referencia": "MBST Vol. IV – MVE" },
+    { "codigo": "TAXI-0", "nome": "Ponto de táxi paralelo", "tipo": "Taxi", "angulo": 0, "largura": 2.20, "comprimento": 5.50, "larguraLinha": 0.10, "cor": "Amarela", "legenda": "TÁXI", "referencia": "MBST Vol. IV – MVE" },
+    { "codigo": "AMB-0", "nome": "Vaga de ambulância paralela", "tipo": "Ambulancia", "angulo": 0, "largura": 2.50, "comprimento": 7.00, "larguraLinha": 0.10, "cor": "Amarela", "legenda": "AMBULÂNCIA", "referencia": "MBST Vol. IV – MVE" }
+  ],
+  "materiais": [
+    { "nome": "Tinta acrílica base solvente", "descricao": "Demarcação provisória/definitiva de baixo custo, vida útil curta.", "espessuraMm": 0.6, "consumo": 0.60, "unidadeConsumo": "L/m²", "microesferasKgM2": 0.25, "referencia": "ABNT NBR 15405 / ABNT NBR 11862" },
+    { "nome": "Tinta acrílica base água", "descricao": "Tinta emulsionada em água, menor emissão de solventes.", "espessuraMm": 0.5, "consumo": 0.50, "unidadeConsumo": "L/m²", "microesferasKgM2": 0.25, "referencia": "ABNT NBR 15405 / ABNT NBR 13699" },
+    { "nome": "Termoplástico aspergido (hot spray)", "descricao": "Aplicado a quente por aspersão.", "espessuraMm": 1.5, "consumo": 3.0, "unidadeConsumo": "kg/m²", "microesferasKgM2": 0.40, "referencia": "Especificação ABNT de termoplástico" },
+    { "nome": "Termoplástico extrudado", "descricao": "Aplicado a quente por extrusão, alta durabilidade.", "espessuraMm": 3.0, "consumo": 6.0, "unidadeConsumo": "kg/m²", "microesferasKgM2": 0.40, "referencia": "Especificação ABNT de termoplástico" },
+    { "nome": "Plástico a frio (bicomponente)", "descricao": "Resina metacrilato aplicada a frio.", "espessuraMm": 2.0, "consumo": 3.2, "unidadeConsumo": "kg/m²", "microesferasKgM2": 0.40, "referencia": "Especificação ABNT de plástico a frio" },
+    { "nome": "Laminado elastoplástico", "descricao": "Material pré-formado colado ao pavimento (faixas de pedestres, legendas).", "espessuraMm": 1.5, "consumo": 1.0, "unidadeConsumo": "m²/m²", "microesferasKgM2": 0.0, "referencia": "Especificação ABNT de laminado elastoplástico" }
+  ]
+}

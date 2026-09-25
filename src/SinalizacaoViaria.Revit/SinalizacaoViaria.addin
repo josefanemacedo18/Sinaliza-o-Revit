@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>Sinalização Viária Horizontal</Name>
+    <Assembly>SinalizacaoViaria\SinalizacaoViaria.dll</Assembly>
+    <FullClassName>SinalizacaoViaria.Revit.App</FullClassName>
+    <ClientId>6F0B6C1E-3A57-4C11-9E6B-5B1D2F7A9C40</ClientId>
+    <VendorId>SinalizacaoViaria</VendorId>
+    <VendorDescription>Sinalização viária horizontal paramétrica para Revit (MBST / CONTRAN)</VendorDescription>
+  </AddIn>
+</RevitAddIns>

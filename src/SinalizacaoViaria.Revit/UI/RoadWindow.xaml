@@ -1,0 +1,94 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.RoadWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
+        Title="Sinalizar via – geração automática" Width="1100" Height="720" MinWidth="880" MinHeight="600">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="380"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+            <StackPanel>
+                <TextBlock Text="Seção transversal" Style="{StaticResource Title}"/>
+                <TextBlock Style="{StaticResource Hint}" Text="Selecione (ou desenhe) o EIXO da via. Em mão dupla o eixo é a divisão dos sentidos; em mão única é o centro da pista. O lado direito é o da direita de quem percorre o eixo no sentido em que foi desenhado."/>
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton x:Name="RbTwoWay" Content="Mão dupla" IsChecked="True" Checked="AnyChanged"/>
+                    <RadioButton x:Name="RbOneWay" Content="Mão única" Checked="AnyChanged"/>
+                </StackPanel>
+                <GroupBox x:Name="GbTwoWay" Header="Faixas por sentido">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Lado direito – larguras (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Column="1" x:Name="TbRight" Text="3,50" TextChanged="AnyChanged" ToolTip="Do eixo para fora, separadas por ';'. Ex.: 3,50; 3,30"/>
+                        <TextBlock Grid.Row="1" Text="Lado esquerdo – larguras (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbLeft" Text="3,50" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="2" Text="Eixo central" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CbCenter" SelectionChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="3" Text="Largura do canteiro (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbMedian" Text="2,00" TextChanged="AnyChanged"/>
+                        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkInvertCenter" Content="LFO-4: contínua do lado direito" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox x:Name="GbOneWay" Header="Faixas (mão única)" Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <TextBlock Text="Larguras, esq. → dir. (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Column="1" x:Name="TbOneWay" Text="3,50; 3,50" TextChanged="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox Header="Linhas">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Velocidade regulamentada (km/h)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Column="1" x:Name="TbSpeed" Text="60" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="1" Text="Entre faixas de mesmo sentido" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbDivider" SelectionChanged="AnyChanged"/>
+                        <CheckBox Grid.Row="2" x:Name="CkEdges" Content="Linhas de bordo" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CbEdge" SelectionChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="3" Text="Afastamento do bordo (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbEdgeInset" Text="0,10" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="4" Text="Recuo início / fim (m)" Style="{StaticResource FieldLabel}"/>
+                        <Grid Grid.Row="4" Grid.Column="1">
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="6"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBox x:Name="TbStart" Text="0" TextChanged="AnyChanged"/>
+                            <TextBox Grid.Column="2" x:Name="TbEnd" Text="0" TextChanged="AnyChanged"/>
+                        </Grid>
+                        <CheckBox Grid.Row="5" x:Name="CkStuds" Content="Tachas no eixo" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <ComboBox Grid.Row="5" Grid.Column="1" x:Name="CbStuds" SelectionChanged="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox Header="Caminho (eixo)">
+                    <StackPanel>
+                        <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas existentes" IsChecked="True"/>
+                        <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar o eixo por pontos"/>
+                    </StackPanel>
+                </GroupBox>
+                <ui:OutputPanel x:Name="Output"/>
+            </StackPanel>
+        </ScrollViewer>
+        <DockPanel Grid.Column="1">
+            <TextBlock DockPanel.Dock="Top" Text="Pré-visualização" Style="{StaticResource Title}"/>
+            <TextBlock DockPanel.Dock="Bottom" x:Name="TxtSummary" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
+                <ui:GeometryPreview x:Name="Preview"/>
+            </Border>
+        </DockPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="Criar" Style="{StaticResource Primary}" Click="OkClick" IsDefault="True"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

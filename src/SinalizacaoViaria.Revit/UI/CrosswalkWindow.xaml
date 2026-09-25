@@ -1,0 +1,73 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.CrosswalkWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
+        Title="Faixa de travessia de pedestres" Width="1040" Height="680" MinWidth="860" MinHeight="560">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="370"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+            <StackPanel>
+                <TextBlock Text="Travessia" Style="{StaticResource Title}"/>
+                <TextBlock Style="{StaticResource Hint}" Text="Após confirmar, clique os dois bordos da pista no alinhamento da travessia (repete até ESC). As linhas de retenção são posicionadas conforme a circulação pela direita."/>
+                <GroupBox Header="Faixa de pedestres">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Tipo" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Column="1" x:Name="CbType" SelectionChanged="TypeChanged"/>
+                        <TextBlock Grid.Row="1" Text="Variante" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbVariant" SelectionChanged="AnyChanged" DisplayMemberPath="Nome"/>
+                        <TextBlock Grid.Row="2" Text="Largura da faixa (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbWidth" TextChanged="AnyChanged" ToolTip="FTP-1: dimensão no sentido do tráfego. Vazio = variante."/>
+                        <TextBlock Grid.Row="3" Text="Recuo dos bordos (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbSetback" Text="0" TextChanged="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox Header="Linhas de retenção (LRE)">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <CheckBox Grid.ColumnSpan="2" x:Name="CkStop" Content="Criar linhas de retenção" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <TextBlock Grid.Row="1" Text="Largura" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbStopVariant" SelectionChanged="AnyChanged" DisplayMemberPath="Nome"/>
+                        <TextBlock Grid.Row="2" Text="Distância até a faixa (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbDistance" Text="1,60" TextChanged="AnyChanged"/>
+                        <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal">
+                            <CheckBox x:Name="CkLeft" Content="Lado esquerdo (A→B)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged" Margin="0,4,14,4"/>
+                            <CheckBox x:Name="CkRight" Content="Lado direito" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal">
+                            <RadioButton x:Name="RbHalf" Content="Meia pista (mão dupla)" IsChecked="True" Checked="AnyChanged"/>
+                            <RadioButton x:Name="RbFull" Content="Pista inteira (mão única)" Checked="AnyChanged"/>
+                        </StackPanel>
+                    </Grid>
+                </GroupBox>
+                <ui:OutputPanel x:Name="Output"/>
+            </StackPanel>
+        </ScrollViewer>
+        <DockPanel Grid.Column="1">
+            <TextBlock DockPanel.Dock="Top" Text="Pré-visualização (pista de 7 m, A embaixo → B em cima)" Style="{StaticResource Title}"/>
+            <TextBlock DockPanel.Dock="Bottom" x:Name="TxtWarnings" Foreground="{StaticResource Warn}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
+                <ui:GeometryPreview x:Name="Preview"/>
+            </Border>
+        </DockPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="Criar" Style="{StaticResource Primary}" Click="OkClick" IsDefault="True"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

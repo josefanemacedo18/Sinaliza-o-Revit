@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Revit 2027 roda sobre .NET 10 -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RootNamespace>SinalizacaoViaria.Revit</RootNamespace>
+    <AssemblyName>SinalizacaoViaria</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <GenerateDependencyFile>true</GenerateDependencyFile>
+    <RevitVersion>2027</RevitVersion>
+    <!-- Copia automaticamente para a pasta de Add-ins do Revit ao compilar no Windows -->
+    <DeployToRevit Condition="'$(DeployToRevit)' == ''">true</DeployToRevit>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Referências da API do Revit 2027 (somente compilação; em execução o Revit fornece as DLLs) -->
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPI" Version="$(RevitVersion).*" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="$(RevitVersion).*" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SinalizacaoViaria.Core\SinalizacaoViaria.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="SinalizacaoViaria.addin" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="DeployAddin" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT' And '$(DeployToRevit)' == 'true'">
+    <PropertyGroup>
+      <AddinRoot>$(AppData)\Autodesk\Revit\Addins\$(RevitVersion)</AddinRoot>
+      <AddinDir>$(AddinRoot)\SinalizacaoViaria</AddinDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <DeployFiles Include="$(TargetDir)*.dll;$(TargetDir)*.pdb;$(TargetDir)*.deps.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(AddinDir)" SkipUnchangedFiles="true" ContinueOnError="true" />
+    <Copy SourceFiles="$(TargetDir)SinalizacaoViaria.addin" DestinationFolder="$(AddinRoot)" SkipUnchangedFiles="true" ContinueOnError="true" />
+    <Message Importance="high" Text="Plugin copiado para $(AddinDir)" />
+  </Target>
+
+</Project>

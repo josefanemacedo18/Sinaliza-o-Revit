@@ -1,0 +1,74 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.SymbolWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
+        Title="Setas e símbolos" Width="1040" Height="660" MinWidth="860" MinHeight="540">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300"/>
+            <ColumnDefinition Width="300"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <DockPanel Margin="0,0,12,0">
+            <TextBlock DockPanel.Dock="Top" Text="Símbolo" Style="{StaticResource Title}"/>
+            <Border DockPanel.Dock="Bottom" Background="{StaticResource Panel}" Padding="8" Margin="0,6,0,0">
+                <StackPanel>
+                    <TextBlock x:Name="TxtDescription" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TxtReference" Style="{StaticResource Hint}" FontStyle="Italic"/>
+                </StackPanel>
+            </Border>
+            <ListBox x:Name="LbSymbols" SelectionChanged="SymbolChanged"/>
+        </DockPanel>
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+            <StackPanel>
+                <TextBlock Text="Parâmetros" Style="{StaticResource Title}"/>
+                <GroupBox Header="Dimensões">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Comprimento (m)" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Column="1" x:Name="CbLength" IsEditable="True" SelectionChanged="AnyChanged" LostFocus="AnyChanged" KeyUp="AnyKey"/>
+                        <TextBlock Grid.Row="1" Text="Fator de largura" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbWidthFactor" Text="1" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="2" Text="Cor" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CbColor" SelectionChanged="AnyChanged"/>
+                        <CheckBox Grid.Row="3" Grid.ColumnSpan="2" x:Name="CkMirror" Content="Espelhar" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox x:Name="GbPlacement" Header="Inserção">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" Text="O 1º clique é a base do símbolo (cauda da seta). O 2º clique indica o sentido do tráfego."/>
+                        <RadioButton x:Name="RbTwoClicks" GroupName="place" Content="Base + sentido (2 cliques, repete até ESC)" IsChecked="True"/>
+                        <RadioButton x:Name="RbAngle" GroupName="place" Content="Base + ângulo fixo (1 clique)"/>
+                        <StackPanel Orientation="Horizontal" Margin="20,0,0,0">
+                            <TextBlock Text="Ângulo (°, 0 = norte do projeto)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbAngle" Text="0" Width="60"/>
+                        </StackPanel>
+                    </StackPanel>
+                </GroupBox>
+                <ui:OutputPanel x:Name="Output"/>
+            </StackPanel>
+        </ScrollViewer>
+        <DockPanel Grid.Column="2">
+            <TextBlock DockPanel.Dock="Top" Text="Pré-visualização" Style="{StaticResource Title}"/>
+            <TextBlock DockPanel.Dock="Bottom" x:Name="TxtWarnings" Foreground="{StaticResource Warn}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
+                <ui:GeometryPreview x:Name="Preview"/>
+            </Border>
+        </DockPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="BtnOk" Content="Inserir" Style="{StaticResource Primary}" Click="OkClick" IsDefault="True"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

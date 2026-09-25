@@ -1,0 +1,79 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.TextWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
+        Title="Legendas no pavimento" Width="1060" Height="700" MinWidth="880" MinHeight="580">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="330"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <DockPanel Margin="0,0,12,0">
+            <TextBlock DockPanel.Dock="Top" Text="Legendas usuais" Style="{StaticResource Title}"/>
+            <ListBox x:Name="LbPresets" SelectionChanged="PresetChanged"/>
+        </DockPanel>
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+            <StackPanel>
+                <TextBlock Text="Texto" Style="{StaticResource Title}"/>
+                <TextBox x:Name="TbText" AcceptsReturn="True" Height="64" TextChanged="AnyChanged" CharacterCasing="Upper" VerticalContentAlignment="Top"
+                         ToolTip="Uma linha por palavra/grupo. A primeira linha é lida primeiro (fica mais próxima do condutor)."/>
+                <GroupBox Header="Letras">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Padrão" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Column="1" x:Name="CbSize" SelectionChanged="LetterSizeChanged"/>
+                        <TextBlock Grid.Row="1" Text="Altura das letras (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbHeight" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="2" Text="Fator de largura" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbWidthFactor" TextChanged="AnyChanged" ToolTip="Menor = letras mais alongadas (perspectiva do condutor)."/>
+                        <TextBlock Grid.Row="3" Text="Espaço entre letras (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbLetter" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="4" Text="Espaço entre linhas (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="4" Grid.Column="1" x:Name="TbLine" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="5" Text="Fonte" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="5" Grid.Column="1" x:Name="CbFont" IsEditable="True" SelectionChanged="AnyChanged" LostFocus="AnyChanged"/>
+                        <CheckBox Grid.Row="6" Grid.ColumnSpan="2" x:Name="CkBold" Content="Negrito" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="7" Grid.ColumnSpan="2" x:Name="CkBottomUp" Content="1ª linha mais próxima do condutor (leitura de baixo para cima)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <TextBlock Grid.Row="8" Text="Cor" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="8" Grid.Column="1" x:Name="CbColor" SelectionChanged="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox x:Name="GbPlacement" Header="Inserção">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" Text="1º clique: centro da base da legenda. 2º clique: sentido do tráfego."/>
+                        <RadioButton x:Name="RbTwoClicks" GroupName="place" Content="Base + sentido (2 cliques, repete até ESC)" IsChecked="True"/>
+                        <RadioButton x:Name="RbAngle" GroupName="place" Content="Base + ângulo fixo"/>
+                        <StackPanel Orientation="Horizontal" Margin="20,0,0,0">
+                            <TextBlock Text="Ângulo (°)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbAngle" Text="0" Width="60"/>
+                        </StackPanel>
+                    </StackPanel>
+                </GroupBox>
+                <ui:OutputPanel x:Name="Output"/>
+            </StackPanel>
+        </ScrollViewer>
+        <DockPanel Grid.Column="2">
+            <TextBlock DockPanel.Dock="Top" Text="Pré-visualização" Style="{StaticResource Title}"/>
+            <TextBlock DockPanel.Dock="Bottom" x:Name="TxtWarnings" Foreground="{StaticResource Warn}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
+                <ui:GeometryPreview x:Name="Preview"/>
+            </Border>
+        </DockPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="BtnOk" Content="Inserir" Style="{StaticResource Primary}" Click="OkClick" IsDefault="False"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,93 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.ParkingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
+        Title="Vagas de estacionamento" Width="1100" Height="720" MinWidth="900" MinHeight="600">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280"/>
+            <ColumnDefinition Width="330"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <DockPanel Margin="0,0,12,0">
+            <TextBlock DockPanel.Dock="Top" Text="Tipo de vaga" Style="{StaticResource Title}"/>
+            <Border DockPanel.Dock="Bottom" Background="{StaticResource Panel}" Padding="8" Margin="0,6,0,0">
+                <TextBlock x:Name="TxtReference" Style="{StaticResource Hint}" FontStyle="Italic"/>
+            </Border>
+            <ListBox x:Name="LbTypes" SelectionChanged="TypeChanged"/>
+        </DockPanel>
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+            <StackPanel>
+                <TextBlock Text="Parâmetros" Style="{StaticResource Title}"/>
+                <GroupBox Header="Vaga">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Ângulo com o meio-fio (°)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Column="1" x:Name="TbAngle" TextChanged="AnyChanged" ToolTip="0 = paralela, 90 = perpendicular"/>
+                        <TextBlock Grid.Row="1" Text="Largura × comprimento (m)" Style="{StaticResource FieldLabel}"/>
+                        <Grid Grid.Row="1" Grid.Column="1">
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="6"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBox x:Name="TbWidth" TextChanged="AnyChanged"/>
+                            <TextBox Grid.Column="2" x:Name="TbLength" TextChanged="AnyChanged"/>
+                        </Grid>
+                        <TextBlock Grid.Row="2" Text="Largura da linha (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbLine" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="3" Text="Quantidade (0 = preencher)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbCount" Text="0" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="4" Text="Cor das linhas" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="4" Grid.Column="1" x:Name="CbColor" SelectionChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="5" Text="Pintura de fundo" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="5" Grid.Column="1" x:Name="CbFill" SelectionChanged="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox Header="Posicionamento no meio-fio">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <StackPanel Grid.ColumnSpan="2" Orientation="Horizontal">
+                            <RadioButton x:Name="RbRight" Content="À direita do caminho" IsChecked="True" Checked="AnyChanged"/>
+                            <RadioButton x:Name="RbLeft" Content="À esquerda" Checked="AnyChanged"/>
+                        </StackPanel>
+                        <TextBlock Grid.Row="1" Text="Recuo inicial (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbStart" Text="0" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="2" Text="Afastamento do meio-fio (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbCurb" Text="0" TextChanged="AnyChanged"/>
+                        <CheckBox Grid.Row="3" Grid.ColumnSpan="2" x:Name="CkFlip" Content="Inclinar no sentido oposto" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkBack" Content="Linha de fundo (limite com a pista)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="5" Grid.ColumnSpan="2" x:Name="CkOutline" Content="Contorno completo" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="6" Grid.ColumnSpan="2" x:Name="CkSymbols" Content="Símbolo SIA / legenda nas vagas especiais" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox x:Name="GbPath" Header="Meio-fio (caminho)">
+                    <StackPanel>
+                        <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas do meio-fio" IsChecked="True"/>
+                        <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar por pontos"/>
+                    </StackPanel>
+                </GroupBox>
+                <ui:OutputPanel x:Name="Output"/>
+            </StackPanel>
+        </ScrollViewer>
+        <DockPanel Grid.Column="2">
+            <TextBlock DockPanel.Dock="Top" Text="Pré-visualização (meio-fio de 30 m)" Style="{StaticResource Title}"/>
+            <TextBlock DockPanel.Dock="Bottom" x:Name="TxtWarnings" Foreground="{StaticResource Warn}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
+                <ui:GeometryPreview x:Name="Preview"/>
+            </Border>
+        </DockPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="BtnOk" Content="Criar" Style="{StaticResource Primary}" Click="OkClick" IsDefault="True"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

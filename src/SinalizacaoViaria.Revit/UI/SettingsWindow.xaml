@@ -1,0 +1,69 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Configurações – Sinalização Viária" Width="560" Height="620" MinHeight="480" MinWidth="480">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="Salvar" Style="{StaticResource Primary}" Click="SaveClick" IsDefault="True"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <GroupBox Header="Padrões de criação">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Representação" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Column="1" x:Name="CbMode"/>
+                        <TextBlock Grid.Row="1" Text="Material" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbMaterial"/>
+                        <TextBlock Grid.Row="2" Text="Velocidade padrão (km/h)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbSpeed"/>
+                        <TextBlock Grid.Row="3" Text="Fonte das legendas" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbFont"/>
+                        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkBold" Content="Legendas em negrito"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox Header="Modelo 3D">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Espessura mínima modelada (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Column="1" x:Name="TbMinThickness" ToolTip="Películas de tinta reais são finas demais para sólidos do Revit; recomenda-se 0,003 m."/>
+                        <TextBlock Grid.Row="1" Text="Elevação adicional padrão (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbElevation"/>
+                        <CheckBox Grid.Row="2" Grid.ColumnSpan="2" x:Name="CkDrape" Content="Acompanhar superfícies por padrão"/>
+                        <TextBlock Grid.Row="3" Text="Comprimento máx. das peças na projeção (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbPiece"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox Header="Comportamento">
+                    <StackPanel>
+                        <CheckBox x:Name="CkAuto" Content="Atualizar marcas automaticamente quando as linhas de referência mudarem"/>
+                        <CheckBox x:Name="CkBoundary" Content="Contorno visível nas regiões 2D (recomendado para marcas brancas)"/>
+                    </StackPanel>
+                </GroupBox>
+                <GroupBox Header="Catálogo normativo">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" Text="Arquivo JSON com os tipos de marca, dimensões, cores, símbolos, vagas e materiais. Itens com o mesmo código substituem os padrões do plugin."/>
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="…" MinWidth="30" Click="BrowseClick"/>
+                            <TextBox x:Name="TbCatalog"/>
+                        </DockPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button Content="Criar cópia editável" Click="CopyClick" Margin="0"/>
+                            <Button Content="Abrir pasta" Click="FolderClick"/>
+                        </StackPanel>
+                        <TextBlock x:Name="TxtCatalogStatus" Style="{StaticResource Hint}"/>
+                    </StackPanel>
+                </GroupBox>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

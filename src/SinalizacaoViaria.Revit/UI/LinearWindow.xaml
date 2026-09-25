@@ -1,0 +1,118 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.LinearWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
+        Title="Marca linear" Width="1180" Height="720" MinWidth="900" MinHeight="600">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300"/>
+            <ColumnDefinition Width="330"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Catálogo -->
+        <DockPanel Grid.Column="0" Margin="0,0,12,0">
+            <TextBlock DockPanel.Dock="Top" x:Name="TxtTitle" Text="Tipo de marca" Style="{StaticResource Title}"/>
+            <TextBox DockPanel.Dock="Top" x:Name="TbSearch" TextChanged="SearchChanged" ToolTip="Filtrar por código ou nome"/>
+            <Border DockPanel.Dock="Bottom" Background="{StaticResource Panel}" Padding="8" Margin="0,6,0,0" CornerRadius="3">
+                <StackPanel>
+                    <TextBlock x:Name="TxtDescription" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TxtReference" Style="{StaticResource Hint}" FontStyle="Italic"/>
+                </StackPanel>
+            </Border>
+            <ListBox x:Name="LbTypes" SelectionChanged="TypeChanged" Margin="0,4,0,0"/>
+        </DockPanel>
+
+        <!-- Parâmetros -->
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+            <StackPanel>
+                <TextBlock Text="Parâmetros" Style="{StaticResource Title}"/>
+                <GroupBox Header="Dimensões (MBST)">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Variante" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Column="1" x:Name="CbVariant" SelectionChanged="AnyChanged"/>
+                        <CheckBox Grid.Row="1" x:Name="CkBySpeed" Content="Pela velocidade (km/h)" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbSpeed" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="2" Text="Largura (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbWidth" TextChanged="AnyChanged" ToolTip="Vazio = largura da variante"/>
+                        <TextBlock Grid.Row="3" Text="Traço / espaço (m)" Style="{StaticResource FieldLabel}"/>
+                        <Grid Grid.Row="3" Grid.Column="1">
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="6"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBox x:Name="TbDash" TextChanged="AnyChanged" ToolTip="Vazio = padrão da variante"/>
+                            <TextBox Grid.Column="2" x:Name="TbGap" TextChanged="AnyChanged"/>
+                        </Grid>
+                        <TextBlock Grid.Row="4" Text="Cor" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="4" Grid.Column="1" x:Name="CbColor" SelectionChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="5" Grid.ColumnSpan="2" x:Name="TxtPattern" Style="{StaticResource Hint}"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox Header="Posicionamento">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Deslocamento lateral (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Column="1" x:Name="TbOffset" Text="0" TextChanged="AnyChanged" ToolTip="Positivo = à esquerda do sentido do caminho"/>
+                        <TextBlock Grid.Row="1" Text="Alinhamento do padrão" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbAlign" SelectionChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="2" Text="Fase (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbPhase" Text="0" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="3" Text="Recuo início / fim (m)" Style="{StaticResource FieldLabel}"/>
+                        <Grid Grid.Row="3" Grid.Column="1">
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="6"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBox x:Name="TbStart" Text="0" TextChanged="AnyChanged"/>
+                            <TextBox Grid.Column="2" x:Name="TbEnd" Text="0" TextChanged="AnyChanged"/>
+                        </Grid>
+                        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkReverse" Content="Inverter sentido do caminho" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="5" Grid.ColumnSpan="2" x:Name="CkInvert" Content="Inverter lados (ex.: LFO-4)" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox x:Name="GbPath" Header="Caminho">
+                    <StackPanel>
+                        <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas existentes (associativo)" IsChecked="True"/>
+                        <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar eixo por pontos (cria linhas associativas)"/>
+                        <RadioButton x:Name="RbTwoPoints" GroupName="path" Content="Dois cliques (repete até ESC)"/>
+                    </StackPanel>
+                </GroupBox>
+                <ui:OutputPanel x:Name="Output"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Prévia -->
+        <DockPanel Grid.Column="2">
+            <TextBlock DockPanel.Dock="Top" Text="Pré-visualização" Style="{StaticResource Title}"/>
+            <TextBlock DockPanel.Dock="Bottom" x:Name="TxtWarnings" Foreground="{StaticResource Warn}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
+                <ui:GeometryPreview x:Name="Preview"/>
+            </Border>
+        </DockPanel>
+
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="BtnOk" Content="Criar" Style="{StaticResource Primary}" Click="OkClick" IsDefault="True"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

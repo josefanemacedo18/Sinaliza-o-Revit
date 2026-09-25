@@ -1,0 +1,85 @@
+<Window x:Class="SinalizacaoViaria.Revit.UI.HatchWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
+        Title="Zebrados e marcações de área" Width="1100" Height="700" MinWidth="880" MinHeight="580">
+    <Window.Resources>
+        <ResourceDictionary Source="pack://application:,,,/SinalizacaoViaria;component/UI/Styles.xaml"/>
+    </Window.Resources>
+    <Window.Style>
+        <StaticResource ResourceKey="SvWindow"/>
+    </Window.Style>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280"/>
+            <ColumnDefinition Width="320"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <DockPanel Margin="0,0,12,0">
+            <TextBlock DockPanel.Dock="Top" Text="Tipo" Style="{StaticResource Title}"/>
+            <Border DockPanel.Dock="Bottom" Background="{StaticResource Panel}" Padding="8" Margin="0,6,0,0">
+                <StackPanel>
+                    <TextBlock x:Name="TxtDescription" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TxtReference" Style="{StaticResource Hint}" FontStyle="Italic"/>
+                </StackPanel>
+            </Border>
+            <ListBox x:Name="LbTypes" SelectionChanged="TypeChanged"/>
+        </DockPanel>
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+            <StackPanel>
+                <TextBlock Text="Parâmetros" Style="{StaticResource Title}"/>
+                <GroupBox Header="Barras">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Largura da barra (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Column="1" x:Name="TbBar" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="1" Text="Espaço livre (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbGap" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="2" Text="Ângulo (°)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbAngle" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="3" Text="Deslocamento (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbPhase" Text="0" TextChanged="AnyChanged"/>
+                        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkChevron" Content="Chevron (barras em V)" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="5" Grid.ColumnSpan="2" x:Name="CkCrossed" Content="Quadriculado (duas direções)" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <TextBlock Grid.Row="6" Text="Cor das barras" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="6" Grid.Column="1" x:Name="CbBarColor" SelectionChanged="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox Header="Contorno (LCA)">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Largura (m, 0 = sem)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Column="1" x:Name="TbBorder" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="1" Text="Cor do contorno" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbBorderColor" SelectionChanged="AnyChanged"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox x:Name="GbPath" Header="Contorno e direção">
+                    <StackPanel>
+                        <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas do contorno fechado" IsChecked="True"/>
+                        <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar o contorno por pontos"/>
+                        <CheckBox x:Name="CkRefDir" Content="Indicar a direção do tráfego com 2 cliques" ToolTip="Senão, o ângulo é medido a partir do maior lado do contorno."/>
+                    </StackPanel>
+                </GroupBox>
+                <ui:OutputPanel x:Name="Output"/>
+            </StackPanel>
+        </ScrollViewer>
+        <DockPanel Grid.Column="2">
+            <TextBlock DockPanel.Dock="Top" Text="Pré-visualização" Style="{StaticResource Title}"/>
+            <TextBlock DockPanel.Dock="Bottom" x:Name="TxtWarnings" Foreground="{StaticResource Warn}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
+                <ui:GeometryPreview x:Name="Preview"/>
+            </Border>
+        </DockPanel>
+        <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button x:Name="BtnOk" Content="Criar" Style="{StaticResource Primary}" Click="OkClick" IsDefault="True"/>
+            <Button Content="Cancelar" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

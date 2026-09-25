@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SinalizacaoViaria.Core/SinalizacaoViaria.Core.csproj" />
+    <Project Path="src/SinalizacaoViaria.Revit/SinalizacaoViaria.Revit.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SinalizacaoViaria.Core.Tests/SinalizacaoViaria.Core.Tests.csproj" />
+  </Folder>
+</Solution>
