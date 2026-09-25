@@ -55,26 +55,31 @@ tabelas, etiquetas e filtros de vista nativos.
 
 ---
 
-## Instalação
+## Instalação (copiar e colar – sem instalar nada)
 
-Requisitos: **Windows**, **Revit 2027** e **.NET 10 SDK** (apenas para compilar).
+A pasta **[`Instalar/Revit2027`](Instalar/Revit2027)** já traz o plugin compilado, com apenas **2 arquivos**:
 
-```powershell
-git clone <este repositório>
-cd Sinaliza-o-Revit
-powershell -ExecutionPolicy Bypass -File .\install.ps1
-```
+| Arquivo | O que é |
+|---|---|
+| `SinalizacaoViaria.addin` | Manifesto que o Revit lê ao iniciar |
+| `SinalizacaoViaria.dll` | O plugin completo (núcleo e bibliotecas incluídos numa única DLL) |
 
-O script roda os testes, compila em *Release* e copia:
+1. Feche o Revit.
+2. Copie os **dois arquivos** para `%AppData%\Autodesk\Revit\Addins\2027`
+   (ou `C:\ProgramData\Autodesk\Revit\Addins\2027` para todos os usuários). Eles devem ficar juntos
+   na mesma pasta.
+3. Se vieram da internet: botão direito na DLL → *Propriedades* → **Desbloquear**.
+4. Abra o Revit 2027 e escolha **"Sempre carregar"** no aviso de add-in não assinado.
 
-* `%AppData%\Autodesk\Revit\Addins\2027\SinalizacaoViaria.addin`
-* `%AppData%\Autodesk\Revit\Addins\2027\SinalizacaoViaria\*.dll`
+Não é necessário .NET SDK nem outro programa: o Revit 2027 já inclui o runtime .NET 10. A DLL foi
+compilada contra a API da primeira versão do Revit 2027, portanto funciona em qualquer atualização
+2027.x. Instruções detalhadas em [`Instalar/LEIA-ME.txt`](Instalar/LEIA-ME.txt).
 
-Para remover: `.\install.ps1 -Uninstall`. Para todos os usuários: `-AllUsers` (como administrador).
+Para atualizar, substitua os dois arquivos; para desinstalar, apague-os. (Opcionalmente,
+`install.ps1` faz essa cópia automaticamente.)
 
-> Compilando pelo Visual Studio / `dotnet build` no Windows, o projeto já copia o plugin para a pasta
-> de Add-ins (`DeployToRevit=true`). A cada *push*, o GitHub Actions gera o pacote pronto
-> (`SinalizacaoViaria-Revit2027`).
+> Para desenvolvedores: `dotnet build src/SinalizacaoViaria.Revit -c Release` (requer .NET 10 SDK)
+> recompila e atualiza a pasta `Instalar/Revit2027`; no Windows também copia para a pasta de Add-ins.
 
 ---
 
@@ -114,6 +119,8 @@ src/SinalizacaoViaria.Core     Núcleo independente do Revit (net10.0): geometri
                                definições paramétricas, automações, quantitativos. Roda em qualquer SO.
 src/SinalizacaoViaria.Revit    Plugin (net10.0-windows, WPF): faixa de opções, comandos, janelas,
                                renderização DirectShape/FilledRegion, Extensible Storage, DMU.
+                               Compila o núcleo junto, gerando uma DLL única.
+Instalar/Revit2027             Pacote pronto: SinalizacaoViaria.dll + SinalizacaoViaria.addin.
 tests/SinalizacaoViaria.Core.Tests   77 testes xUnit do núcleo.
 ```
 

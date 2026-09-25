@@ -4,9 +4,7 @@
     <RootNamespace>SinalizacaoViaria.Core</RootNamespace>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Clipper2" Version="1.5.4" />
-  </ItemGroup>
+  <!-- Clipper2 1.5.4 incorporado como código-fonte (ThirdParty/Clipper2, Boost Software License). -->
   <ItemGroup>
     <EmbeddedResource Include="Catalog\catalogo-padrao.json" LogicalName="SinalizacaoViaria.Core.catalogo-padrao.json" />
   </ItemGroup>

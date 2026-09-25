@@ -1,0 +1,54 @@
+﻿SINALIZAÇÃO VIÁRIA HORIZONTAL – PLUGIN PARA REVIT 2027
+======================================================
+
+A pasta "Revit2027" contém tudo o que é necessário (2 arquivos):
+
+    SinalizacaoViaria.addin   (manifesto que o Revit lê ao iniciar)
+    SinalizacaoViaria.dll     (o plugin completo, sem outras dependências)
+
+Não é preciso instalar .NET, SDK nem nenhum outro programa: o Revit 2027 já traz
+tudo o que o plugin usa.
+
+
+COMO INSTALAR
+-------------
+1. Feche o Revit.
+
+2. Copie os DOIS arquivos da pasta "Revit2027" para UMA destas pastas:
+
+   Somente para o seu usuário (recomendado):
+       %AppData%\Autodesk\Revit\Addins\2027
+       (cole esse endereço na barra do Explorador de Arquivos e tecle Enter;
+        normalmente é C:\Users\<seu usuário>\AppData\Roaming\Autodesk\Revit\Addins\2027)
+
+   Para todos os usuários do computador (exige administrador):
+       C:\ProgramData\Autodesk\Revit\Addins\2027
+
+   Os dois arquivos devem ficar JUNTOS, na mesma pasta.
+
+3. Se os arquivos vieram da internet (ZIP do GitHub, e-mail...), clique com o
+   botão direito em SinalizacaoViaria.dll > Propriedades > marque "Desbloquear"
+   > OK. (Ou desbloqueie o ZIP antes de extrair.)
+
+4. Abra o Revit 2027. Na mensagem de segurança sobre o add-in não assinado,
+   escolha "Sempre carregar".
+
+5. Abra um projeto: aparece a guia "Sinalização Viária" na faixa de opções.
+
+
+ATUALIZAR
+---------
+Feche o Revit e substitua os dois arquivos pelos novos.
+
+
+DESINSTALAR
+-----------
+Feche o Revit e apague os dois arquivos da pasta Addins\2027.
+(As preferências ficam em %AppData%\SinalizacaoViaria e podem ser apagadas.)
+
+
+PROBLEMAS
+---------
+- A guia não aparece: confira se os dois arquivos estão na mesma pasta e se a
+  pasta é a do ano 2027.
+- Erros são registrados em %AppData%\SinalizacaoViaria\log.txt
