@@ -1413,6 +1413,28 @@
       ]
     },
     {
+      "codigo": "ONI-FD",
+      "nome": "Pintura de fundo de faixa de ônibus",
+      "grupo": "Longitudinal",
+      "cor": "Vermelha",
+      "espessura": 0,
+      "descricao": "Pintura de contraste em toda a largura da faixa exclusiva/preferencial de ônibus (cor definida no projeto: vermelha, azul, verde...).",
+      "referencia": "MBST Vol. IV – Faixas exclusivas; cor de contraste conforme regulamentação local",
+      "larguraMin": 2.5,
+      "larguraMax": 5.0,
+      "variantes": [
+        {
+          "nome": "3,50 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 3.5
+            }
+          ]
+        }
+      ]
+    },
+    {
       "codigo": "FCA",
       "nome": "Faixa de caminhada – pintura de fundo",
       "grupo": "Urbanizacao",

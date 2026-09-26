@@ -228,13 +228,40 @@ internal static class RoundaboutForms
                     if (ch is SignDefinition) continue;
                     g.Merge(MarkingBuilder.Build(ch, p == null ? null : new Core.Geometry.Polyline2(p.Points, p.Closed), ctx));
                 }
-                return new FormPreview(g, null, null, $"Diâmetro externo: {UiHelpers.F(2 * c.OuterRadius, "0.0")} m");
+                return new FormPreview(g, null, null, $"Diâmetro inscrito: {UiHelpers.F(2 * c.OuterRadius, "0.0")} m" +
+                    (c.Elongation > 1.001 ? $" (eixo maior) × {UiHelpers.F(2 * (c.IslandRadius + c.ApronWidth + c.Lanes * c.LaneWidth), "0.0")} m" : ""));
             }, false, edit ? "Aplicar" : "Criar", 1080, 720);
-        w.Number("Raio da ilha central (m)", () => d.IslandRadius, v => d.IslandRadius = v, 1, 100)
-         .Number("Faixa galgável em volta da ilha (m)", () => d.ApronWidth, v => d.ApronWidth = v, 0, 10, tooltip: "Para o giro de ônibus e caminhões (bloquete elevado 6 cm).")
+        w.Choice("Tipo de rotatória", new[]
+             {
+                 ("Minirrotatória – ilha galgável (Ø inscrito 13–25 m)", TipoRotatoria.Mini),
+                 ("Compacta urbana – 1 faixa (Ø 25–35 m)", TipoRotatoria.Compacta),
+                 ("Convencional – 1 faixa (Ø 30–45 m)", TipoRotatoria.UmaFaixa),
+                 ("Duas faixas no anel (Ø 45–70 m)", TipoRotatoria.DuasFaixas),
+                 ("Turbo-rotatória – divisores físicos entre faixas", TipoRotatoria.Turbo),
+                 ("Oval / elíptica", TipoRotatoria.Oval),
+                 ("Com by-pass (conversão livre à direita)", TipoRotatoria.ComBypass),
+                 ("Personalizada", TipoRotatoria.Personalizada),
+             }, () => d.Type, v => d.Type = v,
+             "Escolher um tipo preenche os valores de referência (DNIT/FHWA); depois todos os campos podem ser alterados.",
+             preset: t => d.ApplyPreset(t))
+         .Section("Ilha central e anel")
+         .Choice("Ilha central", new[] { ("Ajardinada (meio-fio + grama + árvores)", TipoIlhaCentral.Ajardinada), ("Pavimentada (meio-fio + concreto)", TipoIlhaCentral.Pavimentada),
+             ("Galgável (cúpula pintada, sem meio-fio)", TipoIlhaCentral.Galgavel) }, () => d.IslandType, v => d.IslandType = v)
+         .Number("Raio da ilha central (m)", () => d.IslandRadius, v => d.IslandRadius = v, 1, 100)
+         .Number("Alongamento (1 = circular; > 1 = oval)", () => d.Elongation, v => d.Elongation = v, 1, 4)
+         .Number("Direção do eixo maior da oval (°)", () => d.OvalAngleDeg, v => d.OvalAngleDeg = v, -360, 360, "0")
+         .Number("Faixa galgável em volta da ilha (m)", () => d.ApronWidth, v => d.ApronWidth = v, 0, 10, tooltip: "Para o giro de ônibus e caminhões (bloquete elevado).")
+         .Number("Altura da faixa galgável (m)", () => d.ApronHeight, v => d.ApronHeight = v, 0.02, 0.15, "0.000")
          .Integer("Faixas na pista giratória", () => d.Lanes, v => d.Lanes = v, 1, 4)
          .Number("Largura de cada faixa (m)", () => d.LaneWidth, v => d.LaneWidth = v, 3, 10)
-         .Number("Raio de entrada/saída (m)", () => d.EntryRadius, v => d.EntryRadius = v, 0, 60)
+         .Check("Divisores físicos entre faixas (turbo)", () => d.TurboDividers, v => d.TurboDividers = v)
+         .Number("Largura dos divisores (m)", () => d.DividerWidth, v => d.DividerWidth = v, 0.15, 1)
+         .Section("Entradas e saídas")
+         .Number("Raio de entrada (m)", () => d.EntryRadius, v => d.EntryRadius = v, 0, 80, tooltip: "Concordância do lado de chegada (reduz a velocidade de entrada).")
+         .Number("Raio de saída (m)", () => d.ExitRadius ?? d.EntryRadius, v => d.ExitRadius = v, 0, 120, tooltip: "Normalmente maior que o de entrada.")
+         .Check("By-pass: conversão livre à direita em todos os ramos", () => d.Bypass, v => d.Bypass = v)
+         .Number("Largura da faixa de by-pass (m)", () => d.BypassWidth, v => d.BypassWidth = v, 3, 8)
+         .Number("Raio do by-pass (m)", () => d.BypassRadius, v => d.BypassRadius = v, 10, 150)
          .Number("Calçada em volta (m)", () => d.SidewalkWidth, v => d.SidewalkWidth = v, 0, 20)
          .Choice("Pavimento", new[] { ("Asfalto", TipoPavimento.Asfalto), ("Bloquete", TipoPavimento.Bloquete), ("Concreto", TipoPavimento.Concreto), ("Nenhum", TipoPavimento.Nenhum) },
              () => d.Pavement, v => d.Pavement = v);
@@ -251,8 +278,11 @@ internal static class RoundaboutForms
          .Number("Largura das ilhas junto à pista (m)", () => d.SplitterWidth, v => d.SplitterWidth = v, 0.8, 10)
          .Check("Linhas de dê a preferência, símbolos e zebrados", () => d.Markings, v => d.Markings = v)
          .Check("Travessias de pedestres e rebaixamentos", () => d.Crosswalks, v => d.Crosswalks = v)
+         .Number("Distância da travessia ao anel (m)", () => d.CrosswalkDistance, v => d.CrosswalkDistance = v, 2, 30, tooltip: "Uma a duas faixas de veículo (5–10 m) antes da linha de dê a preferência.")
+         .Number("Largura da faixa de pedestres (m)", () => d.CrosswalkWidth, v => d.CrosswalkWidth = v, 2, 10)
          .Check("Placas R-2 e R-33 em cada entrada", () => d.Signs, v => d.Signs = v)
-         .Check("Paisagismo na ilha central (árvores)", () => d.Landscaping, v => d.Landscaping = v);
+         .Check("Paisagismo na ilha central (árvores)", () => d.Landscaping, v => d.Landscaping = v)
+         .Integer("Número de árvores (0 = automático)", () => d.Trees, v => d.Trees = v, 0, 30);
         return w;
     }
 

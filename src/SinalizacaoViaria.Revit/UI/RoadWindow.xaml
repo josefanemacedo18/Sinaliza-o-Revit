@@ -126,6 +126,7 @@
                             <TextBox x:Name="TbAcesso" Grid.Row="4" Grid.Column="1" TextChanged="DetailChanged"/>
                             <CheckBox x:Name="CkGramado" Grid.Row="5" Grid.ColumnSpan="2" Content="Faixa de serviço gramada" Checked="DetailChanged" Unchecked="DetailChanged"/>
                             <CheckBox x:Name="CkFundo" Grid.Row="6" Grid.ColumnSpan="2" Content="Pintura vermelha de fundo" Checked="DetailChanged" Unchecked="DetailChanged"/>
+                            <CheckBox x:Name="CkFundoOnibus" Grid.Row="6" Grid.ColumnSpan="2" Content="Pintura colorida de fundo (toda a faixa)" ToolTip="Pintura de contraste entre as linhas de bordo da faixa de ônibus – cor escolhida abaixo." Checked="DetailChanged" Unchecked="DetailChanged"/>
                             <CheckBox x:Name="CkBidirecional" Grid.Row="7" Grid.ColumnSpan="2" Content="Ciclofaixa bidirecional (sem setas)" Checked="DetailChanged" Unchecked="DetailChanged"/>
                             <TextBlock x:Name="LblDisp" Grid.Row="8" Text="Segregação física (divisa interna)" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="CbDispositivo" Grid.Row="8" Grid.Column="1" SelectionChanged="DetailChanged"/>
@@ -133,6 +134,8 @@
                             <TextBox x:Name="TbSarjeta" Grid.Row="9" Grid.Column="1" TextChanged="DetailChanged" ToolTip="0 = sem sarjeta. Ocupa a borda da pista."/>
                             <TextBlock x:Name="LblCorCaminhada" Grid.Row="10" Text="Cor da faixa de caminhada" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="CbCorCaminhada" Grid.Row="10" Grid.Column="1" SelectionChanged="DetailChanged"/>
+                            <TextBlock x:Name="LblCorOnibus" Grid.Row="10" Text="Cor do fundo da faixa de ônibus" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="CbCorOnibus" Grid.Row="10" Grid.Column="1" SelectionChanged="DetailChanged"/>
                             <TextBlock x:Name="LblLarguraLinha" Grid.Row="11" Text="Largura da linha de delimitação (m)" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="TbLarguraLinha" Grid.Row="11" Grid.Column="1" TextChanged="DetailChanged"/>
                             <CheckBox x:Name="CkSeccionada" Grid.Row="12" Grid.ColumnSpan="2" Content="Linha de delimitação seccionada" Checked="DetailChanged" Unchecked="DetailChanged"/>

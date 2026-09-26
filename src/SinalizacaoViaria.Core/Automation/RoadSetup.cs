@@ -107,6 +107,12 @@ public sealed class ElementoSecao
     /// <summary>Cor da faixa de caminhada (Azul ou Verde).</summary>
     public MarkingColor CorCaminhada { get; set; } = MarkingColor.Azul;
 
+    // ---- Faixa de ônibus
+    /// <summary>Faixa exclusiva/preferencial: pintura de fundo colorida em toda a largura.</summary>
+    public bool FundoOnibus { get; set; }
+    /// <summary>Cor da pintura de fundo da faixa de ônibus.</summary>
+    public MarkingColor CorOnibus { get; set; } = MarkingColor.Vermelha;
+
     public ElementoSecao Clone() => (ElementoSecao)MemberwiseClone();
 
     public static string Rotulo(TipoElementoSecao t) => t switch
@@ -400,6 +406,12 @@ public sealed class RoadSetup
                 {
                     case TipoElementoSecao.FaixaExclusiva:
                     case TipoElementoSecao.FaixaPreferencial:
+                        if (e.FundoOnibus)
+                        {
+                            // Fundo entre as linhas de bordo (0,20 m) para não encobri-las.
+                            Add(new LinearMarkingDefinition { Code = "ONI-FD", Offset = sigma * c, WidthOverride = Math.Max(0.5, w - 0.40),
+                                ColorOverride = e.CorOnibus, StartSetback = StartSetback, EndSetback = EndSetback });
+                        }
                         if (Inscriptions && e.Espacamento > 0 && !string.IsNullOrWhiteSpace(e.Legenda))
                             Add(new RepeatedMarkingDefinition
                             {

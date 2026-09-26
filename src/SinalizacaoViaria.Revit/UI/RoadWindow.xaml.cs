@@ -131,6 +131,9 @@ public partial class RoadWindow : Window
         foreach (var v in _cat.Vagas) CbVaga.Items.Add(new Option<string>(v.Nome, v.Codigo));
         CbCorCaminhada.Items.Add(new Option<MarkingColor>("Azul", MarkingColor.Azul));
         CbCorCaminhada.Items.Add(new Option<MarkingColor>("Verde", MarkingColor.Verde));
+        foreach (var (n, c) in new[] { ("Vermelha", MarkingColor.Vermelha), ("Azul", MarkingColor.Azul), ("Verde", MarkingColor.Verde),
+                     ("Amarela", MarkingColor.Amarela), ("Laranja", MarkingColor.Laranja), ("Marrom", MarkingColor.Marrom) })
+            CbCorOnibus.Items.Add(new Option<MarkingColor>(n, c));
 
         foreach (var t in _cat.LinearesDoGrupo(GrupoMarca.Longitudinal).Where(t => t.Codigo.StartsWith("LMS") || t.Codigo.StartsWith("LCO")))
             CbDivider.Items.Add(t.Codigo);
@@ -456,6 +459,7 @@ public partial class RoadWindow : Window
             Show(bus || bike, LblEsp, TbEspacamento);
             Show(walk, LblServico, TbServico, LblAcesso, TbAcesso, CkGramado);
             Show(bike, CkFundo, CkBidirecional);
+            Show(bus, CkFundoOnibus, LblCorOnibus, CbCorOnibus);
             Show(t is not (TipoElementoSecao.Calcada or TipoElementoSecao.FaixaSeguranca), LblDisp, CbDispositivo);
             Show(walk, LblSarjeta, TbSarjeta);
             Show(t == TipoElementoSecao.FaixaCaminhada, LblCorCaminhada, CbCorCaminhada, LblEsp, TbEspacamento);
@@ -470,6 +474,8 @@ public partial class RoadWindow : Window
             CkGramado.IsChecked = e.ServicoGramado;
             CkFundo.IsChecked = e.PinturaFundo;
             CkBidirecional.IsChecked = e.Bidirecional;
+            CkFundoOnibus.IsChecked = e.FundoOnibus;
+            Select(CbCorOnibus, e.CorOnibus);
             Select(CbDispositivo, e.Dispositivo);
             TbSarjeta.Text = UiHelpers.F(e.Sarjeta);
             Select(CbCorCaminhada, e.CorCaminhada);
@@ -505,6 +511,8 @@ public partial class RoadWindow : Window
         el.ServicoGramado = CkGramado.IsChecked == true;
         el.PinturaFundo = CkFundo.IsChecked == true;
         el.Bidirecional = CkBidirecional.IsChecked == true;
+        el.FundoOnibus = CkFundoOnibus.IsChecked == true;
+        if (CbCorOnibus.SelectedItem is Option<MarkingColor> co) el.CorOnibus = co.Value;
         el.Dispositivo = Selected<string?>(CbDispositivo);
         double Num(TextBox tb, double current, double min = 0) => UiHelpers.ParseOpt(tb.Text) is { } v && v >= min ? v : current;
         el.Sarjeta = Num(TbSarjeta, el.Sarjeta);

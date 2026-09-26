@@ -21,6 +21,7 @@ public sealed class FormWindow : Window
     private readonly GeometryPreview _preview = new();
     private readonly TextBlock _warnings = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };
     private readonly List<Action> _apply = new();
+    private readonly List<Action> _reload = new();
     private readonly Func<FormPreview?>? _previewFunc;
     private readonly OutputPanel? _output;
     private readonly MarkingDefinition? _def;
@@ -138,6 +139,7 @@ public sealed class FormWindow : Window
         tb.TextChanged += (_, _) => Refresh();
         Row(label, tb, tooltip);
         _apply.Add(() => set(UiHelpers.Parse(tb, get(), label, min, max)));
+        _reload.Add(() => tb.Text = UiHelpers.F(get(), fmt));
         return this;
     }
 
@@ -152,6 +154,7 @@ public sealed class FormWindow : Window
         cb.Unchecked += (_, _) => Refresh();
         _fields.Children.Add(cb);
         _apply.Add(() => set(cb.IsChecked == true));
+        _reload.Add(() => cb.IsChecked = get());
         return this;
     }
 
@@ -168,6 +171,7 @@ public sealed class FormWindow : Window
         tb.TextChanged += (_, _) => Refresh();
         Row(label, tb, tooltip);
         _apply.Add(() => set(tb.Text.Replace("\r\n", "\n")));
+        _reload.Add(() => tb.Text = get() ?? "");
         return this;
     }
 
@@ -176,7 +180,8 @@ public sealed class FormWindow : Window
         public override string ToString() => Label;
     }
 
-    public FormWindow Choice<T>(string label, IEnumerable<(string Label, T Value)> options, Func<T> get, Action<T> set, string? tooltip = null)
+    public FormWindow Choice<T>(string label, IEnumerable<(string Label, T Value)> options, Func<T> get, Action<T> set, string? tooltip = null,
+        Action<T>? preset = null)
     {
         var cb = new ComboBox();
         var current = get();
@@ -187,10 +192,35 @@ public sealed class FormWindow : Window
             if (EqualityComparer<T>.Default.Equals(v, current)) cb.SelectedItem = it;
         }
         if (cb.SelectedItem == null && cb.Items.Count > 0) cb.SelectedIndex = 0;
-        cb.SelectionChanged += (_, _) => Refresh();
+        cb.SelectionChanged += (_, _) =>
+        {
+            // Escolha com "modelo" (ex.: tipo de rotatória): aplica os valores do tipo e recarrega os demais campos.
+            if (!_loading && preset != null && cb.SelectedItem is Item<T> sel)
+            {
+                preset(sel.Value);
+                ReloadFields();
+                return;
+            }
+            Refresh();
+        };
         Row(label, cb, tooltip);
         _apply.Add(() => { if (cb.SelectedItem is Item<T> it) set(it.Value); });
+        _reload.Add(() =>
+        {
+            var v = get();
+            foreach (var it in cb.Items) if (it is Item<T> i && EqualityComparer<T>.Default.Equals(i.Value, v)) cb.SelectedItem = it;
+        });
         return this;
+    }
+
+    /// <summary>Relê todos os campos a partir da definição (após aplicar um modelo) e atualiza a prévia.</summary>
+    public void ReloadFields()
+    {
+        var was = _loading;
+        _loading = true;
+        foreach (var r in _reload) r();
+        _loading = was;
+        Refresh();
     }
 
     public FormWindow Modes(params (string Label, PathMode Mode)[] modes)

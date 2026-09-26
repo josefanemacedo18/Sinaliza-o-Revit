@@ -1107,9 +1107,56 @@ public sealed class RoundaboutLeg
     public string? GroupId { get; set; }
 }
 
+/// <summary>Tipos de rotatória (DNIT – Manual de Projeto de Interseções; CONTRAN/MBST; FHWA NCHRP 672).</summary>
+public enum TipoRotatoria
+{
+    /// <summary>Minirrotatória: ilha central totalmente galgável (diâmetro inscrito 13–25 m), vias locais.</summary>
+    Mini,
+    /// <summary>Compacta urbana: uma faixa, diâmetro inscrito 25–35 m.</summary>
+    Compacta,
+    /// <summary>Convencional de uma faixa: diâmetro inscrito 30–45 m.</summary>
+    UmaFaixa,
+    /// <summary>Duas faixas na pista giratória: diâmetro inscrito 45–70 m.</summary>
+    DuasFaixas,
+    /// <summary>Turbo-rotatória: faixas separadas por divisores físicos (sem troca de faixa no anel).</summary>
+    Turbo,
+    /// <summary>Oval / elíptica: nós alongados, vias paralelas próximas ou canteiro largo.</summary>
+    Oval,
+    /// <summary>Com faixas de conversão livre à direita (by-pass) separadas por ilhas.</summary>
+    ComBypass,
+    /// <summary>Personalizada: nenhum valor é imposto.</summary>
+    Personalizada,
+}
+
+/// <summary>Acabamento da ilha central.</summary>
+public enum TipoIlhaCentral { Ajardinada, Pavimentada, Galgavel }
+
 /// <summary>Rotatória com ilha central, pista giratória, faixa galgável e ramos com ilhas separadoras.</summary>
 public sealed class RoundaboutDefinition : MarkingDefinition
 {
+    public TipoRotatoria Type { get; set; } = TipoRotatoria.UmaFaixa;
+    /// <summary>Alongamento da ilha (1 = circular; 1,5 = oval com eixo maior 1,5× o menor).</summary>
+    public double Elongation { get; set; } = 1.0;
+    /// <summary>Direção do eixo maior da ilha oval (graus).</summary>
+    public double OvalAngleDeg { get; set; }
+    /// <summary>Raio de saída (m). Nulo = igual ao de entrada.</summary>
+    public double? ExitRadius { get; set; }
+    public TipoIlhaCentral IslandType { get; set; } = TipoIlhaCentral.Ajardinada;
+    /// <summary>Altura da faixa galgável (m).</summary>
+    public double ApronHeight { get; set; } = 0.06;
+    /// <summary>Turbo: divisores físicos entre as faixas do anel.</summary>
+    public bool TurboDividers { get; set; }
+    public double DividerWidth { get; set; } = 0.30;
+    /// <summary>Faixas de conversão livre à direita (by-pass) em todos os ramos.</summary>
+    public bool Bypass { get; set; }
+    public double BypassWidth { get; set; } = 4.5;
+    public double BypassRadius { get; set; } = 25.0;
+    /// <summary>Distância da travessia de pedestres à borda do anel (m) – uma a duas faixas de veículo (5–10 m).</summary>
+    public double CrosswalkDistance { get; set; } = 7.0;
+    public double CrosswalkWidth { get; set; } = 3.0;
+    /// <summary>Árvores na ilha central (0 = automático pelo tamanho).</summary>
+    public int Trees { get; set; }
+
     public Vec2 Center { get; set; }
     public double Z { get; set; }
     /// <summary>Raio da ilha central (face do meio-fio).</summary>
@@ -1134,7 +1181,39 @@ public sealed class RoundaboutDefinition : MarkingDefinition
     public bool Landscaping { get; set; } = true;
     public List<string> ChildIds { get; set; } = new();
 
-    public double OuterRadius => IslandRadius + ApronWidth + Lanes * LaneWidth;
+    /// <summary>Maior distância do centro à borda externa do anel (eixo maior, nas ovais).</summary>
+    public double OuterRadius => IslandRadius * Math.Max(1, Elongation) + ApronWidth + Lanes * LaneWidth;
+
+    /// <summary>Aplica os valores de referência do tipo (depois tudo pode ser alterado).</summary>
+    public void ApplyPreset(TipoRotatoria t)
+    {
+        Type = t;
+        Elongation = 1; TurboDividers = false; Bypass = false; IslandType = TipoIlhaCentral.Ajardinada; ExitRadius = null;
+        switch (t)
+        {
+            case TipoRotatoria.Mini:
+                IslandRadius = 2.5; ApronWidth = 0; Lanes = 1; LaneWidth = 6.0; EntryRadius = 8; ExitRadius = 10;
+                IslandType = TipoIlhaCentral.Galgavel; SplitterIslands = false; Landscaping = false; CrosswalkDistance = 5; break;
+            case TipoRotatoria.Compacta:
+                IslandRadius = 6; ApronWidth = 1.5; Lanes = 1; LaneWidth = 5.5; EntryRadius = 12; ExitRadius = 15;
+                SplitterIslands = true; SplitterLength = 10; SplitterWidth = 2.0; CrosswalkDistance = 6; break;
+            case TipoRotatoria.UmaFaixa:
+                IslandRadius = 10; ApronWidth = 1.5; Lanes = 1; LaneWidth = 5.5; EntryRadius = 15; ExitRadius = 20;
+                SplitterIslands = true; SplitterLength = 15; SplitterWidth = 2.5; CrosswalkDistance = 7; break;
+            case TipoRotatoria.DuasFaixas:
+                IslandRadius = 14; ApronWidth = 1.5; Lanes = 2; LaneWidth = 4.8; EntryRadius = 20; ExitRadius = 25;
+                SplitterIslands = true; SplitterLength = 20; SplitterWidth = 3.0; CrosswalkDistance = 8; break;
+            case TipoRotatoria.Turbo:
+                IslandRadius = 14; ApronWidth = 1.0; Lanes = 2; LaneWidth = 4.5; EntryRadius = 18; ExitRadius = 22;
+                TurboDividers = true; SplitterIslands = true; SplitterLength = 20; SplitterWidth = 3.0; CrosswalkDistance = 8; break;
+            case TipoRotatoria.Oval:
+                IslandRadius = 8; Elongation = 1.6; ApronWidth = 1.5; Lanes = 1; LaneWidth = 5.5; EntryRadius = 15; ExitRadius = 20;
+                SplitterIslands = true; SplitterLength = 12; SplitterWidth = 2.5; CrosswalkDistance = 7; break;
+            case TipoRotatoria.ComBypass:
+                IslandRadius = 10; ApronWidth = 1.5; Lanes = 1; LaneWidth = 5.5; EntryRadius = 15; ExitRadius = 20;
+                Bypass = true; BypassWidth = 4.5; BypassRadius = 30; SplitterIslands = true; SplitterLength = 15; SplitterWidth = 2.5; break;
+        }
+    }
     public override double? PointZ => Z;
     public override void Translate(Vec2 delta, double dz) { Center += delta; Z += dz; }
     public override string KindName => "Rotatória";
