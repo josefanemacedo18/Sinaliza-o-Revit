@@ -158,6 +158,9 @@ public sealed class RoadSetup
     /// <summary>Mão dupla (eixo = divisão de sentidos) ou mão única (todas as faixas no sentido do eixo).</summary>
     public bool TwoWay { get; set; } = true;
 
+    /// <summary>Raio das esquinas nas conexões desta via (nulo = pela hierarquia).</summary>
+    public double? CornerRadius { get; set; }
+
     /// <summary>Hierarquia viária (CTB art. 60) – gravada em todas as marcas da via.</summary>
     public HierarquiaViaria Hierarchy { get; set; } = HierarquiaViaria.NaoDefinida;
 
@@ -245,6 +248,7 @@ public sealed class RoadSetup
             TwoWay = TwoWay,
             StartSetback = StartSetback,
             EndSetback = EndSetback,
+            CornerRadius = CornerRadius,
         };
         d.Gaps.AddRange(rg);
         d.Gaps.AddRange(lg);

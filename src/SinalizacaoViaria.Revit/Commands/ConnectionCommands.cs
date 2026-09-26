@@ -168,17 +168,23 @@ public sealed class CmdHierarquia : CommandBase
         var current = all.FirstOrDefault(d => d.GroupId == groups[0])?.Hierarchy ?? HierarquiaViaria.Local;
         var h = current;
         var speed = false;
-        var w = new FormWindow("Hierarquia viária", "Hierarquia viária (CTB art. 60)",
+        var curPav = all.OfType<RoadPavementDefinition>().FirstOrDefault(p => p.GroupId == groups[0]);
+        string? radiusText = curPav?.CornerRadius is { } cr0 ? UiHelpers.F(cr0) : "";
+        var w = new FormWindow("Hierarquia e esquinas", "Hierarquia viária (CTB art. 60) e raio das esquinas",
                 $"{groups.Count} via(s) selecionada(s). A hierarquia é gravada em todos os elementos da via (parâmetro SV_Hierarquia) e usada nos " +
                 "quantitativos e na escolha da via preferencial das interseções.", null, null, false, "Aplicar", 560, 320)
             .Choice("Hierarquia", Hierarquia.Definidas.Select(x => (Hierarquia.Label(x), x)), () => h, v => h = v)
-            .Check("Ajustar a velocidade das linhas à hierarquia (CTB art. 61)", () => speed, v => speed = v);
+            .Check("Ajustar a velocidade das linhas à hierarquia (CTB art. 61)", () => speed, v => speed = v)
+            .Text("Raio das esquinas (m, vazio = pela hierarquia)", () => radiusText, v => radiusText = v,
+                tooltip: "Raio de concordância na face do meio-fio nas interseções destas vias (aplicado também às interseções existentes).");
         if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
+        double? radius = UiHelpers.ParseOpt(radiusText ?? "") is { } rv && rv >= 0 ? rv : null;
 
         var defs = all.Where(d => d.GroupId != null && groups.Contains(d.GroupId)).ToList();
         foreach (var d in defs)
         {
             d.Hierarchy = h;
+            if (d is RoadPavementDefinition pv) pv.CornerRadius = radius;
             if (speed && d is LinearMarkingDefinition { Speed: not null } l) l.Speed = Hierarquia.DefaultSpeed(h);
         }
         var results = MarkingCreator.Commit(uidoc, defs, "SV - Hierarquia viária");
@@ -187,7 +193,12 @@ public sealed class CmdHierarquia : CommandBase
         results.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões", s =>
         {
             var r = new List<RenderResult>();
-            foreach (var it in s.DependentOn(defs)) r.AddRange(s.Refresh(it));
+            var pavs = MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>().ToDictionary(p => p.Id);
+            foreach (var it in s.DependentOn(defs))
+            {
+                it.CornerRadius = Hierarquia.NodeRadius(it.RoadIds.Select(id => pavs.GetValueOrDefault(id)).Where(p => p != null)!);
+                r.AddRange(s.Refresh(it));
+            }
             foreach (var rb in s.RoundaboutsDependentOn(defs)) r.AddRange(s.Refresh(rb));
             foreach (var c in s.CulDeSacsDependentOn(defs)) r.AddRange(s.Refresh(c));
             return r;

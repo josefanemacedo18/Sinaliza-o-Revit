@@ -164,7 +164,7 @@ public class NewFeatureTests
     {
         var path = new Polyline2(new[] { Vec2.Zero, new Vec2(20, 0) });
         var geo = MarkingBuilder.Build(new DeviceMarkingDefinition { Code = "DEF-DUPLA" }, path, Ctx);
-        var rails = geo.Pieces.Where(p => !p.IsUnit && p.Elevation > 0.2).ToList();
+        var rails = geo.Pieces.Where(p => !p.IsUnit && p.Profile != null && p.Profile.Profile.Bounds.Min.Y > 0.2).ToList();
         Assert.True(rails.Count >= 2);
         Assert.Contains(rails, r => r.Shape.Centroid.Y > 0);
         Assert.Contains(rails, r => r.Shape.Centroid.Y < 0);

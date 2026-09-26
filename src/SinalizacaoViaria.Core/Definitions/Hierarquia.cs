@@ -61,6 +61,19 @@ public static class Hierarquia
         _ => 0,
     };
 
+    /// <summary>
+    /// Raio das esquinas de um nó: o informado nas vias (o da via de menor hierarquia que o tiver – a que chega) ou,
+    /// sem nenhum informado, o recomendado pela hierarquia.
+    /// </summary>
+    public static double NodeRadius(IEnumerable<RoadPavementDefinition> roads)
+    {
+        var list = roads.ToList();
+        var set = list.Where(r => r.CornerRadius is >= 0).OrderBy(r => Rank(r.Hierarchy)).FirstOrDefault();
+        if (set != null) return set.CornerRadius!.Value;
+        var hs = list.Select(r => r.Hierarchy).OrderByDescending(Rank).ToList();
+        return hs.Count == 0 ? 6 : CornerRadius(hs[0], hs.Count > 1 ? hs[1] : hs[0]);
+    }
+
     /// <summary>Raio de esquina recomendado (m, face do meio-fio) para o cruzamento de vias destas hierarquias.</summary>
     public static double CornerRadius(HierarquiaViaria? a, HierarquiaViaria? b)
     {

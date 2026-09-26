@@ -31,7 +31,9 @@
                 <GroupBox Header="Letras">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Grid.Row="9" Text="Escala (%)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="9" Grid.Column="1" x:Name="TbScale" Text="100" TextChanged="AnyChanged" ToolTip="Amplia ou reduz a legenda inteira (altura e espaçamentos) mantendo as proporções."/>
                         <TextBlock Text="Padrão" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Column="1" x:Name="CbSize" SelectionChanged="LetterSizeChanged"/>
                         <TextBlock Grid.Row="1" Text="Altura das letras (m)" Style="{StaticResource FieldLabel}"/>

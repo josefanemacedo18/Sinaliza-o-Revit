@@ -181,7 +181,7 @@ public class DefinitionTests
         var path = new Polyline2(new[] { Vec2.Zero, new Vec2(20, 0) });
         var bal = MarkingBuilder.Build(new DeviceMarkingDefinition { Code = "BAL-FLEX" }, path, Ctx);
         Assert.Equal(10, bal.UnitCount);                                   // espaçamento 2 m
-        Assert.Contains(bal.Pieces, p => p.Elevation > 0);                 // haste sobre a base
+        Assert.Contains(bal.Pieces, p => p.Solid != null && p.Solid.MaxZ > 0.7);   // haste sobre a base
         var nj = MarkingBuilder.Build(new DeviceMarkingDefinition { Code = "NJ", Offset = 1 }, path, Ctx);
         Assert.Equal(0, nj.UnitCount);
         Assert.Equal(20, nj.PaintedLength, 6);
@@ -189,7 +189,7 @@ public class DefinitionTests
         Assert.All(nj.Pieces, p => Assert.InRange(p.Shape.Centroid.Y, 0.99, 1.01));
         var def = MarkingBuilder.Build(new DeviceMarkingDefinition { Code = "DEF" }, path, Ctx);
         Assert.True(def.UnitCount >= 5);                                   // postes a cada 4 m
-        Assert.Contains(def.Pieces, p => !p.IsUnit && p.Elevation > 0.2);   // lâmina
+        Assert.Contains(def.Pieces, p => !p.IsUnit && p.Profile != null && p.Profile.Profile.Bounds.Min.Y > 0.2);   // lâmina
     }
 
     [Fact]

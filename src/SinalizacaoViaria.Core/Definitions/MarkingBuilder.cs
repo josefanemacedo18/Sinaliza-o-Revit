@@ -108,6 +108,12 @@ public static class MarkingBuilder
         if (path == null) { geo.Warnings.Add("Caminho da marca não encontrado (a linha de referência foi excluída?)."); return geo; }
         var variant = ResolveVariant(type, d.Variant, d.Speed);
         if (variant == null) { geo.Warnings.Add($"{d.Code}: nenhuma variante no catálogo."); return geo; }
+        if (d.Code == "SARJETAO")
+        {
+            var w = d.WidthOverride ?? variant.Faixas.Max(f => f.Largura);
+            var trimmed = RoadGenerator.Trimmed(path, d.StartSetback, d.EndSetback);
+            return SarjetaoGenerator.Build(Math.Abs(d.Offset) > 1e-6 ? trimmed.Offset(d.Offset) : trimmed, w, d.Depth ?? 0.05);
+        }
         if (d.Code is "PTA" or "PTD")
         {
             // Piso tátil: placas moduladas com relevo (NBR 16537), assentadas no topo da calçada.
@@ -236,20 +242,21 @@ public static class MarkingBuilder
             g.Warnings.Add("Caminho das inscrições não encontrado.");
             return g;
         }
+        var k = Sc(d.Scale);
         var symbol = string.IsNullOrWhiteSpace(d.SymbolCode) ? null : ctx.Catalog.Simbolo(d.SymbolCode);
         if (symbol != null)
         {
             return RepeatedGenerator.Generate(path, d.Offset, d.Spacing, d.StartOffset, d.EndSetback, d.Reverse,
-                f => SymbolBuilder.Build(symbol, d.Length, f, d.Color), d.Length);
+                f => SymbolBuilder.Build(symbol, d.Length * k, f, d.Color), d.Length * k);
         }
         var text = string.IsNullOrWhiteSpace(d.Text) ? "ÔNIBUS" : d.Text!;
         var opt = new TextOptions
         {
-            Height = d.TextHeight, WidthFactor = d.WidthFactor, LetterSpacing = d.LetterSpacing, LineSpacing = d.LineSpacing,
+            Height = d.TextHeight * k, WidthFactor = d.WidthFactor, LetterSpacing = d.LetterSpacing * k, LineSpacing = d.LineSpacing * k,
             FontFamily = d.FontFamily, Bold = d.Bold, BottomToTop = true,
         };
         var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
-        var total = lines * d.TextHeight + (lines - 1) * d.LineSpacing;
+        var total = (lines * d.TextHeight + (lines - 1) * d.LineSpacing) * k;
         var geo = RepeatedGenerator.Generate(path, d.Offset, d.Spacing, d.StartOffset, d.EndSetback, d.Reverse,
             f => TextGenerator.Generate(text, opt, f, d.Color ?? MarkingColor.Branca, ctx.Glyphs), total);
         // Avisos de largura se repetem em cada inscrição: mantém apenas um.
@@ -312,7 +319,7 @@ public static class MarkingBuilder
             return g;
         }
         var frame = new LocalFrame(d.Position, d.Direction.Length < 1e-9 ? Vec2.UnitY : d.Direction, 1.0, d.Mirror);
-        return SymbolBuilder.Build(def, d.Length, frame, d.ColorOverride, d.WidthFactor);
+        return SymbolBuilder.Build(def, d.Length * Sc(d.Scale), frame, d.ColorOverride, d.WidthFactor);
     }
 
     public static MarkingGeometry BuildText(TextMarkingDefinition d, BuildContext ctx)
@@ -320,15 +327,18 @@ public static class MarkingBuilder
         var frame = new LocalFrame(d.Position, d.Direction.Length < 1e-9 ? Vec2.UnitY : d.Direction);
         return TextGenerator.Generate(d.Text, new TextOptions
         {
-            Height = d.Height,
+            Height = d.Height * Sc(d.Scale),
             WidthFactor = d.WidthFactor,
-            LetterSpacing = d.LetterSpacing,
-            LineSpacing = d.LineSpacing,
+            LetterSpacing = d.LetterSpacing * Sc(d.Scale),
+            LineSpacing = d.LineSpacing * Sc(d.Scale),
             FontFamily = d.FontFamily,
             Bold = d.Bold,
             BottomToTop = d.BottomToTop,
         }, frame, d.Color, ctx.Glyphs);
     }
+
+    /// <summary>Escala válida (0,1× a 10×; 0 ou ausente = 1).</summary>
+    private static double Sc(double s) => s is > 0.05 and < 20 ? s : 1.0;
 
     public static MarkingGeometry BuildParking(ParkingMarkingDefinition d, Polyline2? path, BuildContext ctx)
     {

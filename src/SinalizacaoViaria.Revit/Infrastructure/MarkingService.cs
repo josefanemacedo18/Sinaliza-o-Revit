@@ -248,7 +248,10 @@ public sealed class MarkingService
 
             foreach (var g in groups)
             {
-                var solids = BuildSolids(g, baseZ + def.Output.ElevationOffset, thickness, sampler, Styles.Material(g.Key), result.Warnings);
+                // Linhas e símbolos sobre pinturas de fundo (ciclofaixa, faixa de caminhada) ficam logo acima delas –
+                // sem faces coincidentes (que no Revit aparecem como emendas/quadrados).
+                var lift = IsOverlay(def) && MarkingColors.IsPaint(g.Key) ? thickness : 0;
+                var solids = BuildSolids(g, baseZ + def.Output.ElevationOffset + lift, thickness, sampler, Styles.Material(g.Key), result.Warnings);
                 if (solids.Count == 0) continue;
                 var ds = existing.FirstOrDefault(r => r.Color == g.Key && r.Element is DirectShape && !keep.Contains(r.Element.Id))?.Element as DirectShape;
                 if (ds == null)
@@ -502,6 +505,18 @@ public sealed class MarkingService
             loop.Append(Line.CreateBound(pts[i], pts[(i + 1) % pts.Count]));
         return loop;
     }
+
+    private static readonly string[] OverlayCodes = { "CIC-LD", "CIC-LC", "FCA-BD", "MCC", "SIC", "CIC-SETA", "SPE", "LCA" };
+
+    /// <summary>Marca pintada que costuma ficar sobre uma pintura de fundo.</summary>
+    private static bool IsOverlay(MarkingDefinition d) => d switch
+    {
+        LinearMarkingDefinition l => OverlayCodes.Contains(l.Code),
+        RepeatedMarkingDefinition r => r.SymbolCode != null && OverlayCodes.Contains(r.SymbolCode),
+        SymbolMarkingDefinition s => OverlayCodes.Contains(s.Code),
+        TextMarkingDefinition or RepeatedMarkingDefinition => true,
+        _ => false,
+    };
 
     // ------------------------------------------------------------------ pisos
 

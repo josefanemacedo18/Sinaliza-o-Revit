@@ -199,7 +199,7 @@
                         <ComboBox Grid.Column="1" x:Name="CbConnection" ToolTip="Interseção: usa os tipos e o controle escolhidos na ferramenta Interseção. Rotatória: usa os parâmetros da ferramenta Rotatória."/>
                         <TextBlock Grid.Row="1" Text="Pontas livres da via" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbFreeEnds" ToolTip="Cul-de-sac: usa o tipo e as medidas da ferramenta Cul-de-sac, ajustados à largura da via."/>
-                        <TextBlock Grid.Row="2" Text="Raio das esquinas (m, vazio = pela hierarquia)" Style="{StaticResource FieldLabel}"/>
+                        <TextBlock Grid.Row="2" Text="Raio de concordância das esquinas / guia (m, vazio = pela hierarquia)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbCornerRadius" Text="" ToolTip="Vazio: 6 m (local), 8 m (coletora), 10 m (arterial), 15 m (rodovias/trânsito rápido)."/>
                         <CheckBox Grid.Row="3" Grid.ColumnSpan="2" x:Name="CkIntCrosswalks" Content="Faixas de pedestres nas interseções (a retenção e o PARE são sempre criados)" IsChecked="False"/>
                         <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkIntRamps" Content="Rebaixamentos de calçada nas travessias (NBR 9050)" IsChecked="False"/>

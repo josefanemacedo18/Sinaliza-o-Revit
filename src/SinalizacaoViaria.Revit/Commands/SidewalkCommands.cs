@@ -71,6 +71,18 @@ internal static class FootprintCutter
             case SidewalkAreaDefinition sa:
                 Apply(uidoc, sa, One(sa.CutExisting && path != null ? SidewalkGenerator.AreaOutline(sa, path) : null), d => RoadMarking(d) || Sidewalk(d));
                 break;
+            case LinearMarkingDefinition { Code: "SARJETAO" } sj when path != null:
+            {
+                // O sarjetão substitui o pavimento e interrompe linhas, vagas e sarjetas sob ele.
+                var cat = PluginContext.Catalog.Linear("SARJETAO");
+                var variant = cat == null ? null : MarkingBuilder.ResolveVariant(cat, sj.Variant, sj.Speed);
+                var w = sj.WidthOverride ?? variant?.Faixas.Max(f => f.Largura) ?? 1.0;
+                var axis = RoadGenerator.Trimmed(path, sj.StartSetback, sj.EndSetback);
+                if (Math.Abs(sj.Offset) > 1e-6) axis = axis.Offset(sj.Offset);
+                Apply(uidoc, sj, SarjetaoGenerator.Footprint(axis, w),
+                    d => RoadMarking(d) || d is RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition);
+                break;
+            }
             case PlanterDefinition pl:
                 Apply(uidoc, pl, pl.CutSidewalk && path != null ? PolygonOps.Union(SidewalkGenerator.PlanterShapes(pl, path)) : Array.Empty<Polygon2>(), Sidewalk);
                 break;

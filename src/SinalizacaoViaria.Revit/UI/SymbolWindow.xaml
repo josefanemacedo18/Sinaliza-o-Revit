@@ -35,7 +35,9 @@
                 <GroupBox Header="Dimensões">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Grid.Row="4" Text="Escala (%)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="4" Grid.Column="1" x:Name="TbScale" Text="100" TextChanged="AnyChanged" ToolTip="Amplia ou reduz o símbolo inteiro mantendo as proporções (100 = comprimento informado)."/>
                         <TextBlock Text="Comprimento (m)" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Column="1" x:Name="CbLength" IsEditable="True" SelectionChanged="AnyChanged" LostFocus="AnyChanged" KeyUp="AnyKey"/>
                         <TextBlock Grid.Row="1" Text="Fator de largura" Style="{StaticResource FieldLabel}"/>

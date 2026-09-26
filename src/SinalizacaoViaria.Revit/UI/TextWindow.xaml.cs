@@ -37,6 +37,7 @@ public partial class TextWindow : Window
             GbPlacement.Visibility = Visibility.Collapsed;
             TbText.Text = existing.Text.Replace("\n", Environment.NewLine);
             TbHeight.Text = UiHelpers.F(existing.Height, "0.##");
+            TbScale.Text = UiHelpers.F(existing.Scale * 100, "0.#");
             TbWidthFactor.Text = UiHelpers.F(existing.WidthFactor, "0.###");
             TbLetter.Text = UiHelpers.F(existing.LetterSpacing, "0.###");
             TbLine.Text = UiHelpers.F(existing.LineSpacing, "0.##");
@@ -90,6 +91,7 @@ public partial class TextWindow : Window
         var d = _existing != null ? (TextMarkingDefinition)MarkingDefinition.FromJson(_existing.ToJson())! : new TextMarkingDefinition();
         d.Text = text;
         d.Height = UiHelpers.Parse(TbHeight, 1.6, "Altura", 0.1, 10);
+        d.Scale = UiHelpers.Parse(TbScale, 100, "Escala", 10, 1000) / 100.0;
         d.WidthFactor = UiHelpers.Parse(TbWidthFactor, 0.4, "Fator de largura", 0.05, 3);
         d.LetterSpacing = UiHelpers.Parse(TbLetter, 0.08, "Espaço entre letras", 0, 5);
         d.LineSpacing = UiHelpers.Parse(TbLine, 1, "Espaço entre linhas", 0, 20);

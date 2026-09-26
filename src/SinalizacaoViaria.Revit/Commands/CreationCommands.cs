@@ -47,7 +47,7 @@ public class CmdSinalizarVia : CommandBase
             try
             {
                 var extra = IntersectionRunner.Run(uidoc, "SV - Conexões da via", sv =>
-                    sv.Connect(pav, w.Connection, w.FreeEnds, template, rb, cds, radiusByHierarchy: w.CornerRadius == null));
+                    sv.Connect(pav, w.Connection, w.FreeEnds, template, rb, cds, radiusByHierarchy: true));
                 results.AddRange(extra.Where(r => r.Warnings.Count > 0));
             }
             catch (Exception ex)
@@ -152,6 +152,8 @@ public sealed class CmdPista : CommandBase
                 () => center, v => center = v)
             .Check("Linhas de bordo (LBO)", () => edges, v => edges = v)
             .Section("Caminho e conexões")
+            .Number("Raio das esquinas (m, 0 = pela hierarquia)", () => d.CornerRadius ?? 0, v => d.CornerRadius = v > 0.01 ? v : null, 0, 60,
+                tooltip: "Raio na face do meio-fio das esquinas criadas quando esta via encontra outra. 0 = 6 m local, 8 m coletora, 10 m arterial, 15 m rodovia.")
             .Choice("Eixo", new[] { ("Desenhar por pontos (encaixa nas vias existentes)", true), ("Selecionar linhas existentes", false) }, () => draw, v => draw = v)
             .Number("Raio das curvas ao desenhar (m)", () => radius, v => radius = v, 0, 5000)
             .Check("Conectar às vias existentes (interseção simples)", () => connect, v => connect = v)

@@ -104,6 +104,13 @@ A hierarquia é gravada em **todos os elementos** da via e da sua sinalização 
   preferência) e o raio das esquinas criadas automaticamente segue a hierarquia (6 m local, 8 m coletora,
   10 m arterial, 15 m rodovia/trânsito rápido) quando o campo de raio fica vazio.
 
+**Raio de concordância das esquinas (raio da guia).** No **Sinalizar Via** (campo *Raio de
+concordância das esquinas / guia*) e na **Pista** (*Raio das esquinas*) informe o raio desejado – por
+exemplo 3 m para uma rua local estreita ou 12 m para acesso de caminhões. Vazio (ou 0) usa o padrão da
+hierarquia. O valor fica gravado no pavimento e, no encontro de vias com raios diferentes, prevalece o
+da **via de menor hierarquia** (a que faz a conversão). Para mudar o raio de vias já desenhadas use
+**Via → Hierarquia e Esquinas**: selecione as vias, informe o novo raio e as interseções são refeitas.
+
 Para vias já existentes (ou criadas por versões anteriores) use **Via → Hierarquia Viária**: selecione
 elementos das vias e escolha a hierarquia (opcionalmente ajustando a velocidade das linhas); as
 interseções, rotatórias e cul-de-sacs dessas vias são atualizados.
@@ -164,9 +171,19 @@ as interseções, rotatórias e cul-de-sacs refazem também as calçadas e meios
 
 Comando **Bloqueios Físicos** (painel *Segregação Física*): escolha o dispositivo, ajuste
 dimensões, espaçamento entre centros (0 = contínuo), deslocamento e recuos, e selecione/desenhe o
-caminho. Os dispositivos são modelados em 3D com altura real (a barreira New Jersey em camadas que
-reproduzem o perfil; a defensa com postes e lâmina) e aparecem nos quantitativos em unidades ou
-metros.
+caminho. Os dispositivos são modelados em 3D com a forma real e aparecem nos quantitativos em
+unidades ou metros:
+
+* **Tartaruga (segregador)**: cúpula elíptica amarela com refletivos brancos nas duas faces;
+  **tachão**: tronco trapezoidal com refletivos;
+* **Balizador flexível**: base preta, haste com duas faixas refletivas brancas e topo arredondado;
+  **cilindro delimitador**: base preta e duas faixas refletivas; **pilarete/frade**: fuste de concreto
+  com topo abaulado e faixa amarela; **prisma**: tronco de pirâmide chanfrado;
+* **Barreira New Jersey**: perfil padronizado (0,60 × 0,81 m, pé de 7,5 cm, faces a 55° e 84°, topo de
+  15 cm) extrudado ao longo do caminho – contínua ou em módulos; **barreira plástica** com topo
+  arredondado e módulos alternando **vermelho e branco**; **separador contínuo** com topo chanfrado;
+* **Defensa metálica**: postes, espaçadores e **lâmina em "W"** (31 cm, chapa fina) de um ou dos dois
+  lados; **defensa de cabos** com três cabos.
 
 ## 3. Linha Longitudinal / Transversal / Complementos
 
@@ -220,6 +237,8 @@ As barras da FTP-1 são sempre inteiras e centralizadas entre os bordos.
 * Setas: 5,00 m (vias urbanas) ou 7,50 m (vias rápidas), ou qualquer comprimento; *fator de largura*
   engrossa/afina a seta.
 * SIA: símbolo branco com fundo azul (a área azul já desconta o símbolo).
+* **Escala (%)**: amplia ou reduz o símbolo ou a legenda inteira mantendo as proporções (ex.: 75 % em
+  ciclovias e calçadas, 150 % em vias rápidas). Vale também na edição.
 * Legendas: qualquer fonte TrueType instalada; altura das letras, fator de largura (menor = mais
   alongada), espaçamentos e ordem de leitura. Em legendas de duas linhas (ex.: "SÓ / ÔNIBUS") a
   **primeira linha fica mais próxima do condutor**.
@@ -335,6 +354,10 @@ vigente do manual. O catálogo pode ser alterado (seção `placas`, campo `picto
 
 ## 13. Urbanismo e drenagem
 
+* **Sarjetão**: calha de concreto que atravessa a via (clique de sarjeta a sarjeta). É modelado com o
+  **perfil côncavo real** – placa de concreto de 15 cm cuja superfície desce em parábola até a
+  **flecha** no centro (padrão 5 cm, editável; acima de 12 cm a janela avisa) – e **recorta o
+  pavimento e as marcas** sob ele, como nos sarjetões executados em cruzamentos.
 * **Meio-fio e Sarjeta**: meios-fios de vários tipos, sarjetas, sarjetões (clique os dois bordos),
   calçadas, gramados e faixas de caminhada azuis/verdes ao longo de qualquer linha. No meio-fio com
   sarjeta conjugada, desenhe na face do meio-fio com a calçada à esquerda.
@@ -361,6 +384,14 @@ As dimensões padrão devem ser conferidas com as resoluções do CONTRAN vigent
 sinalização vertical obrigatória (ex.: A-18).
 
 ## 15. Ciclofaixa com medidas personalizadas
+
+**Complementos ▾ → Ciclovia / Faixa de caminhada** monta tudo de uma vez, com pré-visualização:
+ciclofaixa unidirecional ou bidirecional, ciclovia ou faixa de caminhada; largura, pintura de fundo
+(vermelha, ou azul/verde na caminhada) **entre as linhas, sem sobreposição**, linhas de bordo (direita,
+esquerda, ambas ou nenhuma; contínuas ou seccionadas), linha central amarela, bicicletas/pedestres e
+setas a cada N metros e segregadores. As linhas e símbolos ficam ligeiramente acima da pintura de fundo,
+eliminando os "quadrados" que apareciam na vista. A ferramenta antiga (só linhas) continua em
+**Ciclofaixa – linhas**.
 
 No **Sinalizar Via**, selecione a ciclofaixa para ajustar: largura, largura da linha de delimitação,
 linha contínua ou seccionada (traço/espaço), tamanho do símbolo da bicicleta e da seta, distância

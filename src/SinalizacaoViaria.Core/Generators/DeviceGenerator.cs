@@ -22,23 +22,15 @@ public sealed class DeviceOptions
 }
 
 /// <summary>
-/// Gera dispositivos físicos ao longo de um caminho: unidades espaçadas (segregadores, balizadores,
-/// pilaretes, prismas, barreiras modulares) ou elementos contínuos (barreira New Jersey, separadores,
-/// defensas). Os volumes são descritos por camadas empilhadas (peças com elevação e altura).
+/// Gera dispositivos físicos ao longo de um caminho: unidades espaçadas (segregadores, tachões, balizadores, cilindros,
+/// pilaretes, prismas, barreiras modulares) ou elementos contínuos (barreira New Jersey, separadores, defensas), com
+/// formas próximas das reais: cúpulas e troncos suavizados, faixas refletivas, perfil New Jersey normalizado e lâmina
+/// de defensa em "W".
 /// </summary>
 public static class DeviceGenerator
 {
-    /// <summary>Camada de um perfil: largura relativa, base e topo relativos à altura total.</summary>
-    private readonly record struct Layer(double WidthFactor, double Z0, double Z1);
-
-    /// <summary>Perfil New Jersey aproximado por 4 camadas (base larga, faces inclinadas, topo estreito).</summary>
-    private static readonly Layer[] NewJerseyLayers =
-    {
-        new(1.00, 0.00, 0.10),
-        new(0.70, 0.10, 0.40),
-        new(0.45, 0.40, 0.70),
-        new(0.30, 0.70, 1.00),
-    };
+    /// <summary>Perfil New Jersey de referência (0,60 × 0,81 m): pé vertical de 7,5 cm, face a 55° até 0,33 m e a 84° até o topo.</summary>
+    private static readonly (double X, double Z)[] NewJerseyHalf = { (0.30, 0), (0.30, 0.075), (0.1214, 0.33), (0.075, 0.81) };
 
     public static MarkingGeometry Generate(Polyline2 path, DispositivoDef def, DeviceOptions? opt = null)
     {
@@ -60,34 +52,32 @@ public static class DeviceGenerator
 
         Vec2 PointAt(double s) => off.PointAtParam(p.ParamAt(s));
 
-        // Elementos contínuos
+        // Elementos contínuos: perfil extrudado trecho a trecho do caminho.
         var guardRail = def.Forma is FormaDispositivo.Defensa or FormaDispositivo.DefensaDupla;
         if (spacing <= 0 || guardRail)
         {
-            var layers = def.Forma switch
-            {
-                FormaDispositivo.NewJersey => NewJerseyLayers,
-                FormaDispositivo.Defensa or FormaDispositivo.DefensaDupla => Array.Empty<Layer>(),
-                _ => new[] { new Layer(1, 0, 1) },
-            };
             foreach (var (c0, c1) in LinearPatternGenerator.Chunk(a, b, opt.MaxPieceLength))
             {
                 var pts = off.SubPoints(p.ParamAt(c0), p.ParamAt(c1));
-                foreach (var layer in layers)
-                    AddStrip(geo, pts, W * layer.WidthFactor, color, H * (layer.Z1 - layer.Z0), H * layer.Z0);
                 if (guardRail)
                 {
-                    // Lâmina (perfil W) no terço superior, afastada do eixo dos postes; na dupla, dos dois lados.
                     var sides = def.Forma == FormaDispositivo.DefensaDupla ? new[] { 1.0, -1.0 } : new[] { 1.0 };
+                    var cable = def.Codigo.Contains("CABO", StringComparison.OrdinalIgnoreCase);
                     foreach (var side in sides)
                     {
-                        var rail = new Polyline2(pts).Offset(side * (W / 2 - 0.05)).Points;
-                        AddStrip(geo, rail, 0.10, color, H * 0.40, H * 0.60);
+                        if (cable)
+                            foreach (var zc in new[] { H * 0.62, H * 0.78, H * 0.94 })
+                                Extrude(geo, pts, Box(side * 0.03, 0.02, zc - 0.01, 0.02), MarkingColor.Metal);
+                        else
+                            Extrude(geo, pts, WBeam(side, 0.075 + 0.02, H - 0.36, 0.31), MarkingColor.Metal);
                     }
                 }
+                else if (def.Forma == FormaDispositivo.NewJersey)
+                    Extrude(geo, pts, NewJerseyProfile(W, H, color == MarkingColor.Branca), color);
+                else
+                    Extrude(geo, pts, MuretaProfile(W, H), color);
             }
             geo.PaintedLength = b - a;
-
             if (!guardRail) return geo;
         }
 
@@ -101,83 +91,213 @@ public static class DeviceGenerator
         {
             var s = s0 + i * step;
             var frame = new LocalFrame(PointAt(s), p.TangentAt(s));
-            foreach (var (shape, z0, h) in Unit(def.Forma, L, W, H))
-                geo.Pieces.Add(new MarkingPiece(frame.ToWorld(shape), color) { Thickness = h, Elevation = z0, IsUnit = true });
+            foreach (var piece in UnitPieces(def, L, W, H, color, i))
+                geo.Pieces.Add(ToWorld(piece, frame) with { IsUnit = true });
         }
-        if (!guardRail)
-        {
-            geo.UnitCount = n;
-            geo.PaintedLength = len;
-        }
-        else
-        {
-            geo.UnitCount = n; // postes
-        }
+        geo.UnitCount = n;
+        if (!guardRail) geo.PaintedLength = len;
         return geo;
     }
 
-    private static void AddStrip(MarkingGeometry geo, IReadOnlyList<Vec2> pts, double width, MarkingColor color, double height, double elevation)
-    {
-        foreach (var poly in PolygonOps.Strip(pts, width))
-        {
-            var s = poly.Simplified();
-            if (s != null) geo.Pieces.Add(new MarkingPiece(s, color) { Thickness = height, Elevation = elevation });
-        }
-    }
+    // ------------------------------------------------------------------ unidades
 
-    /// <summary>
-    /// Peças de uma unidade em coordenadas locais (+Y ao longo do caminho, +X transversal), com base e altura.
-    /// </summary>
-    public static IEnumerable<(Polygon2 Shape, double Z0, double Height)> Unit(FormaDispositivo forma, double L, double W, double H)
+    /// <summary>Peças de uma unidade em coordenadas locais (+Y ao longo do caminho, +X à direita).</summary>
+    public static IEnumerable<MarkingPiece> UnitPieces(DispositivoDef def, double L, double W, double H, MarkingColor color, int index = 0)
     {
-        switch (forma)
+        switch (def.Forma)
         {
-            case FormaDispositivo.Cilindro:
-                yield return (Circle(W / 2), 0, H);
-                break;
-            case FormaDispositivo.Balizador:
-                var baseH = Math.Min(0.04, H * 0.1);
-                yield return (Circle(Math.Max(W * 1.25, 0.10)), 0, baseH);
-                yield return (Circle(W / 2), baseH, H - baseH);
-                break;
             case FormaDispositivo.Tartaruga:
-                yield return (Ellipse(W / 2, L / 2), 0, H * 0.5);
-                yield return (Ellipse(W * 0.35, L * 0.35), H * 0.5, H * 0.5);
+            {
+                // Cúpula elíptica com refletivos brancos nas duas faces inclinadas.
+                yield return Loft(new[] { 1.0, 0.94, 0.78, 0.52, 0.24 }.Zip(new[] { 0, 0.35, 0.68, 0.9, 1.0 },
+                    (k, z) => (Ellipse(W / 2 * k, L / 2 * k, 28), z * H)).ToList(), color);
+                foreach (var sg in new[] { 1.0, -1.0 })
+                    yield return Block(new Vec2(0, sg * L * 0.30), W * 0.45, L * 0.10, H * 0.28, H * 0.34, MarkingColor.Branca);
                 break;
+            }
+            case FormaDispositivo.Caixa when H <= 0.12:
+            {
+                // Tachão: tronco trapezoidal com refletivos nas faces de aproximação.
+                yield return Loft(new[] { (RectRing(W, L), 0.0), (RectRing(W * 0.85, L * 0.8), H * 0.6), (RectRing(W * 0.6, L * 0.55), H) }, color);
+                foreach (var sg in new[] { 1.0, -1.0 })
+                    yield return Block(new Vec2(0, sg * L * 0.36), W * 0.55, L * 0.06, H * 0.25, H * 0.45, MarkingColor.Branca);
+                break;
+            }
+            case FormaDispositivo.Balizador:
+            {
+                var r = W / 2;
+                var baseR = Math.Max(W * 1.5, 0.10);
+                yield return Loft(new[] { (CircleRing(baseR), 0.0), (CircleRing(baseR * 0.9), 0.025), (CircleRing(r * 1.3), 0.045) }, MarkingColor.Preta);
+                yield return Cyl(r, 0.045, H - 0.02, color);
+                foreach (var (z0, z1) in new[] { (0.62, 0.70), (0.78, 0.86) })
+                    yield return Cyl(r * 1.05, H * z0, H * z1, MarkingColor.Branca);
+                yield return Loft(new[] { (CircleRing(r), H - 0.02), (CircleRing(r * 0.6), H) }, color);
+                break;
+            }
+            case FormaDispositivo.Cilindro when color == MarkingColor.Concreto:
+            {
+                // Pilarete / frade: fuste de concreto, topo abaulado e faixa refletiva amarela.
+                var r = W / 2;
+                yield return Cyl(r, 0, H * 0.88, color);
+                yield return Loft(new[] { (CircleRing(r), H * 0.88), (CircleRing(r * 0.92), H * 0.95), (CircleRing(r * 0.6), H * 0.99), (CircleRing(r * 0.25), H) }, color);
+                yield return Cyl(r * 1.02, H * 0.74, H * 0.80, MarkingColor.Amarela);
+                break;
+            }
+            case FormaDispositivo.Cilindro:
+            {
+                // Cilindro delimitador: corpo com duas faixas refletivas e base preta.
+                var r = W / 2;
+                yield return Loft(new[] { (CircleRing(r * 1.35), 0.0), (CircleRing(r * 1.25), 0.05) }, MarkingColor.Preta);
+                yield return Cyl(r, 0.05, H - 0.03, color);
+                foreach (var (z0, z1) in new[] { (0.55, 0.66), (0.76, 0.87) })
+                    yield return Cyl(r * 1.03, H * z0, H * z1, MarkingColor.Branca);
+                yield return Loft(new[] { (CircleRing(r), H - 0.03), (CircleRing(r * 0.75), H) }, color);
+                break;
+            }
             case FormaDispositivo.Prisma:
-                yield return (Rect(W, L), 0, H * 0.5);
-                yield return (Rect(W * 0.7, L * 0.7), H * 0.5, H * 0.5);
+            {
+                // Tronco de pirâmide com chanfro no topo.
+                yield return Loft(new[] { (RectRing(W, L), 0.0), (RectRing(W * 0.93, L * 0.93), H * 0.15), (RectRing(W * 0.62, L * 0.62), H * 0.94), (RectRing(W * 0.55, L * 0.55), H) }, color);
                 break;
+            }
             case FormaDispositivo.NewJersey:
-                foreach (var layer in NewJerseyLayers)
-                    yield return (Rect(W * layer.WidthFactor, L), H * layer.Z0, H * (layer.Z1 - layer.Z0));
+            {
+                // Módulo: perfil New Jersey extrudado; a barreira plástica alterna vermelho e branco.
+                var c = color == MarkingColor.Branca ? (index % 2 == 0 ? MarkingColor.Vermelha : MarkingColor.Branca) : color;
+                var prof = NewJerseyProfile(W, H, color == MarkingColor.Branca);
+                yield return ProfileSolid.Piece(new ProfileSolid(new Vec2(0, -L / 2), new Vec2(1, 0), prof, new Vec2(0, 1), L), c);
                 break;
+            }
             case FormaDispositivo.Defensa:
             case FormaDispositivo.DefensaDupla:
-                // Poste
-                yield return (Rect(Math.Min(0.15, W), Math.Min(0.15, L)), 0, H);
+            {
+                // Poste em "C" e espaçador (bloco) até a lâmina.
+                yield return Block(Vec2.Zero, 0.15, 0.10, 0, H, MarkingColor.Metal);
+                var sides = def.Forma == FormaDispositivo.DefensaDupla ? new[] { 1.0, -1.0 } : new[] { 1.0 };
+                if (!def.Codigo.Contains("CABO", StringComparison.OrdinalIgnoreCase))
+                    foreach (var sg in sides)
+                        yield return Block(new Vec2(-sg * 0.085, 0), 0.10, 0.08, H - 0.33, H - 0.08, MarkingColor.Metal);
                 break;
+            }
             default:
-                yield return (Rect(W, L), 0, H);
+                yield return Loft(new[] { (RectRing(W, L), 0.0), (RectRing(W, L), H * 0.85), (RectRing(W * 0.85, L * 0.9), H) }, color);
                 break;
         }
     }
 
-    private static Polygon2 Rect(double w, double l) =>
-        Polygon2.Rectangle(new Vec2(-w / 2, -l / 2), new Vec2(w / 2, l / 2));
+    // ------------------------------------------------------------------ perfis
 
-    private static Polygon2 Circle(double r) => new(CurveTools.Circle(Vec2.Zero, r, 0.002));
-
-    private static Polygon2 Ellipse(double rx, double ry)
+    /// <summary>Perfil New Jersey escalado (x lateral, z altura); a barreira plástica tem o topo arredondado.</summary>
+    public static Polygon2 NewJerseyProfile(double W, double H, bool plastic)
     {
-        var pts = new List<Vec2>();
-        const int n = 32;
-        for (int i = 0; i < n; i++)
+        var sx = W / 0.60;
+        var sz = H / 0.81;
+        var half = NewJerseyHalf.Select(v => (X: v.X * sx, Z: v.Z * sz)).ToList();
+        if (plastic)
         {
-            var t = 2 * Math.PI * i / n;
-            pts.Add(new Vec2(rx * Math.Cos(t), ry * Math.Sin(t)));
+            // Plástica: laterais mais retas e topo arredondado (encaixe macho-fêmea não modelado).
+            half = new List<(double X, double Z)> { (W / 2, 0), (W / 2, H * 0.12), (W * 0.36, H * 0.5), (W * 0.24, H * 0.9), (W * 0.15, H) };
         }
-        return new Polygon2(pts);
+        var right = half.Select(v => new Vec2(v.X, v.Z)).ToList();
+        var left = Enumerable.Reverse(half).Select(v => new Vec2(-v.X, v.Z)).ToList();
+        return new Polygon2(right.Concat(left));
+    }
+
+    /// <summary>Mureta/separador contínuo com chanfros no topo.</summary>
+    private static Polygon2 MuretaProfile(double W, double H)
+    {
+        var c = Math.Min(0.03, Math.Min(W, H) * 0.2);
+        return new Polygon2(new[] { new Vec2(-W / 2, 0), new Vec2(W / 2, 0), new Vec2(W / 2, H - c), new Vec2(W / 2 - c, H), new Vec2(-W / 2 + c, H), new Vec2(-W / 2, H - c) });
+    }
+
+    /// <summary>Lâmina de defensa em "W" (chapa de 4 mm, 31 cm de altura), afastada <paramref name="offset"/> do eixo dos postes.</summary>
+    private static Polygon2 WBeam(double side, double offset, double z0, double hb)
+    {
+        const double depth = 0.083, t = 0.004;
+        var outer = new List<Vec2>();
+        var inner = new List<Vec2>();
+        const int n = 24;
+        for (int i = 0; i <= n; i++)
+        {
+            var z = hb * i / n;
+            var x = depth * (1 - Math.Cos(4 * Math.PI * z / hb)) / 2;
+            outer.Add(new Vec2(side * (offset + x + t), z0 + z));
+            inner.Add(new Vec2(side * (offset + x), z0 + z));
+        }
+        inner.Reverse();
+        var ring = outer.Concat(inner).ToList();
+        if (side < 0) ring.Reverse();
+        return new Polygon2(ring);
+    }
+
+    private static Polygon2 Box(double x, double w, double z0, double h) =>
+        new(new[] { new Vec2(x - w / 2, z0), new Vec2(x + w / 2, z0), new Vec2(x + w / 2, z0 + h), new Vec2(x - w / 2, z0 + h) });
+
+    /// <summary>Extrusão do perfil (x lateral à esquerda do caminho) ao longo de cada trecho da polilinha.</summary>
+    private static void Extrude(MarkingGeometry geo, IReadOnlyList<Vec2> pts, Polygon2 profile, MarkingColor color)
+    {
+        for (int i = 0; i + 1 < pts.Count; i++)
+        {
+            var a = pts[i];
+            var b = pts[i + 1];
+            var len = a.DistanceTo(b);
+            if (len < 0.005) continue;
+            var t = (b - a) / len;
+            geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(a, t.PerpLeft, profile, t, len), color));
+        }
+    }
+
+    // ------------------------------------------------------------------ sólidos auxiliares
+
+    private static MarkingPiece Cyl(double r, double z0, double z1, MarkingColor c) =>
+        Loft(new[] { (CircleRing(r), z0), (CircleRing(r), z1) }, c);
+
+    private static MarkingPiece Block(Vec2 center, double w, double l, double z0, double z1, MarkingColor c) =>
+        Loft(new[] { (RectRing(w, l, center), z0), (RectRing(w, l, center), z1) }, c);
+
+    /// <summary>Sólido por seções horizontais (mesmo número de vértices), faces laterais trianguladas.</summary>
+    public static MarkingPiece Loft(IReadOnlyList<(List<Vec2> Ring, double Z)> rings, MarkingColor color)
+    {
+        var faces = new List<List<Vec3>>
+        {
+            rings[0].Ring.Select(v => Vec3.At(v, rings[0].Z)).ToList(),
+            rings[^1].Ring.Select(v => Vec3.At(v, rings[^1].Z)).ToList(),
+        };
+        for (int k = 0; k + 1 < rings.Count; k++)
+        {
+            var r0 = rings[k].Ring;
+            var r1 = rings[k + 1].Ring;
+            var z0 = rings[k].Z;
+            var z1 = rings[k + 1].Z;
+            for (int i = 0; i < r0.Count; i++)
+            {
+                var j = (i + 1) % r0.Count;
+                faces.Add(new List<Vec3> { Vec3.At(r0[i], z0), Vec3.At(r0[j], z0), Vec3.At(r1[j], z1) });
+                faces.Add(new List<Vec3> { Vec3.At(r0[i], z0), Vec3.At(r1[j], z1), Vec3.At(r1[i], z1) });
+            }
+        }
+        var poly = new Polyhedron(faces);
+        return Polyhedron.Piece(poly, color) with { Elevation = 0 };
+    }
+
+    private static List<Vec2> CircleRing(double r, int n = 24) => Ellipse(r, r, n);
+
+    private static List<Vec2> Ellipse(double rx, double ry, int n = 24) =>
+        Enumerable.Range(0, n).Select(i => { var t = 2 * Math.PI * i / n; return new Vec2(rx * Math.Cos(t), ry * Math.Sin(t)); }).ToList();
+
+    private static List<Vec2> RectRing(double w, double l, Vec2? c = null)
+    {
+        var o = c ?? Vec2.Zero;
+        return new List<Vec2> { o + new Vec2(-w / 2, -l / 2), o + new Vec2(w / 2, -l / 2), o + new Vec2(w / 2, l / 2), o + new Vec2(-w / 2, l / 2) };
+    }
+
+    /// <summary>Leva a peça do sistema local da unidade para a planta.</summary>
+    private static MarkingPiece ToWorld(MarkingPiece p, LocalFrame f)
+    {
+        Vec2 Dir(Vec2 v) => f.ToWorld(v) - f.ToWorld(Vec2.Zero);
+        var solid = p.Solid == null ? null : new Polyhedron(p.Solid.Faces.Select(face => face.Select(v => Vec3.At(f.ToWorld(v.XY), v.Z))));
+        var prof = p.Profile == null ? null : p.Profile with { Origin = f.ToWorld(p.Profile.Origin), XDir = Dir(p.Profile.XDir), ExtrudeDir = Dir(p.Profile.ExtrudeDir) };
+        return p with { Shape = f.ToWorld(p.Shape), Solid = solid, Profile = prof };
     }
 }
 

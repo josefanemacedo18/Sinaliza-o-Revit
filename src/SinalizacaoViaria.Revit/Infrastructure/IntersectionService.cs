@@ -158,11 +158,7 @@ public sealed class IntersectionService
                 it.RoadIds.Clear();
                 it.MainRoadId = null;
                 it.Output = roads[ids[0]].Def.Output.Clone();
-                if (radiusByHierarchy)
-                {
-                    var hs = ids.Select(i => roads[i].Def.Hierarchy).OrderByDescending(Hierarquia.Rank).ToList();
-                    it.CornerRadius = Hierarquia.CornerRadius(hs[0], hs.Count > 1 ? hs[1] : hs[0]);
-                }
+                if (radiusByHierarchy) it.CornerRadius = Hierarquia.NodeRadius(ids.Select(i => roads[i].Def));
             }
             else it.Node = node;
             foreach (var i in ids) if (!it.RoadIds.Contains(roads[i].Def.Id)) it.RoadIds.Add(roads[i].Def.Id);

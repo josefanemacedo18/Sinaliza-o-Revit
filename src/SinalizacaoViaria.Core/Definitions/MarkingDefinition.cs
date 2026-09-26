@@ -172,6 +172,8 @@ public sealed class LinearMarkingDefinition : MarkingDefinition
     public double? WidthOverride { get; set; }
     public double[]? PatternOverride { get; set; }
     public MarkingColor? ColorOverride { get; set; }
+    /// <summary>Sarjetão: flecha (profundidade da depressão no centro, m). Nulo = 0,05 m.</summary>
+    public double? Depth { get; set; }
 
     public override string KindName => "Linear";
     public override string DisplayCode => Code;
@@ -224,6 +226,8 @@ public sealed class SymbolMarkingDefinition : MarkingDefinition
     public double Z { get; set; }
     public bool Mirror { get; set; }
     public MarkingColor? ColorOverride { get; set; }
+    /// <summary>Escala do símbolo (1 = tamanho informado).</summary>
+    public double Scale { get; set; } = 1.0;
 
     public override string KindName => "Símbolo";
     public override string DisplayCode => Code;
@@ -245,6 +249,8 @@ public sealed class TextMarkingDefinition : MarkingDefinition
     public Vec2 Direction { get; set; } = Vec2.UnitY;
     public double Z { get; set; }
     public MarkingColor Color { get; set; } = MarkingColor.Branca;
+    /// <summary>Escala da legenda (altura, espaçamentos) – 1 = tamanho informado.</summary>
+    public double Scale { get; set; } = 1.0;
 
     public override string KindName => "Legenda";
     public override string DisplayCode => "LEG";
@@ -309,6 +315,8 @@ public sealed class RepeatedMarkingDefinition : MarkingDefinition
     public string FontFamily { get; set; } = "Arial";
     public bool Bold { get; set; } = true;
     public MarkingColor? Color { get; set; }
+    /// <summary>Escala dos símbolos/legendas repetidos.</summary>
+    public double Scale { get; set; } = 1.0;
 
     public override string KindName => "Inscrições repetidas";
     public override string DisplayCode => string.IsNullOrWhiteSpace(SymbolCode) ? "LEG" : SymbolCode!;
@@ -895,6 +903,8 @@ public sealed class RoadPavementDefinition : MarkingDefinition
     public List<PavementGap> Gaps { get; set; } = new();
     public double StartSetback { get; set; }
     public double EndSetback { get; set; }
+    /// <summary>Raio das esquinas (face do meio-fio) nas conexões automáticas desta via. Nulo = pela hierarquia.</summary>
+    public double? CornerRadius { get; set; }
 
     public double DefaultThickness => Material switch { TipoPavimento.Bloquete => 0.08, TipoPavimento.Concreto => 0.15, _ => 0.05 };
     public double ActualThickness => Thickness is > 0 ? Thickness.Value : DefaultThickness;

@@ -42,7 +42,7 @@ public static class RibbonBuilder
             Data(typeof(CmdRampa), "Rampas", "rampa",
                 "Rebaixamentos de calçada (NBR 9050) com abas e piso tátil, e guias rebaixadas de veículos."));
         Stack(via,
-            Data(typeof(CmdHierarquia), "Hierarquia Viária", "hierarquia", "Define a hierarquia viária (CTB art. 60) de vias existentes – quantitativos e via preferencial."),
+            Data(typeof(CmdHierarquia), "Hierarquia e Esquinas", "hierarquia", "Hierarquia viária (CTB art. 60) e raio de concordância das esquinas de vias existentes – aplica às interseções delas."),
             Data(typeof(CmdMobiliario), "Elementos Urbanos", "mobiliario", "Bancos, lixeiras, postes, árvores, abrigos, paraciclos, hidrantes, floreiras, semáforos..."),
             Data(typeof(CmdEixos), "Mostrar/Ocultar Eixos", "eixos", "Mostra ou oculta na vista ativa as linhas de eixo usadas pelas marcas."));
 
@@ -62,7 +62,8 @@ public static class RibbonBuilder
         Split(hor, "SvComplementos", "Complementos",
             Data(typeof(CmdTachas), "Tachas", "tacha", "Tachas e tachões refletivos ao longo de linhas."),
             Data(typeof(CmdPisoTatil), "Piso Tátil", "tatil", "Piso tátil de alerta e direcional (NBR 16537)."),
-            Data(typeof(CmdCiclovia), "Ciclovia", "ciclo", "Linhas de ciclofaixa, pintura vermelha e cruzamento rodocicloviário."),
+            Data(typeof(CmdCiclovia), "Ciclovia / Faixa de Caminhada", "ciclo", "Ciclofaixa uni/bidirecional, ciclovia segregada ou faixa de caminhada completa: fundo, linhas, símbolos, setas e segregação."),
+            Data(typeof(CmdCicloviaLinhas), "Marcas de Ciclovia Avulsas", "ciclo", "CIC-LD, CIC-FD, CIC-LC e cruzamento rodocicloviário (MCC) ao longo de linhas."),
             Data(typeof(CmdModeracao), "Quebra-mola e Lombadas", "quebramola", "Ondulações transversais, faixa elevada e lombada invertida."));
 
         // ---------------------------------------------------------------- Sinalização vertical e dispositivos

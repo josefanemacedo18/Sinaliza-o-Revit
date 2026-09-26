@@ -171,6 +171,7 @@ public partial class RoadWindow : Window
         var was = _loading;
         _loading = true;
         Select(CbHierarchy, s.Hierarchy);
+        TbCornerRadius.Text = s.CornerRadius is { } cr ? UiHelpers.F(cr) : "";
         RbTwoWay.IsChecked = s.TwoWay;
         RbOneWay.IsChecked = !s.TwoWay;
         Select(CbCenter, s.Center);
@@ -526,6 +527,7 @@ public partial class RoadWindow : Window
             GridRight.CommitEdit(DataGridEditingUnit.Row, true);
             GridLeft.CommitEdit(DataGridEditingUnit.Row, true);
             Setup = BuildSetup();
+            Setup.CornerRadius = CornerRadius;
             if (Setup.Hierarchy == HierarquiaViaria.NaoDefinida)
             {
                 UiHelpers.Error("Defina a hierarquia viária da via (CTB art. 60): trânsito rápido, arterial, coletora, local, rodovia ou estrada.");

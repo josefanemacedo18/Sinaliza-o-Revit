@@ -36,6 +36,7 @@ public partial class SymbolWindow : Window
             LbSymbols.SelectedItem = _cat.Simbolo(existing.Code);
             CbLength.Text = UiHelpers.F(existing.Length, "0.##");
             TbWidthFactor.Text = UiHelpers.F(existing.WidthFactor, "0.##");
+            TbScale.Text = UiHelpers.F(existing.Scale * 100, "0.#");
             CkMirror.IsChecked = existing.Mirror;
             UiHelpers.SelectColor(CbColor, existing.ColorOverride);
             Output.Load(existing.Output);
@@ -76,6 +77,7 @@ public partial class SymbolWindow : Window
         d.Length = UiHelpers.ParseOpt(text) ?? s.Comprimentos.FirstOrDefault(5.0);
         if (d.Length <= 0.1 || d.Length > 30) throw new FormatException("Comprimento deve estar entre 0,10 e 30 m.");
         d.WidthFactor = UiHelpers.Parse(TbWidthFactor, 1, "Fator de largura", 0.3, 3);
+        d.Scale = UiHelpers.Parse(TbScale, 100, "Escala", 10, 1000) / 100.0;
         d.Mirror = CkMirror.IsChecked == true;
         d.ColorOverride = UiHelpers.SelectedColor(CbColor);
         d.Output = Output.Save(d.Output);

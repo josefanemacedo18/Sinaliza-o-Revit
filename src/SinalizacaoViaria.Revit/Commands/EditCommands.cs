@@ -113,6 +113,7 @@ public sealed class CmdEditar : CommandBase
         EnsureDetailView(uidoc, edited.Output, keepExistingView: true);
         var results = MarkingCreator.Commit(uidoc, new[] { edited }, $"SV - Editar {edited.DisplayCode}");
         if (edited is RampDefinition ramp) RampCutter.Apply(uidoc, ramp);
+        if (edited is LinearMarkingDefinition { Code: "SARJETAO" }) FootprintCutter.ApplyFor(uidoc, edited);
         Report("Edição", results);
         return Result.Succeeded;
     }
