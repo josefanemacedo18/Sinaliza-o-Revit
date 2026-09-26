@@ -2,6 +2,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using Autodesk.Revit.UI.Selection;
+using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Catalog;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Revit.Infrastructure;
@@ -77,6 +78,8 @@ public sealed class CmdEditar : CommandBase
             var thick = work.ActualThickness;
             var radius = work.CornerRadius ?? 0;
             var h = work.Hierarchy ?? HierarquiaViaria.Local;
+            var axisR = work.PathRef.SmoothRadius ?? 0;
+            var minR = RoadSetup.MinAxisRadius(Math.Max(work.TotalLeft, work.TotalRight));
             var fw = new FormWindow("Editar pavimento da via", "Pavimento da via",
                     "Material, espessura, hierarquia e raio das esquinas. As interseções desta via são refeitas com o novo raio.",
                     null, null, false, "Aplicar", 600, 380)
@@ -85,12 +88,21 @@ public sealed class CmdEditar : CommandBase
                 .Number("Espessura (m)", () => thick, v => thick = v, 0.01, 1)
                 .Choice("Hierarquia viária (CTB art. 60)", Hierarquia.Definidas.Select(x => (Hierarquia.Label(x), x)), () => h, v => h = v)
                 .Number("Raio das esquinas (m, 0 = pela hierarquia)", () => radius, v => radius = v, 0, 60,
-                    tooltip: "Raio de concordância na face do meio-fio. Qualquer valor a partir de 0,5 m gera curva.");
+                    tooltip: "Raio de concordância na face do meio-fio. Qualquer valor a partir de 0,5 m gera curva.")
+                .Number($"Raio das curvas do eixo (m, 0 = cantos como desenhados; mín. {UiHelpers.F(minR, "0.0")})", () => axisR, v => axisR = v, 0, 2000,
+                    tooltip: "Arredonda os cantos vivos do eixo: pavimento, linhas de bordo, meios-fios e calçadas passam a fazer a curva " +
+                             "(a borda interna também). Valores menores que a meia largura + 1,5 m são aumentados.");
             if (UiHelpers.ShowModal(fw) != true) return Result.Cancelled;
             work.Thickness = Math.Abs(thick - work.DefaultThickness) > 1e-6 ? thick : null;
             work.CornerRadius = radius > 0.01 ? radius : null;
             work.Hierarchy = h;
-            var res = MarkingCreator.Commit(uidoc, new[] { work }, "SV - Editar pavimento");
+            double? newR = axisR > 0.01 ? Math.Max(axisR, minR) : null;
+            var group = new List<MarkingDefinition> { work };
+            if (newR != work.PathRef.SmoothRadius && work.GroupId != null)
+                group.AddRange(MarkingStorage.Definitions(uidoc.Document).Where(d => d.GroupId == work.GroupId && d.Id != work.Id && d.Path != null
+                    && d is not IntersectionDefinition));
+            foreach (var g in group) g.Path!.SmoothRadius = newR;
+            var res = MarkingCreator.Commit(uidoc, group, "SV - Editar pavimento");
             res.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões", s =>
             {
                 var r = new List<RenderResult>();
@@ -150,7 +162,7 @@ public sealed class CmdEditar : CommandBase
         EnsureDetailView(uidoc, edited.Output, keepExistingView: true);
         var results = MarkingCreator.Commit(uidoc, new[] { edited }, $"SV - Editar {edited.DisplayCode}");
         if (edited is RampDefinition ramp) RampCutter.Apply(uidoc, ramp);
-        if (edited is LinearMarkingDefinition { Code: "SARJETAO" }) FootprintCutter.ApplyFor(uidoc, edited);
+        if (edited is LinearMarkingDefinition or TrafficCalmingDefinition or HatchMarkingDefinition || edited.Overlay) FootprintCutter.ApplyFor(uidoc, edited);
         Report("Edição", results);
         return Result.Succeeded;
     }
@@ -207,6 +219,12 @@ public sealed class CmdAtualizarTodas : CommandBase
                 catch (Exception ex) { Log.Error("Refresh cul-de-sac", ex); }
             }
             t.Commit();
+        }
+        // Marcas sobrepostas (faixas de pedestres, zebrados) e lombadas invertidas refazem os recortes.
+        foreach (var d in MarkingStorage.Definitions(doc).Where(d => d.Overlay || d is TrafficCalmingDefinition { Type: TipoModeracao.LombadaInvertida }))
+        {
+            try { FootprintCutter.ApplyFor(uidoc, d); }
+            catch (Exception ex) { Log.Error("Recortes de sobreposição", ex); }
         }
         Report("Atualização", results, alwaysShow: true);
         return Result.Succeeded;

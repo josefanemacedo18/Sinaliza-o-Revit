@@ -540,6 +540,21 @@ public sealed class IntersectionService
         var line = (LinearMarkingDefinition)lt.CloneWithNewId();
         line.Exclusions.Clear();
         RoadConnection.PlaceAtEdge(road.Def, left, line, PluginContext.Catalog);
+        // Via com curvas arredondadas: a seção ficou mais larga – o raio mínimo do eixo acompanha.
+        if (road.Def.PathRef.SmoothRadius is { } sr && road.Def.GroupId != null)
+        {
+            var need = RoadSetup.MinAxisRadius(Math.Max(road.Def.TotalLeft, road.Def.TotalRight));
+            line.PathRef.SmoothRadius = Math.Max(sr, need);
+            if (need > sr + 1e-6)
+            {
+                foreach (var m in MarkingStorage.Definitions(_doc).Where(d => d.GroupId == road.Def.GroupId && d.Path != null && d.Id != road.Def.Id))
+                {
+                    m.Path!.SmoothRadius = need;
+                    results.Add(_service.Render(m));
+                }
+                road.Def.PathRef.SmoothRadius = need;
+            }
+        }
         results.Add(_service.Render(line));
         results.Add(_service.Render(road.Def));
         _service.Invalidate();

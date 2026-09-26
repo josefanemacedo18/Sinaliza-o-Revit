@@ -30,10 +30,13 @@ public class CmdSinalizarVia : CommandBase
         if (w.PickSurfaces && MarkingCreator.PickSurfaces(uidoc) is { } s) w.OutputSettings.SurfaceIds = s;
 
         var snapped = new List<string>();
-        var path = RoadAxisInput.Get(uidoc, w.DrawPath, w.Snap, w.CurveRadius, snapped);
+        // Curvas desenhadas com raio menor que a meia largura deixariam a borda interna "dobrada": o raio é limitado.
+        var axisRadius = Math.Max(w.CurveRadius, RoadSetup.MinAxisRadius(w.Setup.MaxHalfWidth));
+        var path = RoadAxisInput.Get(uidoc, w.DrawPath, w.Snap, axisRadius, snapped);
         if (path == null) return Result.Cancelled;
 
         var defs = w.BuildDefinitions(path);
+        RoadSetup.ApplyAxisRadius(defs, w.CurveRadius);
         var results = MarkingCreator.Commit(uidoc, defs, "SV - Sinalizar via");
         if (w.Setup.Warnings.Count > 0 && results.Count > 0) results[0].Warnings.InsertRange(0, w.Setup.Warnings);
         if (defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav && (w.AutoIntersect || w.FreeEnds != Core.Automation.FimLivre.Nenhum))
@@ -171,9 +174,10 @@ public sealed class CmdPista : CommandBase
         EnsureDetailView(uidoc, output);
 
         var snapped = new List<string>();
-        var path = RoadAxisInput.Get(uidoc, draw, snap, radius, snapped);
+        var path = RoadAxisInput.Get(uidoc, draw, snap, Math.Max(radius, RoadSetup.MinAxisRadius(Math.Max(d.LeftWidth, d.RightWidth))), snapped);
         if (path == null) return Result.Cancelled;
         var defs = RoadConnection.BuildCarriageway(d, path, output, center == "-" ? null : center, edges, Hierarquia.DefaultSpeed(h));
+        RoadSetup.ApplyAxisRadius(defs, radius);
         var results = MarkingCreator.Commit(uidoc, defs, "SV - Pista");
         if (connect && defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav)
         {
@@ -270,6 +274,7 @@ public sealed class CmdFaixaPedestres : CommandBase
             var (pts, z) = Picking.ToCore(new[] { a, b });
             var defs = w.BuildDefinitions(w.Setup, w.OutputSettings, pts[0], pts[1], z);
             all.AddRange(MarkingCreator.Commit(uidoc, defs, "SV - Faixa de pedestres"));
+            foreach (var d in defs.Where(d => d.Overlay)) FootprintCutter.ApplyOverlay(uidoc, d);
         }
         if (all.Count == 0) return Result.Cancelled;
         Report("Faixa de pedestres", all);
@@ -309,6 +314,7 @@ public sealed class CmdZebrado : CommandBase
         }
 
         var results = MarkingCreator.Commit(uidoc, new[] { def }, $"SV - {def.Code}");
+        if (def.Overlay) FootprintCutter.ApplyOverlay(uidoc, def);
         Report("Zebrado", results);
         return Result.Succeeded;
     }

@@ -36,6 +36,9 @@ public sealed class CrosswalkSetup
     /// <summary>Recuo das extremidades em relação aos bordos clicados (m).</summary>
     public double EdgeSetback { get; set; }
 
+    /// <summary>A faixa interrompe as linhas pintadas sob ela (eixo, divisão de faixas).</summary>
+    public bool Overlay { get; set; } = true;
+
     /// <summary>
     /// Gera as definições. <paramref name="crosswalkWidth"/> é a largura total ocupada pela faixa
     /// (no sentido do tráfego) e <paramref name="stopLineWidth"/> a largura da LRE.
@@ -57,6 +60,7 @@ public sealed class CrosswalkSetup
             PathRef = PathReference.FromPoints(new[] { aa, bb }, z),
             Output = output.Clone(),
             GroupId = groupId,
+            Overlay = Overlay,
         });
 
         if (!StopLines) return res;

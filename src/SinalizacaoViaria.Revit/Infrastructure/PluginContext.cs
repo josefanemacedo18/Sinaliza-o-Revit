@@ -49,7 +49,8 @@ public static class PluginContext
     {
         Catalog = Catalog,
         Glyphs = Glyphs,
-        MaxPieceLength = drape ? Math.Max(0.5, Settings.DrapePieceLength) : 0,
+        MaxPieceLength = 0,
+        DeviceMaxPieceLength = drape ? Math.Max(2.0, Settings.DrapePieceLength) : 0,
         ViewScale = viewScale > 0 ? viewScale : 100,
         Lookup = lookup,
         AllDefinitions = all,

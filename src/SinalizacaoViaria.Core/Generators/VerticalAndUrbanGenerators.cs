@@ -272,12 +272,14 @@ public static class RampGenerator
     public static (double Width, double Length, double Flare) Dimensions(RampDefinition d)
     {
         var slope = Math.Max(0.01, d.Type == TipoRampa.AcessoVeiculos ? Math.Max(d.Slope, 0.10) : d.Slope);
-        var run = d.Height / slope;
+        var rise = Math.Max(0.005, d.Height - Math.Max(0, d.LipHeight));
+        var run = d.Length is > 0.05 ? d.Length.Value : rise / slope;
+        var flareRun = d.FlareLength is > 0.01 ? d.FlareLength.Value : rise / Math.Max(0.01, d.FlareSlope);
         return d.Type switch
         {
-            TipoRampa.RebaixamentoComAbas => (d.Width, run, d.Height / Math.Max(0.01, d.FlareSlope)),
-            TipoRampa.AcessoVeiculos => (d.Width, run, Math.Min(0.60, run)),
-            TipoRampa.RebaixamentoTotal => (d.Width, d.SidewalkDepth, run),
+            TipoRampa.RebaixamentoComAbas => (d.Width, run, flareRun),
+            TipoRampa.AcessoVeiculos => (d.Width, run, d.FlareLength is > 0.01 ? d.FlareLength.Value : Math.Min(0.60, run)),
+            TipoRampa.RebaixamentoTotal => (d.Width, d.SidewalkDepth, d.Length is > 0.05 ? d.Length.Value : rise / slope),
             _ => (d.Width, run, 0),
         };
     }
@@ -291,6 +293,9 @@ public static class RampGenerator
         const double e = 0.05; // avança sobre a face do meio-fio para garantir o recorte da guia
         if (d.Type == TipoRampa.RebaixamentoTotal)
             return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw + flare, len), f.P(-hw - flare, len) });
+        if (d.LandingDepth > 0.05)
+            return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw, len), f.P(hw, len + d.LandingDepth),
+                f.P(-hw, len + d.LandingDepth), f.P(-hw, len) });
         return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw, len), f.P(-hw, len) });
     }
 
@@ -300,22 +305,23 @@ public static class RampGenerator
         var f = FrameOf(path);
         var (w, len, flare) = Dimensions(d);
         var h = d.Height;
+        var lip = Math.Clamp(d.LipHeight, 0, h * 0.5);
         var hw = w / 2;
-        var slope = h / Math.Max(1e-6, len);
-        const MarkingColor concrete = MarkingColor.Concreto;
+        var slope = (h - lip) / Math.Max(1e-6, len);
+        var concrete = d.RampColor;
 
         if (d.Type == TipoRampa.RebaixamentoTotal)
         {
             // Platô no nível da pista (placa fina) + rampas laterais subindo ao longo do meio-fio.
             var depth = len;
-            geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(new[] { f.P(-hw, 0), f.P(hw, 0), f.P(hw, depth), f.P(-hw, depth) }, _ => 0, _ => 0.005), concrete));
+            geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(new[] { f.P(-hw, 0), f.P(hw, 0), f.P(hw, depth), f.P(-hw, depth) }, _ => 0, _ => Math.Max(0.005, lip)), concrete));
             foreach (var s in new[] { 1.0, -1.0 })
             {
                 var a0 = f.P(s * hw, 0);
                 var a1 = f.P(s * (hw + flare), 0);
                 var a2 = f.P(s * (hw + flare), depth);
                 var a3 = f.P(s * hw, depth);
-                double Top(Vec2 p) => Math.Clamp(Math.Abs((p - f.Curb).Dot(f.Side)) - hw, 0, flare) / flare * h;
+                double Top(Vec2 p) => lip + Math.Clamp(Math.Abs((p - f.Curb).Dot(f.Side)) - hw, 0, flare) / flare * (h - lip);
                 geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(new[] { a0, a1, a2, a3 }, _ => 0, Top), concrete));
             }
             if (d.Tactile)
@@ -329,9 +335,13 @@ public static class RampGenerator
         }
 
         // Rampa central: plano inclinado do meio-fio (z = 0) até o fim da subida (z = h).
-        double RampZ(Vec2 p) => Math.Clamp((p - f.Curb).Dot(f.Up), 0, len) * slope;
+        double RampZ(Vec2 p) => lip + Math.Clamp((p - f.Curb).Dot(f.Up), 0, len) * slope;
         var main = Polyhedron.Prism(new[] { f.P(-hw, 0), f.P(hw, 0), f.P(hw, len), f.P(-hw, len) }, _ => 0, RampZ);
         geo.Pieces.Add(Polyhedron.Piece(main, concrete));
+        // Patamar nivelado no topo (antes da faixa livre da calçada).
+        if (d.LandingDepth > 0.05)
+            geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(new[] { f.P(-hw, len), f.P(hw, len), f.P(hw, len + d.LandingDepth), f.P(-hw, len + d.LandingDepth) },
+                _ => 0, _ => h), concrete));
 
         // Abas laterais: triângulos com superfície plana passando por (meio-fio, 0), (aba, h) e (fim da rampa, h).
         if (flare > 0.01)
@@ -341,15 +351,19 @@ public static class RampGenerator
                 var p1 = f.P(s * hw, 0);
                 var p2 = f.P(s * (hw + flare), 0);
                 var p3 = f.P(s * hw, len);
-                var top = new[] { Vec3.At(p1, 0), Vec3.At(p2, h), Vec3.At(p3, h) };
+                var top = new[] { Vec3.At(p1, lip), Vec3.At(p2, h), Vec3.At(p3, h) };
                 var bottom = new[] { Vec3.At(p1, 0), Vec3.At(p2, 0), Vec3.At(p3, 0) };
                 var faces = new List<IEnumerable<Vec3>>
                 {
                     bottom,
                     top,
-                    new[] { Vec3.At(p1, 0), Vec3.At(p2, 0), Vec3.At(p2, h) },                    // face no meio-fio
+                    lip > 1e-4
+                        ? new[] { Vec3.At(p1, 0), Vec3.At(p2, 0), Vec3.At(p2, h), Vec3.At(p1, lip) }
+                        : new[] { Vec3.At(p1, 0), Vec3.At(p2, 0), Vec3.At(p2, h) },          // face no meio-fio
                     new[] { Vec3.At(p2, 0), Vec3.At(p3, 0), Vec3.At(p3, h), Vec3.At(p2, h) },    // face encostada na calçada
-                    new[] { Vec3.At(p3, 0), Vec3.At(p1, 0), Vec3.At(p3, h) },                    // face encostada na rampa
+                    lip > 1e-4
+                        ? new[] { Vec3.At(p3, 0), Vec3.At(p1, 0), Vec3.At(p1, lip), Vec3.At(p3, h) }
+                        : new[] { Vec3.At(p3, 0), Vec3.At(p1, 0), Vec3.At(p3, h) },          // face encostada na rampa
                 };
                 geo.Pieces.Add(Polyhedron.Piece(new Polyhedron(faces), concrete));
             }
@@ -371,8 +385,10 @@ public static class RampGenerator
                             p => RampZ(p) + TactileGenerator.TileThickness + TactileGenerator.ReliefHeight), MarkingColor.RelevoTatil));
                 }
             }
-            if (t1 - t0 > 0.02) Sloped(TactileGenerator.Rect(f.P(-hw + 0.01, t0), f.Up, t1 - t0, 2 * hw - 0.02, 0.25, true));
-            if (d.DirectionalTactile && len - t1 > 0.1) Sloped(TactileGenerator.Rect(f.P(-0.125, t1), f.Up, len - t1, 0.25, 0.25, false));
+            var tl = Math.Clamp(d.TactileLength ?? 2 * hw - 0.02, 0.25, 2 * hw - 0.02);
+            if (t1 - t0 > 0.02) Sloped(TactileGenerator.Rect(f.P(-tl / 2, t0), f.Up, t1 - t0, tl, 0.25, true));
+            var dw = Math.Clamp(d.DirectionalWidth, 0.25, 2 * hw - 0.02);
+            if (d.DirectionalTactile && len - t1 > 0.1) Sloped(TactileGenerator.Rect(f.P(-dw / 2, t1), f.Up, len - t1, dw, 0.25, false));
         }
 
         Annotate(geo, f, w, len, d.Type == TipoRampa.AcessoVeiculos ? $"Guia rebaixada  i = {slope * 100:0.#} %" : $"i = {slope * 100:0.##} %", false, flare);
@@ -410,7 +426,10 @@ public static class RampGenerator
         geo.PathLength = w;
         if (d.Type != TipoRampa.AcessoVeiculos)
         {
-            if (d.Slope > 0.0833 + 1e-6) geo.Warnings.Add($"Inclinação de {d.Slope * 100:0.##} % acima do máximo de 8,33 % (NBR 9050).");
+            var (_, run, fl) = Dimensions(d);
+            var real = (d.Height - Math.Clamp(d.LipHeight, 0, d.Height * 0.5)) / Math.Max(1e-6, d.Type == TipoRampa.RebaixamentoTotal ? fl : run);
+            if (real > 0.0833 + 1e-4) geo.Warnings.Add($"Inclinação de {real * 100:0.##} % acima do máximo de 8,33 % (NBR 9050).");
+            if (d.LipHeight > 0.005 + 1e-6) geo.Warnings.Add("Desnível no meio-fio acima de 5 mm: a NBR 9050 pede tratamento (chanfro) ou eliminação.");
             if (w < 1.50 - 1e-6) geo.Warnings.Add($"Largura de {w:0.00} m abaixo da mínima recomendada de 1,50 m para rebaixamentos (NBR 9050).");
             if (d.Type == TipoRampa.RebaixamentoComAbas && d.FlareSlope > 0.10 + 1e-6) geo.Warnings.Add("Abas laterais com inclinação acima de 10 % (NBR 9050).");
         }

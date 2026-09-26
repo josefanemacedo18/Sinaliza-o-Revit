@@ -2147,6 +2147,79 @@
       "descricao": "Postes leves com cabos tensionados (modelados como lâmina fina).",
       "referencia": "Prática usual"
     }
+,
+    {
+      "codigo": "ESF",
+      "nome": "Esfera de concreto (bloqueio)",
+      "forma": "Esfera",
+      "cor": "Concreto",
+      "comprimento": 0.6,
+      "largura": 0.6,
+      "altura": 0.6,
+      "espacamento": 1.5,
+      "descricao": "Esfera de concreto sobre base, impede a entrada de veículos em calçadas, praças e áreas de pedestres mantendo a passagem de pedestres e cadeiras de rodas (vão ≥ 1,20 m).",
+      "referencia": "ABNT NBR 9050 / prática usual"
+    },
+    {
+      "codigo": "FLOR-BLOQ",
+      "nome": "Floreira de concreto (bloqueio com vegetação)",
+      "forma": "Floreira",
+      "cor": "Concreto",
+      "comprimento": 1.2,
+      "largura": 0.6,
+      "altura": 0.6,
+      "espacamento": 2.0,
+      "descricao": "Jardineira de concreto com vegetação – bloqueio físico que qualifica o espaço (parklets, ruas compartilhadas, esquinas).",
+      "referencia": "Prática usual de desenho urbano"
+    },
+    {
+      "codigo": "CONE",
+      "nome": "Cone de sinalização (75 cm)",
+      "forma": "Cone",
+      "cor": "Laranja",
+      "comprimento": 0.4,
+      "largura": 0.4,
+      "altura": 0.75,
+      "espacamento": 3.0,
+      "descricao": "Cone laranja com faixas refletivas brancas, base quadrada preta – canalização provisória de obras.",
+      "referencia": "CONTRAN – Manual de sinalização de obras (MBST Vol. VII)"
+    },
+    {
+      "codigo": "CAVALETE",
+      "nome": "Cavalete de sinalização",
+      "forma": "Cavalete",
+      "cor": "Laranja",
+      "comprimento": 1.2,
+      "largura": 0.5,
+      "altura": 1.0,
+      "espacamento": 1.5,
+      "descricao": "Cavalete com réguas listradas laranja/branco – bloqueio provisório de faixa ou via.",
+      "referencia": "CONTRAN – Manual de sinalização de obras"
+    },
+    {
+      "codigo": "TAMBOR",
+      "nome": "Tambor canalizador",
+      "forma": "Tambor",
+      "cor": "Laranja",
+      "comprimento": 0.6,
+      "largura": 0.6,
+      "altura": 1.0,
+      "espacamento": 3.0,
+      "descricao": "Tambor plástico laranja com faixas refletivas brancas – canalização de obras em vias de maior velocidade.",
+      "referencia": "CONTRAN – Manual de sinalização de obras"
+    },
+    {
+      "codigo": "GRADIL",
+      "nome": "Gradil de proteção de pedestres",
+      "forma": "Gradil",
+      "cor": "Metal",
+      "comprimento": 0.05,
+      "largura": 0.05,
+      "altura": 1.1,
+      "espacamento": 0,
+      "descricao": "Gradil metálico contínuo na borda da calçada: canaliza pedestres para as travessias e impede a travessia fora da faixa.",
+      "referencia": "Prática usual (canalização de pedestres)"
+    }
   ],
   "placas": [
     {

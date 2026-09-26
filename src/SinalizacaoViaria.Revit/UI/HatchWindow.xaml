@@ -65,6 +65,8 @@
                         <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas do contorno fechado" IsChecked="True"/>
                         <RadioButton x:Name="RbEdges" GroupName="path" Content="Selecionar bordas (arestas) de pisos que formam o contorno"/>
                         <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar o contorno por pontos"/>
+                        <CheckBox x:Name="CkOverlay" IsChecked="True" Content="Sobrepor: interromper as linhas pintadas sob o zebrado"
+                                  ToolTip="No trecho ocupado pelo zebrado, as linhas longitudinais (eixo, divisão de faixas) somem."/>
                         <CheckBox x:Name="CkRefDir" Content="Indicar a direção do tráfego com 2 cliques" ToolTip="Senão, o ângulo é medido a partir do maior lado do contorno."/>
                     </StackPanel>
                 </GroupBox>

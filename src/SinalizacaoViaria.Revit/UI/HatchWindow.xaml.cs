@@ -36,6 +36,7 @@ public partial class HatchWindow : Window
             GbPath.Visibility = Visibility.Collapsed;
             LbTypes.SelectedItem = _cat.Hachura(existing.Code);
             Fill(existing);
+            CkOverlay.IsChecked = existing.Overlay;
             Output.Load(existing.Output);
         }
         else
@@ -100,6 +101,7 @@ public partial class HatchWindow : Window
         d.Crossed = CkCrossed.IsChecked == true;
         d.BarColor = UiHelpers.SelectedColor(CbBarColor);
         d.BorderColor = UiHelpers.SelectedColor(CbBorderColor);
+        d.Overlay = CkOverlay.IsChecked == true;
         d.Output = Output.Save(d.Output);
         return d;
     }

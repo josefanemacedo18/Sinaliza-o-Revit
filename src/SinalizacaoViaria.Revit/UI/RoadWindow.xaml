@@ -214,8 +214,8 @@
                                   ToolTip="Clique sobre uma via para ligar a nova via ao eixo dela (entroncamento/cruzamento) ou perto da ponta para continuá-la."/>
                         <Grid Margin="18,0,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                            <TextBlock Text="Raio das curvas horizontais (m, 0 = cantos vivos)" Style="{StaticResource FieldLabel}"/>
-                            <TextBox Grid.Column="1" x:Name="TbCurveRadius" Text="30" ToolTip="Concorda os vértices clicados com arcos (reduzido onde não couber)."/>
+                            <TextBlock Text="Raio das curvas do eixo (m, mín. = meia largura + 1,5)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" x:Name="TbCurveRadius" Text="30" ToolTip="Raio das curvas do eixo: concorda os vértices clicados e arredonda os cantos vivos das linhas selecionadas (nunca menor que a meia largura + 1,5 m, para a borda interna também fazer curva)."/>
                         </Grid>
                     </StackPanel>
                 </GroupBox>

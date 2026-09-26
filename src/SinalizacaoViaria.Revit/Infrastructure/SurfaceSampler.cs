@@ -12,13 +12,20 @@ public sealed class SurfaceSampler
     private readonly ReferenceIntersector? _intersector;
     public bool IsAvailable => _intersector != null;
 
-    public SurfaceSampler(Document doc, IEnumerable<string> surfaceUniqueIds, bool allowCreateView)
+    private readonly Dictionary<(long, long), (bool Ok, double Z, XYZ N)> _cache = new();
+
+    /// <param name="terrainOnly">
+    /// Só o terreno (Toposolid/topografia e superfícies escolhidas que não sejam do plugin) – usado pelos pisos do próprio
+    /// plugin, que não podem se apoiar em si mesmos nem em outros pisos gerados.
+    /// </param>
+    public SurfaceSampler(Document doc, IEnumerable<string> surfaceUniqueIds, bool allowCreateView, bool terrainOnly = false)
     {
         _doc = doc;
         var view = Find3DView(doc) ?? (allowCreateView ? Create3DView(doc) : null);
         if (view == null) return;
 
-        var ids = surfaceUniqueIds.Select(u => doc.GetElement(u)?.Id).Where(i => i != null).Cast<ElementId>().ToList();
+        var ids = surfaceUniqueIds.Select(u => doc.GetElement(u)).Where(e => e != null && (!terrainOnly || !MarkingStorage.IsMarking(e)))
+            .Select(e => e!.Id).ToList();
         if (ids.Count > 0)
         {
             _intersector = new ReferenceIntersector(ids, FindReferenceTarget.Face, view);
@@ -28,9 +35,9 @@ public sealed class SurfaceSampler
             var cats = new List<ElementFilter>
             {
                 new ElementCategoryFilter(BuiltInCategory.OST_Toposolid),
-                new ElementCategoryFilter(BuiltInCategory.OST_Floors),
                 new ElementCategoryFilter(BuiltInCategory.OST_Topography),
             };
+            if (!terrainOnly) cats.Add(new ElementCategoryFilter(BuiltInCategory.OST_Floors));
             _intersector = new ReferenceIntersector(new LogicalOrFilter(cats), FindReferenceTarget.Face, view);
         }
         _intersector.FindReferencesInRevitLinks = false;
@@ -38,6 +45,20 @@ public sealed class SurfaceSampler
 
     /// <summary>Elevação (pés) e normal da superfície sob o ponto (coordenadas internas).</summary>
     public bool TrySample(double xFt, double yFt, double zHintFt, out double zFt, out XYZ normal)
+    {
+        var key = ((long)Math.Round(xFt * 20), (long)Math.Round(yFt * 20));   // ~1,5 cm
+        if (_cache.TryGetValue(key, out var c))
+        {
+            zFt = c.Ok ? c.Z : zHintFt;
+            normal = c.N;
+            return c.Ok;
+        }
+        var ok = Sample(xFt, yFt, zHintFt, out zFt, out normal);
+        _cache[key] = (ok, zFt, normal);
+        return ok;
+    }
+
+    private bool Sample(double xFt, double yFt, double zHintFt, out double zFt, out XYZ normal)
     {
         zFt = zHintFt;
         normal = XYZ.BasisZ;

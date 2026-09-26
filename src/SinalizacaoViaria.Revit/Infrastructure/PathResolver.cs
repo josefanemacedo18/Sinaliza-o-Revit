@@ -49,13 +49,13 @@ public static class PathResolver
             if (!chain.AllConnected)
                 warnings.Add($"As linhas selecionadas formam {chain.Chains.Count} trechos separados; cada trecho recebe o padrão de forma independente.");
             var polylines = chain.Chains
-                .Select(c => new Polyline2(c, path.Closed || PathChainer.IsClosed(c, 0.01)))
+                .Select(c => { var closed = path.Closed || PathChainer.IsClosed(c, 0.01); return new Polyline2(PathReference.Smooth(c, path.SmoothRadius, closed), closed); })
                 .Where(p => p.Length > 1e-4).ToList();
             return new ResolvedPath(polylines, zCount > 0 ? zSum / zCount : 0, warnings);
         }
 
         if (path.Points.Count >= 2)
-            return new ResolvedPath(new List<Polyline2> { new(path.Points, path.Closed) }, path.Z, warnings);
+            return new ResolvedPath(new List<Polyline2> { new(PathReference.Smooth(path.Points, path.SmoothRadius, path.Closed), path.Closed) }, path.Z, warnings);
         return null;
     }
 

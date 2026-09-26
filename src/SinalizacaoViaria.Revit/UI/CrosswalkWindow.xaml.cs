@@ -61,6 +61,7 @@ public partial class CrosswalkWindow : Window
         StopLineRightSide = CkRight.IsChecked == true,
         Span = RbFull.IsChecked == true ? StopLineSpan.PistaInteira : StopLineSpan.MeiaPista,
         EdgeSetback = UiHelpers.Parse(TbSetback, 0, "Recuo dos bordos", 0, 10),
+        Overlay = CkOverlay.IsChecked == true,
     };
 
     /// <summary>Largura total ocupada pela faixa e largura da LRE (para posicionar a retenção).</summary>

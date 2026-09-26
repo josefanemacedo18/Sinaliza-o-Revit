@@ -136,7 +136,7 @@ public sealed class CmdModeracao : CommandBase
         if (UiHelpers.ShowModal(w) != true || w.Result == null) return Result.Cancelled;
         EnsureDetailView(uidoc, w.Result.Output);
         if (w.PickSurfaces && MarkingCreator.PickSurfaces(uidoc) is { } s) w.Result.Output.SurfaceIds = s;
-        return MarkingCreator.CreateAlongPath(uidoc, w.Result, w.PathMode, w.Result.DisplayCode);
+        return MarkingCreator.CreateAlongPath(uidoc, w.Result, w.PathMode, w.Result.DisplayCode, afterEach: d => FootprintCutter.ApplyFor(uidoc, d));
     }
 }
 

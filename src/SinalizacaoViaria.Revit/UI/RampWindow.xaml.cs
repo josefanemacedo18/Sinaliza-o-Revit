@@ -34,6 +34,9 @@ public partial class RampWindow : Window
         CbType.Items.Add(new Option("Guia rebaixada / acesso de veículos", TipoRampa.AcessoVeiculos));
         foreach (var c in UiHelpers.ColorItems().Skip(1)) CbTactileColor.Items.Add(c);
         UiHelpers.SelectColor(CbTactileColor, MarkingColor.Amarela);
+        foreach (var (l, c) in new[] { ("Concreto", MarkingColor.Concreto), ("Concreto de pavimento", MarkingColor.PavimentoConcreto), ("Bloquete / intertravado", MarkingColor.Bloquete), ("Asfalto", MarkingColor.Asfalto) })
+            CbRampColor.Items.Add(new UiHelpers.ColorItem(c, l));
+        CbRampColor.SelectedIndex = 0;
         Output.Changed += (_, _) => UpdatePreview();
         var d = existing ?? new RampDefinition();
         foreach (var item in CbType.Items)
@@ -49,6 +52,13 @@ public partial class RampWindow : Window
         TbDepth.Text = UiHelpers.F(d.SidewalkDepth);
         TbSetback.Text = UiHelpers.F(d.TactileSetback);
         CkDirectional.IsChecked = d.DirectionalTactile;
+        TbLength.Text = UiHelpers.F(d.Length, "0.###");
+        TbFlareLength.Text = UiHelpers.F(d.FlareLength, "0.###");
+        TbLip.Text = UiHelpers.F(d.LipHeight, "0.###");
+        TbLanding.Text = UiHelpers.F(d.LandingDepth, "0.###");
+        TbTactileLength.Text = UiHelpers.F(d.TactileLength, "0.###");
+        TbDirWidth.Text = UiHelpers.F(d.DirectionalWidth, "0.###");
+        foreach (var it in CbRampColor.Items) if (it is UiHelpers.ColorItem ci && ci.Color == d.RampColor) CbRampColor.SelectedItem = it;
         Output.Load(existing?.Output ?? PluginContext.Settings.NewOutput());
         if (existing != null) { Title = "Editar rampa"; BtnOk.Content = "Aplicar"; }
         _loading = false;
@@ -84,6 +94,13 @@ public partial class RampWindow : Window
         d.SidewalkDepth = UiHelpers.Parse(TbDepth, 1.80, "Profundidade da calçada", 0.5, 10);
         d.TactileSetback = UiHelpers.Parse(TbSetback, 0, "Afastamento do piso tátil", 0, 2);
         d.DirectionalTactile = CkDirectional.IsChecked == true;
+        d.Length = UiHelpers.ParseNullable(TbLength, "Comprimento da rampa", 0.1, 50);
+        d.FlareLength = UiHelpers.ParseNullable(TbFlareLength, "Comprimento das abas", 0.05, 20);
+        d.LipHeight = UiHelpers.Parse(TbLip, 0, "Desnível no meio-fio", 0, 0.1);
+        d.LandingDepth = UiHelpers.Parse(TbLanding, 0, "Patamar", 0, 10);
+        d.TactileLength = UiHelpers.ParseNullable(TbTactileLength, "Comprimento do piso tátil", 0.25, 20);
+        d.DirectionalWidth = UiHelpers.Parse(TbDirWidth, 0.25, "Largura do direcional", 0.25, 3);
+        d.RampColor = (CbRampColor.SelectedItem as UiHelpers.ColorItem)?.Color ?? MarkingColor.Concreto;
         d.Output = Output.Save(d.Output);
         return d;
     }

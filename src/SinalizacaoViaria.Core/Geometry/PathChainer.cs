@@ -100,6 +100,58 @@ public static class CurveTools
     }
 
     /// <summary>Subdivide segmentos maiores que <paramref name="maxLen"/>.</summary>
+    /// <summary>
+    /// Arredonda os cantos vivos da polilinha (vértices com deflexão maior que <paramref name="minTurnDeg"/>) com arcos de
+    /// raio <paramref name="radius"/>, limitados pelo comprimento disponível dos trechos vizinhos. Arcos já discretizados
+    /// (deflexões pequenas) ficam como estão.
+    /// </summary>
+    public static List<Vec2> FilletCorners(IReadOnlyList<Vec2> pts, double radius, bool closed = false, double minTurnDeg = 8)
+    {
+        var p = pts.ToList();
+        if (closed && p.Count > 3 && p[0].AlmostEquals(p[^1], 1e-6)) p.RemoveAt(p.Count - 1);
+        var n = p.Count;
+        if (radius <= 0.01 || n < 3) return pts.ToList();
+        double Len(int a, int b) => p[(a + n) % n].DistanceTo(p[(b + n) % n]);
+        bool IsCorner(int i, out double turn)
+        {
+            turn = 0;
+            if (!closed && (i == 0 || i == n - 1)) return false;
+            var d1 = (p[i] - p[(i - 1 + n) % n]).Normalized();
+            var d2 = (p[(i + 1) % n] - p[i]).Normalized();
+            turn = Math.Acos(Math.Clamp(d1.Dot(d2), -1, 1));
+            return turn > minTurnDeg * Math.PI / 180 && turn < Math.PI - 1e-3;
+        }
+        var corner = new bool[n];
+        var turns = new double[n];
+        for (int i = 0; i < n; i++) corner[i] = IsCorner(i, out turns[i]);
+        var res = new List<Vec2>();
+        for (int i = 0; i < n; i++)
+        {
+            if (!corner[i]) { res.Add(p[i]); continue; }
+            var prev = (i - 1 + n) % n;
+            var next = (i + 1) % n;
+            // Cada trecho é dividido entre as duas pontas quando ambas são cantos.
+            var availPrev = Len(prev, i) * (corner[prev] ? 0.5 : 1.0);
+            var availNext = Len(i, next) * (corner[next] ? 0.5 : 1.0);
+            var half = Math.Tan(turns[i] / 2);
+            var t = Math.Min(radius * half, Math.Min(availPrev, availNext) * 0.999);
+            var r = t / half;
+            if (r < 0.05) { res.Add(p[i]); continue; }
+            var d1 = (p[i] - p[prev]).Normalized();
+            var d2 = (p[next] - p[i]).Normalized();
+            var a = p[i] - d1 * t;
+            var left = d1.Cross(d2) > 0;
+            var nrm = left ? d1.PerpLeft : d1.PerpRight;
+            var c = a + nrm * r;
+            var a0 = Math.Atan2(a.Y - c.Y, a.X - c.X);
+            var sweep = left ? turns[i] : -turns[i];
+            var arc = Arc(c, r, a0, sweep, 0.005);
+            res.AddRange(arc);
+        }
+        if (closed) res.Add(res[0]);
+        return res;
+    }
+
     public static List<Vec2> Densify(IReadOnlyList<Vec2> pts, double maxLen)
     {
         var res = new List<Vec2>();

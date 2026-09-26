@@ -24,7 +24,18 @@
                 <TextBlock Style="{StaticResource Hint}" Text="1º clique: centro da rampa na FACE DO MEIO-FIO (divisa com a pista). 2º clique: um ponto para dentro da calçada (sentido da subida). Repete até ESC."/>
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <TextBlock Grid.Row="6" Text="Comprimento da rampa (m)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="6" Grid.Column="1" x:Name="TbLength" TextChanged="AnyChanged" ToolTip="Vazio = calculado pela inclinação. Informado: a inclinação passa a ser desnível ÷ comprimento."/>
+                    <TextBlock Grid.Row="7" Text="Comprimento das abas (m)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="7" Grid.Column="1" x:Name="TbFlareLength" TextChanged="AnyChanged" ToolTip="Vazio = calculado pela inclinação das abas."/>
+                    <TextBlock Grid.Row="8" Text="Desnível no meio-fio (m)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="8" Grid.Column="1" x:Name="TbLip" Text="0" TextChanged="AnyChanged" ToolTip="Degrau residual entre a pista e o início da rampa (NBR 9050: até 5 mm)."/>
+                    <TextBlock Grid.Row="9" Text="Patamar no topo (m)" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Grid.Row="9" Grid.Column="1" x:Name="TbLanding" Text="0" TextChanged="AnyChanged" ToolTip="Faixa plana no nível da calçada logo após a rampa (0 = sem patamar)."/>
+                    <TextBlock Grid.Row="10" Text="Material" Style="{StaticResource FieldLabel}"/>
+                    <ComboBox Grid.Row="10" Grid.Column="1" x:Name="CbRampColor" SelectionChanged="AnyChanged"/>
                     <TextBlock Text="Tipo" Style="{StaticResource FieldLabel}"/>
                     <ComboBox Grid.Column="1" x:Name="CbType" SelectionChanged="TypeChanged"/>
                     <TextBlock Grid.Row="1" Text="Largura (m)" Style="{StaticResource FieldLabel}"/>
@@ -42,7 +53,12 @@
                 <GroupBox Header="Piso tátil de alerta (NBR 16537)">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Grid.Row="5" Text="Comprimento ao longo do meio-fio (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="5" Grid.Column="1" x:Name="TbTactileLength" TextChanged="AnyChanged" ToolTip="Vazio = largura toda da rampa."/>
+                        <TextBlock Grid.Row="6" Text="Largura do direcional (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="6" Grid.Column="1" x:Name="TbDirWidth" Text="0,25" TextChanged="AnyChanged"/>
                         <CheckBox Grid.ColumnSpan="2" x:Name="CkTactile" Content="Incluir piso tátil de alerta junto à pista" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
                         <TextBlock Grid.Row="1" Text="Largura (m)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbTactile" Text="0,40" TextChanged="AnyChanged"/>

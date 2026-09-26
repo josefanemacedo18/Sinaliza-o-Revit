@@ -74,10 +74,29 @@ public static class DeviceGenerator
                 }
                 else if (def.Forma == FormaDispositivo.NewJersey)
                     Extrude(geo, pts, NewJerseyProfile(W, H, color == MarkingColor.Branca), color);
+                else if (def.Forma == FormaDispositivo.Gradil)
+                {
+                    // Corrimão superior e travessa inferior contínuos.
+                    Extrude(geo, pts, Box(0, 0.05, H - 0.05, 0.05), color);
+                    Extrude(geo, pts, Box(0, 0.04, 0.10, 0.04), color);
+                }
                 else
                     Extrude(geo, pts, MuretaProfile(W, H), color);
             }
             geo.PaintedLength = b - a;
+            if (def.Forma == FormaDispositivo.Gradil)
+            {
+                // Montantes a cada 2 m e barras verticais a cada 0,15 m.
+                var k = 0;
+                for (var s = a; s <= b + 1e-6; s += 0.15, k++)
+                {
+                    var post = k % 13 == 0 || s + 0.15 > b + 1e-6;
+                    var fr = new LocalFrame(PointAt(s), p.TangentAt(Math.Min(s, b)));
+                    var piece = post ? Block(Vec2.Zero, 0.06, 0.06, 0, H, color) : Block(Vec2.Zero, 0.02, 0.02, 0.12, H - 0.05, color);
+                    geo.Pieces.Add(ToWorld(piece, fr));
+                }
+                return geo;
+            }
             if (!guardRail) return geo;
         }
 
@@ -177,6 +196,84 @@ public static class DeviceGenerator
                 if (!def.Codigo.Contains("CABO", StringComparison.OrdinalIgnoreCase))
                     foreach (var sg in sides)
                         yield return Block(new Vec2(-sg * 0.085, 0), 0.10, 0.08, H - 0.33, H - 0.08, MarkingColor.Metal);
+                break;
+            }
+            case FormaDispositivo.Esfera:
+            {
+                // Base cilíndrica baixa + esfera de concreto.
+                var baseH = Math.Min(0.08, H * 0.15);
+                var r = Math.Min(W / 2, (H - baseH) / 2);
+                yield return Cyl(r * 0.75, 0, baseH, color);
+                var zc = baseH + r;
+                var rings = new List<(List<Vec2> Ring, double Z)>();
+                for (int k = -8; k <= 8; k++)
+                {
+                    var phi = k * 10.0 * Math.PI / 180;
+                    rings.Add((CircleRing(Math.Max(0.01, r * Math.Cos(phi))), zc + r * Math.Sin(phi)));
+                }
+                yield return Loft(rings, color);
+                break;
+            }
+            case FormaDispositivo.Floreira:
+            {
+                // Paredes de concreto (6 cm), fundo, terra e arbustos.
+                const double t = 0.06;
+                yield return Block(Vec2.Zero, W, L, 0, 0.08, color);
+                yield return Block(new Vec2(-(W - t) / 2, 0), t, L, 0, H, color);
+                yield return Block(new Vec2((W - t) / 2, 0), t, L, 0, H, color);
+                yield return Block(new Vec2(0, -(L - t) / 2), W - 2 * t, t, 0, H, color);
+                yield return Block(new Vec2(0, (L - t) / 2), W - 2 * t, t, 0, H, color);
+                yield return Block(Vec2.Zero, W - 2 * t, L - 2 * t, 0.08, H - 0.06, MarkingColor.Marrom);
+                var n = Math.Max(1, (int)Math.Round(L / 0.5));
+                for (int i = 0; i < n; i++)
+                {
+                    var y = -L / 2 + L * (i + 0.5) / n;
+                    var rb = Math.Min(W, L / n) * 0.42;
+                    var z0 = H - 0.06;
+                    var c = new Vec2(0, y);
+                    yield return Loft(new[] { (CircleRing(rb * 0.5, 12, c), z0), (CircleRing(rb, 12, c), z0 + rb * 0.7),
+                        (CircleRing(rb * 0.8, 12, c), z0 + rb * 1.3), (CircleRing(rb * 0.2, 12, c), z0 + rb * 1.6) }, MarkingColor.Grama);
+                }
+                break;
+            }
+            case FormaDispositivo.Cone:
+            {
+                var r = W / 2;
+                yield return Block(Vec2.Zero, W, W, 0, 0.03, MarkingColor.Preta);
+                yield return Loft(new[] { (CircleRing(r * 0.75), 0.03), (CircleRing(r * 0.12), H) }, color);
+                double Rad(double z) => r * 0.75 + (r * 0.12 - r * 0.75) * (z - 0.03) / (H - 0.03);
+                foreach (var (z0, z1) in new[] { (0.42, 0.55), (0.68, 0.78) })
+                    yield return Loft(new[] { (CircleRing(Rad(H * z0) * 1.03), H * z0), (CircleRing(Rad(H * z1) * 1.03), H * z1) }, MarkingColor.Branca);
+                break;
+            }
+            case FormaDispositivo.Tambor:
+            {
+                var r = W / 2;
+                yield return Loft(new[] { (CircleRing(r * 1.1), 0.0), (CircleRing(r * 1.1), 0.06) }, MarkingColor.Preta);
+                yield return Loft(new[] { (CircleRing(r), 0.06), (CircleRing(r), H * 0.97), (CircleRing(r * 0.85), H) }, color);
+                foreach (var (z0, z1) in new[] { (0.30, 0.40), (0.52, 0.62), (0.74, 0.84) })
+                    yield return Cyl(r * 1.02, H * z0, H * z1, MarkingColor.Branca);
+                break;
+            }
+            case FormaDispositivo.Cavalete:
+            {
+                // Pés metálicos nas pontas e duas réguas listradas laranja/branco.
+                foreach (var sy in new[] { -1.0, 1.0 })
+                {
+                    var y = sy * (L / 2 - 0.04);
+                    yield return Block(new Vec2(0, y), 0.04, 0.04, 0, H, MarkingColor.Metal);
+                    yield return Block(new Vec2(0, y), W, 0.05, 0, 0.04, MarkingColor.Metal);
+                }
+                foreach (var (z0, z1) in new[] { (H * 0.55, H * 0.72), (H * 0.80, H * 0.97) })
+                {
+                    var n = Math.Max(1, (int)Math.Round(L / 0.2));
+                    for (int i = 0; i < n; i++)
+                    {
+                        var y0 = -L / 2 + L * i / n;
+                        var y1 = -L / 2 + L * (i + 1) / n;
+                        yield return Block(new Vec2(0.03, (y0 + y1) / 2), 0.02, y1 - y0, z0, z1, i % 2 == 0 ? color : MarkingColor.Branca);
+                    }
+                }
                 break;
             }
             default:
@@ -280,7 +377,8 @@ public static class DeviceGenerator
         return Polyhedron.Piece(poly, color) with { Elevation = 0 };
     }
 
-    private static List<Vec2> CircleRing(double r, int n = 24) => Ellipse(r, r, n);
+    private static List<Vec2> CircleRing(double r, int n = 24, Vec2? c = null) =>
+        Ellipse(r, r, n).Select(v => v + (c ?? Vec2.Zero)).ToList();
 
     private static List<Vec2> Ellipse(double rx, double ry, int n = 24) =>
         Enumerable.Range(0, n).Select(i => { var t = 2 * Math.PI * i / n; return new Vec2(rx * Math.Cos(t), ry * Math.Sin(t)); }).ToList();

@@ -25,7 +25,10 @@
                 <GroupBox Header="Faixa de pedestres">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkOverlay" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
+                                  Content="Sobrepor: interromper as linhas pintadas sob a faixa (eixo, divisão de faixas)"
+                                  ToolTip="A faixa fica por cima: no trecho ocupado por ela, as linhas longitudinais somem. Vale também para linhas criadas depois."/>
                         <TextBlock Text="Tipo" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Column="1" x:Name="CbType" SelectionChanged="TypeChanged"/>
                         <TextBlock Grid.Row="1" Text="Variante" Style="{StaticResource FieldLabel}"/>

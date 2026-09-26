@@ -264,6 +264,30 @@ public sealed class RoadSetup
     /// <summary>Largura total entre os alinhamentos externos.</summary>
     public double TotalWidth => SideWidth(Right) + SideWidth(Left) + 2 * MedianHalf;
 
+    /// <summary>Maior distância do eixo a uma das bordas externas (calçadas incluídas).</summary>
+    public double MaxHalfWidth => Math.Max(SideWidth(Right), SideWidth(Left)) + MedianHalf;
+
+    /// <summary>
+    /// Raio mínimo das curvas do eixo para que a borda interna da via (e as linhas/calçadas) também façam curva:
+    /// meia largura + 1,5 m.
+    /// </summary>
+    public static double MinAxisRadius(double maxHalfWidth) => maxHalfWidth + 1.5;
+
+    /// <summary>
+    /// Cantos vivos do eixo arredondados em todas as marcas da via (pavimento, linhas, calçadas): raio pedido, nunca
+    /// menor que <see cref="MinAxisRadius"/>.
+    /// </summary>
+    public static double ApplyAxisRadius(IEnumerable<MarkingDefinition> defs, double requested)
+    {
+        var list = defs.ToList();
+        var pav = list.OfType<RoadPavementDefinition>().FirstOrDefault();
+        var half = pav == null ? 0 : Math.Max(pav.TotalLeft, pav.TotalRight);
+        var r = Math.Max(requested, MinAxisRadius(half));
+        foreach (var d in list)
+            if (d.Path != null && d is not IntersectionDefinition) d.Path.SmoothRadius = r;
+        return r;
+    }
+
     /// <summary>Largura da pista (somente faixas de tráfego, ciclofaixas, estacionamento e acostamentos).</summary>
     public double CarriagewayWidth => Right.Concat(Left).Where(e => e.Tipo is not (TipoElementoSecao.Calcada or TipoElementoSecao.CanteiroFisico)).Sum(e => e.Largura);
 

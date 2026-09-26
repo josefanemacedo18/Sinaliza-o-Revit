@@ -108,6 +108,7 @@ public partial class LinearWindow : Window
         CkInvert.IsChecked = d.InvertSides;
         if (d.Depth is { } dp) TbDepth.Text = UiHelpers.F(dp, "0.###");
         UiHelpers.FillJustify(CbJustify, d.Justify);
+        CkOverlay.IsChecked = d.Overlay;
         UiHelpers.SelectColor(CbColor, d.ColorOverride);
         CbAlign.SelectedItem = d.Alignment.HasValue ? d.Alignment.Value : CbAlign.Items[0];
         Output.Load(d.Output);
@@ -130,6 +131,7 @@ public partial class LinearWindow : Window
         if (!_loading && _existing == null) CkBySpeed.IsChecked = hasVelocity;
         CkInvert.IsEnabled = t.Variantes.Any(v => v.Faixas.Any(f => Math.Abs(f.Deslocamento) > 1e-9));
         if (_existing == null && t.Transversal) RbTwoPoints.IsChecked = true;
+        if (_existing == null) CkOverlay.IsChecked = t.Transversal && t.Grupo != GrupoMarca.Urbanizacao;
         var sj = t.Codigo == "SARJETAO";
         LblDepth.Visibility = TbDepth.Visibility = sj ? Visibility.Visible : Visibility.Collapsed;
         if (sj && _existing == null) RbTwoPoints.IsChecked = true;   // atravessa a via: dois cliques de sarjeta a sarjeta
@@ -160,6 +162,7 @@ public partial class LinearWindow : Window
         d.Alignment = CbAlign.SelectedItem is AlinhamentoPadrao a ? a : null;
         d.Depth = t.Codigo == "SARJETAO" ? UiHelpers.Parse(TbDepth, 0.05, "Flecha do sarjetão", 0, 0.25) : null;
         d.Justify = UiHelpers.SelectedJustify(CbJustify);
+        d.Overlay = CkOverlay.IsChecked == true;
         if (_existing != null && d.Justify == Justificacao.Clique) d.Justify = _existing.Justify == Justificacao.Clique ? Justificacao.Centro : _existing.Justify;
         d.Output = Output.Save(d.Output);
         return d;

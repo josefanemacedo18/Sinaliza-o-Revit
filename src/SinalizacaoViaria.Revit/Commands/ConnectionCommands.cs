@@ -5,6 +5,7 @@ using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
+using SinalizacaoViaria.Core.Quantities;
 using SinalizacaoViaria.Revit.Infrastructure;
 using SinalizacaoViaria.Revit.UI;
 
@@ -157,18 +158,39 @@ public sealed class CmdHierarquia : CommandBase
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
         var doc = uidoc.Document;
-        var picked = MarkingPicker.PickMany(uidoc, "Selecione elementos das vias (qualquer linha, calçada ou pavimento) e clique em Concluir");
-        var groups = picked.Select(p => p.Definition.GroupId).Where(g => g != null).Distinct().ToList();
-        if (groups.Count == 0)
+        // Qualquer elemento serve para delimitar a via: marcas do plugin, linhas (eixo/bordas) ou pisos desenhados à mão.
+        List<Element> elems;
+        var pre = uidoc.Selection.GetElementIds().Select(doc.GetElement).Where(e => e != null && RoadElementFilter.Accept(e!)).Cast<Element>().ToList();
+        if (pre.Count > 0) elems = pre;
+        else
         {
-            if (picked.Count > 0) TaskDialog.Show(AppTitle, "Selecione elementos criados pelo \"Sinalizar via\".");
-            return Result.Cancelled;
+            try
+            {
+                elems = uidoc.Selection.PickObjects(Autodesk.Revit.UI.Selection.ObjectType.Element, new RoadElementFilter(),
+                        "Selecione os elementos da via – marcas do plugin, linhas (eixo, bordas) ou PISOS – e clique em Concluir")
+                    .Select(r => doc.GetElement(r)).Where(e => e != null).ToList();
+            }
+            catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return Result.Cancelled; }
         }
         var all = MarkingStorage.Definitions(doc);
-        var current = all.FirstOrDefault(d => d.GroupId == groups[0])?.Hierarchy ?? HierarquiaViaria.Local;
+        var picked = elems.Select(MarkingStorage.Read).Where(r => r != null).Cast<StoredMarking>().ToList();
+        var lineIds = elems.Where(e => e is CurveElement && !MarkingStorage.IsMarking(e)).Select(e => e.UniqueId).ToHashSet();
+        var userFloors = elems.Where(e => e is Floor && !MarkingStorage.IsMarking(e)).ToList();
+        // Marcas que usam as linhas/bordas escolhidas como caminho também pertencem à via.
+        var loose = all.Where(d => d.Path?.ElementIds.Any(id => lineIds.Contains(PathReference.OwnerOf(id))
+                                                             || userFloors.Any(f => f.UniqueId == PathReference.OwnerOf(id))) == true).ToList();
+        loose.AddRange(all.Where(d => d.GroupId == null && picked.Any(p => p.MarkingId == d.Id)));
+        var groups = picked.Select(p => p.Definition.GroupId).Concat(loose.Select(d => d.GroupId)).Where(g => g != null).Distinct().ToList();
+        if (groups.Count == 0 && loose.Count == 0 && userFloors.Count == 0)
+        {
+            TaskDialog.Show(AppTitle, "Selecione marcas do plugin, linhas de eixo/borda ou pisos da via.");
+            return Result.Cancelled;
+        }
+        var current = (groups.Count > 0 ? all.FirstOrDefault(d => d.GroupId == groups[0])?.Hierarchy : loose.FirstOrDefault()?.Hierarchy)
+                      ?? HierarquiaViaria.Local;
         var h = current;
         var speed = false;
-        var curPav = all.OfType<RoadPavementDefinition>().FirstOrDefault(p => p.GroupId == groups[0]);
+        var curPav = all.OfType<RoadPavementDefinition>().FirstOrDefault(p => groups.Count > 0 && p.GroupId == groups[0]);
         string? radiusText = curPav?.CornerRadius is { } cr0 ? UiHelpers.F(cr0) : "";
         var w = new FormWindow("Hierarquia e esquinas", "Hierarquia viária (CTB art. 60) e raio das esquinas",
                 $"{groups.Count} via(s) selecionada(s). A hierarquia é gravada em todos os elementos da via (parâmetro SV_Hierarquia) e usada nos " +
@@ -181,6 +203,23 @@ public sealed class CmdHierarquia : CommandBase
         double? radius = UiHelpers.ParseOpt(radiusText ?? "") is { } rv && rv >= 0 ? rv : null;
 
         var defs = all.Where(d => d.GroupId != null && groups.Contains(d.GroupId)).ToList();
+        defs.AddRange(loose.Where(l => defs.All(d => d.Id != l.Id)));
+        if (userFloors.Count > 0)
+        {
+            // Pisos desenhados à mão: recebem a hierarquia (e entram nos quantitativos por hierarquia).
+            using var t = new Transaction(doc, "SV - Hierarquia dos pisos");
+            t.Start();
+            SharedParameters.Ensure(doc);
+            foreach (var f in userFloors)
+            {
+                SharedParameters.Set(f, SharedParameters.Hierarquia, Hierarquia.Label(h));
+                SharedParameters.Set(f, SharedParameters.Categoria, QuantityRow.CategoryLabel(CategoriaQuantitativo.PavimentacaoGeometria));
+                SharedParameters.Set(f, SharedParameters.Codigo, "PAV-PISO");
+                SharedParameters.Set(f, SharedParameters.Descricao, "Pavimento (piso do projeto)");
+                SharedParameters.Set(f, SharedParameters.Area, f.get_Parameter(BuiltInParameter.HOST_AREA_COMPUTED)?.AsDouble() ?? 0);
+            }
+            t.Commit();
+        }
         foreach (var d in defs)
         {
             d.Hierarchy = h;
@@ -206,4 +245,12 @@ public sealed class CmdHierarquia : CommandBase
         Report("Hierarquia viária", results.Where(r => r.Warnings.Count > 0).ToList());
         return Result.Succeeded;
     }
+}
+
+/// <summary>Seleção para delimitar uma via: marcas do plugin, linhas e pisos.</summary>
+internal sealed class RoadElementFilter : Autodesk.Revit.UI.Selection.ISelectionFilter
+{
+    public static bool Accept(Element e) => e is Floor || e is CurveElement || MarkingStorage.IsMarking(e);
+    public bool AllowElement(Element elem) => Accept(elem);
+    public bool AllowReference(Reference reference, XYZ position) => false;
 }

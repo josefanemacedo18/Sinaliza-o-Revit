@@ -69,6 +69,16 @@ public sealed class PathReference
     /// </summary>
     public List<List<Vec2>>? Cache { get; set; }
 
+    /// <summary>
+    /// Raio (m) com que os cantos vivos do eixo são arredondados antes de gerar a marca (vias: bordas, linhas e calçadas
+    /// acompanham a curva). Nulo/0 = cantos como desenhados.
+    /// </summary>
+    public double? SmoothRadius { get; set; }
+
+    /// <summary>Pontos do caminho já com os cantos arredondados (<see cref="SmoothRadius"/>).</summary>
+    public static IReadOnlyList<Vec2> Smooth(IReadOnlyList<Vec2> pts, double? radius, bool closed) =>
+        radius is > 0.01 ? CurveTools.FilletCorners(pts, radius.Value, closed) : pts;
+
     [JsonIgnore]
     public bool IsAssociative => ElementIds.Count > 0;
 
@@ -93,6 +103,7 @@ public sealed class PathReference
         Z = Z,
         Closed = Closed,
         Cache = Cache?.Select(c => new List<Vec2>(c)).ToList(),
+        SmoothRadius = SmoothRadius,
     };
 
     public static PathReference FromPoints(IEnumerable<Vec2> pts, double z, bool closed = false) =>
@@ -169,6 +180,12 @@ public abstract class MarkingDefinition
     /// calçadas, sarjetas, dispositivos, canteiros).
     /// </summary>
     public Justificacao Justify { get; set; }
+
+    /// <summary>
+    /// Sobrepor: a marca fica "por cima" – as linhas longitudinais pintadas sob ela (eixo, bordo, divisão de faixas) são
+    /// interrompidas no trecho ocupado. Padrão nas faixas de pedestres e zebrados.
+    /// </summary>
+    public bool Overlay { get; set; }
 
     [JsonIgnore]
     public abstract string KindName { get; }
@@ -507,6 +524,20 @@ public sealed class RampDefinition : MarkingDefinition
     public bool DirectionalTactile { get; set; }
     /// <summary>Recortar automaticamente calçadas/meios-fios sob a rampa.</summary>
     public bool CutSidewalk { get; set; } = true;
+    /// <summary>Comprimento da rampa (m) – se informado, define a inclinação (desnível ÷ comprimento).</summary>
+    public double? Length { get; set; }
+    /// <summary>Comprimento das abas ao longo do meio-fio (m) – se informado, define a inclinação das abas.</summary>
+    public double? FlareLength { get; set; }
+    /// <summary>Desnível residual entre a pista e o início da rampa (m; NBR 9050: até 5 mm sem tratamento).</summary>
+    public double LipHeight { get; set; }
+    /// <summary>Comprimento do piso tátil de alerta ao longo do meio-fio (m). Nulo = largura toda da rampa.</summary>
+    public double? TactileLength { get; set; }
+    /// <summary>Largura da faixa de piso tátil direcional (m).</summary>
+    public double DirectionalWidth { get; set; } = 0.25;
+    /// <summary>Patamar plano no topo da rampa (m) – faixa nivelada antes da calçada.</summary>
+    public double LandingDepth { get; set; }
+    /// <summary>Material da rampa (concreto, bloquete...).</summary>
+    public MarkingColor RampColor { get; set; } = MarkingColor.Concreto;
 
     public override string KindName => "Rampa";
     public override string DisplayCode => Type switch

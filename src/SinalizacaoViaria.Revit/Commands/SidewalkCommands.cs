@@ -86,7 +86,59 @@ internal static class FootprintCutter
             case PlanterDefinition pl:
                 Apply(uidoc, pl, pl.CutSidewalk && path != null ? PolygonOps.Union(SidewalkGenerator.PlanterShapes(pl, path)) : Array.Empty<Polygon2>(), Sidewalk);
                 break;
+            case TrafficCalmingDefinition { Type: TipoModeracao.LombadaInvertida } tc:
+            {
+                // A lombada invertida fica abaixo do pavimento: a pista (piso) e as linhas são recortadas sobre ela.
+                var geo = new MarkingService(uidoc.Document, uidoc.ActiveView).BuildGeometry(tc, out _);
+                var fp = PolygonOps.Offset(PolygonOps.Union(geo.Pieces.Select(p => p.Shape)), 0.01);
+                Apply(uidoc, tc, fp, d => RoadMarking(d) || d is RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition);
+                return;
+            }
         }
+        if (def.Overlay) ApplyOverlay(uidoc, def);
+        else if (PaintedLine(def)) CutByOverlays(uidoc, def);
+    }
+
+    /// <summary>Linha longitudinal pintada (eixo, bordo, divisão) – interrompida pelas marcas que se sobrepõem.</summary>
+    public static bool PaintedLine(MarkingDefinition d) =>
+        d is LinearMarkingDefinition l && !l.Overlay && !SidewalkCodes.Contains(l.Code) && !IntersectionGenerator.IsPhysical(l)
+        && PluginContext.Catalog.Linear(l.Code) is { Transversal: false } t && t.Grupo != Core.Catalog.GrupoMarca.Urbanizacao;
+
+    /// <summary>Área ocupada por uma marca sobreposta (vãos entre as barras incluídos) + 10 cm.</summary>
+    public static List<Polygon2> OverlayFootprint(MarkingGeometry geo)
+    {
+        var u = PolygonOps.Union(geo.Pieces.Select(p => p.Shape));
+        return PolygonOps.Offset(PolygonOps.Offset(u, 0.6, true), -0.5, true).Where(p => p.Area > 0.05).ToList();
+    }
+
+    /// <summary>Marca "por cima": interrompe as linhas pintadas sob ela.</summary>
+    public static int ApplyOverlay(UIDocument uidoc, MarkingDefinition def)
+    {
+        var geo = new MarkingService(uidoc.Document, uidoc.ActiveView).BuildGeometry(def, out _);
+        return Apply(uidoc, def, OverlayFootprint(geo), PaintedLine);
+    }
+
+    /// <summary>Linha nova (ou editada) passando sob marcas sobrepostas existentes: recebe os recortes delas.</summary>
+    public static void CutByOverlays(UIDocument uidoc, MarkingDefinition line)
+    {
+        var doc = uidoc.Document;
+        var service = new MarkingService(doc, uidoc.ActiveView);
+        var copy = MarkingDefinition.FromJson(line.ToJson())!;
+        copy.Exclusions.Clear();
+        var shapes = service.BuildGeometry(copy, out _).Pieces.Select(p => p.Shape).ToList();
+        if (shapes.Count == 0) return;
+        var changed = false;
+        foreach (var o in MarkingStorage.Definitions(doc).Where(d => d.Overlay && d.Id != line.Id))
+        {
+            if (line.Exclusions.Any(z => z.SourceId == o.Id)) continue;
+            foreach (var fp in OverlayFootprint(service.BuildGeometry(o, out _)))
+            {
+                if (PolygonOps.Intersect(shapes, new[] { fp }).Sum(p => p.Area) <= 1e-4) continue;
+                line.Exclusions.Add(new ExclusionZone { SourceId = o.Id, Points = fp.Outer.ToList() });
+                changed = true;
+            }
+        }
+        if (changed) MarkingCreator.Commit(uidoc, new[] { line }, "SV - Recortar sob faixas");
     }
 }
 

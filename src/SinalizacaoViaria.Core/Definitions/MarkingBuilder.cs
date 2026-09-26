@@ -11,8 +11,14 @@ public sealed class BuildContext
     public required Catalogo Catalog { get; init; }
     public IGlyphOutlineProvider Glyphs { get; init; } = new BlockFontProvider();
 
-    /// <summary>Comprimento máximo das peças (m) – usado ao projetar sobre superfícies. 0 = sem divisão.</summary>
+    /// <summary>
+    /// Comprimento máximo das peças (m). 0 = sem divisão – ao projetar sobre superfícies as peças contínuas são divididas
+    /// só onde o terreno dobra (no Revit), e não em pedaços fixos.
+    /// </summary>
     public double MaxPieceLength { get; init; }
+
+    /// <summary>Trechos (m) dos dispositivos contínuos (barreiras, defensas) ao acompanhar superfícies.</summary>
+    public double DeviceMaxPieceLength { get; init; }
 
     /// <summary>Escala da vista (ex.: 100 para 1:100) – dimensões de detalhamento em mm de papel.</summary>
     public double ViewScale { get; init; } = 100;
@@ -326,7 +332,7 @@ public static class MarkingBuilder
         {
             Offset = d.Offset, Spacing = d.Spacing, StartSetback = d.StartSetback, EndSetback = d.EndSetback,
             Length = d.LengthOverride, Width = d.WidthOverride, Height = d.HeightOverride, Color = d.Color,
-            Reverse = d.Reverse, MaxPieceLength = ctx.MaxPieceLength,
+            Reverse = d.Reverse, MaxPieceLength = Math.Max(ctx.MaxPieceLength, ctx.DeviceMaxPieceLength),
         });
     }
 

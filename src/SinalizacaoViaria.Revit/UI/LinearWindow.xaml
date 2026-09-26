@@ -78,7 +78,7 @@
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <TextBlock Text="Deslocamento lateral (m)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Column="1" x:Name="TbOffset" Text="0" TextChanged="AnyChanged" ToolTip="Positivo = à esquerda do sentido do caminho"/>
@@ -94,6 +94,9 @@
                         </Grid>
                         <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkReverse" Content="Inverter sentido do caminho" Checked="AnyChanged" Unchecked="AnyChanged"/>
                         <CheckBox Grid.Row="5" Grid.ColumnSpan="2" x:Name="CkInvert" Content="Inverter lados (ex.: LFO-4)" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="7" Grid.ColumnSpan="2" x:Name="CkOverlay" Checked="AnyChanged" Unchecked="AnyChanged"
+                                  Content="Sobrepor: interromper as linhas pintadas sob esta marca"
+                                  ToolTip="Faixas de pedestres e marcas transversais ficam por cima: no trecho ocupado, as linhas longitudinais somem."/>
                         <TextBlock Grid.Row="6" x:Name="LblDepth" Text="Sarjetão: flecha no centro (m)" Style="{StaticResource FieldLabel}" Visibility="Collapsed"/>
                         <TextBox Grid.Row="6" Grid.Column="1" x:Name="TbDepth" Text="0,05" TextChanged="AnyChanged" Visibility="Collapsed"
                                  ToolTip="Profundidade da depressão central do sarjetão (usual 3 a 8 cm). Laje de concreto de 15 cm; rente ao pavimento nas bordas."/>

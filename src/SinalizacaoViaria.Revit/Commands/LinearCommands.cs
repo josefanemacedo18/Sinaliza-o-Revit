@@ -28,7 +28,7 @@ public abstract class LinearCommandBase : CommandBase
             if (s != null) template.Output.SurfaceIds = s;
         }
         return MarkingCreator.CreateAlongPath(uidoc, template, w.PathMode, template.Code,
-            afterEach: d => { if (d is LinearMarkingDefinition { Code: "SARJETAO" }) FootprintCutter.ApplyFor(uidoc, d); });
+            afterEach: d => FootprintCutter.ApplyFor(uidoc, d));
     }
 }
 

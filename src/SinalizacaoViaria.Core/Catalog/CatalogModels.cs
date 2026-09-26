@@ -253,6 +253,18 @@ public enum FormaDispositivo
     Defensa,
     /// <summary>Defensa dupla (lâminas nos dois lados dos postes – canteiros centrais).</summary>
     DefensaDupla,
+    /// <summary>Esfera de concreto sobre base (bloqueio de calçadas e praças).</summary>
+    Esfera,
+    /// <summary>Floreira / jardineira de concreto (bloqueio com vegetação).</summary>
+    Floreira,
+    /// <summary>Cone de sinalização (obras).</summary>
+    Cone,
+    /// <summary>Cavalete de sinalização (obras): pés metálicos e réguas listradas.</summary>
+    Cavalete,
+    /// <summary>Tambor / barril canalizador (obras).</summary>
+    Tambor,
+    /// <summary>Gradil metálico de proteção de pedestres (contínuo, montantes e barras).</summary>
+    Gradil,
 }
 
 /// <summary>Formato da chapa de uma placa de sinalização vertical.</summary>

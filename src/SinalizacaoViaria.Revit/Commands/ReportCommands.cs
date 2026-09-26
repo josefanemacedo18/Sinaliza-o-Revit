@@ -36,6 +36,17 @@ public sealed class CmdQuantitativos : CommandBase
             try { items.Add((d, service.QuantityGeometry(d))); }
             catch (Exception ex) { Log.Error($"Quantitativos {d.DisplayCode}", ex); }
         }
+        // Pisos desenhados à mão com hierarquia definida (Hierarquia e Esquinas): entram como pavimento da via.
+        foreach (var f in new FilteredElementCollector(doc).OfClass(typeof(Floor)).Cast<Floor>().Where(f => !MarkingStorage.IsMarking(f)))
+        {
+            var label = f.get_Parameter(SharedParameters.Hierarquia.Guid)?.AsString();
+            if (string.IsNullOrWhiteSpace(label)) continue;
+            var h = Hierarquia.Definidas.Cast<HierarquiaViaria?>().FirstOrDefault(x => Hierarquia.Label(x) == label);
+            var pv = new RoadPavementDefinition { Hierarchy = h };
+            var g = new MarkingGeometry();
+            g.AreaOverrides[MarkingColor.Asfalto] = MarkingService.FloorArea(f);
+            items.Add((pv, g));
+        }
         var rows = QuantityCalculator.Compute(items, PluginContext.Catalog, PluginContext.Settings.DefaultMaterial);
         var w = new QuantitiesWindow(rows, doc.Title);
         if (UiHelpers.ShowModal(w) == true)

@@ -245,8 +245,15 @@ public sealed class MarkingService
         var solidPieces = geo.Pieces;
 
         // Pavimento, calçada, meio-fio, sarjeta e grama como Piso do Revit (editáveis com as ferramentas nativas).
-        if (def.Output.Mode == OutputMode.Modelo3D && settings.PhysicalAsFloors && !def.Output.Drape)
+        if (def.Output.Mode == OutputMode.Modelo3D && settings.PhysicalAsFloors)
         {
+            // Acompanhando a superfície: o piso é criado na cota do terreno e deformado (edição de forma nativa do piso).
+            SurfaceSampler? terrain = null;
+            if (def.Output.Drape)
+            {
+                terrain = new SurfaceSampler(_doc, def.Output.SurfaceIds, _interactive, terrainOnly: true);
+                if (!terrain.IsAvailable) terrain = null;
+            }
             var floorPieces = geo.Pieces.Where(p => FloorEligible(def, p)).ToList();
             var oldFloors = existing.Where(r => r.Element is Floor).ToList();
             if (floorPieces.Count > 0 || oldFloors.Count > 0)
@@ -277,7 +284,7 @@ public sealed class MarkingService
                     foreach (var shape in merged)
                     {
                         var piece = new MarkingPiece(shape, grp.Key.Color) { Elevation = grp.Key.E, Thickness = grp.Key.T };
-                        var floors = CreateFloors(piece, baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(grp.Key.Color), ref reason);
+                        var floors = CreateFloors(piece, baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(grp.Key.Color), ref reason, terrain);
                         if (floors.Count == 0) { failed.Add(piece); continue; }
                         foreach (var f in floors)
                         {
@@ -311,7 +318,8 @@ public sealed class MarkingService
                 // Linhas e símbolos sobre pinturas de fundo (ciclofaixa, faixa de caminhada) ficam logo acima delas –
                 // sem faces coincidentes (que no Revit aparecem como emendas/quadrados).
                 var lift = IsOverlay(def) && MarkingColors.IsPaint(g.Key) ? thickness : 0;
-                var solids = BuildSolids(g, baseZ + def.Output.ElevationOffset + lift, thickness, sampler, Styles.Material(g.Key), result.Warnings);
+                var solids = BuildSolids(g, baseZ + def.Output.ElevationOffset + lift, thickness, sampler, Styles.Material(g.Key), result.Warnings,
+                    def.Output.ElevationOffset + lift);
                 if (solids.Count == 0) continue;
                 var ds = existing.FirstOrDefault(r => r.Color == g.Key && r.Element is DirectShape && !keep.Contains(r.Element.Id))?.Element as DirectShape;
                 if (ds == null)
@@ -417,52 +425,54 @@ public sealed class MarkingService
     // ------------------------------------------------------------------ 3D
 
     private List<GeometryObject> BuildSolids(IEnumerable<MarkingPiece> pieces, double zMeters, double thickness,
-        SurfaceSampler? sampler, ElementId materialId, List<string> warnings)
+        SurfaceSampler? sampler, ElementId materialId, List<string> warnings, double aboveSurfaceM = 0.001)
     {
         var res = new List<GeometryObject>();
         var options = new SolidOptions(materialId, ElementId.InvalidElementId);
         int failures = 0;
         var zBaseFt = UnitConv.Ft(zMeters);
+        var above = UnitConv.Ft(Math.Max(0.001, aboveSurfaceM));
+        var draped = sampler is { IsAvailable: true };
 
         foreach (var piece in pieces)
         {
             try
             {
                 var t = UnitConv.Ft(piece.Thickness > 0 ? piece.Thickness : thickness);
-                var z = zBaseFt;
                 var lift = UnitConv.Ft(piece.Elevation);
-                XYZ? normal = null;
-                var c = piece.Shape.Centroid;
-                if (sampler is { IsAvailable: true } && sampler.TrySample(UnitConv.Ft(c.X), UnitConv.Ft(c.Y), zBaseFt, out var sz, out var n))
+                if (piece.Solid != null || piece.Profile != null)
                 {
-                    z = sz + UnitConv.Ft(0.001);
-                    normal = n;
-                }
-                if (piece.Solid is { } poly)
-                {
-                    res.AddRange(PolyhedronGeometry(poly, z + lift, materialId));
+                    var z = zBaseFt;
+                    var c = piece.Shape.Centroid;
+                    if (draped && sampler!.TrySample(UnitConv.Ft(c.X), UnitConv.Ft(c.Y), zBaseFt, out var sz, out _)) z = sz + above;
+                    if (piece.Solid is { } poly) res.AddRange(PolyhedronGeometry(poly, z + lift, materialId));
+                    else res.Add(ProfileSolidGeometry(piece.Profile!, z + lift, options));
                     continue;
                 }
-                if (piece.Profile is { } prof)
+                // Sobre superfícies: a peça inteira num plano ajustado ao terreno; dividida só onde o terreno dobra
+                // (sem "quadradinhos" de tamanho fixo).
+                var parts = draped
+                    ? DrapedParts(piece.Shape, sampler!, zBaseFt, 0).ToList()
+                    : new List<(Polygon2, double, XYZ?)> { (piece.Shape, zBaseFt, null) };
+                foreach (var (shape, zPart, normal) in parts)
                 {
-                    res.Add(ProfileSolidGeometry(prof, z + lift, options));
-                    continue;
-                }
-                // Peças empilhadas (barreiras, balizadores) começam acima da base.
-                var loops = ToCurveLoops(piece.Shape, z + lift);
-                if (loops.Count == 0) { failures++; continue; }
-                var solid = GeometryCreationUtilities.CreateExtrusionGeometry(loops, XYZ.BasisZ, t, options);
-                if (normal != null && normal.Z < 0.9999)
-                {
-                    var axis = XYZ.BasisZ.CrossProduct(normal);
-                    if (axis.GetLength() > 1e-9)
+                    var z = draped ? zPart + above : zPart;
+                    var loops = ToCurveLoops(shape, z + lift);
+                    if (loops.Count == 0) { failures++; continue; }
+                    var solid = GeometryCreationUtilities.CreateExtrusionGeometry(loops, XYZ.BasisZ, t, options);
+                    if (normal != null && normal.Z < 0.99999)
                     {
-                        var angle = XYZ.BasisZ.AngleTo(normal);
-                        var tr = Transform.CreateRotationAtPoint(axis.Normalize(), angle, new XYZ(UnitConv.Ft(c.X), UnitConv.Ft(c.Y), z));
-                        solid = SolidUtils.CreateTransformed(solid, tr);
+                        var axis = XYZ.BasisZ.CrossProduct(normal);
+                        if (axis.GetLength() > 1e-9)
+                        {
+                            var c = shape.Centroid;
+                            var angle = XYZ.BasisZ.AngleTo(normal);
+                            var tr = Transform.CreateRotationAtPoint(axis.Normalize(), angle, new XYZ(UnitConv.Ft(c.X), UnitConv.Ft(c.Y), z));
+                            solid = SolidUtils.CreateTransformed(solid, tr);
+                        }
                     }
+                    res.Add(solid);
                 }
-                res.Add(solid);
             }
             catch (Exception ex)
             {
@@ -472,6 +482,70 @@ public sealed class MarkingService
         }
         if (failures > 0) warnings.Add($"{failures} peça(s) não puderam ser modeladas (geometria muito pequena ou inválida).");
         return res;
+    }
+
+    /// <summary>
+    /// Divide a peça até cada parte ficar num plano do terreno (desvio ≤ 1,5 cm): devolve a parte, a cota do plano no
+    /// centroide (pés) e a normal do plano. Rampas constantes = peça única; só as mudanças de greide geram emendas.
+    /// </summary>
+    private static IEnumerable<(Polygon2 Shape, double Z, XYZ? Normal)> DrapedParts(Polygon2 shape, SurfaceSampler s, double zHintFt, int depth)
+    {
+        var ring = CurveTools.Densify(shape.Outer.Append(shape.Outer[0]).ToList(), 5.0);
+        var step = Math.Max(1, ring.Count / 32);
+        var pts = new List<Vec2>();
+        for (int i = 0; i < ring.Count; i += step) pts.Add(ring[i]);
+        var cen = shape.Centroid;
+        pts.Add(cen);
+        var samples = new List<(double X, double Y, double Z)>();
+        foreach (var v in pts)
+        {
+            double x = UnitConv.Ft(v.X), y = UnitConv.Ft(v.Y);
+            if (s.TrySample(x, y, zHintFt, out var z, out _)) samples.Add((x, y, z));
+        }
+        if (samples.Count < 3)
+        {
+            yield return (shape, samples.Count > 0 ? samples.Average(q => q.Z) : zHintFt, null);
+            yield break;
+        }
+        // Plano por mínimos quadrados: z = a·x + b·y + c (coordenadas centradas).
+        double mx = samples.Average(q => q.X), my = samples.Average(q => q.Y), mz = samples.Average(q => q.Z);
+        double sxx = 0, sxy = 0, syy = 0, sxz = 0, syz = 0;
+        foreach (var q in samples)
+        {
+            double dx = q.X - mx, dy = q.Y - my, dz = q.Z - mz;
+            sxx += dx * dx; sxy += dx * dy; syy += dy * dy; sxz += dx * dz; syz += dy * dz;
+        }
+        var det = sxx * syy - sxy * sxy;
+        double a = 0, b = 0;
+        if (Math.Abs(det) > 1e-12) { a = (sxz * syy - syz * sxy) / det; b = (syz * sxx - sxz * sxy) / det; }
+        else if (sxx > 1e-12) a = sxz / sxx;
+        else if (syy > 1e-12) b = syz / syy;
+        var dev = samples.Max(q => Math.Abs(mz + a * (q.X - mx) + b * (q.Y - my) - q.Z));
+        var (mn, mxp) = shape.Bounds;
+        var ext = Math.Max(mxp.X - mn.X, mxp.Y - mn.Y);
+        if (dev <= UnitConv.Ft(0.015) || depth >= 7 || ext < 0.8)
+        {
+            var zc = mz + a * (UnitConv.Ft(cen.X) - mx) + b * (UnitConv.Ft(cen.Y) - my);
+            yield return (shape, zc, new XYZ(-a, -b, 1).Normalize());
+            yield break;
+        }
+        // Divide ao meio pelo lado mais longo.
+        List<Polygon2> halves;
+        if (mxp.X - mn.X >= mxp.Y - mn.Y)
+        {
+            var xm = (mn.X + mxp.X) / 2;
+            halves = PolygonOps.Intersect(new[] { shape }, new[] { Polygon2.Rectangle(new Vec2(mn.X - 1, mn.Y - 1), new Vec2(xm, mxp.Y + 1)) })
+                .Concat(PolygonOps.Intersect(new[] { shape }, new[] { Polygon2.Rectangle(new Vec2(xm, mn.Y - 1), new Vec2(mxp.X + 1, mxp.Y + 1)) })).ToList();
+        }
+        else
+        {
+            var ym = (mn.Y + mxp.Y) / 2;
+            halves = PolygonOps.Intersect(new[] { shape }, new[] { Polygon2.Rectangle(new Vec2(mn.X - 1, mn.Y - 1), new Vec2(mxp.X + 1, ym)) })
+                .Concat(PolygonOps.Intersect(new[] { shape }, new[] { Polygon2.Rectangle(new Vec2(mn.X - 1, ym), new Vec2(mxp.X + 1, mxp.Y + 1)) })).ToList();
+        }
+        foreach (var h in halves.Where(h => h.Area > 1e-4))
+            foreach (var part in DrapedParts(h, s, zHintFt, depth + 1))
+                yield return part;
     }
 
     /// <summary>Poliedro (rampas, abas) via TessellatedShapeBuilder – sólido quando possível, senão malha.</summary>
@@ -620,10 +694,17 @@ public sealed class MarkingService
     /// Cria o(s) piso(s) da peça (topo na cota da peça). Tenta o contorno original, depois limpo de lascas e, por fim,
     /// dividido sem furos. Lista vazia se o Revit recusar todas as tentativas (<paramref name="reason"/> recebe o motivo).
     /// </summary>
-    private List<Floor> CreateFloors(MarkingPiece piece, double baseZm, ElementId? userType, ref string? reason)
+    private List<Floor> CreateFloors(MarkingPiece piece, double baseZm, ElementId? userType, ref string? reason, SurfaceSampler? terrain = null)
     {
         var res = new List<Floor>();
         var topFt = UnitConv.Ft(baseZm + piece.Elevation + piece.Thickness);
+        var c0 = piece.Shape.Centroid;
+        double? groundFt = null;
+        if (terrain != null && terrain.TrySample(UnitConv.Ft(c0.X), UnitConv.Ft(c0.Y), topFt, out var gz, out _))
+        {
+            groundFt = gz;
+            topFt = gz + UnitConv.Ft(piece.Elevation + piece.Thickness);
+        }
         var level = LevelFor(topFt);
         if (level == null) { reason = "o projeto não tem níveis"; return res; }
         ElementId typeId;
@@ -640,9 +721,11 @@ public sealed class MarkingService
         }
         if (typeId == ElementId.InvalidElementId) { reason = "o projeto não tem nenhum tipo de piso"; return res; }
 
+        // No terreno, o contorno ganha vértices a cada 4 m (pontos de apoio da deformação do piso).
+        Polygon2 Prep(Polygon2 p) => groundFt == null ? p : Densified(p, 4.0);
         var attempts = new List<Func<List<Polygon2>>>
         {
-            () => new List<Polygon2> { piece.Shape.Simplified(0.005) ?? piece.Shape },
+            () => new List<Polygon2> { Prep(piece.Shape.Simplified(0.005) ?? piece.Shape) },
             () => PolygonOps.Clean(new[] { piece.Shape }),
             () => PolygonOps.Clean(new[] { piece.Shape }).SelectMany(p => PolygonOps.SplitHoles(p)).ToList(),
         };
@@ -664,6 +747,7 @@ public sealed class MarkingService
                     var f = Floor.Create(_doc, loops, typeId, level.Id, false, null, 0.0);
                     f.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)?.Set(topFt - level.ProjectElevation);
                     FloorSignature.Write(f, loops);
+                    if (groundFt != null && terrain != null) DrapeFloor(f, shape, terrain, groundFt.Value);
                     created.Add(f);
                 }
                 catch (Exception ex)
@@ -678,6 +762,54 @@ public sealed class MarkingService
             foreach (var f in created) SafeDelete(f.Id);
         }
         return res;
+    }
+
+    private static Polygon2 Densified(Polygon2 p, double maxLen)
+    {
+        List<Vec2> D(IReadOnlyList<Vec2> ring) => CurveTools.Densify(ring.Append(ring[0]).ToList(), maxLen).SkipLast(1).ToList();
+        return new Polygon2(D(p.Outer), p.Holes.Select(h => (IEnumerable<Vec2>)D(h)));
+    }
+
+    /// <summary>
+    /// Deforma o piso para acompanhar o terreno: edição de forma do Revit com os vértices do contorno e uma malha interna
+    /// de pontos (4 m), cada um na cota da superfície. O piso continua editável com as ferramentas nativas.
+    /// </summary>
+    private void DrapeFloor(Floor f, Polygon2 shape, SurfaceSampler terrain, double groundFt)
+    {
+        try
+        {
+            var ed = f.GetSlabShapeEditor();
+            ed.Enable();
+            _doc.Regenerate();
+            var top = f.get_BoundingBox(null)?.Max.Z ?? groundFt;
+            // Pontos internos (malha de 4 m, afastados do contorno).
+            var (mn, mx) = shape.Bounds;
+            var inner = new List<XYZ>();
+            const double step = 4.0;
+            var edge = PolygonOps.Offset(new[] { shape }, -0.5);
+            for (var x = mn.X + step / 2; x < mx.X; x += step)
+                for (var y = mn.Y + step / 2; y < mx.Y; y += step)
+                {
+                    var v = new Vec2(x, y);
+                    if (inner.Count < 400 && edge.Any(e => e.Contains(v))) inner.Add(new XYZ(UnitConv.Ft(x), UnitConv.Ft(y), top));
+                }
+            if (inner.Count > 0)
+            {
+                try { ed.AddPoints(inner); } catch (Exception ex) { Log.Error("SlabShape.AddPoints", ex); }
+                _doc.Regenerate();
+            }
+            foreach (SlabShapeVertex v in ed.SlabShapeVertices)
+            {
+                var p = v.Position;
+                if (!terrain.TrySample(p.X, p.Y, groundFt, out var z, out _)) continue;
+                var off = z - groundFt;
+                if (Math.Abs(off) > 1e-4) ed.ModifySubElement(v, off);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("DrapeFloor", ex);
+        }
     }
 
     /// <summary>O contorno do piso foi alterado (ou o piso foi movido) pelo usuário depois de gerado?</summary>

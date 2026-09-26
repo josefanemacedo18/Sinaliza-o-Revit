@@ -124,6 +124,10 @@ hierarquia. O valor fica gravado no pavimento e, no encontro de vias com raios d
 da **via de menor hierarquia** (a que faz a conversão). Para mudar o raio de vias já desenhadas use
 **Via → Hierarquia e Esquinas**: selecione as vias, informe o novo raio e as interseções são refeitas.
 
+Para delimitar uma via por **qualquer linha ou piso**, use **Hierarquia e Esquinas** selecionando linhas de
+eixo/borda ou **pisos desenhados à mão**: as marcas que usam essas linhas/bordas recebem a hierarquia, e os pisos
+ganham o parâmetro SV_Hierarquia e entram nos quantitativos (código PAV-PISO).
+
 Para vias já existentes (ou criadas por versões anteriores) use **Via → Hierarquia Viária**: selecione
 elementos das vias e escolha a hierarquia (opcionalmente ajustando a velocidade das linhas); as
 interseções, rotatórias e cul-de-sacs dessas vias são atualizados.
@@ -180,6 +184,13 @@ clique ao lado da via, no lado desejado, e o elemento é colocado encostado no b
 Esses elementos passam a fazer parte da via (mesmo grupo) e a seção registrada no pavimento é atualizada –
 as interseções, rotatórias e cul-de-sacs refazem também as calçadas e meios-fios acrescentados.
 
+## 2.3.1 Curvas do eixo
+
+Cantos vivos do eixo (linhas selecionadas com quebra, ou pontos clicados) são **arredondados** com o raio das
+curvas informado na janela (**nunca menor que a meia largura da via + 1,5 m**): a borda interna, as linhas de
+bordo, os meios-fios e as calçadas passam a acompanhar a curva, sem dobras. Para vias já criadas, clique no
+asfalto → **Editar** → *Raio das curvas do eixo* (0 = cantos como desenhados).
+
 ## 2.4 Bloqueios físicos
 
 Comando **Bloqueios Físicos** (painel *Segregação Física*): escolha o dispositivo, ajuste
@@ -187,6 +198,8 @@ dimensões, espaçamento entre centros (0 = contínuo), deslocamento e recuos, e
 caminho. Os dispositivos são modelados em 3D com a forma real e aparecem nos quantitativos em
 unidades ou metros:
 
+* **Esfera de concreto**, **floreira de concreto com vegetação** e **gradil de proteção de pedestres** (bloqueios
+  urbanos); **cone**, **cavalete listrado** e **tambor canalizador** (obras);
 * **Tartaruga (segregador)**: cúpula elíptica amarela com refletivos brancos nas duas faces;
   **tachão**: tronco trapezoidal com refletivos;
 * **Balizador flexível**: base preta, haste com duas faixas refletivas brancas e topo arredondado;
@@ -224,6 +237,9 @@ segue a NBR 16537 (larguras de 0,25 a 0,60 m).
 2. Ajuste a largura da faixa (FTP-1) e o recuo dos bordos.
 3. Linhas de retenção: largura (0,30 a 0,60 m), distância livre até a faixa (padrão 1,60 m), lados e
    extensão (**meia pista** em vias de mão dupla, **pista inteira** em mão única).
+4. **Sobrepor** (padrão ligado): a faixa fica por cima – no trecho ocupado por ela as linhas longitudinais
+   (eixo, divisão de faixas) somem, inclusive linhas criadas depois. A mesma opção existe nos zebrados e nas
+   marcas transversais. **Atualizar Todas** refaz os recortes.
 4. Clique o bordo A e o bordo B no alinhamento da travessia; repita para outras travessias.
 
 As barras da FTP-1 são sempre inteiras e centralizadas entre os bordos.
@@ -287,8 +303,11 @@ Painel **Representação no Revit** (em todas as janelas):
 * **Modelo 3D**: sólido fino (Modelos genéricos). A espessura padrão é a do material, com mínimo
   modelável de 3 mm (configurável) – películas de tinta reais são finas demais para sólidos do Revit.
   Os quantitativos usam sempre a **área**, independentemente da espessura.
-* **Acompanhar a superfície**: cada peça é posicionada e inclinada conforme o Toposolid/piso/topografia
-  sob ela (traços longos são divididos em peças de até 2 m). Opcionalmente selecione as superfícies.
+* **Acompanhar a superfície**: os **pisos** (pavimento, calçada, meio-fio, sarjeta, grama) são criados na
+  cota do terreno e deformados com a **edição de forma nativa do piso** (vértices do contorno a cada 4 m e malha
+  interna), continuando editáveis. As marcas pintadas ficam **inteiras**, num plano ajustado ao terreno – só são
+  divididas onde o greide muda (desvio acima de 1,5 cm), acabando com os "quadradinhos" de 2 m. Linhas sobre
+  pinturas de fundo (ciclofaixa) ficam sempre acima delas. Opcionalmente selecione as superfícies.
 * **Detalhe 2D**: regiões preenchidas na vista ativa (planta ou vista de desenho).
 * **Material**: define espessura e consumo nos quantitativos (tinta acrílica, termoplástico, plástico
   a frio, laminado elastoplástico...).
@@ -387,6 +406,9 @@ vigente do manual. O catálogo pode ser alterado (seção `placas`, campo `picto
   automaticamente; a **Faixa de caminhada** é um elemento da seção (azul ou verde, bordas brancas e
   símbolo de pedestre repetido).
 * **Rampas**: 1º clique no centro da rampa, na face do meio-fio; 2º clique para dentro da calçada.
+  Tudo é dimensionável: largura, altura, inclinação **ou comprimento** da rampa, inclinação **ou comprimento**
+  das abas, **desnível residual** no meio-fio, **patamar** plano no topo, **material** (concreto, bloquete...),
+  piso tátil (largura, comprimento ao longo do meio-fio, afastamento, cor) e largura do direcional.
   A rampa é um sólido inclinado (0 na pista → altura do meio-fio no topo, com a inclinação
   escolhida), as abas são cunhas triangulares com a inclinação das abas e o piso tátil de alerta
   acompanha a rampa (afastamento do meio-fio configurável; direcional opcional no eixo). Tipos:
@@ -402,6 +424,7 @@ vigente do manual. O catálogo pode ser alterado (seção `placas`, campo `picto
 
 Quebra-molas tipo A (3,70 m × 0,08 m) e tipo B (1,50 m × 0,06 m), faixa elevada (platô + rampas de
 1,50 m, 0,15 m de altura, zebrado no platô) e lombada invertida. Clique os dois bordos da pista.
+A **lombada invertida** recorta o pavimento (piso) e as linhas sobre ela, ficando visível a depressão em concreto.
 As dimensões padrão devem ser conferidas com as resoluções do CONTRAN vigentes; lembre-se da
 sinalização vertical obrigatória (ex.: A-18).
 
