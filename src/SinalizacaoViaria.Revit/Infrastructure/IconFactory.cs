@@ -141,6 +141,36 @@ public static class IconFactory
                 dc.DrawRectangle(B(Color.FromRgb(140, 146, 154)), null, new Rect(17, 24, 2, 6));
                 dc.DrawRectangle(B(Color.FromRgb(140, 146, 154)), null, new Rect(27, 24, 2, 6));
                 break;
+            case "familia":
+            {
+                // Luminária/banco do usuário + "cubo" de família do Revit.
+                dc.DrawRectangle(B(Color.FromRgb(90, 96, 104)), null, new Rect(6, 6, 2.5, 22));
+                dc.DrawRectangle(B(Color.FromRgb(90, 96, 104)), null, new Rect(6, 5, 9, 2.2));
+                dc.DrawEllipse(B(Color.FromRgb(250, 200, 60)), null, new Point(14, 9), 2.4, 2.4);
+                dc.DrawRectangle(B(Color.FromRgb(120, 78, 44)), null, new Rect(3, 25, 12, 3));
+                var top = new StreamGeometry();
+                using (var g = top.Open())
+                {
+                    g.BeginFigure(new Point(23, 12), true, true);
+                    g.PolyLineTo(new[] { new Point(30, 15.5), new Point(23, 19), new Point(16, 15.5) }, true, true);
+                }
+                var left = new StreamGeometry();
+                using (var g = left.Open())
+                {
+                    g.BeginFigure(new Point(16, 15.5), true, true);
+                    g.PolyLineTo(new[] { new Point(23, 19), new Point(23, 29), new Point(16, 25.5) }, true, true);
+                }
+                var right = new StreamGeometry();
+                using (var g = right.Open())
+                {
+                    g.BeginFigure(new Point(23, 19), true, true);
+                    g.PolyLineTo(new[] { new Point(30, 15.5), new Point(30, 25.5), new Point(23, 29) }, true, true);
+                }
+                dc.DrawGeometry(B(Color.FromRgb(120, 180, 240)), P(Color.FromRgb(30, 80, 140), 0.8), top);
+                dc.DrawGeometry(B(Color.FromRgb(60, 130, 210)), P(Color.FromRgb(30, 80, 140), 0.8), left);
+                dc.DrawGeometry(B(Color.FromRgb(40, 100, 180)), P(Color.FromRgb(30, 80, 140), 0.8), right);
+                break;
+            }
             case "conflito":
                 RoadBackground(dc);
                 dc.PushClip(new RectangleGeometry(new Rect(5, 5, 22, 22)));

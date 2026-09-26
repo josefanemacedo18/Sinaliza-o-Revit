@@ -39,6 +39,48 @@ public sealed class QuantityRow
 
     public CategoriaQuantitativo Category { get; set; }
 
+    /// <summary>Subcategoria (elementos urbanos: iluminação, arborização...; demais: grupo da marca).</summary>
+    public string Subcategory { get; set; } = "";
+
+    /// <summary>Família do Revit inserida pelo usuário (não gerada pelo plugin).</summary>
+    public bool IsFamily { get; set; }
+
+    /// <summary>Tipos de família do Revit consolidados na linha (famílias do usuário).</summary>
+    public string FamilyTypes { get; set; } = "";
+
+    public string SubcategoryName => string.IsNullOrEmpty(Subcategory) ? GroupName : Subcategory;
+
+    /// <summary>Nome da cor para exibição ("—" em famílias do usuário).</summary>
+    public string ColorLabel => IsFamily ? "—" : Color switch
+    {
+        MarkingColor.PavimentoConcreto => "Pav. concreto",
+        MarkingColor.RelevoTatil => "Relevo tátil",
+        _ => Color.ToString(),
+    };
+
+    /// <summary>Consumo com unidade ("" quando não se aplica).</summary>
+    public string ConsumptionText => MaterialConsumption > 1e-6
+        ? MaterialConsumption.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) + " " + ConsumptionUnit
+        : "";
+
+    /// <summary>Detalhes da linha (referência, elementos, tipo de área, famílias).</summary>
+    public string DetailText
+    {
+        get
+        {
+            var pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+            var parts = new List<string> { $"{Elements} elemento(s) no modelo" };
+            if (Area > 1e-6) parts.Add($"área {AreaKind}: {Area.ToString("N2", pt)} m²");
+            if (PaintedLength > 1e-6) parts.Add($"extensão: {PaintedLength.ToString("N2", pt)} m");
+            if (RoadLength > 1e-6) parts.Add($"extensão de via (eixo): {RoadLength.ToString("N2", pt)} m");
+            if (GlassBeadsKg > 1e-6) parts.Add($"microesferas: {GlassBeadsKg.ToString("N2", pt)} kg");
+            var text = string.Join(" · ", parts);
+            if (!string.IsNullOrWhiteSpace(FamilyTypes)) text += "\nFamílias/tipos: " + FamilyTypes;
+            if (!string.IsNullOrWhiteSpace(Reference)) text += "\nReferência: " + Reference;
+            return text;
+        }
+    }
+
     /// <summary>Hierarquia viária (CTB art. 60) da via a que os itens pertencem.</summary>
     public HierarquiaViaria? Hierarchy { get; set; }
     public string HierarchyName => Hierarquia.Label(Hierarchy);
@@ -132,6 +174,7 @@ public static class QuantityCalculator
                     {
                         Code = info.Code, Name = info.Name, Group = info.Group, Color = color, Material = MarkingColors.IsPaint(color) ? matName : "",
                         Category = QuantityRow.Categorize(def, info.Group),
+                        Subcategory = def is UrbanElementDefinition u && catalog.Movel(u.Code) is { } mv ? UrbanCategories.Label(UrbanCategories.Of(mv.Forma)) : "",
                         Hierarchy = def.Hierarchy,
                         Unit = info.Unit, Reference = info.Reference, ConsumptionUnit = mat?.UnidadeConsumo ?? "",
                     };
@@ -156,11 +199,64 @@ public static class QuantityCalculator
                 }
             }
         }
-        return rows.Values
-            .OrderBy(r => r.Category).ThenBy(r => r.Group).ThenBy(r => r.Code, StringComparer.OrdinalIgnoreCase)
-            .ThenByDescending(r => Hierarquia.Rank(r.Hierarchy)).ThenBy(r => r.Color)
-            .ToList();
+        return Sort(rows.Values);
     }
+
+    private static List<QuantityRow> Sort(IEnumerable<QuantityRow> rows) => rows
+        .OrderBy(r => r.Category).ThenBy(r => r.SubcategoryName, StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Code, StringComparer.OrdinalIgnoreCase)
+        .ThenByDescending(r => Hierarquia.Rank(r.Hierarchy)).ThenBy(r => r.Color)
+        .ToList();
+
+    /// <summary>
+    /// Acrescenta as famílias do Revit classificadas como elementos urbanos (uma linha por código, subcategoria e hierarquia),
+    /// contando unidades e listando os tipos usados.
+    /// </summary>
+    public static List<QuantityRow> AddFamilies(IEnumerable<QuantityRow> rows, IEnumerable<FamilyItem> families)
+    {
+        var list = rows.ToList();
+        foreach (var g in families.GroupBy(f => (Code: f.Code.Trim().ToUpperInvariant(), f.Category, f.Hierarchy)))
+        {
+            var first = g.First();
+            var types = g.Select(f => f.TypeName).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct().OrderBy(t => t).ToList();
+            var names = g.Select(f => f.Description).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct().ToList();
+            list.Add(new QuantityRow
+            {
+                Code = string.IsNullOrWhiteSpace(first.Code) ? "FAMÍLIA" : first.Code.Trim(),
+                Name = names.Count == 1 ? names[0] : names.Count > 1 ? $"{names[0]} (+{names.Count - 1} variação(ões))" : first.TypeName,
+                Group = GrupoMarca.Mobiliario,
+                Color = MarkingColor.Metal,
+                Category = CategoriaQuantitativo.MobiliarioUrbano,
+                Subcategory = UrbanCategories.Label(g.Key.Category),
+                Hierarchy = g.Key.Hierarchy,
+                Units = g.Count(),
+                Elements = g.Count(),
+                PaintedLength = g.Sum(f => f.Length),
+                Unit = "un",
+                IsFamily = true,
+                FamilyTypes = string.Join(", ", types),
+                Reference = "Família do Revit (projeto)",
+            });
+        }
+        return Sort(list);
+    }
+
+    /// <summary>Totais por subcategoria dentro de uma categoria (ex.: iluminação, arborização).</summary>
+    public static List<QuantityRow> SubcategorySummary(IEnumerable<QuantityRow> rows) =>
+        rows.GroupBy(r => (r.Category, r.SubcategoryName))
+            .Select(g => new QuantityRow
+            {
+                Code = "SUBTOTAL",
+                Name = g.Key.SubcategoryName,
+                Category = g.Key.Category,
+                Subcategory = g.Key.SubcategoryName,
+                Area = g.Sum(r => r.Area),
+                PaintedLength = g.Sum(r => r.PaintedLength),
+                Units = g.Sum(r => r.Units),
+                Elements = g.Sum(r => r.Elements),
+                MaterialConsumption = g.Sum(r => r.MaterialConsumption),
+                Unit = "",
+            })
+            .OrderBy(r => r.Category).ThenBy(r => r.Name).ToList();
 
     /// <summary>Resumo por hierarquia viária: extensão de vias, pavimento, pintura, placas e elementos.</summary>
     public static List<HierarchySummaryRow> HierarchySummary(IEnumerable<QuantityRow> rows) =>
@@ -223,9 +319,9 @@ public static class QuantityCalculator
     {
         var pt = CultureInfo.GetCultureInfo("pt-BR");
         var sb = new StringBuilder();
-        const string header = "Categoria;Hierarquia viária;Grupo;Código;Descrição;Cor;Material;Quantidade;Unidade;Área (m²);Extensão (m);Unidades;Elementos;Consumo estimado;Unidade consumo;Microesferas (kg);Referência";
+        const string header = "Categoria;Hierarquia viária;Subcategoria;Código;Descrição;Cor;Material;Quantidade;Unidade;Área (m²);Extensão (m);Unidades;Elementos;Consumo estimado;Unidade consumo;Microesferas (kg);Referência";
         void Row(QuantityRow r) => sb.AppendLine(string.Join(";",
-            Esc(r.CategoryName), Esc(r.HierarchyName), Esc(r.GroupName), Esc(r.Code), Esc(r.Name), r.Color, Esc(r.Material),
+            Esc(r.CategoryName), Esc(r.HierarchyName), Esc(r.SubcategoryName), Esc(r.Code), Esc(r.Name), r.Color, Esc(r.Material),
             r.MainQuantity.ToString("0.00", pt), Esc(r.Unit),
             r.Area.ToString("0.00", pt), r.PaintedLength.ToString("0.00", pt), r.Units, r.Elements,
             r.MaterialConsumption.ToString("0.00", pt), Esc(r.ConsumptionUnit), r.GlassBeadsKg.ToString("0.00", pt), Esc(r.Reference)));
@@ -264,6 +360,9 @@ public static class QuantityCalculator
     private static string Esc(string s) =>
         s.Contains(';') || s.Contains('"') || s.Contains('\n') ? "\"" + s.Replace("\"", "\"\"").Replace("\n", " ") + "\"" : s;
 }
+
+/// <summary>Família do Revit classificada como elemento urbano (entrada do quantitativo).</summary>
+public sealed record FamilyItem(string Code, string Description, string TypeName, CategoriaUrbana Category, HierarquiaViaria? Hierarchy, double Length = 0);
 
 /// <summary>Totais de uma hierarquia viária.</summary>
 public sealed class HierarchySummaryRow

@@ -24,7 +24,8 @@ public sealed class CmdQuantitativos : CommandBase
     {
         var doc = uidoc.Document;
         var defs = MarkingStorage.Definitions(doc);
-        if (defs.Count == 0)
+        var families = FamilyClassifier.Collect(doc);
+        if (defs.Count == 0 && families.Count == 0)
         {
             TaskDialog.Show(AppTitle, "Nenhuma marca de sinalização encontrada neste projeto.");
             return Result.Cancelled;
@@ -48,6 +49,8 @@ public sealed class CmdQuantitativos : CommandBase
             items.Add((pv, g));
         }
         var rows = QuantityCalculator.Compute(items, PluginContext.Catalog, PluginContext.Settings.DefaultMaterial);
+        // Famílias do Revit do usuário classificadas como elementos urbanos (Elementos Urbanos → Famílias do Revit).
+        if (families.Count > 0) rows = QuantityCalculator.AddFamilies(rows, families);
         var w = new QuantitiesWindow(rows, doc.Title);
         if (UiHelpers.ShowModal(w) == true)
         {

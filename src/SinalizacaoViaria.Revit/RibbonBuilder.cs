@@ -41,9 +41,13 @@ public static class RibbonBuilder
                 "Balão de retorno na ponta de uma via (ligado a ela) ou avulso: circular, excêntrico, gota, T, Y ou L."),
             Data(typeof(CmdRampa), "Rampas", "rampa",
                 "Rebaixamentos de calçada (NBR 9050) com abas e piso tátil, e guias rebaixadas de veículos."));
-        Stack(via,
-            Data(typeof(CmdHierarquia), "Hierarquia e Esquinas", "hierarquia", "Hierarquia viária (CTB art. 60) e raio de concordância das esquinas de vias existentes – aplica às interseções delas."),
+        Split(via, "SvUrbanos", "Elementos Urbanos",
             Data(typeof(CmdMobiliario), "Elementos Urbanos", "mobiliario", "Bancos, lixeiras, postes, árvores, abrigos, paraciclos, hidrantes, floreiras, semáforos..."),
+            Data(typeof(CmdElementoFamilia), "Famílias do Revit", "familia",
+                "Use suas próprias famílias de componente (mobiliário, luminárias, plantio, modelo genérico...) como elementos urbanos – por cliques ou ao longo de linhas – " +
+                "classificadas por subcategoria (iluminação, arborização, bancos, lixeiras...) no Quantitativo. Também classifica famílias já inseridas."));
+        StackTwo(via,
+            Data(typeof(CmdHierarquia), "Hierarquia e Esquinas", "hierarquia", "Hierarquia viária (CTB art. 60) e raio de concordância das esquinas de vias existentes – aplica às interseções delas."),
             Data(typeof(CmdEixos), "Mostrar/Ocultar Eixos", "eixos", "Mostra ou oculta na vista ativa as linhas de eixo usadas pelas marcas."));
 
         // ---------------------------------------------------------------- Sinalização horizontal

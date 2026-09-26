@@ -82,6 +82,35 @@ public static class SharedParameters
         }
     }
 
+    /// <summary>
+    /// Estende os parâmetros SV_* a outra categoria (famílias do usuário classificadas como elementos urbanos:
+    /// mobiliário, iluminação, plantio, equipamentos...). Deve ser chamado dentro de uma transação.
+    /// </summary>
+    public static bool BindTo(Document doc, Category? category)
+    {
+        if (category == null || !category.AllowsBoundParameters) return false;
+        Ensure(doc);
+        var ok = true;
+        foreach (var d in All)
+        {
+            try
+            {
+                if (SharedParameterElement.Lookup(doc, d.Guid) is not { } spe) { ok = false; continue; }
+                var def = spe.GetDefinition();
+                if (doc.ParameterBindings.get_Item(def) is not InstanceBinding b) { ok = false; continue; }
+                if (b.Categories.Contains(category)) continue;
+                b.Categories.Insert(category);
+                doc.ParameterBindings.ReInsert(def, b, GroupTypeId.Data);
+            }
+            catch (Exception ex)
+            {
+                ok = false;
+                Log.Error($"SharedParameters.BindTo {category.Name}", ex);
+            }
+        }
+        return ok;
+    }
+
     private static readonly HashSet<int> FloorBound = new();
 
     /// <summary>Projetos antigos: os parâmetros SV_* passam a valer também para Pisos (elementos físicos como piso).</summary>
