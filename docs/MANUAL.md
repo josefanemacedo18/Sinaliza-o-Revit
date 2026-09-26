@@ -15,7 +15,7 @@ Convenções usadas em todo o plugin:
 
 | Painel | Ferramentas |
 |---|---|
-| **Vias** | **Via** (Nova Via · Sinalizar Via · Pista · Desenhar Eixo) · **Conexões** (interseções, rotatórias, cul-de-sac – uma ou todas) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Orelha · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
+| **Vias** | **Via** (Nova Via · Sinalizar Via · Pista · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Orelha · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
 | **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (tachas · piso tátil · ciclovia · quebra-mola) |
 | **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive guard rail) |
 | **Detalhamento** | **Detalhar** (anotar · cotar seção · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
@@ -654,7 +654,7 @@ Parâmetros adicionais: tipo da ilha (**ajardinada**, **pavimentada** ou **galg�
 galgável, **raios de entrada e de saída** separados, largura dos divisores, largura/raio do by-pass,
 distância e largura das **travessias**, número de **árvores**. A janela mostra o **diâmetro inscrito**.
 
-**Via → Rotatória**: clique o centro (o ponto é encaixado no cruzamento de vias mais próximo). Os ramos
+**Vias → Conexões → Rotatória** (seta do botão *Conexões*): clique o centro (o ponto é encaixado no cruzamento de vias mais próximo). Os ramos
 são detectados das vias que passam pelo centro (ou informados por ângulo, para uma rotatória isolada).
 Parâmetros: raio da **ilha central** (ajardinada, com árvores opcionais), **faixa galgável** em bloquete
 para ônibus e caminhões, número e largura das **faixas da pista giratória** (linha divisória quando há 2

@@ -26,8 +26,14 @@ public static class RibbonBuilder
                 "Só a pista dos veículos (asfalto, bloquete ou concreto), já conectada. Monte o resto passo a passo com Calçadas → 'Junto ao bordo de uma via'."),
             Data(typeof(CmdDesenharEixo), "Desenhar Eixo", "eixo",
                 "Eixo com a ferramenta nativa Linha de modelo (reta, arco, spline, cadeia, snaps) ou por pontos com encaixe nas vias."));
-        Large(via, typeof(CmdConexao), "Conexões", "conexao",
-            "Interseções, rotatórias e cul-de-sacs: troque o tipo de uma conexão (clicando nela) ou ajuste todas as interseções do projeto (tipos I a IV, PARE / dê a preferência / semáforo).");
+        Split(via, "SvConexoes", "Conexões",
+            Data(typeof(CmdRotatoria), "Rotatória", "rotatoria",
+                "Clique o centro (encaixa no cruzamento mais próximo; os ramos vêm das vias) ou um ponto livre para uma rotatória isolada. " +
+                "Tipos: mini, compacta, 1 faixa, 2 faixas, turbo, oval, com by-pass ou personalizada – tudo editável."),
+            Data(typeof(CmdIntersecao), "Interseção", "intersecao",
+                "Cria/atualiza a interseção do cruzamento clicado ou todas as do projeto (tipos I a IV, PARE / dê a preferência / semáforo)."),
+            Data(typeof(CmdConexao), "Trocar Conexão", "conexao",
+                "Clique num encontro de vias, rotatória ou ponta livre e troque o tratamento: interseção, rotatória, cul-de-sac ou nenhum."));
         Split(via, "SvCalcadas", "Calçadas",
             Data(typeof(CmdCalcadas), "Meio-fio, Calçada e Sarjeta", "calcada",
                 "Meios-fios, sarjetas, sarjetões, calçadas, grama e faixas de caminhada ao longo de linhas – ou 'Junto ao bordo de uma via', empilhando a partir do bordo (fazem parte da via e das conexões)."),
