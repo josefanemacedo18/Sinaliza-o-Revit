@@ -50,7 +50,40 @@ public sealed class MarkingService
     public void Invalidate()
     {
         _definitions = null;
+        _present = null;
         _geometryCache.Clear();
+    }
+
+    private Dictionary<string, List<StoredMarking>>? _present;
+
+    /// <summary>Elementos existentes de cada marca (por id).</summary>
+    private Dictionary<string, List<StoredMarking>> Present =>
+        _present ??= MarkingStorage.All(_doc).GroupBy(r => r.MarkingId).ToDictionary(g => g.Key, g => g.ToList());
+
+    /// <summary>
+    /// Geometria para quantitativos: só o que existe no modelo. Cores cujos elementos foram apagados saem, e pisos
+    /// entram com a área real (inclusive editados à mão).
+    /// </summary>
+    public MarkingGeometry QuantityGeometry(MarkingDefinition d)
+    {
+        var geo = BuildGeometry(d, out _);
+        return FilterPresent(d, geo);
+    }
+
+    private MarkingGeometry FilterPresent(MarkingDefinition d, MarkingGeometry geo)
+    {
+        if (!Present.TryGetValue(d.Id, out var els) || els.Count == 0) return geo;
+        var colors = els.Select(e => e.Color).ToHashSet();
+        var res = new MarkingGeometry { PaintedLength = geo.PaintedLength, PathLength = geo.PathLength, UnitCount = geo.UnitCount };
+        res.Annotations.AddRange(geo.Annotations);
+        res.Warnings.AddRange(geo.Warnings);
+        res.Pieces.AddRange(geo.Pieces.Where(p => colors.Contains(p.Color)));
+        foreach (var g in els.GroupBy(e => e.Color))
+            if (g.All(e => e.Element is Floor))
+                res.AreaOverrides[g.Key] = g.Sum(e => FloorArea((Floor)e.Element));
+        // Unidades/extensão ficam com o elemento principal: se todos os elementos de uma marca com várias cores
+        // sumiram, a marca inteira sumiu (não chega aqui).
+        return res;
     }
 
     /// <summary>Geometria sem detalhes (null para detalhes ou em caso de erro) – prévias de quadros.</summary>
@@ -62,7 +95,7 @@ public sealed class MarkingService
         if (d is IAnnotationDefinition) return null;
         var key = d.Id + "|" + d.ToJson().GetHashCode();
         if (_geometryCache.TryGetValue(key, out var g)) return g;
-        try { g = BuildGeometry(d, out _); }
+        try { g = FilterPresent(d, BuildGeometry(d, out _)); }
         catch (Exception ex) { Log.Error($"OtherGeometry {d.DisplayCode}", ex); g = null; }
         _geometryCache[key] = g;
         return g;
@@ -151,6 +184,7 @@ public sealed class MarkingService
     {
         var result = new RenderResult();
         _definitions = null;
+        _present = null;
         var existing = MarkingStorage.ById(_doc, def.Id);
         PruneExclusions(def);
 
@@ -214,24 +248,50 @@ public sealed class MarkingService
         if (def.Output.Mode == OutputMode.Modelo3D && settings.PhysicalAsFloors && !def.Output.Drape)
         {
             var floorPieces = geo.Pieces.Where(p => FloorEligible(def, p)).ToList();
-            if (floorPieces.Count > 0)
+            var oldFloors = existing.Where(r => r.Element is Floor).ToList();
+            if (floorPieces.Count > 0 || oldFloors.Count > 0)
             {
                 // Tipo de piso escolhido pelo usuário em pisos anteriores (por cor) é mantido.
-                var userTypes = existing.Where(r => r.Element is Floor).GroupBy(r => r.Color)
-                    .ToDictionary(g => g.Key, g => g.First().Element.GetTypeId());
-                foreach (var old in existing.Where(r => r.Element is Floor)) SafeDelete(old.Element.Id);
-                existing.RemoveAll(r => r.Element is Floor);
-                var failed = new List<MarkingPiece>();
-                foreach (var piece in floorPieces)
+                var userTypes = oldFloors.GroupBy(r => r.Color).ToDictionary(g => g.Key, g => g.First().Element.GetTypeId());
+                // Pisos editados à mão (contorno alterado ou movidos) são preservados: a edição do usuário prevalece.
+                var edited = oldFloors.Where(r => FloorEdited((Floor)r.Element)).ToList();
+                var locked = edited.Select(r => r.Color).ToHashSet();
+                foreach (var old in oldFloors.Where(r => !locked.Contains(r.Color))) SafeDelete(old.Element.Id);
+                existing.RemoveAll(r => r.Element is Floor && !locked.Contains(r.Color));
+                foreach (var r in oldFloors.Where(r => locked.Contains(r.Color)))
                 {
-                    var f = CreateFloor(piece, baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(piece.Color));
-                    if (f == null) { failed.Add(piece); continue; }
-                    try { f.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set($"SV {info.Code}"); } catch { /* opcional */ }
-                    Tag(f, def, info, piece.Color, StyleService.ColorName(piece.Color), piece.Shape.Area, geo, primary);
-                    keep.Add(f.Id);
+                    Tag(r.Element, def, info, r.Color, StyleService.ColorName(r.Color), FloorArea((Floor)r.Element), geo, primary);
+                    keep.Add(r.Element.Id);
                     primary = false;
                 }
-                solidPieces = geo.Pieces.Where(p => !floorPieces.Contains(p) || failed.Contains(p)).ToList();
+                if (edited.Count > 0 && _interactive)
+                    result.Warnings.Add($"{info.Code}: {edited.Count} piso(s) editado(s) à mão foram mantidos como estão (para gerar de novo, apague o piso e use Atualizar).");
+
+                var failed = new List<MarkingPiece>();
+                string? reason = null;
+                foreach (var grp in floorPieces.Where(p => !locked.Contains(p.Color))
+                             .GroupBy(p => (p.Color, E: Math.Round(p.Elevation, 3), T: Math.Round(p.Thickness, 3))))
+                {
+                    // Peças vizinhas do mesmo material viram um piso só (calçadas, trechos recortados).
+                    var merged = PolygonOps.Union(grp.Select(p => p.Shape)).Where(p => p.Area > 0.01).ToList();
+                    foreach (var shape in merged)
+                    {
+                        var piece = new MarkingPiece(shape, grp.Key.Color) { Elevation = grp.Key.E, Thickness = grp.Key.T };
+                        var floors = CreateFloors(piece, baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(grp.Key.Color), ref reason);
+                        if (floors.Count == 0) { failed.Add(piece); continue; }
+                        foreach (var f in floors)
+                        {
+                            try { f.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set($"SV {info.Code}"); } catch { /* opcional */ }
+                            Tag(f, def, info, grp.Key.Color, StyleService.ColorName(grp.Key.Color), FloorArea(f, piece.Shape.Area / floors.Count), geo, primary);
+                            keep.Add(f.Id);
+                            primary = false;
+                        }
+                    }
+                }
+                if (failed.Count > 0)
+                    result.Warnings.Add($"{info.Code}: {failed.Count} parte(s) não puderam virar Piso do Revit e foram geradas como forma direta" +
+                                        (reason != null ? $" ({reason})." : "."));
+                solidPieces = geo.Pieces.Where(p => !floorPieces.Contains(p)).Concat(failed).ToList();
             }
         }
         var groups = solidPieces.GroupBy(p => p.Color)
@@ -556,29 +616,96 @@ public sealed class MarkingService
         return _levels.LastOrDefault(l => l.ProjectElevation <= zFt + 0.01) ?? _levels[0];
     }
 
-    /// <summary>Cria um piso para a peça (topo na cota da peça). Nulo se o Revit recusar o contorno.</summary>
-    private Floor? CreateFloor(MarkingPiece piece, double baseZm, ElementId? userType)
+    /// <summary>
+    /// Cria o(s) piso(s) da peça (topo na cota da peça). Tenta o contorno original, depois limpo de lascas e, por fim,
+    /// dividido sem furos. Lista vazia se o Revit recusar todas as tentativas (<paramref name="reason"/> recebe o motivo).
+    /// </summary>
+    private List<Floor> CreateFloors(MarkingPiece piece, double baseZm, ElementId? userType, ref string? reason)
     {
+        var res = new List<Floor>();
+        var topFt = UnitConv.Ft(baseZm + piece.Elevation + piece.Thickness);
+        var level = LevelFor(topFt);
+        if (level == null) { reason = "o projeto não tem níveis"; return res; }
+        ElementId typeId;
         try
         {
-            var topFt = UnitConv.Ft(baseZm + piece.Elevation + piece.Thickness);
-            var level = LevelFor(topFt);
-            if (level == null) return null;
-            var shape = piece.Shape.Simplified(0.005) ?? piece.Shape;
-            var loops = ToCurveLoops(shape, level.ProjectElevation);
-            if (loops.Count == 0) return null;
-            var typeId = userType != null && userType != ElementId.InvalidElementId && _doc.GetElement(userType) is FloorType
+            typeId = userType != null && userType != ElementId.InvalidElementId && _doc.GetElement(userType) is FloorType
                 ? userType : FloorType(piece.Color, piece.Thickness);
-            if (typeId == ElementId.InvalidElementId) return null;
-            var f = Floor.Create(_doc, loops, typeId, level.Id, false, null, 0.0);
-            f.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)?.Set(topFt - level.ProjectElevation);
-            return f;
         }
         catch (Exception ex)
         {
-            Log.Error("Floor.Create", ex);
-            return null;
+            Log.Error("FloorType", ex);
+            reason = "não foi possível criar o tipo de piso: " + ex.Message;
+            return res;
         }
+        if (typeId == ElementId.InvalidElementId) { reason = "o projeto não tem nenhum tipo de piso"; return res; }
+
+        var attempts = new List<Func<List<Polygon2>>>
+        {
+            () => new List<Polygon2> { piece.Shape.Simplified(0.005) ?? piece.Shape },
+            () => PolygonOps.Clean(new[] { piece.Shape }),
+            () => PolygonOps.Clean(new[] { piece.Shape }).SelectMany(p => PolygonOps.SplitHoles(p)).ToList(),
+        };
+        foreach (var attempt in attempts)
+        {
+            List<Polygon2> shapes;
+            try { shapes = attempt(); }
+            catch { continue; }
+            if (shapes.Count == 0) continue;
+            var created = new List<Floor>();
+            var ok = true;
+            foreach (var shape in shapes)
+            {
+                var loops = ToCurveLoops(shape, level.ProjectElevation);
+                if (loops.Count == 0) continue;
+                try
+                {
+                    if (!BoundaryValidation.IsValidHorizontalBoundary(loops)) { ok = false; reason = "contorno inválido para o esboço do piso"; break; }
+                    var f = Floor.Create(_doc, loops, typeId, level.Id, false, null, 0.0);
+                    f.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)?.Set(topFt - level.ProjectElevation);
+                    FloorSignature.Write(f, loops);
+                    created.Add(f);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Floor.Create", ex);
+                    reason = ex.Message;
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok && created.Count > 0) { res.AddRange(created); return res; }
+            foreach (var f in created) SafeDelete(f.Id);
+        }
+        return res;
+    }
+
+    /// <summary>O contorno do piso foi alterado (ou o piso foi movido) pelo usuário depois de gerado?</summary>
+    private bool FloorEdited(Floor f)
+    {
+        try
+        {
+            if (_doc.GetElement(f.SketchId) is not Sketch sk) return false;
+            var loops = new List<CurveLoop>();
+            foreach (CurveArray arr in sk.Profile)
+            {
+                var loop = new CurveLoop();
+                foreach (Curve c in arr) loop.Append(c);
+                loops.Add(loop);
+            }
+            return FloorSignature.Differs(f, loops);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Área real do piso (m²) – inclui edições do usuário.</summary>
+    public static double FloorArea(Floor f, double fallback = 0)
+    {
+        var a = f.get_Parameter(BuiltInParameter.HOST_AREA_COMPUTED)?.AsDouble() ?? 0;
+        return a > 1e-9 ? UnitConv.M2(a) : fallback;
     }
 
     // ------------------------------------------------------------------ 2D

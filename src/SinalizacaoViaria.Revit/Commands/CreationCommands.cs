@@ -292,19 +292,8 @@ public sealed class CmdZebrado : CommandBase
         EnsureDetailView(uidoc, def.Output);
         if (w.PickSurfaces && MarkingCreator.PickSurfaces(uidoc) is { } s) def.Output.SurfaceIds = s;
 
-        PathReference boundary;
-        if (w.PathMode == PathMode.Desenhar)
-        {
-            var pl = Picking.PickPolyline(uidoc, "Contorno do zebrado", true, keepAsModelLines: true);
-            if (pl == null) return Result.Cancelled;
-            boundary = PathReference.FromElements(pl.Value.Lines.Select(id => uidoc.Document.GetElement(id).UniqueId));
-        }
-        else
-        {
-            var curves = Picking.PickCurves(uidoc, "Selecione as linhas que formam o CONTORNO FECHADO e clique em Concluir");
-            if (curves == null) return Result.Cancelled;
-            boundary = PathReference.FromElements(curves.Select(c => c.UniqueId));
-        }
+        var boundary = MarkingCreator.PickPath(uidoc, w.PathMode, "Contorno FECHADO do zebrado", closed: true);
+        if (boundary == null) return Result.Cancelled;
         boundary.Closed = true;
         def.Boundary = boundary;
 

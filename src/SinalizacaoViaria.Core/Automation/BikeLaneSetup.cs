@@ -52,17 +52,28 @@ public sealed class BikeLaneSetup
         _ => 1.50,
     };
 
+    /// <summary>Posição da faixa em relação à linha de referência (centro ou borda sobre a linha).</summary>
+    public Justificacao Justify { get; set; }
+
     public List<MarkingDefinition> Build(PathReference path, OutputSettings output)
     {
         var groupId = Guid.NewGuid().ToString("N");
         var res = new List<MarkingDefinition>();
         var w = Math.Max(0.5, Width);
         var hw = w / 2;
+        // Linha de referência no centro da faixa ou numa das bordas (faixa inteira para um dos lados).
+        var shift = Justify switch { Justificacao.Esquerda => hw, Justificacao.Direita => -hw, _ => 0.0 };
         T Add<T>(T d) where T : MarkingDefinition
         {
             d.Output = output.Clone();
             d.GroupId = groupId;
             d.SetPath(RoadConnection.CopyPath(path));
+            switch (d)
+            {
+                case LinearMarkingDefinition l: l.Offset += shift; break;
+                case RepeatedMarkingDefinition r: r.Offset += shift; break;
+                case DeviceMarkingDefinition dv: dv.Offset += shift; break;
+            }
             res.Add(d);
             return d;
         }
@@ -111,8 +122,11 @@ public sealed class BikeLaneSetup
             var start = Math.Max(5, StartSetback + 3);
             var two = Type is TipoCiclo.CiclofaixaBidirecional or TipoCiclo.Ciclovia;
             var symbol = walk ? "SPE" : "SIC";
-            var symLen = Math.Min(SymbolLength, walk ? w * 0.9 : Math.Max(0.6, SymbolLength));
-            foreach (var (off, rev) in two ? new[] { (w / 4, true), (-w / 4, false) } : new[] { (0.0, false) })
+            // O símbolo fica atravessado na faixa: nunca maior que a largura útil (entre as linhas).
+            var usable = Math.Max(0.5, innerL + innerR - 0.10);
+            var symLen = Math.Min(SymbolLength, walk ? w * 0.9 : Math.Max(0.6, Math.Min(SymbolLength, usable)));
+            // Faixa única: símbolos centrados entre as linhas (não no eixo da faixa, que inclui a linha).
+            foreach (var (off, rev) in two ? new[] { (w / 4, true), (-w / 4, false) } : new[] { ((innerL - innerR) / 2, false) })
             {
                 Add(new RepeatedMarkingDefinition
                 {

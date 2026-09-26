@@ -23,11 +23,22 @@ public static class PathResolver
             var pieces = new List<IReadOnlyList<Vec2>>();
             double zSum = 0;
             int zCount = 0;
-            foreach (var uid in path.ElementIds)
+            for (int k = 0; k < path.ElementIds.Count; k++)
             {
-                if (doc.GetElement(uid) is not CurveElement ce) { warnings.Add("Uma das linhas de referência não existe mais."); continue; }
-                var curve = ce.GeometryCurve;
-                if (curve == null) continue;
+                var uid = path.ElementIds[k];
+                var curve = CurveOf(doc, uid);
+                if (curve == null)
+                {
+                    // Referência perdida (linha apagada ou piso regenerado): usa o traçado guardado na criação.
+                    if (path.Cache != null && k < path.Cache.Count && path.Cache[k].Count >= 2)
+                    {
+                        pieces.Add(path.Cache[k]);
+                        zSum += path.Z; zCount++;
+                        continue;
+                    }
+                    warnings.Add(PathReference.IsEdge(uid) ? "Uma das bordas de referência não existe mais." : "Uma das linhas de referência não existe mais.");
+                    continue;
+                }
                 var pts = Tessellate(curve);
                 if (pts.Count < 2) continue;
                 pieces.Add(pts.Select(UnitConv.ToVec2).ToList());
@@ -67,4 +78,30 @@ public static class PathResolver
     }
 
     public static bool IsPathElement(Element e) => e is ModelCurve || e is DetailCurve;
+
+    /// <summary>Curva de uma referência: linha de modelo/detalhe (UniqueId) ou aresta de elemento ("edge|" + referência estável).</summary>
+    public static Curve? CurveOf(Document doc, string id)
+    {
+        if (!PathReference.IsEdge(id)) return (doc.GetElement(id) as CurveElement)?.GeometryCurve;
+        try
+        {
+            var r = Reference.ParseFromStableRepresentation(doc, id.Substring(PathReference.EdgePrefix.Length));
+            var e = doc.GetElement(r);
+            var go = e?.GetGeometryObjectFromReference(r);
+            var c = go switch { Edge edge => edge.AsCurve(), Curve cv => cv, _ => null };
+            if (c == null) return null;
+            // Famílias sem geometria própria (não cortadas/unidas): a aresta vem no sistema do tipo.
+            if (e is FamilyInstance fi && !fi.HasModifiedGeometry() && fi.GetTransform() is { IsIdentity: false } tr)
+                c = c.CreateTransformed(tr);
+            return c;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Traçado (m) de cada referência – guardado no caminho para o caso de a referência deixar de existir.</summary>
+    public static List<List<Vec2>> CacheOf(Document doc, IEnumerable<string> ids) =>
+        ids.Select(id => CurveOf(doc, id) is { } c ? Tessellate(c).Select(UnitConv.ToVec2).ToList() : new List<Vec2>()).ToList();
 }

@@ -42,12 +42,14 @@ public partial class DeviceWindow : Window
             TbStart.Text = UiHelpers.F(existing.StartSetback, "0.##");
             TbEnd.Text = UiHelpers.F(existing.EndSetback, "0.##");
             CkReverse.IsChecked = existing.Reverse;
+            UiHelpers.FillJustify(CbJustify, existing.Justify);
             UiHelpers.SelectColor(CbColor, existing.Color);
             Output.Load(existing.Output);
         }
         else
         {
             Output.Load(PluginContext.Settings.NewOutput());
+            UiHelpers.FillJustify(CbJustify, Enum.TryParse<Justificacao>(PluginContext.Settings.Get("device:pos"), out var jl) ? jl : Justificacao.Centro);
             LbTypes.SelectedItem = _cat.Dispositivo(initialCode ?? PluginContext.Settings.Get("device")) ?? _cat.Dispositivos.FirstOrDefault();
         }
         _loading = false;
@@ -95,6 +97,8 @@ public partial class DeviceWindow : Window
         r.EndSetback = UiHelpers.Parse(TbEnd, 0, "Recuo final", 0, 10000);
         r.Reverse = CkReverse.IsChecked == true;
         r.Color = UiHelpers.SelectedColor(CbColor);
+        r.Justify = UiHelpers.SelectedJustify(CbJustify);
+        if (_existing != null && r.Justify == Justificacao.Clique) r.Justify = _existing.Justify == Justificacao.Clique ? Justificacao.Centro : _existing.Justify;
         r.Output = Output.Save(r.Output);
         return r;
     }
@@ -106,6 +110,7 @@ public partial class DeviceWindow : Window
         {
             var d = BuildDefinition();
             var sample = new Polyline2(new[] { new Vec2(0, 0), new Vec2(20, 0) });
+            if (d.Justify == Justificacao.Clique) d.Justify = Justificacao.Esquerda;   // prévia: um dos lados
             var geo = MarkingBuilder.Build(d, sample, new BuildContext { Catalog = _cat });
             var pav = Polygon2.Rectangle(new Vec2(-1, -3), new Vec2(21, 3));
             Preview.Show(geo, new[] { sample.Points }, new[] { pav });
@@ -124,8 +129,10 @@ public partial class DeviceWindow : Window
         try
         {
             Result = BuildDefinition();
-            PathMode = RbDraw.IsChecked == true ? PathMode.Desenhar : RbTwoPoints.IsChecked == true ? PathMode.DoisPontos : PathMode.Linhas;
+            PathMode = RbDraw.IsChecked == true ? PathMode.Desenhar : RbTwoPoints.IsChecked == true ? PathMode.DoisPontos
+                : RbEdges.IsChecked == true ? PathMode.Bordas : PathMode.Linhas;
             PluginContext.Settings.Set("device", Result.Code);
+            PluginContext.Settings.Set("device:pos", Result.Justify.ToString());
             DialogResult = true;
         }
         catch (FormatException ex)

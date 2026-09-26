@@ -52,6 +52,7 @@
                     <StackPanel>
                         <RadioButton x:Name="RbPoint" GroupName="mode" Content="Por ponto: posição + direção (2 cliques, repete)" IsChecked="True" Checked="AnyChanged"/>
                         <RadioButton x:Name="RbPath" GroupName="mode" Content="Distribuir ao longo de linhas (associativo)" Checked="AnyChanged"/>
+                        <RadioButton x:Name="RbEdges" GroupName="mode" Content="Distribuir ao longo de bordas de pisos/calçadas (associativo)" Checked="AnyChanged"/>
                         <RadioButton x:Name="RbDraw" GroupName="mode" Content="Distribuir ao longo de um caminho desenhado" Checked="AnyChanged"/>
                         <Grid x:Name="PanelPath" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>

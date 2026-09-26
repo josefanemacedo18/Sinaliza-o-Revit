@@ -129,7 +129,7 @@ public partial class ParkingWindow : Window
         try
         {
             Result = BuildDefinition();
-            PathMode = RbDraw.IsChecked == true ? PathMode.Desenhar : PathMode.Linhas;
+            PathMode = RbDraw.IsChecked == true ? PathMode.Desenhar : RbEdges.IsChecked == true ? PathMode.Bordas : PathMode.Linhas;
             PluginContext.Settings.Set("parking", Result.Code);
             DialogResult = true;
         }

@@ -63,6 +63,7 @@
                 <GroupBox x:Name="GbPath" Header="Contorno e direção">
                     <StackPanel>
                         <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas do contorno fechado" IsChecked="True"/>
+                        <RadioButton x:Name="RbEdges" GroupName="path" Content="Selecionar bordas (arestas) de pisos que formam o contorno"/>
                         <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar o contorno por pontos"/>
                         <CheckBox x:Name="CkRefDir" Content="Indicar a direção do tráfego com 2 cliques" ToolTip="Senão, o ângulo é medido a partir do maior lado do contorno."/>
                     </StackPanel>

@@ -532,13 +532,12 @@ public sealed class RoadSetup
 
     private static bool IsLane(List<ElementoSecao> side, int i) => side.Count > i && ElementoSecao.EhFaixaDeTrafego(side[i].Tipo);
 
-    private static PathReference Clone(PathReference p) => new()
+    private static PathReference Clone(PathReference p)
     {
-        ElementIds = new List<string>(p.ElementIds),
-        Points = new List<Vec2>(p.Points),
-        Z = p.Z,
-        Closed = false,
-    };
+        var c = p.Clone();
+        c.Closed = false;
+        return c;
+    }
 
     /// <summary>Lê uma lista de larguras no formato "3,50; 3,30" ou "3.5 3.3".</summary>
     public static List<double> ParseWidths(string text)

@@ -198,11 +198,24 @@ public sealed class FormWindow : Window
         _grid = null;
         var box = new GroupBox { Header = "Inserção" };
         var sp = new StackPanel();
-        foreach (var (l, m) in modes)
+        var list = modes.ToList();
+        // Onde se pode escolher linhas, também se pode escolher bordas de pisos/calçadas.
+        var k = list.FindIndex(m => m.Mode == PathMode.Linhas);
+        if (k >= 0 && list.All(m => m.Mode != PathMode.Bordas)) list.Insert(k + 1, (UiHelpers.EdgesLabel, PathMode.Bordas));
+        foreach (var (l, m) in list)
         {
             var rb = new RadioButton { Content = l, GroupName = "modes" + GetHashCode(), IsChecked = _modes.Count == 0, Margin = new Thickness(0, 2, 0, 2) };
             sp.Children.Add(rb);
             _modes.Add((rb, m));
+        }
+        if (_def != null && MarkingBuilder.SupportsJustify(_def))
+        {
+            var cb = new ComboBox { Margin = new Thickness(0, 6, 0, 2) };
+            UiHelpers.FillJustify(cb, _def.Justify);
+            cb.SelectionChanged += (_, _) => Refresh();
+            sp.Children.Add(new TextBlock { Text = "Posição em relação à linha", Margin = new Thickness(0, 6, 0, 0) });
+            sp.Children.Add(cb);
+            _apply.Add(() => _def.Justify = UiHelpers.SelectedJustify(cb));
         }
         box.Content = sp;
         _fields.Children.Add(box);

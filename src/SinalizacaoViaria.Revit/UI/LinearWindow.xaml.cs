@@ -16,6 +16,8 @@ public enum PathMode
     DoisPontos,
     /// <summary>Junto ao bordo de uma via existente (montagem da via passo a passo).</summary>
     BordoDaVia,
+    /// <summary>Arestas de pisos, calçadas, lajes, topografia ou outros elementos (associativo).</summary>
+    Bordas,
 }
 
 /// <summary>Janela genérica para marcas lineares (longitudinais, transversais, tachas, piso tátil, ciclovia).</summary>
@@ -47,6 +49,7 @@ public partial class LinearWindow : Window
         foreach (var a in Enum.GetValues<AlinhamentoPadrao>()) CbAlign.Items.Add(a);
         CbAlign.SelectedIndex = 0;
         TbSpeed.Text = UiHelpers.F(PluginContext.Settings.DefaultSpeed, "0");
+        UiHelpers.FillJustify(CbJustify, Enum.TryParse<Justificacao>(PluginContext.Settings.Get(_settingsKey + ":pos"), out var jl) ? jl : Justificacao.Centro);
         Output.Changed += (_, _) => UpdatePreview();
 
         FillList("");
@@ -63,6 +66,7 @@ public partial class LinearWindow : Window
             RbDraw.IsChecked = defaultMode == PathMode.Desenhar;
             RbTwoPoints.IsChecked = defaultMode == PathMode.DoisPontos;
             RbRoadEdge.IsChecked = defaultMode == PathMode.BordoDaVia;
+            RbEdges.IsChecked = defaultMode == PathMode.Bordas;
             var last = PluginContext.Settings.Get(_settingsKey);
             LbTypes.SelectedItem = _types.FirstOrDefault(t => t.Codigo == last) ?? _types.FirstOrDefault();
         }
@@ -103,6 +107,7 @@ public partial class LinearWindow : Window
         CkReverse.IsChecked = d.Reverse;
         CkInvert.IsChecked = d.InvertSides;
         if (d.Depth is { } dp) TbDepth.Text = UiHelpers.F(dp, "0.###");
+        UiHelpers.FillJustify(CbJustify, d.Justify);
         UiHelpers.SelectColor(CbColor, d.ColorOverride);
         CbAlign.SelectedItem = d.Alignment.HasValue ? d.Alignment.Value : CbAlign.Items[0];
         Output.Load(d.Output);
@@ -154,6 +159,8 @@ public partial class LinearWindow : Window
         d.ColorOverride = UiHelpers.SelectedColor(CbColor);
         d.Alignment = CbAlign.SelectedItem is AlinhamentoPadrao a ? a : null;
         d.Depth = t.Codigo == "SARJETAO" ? UiHelpers.Parse(TbDepth, 0.05, "Flecha do sarjetão", 0, 0.25) : null;
+        d.Justify = UiHelpers.SelectedJustify(CbJustify);
+        if (_existing != null && d.Justify == Justificacao.Clique) d.Justify = _existing.Justify == Justificacao.Clique ? Justificacao.Centro : _existing.Justify;
         d.Output = Output.Save(d.Output);
         return d;
     }
@@ -182,6 +189,7 @@ public partial class LinearWindow : Window
                 sample = new Polyline2(pts);
                 pavement.AddRange(PolygonOps.Strip(sample.Points, 9 + Math.Abs(d.Offset) * 2));
             }
+            if (d.Justify == Justificacao.Clique) d.Justify = Justificacao.Esquerda;   // prévia: um dos lados
             var geo = MarkingBuilder.Build(d, sample, new BuildContext { Catalog = _cat });
             Preview.Show(geo, new[] { sample.Points }, pavement);
             TxtWarnings.Text = string.Join("\n", geo.Warnings.Distinct());
@@ -202,8 +210,9 @@ public partial class LinearWindow : Window
         {
             Result = BuildDefinition();
             PathMode = RbDraw.IsChecked == true ? PathMode.Desenhar : RbTwoPoints.IsChecked == true ? PathMode.DoisPontos
-                : RbRoadEdge.IsChecked == true ? PathMode.BordoDaVia : PathMode.Linhas;
+                : RbRoadEdge.IsChecked == true ? PathMode.BordoDaVia : RbEdges.IsChecked == true ? PathMode.Bordas : PathMode.Linhas;
             PluginContext.Settings.Set(_settingsKey, Result.Code);
+            PluginContext.Settings.Set(_settingsKey + ":pos", Result.Justify.ToString());
             DialogResult = true;
         }
         catch (FormatException ex)

@@ -130,7 +130,7 @@ public partial class HatchWindow : Window
         try
         {
             Result = BuildDefinition();
-            PathMode = RbDraw.IsChecked == true ? PathMode.Desenhar : PathMode.Linhas;
+            PathMode = RbDraw.IsChecked == true ? PathMode.Desenhar : RbEdges.IsChecked == true ? PathMode.Bordas : PathMode.Linhas;
             PickReferenceDirection = CkRefDir.IsChecked == true;
             PluginContext.Settings.Set("hatch", Result.Code);
             DialogResult = true;

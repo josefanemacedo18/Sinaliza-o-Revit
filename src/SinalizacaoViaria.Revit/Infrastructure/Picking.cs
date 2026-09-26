@@ -12,6 +12,13 @@ public sealed class CurveSelectionFilter : ISelectionFilter
     public bool AllowReference(Reference reference, XYZ position) => false;
 }
 
+/// <summary>Filtro de seleção: arestas de pisos, lajes, topografia, paredes e demais elementos com sólidos.</summary>
+public sealed class EdgeSelectionFilter : ISelectionFilter
+{
+    public bool AllowElement(Element elem) => elem is not CurveElement && elem is not View && elem.Category != null;
+    public bool AllowReference(Reference reference, XYZ position) => true;
+}
+
 /// <summary>Filtro de seleção: elementos de sinalização gerados pelo plugin.</summary>
 public sealed class MarkingSelectionFilter : ISelectionFilter
 {
@@ -46,6 +53,36 @@ public static class Picking
         {
             var refs = uidoc.Selection.PickObjects(ObjectType.Element, new CurveSelectionFilter(), prompt);
             var res = refs.Select(r => uidoc.Document.GetElement(r)).OfType<CurveElement>().ToList();
+            return res.Count > 0 ? res : null;
+        }
+        catch (Autodesk.Revit.Exceptions.OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Arestas escolhidas pelo usuário (bordas de pisos, calçadas, lajes, topografia...): referência estável + traçado.
+    /// Nulo = cancelado.
+    /// </summary>
+    public static List<(string Id, List<Vec2> Points, double Z)>? PickEdges(UIDocument uidoc, string prompt)
+    {
+        var doc = uidoc.Document;
+        try
+        {
+            var refs = uidoc.Selection.PickObjects(ObjectType.Edge, new EdgeSelectionFilter(), prompt);
+            var res = new List<(string, List<Vec2>, double)>();
+            foreach (var r in refs)
+            {
+                string stable;
+                try { stable = r.ConvertToStableRepresentation(doc); }
+                catch { continue; }
+                var id = Core.Definitions.PathReference.EdgePrefix + stable;
+                var c = PathResolver.CurveOf(doc, id);
+                if (c == null) continue;
+                var pts = PathResolver.Tessellate(c);
+                res.Add((id, pts.Select(UnitConv.ToVec2).ToList(), UnitConv.M(pts.Average(p => p.Z))));
+            }
             return res.Count > 0 ? res : null;
         }
         catch (Autodesk.Revit.Exceptions.OperationCanceledException)

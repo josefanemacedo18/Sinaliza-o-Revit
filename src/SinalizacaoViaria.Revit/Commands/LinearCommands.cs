@@ -80,7 +80,7 @@ public sealed class CmdCiclovia : CommandBase
         try { if (st.Get("ciclo:ultima") is { } j) last = System.Text.Json.JsonSerializer.Deserialize<BikeLaneSetup>(j); }
         catch { /* configuração antiga */ }
         var s = last ?? new BikeLaneSetup();
-        var holder = new LinearMarkingDefinition { Output = st.NewOutput() };
+        var holder = new LinearMarkingDefinition { Output = st.NewOutput(), Justify = s.Justify };
         var lastType = s.Type;
         var w = new FormWindow("Ciclovia / faixa de caminhada", "Ciclofaixa, ciclovia ou faixa de caminhada",
                 "Desenhe ou selecione o EIXO da faixa. Fundo colorido contínuo, linhas de delimitação, linha central (bidirecional), " +
@@ -96,6 +96,7 @@ public sealed class CmdCiclovia : CommandBase
                         Type = s.Type, Width = s.Width, Background = s.Background, WalkColor = s.WalkColor, Lines = s.Lines, DashedLines = s.DashedLines,
                         LineWidth = s.LineWidth, CenterDash = s.CenterDash, CenterGap = s.CenterGap, SymbolSpacing = Math.Min(s.SymbolSpacing, 10),
                         SymbolLength = s.SymbolLength, Arrows = s.Arrows, ArrowLength = s.ArrowLength, Segregation = s.Segregation,
+                        Justify = holder.Justify == Justificacao.Clique ? Justificacao.Esquerda : holder.Justify,
                     };
                     foreach (var d in tmp.Build(PathReference.FromPoints(axis.Points, 0), new OutputSettings())) geo.Merge(MarkingBuilder.Build(d, axis, ctx));
                     var road = Core.Geometry.Polygon2.Rectangle(new Core.Geometry.Vec2(0, -s.Width / 2 - 1.5), new Core.Geometry.Vec2(24, s.Width / 2 + 1.5));
@@ -125,24 +126,23 @@ public sealed class CmdCiclovia : CommandBase
                 () => s.Segregation, v => s.Segregation = v)
             .Modes(("Selecionar linhas existentes (eixo da faixa)", PathMode.Linhas), ("Desenhar o eixo por pontos", PathMode.Desenhar));
         if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
+        s.Justify = holder.Justify;
         st.Set("ciclo:ultima", System.Text.Json.JsonSerializer.Serialize(s));
         PluginContext.SaveSettings();
         EnsureDetailView(uidoc, holder.Output);
 
-        PathReference path;
-        if (w.PathMode == PathMode.Desenhar)
+        s.Justify = holder.Justify;
+        var path = MarkingCreator.PickPath(uidoc, w.PathMode, s.Justify == Justificacao.Centro ? "Eixo da faixa" : "Borda da faixa");
+        if (path == null) return Result.Cancelled;
+        var justify = s.Justify;
+        if (s.Justify == Justificacao.Clique)
         {
-            var pl = Picking.PickPolyline(uidoc, "Eixo da faixa", false, keepAsModelLines: true);
-            if (pl == null) return Result.Cancelled;
-            path = PathReference.FromElements(pl.Value.Lines.Select(id => uidoc.Document.GetElement(id).UniqueId));
-        }
-        else
-        {
-            var curves = Picking.PickCurves(uidoc, "Selecione as linhas do EIXO da faixa e clique em Concluir");
-            if (curves == null) return Result.Cancelled;
-            path = PathReference.FromElements(curves.Select(c => c.UniqueId));
+            var side = MarkingCreator.PickSide(uidoc, path);
+            if (side == null) return Result.Cancelled;
+            s.Justify = side.Value;
         }
         var defs = s.Build(path, holder.Output);
+        s.Justify = justify;
         Report("Ciclovia", MarkingCreator.Commit(uidoc, defs, "SV - Ciclovia"));
         return Result.Succeeded;
     }

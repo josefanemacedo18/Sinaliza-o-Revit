@@ -63,13 +63,55 @@ public sealed class PathReference
 
     public bool Closed { get; set; }
 
+    /// <summary>
+    /// Traçado (m) de cada referência de <see cref="ElementIds"/> no momento da criação – usado se a referência deixar de
+    /// existir (ex.: aresta de um piso que foi regenerado), para a marca não sumir.
+    /// </summary>
+    public List<List<Vec2>>? Cache { get; set; }
+
     [JsonIgnore]
     public bool IsAssociative => ElementIds.Count > 0;
+
+    /// <summary>Prefixo das referências a arestas de elementos (bordas de pisos, lajes, topografia...).</summary>
+    public const string EdgePrefix = "edge|";
+
+    public static bool IsEdge(string id) => id.StartsWith(EdgePrefix, StringComparison.Ordinal);
+
+    /// <summary>UniqueId do elemento dono da referência (linha ou aresta).</summary>
+    public static string OwnerOf(string id)
+    {
+        if (!IsEdge(id)) return id;
+        var stable = id.Substring(EdgePrefix.Length);
+        var k = stable.IndexOf(':');
+        return k < 0 ? stable : stable.Substring(0, k);
+    }
+
+    public PathReference Clone() => new()
+    {
+        ElementIds = new List<string>(ElementIds),
+        Points = new List<Vec2>(Points),
+        Z = Z,
+        Closed = Closed,
+        Cache = Cache?.Select(c => new List<Vec2>(c)).ToList(),
+    };
 
     public static PathReference FromPoints(IEnumerable<Vec2> pts, double z, bool closed = false) =>
         new() { Points = pts.ToList(), Z = z, Closed = closed };
 
     public static PathReference FromElements(IEnumerable<string> ids) => new() { ElementIds = ids.ToList() };
+}
+
+/// <summary>Posição do elemento em relação à linha de referência.</summary>
+public enum Justificacao
+{
+    /// <summary>Centralizado na linha.</summary>
+    Centro,
+    /// <summary>Borda direita sobre a linha: o elemento fica à esquerda (sentido da linha).</summary>
+    Esquerda,
+    /// <summary>Borda esquerda sobre a linha: o elemento fica à direita (sentido da linha).</summary>
+    Direita,
+    /// <summary>Lado indicado com um clique na criação (convertido em Esquerda/Direita).</summary>
+    Clique,
 }
 
 /// <summary>Definição paramétrica de uma marca: gravada no elemento (Extensible Storage) e usada para regenerá-lo.</summary>
@@ -120,6 +162,13 @@ public abstract class MarkingDefinition
 
     /// <summary>Observações do projetista.</summary>
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// Posição do elemento em relação à linha de referência: centralizado ou com a borda sobre a linha (elemento à
+    /// esquerda ou à direita, no sentido da linha). Vale para marcas ao longo de caminho (linhas, meios-fios,
+    /// calçadas, sarjetas, dispositivos, canteiros).
+    /// </summary>
+    public Justificacao Justify { get; set; }
 
     [JsonIgnore]
     public abstract string KindName { get; }

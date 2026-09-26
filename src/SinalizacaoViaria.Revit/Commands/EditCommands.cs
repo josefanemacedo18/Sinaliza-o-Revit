@@ -70,6 +70,43 @@ public sealed class CmdEditar : CommandBase
             Report("Interseção", IntersectionRunner.Run(uidoc, "SV - Editar interseção", s => s.Refresh(inter)).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;
         }
+        if (stored.Definition is RoadPavementDefinition pv)
+        {
+            // Pavimento da via: material, espessura e raio das esquinas (larguras e faixas: Sinalizar via / Pista).
+            var work = (RoadPavementDefinition)MarkingDefinition.FromJson(pv.ToJson())!;
+            var thick = work.ActualThickness;
+            var radius = work.CornerRadius ?? 0;
+            var h = work.Hierarchy ?? HierarquiaViaria.Local;
+            var fw = new FormWindow("Editar pavimento da via", "Pavimento da via",
+                    "Material, espessura, hierarquia e raio das esquinas. As interseções desta via são refeitas com o novo raio.",
+                    null, null, false, "Aplicar", 600, 380)
+                .Choice("Pavimento", new[] { ("Asfalto (CBUQ)", TipoPavimento.Asfalto), ("Bloquete / intertravado", TipoPavimento.Bloquete), ("Concreto", TipoPavimento.Concreto) },
+                    () => work.Material, v => work.Material = v)
+                .Number("Espessura (m)", () => thick, v => thick = v, 0.01, 1)
+                .Choice("Hierarquia viária (CTB art. 60)", Hierarquia.Definidas.Select(x => (Hierarquia.Label(x), x)), () => h, v => h = v)
+                .Number("Raio das esquinas (m, 0 = pela hierarquia)", () => radius, v => radius = v, 0, 60,
+                    tooltip: "Raio de concordância na face do meio-fio. Qualquer valor a partir de 0,5 m gera curva.");
+            if (UiHelpers.ShowModal(fw) != true) return Result.Cancelled;
+            work.Thickness = Math.Abs(thick - work.DefaultThickness) > 1e-6 ? thick : null;
+            work.CornerRadius = radius > 0.01 ? radius : null;
+            work.Hierarchy = h;
+            var res = MarkingCreator.Commit(uidoc, new[] { work }, "SV - Editar pavimento");
+            res.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões", s =>
+            {
+                var r = new List<RenderResult>();
+                var pavs = MarkingStorage.Definitions(uidoc.Document).OfType<RoadPavementDefinition>().ToDictionary(p => p.Id);
+                foreach (var it in s.DependentOn(new[] { work }))
+                {
+                    it.CornerRadius = Hierarquia.NodeRadius(it.RoadIds.Select(id => pavs.GetValueOrDefault(id)).Where(p => p != null)!);
+                    r.AddRange(s.Refresh(it));
+                }
+                foreach (var rb in s.RoundaboutsDependentOn(new[] { work })) r.AddRange(s.Refresh(rb));
+                foreach (var c in s.CulDeSacsDependentOn(new[] { work })) r.AddRange(s.Refresh(c));
+                return r;
+            }));
+            Report("Pavimento", res.Where(r => r.Warnings.Count > 0).ToList());
+            return Result.Succeeded;
+        }
         if (stored.Definition is CulDeSacDefinition { RoadId: not null } linked)
         {
             var form0 = SidewalkForms.CulDeSac(linked, true);

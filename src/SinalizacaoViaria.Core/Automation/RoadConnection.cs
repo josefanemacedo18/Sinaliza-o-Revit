@@ -339,13 +339,7 @@ public static class RoadConnection
         return offset;
     }
 
-    public static PathReference CopyPath(PathReference p) => new()
-    {
-        ElementIds = new List<string>(p.ElementIds),
-        Points = new List<Vec2>(p.Points),
-        Z = p.Z,
-        Closed = p.Closed,
-    };
+    public static PathReference CopyPath(PathReference p) => p.Clone();
 
     /// <summary>Pista simples (só o pavimento) – o ponto de partida para montar a via elemento por elemento.</summary>
     public static List<MarkingDefinition> BuildCarriageway(RoadPavementDefinition template, PathReference path, OutputSettings output,

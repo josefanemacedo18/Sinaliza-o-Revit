@@ -101,4 +101,30 @@ public static class UiHelpers
     }
 
     public static void Error(string msg) => MessageBox.Show(msg, "SinalizaBIM", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+    /// <summary>Opções de posição em relação à linha de referência.</summary>
+    public static readonly (string Label, Core.Definitions.Justificacao Value)[] JustifyOptions =
+    {
+        ("Centralizado na linha", Core.Definitions.Justificacao.Centro),
+        ("Borda na linha – indicar o lado com um clique", Core.Definitions.Justificacao.Clique),
+        ("Borda na linha – elemento à ESQUERDA (sentido da linha)", Core.Definitions.Justificacao.Esquerda),
+        ("Borda na linha – elemento à DIREITA (sentido da linha)", Core.Definitions.Justificacao.Direita),
+    };
+
+    public const string JustifyTip = "Centro: o eixo do elemento fica sobre a linha. Borda: a face lateral do elemento fica sobre a linha " +
+        "(ex.: meio-fio ou calçada encostados na borda de um piso) e o elemento cresce para o lado escolhido. " +
+        "Com 'indicar o lado', após escolher a linha clique do lado em que o elemento deve ficar.";
+
+    public static void FillJustify(ComboBox cb, Core.Definitions.Justificacao value)
+    {
+        cb.Items.Clear();
+        foreach (var (l, _) in JustifyOptions) cb.Items.Add(l);
+        cb.SelectedIndex = Math.Max(0, Array.FindIndex(JustifyOptions, o => o.Value == value));
+        cb.ToolTip = JustifyTip;
+    }
+
+    public static Core.Definitions.Justificacao SelectedJustify(ComboBox cb) =>
+        cb.SelectedIndex >= 0 && cb.SelectedIndex < JustifyOptions.Length ? JustifyOptions[cb.SelectedIndex].Value : Core.Definitions.Justificacao.Centro;
+
+    public const string EdgesLabel = "Selecionar bordas (arestas) de pisos, calçadas, lajes ou topografia (associativo)";
 }

@@ -32,11 +32,24 @@ Qualquer marca linear, zebrado ou conjunto de vagas pode usar como caminho:
 | Opção | Resultado |
 |---|---|
 | **Selecionar linhas existentes** | Linhas de modelo ou de detalhe (retas, arcos, splines, elipses). Várias linhas são encadeadas automaticamente, invertendo o sentido quando necessário. **Associativo**: editar as linhas regenera a marca. |
+| **Selecionar bordas (arestas)** | Bordas de **pisos** (seus ou do plugin), calçadas, lajes, topografia (Toposolid), paredes e telhados – clique as arestas em planta e *Concluir*. **Associativo**: editar o contorno do piso regenera a marca. Se a borda deixar de existir (piso apagado ou regenerado), a marca usa o traçado guardado na criação. |
 | **Desenhar por pontos** | O plugin cria linhas de modelo no estilo *SV - Eixo de sinalização* (tracejado magenta) e as associa à marca. |
 | **Dois cliques** | Para marcas transversais: cada par de cliques cria uma marca (repete até ESC). Não associativo. |
 
 Se as linhas selecionadas formarem trechos separados, cada trecho recebe o padrão de forma
 independente (o plugin avisa).
+
+**Posição em relação à linha** (linhas, meios-fios, calçadas, sarjetas, gramados, faixas de caminhada,
+ciclovias, dispositivos e canteiros):
+
+| Opção | Resultado |
+|---|---|
+| **Centralizado na linha** | O eixo do elemento fica sobre a linha (padrão das marcas pintadas). |
+| **Borda na linha – indicar o lado com um clique** | Depois de escolher a linha/borda, clique do lado em que o elemento deve ficar: a face lateral do elemento fica exatamente sobre a linha e ele cresce para esse lado. Ideal para encostar meio-fio, sarjeta e calçada na borda de um piso. |
+| **Borda na linha – elemento à esquerda / à direita** | O mesmo, com o lado fixo (esquerda/direita no sentido em que a linha foi desenhada). |
+
+O *deslocamento lateral* continua valendo e é somado a partir da borda. A largura é medida na própria
+geometria gerada, por isso funciona também em curvas, linhas duplas e dispositivos.
 
 > Dica: coloque o estilo *SV - Eixo de sinalização* como invisível nas vistas de prancha
 > (Visibilidade/Gráficos → Linhas) para imprimir apenas a sinalização.
@@ -263,8 +276,13 @@ Painel **Representação no Revit** (em todas as janelas):
 * **Pisos do Revit**: pavimento da pista (asfalto, bloquete, concreto), **calçadas, meios-fios, sarjetas e
   grama** – das vias, interseções, rotatórias, cul-de-sacs, orelhas, áreas de calçada e canteiros – são
   criados como **Piso** (tipos *SV - {material} {espessura}*, com o material da sinalização), editáveis com
-  as ferramentas nativas (tipo, material, estrutura). Se você trocar o tipo de um piso, a troca é mantida
-  quando a via é regenerada. Desligue em **Configurações** para voltar à forma direta. A sinalização
+  as ferramentas nativas (**Editar contorno**, tipo, material, estrutura). Peças vizinhas do mesmo material
+  viram um piso só. Se você trocar o tipo de um piso, a troca é mantida quando a via é regenerada.
+  **Contorno editado à mão é preservado**: se você editar o contorno de um piso (ou movê-lo), o plugin não o
+  refaz nas regenerações seguintes – para voltar ao contorno gerado, apague o piso e use **Atualizar**.
+  Se o Revit recusar algum contorno, aquela parte é gerada como forma direta e o motivo aparece no aviso.
+  Projetos feitos em versões anteriores: use **Atualizar Todas** para converter pavimentos, calçadas,
+  meios-fios e sarjetas em pisos. Desligue em **Configurações** para voltar à forma direta. A sinalização
   pintada e os dispositivos continuam como modelo genérico.
 * **Modelo 3D**: sólido fino (Modelos genéricos). A espessura padrão é a do material, com mínimo
   modelável de 3 mm (configurável) – películas de tinta reais são finas demais para sólidos do Revit.
@@ -283,6 +301,8 @@ Painel **Representação no Revit** (em todas as janelas):
 
 * **Editar**: selecione uma marca (qualquer elemento dela) → a janela abre com os valores atuais →
   *Aplicar* regenera a marca mantendo o mesmo identificador (tabelas e seleções continuam válidas).
+  No **pavimento da via** (clique no asfalto) a edição altera material, espessura, hierarquia e **raio das
+  esquinas** – as interseções da via são refeitas com o novo raio.
 * **Atualização automática**: ao mover/editar linhas de referência, as marcas associadas são
   regeneradas na mesma operação (pode ser desativada em Configurações).
 * **Atualizar Todas**: regenera todo o projeto (após alterar o catálogo, as superfícies ou as
@@ -298,6 +318,8 @@ Painel **Representação no Revit** (em todas as janelas):
 
 ## 10. Quantitativos
 
+* Somente o que **existe no modelo**: partes apagadas de uma marca saem do quantitativo, e pisos entram
+  com a **área real** (inclusive os editados à mão).
 * Itens separados por **categoria**: 1. Sinalização horizontal, 2. Sinalização vertical,
   3. Dispositivos auxiliares e segregação física, 4. Acessibilidade (rampas e piso tátil),
   5. Calçadas, meios-fios e urbanização, 6. Moderação de tráfego, 7. Mobiliário e elementos urbanos.
@@ -492,8 +514,10 @@ Vias criadas por versões anteriores (ou com pavimento *Nenhum*) funcionam tamb�
 automaticamente. A interseção:
 
 * torna o pavimento contínuo no miolo e arredonda as **esquinas** com o **raio** informado (na face do
-  meio-fio), com **meio-fio curvo**;
-* refaz as **calçadas** junto à esquina e as **pontas dos canteiros centrais** (nariz com meio-fio,
+  meio-fio), com **meio-fio curvo** – qualquer raio a partir de 0,5 m gera a curva inteira (a área refeita
+  acompanha cada ramo até o fim da curva, sem cortar o asfalto da esquina);
+* refaz as **calçadas** junto à esquina – **contornando a curva** com a largura da calçada – e as **pontas
+  dos canteiros centrais** (nariz com meio-fio,
   terminando 1 m antes da pista transversal; a travessia corta o canteiro formando **refúgio** no nível da
   pista);
 * interrompe a sinalização horizontal das vias no cruzamento e na aproximação (até depois da linha de

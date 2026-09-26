@@ -12,6 +12,7 @@ public static class UnitConv
     public static double Ft(double meters) => meters * FeetPerMeter;
     public static double M(double feet) => feet * MetersPerFoot;
     public static double Ft2(double squareMeters) => squareMeters * FeetPerMeter * FeetPerMeter;
+    public static double M2(double squareFeet) => squareFeet * MetersPerFoot * MetersPerFoot;
 
     public static XYZ ToXyz(Vec2 v, double zMeters) => new(Ft(v.X), Ft(v.Y), Ft(zMeters));
     public static Vec2 ToVec2(XYZ p) => new(M(p.X), M(p.Y));

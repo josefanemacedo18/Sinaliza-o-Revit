@@ -72,6 +72,7 @@
                 <GroupBox x:Name="GbPath" Header="Meio-fio (caminho)">
                     <StackPanel>
                         <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas do meio-fio" IsChecked="True"/>
+                        <RadioButton x:Name="RbEdges" GroupName="path" Content="Selecionar bordas (arestas) de pisos/calçadas (face do meio-fio)"/>
                         <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar por pontos"/>
                     </StackPanel>
                 </GroupBox>

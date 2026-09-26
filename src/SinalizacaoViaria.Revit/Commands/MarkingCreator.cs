@@ -57,6 +57,7 @@ public static class MarkingCreator
         Action<MarkingDefinition>? afterEach = null)
     {
         var results = new List<RenderResult>();
+        var doc = uidoc.Document;
         switch (mode)
         {
             case PathMode.Linhas:
@@ -67,32 +68,52 @@ public static class MarkingCreator
                 if (curves == null) return Result.Cancelled;
                 var def = template.CloneWithNewId();
                 SetPath(def, PathReference.FromElements(curves.Select(c => c.UniqueId)));
+                if (!ResolveSide(uidoc, def)) return Result.Cancelled;
                 results.AddRange(Commit(uidoc, new[] { def }, $"SV - {action}"));
-                    afterEach?.Invoke(def);
+                afterEach?.Invoke(def);
+                break;
+            }
+            case PathMode.Bordas:
+            {
+                var edges = Picking.PickEdges(uidoc, closed
+                    ? "Selecione as BORDAS (arestas) que formam o contorno fechado – pisos, calçadas, lajes, topografia – e clique em Concluir"
+                    : "Selecione as BORDAS (arestas) de pisos, calçadas, lajes ou topografia que formam o caminho e clique em Concluir");
+                if (edges == null) return Result.Cancelled;
+                var def = template.CloneWithNewId();
+                var pr = PathReference.FromElements(edges.Select(e => e.Id));
+                pr.Cache = edges.Select(e => e.Points).ToList();
+                pr.Z = edges.Average(e => e.Z);
+                SetPath(def, pr);
+                Updater.MarkingUpdater.NoteEdgeOwners(doc, pr.ElementIds);
+                if (!ResolveSide(uidoc, def)) return Result.Cancelled;
+                results.AddRange(Commit(uidoc, new[] { def }, $"SV - {action}"));
+                afterEach?.Invoke(def);
                 break;
             }
             case PathMode.Desenhar:
             {
                 var pl = Picking.PickPolyline(uidoc, action, closed, keepAsModelLines: true);
                 if (pl == null) return Result.Cancelled;
-                var uids = pl.Value.Lines.Select(id => uidoc.Document.GetElement(id).UniqueId);
+                var uids = pl.Value.Lines.Select(id => doc.GetElement(id).UniqueId);
                 var def = template.CloneWithNewId();
                 SetPath(def, PathReference.FromElements(uids));
+                if (!ResolveSide(uidoc, def)) return Result.Cancelled;
                 results.AddRange(Commit(uidoc, new[] { def }, $"SV - {action}"));
-                    afterEach?.Invoke(def);
+                afterEach?.Invoke(def);
                 break;
             }
             case PathMode.DoisPontos:
             {
                 while (true)
                 {
-                    var a = Picking.PickPoint(uidoc, $"{action}: clique o 1º ponto (bordo da pista) – ESC encerra");
+                    var a = Picking.PickPoint(uidoc, $"{action}: clique o 1º ponto – ESC encerra");
                     if (a == null) break;
                     var b = Picking.PickPoint(uidoc, $"{action}: clique o 2º ponto");
                     if (b == null) break;
                     var (pts, z) = Picking.ToCore(new[] { a, b });
                     var def = template.CloneWithNewId();
                     SetPath(def, PathReference.FromPoints(pts, z));
+                    if (!ResolveSide(uidoc, def)) break;
                     results.AddRange(Commit(uidoc, new[] { def }, $"SV - {action}"));
                     afterEach?.Invoke(def);
                 }
@@ -123,6 +144,58 @@ public static class MarkingCreator
         }
         CommandBase_Report(action, results);
         return Result.Succeeded;
+    }
+
+    /// <summary>
+    /// "Borda na linha – indicar o lado": pede um clique ao lado do caminho e grava o lado (esquerda/direita da linha).
+    /// Falso se o usuário cancelar.
+    /// </summary>
+    public static bool ResolveSide(UIDocument uidoc, MarkingDefinition def)
+    {
+        if (def.Justify != Justificacao.Clique) return true;
+        var side = PickSide(uidoc, def.Path);
+        if (side == null) return false;
+        def.Justify = side.Value;
+        return true;
+    }
+
+    /// <summary>Lado (esquerda/direita da linha) indicado com um clique. Nulo = cancelado.</summary>
+    public static Justificacao? PickSide(UIDocument uidoc, PathReference? pathRef)
+    {
+        var path = PathResolver.Resolve(uidoc.Document, pathRef)?.Main;
+        if (path == null || path.Points.Count < 2) return Justificacao.Centro;
+        var p = Picking.PickPoint(uidoc, "Clique AO LADO da linha, no lado em que o elemento deve ficar (a borda fica sobre a linha)");
+        if (p == null) return null;
+        return path.SignedDistance(UnitConv.ToVec2(p)) >= 0 ? Justificacao.Esquerda : Justificacao.Direita;
+    }
+
+    /// <summary>Caminho por linhas, bordas de elementos ou desenho (para comandos que montam várias marcas). Nulo = cancelado.</summary>
+    public static PathReference? PickPath(UIDocument uidoc, PathMode mode, string what, bool closed = false)
+    {
+        var doc = uidoc.Document;
+        switch (mode)
+        {
+            case PathMode.Desenhar:
+            {
+                var pl = Picking.PickPolyline(uidoc, what, closed, keepAsModelLines: true);
+                return pl == null ? null : PathReference.FromElements(pl.Value.Lines.Select(id => doc.GetElement(id).UniqueId));
+            }
+            case PathMode.Bordas:
+            {
+                var edges = Picking.PickEdges(uidoc, $"{what}: selecione as BORDAS (arestas) de pisos, calçadas, lajes ou topografia e clique em Concluir");
+                if (edges == null) return null;
+                var pr = PathReference.FromElements(edges.Select(e => e.Id));
+                pr.Cache = edges.Select(e => e.Points).ToList();
+                pr.Z = edges.Average(e => e.Z);
+                Updater.MarkingUpdater.NoteEdgeOwners(doc, pr.ElementIds);
+                return pr;
+            }
+            default:
+            {
+                var curves = Picking.PickCurves(uidoc, $"{what}: selecione as linhas e clique em Concluir");
+                return curves == null ? null : PathReference.FromElements(curves.Select(c => c.UniqueId));
+            }
+        }
     }
 
     /// <summary>Permite escolher as superfícies de projeção (Toposolid/pisos).</summary>

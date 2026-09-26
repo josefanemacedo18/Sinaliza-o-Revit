@@ -160,7 +160,13 @@ public sealed class IntersectionService
                 it.Output = roads[ids[0]].Def.Output.Clone();
                 if (radiusByHierarchy) it.CornerRadius = Hierarquia.NodeRadius(ids.Select(i => roads[i].Def));
             }
-            else it.Node = node;
+            else
+            {
+                it.Node = node;
+                // Raio informado numa das vias (criação/edição da via): vale também para a interseção existente.
+                if (radiusByHierarchy && ids.Any(i => roads[i].Def.CornerRadius != null))
+                    it.CornerRadius = Hierarquia.NodeRadius(ids.Select(i => roads[i].Def));
+            }
             foreach (var i in ids) if (!it.RoadIds.Contains(roads[i].Def.Id)) it.RoadIds.Add(roads[i].Def.Id);
             results.AddRange(Refresh(it));
             processed.Add(it.Id);

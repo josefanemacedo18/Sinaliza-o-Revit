@@ -133,6 +133,32 @@ public sealed class Polyline2
         return new Polyline2(res, Closed);
     }
 
+    /// <summary>Projeção do ponto na polilinha: estaca e distância com sinal (+ à esquerda do sentido).</summary>
+    public (double Station, double Signed) Project(Vec2 p)
+    {
+        double best = double.MaxValue, bestS = 0, sign = 1;
+        for (int i = 0; i + 1 < Points.Count; i++)
+        {
+            var a = Points[i];
+            var ab = Points[i + 1] - a;
+            var len2 = ab.Dot(ab);
+            var t = len2 < 1e-18 ? 0 : Math.Clamp((p - a).Dot(ab) / len2, 0, 1);
+            var q = a + ab * t;
+            var d = q.DistanceTo(p);
+            if (d < best - 1e-12)
+            {
+                best = d;
+                bestS = _stations[i] + t * Math.Sqrt(len2);
+                var cr = ab.Cross(p - a);
+                sign = cr >= 0 ? 1 : -1;
+            }
+        }
+        return (bestS, best * sign);
+    }
+
+    /// <summary>Distância com sinal (+ à esquerda do sentido da polilinha).</summary>
+    public double SignedDistance(Vec2 p) => Project(p).Signed;
+
     /// <summary>Polilinha simplificada (remove vértices colineares), útil para exibição.</summary>
     public static Polyline2 FromSegment(Vec2 a, Vec2 b) => new(new[] { a, b });
 }

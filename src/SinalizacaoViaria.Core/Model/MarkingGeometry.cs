@@ -176,8 +176,21 @@ public sealed class MarkingGeometry
 
     public double TotalArea => Pieces.Sum(p => p.Shape.Area);
 
-    public IReadOnlyDictionary<MarkingColor, double> AreaByColor =>
-        Pieces.GroupBy(p => p.Color).ToDictionary(g => g.Key, g => g.Sum(p => p.Shape.Area));
+    /// <summary>
+    /// Áreas medidas no modelo que substituem as calculadas (ex.: pisos do Revit editados pelo usuário) – usadas nos
+    /// quantitativos.
+    /// </summary>
+    public Dictionary<MarkingColor, double> AreaOverrides { get; } = new();
+
+    public IReadOnlyDictionary<MarkingColor, double> AreaByColor
+    {
+        get
+        {
+            var d = Pieces.GroupBy(p => p.Color).ToDictionary(g => g.Key, g => g.Sum(p => p.Shape.Area));
+            foreach (var (c, a) in AreaOverrides) d[c] = a;
+            return d;
+        }
+    }
 
     public IEnumerable<MarkingColor> Colors => Pieces.Select(p => p.Color).Distinct();
 

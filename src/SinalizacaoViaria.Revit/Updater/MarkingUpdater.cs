@@ -20,11 +20,17 @@ public sealed class MarkingUpdater : IUpdater
         if (UpdaterRegistry.IsUpdaterRegistered(updater.GetUpdaterId())) return;
         UpdaterRegistry.RegisterUpdater(updater, true);
         UpdaterRegistry.AddTrigger(updater.GetUpdaterId(), new ElementClassFilter(typeof(CurveElement)), Element.GetChangeTypeGeometry());
+        // Bordas de pisos, lajes, topografia e paredes usadas como referência: a marca acompanha a edição do elemento.
+        UpdaterRegistry.AddTrigger(updater.GetUpdaterId(), new LogicalOrFilter(new List<ElementFilter>
+        {
+            new ElementClassFilter(typeof(Floor)), new ElementClassFilter(typeof(Toposolid)),
+            new ElementClassFilter(typeof(Wall)), new ElementClassFilter(typeof(RoofBase)),
+        }), Element.GetChangeTypeGeometry());
         // Cópias de elementos de sinalização (copiar/colar) tornam-se marcas independentes.
         var markingClasses = new LogicalOrFilter(new List<ElementFilter>
         {
             new ElementClassFilter(typeof(DirectShape)), new ElementClassFilter(typeof(FilledRegion)),
-            new ElementClassFilter(typeof(TextNote)), new ElementClassFilter(typeof(CurveElement)),
+            new ElementClassFilter(typeof(TextNote)), new ElementClassFilter(typeof(CurveElement)), new ElementClassFilter(typeof(Floor)),
         });
         UpdaterRegistry.AddTrigger(updater.GetUpdaterId(), markingClasses, Element.GetChangeTypeElementAddition());
         // Placa/marca apagada: remove os detalhes e anotações que apontavam para ela.
@@ -63,14 +69,18 @@ public sealed class MarkingUpdater : IUpdater
         if (!PluginContext.Settings.AutoUpdate) return;
         try
         {
-            var changed = new HashSet<string>(data.GetModifiedElementIds()
-                .Select(id => doc.GetElement(id)?.UniqueId)
-                .Where(u => u != null)!
-                .Cast<string>());
+            var modified = data.GetModifiedElementIds().Select(id => doc.GetElement(id)).Where(e => e != null).ToList();
+            // Pisos/paredes editados só interessam se alguma marca usa uma borda deles (evita varrer o projeto à toa).
+            if (!modified.Any(e => e is CurveElement))
+            {
+                var owners = EdgeOwners(doc);
+                if (!modified.Any(e => owners.Contains(e.UniqueId))) return;
+            }
+            var changed = new HashSet<string>(modified.Select(e => e.UniqueId));
             if (changed.Count == 0) return;
 
             var affected = MarkingStorage.Definitions(doc)
-                .Where(d => d.Path?.ElementIds.Any(changed.Contains) == true)
+                .Where(d => d.Path?.ElementIds.Any(id => changed.Contains(Core.Definitions.PathReference.OwnerOf(id))) == true)
                 .ToList();
             if (affected.Count == 0) return;
 
@@ -137,6 +147,25 @@ public sealed class MarkingUpdater : IUpdater
         {
             Log.Error("MarkingUpdater", ex);
         }
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Document, HashSet<string>> Owners = new();
+
+    /// <summary>Elementos (UniqueId) cujas arestas servem de caminho para alguma marca.</summary>
+    private static HashSet<string> EdgeOwners(Document doc)
+    {
+        if (Owners.TryGetValue(doc, out var set)) return set;
+        set = MarkingStorage.Definitions(doc).SelectMany(d => d.Path?.ElementIds ?? new List<string>())
+            .Where(Core.Definitions.PathReference.IsEdge).Select(Core.Definitions.PathReference.OwnerOf).ToHashSet();
+        Owners.AddOrUpdate(doc, set);
+        return set;
+    }
+
+    /// <summary>Registra novas referências a arestas (marcas criadas por bordas de elementos).</summary>
+    public static void NoteEdgeOwners(Document doc, IEnumerable<string> pathIds)
+    {
+        var set = EdgeOwners(doc);
+        foreach (var id in pathIds.Where(Core.Definitions.PathReference.IsEdge)) set.Add(Core.Definitions.PathReference.OwnerOf(id));
     }
 
     private static void RemoveOrphanDetails(Document doc)

@@ -41,8 +41,58 @@ public static class MarkingBuilder
 {
     public static MarkingGeometry Build(MarkingDefinition def, Polyline2? path, BuildContext ctx)
     {
+        if (path != null && def.Justify is Justificacao.Esquerda or Justificacao.Direita && SupportsJustify(def) && path.Points.Count >= 2)
+            path = JustifiedPath(def, path, ctx);
         var geo = BuildRaw(def, path, ctx);
         return def.Exclusions.Count == 0 ? geo : ApplyExclusions(geo, def.Exclusions);
+    }
+
+    /// <summary>Marcas ao longo de caminho que aceitam borda sobre a linha (em vez de centralizadas).</summary>
+    public static bool SupportsJustify(MarkingDefinition d) =>
+        d is LinearMarkingDefinition or DeviceMarkingDefinition or RepeatedMarkingDefinition or PlanterDefinition
+            or HatchMarkingDefinition { IsStrip: true };
+
+    /// <summary>Deslocamento lateral informado na marca, no sentido da linha de referência (+ à esquerda).</summary>
+    private static double LateralOffset(MarkingDefinition d) => d switch
+    {
+        LinearMarkingDefinition l => l.Reverse ? -l.Offset : l.Offset,
+        DeviceMarkingDefinition dv => dv.Offset,
+        RepeatedMarkingDefinition r => r.Offset,
+        PlanterDefinition p => p.Offset,
+        HatchMarkingDefinition h => h.StripOffset,
+        _ => 0,
+    };
+
+    /// <summary>
+    /// Caminho deslocado para que a borda do elemento (e não o centro) fique sobre a linha de referência – mais o
+    /// deslocamento informado. A largura é medida na própria geometria gerada.
+    /// </summary>
+    public static Polyline2 JustifiedPath(MarkingDefinition def, Polyline2 path, BuildContext ctx)
+    {
+        MarkingGeometry geo;
+        try { geo = BuildRaw(def, path, ctx); }
+        catch { return path; }
+        var (lo, hi) = LateralExtent(geo, path);
+        if (lo > hi) return path;
+        var o = LateralOffset(def);
+        var shift = def.Justify == Justificacao.Esquerda ? o - lo : o - hi;
+        return Math.Abs(shift) < 1e-6 ? path : path.Offset(shift);
+    }
+
+    /// <summary>Menor e maior distância lateral (+ à esquerda) das peças em relação ao caminho.</summary>
+    public static (double Lo, double Hi) LateralExtent(MarkingGeometry geo, Polyline2 path)
+    {
+        var pts = geo.Pieces.SelectMany(p => p.Shape.Outer).ToList();
+        if (pts.Count == 0) return (1, -1);
+        var step = Math.Max(1, pts.Count / 600);
+        double lo = double.MaxValue, hi = double.MinValue;
+        for (int i = 0; i < pts.Count; i += step)
+        {
+            var d = path.SignedDistance(pts[i]);
+            lo = Math.Min(lo, d);
+            hi = Math.Max(hi, d);
+        }
+        return (lo, hi);
     }
 
     /// <summary>Recorta as peças pelas zonas de exclusão (ex.: calçada sob um rebaixamento).</summary>

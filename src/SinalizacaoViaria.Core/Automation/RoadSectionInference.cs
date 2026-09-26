@@ -94,12 +94,9 @@ public static class RoadSectionInference
         d.GroupId = first.GroupId;
         d.Hierarchy = group.Select(m => m.Hierarchy).FirstOrDefault(h => h != null);
         d.Output = first.Output.Clone();
-        d.SetPath(new PathReference
-        {
-            ElementIds = new List<string>(first.PathRef.ElementIds),
-            Points = new List<Geometry.Vec2>(first.PathRef.Points),
-            Z = first.PathRef.Z,
-        });
+        var path = first.PathRef.Clone();
+        path.Closed = false;
+        d.SetPath(path);
         return d;
     }
 }

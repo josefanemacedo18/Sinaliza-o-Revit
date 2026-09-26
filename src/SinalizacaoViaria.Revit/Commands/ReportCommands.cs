@@ -33,7 +33,7 @@ public sealed class CmdQuantitativos : CommandBase
         var items = new List<(MarkingDefinition, MarkingGeometry)>();
         foreach (var d in defs)
         {
-            try { items.Add((d, service.BuildGeometry(d, out _))); }
+            try { items.Add((d, service.QuantityGeometry(d))); }
             catch (Exception ex) { Log.Error($"Quantitativos {d.DisplayCode}", ex); }
         }
         var rows = QuantityCalculator.Compute(items, PluginContext.Catalog, PluginContext.Settings.DefaultMaterial);
@@ -60,7 +60,8 @@ public sealed class CmdQuantitativos : CommandBase
         using var t = new Transaction(doc, "SV - Tabela de quantitativos");
         t.Start();
         SharedParameters.Ensure(doc);
-        var sched = ViewSchedule.CreateSchedule(doc, new ElementId(BuiltInCategory.OST_GenericModel));
+        // Multicategoria: formas diretas (modelos genéricos) e pisos (pavimento, calçadas, meios-fios...) juntos.
+        var sched = ViewSchedule.CreateSchedule(doc, ElementId.InvalidElementId);
         var name = category is { } cc ? $"SV - {QuantityRow.CategoryLabel(cc)}" : ScheduleName;
         var baseName = name;
         var existing = new FilteredElementCollector(doc).OfClass(typeof(ViewSchedule)).Cast<ViewSchedule>().Select(v => v.Name).ToHashSet();

@@ -32,7 +32,7 @@ public partial class UrbanWindow : Window
         {
             Title = $"Editar – {existing.Code}";
             BtnOk.Content = "Aplicar";
-            RbPoint.IsEnabled = RbPath.IsEnabled = RbDraw.IsEnabled = false;
+            RbPoint.IsEnabled = RbPath.IsEnabled = RbDraw.IsEnabled = RbEdges.IsEnabled = false;
             RbPath.IsChecked = existing.UsePath;
             LbTypes.SelectedItem = _cat.Movel(existing.Code);
             var m = _cat.Movel(existing.Code);
@@ -145,7 +145,8 @@ public partial class UrbanWindow : Window
         try
         {
             Result = BuildDefinition();
-            PathMode = RbPath.IsChecked == true ? UI.PathMode.Linhas : RbDraw.IsChecked == true ? UI.PathMode.Desenhar : null;
+            PathMode = RbPath.IsChecked == true ? UI.PathMode.Linhas : RbDraw.IsChecked == true ? UI.PathMode.Desenhar
+                : RbEdges.IsChecked == true ? UI.PathMode.Bordas : null;
             PluginContext.Settings.Set("urban", Result.Code);
             DialogResult = true;
         }

@@ -67,6 +67,26 @@ public static class PolygonOps
 
     public static double TotalArea(IEnumerable<Polygon2> polys) => polys.Sum(p => p.Area);
 
+    /// <summary>
+    /// Divide um polígono com furos em partes sem furos (cortes verticais pelos furos, sem folga entre as partes) –
+    /// contornos mais simples para o esboço de pisos.
+    /// </summary>
+    public static List<Polygon2> SplitHoles(Polygon2 poly, int maxDepth = 32)
+    {
+        if (poly.Holes.Count == 0 || maxDepth <= 0) return new List<Polygon2> { poly };
+        var (mn, mx) = poly.Bounds;
+        var hole = poly.Holes.OrderByDescending(h => new Polygon2(h).Area).First();
+        var cx = hole.Average(v => v.X);
+        var left = Intersect(new[] { poly }, new[] { Polygon2.Rectangle(new Vec2(mn.X - 1, mn.Y - 1), new Vec2(cx, mx.Y + 1)) });
+        var right = Intersect(new[] { poly }, new[] { Polygon2.Rectangle(new Vec2(cx, mn.Y - 1), new Vec2(mx.X + 1, mx.Y + 1)) });
+        return left.Concat(right).Where(p => p.Area > 1e-6).SelectMany(p => SplitHoles(p, maxDepth - 1)).ToList();
+    }
+
+    /// <summary>Limpa lascas e vértices quase coincidentes (fecha e abre com <paramref name="r"/>).</summary>
+    public static List<Polygon2> Clean(IEnumerable<Polygon2> polys, double r = 0.003) =>
+        Offset(Offset(Offset(Offset(polys, -r), r), r), -r).Select(p => p.Simplified(0.01) ?? p).Where(p => p.Area > 1e-4).ToList();
+
+
     // ---------------------------------------------------------------- conversões
 
     internal static PathD ToPath(IReadOnlyList<Vec2> pts)
