@@ -78,6 +78,18 @@ public partial class SignDetailWindow : Window
         }
         CbDirection.SelectedIndex = best;
         CkLeader.IsChecked = def.Leader;
+        foreach (var (l, v) in new[] { ("Reta até a borda do símbolo", EstiloChamada.Reta), ("Com cotovelo horizontal", EstiloChamada.Cotovelo),
+                     ("Livre (vértices clicados em 'Mover Chamada')", EstiloChamada.Livre) })
+        {
+            CbLeaderStyle.Items.Add(new Option<EstiloChamada>(l, v));
+            if (v == def.LeaderStyle) CbLeaderStyle.SelectedIndex = CbLeaderStyle.Items.Count - 1;
+        }
+        foreach (var (l, v) in new[] { ("Ponto", TerminalChamada.Ponto), ("Seta", TerminalChamada.Seta), ("Sem terminal", TerminalChamada.Nenhum) })
+        {
+            CbTerminal.Items.Add(new Option<TerminalChamada>(l, v));
+            if (v == def.Terminal) CbTerminal.SelectedIndex = CbTerminal.Items.Count - 1;
+        }
+        CkBubble.IsChecked = def.NumberBubble;
         CkLabel.IsChecked = def.Label;
         CkName.IsChecked = def.ShowName;
         _loading = false;
@@ -97,6 +109,9 @@ public partial class SignDetailWindow : Window
         var dir = (CbDirection.SelectedItem as Option<Vec2>)?.Value ?? new Vec2(0, 1);
         d.OffsetMm = dir.Normalized() * dist;
         d.Leader = CkLeader.IsChecked == true;
+        d.LeaderStyle = (CbLeaderStyle.SelectedItem as Option<EstiloChamada>)?.Value ?? EstiloChamada.Reta;
+        d.Terminal = (CbTerminal.SelectedItem as Option<TerminalChamada>)?.Value ?? TerminalChamada.Ponto;
+        d.NumberBubble = CkBubble.IsChecked == true;
         d.Label = CkLabel.IsChecked == true;
         d.ShowName = CkName.IsChecked == true;
         if (_existing != null) d.Number = string.IsNullOrWhiteSpace(TbNumber.Text) ? null : TbNumber.Text.Trim();

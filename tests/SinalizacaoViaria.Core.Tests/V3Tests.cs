@@ -225,7 +225,7 @@ public class V3Tests
         var d0 = new LinearMarkingDefinition { Code = "LBO" };
         var d1 = new LinearMarkingDefinition { Code = "LFO-1" };
         var d2 = new LinearMarkingDefinition { Code = "LBO" };
-        var sec = new SectionDimensionDefinition { Start = new Vec2(20, -1), End = new Vec2(20, 8), IncludeEnds = false };
+        var sec = new SectionDimensionDefinition { Start = new Vec2(20, -1), End = new Vec2(20, 8), IncludeEnds = false, SectionLetter = "" };
         var defs = new List<MarkingDefinition> { d0, d1, d2, sec };
         var ctx = DetailCtx(defs, new() { [d0.Id] = edge0, [d1.Id] = axis, [d2.Id] = edge1 });
         var st = DetailGenerator.SectionStations(sec, new[] { edge0, axis, edge1 }.Zip(new[] { d0, d1, d2 }, (p, d) => MarkingBuilder.Build(d, p, Ctx)));

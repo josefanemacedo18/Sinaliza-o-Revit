@@ -27,7 +27,17 @@
                     <TextBlock x:Name="TxtReference" Style="{StaticResource Hint}" FontStyle="Italic"/>
                 </StackPanel>
             </Border>
-            <ListBox x:Name="LbTypes" SelectionChanged="TypeChanged"/>
+            <ListBox x:Name="LbTypes" SelectionChanged="TypeChanged">
+                <ListBox.GroupStyle>
+                    <GroupStyle>
+                        <GroupStyle.HeaderTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource AccentDark}" Margin="2,8,0,2"/>
+                            </DataTemplate>
+                        </GroupStyle.HeaderTemplate>
+                    </GroupStyle>
+                </ListBox.GroupStyle>
+            </ListBox>
         </DockPanel>
         <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
             <StackPanel>

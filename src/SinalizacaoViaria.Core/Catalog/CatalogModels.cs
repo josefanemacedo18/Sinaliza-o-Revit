@@ -391,6 +391,18 @@ public sealed class MobiliarioDef
 /// <summary>Dispositivo físico de bloqueio, segregação ou canalização implantado junto à sinalização horizontal.</summary>
 public sealed class DispositivoDef
 {
+    /// <summary>Família do dispositivo (agrupamento da lista de Bloqueios físicos).</summary>
+    public string Familia => Forma switch
+    {
+        FormaDispositivo.Tartaruga or FormaDispositivo.Prisma or FormaDispositivo.Caixa => "1. Segregadores e tachões",
+        FormaDispositivo.Balizador or FormaDispositivo.Cilindro or FormaDispositivo.Esfera => "2. Balizadores, pilaretes e frades",
+        FormaDispositivo.NewJersey => "3. Barreiras de concreto",
+        FormaDispositivo.Defensa or FormaDispositivo.DefensaDupla => "4. Defensas metálicas (guard rail)",
+        FormaDispositivo.Gradil or FormaDispositivo.Floreira => "5. Gradis e floreiras",
+        FormaDispositivo.Cone or FormaDispositivo.Cavalete or FormaDispositivo.Tambor => "6. Canalização provisória (obras)",
+        _ => "7. Outros",
+    };
+
     public string Codigo { get; set; } = "";
     public string Nome { get; set; } = "";
     public FormaDispositivo Forma { get; set; }

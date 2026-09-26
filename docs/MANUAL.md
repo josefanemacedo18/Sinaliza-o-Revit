@@ -15,9 +15,9 @@ Convenções usadas em todo o plugin:
 
 | Painel | Ferramentas |
 |---|---|
-| **Vias** | **Via** (Nova Via · Sinalizar Via · Pista · Desenhar Eixo) · **Conexões** (interseções, rotatórias, cul-de-sac – uma ou todas) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Orelha · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · Elementos Urbanos · Mostrar/Ocultar Eixos |
+| **Vias** | **Via** (Nova Via · Sinalizar Via · Pista · Desenhar Eixo) · **Conexões** (interseções, rotatórias, cul-de-sac – uma ou todas) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Orelha · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
 | **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (tachas · piso tátil · ciclovia · quebra-mola) |
-| **Sinalização Vertical** | **Placas** (placas · detalhar placas · quadro de placas · quadro de legenda) · **Segregação** (bloqueios físicos · guard rail) |
+| **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive guard rail) |
 | **Detalhamento** | **Detalhar** (anotar · cotar seção · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
 | **Editar** | Editar · Atualizar Todas · Selecionar Conjunto · Alternar 2D/3D · Configurações · Catálogo · Normas |
 
@@ -83,8 +83,8 @@ centros, mais próximo).
 | Elemento | O que é gerado |
 |---|---|
 | Faixa de rolamento | Linhas LMS entre faixas; LBO junto a acostamento, canteiro ou calçada. |
-| Faixa exclusiva (ônibus) | Linha MFE contínua na divisa com as faixas comuns + legenda repetida (ÔNIBUS). |
-| Faixa preferencial (ônibus) | Linha MFE seccionada + legenda repetida. |
+| Faixa exclusiva (ônibus) | Linha MFE contínua na divisa com as faixas comuns + legenda repetida (ÔNIBUS). Opcional: **pintura colorida de fundo** em toda a faixa (vermelha, azul, verde, amarela, laranja ou marrom – como na ciclofaixa e na faixa de caminhada), entre as linhas de bordo (código ONI-FD). |
+| Faixa preferencial (ônibus) | Linha MFE seccionada + legenda repetida; mesma opção de fundo colorido. |
 | Ciclofaixa | Linha CIC-LD, pintura vermelha, bicicletas e setas repetidas; segregação física opcional. |
 | Faixa de estacionamento | Vagas do tipo escolhido (paralelas, em ângulo, PcD, carga e descarga...) com linha de fundo no lado da pista. |
 | Acostamento | LBO no bordo da faixa. |
@@ -193,7 +193,12 @@ asfalto → **Editar** → *Raio das curvas do eixo* (0 = cantos como desenhados
 
 ## 2.4 Bloqueios físicos
 
-Comando **Bloqueios Físicos** (painel *Segregação Física*): escolha o dispositivo, ajuste
+Comando **Bloqueios Físicos** (painel *Sinalização Vertical*) – **uma única ferramenta** para todos os
+dispositivos físicos, inclusive as **defensas metálicas (guard rail)**, que antes tinham um botão próprio
+(o que duplicava a ferramenta). A lista é agrupada por família: *segregadores e tachões*, *balizadores,
+pilaretes e frades*, *barreiras de concreto*, *defensas metálicas (guard rail)*, *gradis e floreiras* e
+*canalização provisória (obras)*. Na **Sinalizar Via**, um mesmo dispositivo nunca é repetido no mesmo
+alinhamento. Escolha o dispositivo, ajuste
 dimensões, espaçamento entre centros (0 = contínuo), deslocamento e recuos, e selecione/desenhe o
 caminho. Os dispositivos são modelados em 3D com a forma real e aparecem nos quantitativos em
 unidades ou metros:
@@ -358,6 +363,17 @@ Painel **Representação no Revit** (em todas as janelas):
   categoria. O parâmetro compartilhado **SV_Categoria** também pode ser usado em filtros de vista.
 * Para a prancha, use **Detalhamento → Quadro de Quantitativos** (seção 16).
 
+**Janela redesenhada**: cabeçalho com o projeto, **cartões de resumo** (elementos, área pintada, extensão
+pintada, pavimento, placas, elementos urbanos e tinta estimada), filtros e **grupos recolhíveis** por
+**categoria → subcategoria** com subtotais no cabeçalho de cada grupo (itens, m², m e un). A coluna *Cor*
+mostra a amostra da cor; ao clicar numa linha aparecem os detalhes (elementos no modelo, tipo de área,
+extensão de via, microesferas, **tipos de família** e referência normativa). A aba *Resumo por categoria e
+subcategoria* mostra os subtotais em árvore. Os **elementos urbanos** são subdivididos em *bancos e
+assentos*, *iluminação pública*, *arborização e paisagismo*, *lixeiras*, *abrigos de transporte*,
+*paraciclos*, *proteção e segurança*, *comunicação*, *infraestrutura*, *lazer* e *acessibilidade* – tanto os do
+plugin quanto as **famílias do Revit** classificadas (seção 22.1). O CSV e a tabela do Revit trazem a
+subcategoria.
+
 ---
 
 ## 11. Configurações e catálogo
@@ -454,7 +470,28 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   símbolo, a distância e a direção em relação ao suporte, e se haverá linha de chamada e
   código/nome. O símbolo é a face da placa (forma, orla, fundo e legenda) desenhada na planta; o
   ponto vermelho marca o suporte. Rodar de novo o comando atualiza os detalhes existentes na vista
-  (não duplica). Para ajustar só um símbolo, use **Editar** sobre ele.
+  (não duplica). Para ajustar só um símbolo, use **Editar** sobre ele. A chamada pode ser **reta**,
+  com **cotovelo horizontal** ou **livre**, com terminal em **ponto** ou **seta**, e o número pode ir
+  num **balão** acima do símbolo.
+* **Mover Chamada de Placa**: leve o símbolo **para onde quiser** e desenhe a linha de chamada
+  clicando os vértices (ESC termina) – ou só redesenhe a linha, mude a **ponta** da chamada (para
+  apontar para a face da placa, o poste etc.) ou volte à chamada automática. Tudo fica relativo ao
+  suporte: movendo a placa, o detalhe acompanha.
+* **Cotar Seção** (refeito): cadeia de cotas com **nome de cada trecho** (calçada, meio-fio, faixa de
+  rolamento, ciclofaixa, faixa de ônibus, faixa de caminhada, canteiro, estacionamento, zebrado),
+  **eixo da via** em traço-ponto com a inscrição EIXO (opcionalmente dividindo as cotas em
+  meias-larguras), **cota total**, **marcas de corte** nas pontas (letra no círculo + seta do sentido de
+  observação) e título **SEÇÃO A–A (cotas em metros)**. Calçada e meio-fio encostados têm cada um sua
+  cota; as bordas de pinturas de fundo sob uma linha são absorvidas pelo eixo da linha. Terminal em
+  **traço 45°**, **seta** ou **ponto**; 1, 2 ou 3 casas decimais. A janela tem pré-visualização numa via
+  de exemplo.
+* **Detalhe Típico**: terminal das cotas (traço/seta/ponto), título sublinhado e moldura opcional.
+* **Quadro de Quantitativos**: coluna **ITEM** numerada por categoria (1.1, 1.2… 7.3), como em
+  planilha orçamentária.
+* **Notas Gerais**: **modelos de notas** prontos – geral, sinalização horizontal (tintas, microesferas
+  NBR 16184, retrorrefletância), sinalização vertical (NBR 14644, suportes, altura livre), acessibilidade
+  (NBR 9050/16537), obras (MBST Vol. VII) e urbanização – editáveis.
+* **Norte**: estilos *clássico*, *rosa dos ventos* (N, S, L, O) e *seta*.
 * **Anotar**: clique sobre qualquer sinalização (o ponto clicado recebe a chamada) e depois onde o
   texto deve ficar. O texto automático traz código e nome e, opcionalmente, detalhes (variante/
   largura da linha, barras e espaçamento do zebrado, dimensões da vaga, espaçamento dos
@@ -599,6 +636,24 @@ tipos e o controle escolhidos a todas as interseções do projeto.
 
 ## 20. Rotatórias
 
+**Tipos** (escolha em *Tipo de rotatória* – os valores de referência são aplicados e **tudo continua
+editável**):
+
+| Tipo | Uso | Referência de dimensões |
+|---|---|---|
+| **Mini-rotatória** | vias locais, baixa velocidade | ilha **galgável** (pintada/elevada 7 cm), Ø inscrito ≈ 14–25 m |
+| **Compacta** | vias locais/coletoras | 1 faixa, ilha pequena com faixa galgável |
+| **1 faixa** | coletoras | Ø inscrito ≈ 30–40 m |
+| **2 faixas** | arteriais | 2 faixas no anel, LMS entre elas |
+| **Turbo-rotatória** | arteriais com fluxo alto | 2 faixas com **divisores físicos** (sem troca de faixa no anel) |
+| **Oval (alongada)** | nós alongados/assimétricos | ilha elíptica (alongamento e ângulo livres) |
+| **Com by-pass** | conversão à direita livre | faixa de by-pass (largura e raio) com ilhas separadoras |
+| **Personalizada** | qualquer | todos os parâmetros livres |
+
+Parâmetros adicionais: tipo da ilha (**ajardinada**, **pavimentada** ou **galgável**), altura da faixa
+galgável, **raios de entrada e de saída** separados, largura dos divisores, largura/raio do by-pass,
+distância e largura das **travessias**, número de **árvores**. A janela mostra o **diâmetro inscrito**.
+
 **Via → Rotatória**: clique o centro (o ponto é encaixado no cruzamento de vias mais próximo). Os ramos
 são detectados das vias que passam pelo centro (ou informados por ângulo, para uma rotatória isolada).
 Parâmetros: raio da **ilha central** (ajardinada, com árvores opcionais), **faixa galgável** em bloquete
@@ -625,6 +680,26 @@ rotatória); também pode ser criada direto na conexão (**Nova Via → Rotatór
 
 Os rebaixamentos (rampas) também usam placas com relevo acompanhando a inclinação. Confira dimensões e
 distribuição com a ABNT NBR 16537 vigente.
+
+## 22.1 Famílias do Revit como elementos urbanos
+
+**Via → Elementos Urbanos → Famílias do Revit**: use **suas próprias famílias de componente** (mobiliário,
+luminárias, plantio, modelo genérico, equipamentos…) com o design que quiser:
+
+* escolha a família carregada (ou **carregue um .rfa**), a **subcategoria urbana** (sugerida pelo nome:
+  iluminação, arborização, bancos, lixeiras, abrigos, paraciclos, segurança, comunicação, infraestrutura,
+  lazer, acessibilidade), o **código no quantitativo** (ex.: POSTE-LED), a descrição e a hierarquia viária;
+* **insira por cliques** (ponto + sentido para onde fica voltado, rotação adicional) ou **distribua ao longo
+  de linhas/bordas** (espaçamento, afastamento lateral, recuos, nos dois lados e em quincôncio);
+* os elementos são **assentados sobre a topografia/pisos** (opcional) com elevação adicional;
+* **Classificar famílias já inseridas**: selecione instâncias existentes e elas passam a contar no
+  quantitativo.
+
+As instâncias recebem os parâmetros SV_* (SV_Categoria = 7. Mobiliário e elementos urbanos, SV_Grupo =
+subcategoria, SV_Codigo, SV_Descricao, SV_Hierarquia), que podem ser editados na paleta Propriedades.
+No **Quantitativo** elas aparecem na categoria 7, na subcategoria escolhida, contadas por código com a
+lista dos tipos usados. Famílias baseadas em nível ou em plano de trabalho podem ser inseridas por ponto;
+as hospedadas (em face/parede) podem ser inseridas pelo Revit e depois classificadas.
 
 ## 22. Mobiliário, árvores e placas sobre a calçada
 

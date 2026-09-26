@@ -74,12 +74,13 @@ public static class RibbonBuilder
         var vert = app.CreateRibbonPanel(TabName, "Sinalização Vertical");
         Split(vert, "SvPlacas", "Placas",
             Data(typeof(CmdPlacas), "Placas", "placa", "Placas de regulamentação, advertência, indicação, educativas, turísticas e de obras, com suporte – em 3D."),
-            Data(typeof(CmdDetalharPlacas), "Detalhar Placas", "detalheplaca", "Placa ampliada ao lado do suporte, com chamada e código/nome."),
+            Data(typeof(CmdDetalharPlacas), "Detalhar Placas", "detalheplaca", "Placa ampliada ao lado do suporte, com chamada (reta, cotovelo ou livre), código/nome e número em balão."),
+            Data(typeof(CmdMoverChamadaPlaca), "Mover Chamada de Placa", "detalheplaca", "Leve o símbolo detalhado para onde quiser e desenhe a linha de chamada clicando os vértices – ou mude a ponta da chamada."),
             Data(typeof(CmdQuadroPlacas), "Quadro de Placas", "quadroplacas", "Símbolo, numeração, código, descrição, dimensões e quantidade de cada placa."),
             Data(typeof(CmdQuadroLegenda), "Quadro de Legenda", "quadrolegenda", "Legenda das placas do projeto, com desenho e descrição."));
-        Split(vert, "SvSegregacao", "Segregação",
-            Data(typeof(CmdDispositivos), "Bloqueios Físicos", "bloqueio", "Tartarugas, tachões, balizadores, cilindros, pilaretes, New Jersey, separadores..."),
-            Data(typeof(CmdGuardRail), "Guard Rail", "guardrail", "Defensas metálicas simples, duplas e de cabos."));
+        Large(vert, typeof(CmdDispositivos), "Bloqueios Físicos", "bloqueio",
+            "Todos os dispositivos físicos numa só ferramenta: segregadores e tachões, balizadores, pilaretes e frades, New Jersey, " +
+            "defensas metálicas (guard rail simples, dupla e de cabos), gradis, floreiras e canalização provisória de obras.");
 
         // ---------------------------------------------------------------- Detalhamento e quantitativos
         var det = app.CreateRibbonPanel(TabName, "Detalhamento");

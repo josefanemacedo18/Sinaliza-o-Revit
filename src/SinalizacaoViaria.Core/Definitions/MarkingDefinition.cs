@@ -805,10 +805,28 @@ public sealed class SignPlanDetailDefinition : MarkingDefinition, IAnnotationDef
     /// <summary>Número da placa no projeto (ex.: P01) – aparece no símbolo e no quadro de placas.</summary>
     public string? Number { get; set; }
 
+    /// <summary>Traçado da linha de chamada: reta, com cotovelo horizontal ou livre (vértices clicados).</summary>
+    public EstiloChamada LeaderStyle { get; set; } = EstiloChamada.Reta;
+    /// <summary>Terminal da chamada junto ao suporte.</summary>
+    public TerminalChamada Terminal { get; set; } = TerminalChamada.Ponto;
+    /// <summary>Vértices da chamada livre, em mm de papel relativos ao suporte (acompanham a placa).</summary>
+    public List<Vec2> ElbowsMm { get; set; } = new();
+    /// <summary>Ponta da chamada em relação ao suporte (mm de papel) – permite apontar para outro ponto.</summary>
+    public Vec2 AnchorMm { get; set; }
+    /// <summary>Número dentro de um balão ao lado do símbolo (além do texto).</summary>
+    public bool NumberBubble { get; set; }
+
     public string? TargetId => SignId;
     public override string KindName => "Detalhe de placa";
     public override string DisplayCode => "DET-PLACA";
 }
+
+public enum EstiloChamada { Reta, Cotovelo, Livre }
+
+/// <summary>Terminal das linhas de cota.</summary>
+public enum TerminalCota { Traco, Seta, Ponto }
+
+public enum TerminalChamada { Ponto, Seta, Nenhum }
 
 /// <summary>Anotação com linha de chamada para qualquer sinalização.</summary>
 public sealed class LabelDefinition : MarkingDefinition, IAnnotationDefinition
@@ -866,6 +884,16 @@ public sealed class SectionDimensionDefinition : MarkingDefinition, IProjectWide
     public bool Total { get; set; } = true;
     public bool Horizontal { get; set; } = true;
     public bool Physical { get; set; } = true;
+    /// <summary>Nome de cada trecho (calçada, faixa de rolamento, ciclofaixa, canteiro...) junto à cota.</summary>
+    public bool Labels { get; set; } = true;
+    /// <summary>Letra do corte (A → "SEÇÃO A–A" com marcas nas pontas). Vazio = sem marcas nem título.</summary>
+    public string SectionLetter { get; set; } = "A";
+    /// <summary>Marca o eixo da via (linha traço-ponto) onde a seção cruza o eixo.</summary>
+    public bool AxisMarker { get; set; } = true;
+    /// <summary>Divide a cadeia de cotas no eixo da via (meias-larguras).</summary>
+    public bool SplitAtAxis { get; set; }
+    public TerminalCota Terminal { get; set; } = TerminalCota.Traco;
+    public int Decimals { get; set; } = 2;
 
     public string? TargetId => null;
     public override void Translate(Vec2 delta, double dz) { Start += delta; End += delta; }
@@ -883,6 +911,9 @@ public sealed class TypicalDetailDefinition : MarkingDefinition, IAnnotationDefi
     public double DetailScale { get; set; } = 20;
     public double TextMm { get; set; } = 2.0;
     public string? Title { get; set; }
+    public TerminalCota Terminal { get; set; } = TerminalCota.Traco;
+    /// <summary>Moldura em volta do detalhe.</summary>
+    public bool FrameBox { get; set; } = true;
 
     public string? TargetId => MarkingTargetId;
     public override void Translate(Vec2 delta, double dz) => Position += delta;
@@ -940,12 +971,15 @@ public sealed class NorthArrowDefinition : MarkingDefinition, IAnnotationDefinit
     public double SizeMm { get; set; } = 16;
     /// <summary>Ângulo do norte em relação ao eixo Y do projeto (graus, anti-horário).</summary>
     public double AngleDeg { get; set; }
+    public EstiloNorte Style { get; set; } = EstiloNorte.Classico;
 
     public string? TargetId => null;
     public override void Translate(Vec2 delta, double dz) => Position += delta;
     public override string KindName => "Norte";
     public override string DisplayCode => "NORTE";
 }
+
+public enum EstiloNorte { Classico, RosaDosVentos, Seta }
 
 public enum TipoPavimento
 {

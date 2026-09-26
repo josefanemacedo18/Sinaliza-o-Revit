@@ -66,15 +66,15 @@ public static partial class DetailGenerator
         var hx = (mx.X - mn.X) * k / 2;
         var hy = (mx.Y - mn.Y) * k / 2;
         var post = sign.Position;
-        if (d.Leader && post.DistanceTo(center) > Math.Max(hx, hy) * 1.05)
+        if (d.Leader) AddLeader(geo, ctx, post + d.AnchorMm * ctx.Mm(1), center, hx, hy, d.LeaderStyle,
+                d.LeaderStyle == EstiloChamada.Livre ? d.ElbowsMm.Select(e => post + e * ctx.Mm(1)).ToList() : new List<Vec2>(), d.Terminal);
+        if (d.NumberBubble && !string.IsNullOrWhiteSpace(d.Number))
         {
-            var dotR = ctx.Mm(0.6);
-            geo.Pieces.Add(new MarkingPiece(new Polygon2(CurveTools.Circle(post, dotR, dotR * 0.05)), MarkingColor.Vermelha));
-            var v = post - center;
-            var t = Math.Min(Math.Abs(v.X) < 1e-9 ? double.MaxValue : hx / Math.Abs(v.X), Math.Abs(v.Y) < 1e-9 ? double.MaxValue : hy / Math.Abs(v.Y));
-            var edge = center + v * Math.Min(1, t);
-            var start = post - v.Normalized() * dotR;
-            geo.Annotations.Add(new AnnotationLine(new[] { start, edge }, MarkingColor.Vermelha));
+            // Balão com o número acima do símbolo (padrão de pranchas de sinalização).
+            var r = Math.Max(ctx.Mm(Math.Max(2.2, d.TextMm * 1.4)), DetailGenerator.TextWidth(d.Number!, d.TextMm, ctx) / 2 + ctx.Mm(1.0));
+            var bc = center + new Vec2(0, hy + r + ctx.Mm(1));
+            geo.Annotations.Add(new AnnotationLine(CurveTools.Circle(bc, r, r * 0.02).Append(CurveTools.Circle(bc, r, r * 0.02)[0]).ToList(), MarkingColor.Preta));
+            geo.Annotations.Add(new AnnotationText(bc + new Vec2(0, ctx.Mm(d.TextMm) / 2), d.Number!, d.TextMm, TextAlign.Center));
         }
         if (d.Label)
         {
@@ -88,6 +88,64 @@ public static partial class DetailGenerator
                 side > 0 ? TextAlign.Left : TextAlign.Right));
         }
         return geo;
+    }
+
+    /// <summary>
+    /// Linha de chamada do suporte (<paramref name="tip"/>) até a borda do símbolo, reta, com cotovelo horizontal
+    /// ou passando pelos vértices dados, com terminal (ponto ou seta) na ponta.
+    /// </summary>
+    public static void AddLeader(MarkingGeometry geo, BuildContext ctx, Vec2 tip, Vec2 center, double hx, double hy, EstiloChamada style,
+        IReadOnlyList<Vec2> elbows, TerminalChamada terminal)
+    {
+        if (tip.DistanceTo(center) <= Math.Max(hx, hy) * 1.05 && elbows.Count == 0) return;
+        Vec2 Edge(Vec2 from)
+        {
+            var v = from - center;
+            if (v.Length < 1e-9) return center;
+            var t = Math.Min(Math.Abs(v.X) < 1e-9 ? double.MaxValue : hx / Math.Abs(v.X), Math.Abs(v.Y) < 1e-9 ? double.MaxValue : hy / Math.Abs(v.Y));
+            return center + v * Math.Min(1, t);
+        }
+        var pts = new List<Vec2> { tip };
+        switch (style)
+        {
+            case EstiloChamada.Cotovelo:
+            {
+                var side = tip.X >= center.X ? 1.0 : -1.0;
+                var landing = center + new Vec2(side * hx, 0);
+                var elbow = landing + new Vec2(side * ctx.Mm(4), 0);
+                // Suporte muito próximo em X: cotovelo vertical (sobe/desce e entra pela lateral).
+                if (Math.Abs(tip.X - center.X) < hx + ctx.Mm(4)) elbow = new Vec2(elbow.X, tip.Y);
+                pts.Add(elbow);
+                pts.Add(landing);
+                break;
+            }
+            case EstiloChamada.Livre when elbows.Count > 0:
+                pts.AddRange(elbows);
+                pts.Add(Edge(elbows[^1]));
+                break;
+            default:
+                pts.Add(Edge(tip));
+                break;
+        }
+        var dotR = ctx.Mm(0.6);
+        var dir = (pts[1] - pts[0]).Normalized();
+        switch (terminal)
+        {
+            case TerminalChamada.Ponto:
+                geo.Pieces.Add(new MarkingPiece(new Polygon2(CurveTools.Circle(tip, dotR, dotR * 0.05)), MarkingColor.Vermelha));
+                pts[0] = tip + dir * dotR;
+                break;
+            case TerminalChamada.Seta:
+            {
+                var len = ctx.Mm(2.2);
+                var half = ctx.Mm(0.7);
+                var n = dir.PerpLeft;
+                geo.Pieces.Add(new MarkingPiece(new Polygon2(new[] { tip, tip + dir * len + n * half, tip + dir * len - n * half }), MarkingColor.Vermelha));
+                pts[0] = tip + dir * len * 0.9;
+                break;
+            }
+        }
+        geo.Annotations.Add(new AnnotationLine(pts, MarkingColor.Vermelha));
     }
 
     // ------------------------------------------------------------------ anotações

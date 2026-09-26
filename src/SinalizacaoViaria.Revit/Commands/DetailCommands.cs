@@ -90,6 +90,114 @@ public sealed class CmdDetalharPlacas : CommandBase
     }
 }
 
+/// <summary>
+/// Leva o símbolo de uma placa detalhada para qualquer posição e desenha a linha de chamada por onde quiser
+/// (vértices clicados), ou muda a ponta da chamada. Tudo fica relativo ao suporte: se a placa for movida, o detalhe acompanha.
+/// </summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdMoverChamadaPlaca : CommandBase
+{
+    protected override Result Run(UIApplication app, UIDocument uidoc)
+    {
+        var doc = uidoc.Document;
+        var view = DetailHelpers.RequireDetailView(uidoc);
+        var mm = view.Scale / 1000.0;
+        var all = MarkingStorage.Definitions(doc);
+        var details = all.OfType<SignPlanDetailDefinition>().Where(d => d.Output.ViewId == view.UniqueId).ToList();
+        if (details.Count == 0) throw new UserMessageException("Nenhum detalhe de placa nesta vista. Use 'Detalhar Placas' primeiro.");
+
+        var td = new TaskDialog(AppTitle)
+        {
+            MainInstruction = "Mover chamada de placa",
+            MainContent = "Clique depois no símbolo detalhado (ou na própria placa). A posição e os vértices ficam relativos ao suporte.",
+        };
+        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Mover o símbolo e desenhar a chamada",
+            "Clique a nova posição do símbolo e, em seguida, os vértices da linha de chamada (ESC termina; sem vértices = reta).");
+        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Só redesenhar a chamada", "Mantém o símbolo e clica os vértices da linha (ESC termina).");
+        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Mudar a ponta da chamada", "Clique o ponto para onde a chamada deve apontar (ex.: face da placa, poste).");
+        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink4, "Voltar à chamada automática", "Chamada reta, ponta no suporte.");
+        var choice = td.Show();
+        if (choice is not (TaskDialogResult.CommandLink1 or TaskDialogResult.CommandLink2 or TaskDialogResult.CommandLink3 or TaskDialogResult.CommandLink4))
+            return Result.Cancelled;
+
+        var results = new List<RenderResult>();
+        while (true)
+        {
+            Reference picked;
+            try
+            {
+                picked = uidoc.Selection.PickObject(ObjectType.Element, new MarkingSelectionFilter(), "Clique no símbolo detalhado (ou na placa) – ESC encerra");
+            }
+            catch (Autodesk.Revit.Exceptions.OperationCanceledException)
+            {
+                break;
+            }
+            var rec = MarkingStorage.Read(doc.GetElement(picked));
+            var detail = rec?.Definition switch
+            {
+                SignPlanDetailDefinition sd => details.FirstOrDefault(d => d.Id == sd.Id),
+                SignDefinition sign => details.FirstOrDefault(d => d.SignId == sign.Id),
+                _ => null,
+            };
+            if (detail == null) { TaskDialog.Show(AppTitle, "Esse elemento não é uma placa detalhada nesta vista."); continue; }
+            if (all.FirstOrDefault(x => x.Id == detail.SignId) is not SignDefinition post) continue;
+            Vec2 Rel(XYZ p) => (DetailHelpers.ToCore(p) - post.Position) / mm;
+
+            var d = (SignPlanDetailDefinition)MarkingDefinition.FromJson(detail.ToJson())!;
+            switch (choice)
+            {
+                case TaskDialogResult.CommandLink1:
+                {
+                    var p = Picking.PickPoint(uidoc, $"{d.Number ?? "Placa"}: clique a nova posição do centro do símbolo");
+                    if (p == null) continue;
+                    d.OffsetMm = Rel(p);
+                    d.ElbowsMm = PickElbows(uidoc, Rel);
+                    d.LeaderStyle = d.ElbowsMm.Count > 0 ? EstiloChamada.Livre : d.LeaderStyle == EstiloChamada.Livre ? EstiloChamada.Reta : d.LeaderStyle;
+                    d.Leader = true;
+                    break;
+                }
+                case TaskDialogResult.CommandLink2:
+                    d.ElbowsMm = PickElbows(uidoc, Rel);
+                    d.LeaderStyle = d.ElbowsMm.Count > 0 ? EstiloChamada.Livre : EstiloChamada.Reta;
+                    d.Leader = true;
+                    break;
+                case TaskDialogResult.CommandLink3:
+                {
+                    var p = Picking.PickPoint(uidoc, "Clique a ponta da chamada");
+                    if (p == null) continue;
+                    d.AnchorMm = Rel(p);
+                    d.Leader = true;
+                    break;
+                }
+                default:
+                    d.ElbowsMm.Clear();
+                    d.AnchorMm = Vec2.Zero;
+                    d.LeaderStyle = EstiloChamada.Reta;
+                    d.Leader = true;
+                    break;
+            }
+            results.AddRange(MarkingCreator.Commit(uidoc, new[] { d }, "SV - Mover chamada de placa"));
+            var i = details.FindIndex(x => x.Id == d.Id);
+            if (i >= 0) details[i] = d;
+        }
+        if (results.Count == 0) return Result.Cancelled;
+        Report("Chamadas de placa", results.Where(r => r.Warnings.Count > 0).ToList());
+        return Result.Succeeded;
+    }
+
+    private static List<Vec2> PickElbows(UIDocument uidoc, Func<XYZ, Vec2> rel)
+    {
+        var res = new List<Vec2>();
+        while (res.Count < 12)
+        {
+            var p = Picking.PickPoint(uidoc, $"Vértice {res.Count + 1} da chamada, do suporte para o símbolo (ESC termina)");
+            if (p == null) break;
+            res.Add(rel(p));
+        }
+        return res;
+    }
+}
+
 /// <summary>Anotação com linha de chamada e texto automático para qualquer sinalização.</summary>
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdAnotar : CommandBase

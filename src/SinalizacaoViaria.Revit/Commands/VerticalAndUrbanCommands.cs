@@ -147,16 +147,3 @@ public sealed class CmdAreaConflito : CommandBase
     protected override Result Run(UIApplication app, UIDocument uidoc) => CmdZebrado.RunWith(uidoc, "MAC");
 }
 
-/// <summary>Atalho: guard rail / defensas.</summary>
-[Transaction(TransactionMode.Manual)]
-public sealed class CmdGuardRail : CommandBase
-{
-    protected override Result Run(UIApplication app, UIDocument uidoc)
-    {
-        var w = new DeviceWindow(null, "DEF");
-        if (UiHelpers.ShowModal(w) != true || w.Result == null) return Result.Cancelled;
-        PluginContext.SaveSettings();
-        EnsureDetailView(uidoc, w.Result.Output);
-        return MarkingCreator.CreateAlongPath(uidoc, w.Result, w.PathMode, w.Result.Code);
-    }
-}

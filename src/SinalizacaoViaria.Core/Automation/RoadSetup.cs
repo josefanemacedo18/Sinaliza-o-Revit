@@ -399,7 +399,9 @@ public sealed class RoadSetup
 
                 // Linha na divisa interna (entre o elemento anterior e este)
                 if (i > 0) BoundaryLine(side[i - 1], e, a, sigma);
-                if (!string.IsNullOrWhiteSpace(e.Dispositivo))
+                // Um único dispositivo por alinhamento (evita bloqueios/defensas sobrepostos na mesma divisa).
+                if (!string.IsNullOrWhiteSpace(e.Dispositivo)
+                    && !res.OfType<DeviceMarkingDefinition>().Any(x => string.Equals(x.Code, e.Dispositivo, StringComparison.OrdinalIgnoreCase) && Math.Abs(x.Offset - sigma * a) < 0.05))
                     Add(new DeviceMarkingDefinition { Code = e.Dispositivo!, Offset = sigma * a, StartSetback = StartSetback, EndSetback = EndSetback });
 
                 switch (e.Tipo)

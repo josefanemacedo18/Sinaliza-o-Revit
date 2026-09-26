@@ -41,7 +41,7 @@ public static partial class DetailGenerator
     /// para o lado <paramref name="side"/>, linhas de chamada, tiques a 45° e texto centralizado.
     /// </summary>
     public static void Dimension(MarkingGeometry geo, BuildContext ctx, Vec2 a, Vec2 b, Vec2 side, double offset, string text, double textMm,
-        double textShift = 0, bool extension = true)
+        double textShift = 0, bool extension = true, TerminalCota terminal = TerminalCota.Traco)
     {
         var len = a.DistanceTo(b);
         if (len < 1e-4) return;
@@ -56,10 +56,37 @@ public static partial class DetailGenerator
             geo.Annotations.Add(new AnnotationLine(new[] { a + n * gap * Math.Sign(offset), pa + n * over * Math.Sign(offset) }, MarkingColor.Preta));
             geo.Annotations.Add(new AnnotationLine(new[] { b + n * gap * Math.Sign(offset), pb + n * over * Math.Sign(offset) }, MarkingColor.Preta));
         }
-        geo.Annotations.Add(new AnnotationLine(new[] { pa - u * over, pb + u * over }, MarkingColor.Preta));
-        var tick = (u + n).Normalized() * ctx.Mm(1.2);
-        geo.Annotations.Add(new AnnotationLine(new[] { pa - tick, pa + tick }, MarkingColor.Preta));
-        geo.Annotations.Add(new AnnotationLine(new[] { pb - tick, pb + tick }, MarkingColor.Preta));
+        switch (terminal)
+        {
+            case TerminalCota.Seta:
+            {
+                // Setas cheias para dentro (ou para fora, com a linha prolongada, quando o trecho é curto).
+                var al = ctx.Mm(2.0);
+                var aw = ctx.Mm(0.55);
+                var inside = len > 2.6 * al;
+                var d = inside ? u : -u;
+                geo.Pieces.Add(new MarkingPiece(new Polygon2(new[] { pa, pa + d * al + n * aw, pa + d * al - n * aw }), MarkingColor.Preta));
+                geo.Pieces.Add(new MarkingPiece(new Polygon2(new[] { pb, pb - d * al + n * aw, pb - d * al - n * aw }), MarkingColor.Preta));
+                geo.Annotations.Add(new AnnotationLine(inside ? new[] { pa, pb } : new[] { pa - u * al * 1.6, pb + u * al * 1.6 }, MarkingColor.Preta));
+                break;
+            }
+            case TerminalCota.Ponto:
+            {
+                var r = ctx.Mm(0.45);
+                geo.Pieces.Add(new MarkingPiece(new Polygon2(CurveTools.Circle(pa, r, r * 0.05)), MarkingColor.Preta));
+                geo.Pieces.Add(new MarkingPiece(new Polygon2(CurveTools.Circle(pb, r, r * 0.05)), MarkingColor.Preta));
+                geo.Annotations.Add(new AnnotationLine(new[] { pa - u * over, pb + u * over }, MarkingColor.Preta));
+                break;
+            }
+            default:
+            {
+                geo.Annotations.Add(new AnnotationLine(new[] { pa - u * over, pb + u * over }, MarkingColor.Preta));
+                var tick = (u + n).Normalized() * ctx.Mm(1.2);
+                geo.Annotations.Add(new AnnotationLine(new[] { pa - tick, pa + tick }, MarkingColor.Preta));
+                geo.Annotations.Add(new AnnotationLine(new[] { pb - tick, pb + tick }, MarkingColor.Preta));
+                break;
+            }
+        }
 
         var rot = Readable(u);
         var up = Vec2.FromAngle(rot + Math.PI / 2);
@@ -116,14 +143,21 @@ public static partial class DetailGenerator
         return physical ? sd.Physical : sd.Horizontal;
     }
 
-    /// <summary>Estações (m ao longo de a→b) das bordas/eixos dos elementos cortados pela seção.</summary>
+    /// <summary>
+    /// Estações (m ao longo de a→b) das bordas/eixos dos elementos cortados pela seção. Cada elemento é tratado à parte
+    /// (calçada e meio-fio encostados têm cada um a sua cota); linhas estreitas são cotadas pelo eixo e as bordas de
+    /// pinturas de fundo que ficam sob uma linha são absorvidas pelo eixo dela.
+    /// </summary>
     public static List<double> SectionStations(SectionDimensionDefinition sd, IEnumerable<MarkingGeometry> geometries)
     {
         var a = sd.Start;
         var b = sd.End;
         var L = a.DistanceTo(b);
-        var intervals = new List<(double, double)>();
+        var edges = new List<double>();
+        var axes = new List<(double S, double Half)>();
         foreach (var g in geometries)
+        {
+            var intervals = new List<(double, double)>();
             foreach (var p in g.Pieces)
             {
                 if (MarkingColors.IsPavement(p.Color) || p.Elevation > 0.5) continue;   // pavimento e volumes altos (árvores, placas) não definem cotas
@@ -131,20 +165,25 @@ public static partial class DetailGenerator
                 if (Math.Max(a.X, b.X) < mn.X || Math.Min(a.X, b.X) > mx.X || Math.Max(a.Y, b.Y) < mn.Y || Math.Min(a.Y, b.Y) > mx.Y) continue;
                 intervals.AddRange(SegmentIntervals(p.Shape, a, b).Select(i => (i.T0 * L, i.T1 * L)));
             }
-        // Une intervalos sobrepostos/encostados (peças da mesma faixa).
-        var merged = new List<(double S0, double S1)>();
-        foreach (var iv in intervals.OrderBy(i => i.Item1))
-        {
-            if (merged.Count > 0 && iv.Item1 <= merged[^1].S1 + 0.01) merged[^1] = (merged[^1].S0, Math.Max(merged[^1].S1, iv.Item2));
-            else merged.Add(iv);
+            // Une intervalos sobrepostos/encostados do MESMO elemento (peças da mesma faixa).
+            var merged = new List<(double S0, double S1)>();
+            foreach (var iv in intervals.OrderBy(i => i.Item1))
+            {
+                if (merged.Count > 0 && iv.Item1 <= merged[^1].S1 + 0.01) merged[^1] = (merged[^1].S0, Math.Max(merged[^1].S1, iv.Item2));
+                else merged.Add(iv);
+            }
+            // Só linhas PINTADAS são cotadas pelo eixo (meio-fio estreito é elemento físico: bordas).
+            var paint = g.Pieces.Count > 0 && g.Pieces.All(p => MarkingColors.IsPaint(p.Color));
+            foreach (var (s0, s1) in merged)
+            {
+                if (paint && sd.LineAxes && s1 - s0 <= sd.AxisMaxWidth) axes.Add(((s0 + s1) / 2, (s1 - s0) / 2));
+                else { edges.Add(s0); edges.Add(s1); }
+            }
         }
         var st = new List<double>();
         if (sd.IncludeEnds) { st.Add(0); st.Add(L); }
-        foreach (var (s0, s1) in merged)
-        {
-            if (sd.LineAxes && s1 - s0 <= sd.AxisMaxWidth) st.Add((s0 + s1) / 2);
-            else { st.Add(s0); st.Add(s1); }
-        }
+        st.AddRange(axes.Select(x => x.S));
+        st.AddRange(edges.Where(e => !axes.Any(x => Math.Abs(e - x.S) <= x.Half + 0.02)));
         st = st.Where(s => s >= -1e-6 && s <= L + 1e-6).OrderBy(s => s).ToList();
         var res = new List<double>();
         foreach (var s in st)
@@ -160,29 +199,215 @@ public static partial class DetailGenerator
         var L = a.DistanceTo(b);
         if (L < 0.2) { geo.Warnings.Add("Linha de seção muito curta."); return geo; }
         var defs = ctx.AllDefinitions?.Invoke() ?? Array.Empty<MarkingDefinition>();
-        var geos = defs.Where(d => SectionIncludes(d, sd)).Select(d => ctx.GeometryOf?.Invoke(d)).Where(g => g != null).Cast<MarkingGeometry>();
-        var st = SectionStations(sd, geos);
+        var withGeo = defs.Select(d => (Def: d, Geo: SectionIncludes(d, sd) || IsPavement(d) ? ctx.GeometryOf?.Invoke(d) : null))
+            .Where(x => x.Geo != null).Select(x => (x.Def, Geo: x.Geo!)).ToList();
+        var st = SectionStations(sd, withGeo.Where(x => SectionIncludes(x.Def, sd)).Select(x => x.Geo));
         if (st.Count < 2) { geo.Warnings.Add("Nenhum elemento cortado pela linha de seção."); return geo; }
 
         var u = (b - a) / L;
         var n = u.PerpLeft * Math.Sign(sd.OffsetMm == 0 ? 1 : sd.OffsetMm);
         var off = ctx.Mm(Math.Abs(sd.OffsetMm));
         Vec2 P(double s) => a + u * s;
+        var fmt = "0." + new string('0', Math.Clamp(sd.Decimals, 0, 3));
+        if (sd.Decimals <= 0) fmt = "0";
+
+        // Eixo(s) de via cruzados pela seção.
+        var axes = new List<double>();
+        if (sd.AxisMarker || sd.SplitAtAxis)
+            foreach (var d in defs.OfType<RoadPavementDefinition>())
+                if (ctx.PathOf?.Invoke(d) is { } path)
+                    foreach (var t in Crossings(path, a, b)) if (!axes.Any(x => Math.Abs(x - t * L) < 0.05)) axes.Add(t * L);
+        if (sd.SplitAtAxis)
+        {
+            foreach (var s0 in axes) if (!st.Any(x => Math.Abs(x - s0) < 0.02)) st.Add(s0);
+            st.Sort();
+        }
+
         var stagger = false;
+        var labelMm = sd.TextMm * 0.8;
         for (int i = 0; i + 1 < st.Count; i++)
         {
             var len = st[i + 1] - st[i];
-            var text = F(len);
+            var text = len.ToString(fmt, Pt);
             var fits = TextWidth(text, sd.TextMm, ctx) < len * 0.9;
             stagger = !fits && !stagger;
-            Dimension(geo, ctx, P(st[i]), P(st[i + 1]), n, off, text, sd.TextMm, fits || !stagger ? 0 : sd.TextMm * 1.4);
+            Dimension(geo, ctx, P(st[i]), P(st[i + 1]), n, off, text, sd.TextMm, fits || !stagger ? 0 : sd.TextMm * 1.4, terminal: sd.Terminal);
+            if (!sd.Labels) continue;
+            // Nome do trecho entre a linha de seção e a linha de cota (só quando cabe).
+            var name = SectionLabel(withGeo, P((st[i] + st[i + 1]) / 2), len);
+            if (name == null) continue;
+            var lines = TextWidth(name, labelMm, ctx) < len * 0.92 ? name
+                : name.Contains(' ') && name.Split(' ').Max(w => TextWidth(w, labelMm, ctx)) < len * 0.92 ? WrapToWidth(name, len * 0.92, labelMm, ctx) : null;
+            if (lines == null) continue;
+            var rot = Readable(u);
+            var up = Vec2.FromAngle(rot + Math.PI / 2);
+            if (up.Dot(n) < 0) up = -up;
+            var nl = lines.Split('\n').Length;
+            // Texto logo abaixo da linha de cota (entre ela e a seção).
+            var mid = P((st[i] + st[i + 1]) / 2) + n * off - up * ctx.Mm(1.0);
+            if (off > ctx.Mm(labelMm * 1.6 * nl + 2)) geo.Annotations.Add(new AnnotationText(mid, lines, labelMm) { Rotation = rot });
         }
+        var totalOff = off + ctx.Mm(sd.TextMm * 3.2 + 2);
         if (sd.Total && st.Count > 2)
-            Dimension(geo, ctx, P(st[0]), P(st[^1]), n, off + ctx.Mm(sd.TextMm * 3.2 + 2), F(st[^1] - st[0]), sd.TextMm);
+            Dimension(geo, ctx, P(st[0]), P(st[^1]), n, totalOff, (st[^1] - st[0]).ToString(fmt, Pt), sd.TextMm, terminal: sd.Terminal);
+        var outer = sd.Total && st.Count > 2 ? totalOff : off;
+
         // Linha de seção (traço fino) para referência.
         geo.Annotations.Add(new AnnotationLine(new[] { a, b }, MarkingColor.Vermelha));
+
+        // Eixo: linha traço-ponto atravessando a cadeia de cotas, com a inscrição "EIXO".
+        if (sd.AxisMarker)
+            foreach (var s0 in axes)
+            {
+                var from = P(s0) - n * ctx.Mm(4);
+                var to = P(s0) + n * (outer + ctx.Mm(3));
+                DashDot(geo, from, to, ctx);
+                var ang = Readable(n);
+                var upA = Vec2.FromAngle(ang + Math.PI / 2);
+                geo.Annotations.Add(new AnnotationText(from - n * ctx.Mm(1) + upA * ctx.Mm(sd.TextMm * 0.5), "EIXO", sd.TextMm * 0.85,
+                    n.Dot(Vec2.FromAngle(ang)) > 0 ? TextAlign.Right : TextAlign.Left) { Rotation = ang });
+            }
+
+        // Marcas de corte nas pontas (letra no círculo + seta do sentido de observação) e título.
+        var letter = (sd.SectionLetter ?? "").Trim().ToUpperInvariant();
+        if (letter.Length > 0)
+        {
+            var r = ctx.Mm(Math.Max(3.0, sd.TextMm * 1.6));
+            foreach (var (p0, dir) in new[] { (a, -u), (b, u) })
+            {
+                var c = p0 + dir * (r + ctx.Mm(3));
+                var circle = CurveTools.Circle(c, r, r * 0.02);
+                circle.Add(circle[0]);
+                geo.Annotations.Add(new AnnotationLine(circle, MarkingColor.Preta));
+                geo.Annotations.Add(new AnnotationLine(new[] { p0, c - dir * r }, MarkingColor.Preta));
+                geo.Annotations.Add(new AnnotationText(c + new Vec2(0, ctx.Mm(sd.TextMm * 1.3) / 2), letter, sd.TextMm * 1.3, TextAlign.Center));
+                // Seta cheia indicando o sentido de observação (para o lado oposto às cotas).
+                var tip = c - n * (r + ctx.Mm(3.2));
+                geo.Pieces.Add(new MarkingPiece(new Polygon2(new[] { tip, c - n * r + dir * ctx.Mm(1.4), c - n * r - dir * ctx.Mm(1.4) }), MarkingColor.Preta));
+            }
+            var titleRot = Readable(u);
+            var tUp = Vec2.FromAngle(titleRot + Math.PI / 2);
+            if (tUp.Dot(n) < 0) tUp = -tUp;
+            var title = $"SEÇÃO {letter}–{letter}";
+            var tMm = sd.TextMm * 1.5;
+            // Bloco de 2 linhas além da cota total: o topo do texto fica do lado de fora, o texto cresce em direção à seção.
+            var tPos = (a + b) / 2 + tUp * (outer + ctx.Mm(sd.TextMm * 1.6 + 6 + 2 * tMm * 1.45));
+            geo.Annotations.Add(new AnnotationText(tPos, title + "\n(cotas em metros)", tMm) { Rotation = titleRot });
+        }
         geo.UnitCount = st.Count - 1;
         return geo;
+    }
+
+    private static bool IsPavement(MarkingDefinition d) => d is RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition;
+
+    /// <summary>Parâmetros t ∈ [0,1] do segmento a→b onde ele cruza a polilinha.</summary>
+    public static List<double> Crossings(Polyline2 path, Vec2 a, Vec2 b)
+    {
+        var res = new List<double>();
+        var d1 = b - a;
+        for (int i = 0; i + 1 < path.Points.Count; i++)
+        {
+            var p = path.Points[i];
+            var d2 = path.Points[i + 1] - p;
+            var den = d1.Cross(d2);
+            if (Math.Abs(den) < 1e-12) continue;
+            var t = (p - a).Cross(d2) / den;
+            var s = (p - a).Cross(d1) / den;
+            if (t >= 0 && t <= 1 && s >= 0 && s <= 1) res.Add(t);
+        }
+        return res;
+    }
+
+    private static void DashDot(MarkingGeometry geo, Vec2 from, Vec2 to, BuildContext ctx)
+    {
+        var len = from.DistanceTo(to);
+        if (len < 1e-6) return;
+        var u = (to - from) / len;
+        var dash = ctx.Mm(4);
+        var gap = ctx.Mm(1);
+        var dot = ctx.Mm(0.4);
+        for (double s = 0; s < len; s += dash + gap + dot + gap)
+        {
+            geo.Annotations.Add(new AnnotationLine(new[] { from + u * s, from + u * Math.Min(len, s + dash) }, MarkingColor.Preta));
+            var ds = s + dash + gap;
+            if (ds < len) geo.Annotations.Add(new AnnotationLine(new[] { from + u * ds, from + u * Math.Min(len, ds + dot) }, MarkingColor.Preta));
+        }
+    }
+
+    private static string WrapToWidth(string text, double width, double textMm, BuildContext ctx)
+    {
+        var lines = new List<string>();
+        var line = "";
+        foreach (var w in text.Split(' '))
+        {
+            var cand = line.Length == 0 ? w : line + " " + w;
+            if (line.Length > 0 && TextWidth(cand, textMm, ctx) > width) { lines.Add(line); line = w; }
+            else line = cand;
+        }
+        if (line.Length > 0) lines.Add(line);
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>Nome do elemento cortado no ponto <paramref name="m"/> da seção (null = sem nome).</summary>
+    public static string? SectionLabel(IReadOnlyList<(MarkingDefinition Def, MarkingGeometry Geo)> items, Vec2 m, double width)
+    {
+        string? best = null;
+        var rank = int.MaxValue;
+        foreach (var (def, g) in items)
+        {
+            if (!g.Pieces.Any(p => p.Elevation <= 0.5 && p.Shape.Contains(m))) continue;
+            var (name, r) = def switch
+            {
+                LinearMarkingDefinition l => l.Code.ToUpperInvariant() switch
+                {
+                    "CALCADA" => ("Calçada", 1),
+                    "GRAMADO" => ("Faixa gramada", 1),
+                    "SARJETA" => ("Sarjeta", 1),
+                    "SARJETAO" => ("Sarjetão", 1),
+                    var c when c.StartsWith("MEIO-FIO") => ("Meio-fio", 1),
+                    "CIC-FD" => ("Ciclofaixa", 2),
+                    "FCA" => ("Faixa de caminhada", 2),
+                    "ONI-FD" => ("Faixa de ônibus", 2),
+                    _ => ((string)null!, int.MaxValue),
+                },
+                SidewalkAreaDefinition or CurbExtensionDefinition => ("Calçada", 1),
+                PlanterDefinition => ("Canteiro", 1),
+                DeviceMarkingDefinition => ("Segregador", 3),
+                HatchMarkingDefinition h => (h.Code.StartsWith("ZPA", StringComparison.OrdinalIgnoreCase) ? "Zebrado" : "Canalização", 3),
+                ParkingMarkingDefinition => ("Estacionamento", 3),
+                RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition => (width >= 2.2 ? "Faixa de rolamento" : width >= 0.8 ? "Pista" : null!, 9),
+                _ => ((string)null!, int.MaxValue),
+            };
+            if (name != null && r < rank) { best = name; rank = r; }
+        }
+        return best;
+    }
+
+    /// <summary>Via de exemplo (pontos, definições e geometrias) para a pré-visualização das cotas de seção.</summary>
+    public static (List<MarkingDefinition> Defs, Func<MarkingDefinition, MarkingGeometry?> Geometry, Func<MarkingDefinition, Polyline2?> Path) SectionSample()
+    {
+        var defs = new List<MarkingDefinition>();
+        var geos = new Dictionary<MarkingDefinition, MarkingGeometry>();
+        void Add(MarkingDefinition d, double y0, double y1, MarkingColor c, double elev = 0)
+        {
+            defs.Add(d);
+            if (!geos.TryGetValue(d, out var g)) geos[d] = g = new MarkingGeometry();
+            g.Pieces.Add(new MarkingPiece(Polygon2.Rectangle(new Vec2(0, y0), new Vec2(30, y1)), c) { Elevation = elev });
+        }
+        var road = new RoadPavementDefinition();
+        defs.Add(road);
+        geos[road] = new MarkingGeometry();
+        geos[road].Pieces.Add(new MarkingPiece(Polygon2.Rectangle(new Vec2(0, -5.3), new Vec2(30, 5.3)), MarkingColor.Asfalto));
+        Add(new LinearMarkingDefinition { Code = "CALCADA" }, 5.45, 8.45, MarkingColor.Concreto);
+        Add(new LinearMarkingDefinition { Code = "CALCADA" }, -8.45, -5.45, MarkingColor.Concreto);
+        Add(new LinearMarkingDefinition { Code = "MEIO-FIO" }, 5.3, 5.45, MarkingColor.Concreto);
+        Add(new LinearMarkingDefinition { Code = "MEIO-FIO" }, -5.45, -5.3, MarkingColor.Concreto);
+        Add(new LinearMarkingDefinition { Code = "CIC-FD" }, 3.5, 5.0, MarkingColor.Vermelha);
+        Add(new LinearMarkingDefinition { Code = "LBO" }, 3.3, 3.5, MarkingColor.Branca);
+        Add(new LinearMarkingDefinition { Code = "LFO-2" }, -0.05, 0.05, MarkingColor.Amarela);
+        Add(new LinearMarkingDefinition { Code = "LBO" }, -5.2, -5.1, MarkingColor.Branca);
+        var paths = new Dictionary<MarkingDefinition, Polyline2> { [road] = new(new[] { new Vec2(0, 0), new Vec2(30, 0) }) };
+        return (defs.Distinct().ToList(), d => geos.GetValueOrDefault(d), d => paths.GetValueOrDefault(d));
     }
 
     // ------------------------------------------------------------------ detalhe típico
@@ -271,7 +496,7 @@ public static partial class DetailGenerator
         foreach (var t in local.Annotations.OfType<AnnotationText>()) geo.Annotations.Add(t with { Position = W(t.Position) });
 
         foreach (var (a, b, side, offMm, text) in dims)
-            Dimension(geo, ctx, W(a), W(b), side, ctx.Mm(offMm), text, td.TextMm);
+            Dimension(geo, ctx, W(a), W(b), side, ctx.Mm(offMm), text, td.TextMm, terminal: td.Terminal);
 
         var right = W(mx).X;
         geo.Annotations.Add(new AnnotationText(new Vec2(td.Position.X + pad, td.Position.Y - ctx.Mm(2)), title, td.TextMm * 1.3, TextAlign.Left));
@@ -288,7 +513,10 @@ public static partial class DetailGenerator
             .Concat(geo.Pieces.Select(p => p.Shape.Bounds.Max.X)).DefaultIfEmpty(right).Max();
         var frameMax = new Vec2(Math.Max(Math.Max(right, drawnRight) + pad, td.Position.X + TextWidth(title, td.TextMm * 1.3, ctx) + 2 * pad), td.Position.Y);
         foreach (var note in notes) frameMax = new Vec2(Math.Max(frameMax.X, origin.X + TextWidth("• " + note, td.TextMm, ctx) + pad), frameMax.Y);
-        Frame(geo, frameMin, frameMax);
+        if (td.FrameBox) Frame(geo, frameMin, frameMax);
+        // Título sublinhado (padrão de prancha).
+        geo.Annotations.Add(new AnnotationLine(new[] { new Vec2(td.Position.X + pad, td.Position.Y - ctx.Mm(2) - titleH * 1.12),
+            new Vec2(td.Position.X + pad + TextWidth(title, td.TextMm * 1.3, ctx), td.Position.Y - ctx.Mm(2) - titleH * 1.12) }, MarkingColor.Preta));
         geo.UnitCount = 1;
         return geo;
     }
@@ -414,8 +642,8 @@ public static partial class DetailGenerator
         }
         else
         {
-            headers = new[] { "CÓDIGO", "DESCRIÇÃO", "UN.", "QUANTIDADE" };
-            aligns = new[] { TextAlign.Center, TextAlign.Left, TextAlign.Center, TextAlign.Right };
+            headers = new[] { "ITEM", "CÓDIGO", "DESCRIÇÃO", "UN.", "QUANTIDADE" };
+            aligns = new[] { TextAlign.Center, TextAlign.Center, TextAlign.Left, TextAlign.Center, TextAlign.Right };
             var items = all.Where(d => d is not IAnnotationDefinition).Select(d => (d, ctx.GeometryOf?.Invoke(d))).Where(i => i.Item2 != null)
                 .Select(i => (i.d, i.Item2!)).ToList();
             var qrows = QuantityCalculator.Compute(items, ctx.Catalog);
@@ -425,11 +653,13 @@ public static partial class DetailGenerator
             foreach (var cg in qrows.GroupBy(r => r.Category).OrderBy(g => g.Key))
             {
                 rows.Add((new[] { QuantityRow.CategoryLabel(cg.Key).ToUpperInvariant() }, true, null));
+                var catNo = (int)cg.Key + 1;
+                var item = 0;
                 foreach (var g in cg.GroupBy(r => r.Code).OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
                 {
                     var first = g.First();
                     var q = first.Unit switch { "m²" => g.Sum(r => r.Area), "m" => g.Sum(r => r.PaintedLength), _ => g.Sum(r => r.Units) };
-                    rows.Add((new[] { first.Code, first.Name, first.Unit, first.Unit is "m²" or "m" ? F(q) : q.ToString("0") }, false, null));
+                    rows.Add((new[] { $"{catNo}.{++item}", first.Code, first.Name, first.Unit, first.Unit is "m²" or "m" ? F(q) : q.ToString("0") }, false, null));
                 }
             }
         }
@@ -581,11 +811,40 @@ public static partial class DetailGenerator
         Vec2 R(double x, double y) => c + new Vec2(x * Math.Cos(a) - y * Math.Sin(a), x * Math.Sin(a) + y * Math.Cos(a)) * r;
         var circle = CurveTools.Circle(c, r, r * 0.01);
         circle.Add(circle[0]);
-        geo.Annotations.Add(new AnnotationLine(circle, MarkingColor.Preta));
-        // Seta: metade preenchida, metade em contorno.
-        geo.Pieces.Add(new MarkingPiece(new Polygon2(new[] { R(0, 0.95), R(0, -0.55), R(-0.32, -0.75) }), MarkingColor.Preta));
-        geo.Annotations.Add(new AnnotationLine(new[] { R(0, 0.95), R(0.32, -0.75), R(0, -0.55) }, MarkingColor.Preta));
-        geo.Annotations.Add(new AnnotationText(R(0, 1.15) + new Vec2(0, ctx.Mm(3)), "N", 3.5));
+        switch (na.Style)
+        {
+            case EstiloNorte.RosaDosVentos:
+            {
+                // Rosa dos ventos de 4 pontas: metades alternadas cheias/vazadas, letras N, L, S, O.
+                for (int k = 0; k < 4; k++)
+                {
+                    var q = k * Math.PI / 2;
+                    Vec2 Q(double x, double y) => R(x * Math.Cos(q) - y * Math.Sin(q), x * Math.Sin(q) + y * Math.Cos(q));
+                    geo.Pieces.Add(new MarkingPiece(new Polygon2(new[] { Q(0, 0.95), Q(0, 0), Q(-0.2, 0.2) }), MarkingColor.Preta));
+                    geo.Annotations.Add(new AnnotationLine(new[] { Q(0, 0.95), Q(0.2, 0.2), Q(0, 0) }, MarkingColor.Preta));
+                }
+                var inner = CurveTools.Circle(c, r * 0.45, r * 0.01);
+                inner.Add(inner[0]);
+                geo.Annotations.Add(new AnnotationLine(inner, MarkingColor.Preta));
+                var t = ctx.Mm(3) / 2;
+                geo.Annotations.Add(new AnnotationText(R(0, 1.2) + new Vec2(0, t * 2), "N", 3.5));
+                geo.Annotations.Add(new AnnotationText(R(0, -1.2) + new Vec2(0, 0), "S", 2.5));
+                geo.Annotations.Add(new AnnotationText(R(1.25, 0) + new Vec2(0, t), "L", 2.5, TextAlign.Left));
+                geo.Annotations.Add(new AnnotationText(R(-1.25, 0) + new Vec2(0, t), "O", 2.5, TextAlign.Right));
+                break;
+            }
+            case EstiloNorte.Seta:
+                geo.Pieces.Add(new MarkingPiece(new Polygon2(new[] { R(0, 1.0), R(0.35, 0.35), R(0.1, 0.35), R(0.1, -0.9), R(-0.1, -0.9), R(-0.1, 0.35), R(-0.35, 0.35) }), MarkingColor.Preta));
+                geo.Annotations.Add(new AnnotationText(R(0, 1.15) + new Vec2(0, ctx.Mm(3)), "N", 3.5));
+                break;
+            default:
+                geo.Annotations.Add(new AnnotationLine(circle, MarkingColor.Preta));
+                // Seta: metade preenchida, metade em contorno.
+                geo.Pieces.Add(new MarkingPiece(new Polygon2(new[] { R(0, 0.95), R(0, -0.55), R(-0.32, -0.75) }), MarkingColor.Preta));
+                geo.Annotations.Add(new AnnotationLine(new[] { R(0, 0.95), R(0.32, -0.75), R(0, -0.55) }, MarkingColor.Preta));
+                geo.Annotations.Add(new AnnotationText(R(0, 1.15) + new Vec2(0, ctx.Mm(3)), "N", 3.5));
+                break;
+        }
         return geo;
     }
 }

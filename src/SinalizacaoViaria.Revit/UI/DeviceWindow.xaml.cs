@@ -22,7 +22,11 @@ public partial class DeviceWindow : Window
     {
         InitializeComponent();
         _existing = existing;
-        foreach (var d in _cat.Dispositivos) LbTypes.Items.Add(d);
+        // Lista única, agrupada por família (segregadores, balizadores, barreiras, defensas/guard rail, gradis, obras).
+        var view = new System.Windows.Data.ListCollectionView(_cat.Dispositivos.GroupBy(d => d.Codigo, StringComparer.OrdinalIgnoreCase).Select(g => g.First())
+            .OrderBy(d => d.Familia).ToList());
+        view.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(DispositivoDef.Familia)));
+        LbTypes.ItemsSource = view;
         foreach (var c in UiHelpers.ColorItems()) CbColor.Items.Add(c);
         CbColor.SelectedIndex = 0;
         Output.Changed += (_, _) => UpdatePreview();
