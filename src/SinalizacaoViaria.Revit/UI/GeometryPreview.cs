@@ -1,5 +1,7 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Core.Model;
 
@@ -24,6 +26,31 @@ public sealed class GeometryPreview : FrameworkElement
 
     /// <summary>Vista 3D (isométrica) em vez de planta – alternada pelo botão no canto da prévia.</summary>
     public bool Iso { get; set; }
+
+    /// <summary>Miniatura: sem seletor, barra de escala e textos.</summary>
+    public bool Compact { get; set; }
+
+    /// <summary>Miniatura (bitmap) de uma geometria – usada no quantitativo e na planilha.</summary>
+    public static BitmapSource Snapshot(MarkingGeometry geo, int width, int height, bool iso)
+    {
+        var pv = new GeometryPreview { Iso = iso, Compact = true, Width = width, Height = height };
+        pv.Show(geo);
+        pv.Measure(new Size(width, height));
+        pv.Arrange(new Rect(0, 0, width, height));
+        var bmp = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bmp.Render(pv);
+        bmp.Freeze();
+        return bmp;
+    }
+
+    public static byte[] Png(BitmapSource bmp)
+    {
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(bmp));
+        using var ms = new MemoryStream();
+        enc.Save(ms);
+        return ms.ToArray();
+    }
 
     private Rect _togglePlan, _toggle3D;
     private double _zoom = 1;
@@ -101,7 +128,7 @@ public sealed class GeometryPreview : FrameworkElement
         if (Iso && !Paper && _geometry != null && _geometry.Pieces.Count > 0)
         {
             RenderIso(dc, w, h);
-            DrawToggle(dc, w);
+            if (!Compact) DrawToggle(dc, w);
             return;
         }
 
@@ -147,7 +174,7 @@ public sealed class GeometryPreview : FrameworkElement
         if (_geometry != null) DrawAnnotations(dc, s, P);
         dc.Pop();
 
-        if (Paper) return;
+        if (Paper || Compact) return;
         DrawToggle(dc, w);
         DrawScaleBar(dc, s * _zoom, h);
         if (_message != null) DrawText(dc, _message, new Point(8, 6), Brushes.White, 11);
@@ -255,7 +282,7 @@ public sealed class GeometryPreview : FrameworkElement
             dc.DrawGeometry(brush, null, sg);
         }
         dc.Pop();
-        DrawText(dc, "Vista 3D (isométrica)", new Point(8, h - 20), Brushes.White, 11);
+        if (!Compact) DrawText(dc, "Vista 3D (isométrica)", new Point(8, h - 20), Brushes.White, 11);
     }
 
     private double TextModelHeight(AnnotationText t) => t.PaperHeightMm * ViewScale / 1000.0;

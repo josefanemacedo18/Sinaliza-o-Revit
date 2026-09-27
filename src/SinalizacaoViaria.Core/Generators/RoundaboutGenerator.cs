@@ -22,6 +22,10 @@ public sealed class RoundaboutLayout
     public List<Polygon2> IslandCore { get; } = new();
     public List<Polygon2> Curb { get; } = new();
     public List<Polygon2> Sidewalk { get; } = new();
+    /// <summary>Faixa de serviço da calçada (composição das vias) – subconjunto de Sidewalk.</summary>
+    public List<Polygon2> SidewalkService { get; } = new();
+    /// <summary>Sarjeta junto ao meio-fio.</summary>
+    public List<Polygon2> Gutter { get; } = new();
     public List<Polygon2> SplitterCurb { get; } = new();
     public List<Polygon2> SplitterCore { get; } = new();
     /// <summary>Divisores físicos entre as faixas (turbo-rotatória).</summary>
@@ -265,6 +269,8 @@ public static class RoundaboutGenerator
             L.Curb.AddRange(curb);
             if (sw > 0.05)
                 L.Sidewalk.AddRange(PolygonOps.Intersect(PolygonOps.Difference(PolygonOps.Offset(full, cw + sw, true), PolygonOps.Offset(full, cw, true)), zone));
+            if (d.ServiceStripWidth > 0.05) L.SidewalkService.AddRange(Automation.SectionMatch.ServiceBand(full, L.Sidewalk, cw, d.ServiceStripWidth));
+            if (d.GutterWidth > 0.05) L.Gutter.AddRange(Automation.SectionMatch.GutterBand(full, curb, d.GutterWidth));
         }
         return L;
     }
@@ -326,8 +332,10 @@ public static class RoundaboutGenerator
             {
                 var sw = PolygonOps.Difference(L.Sidewalk, ramps);
                 var cb = PolygonOps.Difference(L.Curb, ramps);
+                var sv = PolygonOps.Difference(L.SidewalkService, ramps);
                 L.Sidewalk.Clear(); L.Sidewalk.AddRange(sw);
                 L.Curb.Clear(); L.Curb.AddRange(cb);
+                L.SidewalkService.Clear(); L.SidewalkService.AddRange(sv);
             }
         }
         var pavColor = d.Pavement switch { TipoPavimento.Bloquete => MarkingColor.Bloquete, TipoPavimento.Concreto => MarkingColor.PavimentoConcreto, _ => MarkingColor.Asfalto };
@@ -383,13 +391,27 @@ public static class RoundaboutGenerator
                 }
                 break;
             }
-            default: Raised(L.IslandCore, MarkingColor.Grama, d.CurbHeight, hp); break;
+            default:
+            {
+                // Ilha ajardinada: faixa pavimentada opcional entre o meio-fio e a grama; grama elevada opcional (canteiro).
+                var paved = Math.Clamp(d.IslandPavedRing, 0, 10);
+                var core = paved > 0.05 ? PolygonOps.Offset(L.IslandCore, -paved) : L.IslandCore;
+                if (paved > 0.05) Raised(PolygonOps.Difference(L.IslandCore, core), MarkingColor.Concreto, d.CurbHeight, hp);
+                Raised(core, MarkingColor.Grama, d.CurbHeight + Math.Clamp(d.GrassRaise, 0, 1), hp);
+                break;
+            }
         }
         Raised(L.Dividers, MarkingColor.Concreto, 0.10, hp);
         Raised(L.SplitterCurb, MarkingColor.Concreto, d.CurbHeight);
         Raised(L.SplitterCore, MarkingColor.Concreto, d.CurbHeight);
-        Raised(L.Curb, MarkingColor.Concreto, d.CurbHeight);
-        Raised(L.Sidewalk, MarkingColor.Concreto, d.CurbHeight);
+        Raised(L.Curb, MarkingColor.Concreto, d.CurbHeight, 0.001);
+        Raised(L.Gutter, MarkingColor.Concreto, 0.005);
+        if (L.SidewalkService.Count > 0)
+        {
+            Raised(PolygonOps.Difference(L.Sidewalk, L.SidewalkService), MarkingColor.Concreto, d.CurbHeight);
+            Raised(L.SidewalkService, d.ServiceStripGrass ? MarkingColor.Grama : MarkingColor.Concreto, d.CurbHeight + (d.ServiceStripGrass ? 0.0 : 0.001));
+        }
+        else Raised(L.Sidewalk, MarkingColor.Concreto, d.CurbHeight);
 
         if (d.Landscaping && d.IslandType == TipoIlhaCentral.Ajardinada && d.IslandRadius >= 3 && ctx.Catalog.Movel("ARVORE") is { } tree)
         {

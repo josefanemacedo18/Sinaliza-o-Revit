@@ -270,6 +270,17 @@ public sealed class IntersectionService
             var hs = legs.Select(l => roads.FirstOrDefault(r => r.Def.Id == l.RoadId)?.Def.Hierarchy).OrderByDescending(Hierarquia.Rank).FirstOrDefault();
             if (hs != null) rb.Hierarchy = hs;
         }
+        if (rb.MatchRoadSection)
+        {
+            var ids = rb.Legs.Select(l => l.RoadId).Where(i => i != null).ToHashSet();
+            var pavs = MarkingStorage.Definitions(_doc).OfType<RoadPavementDefinition>().Where(p => ids.Contains(p.Id));
+            if (SectionMatch.From(pavs, RoadSetup.CurbWidth) is { } sec)
+            {
+                rb.ServiceStripWidth = sec.Service;
+                rb.ServiceStripGrass = sec.Grass;
+                rb.GutterWidth = sec.Gutter;
+            }
+        }
         var layout = RoundaboutGenerator.Layout(rb);
         results.Add(_service.Render(rb));
         foreach (var old in rb.ChildIds) _service.Delete(old);
@@ -369,6 +380,12 @@ public sealed class IntersectionService
         var others = roads.Where(r => r.Def.Id != road.Def.Id).ToList();
         if (!RoadConnection.FreeEnds(road, others).Any(e => e.AtEnd == c.AtRoadEnd)) { Remove(c); return results; }
         var cut = RoadConnection.FitCulDeSac(c, road, road.Def.Path?.Z ?? 0);
+        if (c.MatchRoadSection && SectionMatch.From(road.Def, c.CurbWidth) is { } sec)
+        {
+            c.ServiceStripWidth = sec.Service;
+            c.ServiceStripGrass = sec.Grass;
+            c.GutterWidth = sec.Gutter;
+        }
         results.Add(_service.Render(c));
         _service.Invalidate();
         foreach (var m in MarkingStorage.Definitions(_doc).Where(d => d.GroupId != null && d.GroupId == road.Def.GroupId || d.Exclusions.Any(e => e.SourceId == c.Id)))

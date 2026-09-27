@@ -62,6 +62,8 @@ public sealed class IntersectionLayout
     public List<Polygon2> Sidewalk { get; } = new();
     /// <summary>Faixa de serviço gramada das calçadas (composição repetida das vias) – subconjunto de Sidewalk.</summary>
     public List<Polygon2> SidewalkService { get; } = new();
+    /// <summary>Sarjeta junto ao meio-fio (composição repetida das vias).</summary>
+    public List<Polygon2> Gutter { get; } = new();
     public List<Polygon2> MedianCurb { get; } = new();
     public List<Polygon2> MedianCore { get; } = new();
     /// <summary>Ilhas físicas (gota e ilhas triangulares das esquinas), já sem as passagens de pedestres.</summary>
@@ -770,22 +772,11 @@ public static class IntersectionGenerator
         var curbRing = PolygonOps.Difference(PolygonOps.Offset(pav, cw, true), pav);
         L.Curb.AddRange(PolygonOps.Intersect(curbRing, sides));
         L.Sidewalk.AddRange(PolygonOps.Difference(sides, L.Curb).Where(p => p.Area > 0.05));
-        if (d.MatchRoadSection)
+        if (d.MatchRoadSection && Automation.SectionMatch.From(L.Roads.Select(r => r.Def), cw) is { } sec)
         {
-            // Faixa de serviço gramada com a largura da seção das vias (a maior entre as vias com grama).
-            var service = 0.0;
-            foreach (var r in L.Roads)
-            {
-                var setup = Automation.RoadTemplates.FromJson(r.Def.SetupJson);
-                if (setup == null) continue;
-                foreach (var e in setup.Right.Concat(setup.Left).Where(e => e.Tipo == Automation.TipoElementoSecao.Calcada && e.ServicoGramado))
-                    service = Math.Max(service, Math.Clamp(e.FaixaServico, cw, e.Largura) - cw);
-            }
-            if (service > 0.05)
-            {
-                var band = PolygonOps.Difference(PolygonOps.Offset(pav, cw + service, true), PolygonOps.Offset(pav, cw, true));
-                L.SidewalkService.AddRange(PolygonOps.Intersect(band, L.Sidewalk).Where(p => p.Area > 0.05));
-            }
+            // Composição das vias: faixa de serviço (gramada) entre meio-fio e passeio e sarjeta junto ao meio-fio.
+            if (sec.HasService && sec.Grass) L.SidewalkService.AddRange(Automation.SectionMatch.ServiceBand(pav, L.Sidewalk, cw, sec.Service));
+            if (sec.HasGutter) L.Gutter.AddRange(Automation.SectionMatch.GutterBand(pav, L.Curb, sec.Gutter));
         }
 
         var medParts = PolygonOps.Intersect(medT.SelectMany(x => x), core0).ToList();
@@ -897,7 +888,8 @@ public static class IntersectionGenerator
         }
         if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
             Raised(L.Pavement, L.PavementColor, L.PavementThickness, -L.PavementThickness);
-        Raised(L.Curb, MarkingColor.Concreto, L.CurbHeight);
+        Raised(L.Curb, MarkingColor.Concreto, L.CurbHeight, 0.001);   // 1 mm: piso próprio, separado do passeio
+        Raised(L.Gutter, MarkingColor.Concreto, 0.005);
         if (L.SidewalkService.Count > 0)
         {
             Raised(PolygonOps.Difference(L.Sidewalk, L.SidewalkService), MarkingColor.Concreto, L.CurbHeight);

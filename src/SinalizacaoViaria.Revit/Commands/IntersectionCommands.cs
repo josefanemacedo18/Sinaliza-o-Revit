@@ -267,6 +267,8 @@ internal static class RoundaboutForms
              ("Galgável (cúpula pintada, sem meio-fio)", TipoIlhaCentral.Galgavel), ("Pintada – LCA 0,20 m + tachões (MIR, sem obra civil)", TipoIlhaCentral.Pintada),
              ("Calota rampada (tronco de cone de concreto, galgável)", TipoIlhaCentral.Calota) }, () => d.IslandType, v => d.IslandType = v)
          .Number("Calota: altura no centro (m)", () => d.DomeHeight, v => d.DomeHeight = v, 0.05, 0.6, tooltip: "Ilha em tronco de cone baixo, transponível pelas rodas traseiras de veículos longos (minirrotatórias e compactas).")
+         .Number("Ilha ajardinada: faixa pavimentada entre o meio-fio e a grama (m)", () => d.IslandPavedRing, v => d.IslandPavedRing = v, 0, 10)
+         .Number("Ilha ajardinada: grama acima do meio-fio (m)", () => d.GrassRaise, v => d.GrassRaise = v, 0, 1, "0.00", "Canteiro elevado: 0 = grama rente ao topo do meio-fio.")
          .Number("Calota: platô superior (proporção do raio)", () => d.DomeTopRatio, v => d.DomeTopRatio = v, 0.1, 0.9)
          .Check("Calota: platô superior gramado", () => d.DomeGrassTop, v => d.DomeGrassTop = v)
          .Number("Raio da ilha central (m)", () => d.IslandRadius, v => d.IslandRadius = v, 1, 100)
@@ -306,6 +308,12 @@ internal static class RoundaboutForms
                  var fresh = ParseAngles(angles).Select(a => new RoundaboutLeg { AngleDeg = a, Width = legWidth, Sidewalk = d.SidewalkWidth }).ToList();
                  d.Legs = RoundaboutGenerator.MergeLegSettings(d.Legs, fresh);
              }, 3, 40);
+        w.Section("Calçadas e meio-fio em volta")
+         .Check("Seguir a composição das calçadas das vias ligadas (faixa de serviço gramada e sarjeta)", () => d.MatchRoadSection, v => d.MatchRoadSection = v,
+             "Lê a seção das vias que chegam à rotatória e continua a faixa de serviço e a sarjeta pela calçada da rotatória. Desligado: use os campos abaixo.")
+         .Number("Faixa de serviço junto ao meio-fio (m, 0 = nenhuma)", () => d.ServiceStripWidth, v => d.ServiceStripWidth = v, 0, 5)
+         .Check("Faixa de serviço gramada", () => d.ServiceStripGrass, v => d.ServiceStripGrass = v)
+         .Number("Sarjeta junto ao meio-fio (m, 0 = nenhuma)", () => d.GutterWidth, v => d.GutterWidth = v, 0, 1.5);
         w.Section("Ilhas separadoras, travessias e placas (valores gerais)")
          .Check("Ilhas separadoras (gota) nos ramos", () => d.SplitterIslands, v => d.SplitterIslands = v)
          .Choice("Ilha separadora padrão", new[] { ("Física (meio-fio + concreto)", IlhaSeparadora.Fisica), ("Pintada (zebrado + linha de canalização)", IlhaSeparadora.Pintada), ("Nenhuma", IlhaSeparadora.Nenhuma) },

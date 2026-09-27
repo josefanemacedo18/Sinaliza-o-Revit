@@ -7,6 +7,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using SinalizacaoViaria.Core.Catalog;
 using SinalizacaoViaria.Core.Definitions;
+using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Model;
 using SinalizacaoViaria.Core.Quantities;
 using SinalizacaoViaria.Revit.Infrastructure;
@@ -51,7 +52,25 @@ public sealed class CmdQuantitativos : CommandBase
         var rows = QuantityCalculator.Compute(items, PluginContext.Catalog, PluginContext.Settings.DefaultMaterial);
         // Famílias do Revit do usuário classificadas como elementos urbanos (Elementos Urbanos → Famílias do Revit).
         if (families.Count > 0) rows = QuantityCalculator.AddFamilies(rows, families);
-        var w = new QuantitiesWindow(rows, doc.Title);
+        // Amostra de geometria por código (miniaturas do quantitativo e da planilha): marcas lineares num trecho curto.
+        var samples = new Dictionary<string, MarkingGeometry>();
+        var ctx = new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs };
+        foreach (var (d, g) in items)
+        {
+            var code = MarkingBuilder.Describe(d, PluginContext.Catalog).Code;
+            if (samples.ContainsKey(code) || g.Pieces.Count == 0) continue;
+            try
+            {
+                if (d is LinearMarkingDefinition or DeviceMarkingDefinition or RepeatedMarkingDefinition or TactileRouteDefinition)
+                {
+                    var sample = MarkingBuilder.Build(d, new Core.Geometry.Polyline2(new[] { new Core.Geometry.Vec2(0, 0), new Core.Geometry.Vec2(8, 0) }), ctx);
+                    samples[code] = sample.Pieces.Count > 0 ? sample : g;
+                }
+                else samples[code] = g;
+            }
+            catch { samples[code] = g; }
+        }
+        var w = new QuantitiesWindow(rows, doc.Title, samples);
         if (UiHelpers.ShowModal(w) == true)
         {
             ViewSchedule? view = null;

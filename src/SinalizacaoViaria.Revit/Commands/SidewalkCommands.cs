@@ -293,6 +293,11 @@ internal static class SidewalkForms
          .Number("Y: ângulo dos ramos (°)", () => d.BranchAngle, v => d.BranchAngle = v, 15, 80, "0")
          .Section("Calçada e ilha")
          .Number("Largura da calçada (m)", () => d.SidewalkWidth, v => d.SidewalkWidth = v, 0, 20)
+         .Check("Seguir a composição da calçada da via (faixa de serviço gramada e sarjeta)", () => d.MatchRoadSection, v => d.MatchRoadSection = v,
+             "Quando o cul-de-sac está ligado a uma via, lê a seção dela e continua a faixa de serviço e a sarjeta. Desligado: use os campos abaixo.")
+         .Number("Faixa de serviço junto ao meio-fio (m, 0 = nenhuma)", () => d.ServiceStripWidth, v => d.ServiceStripWidth = v, 0, 5)
+         .Check("Faixa de serviço gramada", () => d.ServiceStripGrass, v => d.ServiceStripGrass = v)
+         .Number("Sarjeta junto ao meio-fio (m, 0 = nenhuma)", () => d.GutterWidth, v => d.GutterWidth = v, 0, 1.5)
          .Number("Largura do meio-fio (m)", () => d.CurbWidth, v => d.CurbWidth = v, 0.05, 0.5)
          .Number("Altura do meio-fio (m)", () => d.Height, v => d.Height = v, 0.02, 0.5)
          .Check("Ilha central ajardinada", () => d.Island, v => d.Island = v)

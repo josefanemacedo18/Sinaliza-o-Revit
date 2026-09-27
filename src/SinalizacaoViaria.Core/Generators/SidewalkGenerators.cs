@@ -483,8 +483,19 @@ public static class SidewalkGenerator
 
         List<Polygon2> W(IEnumerable<Polygon2> local) => local.Select(frame.ToWorld).ToList();
         if (d.Pavement) AddRaised(geo, W(roadway), MarkingColor.Asfalto, d.PavementThickness, -d.PavementThickness);
-        AddRaised(geo, W(curb), MarkingColor.Concreto, d.Height);
-        if (d.SidewalkWidth > 0.05) AddRaised(geo, W(walk), MarkingColor.Concreto, d.Height);
+        AddRaised(geo, W(curb), MarkingColor.Concreto, d.Height, 0.001);
+        if (d.SidewalkWidth > 0.05)
+        {
+            // Composição da via: faixa de serviço (gramada) e sarjeta.
+            var service = d.ServiceStripWidth > 0.05 ? Automation.SectionMatch.ServiceBand(pav, walk, cw, d.ServiceStripWidth) : new List<Polygon2>();
+            if (service.Count > 0)
+            {
+                AddRaised(geo, W(PolygonOps.Difference(walk, service)), MarkingColor.Concreto, d.Height);
+                AddRaised(geo, W(service), d.ServiceStripGrass ? MarkingColor.Grama : MarkingColor.Concreto, d.Height + (d.ServiceStripGrass ? 0 : 0.001));
+            }
+            else AddRaised(geo, W(walk), MarkingColor.Concreto, d.Height);
+        }
+        if (d.GutterWidth > 0.05) AddRaised(geo, W(Automation.SectionMatch.GutterBand(roadway, curb, d.GutterWidth)), MarkingColor.Concreto, 0.005);
         if (island != null)
         {
             var islandCore = PolygonOps.Offset(new[] { island }, -cw);

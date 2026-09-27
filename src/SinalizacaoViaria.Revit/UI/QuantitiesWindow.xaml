@@ -64,7 +64,8 @@
             <TextBlock DockPanel.Dock="Left" Style="{StaticResource Hint}" VerticalAlignment="Center" MaxWidth="560" TextWrapping="Wrap"
                        Text="Placas, dispositivos, mobiliário, moderação e acessibilidade: memorial por modelo (quantidade). Sinalização horizontal e pavimentação: área, extensão, cor e material. Clique numa linha para ver a referência normativa."/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Exportar CSV (Excel)" Click="ExportClick" ToolTip="Exporta a seleção atual, separada por categoria e subcategoria, com subtotais e resumos."/>
+                <Button Content="Exportar planilha Excel (.xlsx)" Click="ExportXlsxClick" Style="{StaticResource Primary}" ToolTip="Planilha formatada como esta janela: miniaturas, blocos por categoria e subcategoria, subtotais e resumos."/>
+                <Button Content="Exportar CSV" Click="ExportClick" ToolTip="Texto separado por ponto e vírgula (sem formatação nem imagens), para outros sistemas."/>
                 <Button Content="Criar tabela no Revit" Click="ScheduleClick" ToolTip="Tabela 'SV - Quantitativos' agrupada por categoria, hierarquia e subcategoria, com subtotais (parâmetros SV_*)."/>
                 <Button Content="Tabelas por categoria" Click="SchedulesByCategoryClick" ToolTip="Cria uma tabela do Revit para cada categoria existente no projeto."/>
                 <Button Content="Fechar" IsCancel="True" Style="{StaticResource Primary}"/>
@@ -74,8 +75,8 @@
         <TabControl>
             <TabItem Header="Itens detalhados">
                 <DataGrid x:Name="GridRows" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
-                          GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" AlternatingRowBackground="#FAFBFD" RowHeight="26"
-                          RowDetailsVisibilityMode="VisibleWhenSelected" SelectionMode="Single" BorderBrush="#D5DBE3">
+                          GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" AlternatingRowBackground="#FAFBFD"
+                          RowDetailsVisibilityMode="VisibleWhenSelected" SelectionMode="Single" BorderBrush="#D5DBE3" RowHeight="44">
                     <DataGrid.GroupStyle>
                         <!-- Nível 1: categoria -->
                         <GroupStyle>
@@ -123,14 +124,12 @@
                         </GroupStyle>
                     </DataGrid.GroupStyle>
                     <DataGrid.Columns>
-                        <DataGridTemplateColumn x:Name="ColColor" Header="Cor" Width="92">
+                        <DataGridTemplateColumn Header="Imagem" Width="76">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Width="14" Height="14" CornerRadius="3" BorderBrush="#8893A2" BorderThickness="1" Margin="4,0,6,0"
-                                                Background="{Binding Color, Converter={x:Static ui:MarkingColorBrushConverter.Instance}}"/>
-                                        <TextBlock Text="{Binding ColorLabel}" VerticalAlignment="Center"/>
-                                    </StackPanel>
+                                    <Border Background="#3E4248" CornerRadius="3" Margin="3,2" Width="64" Height="38">
+                                        <Image Source="{Binding Code, Converter={x:Static ui:ThumbnailConverter.Instance}}" Stretch="Uniform"/>
+                                    </Border>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
@@ -158,12 +157,13 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
                         <DataGridTextColumn Header="Hierarquia" Binding="{Binding HierarchyName}" Width="120"/>
+                        <DataGridTextColumn x:Name="ColColor" Header="Cor" Binding="{Binding ColorLabel}" Width="80"/>
                         <DataGridTextColumn x:Name="ColMaterial" Header="Material" Binding="{Binding Material}" Width="140"/>
                         <DataGridTextColumn x:Name="ColConsumption" Header="Consumo" Binding="{Binding ConsumptionText}" Width="100"/>
                     </DataGrid.Columns>
                     <DataGrid.RowDetailsTemplate>
                         <DataTemplate>
-                            <Border Background="#F4F6F9" BorderBrush="#D5DBE3" BorderThickness="0,1,0,1" Padding="104,6,8,6">
+                            <Border Background="#F4F6F9" BorderBrush="#D5DBE3" BorderThickness="0,1,0,1" Padding="88,6,8,6">
                                 <StackPanel>
                                     <TextBlock Text="{Binding DetailText}" TextWrapping="Wrap" Foreground="#2B3A4E"/>
                                 </StackPanel>

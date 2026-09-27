@@ -382,6 +382,14 @@ partir do pavimento – confira antes de aplicar.
 
 ## 10. Quantitativos
 
+**Miniaturas.** Cada linha mostra a **imagem do item** (planta para pintura, 3D para placas, dispositivos, mobiliário
+e rampas) no lugar da amostra de cor; a cor fica numa coluna de texto.
+
+**Exportação Excel (.xlsx).** Botão principal da janela: planilha formatada como a janela – título e dados do projeto,
+um bloco por categoria com as subcategorias, **miniatura de cada item**, colunas fixas e alinhadas (item, código,
+descrição, quantidade, unidade, área, extensão, unidades, elementos, cor, material, consumo, hierarquia, referência),
+subtotais, resumos por categoria, hierarquia e pintura, larguras de coluna, bordas e formatos numéricos.
+
 **Exportação CSV.** O arquivo segue o desenho da janela: cabeçalho do projeto, um bloco por categoria com as
 subcategorias como títulos, colunas próprias de cada categoria (memorial: código, descrição, quantidade, elementos;
 horizontal: cor, material, área, extensão, consumo), subtotais e os resumos por categoria, hierarquia e pintura.
@@ -653,6 +661,9 @@ automaticamente. A interseção:
 Funciona para **qualquer geometria**: cruzamentos ortogonais ou oblíquos, entroncamentos em **T** e em
 **Y**, vias curvas e nós com vários ramos. Em ângulos agudos as esquinas continuam arredondadas.
 
+**Meio-fio e sarjeta nas esquinas.** O meio-fio das esquinas é um piso próprio (não se funde ao passeio) e a sarjeta da
+seção das vias continua pela curva, junto ao meio-fio.
+
 **Esquinas com a composição das vias.** Com *Esquinas com a mesma composição das calçadas das vias* (ligado por
 padrão), a faixa de serviço gramada definida na seção das vias continua pela curva da esquina, entre o meio-fio e o
 passeio, alinhando o cruzamento com as vias. Desligue para esquinas só em concreto.
@@ -704,6 +715,11 @@ Travessias, retenções, placas, zebrados e linhas deslocadas da interseção s�
 tipos e o controle escolhidos a todas as interseções do projeto.
 
 ## 20. Rotatórias
+
+**Seguir a composição das vias.** Rotatórias e cul-de-sacs ligados a vias leem a seção das vias (faixa de serviço
+gramada e sarjeta) e a continuam pelas próprias calçadas – opção *Seguir a composição das calçadas das vias ligadas*,
+ligada por padrão; desligada, a faixa de serviço, a grama e a sarjeta são informadas nos campos ao lado. A **ilha
+ajardinada** ganhou faixa pavimentada entre o meio-fio e a grama e grama elevada (canteiro).
 
 **Rotatória elevada (platô)** e **ilha em calota**: em *Ilha central e anel*, marque *Rotatória elevada* para a pista
 giratória subir (altura e comprimento das rampas editáveis; rampas geradas em cada ramo) – solução de moderação de

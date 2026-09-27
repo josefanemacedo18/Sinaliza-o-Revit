@@ -1,3 +1,5 @@
+using SinalizacaoViaria.Revit.Infrastructure;
+using System.Windows.Media.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -30,11 +32,25 @@ public partial class QuantitiesWindow : Window
         public override string ToString() => Label;
     }
 
-    public QuantitiesWindow(List<QuantityRow> rows, string projectName)
+    private readonly Dictionary<string, BitmapSource> _thumbs = new();
+
+    public QuantitiesWindow(List<QuantityRow> rows, string projectName, Dictionary<string, MarkingGeometry>? samples = null)
     {
         InitializeComponent();
         _rows = rows;
         _projectName = projectName;
+        // Miniaturas: 3D para elementos com volume (placas, dispositivos, mobiliário, rampas), planta para pintura.
+        if (samples != null)
+            foreach (var (code, geo) in samples)
+            {
+                try
+                {
+                    var iso = geo.Pieces.Any(p => p.Solid != null || p.Profile != null || p.Thickness > 0.03);
+                    _thumbs[code] = GeometryPreview.Snapshot(geo, 120, 72, iso);
+                }
+                catch (Exception ex) { Log.Error("Miniatura " + code, ex); }
+            }
+        ThumbnailConverter.Images = _thumbs;
         CbCategory.Items.Add(new Option("Todas as categorias", null));
         foreach (var c in rows.Select(r => r.Category).Distinct().OrderBy(c => c))
             CbCategory.Items.Add(new Option($"{QuantityRow.CategoryLabel(c)} ({rows.Count(r => r.Category == c)})", c));
@@ -142,6 +158,35 @@ public partial class QuantitiesWindow : Window
         }
     }
 
+    private void ExportXlsxClick(object sender, RoutedEventArgs e)
+    {
+        var v = Visible;
+        var suffix = Category is { } c ? " - " + QuantityRow.CategoryLabel(c) : "";
+        var dlg = new SaveFileDialog
+        {
+            Filter = "Planilha do Excel|*.xlsx",
+            FileName = $"Quantitativos - {_projectName}{suffix}.xlsx".Replace(":", ""),
+        };
+        if (dlg.ShowDialog(this) != true) return;
+        try
+        {
+            var pngCache = new Dictionary<string, byte[]?>();
+            byte[]? Png(QuantityRow r)
+            {
+                if (pngCache.TryGetValue(r.Code, out var b)) return b;
+                b = _thumbs.TryGetValue(r.Code, out var bmp) ? GeometryPreview.Png(bmp) : null;
+                pngCache[r.Code] = b;
+                return b;
+            }
+            File.WriteAllBytes(dlg.FileName, QuantityWorkbook.Build(v, QuantityCalculator.Summary(v), _projectName, Png));
+            MessageBox.Show(this, "Planilha exportada:\n" + dlg.FileName, "Quantitativos", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            UiHelpers.Error("Não foi possível gravar a planilha: " + ex.Message);
+        }
+    }
+
     private void ExportClick(object sender, RoutedEventArgs e)
     {
         var v = Visible;
@@ -228,4 +273,16 @@ public sealed class MarkingColorBrushConverter : IValueConverter
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
+}
+
+/// <summary>Miniatura do item (por código) para a coluna "Imagem" do quantitativo.</summary>
+public sealed class ThumbnailConverter : IValueConverter
+{
+    public static ThumbnailConverter Instance { get; } = new();
+    public static Dictionary<string, BitmapSource> Images { get; set; } = new();
+
+    public object? Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is string code && Images.TryGetValue(code, out var bmp) ? bmp : null;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }

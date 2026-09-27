@@ -850,6 +850,11 @@ public sealed class CulDeSacDefinition : MarkingDefinition
     public bool Island { get; set; }
     public double IslandRadius { get; set; } = 3.00;
     public double SidewalkWidth { get; set; } = 2.50;
+    /// <summary>Calçada com a composição da via (faixa de serviço e sarjeta lidas da via ligada).</summary>
+    public bool MatchRoadSection { get; set; } = true;
+    public double ServiceStripWidth { get; set; }
+    public bool ServiceStripGrass { get; set; } = true;
+    public double GutterWidth { get; set; }
     public double CurbWidth { get; set; } = 0.15;
     public double Height { get; set; } = 0.15;
     public bool Pavement { get; set; } = true;
@@ -1360,6 +1365,17 @@ public sealed class RoundaboutDefinition : MarkingDefinition
     public double DomeTopRatio { get; set; } = 0.35;
     /// <summary>Ilha em calota: platô superior gramado.</summary>
     public bool DomeGrassTop { get; set; }
+    /// <summary>Ilha ajardinada: faixa pavimentada (concreto) entre o meio-fio e a grama (m).</summary>
+    public double IslandPavedRing { get; set; }
+    /// <summary>Ilha ajardinada: grama acima do meio-fio (m) – canteiro elevado.</summary>
+    public double GrassRaise { get; set; }
+    /// <summary>Calçadas da rotatória com a composição das vias ligadas (faixa de serviço e sarjeta lidas das vias).</summary>
+    public bool MatchRoadSection { get; set; } = true;
+    /// <summary>Faixa de serviço entre o meio-fio e o passeio (m); 0 = nenhuma. Preenchida pelas vias quando MatchRoadSection.</summary>
+    public double ServiceStripWidth { get; set; }
+    public bool ServiceStripGrass { get; set; } = true;
+    /// <summary>Sarjeta junto ao meio-fio (m); 0 = nenhuma.</summary>
+    public double GutterWidth { get; set; }
     /// <summary>Rotatória elevada (platô): a pista giratória fica acima das vias, com rampas nas entradas/saídas (moderação de tráfego).</summary>
     public bool Raised { get; set; }
     /// <summary>Altura do platô (m) – 0,08 a 0,15 m.</summary>

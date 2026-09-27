@@ -346,32 +346,28 @@ public static class QuantityCalculator
         sb.AppendLine(Esc($"Emitido em {DateTime.Now:dd/MM/yyyy HH:mm} – SinalizaBIM"));
         sb.AppendLine(Esc($"{list.Count} item(ns) em {list.Select(r => r.Category).Distinct().Count()} categoria(s)"));
         sb.AppendLine();
+        const string header = "Item;Código;Descrição;Quantidade;Un.;Área (m²);Extensão (m);Unidades;Elementos;Cor;Material;Consumo estimado;Hierarquia viária;Referência";
+        var n = 0;
         foreach (var g in list.GroupBy(r => r.Category).OrderBy(g => g.Key))
         {
             var memorial = QuantityRow.IsMemorialCategory(g.Key);
             sb.AppendLine(Esc(QuantityRow.CategoryLabel(g.Key).ToUpperInvariant()));
-            sb.AppendLine(memorial
-                ? "Item;Código;Descrição;Quantidade;Un.;Elementos no modelo;Hierarquia viária;Referência"
-                : "Item;Código;Descrição;Cor;Material;Quantidade;Un.;Área (m²);Extensão (m);Unidades;Consumo estimado;Un. consumo;Microesferas (kg);Hierarquia viária;Referência");
-            var n = 0;
+            sb.AppendLine(header);
             foreach (var sg in g.GroupBy(r => r.SubcategoryName).OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
             {
-                sb.AppendLine(Esc("  " + sg.Key));
+                sb.AppendLine(Esc("· " + sg.Key));
                 foreach (var r in sg)
                 {
                     n++;
-                    if (memorial)
-                        sb.AppendLine(string.Join(";", n, Esc(r.Code), Esc(r.Name), Q(r.MainQuantity), Esc(r.Unit), r.Elements, Esc(r.HierarchyName), Esc(r.Reference)));
-                    else
-                        sb.AppendLine(string.Join(";", n, Esc(r.Code), Esc(r.Name), Esc(r.IsFamily ? "" : r.ColorLabel), Esc(r.Material), Q(r.MainQuantity), Esc(r.Unit),
-                            N(r.Area), N(r.PaintedLength), r.Units, r.MaterialConsumption > 1e-6 ? N(r.MaterialConsumption) : "", Esc(r.MaterialConsumption > 1e-6 ? r.ConsumptionUnit : ""),
-                            r.GlassBeadsKg > 1e-6 ? N(r.GlassBeadsKg) : "", Esc(r.HierarchyName), Esc(r.Reference)));
+                    sb.AppendLine(string.Join(";", n, Esc(r.Code), Esc(r.Name), Q(r.MainQuantity), Esc(r.Unit),
+                        memorial ? "" : N(r.Area), memorial ? "" : N(r.PaintedLength), r.Units, r.Elements,
+                        memorial || r.IsFamily ? "" : Esc(r.ColorLabel), memorial ? "" : Esc(r.Material),
+                        memorial || r.MaterialConsumption <= 1e-6 ? "" : Esc(r.ConsumptionText), Esc(r.HierarchyName), Esc(r.Reference)));
                 }
             }
             var sub = CategorySummary(g).First();
-            sb.AppendLine(memorial
-                ? string.Join(";", "", "SUBTOTAL", "", sub.Units, "un", sub.Elements, "", "")
-                : string.Join(";", "", "SUBTOTAL", "", "", "", "", "", N(sub.Area), N(sub.PaintedLength), sub.Units, N(sub.MaterialConsumption), "", N(sub.GlassBeadsKg), "", ""));
+            sb.AppendLine(string.Join(";", "", "SUBTOTAL", "", "", "", memorial ? "" : N(sub.Area), memorial ? "" : N(sub.PaintedLength), sub.Units, sub.Elements, "", "",
+                memorial || sub.MaterialConsumption <= 1e-6 ? "" : (N(sub.MaterialConsumption) + " " + sub.ConsumptionUnit).Trim(), "", ""));
             sb.AppendLine();
         }
         sb.AppendLine("RESUMO POR CATEGORIA");

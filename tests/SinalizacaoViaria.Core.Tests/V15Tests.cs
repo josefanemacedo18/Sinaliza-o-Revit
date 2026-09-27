@@ -147,3 +147,94 @@ public class V15SignTests
         if (support == TipoSuporte.Portico) Assert.Contains(cols, c => c.Shape.Centroid.X > 11.5);
     }
 }
+
+public class V16Tests
+{
+    private static readonly Catalogo Cat = CatalogService.LoadDefault();
+    private static readonly BuildContext Ctx = new() { Catalog = Cat };
+
+    [Fact]
+    public void SectionMatch_ReadsServiceAndGutterFromRoad()
+    {
+        var setup = RoadTemplates.All[1].Create();
+        setup.Hierarchy = HierarquiaViaria.Local;
+        var defs = setup.Build(PathReference.FromPoints(new[] { new Vec2(0, 0), new Vec2(50, 0) }, 0), new OutputSettings(), Cat);
+        var pav = defs.OfType<RoadPavementDefinition>().Single();
+        var sec = SectionMatch.From(pav, RoadSetup.CurbWidth);
+        Assert.NotNull(sec);
+        Assert.True(sec!.Value.HasService);
+        Assert.True(sec.Value.Grass);
+        Assert.True(sec.Value.HasGutter);
+        Assert.Null(SectionMatch.From(new RoadPavementDefinition(), 0.15));
+    }
+
+    [Fact]
+    public void Roundabout_And_CulDeSac_UseRoadComposition()
+    {
+        var rb = new RoundaboutDefinition();
+        rb.ApplyPreset(TipoRotatoria.Compacta);
+        rb.ServiceStripWidth = 0.7; rb.ServiceStripGrass = true; rb.GutterWidth = 0.3;
+        foreach (var a in new[] { 0.0, 90, 180, 270 }) rb.Legs.Add(new RoundaboutLeg { AngleDeg = a, Width = 7, Sidewalk = 2.5 });
+        var L = RoundaboutGenerator.Layout(rb);
+        Assert.NotEmpty(L.SidewalkService);
+        Assert.NotEmpty(L.Gutter);
+        var geo = MarkingBuilder.Build(rb, null, Ctx);
+        Assert.Contains(geo.Pieces, p => p.Color == MarkingColor.Grama);
+        Assert.Contains(geo.Pieces, p => p.Color == MarkingColor.Concreto && Math.Abs(p.Thickness - 0.005) < 1e-9);   // sarjeta
+        Assert.Contains(geo.Pieces, p => p.Color == MarkingColor.Concreto && Math.Abs(p.Elevation - 0.001) < 1e-9);   // meio-fio separado
+
+        var c = new CulDeSacDefinition { ServiceStripWidth = 0.7, GutterWidth = 0.3, SidewalkWidth = 2.5 };
+        var cg = MarkingBuilder.Build(c, new Polyline2(new[] { new Vec2(0, 0), new Vec2(0, 25) }), Ctx);
+        Assert.Contains(cg.Pieces, p => p.Color == MarkingColor.Grama);
+        Assert.Contains(cg.Pieces, p => p.Color == MarkingColor.Concreto && Math.Abs(p.Thickness - 0.005) < 1e-9);
+    }
+
+    [Fact]
+    public void Roundabout_IslandPavedRingAndRaisedGrass()
+    {
+        var rb = new RoundaboutDefinition();
+        rb.ApplyPreset(TipoRotatoria.UmaFaixa);
+        rb.IslandPavedRing = 1.0; rb.GrassRaise = 0.3;
+        foreach (var a in new[] { 0.0, 180 }) rb.Legs.Add(new RoundaboutLeg { AngleDeg = a, Width = 7, Sidewalk = 2.5 });
+        var geo = MarkingBuilder.Build(rb, null, Ctx);
+        var grass = geo.Pieces.Where(p => p.Color == MarkingColor.Grama).ToList();
+        Assert.NotEmpty(grass);
+        Assert.Contains(grass, g => g.Elevation < 1e-9 && Math.Abs(g.Thickness - (rb.CurbHeight + 0.3)) < 1e-6);
+        Assert.Contains(geo.Pieces, p => p.Color == MarkingColor.Concreto && p.Shape.Contains(new Vec2(rb.IslandRadius - 0.5, 0)));
+    }
+
+    [Fact]
+    public void Workbook_IsValidPackageWithSheetStylesAndImages()
+    {
+        var sign = new SignDefinition { Code = "R-1", Position = Vec2.Zero, Direction = new Vec2(1, 0) };
+        var line = new LinearMarkingDefinition { Code = "LFO-1" };
+        var rows = QuantityCalculator.Compute(new List<(MarkingDefinition, MarkingGeometry)>
+        {
+            (sign, MarkingBuilder.Build(sign, null, Ctx)),
+            (line, MarkingBuilder.Build(line, new Polyline2(new[] { new Vec2(0, 0), new Vec2(20, 0) }), Ctx)),
+        }, Cat);
+        var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0 };
+        var bytes = QuantityWorkbook.Build(rows, QuantityCalculator.Summary(rows), "Projeto X", _ => png);
+        using var zip = new System.IO.Compression.ZipArchive(new MemoryStream(bytes));
+        var names = zip.Entries.Select(e => e.FullName).ToList();
+        Assert.Contains("[Content_Types].xml", names);
+        Assert.Contains("xl/workbook.xml", names);
+        Assert.Contains("xl/worksheets/sheet1.xml", names);
+        Assert.Contains("xl/styles.xml", names);
+        Assert.Contains("xl/drawings/drawing1.xml", names);
+        Assert.Contains("xl/media/image1.png", names);
+        using var sr = new StreamReader(zip.GetEntry("xl/worksheets/sheet1.xml")!.Open());
+        var sheet = sr.ReadToEnd();
+        Assert.Contains("Projeto: Projeto X", sheet);
+        Assert.Contains("SUBTOTAL", sheet);
+        Assert.Contains("<drawing r:id=\"rId1\"/>", sheet);
+        foreach (var e in zip.Entries.Where(e => e.FullName.EndsWith(".xml") || e.FullName.EndsWith(".rels")))
+        {
+            using var s = e.Open();
+            var doc = new System.Xml.XmlDocument();
+            doc.Load(s);   // XML bem formado
+        }
+        var csv = QuantityCalculator.ToCsv(rows, null, "Projeto X");
+        Assert.Contains("Item;Código;Descrição;Quantidade", csv);
+    }
+}
