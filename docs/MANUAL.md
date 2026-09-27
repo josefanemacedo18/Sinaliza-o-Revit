@@ -434,6 +434,16 @@ compartilhados e `log.txt`).
 
 ## 12. Sinalização vertical (Placas)
 
+**Suportes aéreos (rodovias e vias arteriais).** Além da coluna simples e dupla, o tipo de suporte pode ser **braço
+projetado** (coluna no bordo e braço sobre a pista), **semipórtico** (coluna robusta e viga treliçada em balanço) ou
+**pórtico** (duas colunas e viga atravessando a pista). Parâmetros: vão da viga/braço, diâmetro das colunas e altura da
+viga; a altura livre passa a 5,50 m (mínimo do MBST/DER) e a placa é deslocada para o meio da pista. O 1º clique é a
+coluna no bordo; o deslocamento da placa (positivo à direita do condutor) diz para que lado a viga avança.
+
+**Prévia 3D.** Em todas as janelas com pré-visualização há o botão **3D / Planta** no canto da prévia: a vista
+isométrica mostra o volume real do elemento (tachão, balizador, placa com suporte, quebra-mola...), o que ajuda a escolher
+o tipo de cara.
+
 Escolha a categoria e a placa, ajuste o tamanho (lista com os tamanhos usuais ou valor livre),
 a legenda (ex.: velocidade na R-19; "-" remove a legenda), o suporte (coluna simples, duas colunas
 ou sem suporte) e a altura livre sob a placa (2,10 m em calçadas). 1º clique: posição do suporte;

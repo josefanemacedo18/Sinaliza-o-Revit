@@ -448,6 +448,12 @@ public enum TipoSuporte
     Duplo,
     /// <summary>Sem suporte (fixada em poste/parede existente).</summary>
     Nenhum,
+    /// <summary>Braço projetado: coluna na lateral e braço horizontal sobre a pista (placa suspensa).</summary>
+    BracoProjetado,
+    /// <summary>Semipórtico: coluna robusta na lateral e viga treliçada em balanço sobre a pista.</summary>
+    SemiPortico,
+    /// <summary>Pórtico: duas colunas e viga atravessando toda a pista.</summary>
+    Portico,
 }
 
 /// <summary>Placa de sinalização vertical com suporte.</summary>
@@ -464,6 +470,14 @@ public sealed class SignDefinition : MarkingDefinition
     public double MountHeight { get; set; } = 2.10;
     public TipoSuporte Support { get; set; } = TipoSuporte.Simples;
     public double PostDiameter { get; set; } = 0.063;
+    /// <summary>Pórtico/semipórtico/braço: vão da viga ou comprimento do braço (m), a partir da coluna na direção da placa.</summary>
+    public double StructureSpan { get; set; } = 12.0;
+    /// <summary>Pórtico/semipórtico/braço: diâmetro (ou lado) das colunas (m).</summary>
+    public double StructureColumn { get; set; } = 0.30;
+    /// <summary>Pórtico/semipórtico/braço: altura da viga (m).</summary>
+    public double StructureBeam { get; set; } = 0.60;
+    /// <summary>Suporte aéreo (pórtico, semipórtico ou braço projetado).</summary>
+    public bool Overhead => Support is TipoSuporte.BracoProjetado or TipoSuporte.SemiPortico or TipoSuporte.Portico;
     /// <summary>Legenda substituta (vazio = a do catálogo; "-" = sem legenda).</summary>
     public string? Legend { get; set; }
     /// <summary>Deslocamento lateral da placa em relação ao suporte (m, + à direita do condutor).</summary>

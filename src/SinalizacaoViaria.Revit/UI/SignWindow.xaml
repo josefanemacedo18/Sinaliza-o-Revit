@@ -58,7 +58,7 @@
                 <GroupBox Header="Suporte">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Text="Tipo de suporte" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Column="1" x:Name="CbSupport" SelectionChanged="AnyChanged"/>
                         <TextBlock Grid.Row="1" Text="Altura livre sob a placa (m)" Style="{StaticResource FieldLabel}"/>
@@ -69,6 +69,13 @@
                         <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbLateral" Text="0" TextChanged="AnyChanged" ToolTip="+ à direita do condutor"/>
                         <TextBlock Grid.Row="4" Text="Nível da base (m)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="4" Grid.Column="1" x:Name="TbBase" Text="0,15" TextChanged="AnyChanged" ToolTip="Acima do ponto clicado: 0,15 = topo da calçada; 0 = nível da pista."/>
+                        <TextBlock Grid.Row="5" x:Name="LblSpan" Text="Vão da viga / braço (m)" Style="{StaticResource FieldLabel}" Visibility="Collapsed"/>
+                        <TextBox Grid.Row="5" Grid.Column="1" x:Name="TbSpan" Text="12" TextChanged="AnyChanged" Visibility="Collapsed"
+                                 ToolTip="A viga parte da coluna (ponto clicado, no bordo) e avança para o lado do deslocamento da placa. No pórtico, a segunda coluna fica no fim do vão."/>
+                        <TextBlock Grid.Row="6" x:Name="LblColumn" Text="Coluna da estrutura (m)" Style="{StaticResource FieldLabel}" Visibility="Collapsed"/>
+                        <TextBox Grid.Row="6" Grid.Column="1" x:Name="TbColumn" Text="0,30" TextChanged="AnyChanged" Visibility="Collapsed"/>
+                        <TextBlock Grid.Row="7" x:Name="LblBeam" Text="Altura da viga (m)" Style="{StaticResource FieldLabel}" Visibility="Collapsed"/>
+                        <TextBox Grid.Row="7" Grid.Column="1" x:Name="TbBeam" Text="0,60" TextChanged="AnyChanged" Visibility="Collapsed"/>
                     </Grid>
                 </GroupBox>
                 <GroupBox x:Name="GbPlacement" Header="Inserção">

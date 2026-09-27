@@ -203,6 +203,11 @@ public static class SignGenerator
                 Post(center - right * (w / 3));
                 Post(center + right * (w / 3));
                 break;
+            case TipoSuporte.BracoProjetado:
+            case TipoSuporte.SemiPortico:
+            case TipoSuporte.Portico:
+                Overhead(geo, d, plateH, f, right);
+                break;
         }
         geo.UnitCount = 1;
         geo.PathLength = 0;
@@ -210,7 +215,54 @@ public static class SignGenerator
         var marker = d.Code.StartsWith("MA-", StringComparison.OrdinalIgnoreCase) || d.Code.StartsWith("MP-", StringComparison.OrdinalIgnoreCase);
         if (bottom < 2.0 && d.Support != TipoSuporte.Nenhum && !marker)
             geo.Warnings.Add($"Altura livre de {bottom:0.00} m – em calçadas o MBST recomenda no mínimo 2,10 m sob a placa.");
+        if (d.Overhead && bottom < 5.5)
+            geo.Warnings.Add($"Placa aérea com altura livre de {bottom:0.00} m – o MBST/DER exigem no mínimo 5,50 m sobre a pista.");
         return geo;
+    }
+
+    /// <summary>
+    /// Suportes aéreos (MBST Vol. I/III; DER/SP): a coluna fica em <c>Position</c> (bordo da pista) e a viga/braço avança
+    /// na direção da placa (deslocamento lateral) até o vão informado; no pórtico há uma segunda coluna no fim do vão.
+    /// </summary>
+    private static void Overhead(MarkingGeometry geo, SignDefinition d, double plateH, Vec2 f, Vec2 right)
+    {
+        var span = Math.Max(1.0, d.StructureSpan);
+        var dir = d.LateralOffset < 0 ? -1.0 : 1.0;   // lado para onde a viga avança
+        var col = Math.Clamp(d.StructureColumn, 0.10, 1.0);
+        var beamH = Math.Clamp(d.StructureBeam, 0.15, 2.0);
+        var top = d.MountHeight + plateH + 0.10 + beamH;          // topo da viga acima da placa
+        var truss = d.Support != TipoSuporte.BracoProjetado;
+        MarkingPiece Column(Vec2 at, double h) => new(new Polygon2(CurveTools.Circle(at, col / 2, 0.002)), MarkingColor.Metal) { Thickness = h };
+        geo.Pieces.Add(Column(d.Position, top));
+        if (d.Support == TipoSuporte.Portico) geo.Pieces.Add(Column(d.Position + right * (dir * span), top));
+        // Viga: caixa (braço) ou viga treliçada esquemática (banzos + montantes) ao longo da direção lateral.
+        var depth = truss ? Math.Max(0.30, col) : Math.Max(0.15, col * 0.8);
+        Polygon2 Box(double z0, double z1, double half) => new(new[] { new Vec2(-half, z0), new Vec2(half, z0), new Vec2(half, z1), new Vec2(-half, z1) });
+        var start = d.Position - right * (dir * col / 2);
+        var extrude = right * dir;
+        var len = span + col;
+        if (!truss)
+            geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(start, f, Box(top - beamH, top, depth / 2), extrude, len), MarkingColor.Metal));
+        else
+        {
+            var chord = Math.Clamp(beamH * 0.15, 0.06, 0.20);
+            geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(start, f, Box(top - chord, top, depth / 2), extrude, len), MarkingColor.Metal));
+            geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(start, f, Box(top - beamH, top - beamH + chord, depth / 2), extrude, len), MarkingColor.Metal));
+            var n = Math.Max(2, (int)Math.Round(len / 1.5));
+            for (int i = 0; i <= n; i++)
+            {
+                var at = start + extrude * (len * i / n);
+                foreach (var sg in new[] { 1.0, -1.0 })
+                    geo.Pieces.Add(new MarkingPiece(Polygon2.Rectangle(at + f * (sg * depth / 2) - right * 0.03 - f * 0.03, at + f * (sg * depth / 2) + right * 0.03 + f * 0.03), MarkingColor.Metal)
+                    { Elevation = top - beamH + chord, Thickness = beamH - 2 * chord });
+            }
+        }
+        // Pendurais entre a viga e a placa.
+        var plateCenter = d.Position + right * d.LateralOffset;
+        var w = d.Width ?? 1.0;
+        foreach (var sg in new[] { -0.35, 0.35 })
+            geo.Pieces.Add(new MarkingPiece(Polygon2.Rectangle(plateCenter + right * (sg * w) - right * 0.03 - f * 0.03, plateCenter + right * (sg * w) + right * 0.03 + f * 0.03), MarkingColor.Metal)
+            { Elevation = d.MountHeight + plateH, Thickness = 0.10 + 1e-3 });
     }
 }
 

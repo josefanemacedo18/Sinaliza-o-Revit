@@ -22,6 +22,21 @@ public sealed class GeometryPreview : FrameworkElement
     /// <summary>Escala da vista usada para dimensionar os textos de detalhamento na prévia.</summary>
     public double ViewScale { get; set; } = 100;
 
+    /// <summary>Vista 3D (isométrica) em vez de planta – alternada pelo botão no canto da prévia.</summary>
+    public bool Iso { get; set; }
+
+    private Rect _toggleRect;
+
+    public GeometryPreview()
+    {
+        MouseLeftButtonDown += (_, e) =>
+        {
+            if (!_toggleRect.Contains(e.GetPosition(this))) return;
+            Iso = !Iso;
+            InvalidateVisual();
+        };
+    }
+
     private static readonly Brush Asphalt = Freeze(new SolidColorBrush(Color.FromRgb(62, 66, 72)));
     private static readonly Brush Surround = Freeze(new SolidColorBrush(Color.FromRgb(214, 219, 206)));
     private static readonly Pen GuidePen = Freeze(new Pen(new SolidColorBrush(Color.FromArgb(200, 230, 90, 210)), 1) { DashStyle = DashStyles.Dash });
@@ -46,6 +61,12 @@ public sealed class GeometryPreview : FrameworkElement
         var h = ActualHeight;
         if (w < 10 || h < 10) return;
         dc.DrawRectangle(Paper ? Brushes.White : _pavement.Count > 0 ? Surround : Asphalt, null, new Rect(0, 0, w, h));
+        if (Iso && !Paper && _geometry != null && _geometry.Pieces.Count > 0)
+        {
+            RenderIso(dc, w, h);
+            DrawToggle(dc, w);
+            return;
+        }
 
         var pts = new List<Vec2>();
         if (_geometry != null) foreach (var p in _geometry.Pieces) pts.AddRange(p.Shape.Outer);
@@ -88,6 +109,7 @@ public sealed class GeometryPreview : FrameworkElement
         if (_geometry != null) DrawAnnotations(dc, s, P);
 
         if (Paper) return;
+        DrawToggle(dc, w);
         DrawScaleBar(dc, s, h);
         if (_message != null) DrawText(dc, _message, new Point(8, 6), Brushes.White, 11);
         if (_geometry != null)
@@ -96,6 +118,93 @@ public sealed class GeometryPreview : FrameworkElement
                        (_geometry.UnitCount > 0 ? $"   Unidades: {_geometry.UnitCount}" : "");
             DrawText(dc, info, new Point(8, h - 20), Brushes.White, 11);
         }
+    }
+
+    /// <summary>Botão "3D / Planta" no canto superior direito.</summary>
+    private void DrawToggle(DrawingContext dc, double w)
+    {
+        var label = Iso ? "Planta" : "3D";
+        var ft = new FormattedText(label, UiHelpers.PtBr, FlowDirection.LeftToRight, new Typeface("Segoe UI"), 11, Brushes.White, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        _toggleRect = new Rect(w - ft.Width - 22, 6, ft.Width + 16, ft.Height + 6);
+        dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromArgb(170, 30, 90, 160)), new Pen(Brushes.White, 1), _toggleRect, 4, 4);
+        dc.DrawText(ft, new Point(_toggleRect.X + 8, _toggleRect.Y + 3));
+    }
+
+    /// <summary>
+    /// Vista isométrica das mesmas peças (sólidos, perfis extrudados e peças planas com espessura), com ordenação por
+    /// profundidade e sombreamento simples – dá a noção do volume real do elemento (tachão, balizador, placa, poste...).
+    /// </summary>
+    private void RenderIso(DrawingContext dc, double w, double h)
+    {
+        var faces = new List<(List<Vec3> Pts, MarkingColor C)>();
+        foreach (var pav in _pavement) faces.Add((pav.Outer.Select(v => Vec3.At(v, -0.02)).ToList(), MarkingColor.Asfalto));
+        foreach (var p in _geometry!.Pieces)
+        {
+            if (p.Solid != null) { foreach (var f in p.Solid.Faces) faces.Add((f, p.Color)); continue; }
+            if (p.Profile != null)
+            {
+                var pr = p.Profile;
+                var ring = pr.Profile.Outer.Select(q => Vec3.At(pr.Origin + pr.XDir * q.X, q.Y)).ToList();
+                var dz = pr.ExtrudeDir * pr.Depth;
+                var ring2 = ring.Select(v => new Vec3(v.X + dz.X, v.Y + dz.Y, v.Z)).ToList();
+                faces.Add((ring, p.Color));
+                faces.Add((ring2, p.Color));
+                for (int i = 0; i < ring.Count; i++)
+                {
+                    var j = (i + 1) % ring.Count;
+                    faces.Add((new List<Vec3> { ring[i], ring[j], ring2[j], ring2[i] }, p.Color));
+                }
+                continue;
+            }
+            var z0 = p.Elevation;
+            var z1 = p.Elevation + Math.Max(0.003, p.Thickness);
+            var outer = p.Shape.Outer;
+            faces.Add((outer.Select(v => Vec3.At(v, z1)).ToList(), p.Color));
+            if (p.Thickness > 0.004)
+                for (int i = 0; i < outer.Count; i++)
+                {
+                    var a = outer[i];
+                    var b = outer[(i + 1) % outer.Count];
+                    faces.Add((new List<Vec3> { Vec3.At(a, z0), Vec3.At(b, z0), Vec3.At(b, z1), Vec3.At(a, z1) }, p.Color));
+                }
+        }
+        if (faces.Count == 0) return;
+        const double az = -35 * Math.PI / 180, el = 30 * Math.PI / 180;
+        double ca = Math.Cos(az), sa = Math.Sin(az), ce = Math.Cos(el), se = Math.Sin(el);
+        (double X, double Y, double D) Pr(Vec3 v)
+        {
+            var x = v.X * ca - v.Y * sa;
+            var y = v.X * sa + v.Y * ca;
+            return (x, v.Z * ce + y * se, y * ce - v.Z * se);
+        }
+        var light = new Vec3(-0.4, -0.6, 0.7);
+        var ll = Math.Sqrt(light.Dot(light));
+        light = light * (1 / ll);
+        var list = faces.Select(f => (P: f.Pts.Select(Pr).ToList(), f.C, N: Polyhedron.Normal(f.Pts))).ToList();
+        var all = list.SelectMany(f => f.P).ToList();
+        double minX = all.Min(q => q.X), maxX = all.Max(q => q.X), minY = all.Min(q => q.Y), maxY = all.Max(q => q.Y);
+        var margin = 20.0;
+        var s = Math.Min((w - 2 * margin) / Math.Max(0.01, maxX - minX), (h - 2 * margin) / Math.Max(0.01, maxY - minY));
+        var ox = (w - (maxX - minX) * s) / 2;
+        var oy = (h - (maxY - minY) * s) / 2;
+        foreach (var f in list.OrderByDescending(f => f.P.Average(q => q.D)))
+        {
+            var rgb = MarkingColors.Display(f.C);
+            var nl = Math.Sqrt(f.N.Dot(f.N));
+            var shade = nl < 1e-12 ? 0.8 : 0.55 + 0.45 * Math.Abs(f.N.Dot(light) / nl);
+            var brush = new SolidColorBrush(Color.FromRgb((byte)(rgb.R * shade), (byte)(rgb.G * shade), (byte)(rgb.B * shade)));
+            brush.Freeze();
+            var sg = new StreamGeometry();
+            using (var ctx = sg.Open())
+            {
+                var pts = f.P.Select(q => new Point(ox + (q.X - minX) * s, h - (oy + (q.Y - minY) * s))).ToList();
+                ctx.BeginFigure(pts[0], true, true);
+                ctx.PolyLineTo(pts.Skip(1).ToList(), true, false);
+            }
+            sg.Freeze();
+            dc.DrawGeometry(brush, null, sg);
+        }
+        DrawText(dc, "Vista 3D (isométrica) – clique em Planta para voltar", new Point(8, h - 20), Brushes.White, 11);
     }
 
     private double TextModelHeight(AnnotationText t) => t.PaperHeightMm * ViewScale / 1000.0;

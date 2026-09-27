@@ -123,3 +123,27 @@ public class V15Tests
         Assert.Equal(setup.TotalWidth, again.TotalWidth, 6);
     }
 }
+
+public class V15SignTests
+{
+    private static readonly Catalogo Cat = CatalogService.LoadDefault();
+    private static readonly BuildContext Ctx = new() { Catalog = Cat };
+
+    [Theory]
+    [InlineData(TipoSuporte.BracoProjetado, 1)]
+    [InlineData(TipoSuporte.SemiPortico, 1)]
+    [InlineData(TipoSuporte.Portico, 2)]
+    public void OverheadSupports_ColumnsAndBeam(TipoSuporte support, int columns)
+    {
+        var d = new SignDefinition { Code = "R-1", Position = Vec2.Zero, Direction = new Vec2(0, 1), Support = support, MountHeight = 5.5, LateralOffset = 6, StructureSpan = 12 };
+        var geo = MarkingBuilder.Build(d, null, Ctx);
+        Assert.True(d.Overhead);
+        var cols = geo.Pieces.Where(p => p.Color == MarkingColor.Metal && p.Profile == null && p.Solid == null && p.Elevation < 0.5 && p.Thickness > 6).ToList();
+        Assert.Equal(columns, cols.Count);
+        Assert.Contains(geo.Pieces, p => p.Profile != null && p.Color == MarkingColor.Metal && Math.Abs(p.Profile!.Depth - 12.3) < 1e-6);
+        Assert.DoesNotContain(geo.Warnings, w => w.Contains("5,50"));
+        d.MountHeight = 4.0;
+        Assert.Contains(MarkingBuilder.Build(d, null, Ctx).Warnings, w => w.Contains("5,50"));
+        if (support == TipoSuporte.Portico) Assert.Contains(cols, c => c.Shape.Centroid.X > 11.5);
+    }
+}

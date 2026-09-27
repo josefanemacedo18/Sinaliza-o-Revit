@@ -47,7 +47,11 @@ public partial class SignWindow : Window
         CbSupport.Items.Add(new Option<TipoSuporte>("Coluna simples", TipoSuporte.Simples));
         CbSupport.Items.Add(new Option<TipoSuporte>("Duas colunas", TipoSuporte.Duplo));
         CbSupport.Items.Add(new Option<TipoSuporte>("Sem suporte (fixada em poste/parede)", TipoSuporte.Nenhum));
+        CbSupport.Items.Add(new Option<TipoSuporte>("Braço projetado (coluna + braço sobre a pista)", TipoSuporte.BracoProjetado));
+        CbSupport.Items.Add(new Option<TipoSuporte>("Semipórtico (coluna + viga em balanço)", TipoSuporte.SemiPortico));
+        CbSupport.Items.Add(new Option<TipoSuporte>("Pórtico (duas colunas + viga sobre toda a pista)", TipoSuporte.Portico));
         CbSupport.SelectedIndex = 0;
+        CbSupport.SelectionChanged += SupportChanged;
         CbCategory.SelectedIndex = 0;
         Output.Changed += (_, _) => UpdatePreview();
 
@@ -67,6 +71,10 @@ public partial class SignWindow : Window
             TbBase.Text = UiHelpers.F(existing.BaseElevation, "0.##");
             foreach (var item in CbSupport.Items)
                 if (item is Option<TipoSuporte> o && o.Value == existing.Support) CbSupport.SelectedItem = item;
+            TbSpan.Text = UiHelpers.F(existing.StructureSpan, "0.##");
+            TbColumn.Text = UiHelpers.F(existing.StructureColumn, "0.###");
+            TbBeam.Text = UiHelpers.F(existing.StructureBeam, "0.##");
+            ShowStructureFields();
             Output.Load(existing.Output);
         }
         else
@@ -117,6 +125,32 @@ public partial class SignWindow : Window
 
     private void AnyChanged(object sender, RoutedEventArgs e) => UpdatePreview();
 
+    private TipoSuporte SelectedSupport => (CbSupport.SelectedItem as Option<TipoSuporte>)?.Value ?? TipoSuporte.Simples;
+    private bool OverheadSelected => SelectedSupport is TipoSuporte.BracoProjetado or TipoSuporte.SemiPortico or TipoSuporte.Portico;
+
+    private void ShowStructureFields()
+    {
+        var v = OverheadSelected ? Visibility.Visible : Visibility.Collapsed;
+        LblSpan.Visibility = TbSpan.Visibility = LblColumn.Visibility = TbColumn.Visibility = LblBeam.Visibility = TbBeam.Visibility = v;
+    }
+
+    private void SupportChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        ShowStructureFields();
+        // Placas aéreas: altura livre mínima de 5,50 m (MBST/DER) e placa deslocada para o meio da pista.
+        if (OverheadSelected)
+        {
+            if (UiHelpers.Parse(TbMount, 2.1, "Altura livre", 0, 20) < 5.5) TbMount.Text = "5,50";
+            if (Math.Abs(UiHelpers.Parse(TbLateral, 0, "Deslocamento", -100, 100)) < 0.5)
+            {
+                var span = UiHelpers.Parse(TbSpan, 12, "Vão", 1, 100);
+                TbLateral.Text = UiHelpers.F(SelectedSupport == TipoSuporte.Portico ? span / 2 : span - 2.0, "0.##");
+            }
+        }
+        else if (UiHelpers.Parse(TbMount, 2.1, "Altura livre", 0, 20) > 4) TbMount.Text = "2,10";
+    }
+
     private SignDefinition BuildDefinition()
     {
         var p = Plate ?? throw new FormatException("Selecione uma placa.");
@@ -129,7 +163,10 @@ public partial class SignWindow : Window
         d.Height = Math.Abs(h - p.Altura) > 1e-9 ? h : null;
         d.Legend = string.IsNullOrWhiteSpace(TbLegend.Text) ? null : TbLegend.Text.Trim();
         d.Support = (CbSupport.SelectedItem as Option<TipoSuporte>)?.Value ?? TipoSuporte.Simples;
-        d.MountHeight = UiHelpers.Parse(TbMount, 2.10, "Altura livre", 0, 10);
+        d.MountHeight = UiHelpers.Parse(TbMount, 2.10, "Altura livre", 0, 12);
+        d.StructureSpan = UiHelpers.Parse(TbSpan, 12, "Vão da viga", 1, 100);
+        d.StructureColumn = UiHelpers.Parse(TbColumn, 0.30, "Coluna da estrutura", 0.1, 1.0);
+        d.StructureBeam = UiHelpers.Parse(TbBeam, 0.60, "Altura da viga", 0.15, 2.0);
         d.PostDiameter = UiHelpers.Parse(TbPost, 0.063, "Diâmetro da coluna", 0.02, 0.5);
         d.LateralOffset = UiHelpers.Parse(TbLateral, 0, "Deslocamento", -10, 10);
         d.BaseElevation = UiHelpers.Parse(TbBase, 0.15, "Nível da base", -5, 50);
@@ -154,7 +191,24 @@ public partial class SignWindow : Window
             void Post(double x) => geo.Pieces.Insert(0, new MarkingPiece(Polygon2.Rectangle(new Vec2(x - post / 2, 0), new Vec2(x + post / 2, top)), MarkingColor.Metal));
             if (d.Support == TipoSuporte.Simples) Post(-d.LateralOffset);
             else if (d.Support == TipoSuporte.Duplo) { Post(-w / 3); Post(w / 3); }
-            var ground = Polygon2.Rectangle(new Vec2(-Math.Max(1.2, w), -0.15), new Vec2(Math.Max(1.2, w), 0));
+            var groundHalf = Math.Max(1.2, w);
+            if (d.Overhead)
+            {
+                // Elevação: coluna no bordo (x = −deslocamento), viga avançando sobre a pista até o vão.
+                var dir = d.LateralOffset < 0 ? -1.0 : 1.0;
+                var x0 = -d.LateralOffset;
+                var beamTop = top + 0.10 + d.StructureBeam;
+                var c = d.StructureColumn;
+                geo.Pieces.Insert(0, new MarkingPiece(Polygon2.Rectangle(new Vec2(x0 - c / 2, 0), new Vec2(x0 + c / 2, beamTop)), MarkingColor.Metal));
+                var x1 = x0 + dir * d.StructureSpan;
+                geo.Pieces.Insert(0, new MarkingPiece(Polygon2.Rectangle(new Vec2(Math.Min(x0, x1) - c / 2, beamTop - d.StructureBeam), new Vec2(Math.Max(x0, x1) + c / 2, beamTop)), MarkingColor.Metal));
+                if (d.Support == TipoSuporte.Portico) geo.Pieces.Insert(0, new MarkingPiece(Polygon2.Rectangle(new Vec2(x1 - c / 2, 0), new Vec2(x1 + c / 2, beamTop)), MarkingColor.Metal));
+                foreach (var sg in new[] { -0.35, 0.35 })
+                    geo.Pieces.Insert(0, new MarkingPiece(Polygon2.Rectangle(new Vec2(sg * w - 0.03, top), new Vec2(sg * w + 0.03, top + 0.10)), MarkingColor.Metal));
+                groundHalf = Math.Max(groundHalf, Math.Max(Math.Abs(x0), Math.Abs(x1)) + 1);
+                top = beamTop;
+            }
+            var ground = Polygon2.Rectangle(new Vec2(-groundHalf, -0.15), new Vec2(groundHalf, 0));
             Preview.Show(geo, null, new[] { ground }, $"Altura total: {UiHelpers.F(top)} m");
             var full = MarkingBuilder.Build(d, null, new BuildContext { Catalog = _cat, Glyphs = PluginContext.Glyphs });
             TxtWarnings.Text = string.Join("\n", full.Warnings.Distinct());

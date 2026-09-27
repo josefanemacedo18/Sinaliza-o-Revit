@@ -678,8 +678,27 @@ public sealed class MarkingService
         return loop;
     }
 
+    /// <summary>
+    /// Contorno pronto para o Revit: união (remove auto-toques), arestas menores que 1 cm e vértices colineares removidos.
+    /// Curvas discretizadas e recortes oblíquos geram arestas submilimétricas que o Revit recusa.
+    /// </summary>
+    private static Polygon2 Prepare(Polygon2 poly)
+    {
+        try
+        {
+            var u = PolygonOps.Union(new[] { poly }).OrderByDescending(p => p.Area).FirstOrDefault();
+            var simplified = (u ?? poly).Simplified(0.01, 1e-4);
+            return simplified ?? u ?? poly;
+        }
+        catch
+        {
+            return poly.Simplified(0.01, 1e-4) ?? poly;
+        }
+    }
+
     private IList<CurveLoop> ToCurveLoops(Polygon2 poly, double zFt)
     {
+        poly = Prepare(poly);
         var loops = new List<CurveLoop>();
         var outer = ToCurveLoop(poly.Outer, zFt);
         if (outer == null) return loops;
@@ -746,8 +765,35 @@ public sealed class MarkingService
             var baseType = types.FirstOrDefault(t => !t.IsFoundationSlab) ?? types.FirstOrDefault();
             if (baseType == null) return ElementId.InvalidElementId;
             ft = (FloorType)baseType.Duplicate(name);
-            var cs = CompoundStructure.CreateSingleLayerCompoundStructure(MaterialFunctionAssignment.Structure, UnitConv.Ft(thicknessM), Styles.Material(color));
-            ft.SetCompoundStructure(cs);
+            // A estrutura do tipo copiado é reduzida a uma camada (uma estrutura nova pode ter condição de EndCap
+            // inválida para pisos e ser recusada pelo Revit).
+            try
+            {
+                var cs = ft.GetCompoundStructure();
+                if (cs == null) throw new InvalidOperationException("tipo sem estrutura composta");
+                var keep = Math.Max(0, cs.StructuralMaterialIndex);
+                for (int i = cs.LayerCount - 1; i >= 0; i--) if (i != keep && cs.LayerCount > 1) cs.DeleteLayer(i);
+                cs.SetLayerWidth(0, UnitConv.Ft(thicknessM));
+                cs.SetMaterialId(0, Styles.Material(color));
+                cs.SetLayerFunction(0, MaterialFunctionAssignment.Structure);
+                cs.EndCap = EndCapCondition.NoEndCap;
+                ft.SetCompoundStructure(cs);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("FloorType (estrutura copiada)", ex);
+                try
+                {
+                    var cs = CompoundStructure.CreateSingleLayerCompoundStructure(MaterialFunctionAssignment.Structure, UnitConv.Ft(thicknessM), Styles.Material(color));
+                    cs.EndCap = EndCapCondition.NoEndCap;
+                    ft.SetCompoundStructure(cs);
+                }
+                catch (Exception ex2)
+                {
+                    // Fica o tipo copiado (espessura/material do tipo base) – melhor um piso do que nenhum.
+                    Log.Error("FloorType (estrutura nova)", ex2);
+                }
+            }
         }
         _floorTypes[(color, mm)] = ft.Id;
         return ft.Id;
@@ -795,7 +841,7 @@ public sealed class MarkingService
         Polygon2 Prep(Polygon2 p) => groundFt == null ? p : Densified(p, 4.0);
         var attempts = new List<Func<List<Polygon2>>>
         {
-            () => new List<Polygon2> { Prep(piece.Shape.Simplified(0.005) ?? piece.Shape) },
+            () => new List<Polygon2> { Prep(Prepare(piece.Shape)) },
             () => PolygonOps.Clean(new[] { piece.Shape }),
             () => PolygonOps.Clean(new[] { piece.Shape }).SelectMany(p => PolygonOps.SplitHoles(p)).ToList(),
         };
