@@ -78,6 +78,14 @@ public partial class QuantitiesWindow : Window
     private void Refresh()
     {
         var v = Visible;
+        // Categorias de memorial: sem colunas de cor, material, consumo, área e extensão.
+        var memorialOnly = Category is { } cat && QuantityRow.IsMemorialCategory(cat);
+        var vis = memorialOnly ? Visibility.Collapsed : Visibility.Visible;
+        ColColor.Visibility = vis;
+        ColMaterial.Visibility = vis;
+        ColConsumption.Visibility = vis;
+        ColLength.Visibility = vis;
+        ColArea.Visibility = vis;
         GridCategories.ItemsSource = CategoryTree(v);
         GridSummary.ItemsSource = QuantityCalculator.Summary(v);
         GridHierarchy.ItemsSource = QuantityCalculator.HierarchySummary(v);
@@ -146,7 +154,7 @@ public partial class QuantitiesWindow : Window
         if (dlg.ShowDialog(this) != true) return;
         try
         {
-            File.WriteAllText(dlg.FileName, QuantityCalculator.ToCsv(v, QuantityCalculator.Summary(v)), new UTF8Encoding(true));
+            File.WriteAllText(dlg.FileName, QuantityCalculator.ToCsv(v, QuantityCalculator.Summary(v), _projectName), new UTF8Encoding(true));
             MessageBox.Show(this, "Arquivo exportado:\n" + dlg.FileName, "Quantitativos", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)

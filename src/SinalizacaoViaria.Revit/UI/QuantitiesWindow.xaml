@@ -62,7 +62,7 @@
 
         <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
             <TextBlock DockPanel.Dock="Left" Style="{StaticResource Hint}" VerticalAlignment="Center" MaxWidth="560" TextWrapping="Wrap"
-                       Text="Área pintada para tintas; área em planta para concreto, grama e demais elementos físicos. Consumos estimados pelo catálogo de materiais. Clique numa linha para ver referência e detalhes."/>
+                       Text="Placas, dispositivos, mobiliário, moderação e acessibilidade: memorial por modelo (quantidade). Sinalização horizontal e pavimentação: área, extensão, cor e material. Clique numa linha para ver a referência normativa."/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Exportar CSV (Excel)" Click="ExportClick" ToolTip="Exporta a seleção atual, separada por categoria e subcategoria, com subtotais e resumos."/>
                 <Button Content="Criar tabela no Revit" Click="ScheduleClick" ToolTip="Tabela 'SV - Quantitativos' agrupada por categoria, hierarquia e subcategoria, com subtotais (parâmetros SV_*)."/>
@@ -123,7 +123,7 @@
                         </GroupStyle>
                     </DataGrid.GroupStyle>
                     <DataGrid.Columns>
-                        <DataGridTemplateColumn Header="Cor" Width="92">
+                        <DataGridTemplateColumn x:Name="ColColor" Header="Cor" Width="92">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -142,12 +142,12 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
                         <DataGridTextColumn Header="Un." Binding="{Binding Unit}" Width="40"/>
-                        <DataGridTextColumn Header="Área (m²)" Binding="{Binding Area, StringFormat=N2, ConverterCulture=pt-BR}" Width="82">
+                        <DataGridTextColumn x:Name="ColArea" Header="Área (m²)" Binding="{Binding Area, StringFormat=N2, ConverterCulture=pt-BR}" Width="82">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Margin" Value="0,0,6,0"/></Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Header="Extensão (m)" Binding="{Binding PaintedLength, StringFormat=N2, ConverterCulture=pt-BR}" Width="90">
+                        <DataGridTextColumn x:Name="ColLength" Header="Extensão (m)" Binding="{Binding PaintedLength, StringFormat=N2, ConverterCulture=pt-BR}" Width="90">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Right"/><Setter Property="Margin" Value="0,0,6,0"/></Style>
                             </DataGridTextColumn.ElementStyle>
@@ -158,8 +158,8 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
                         <DataGridTextColumn Header="Hierarquia" Binding="{Binding HierarchyName}" Width="120"/>
-                        <DataGridTextColumn Header="Material" Binding="{Binding Material}" Width="140"/>
-                        <DataGridTextColumn Header="Consumo" Binding="{Binding ConsumptionText}" Width="100"/>
+                        <DataGridTextColumn x:Name="ColMaterial" Header="Material" Binding="{Binding Material}" Width="140"/>
+                        <DataGridTextColumn x:Name="ColConsumption" Header="Consumo" Binding="{Binding ConsumptionText}" Width="100"/>
                     </DataGrid.Columns>
                     <DataGrid.RowDetailsTemplate>
                         <DataTemplate>

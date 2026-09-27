@@ -382,6 +382,10 @@ partir do pavimento – confira antes de aplicar.
 
 ## 10. Quantitativos
 
+**Exportação CSV.** O arquivo segue o desenho da janela: cabeçalho do projeto, um bloco por categoria com as
+subcategorias como títulos, colunas próprias de cada categoria (memorial: código, descrição, quantidade, elementos;
+horizontal: cor, material, área, extensão, consumo), subtotais e os resumos por categoria, hierarquia e pintura.
+
 **Memorial × quantidades.** As categorias **Sinalização vertical, Dispositivos, Mobiliário, Moderação de tráfego e
 Acessibilidade** são listadas como **memorial**: **uma linha por modelo** (ex.: *R-1 – Parada obrigatória: 3 un*), sem
 desdobrar por cor nem por material da chapa. Cores e materiais (consumo de tinta, microesferas) continuam só na
@@ -440,7 +444,7 @@ projetado** (coluna no bordo e braço sobre a pista), **semipórtico** (coluna r
 viga; a altura livre passa a 5,50 m (mínimo do MBST/DER) e a placa é deslocada para o meio da pista. O 1º clique é a
 coluna no bordo; o deslocamento da placa (positivo à direita do condutor) diz para que lado a viga avança.
 
-**Prévia 3D.** Em todas as janelas com pré-visualização há o botão **3D / Planta** no canto da prévia: a vista
+**Prévia 3D, zoom e pan.** Em todas as janelas com pré-visualização há o seletor **Planta | 3D** (o modo ativo fica destacado); a roda do mouse dá zoom em torno do cursor, arrastar move e o duplo clique reenquadra. O botão **3D / Planta** no canto da prévia: a vista
 isométrica mostra o volume real do elemento (tachão, balizador, placa com suporte, quebra-mola...), o que ajuda a escolher
 o tipo de cara.
 
@@ -649,6 +653,10 @@ automaticamente. A interseção:
 Funciona para **qualquer geometria**: cruzamentos ortogonais ou oblíquos, entroncamentos em **T** e em
 **Y**, vias curvas e nós com vários ramos. Em ângulos agudos as esquinas continuam arredondadas.
 
+**Esquinas com a composição das vias.** Com *Esquinas com a mesma composição das calçadas das vias* (ligado por
+padrão), a faixa de serviço gramada definida na seção das vias continua pela curva da esquina, entre o meio-fio e o
+passeio, alinhando o cruzamento com as vias. Desligue para esquinas só em concreto.
+
 ### 19.1 Via principal e controle
 
 A **via principal** (preferencial) é escolhida automaticamente – a que atravessa o nó (dois ramos), depois
@@ -700,7 +708,7 @@ tipos e o controle escolhidos a todas as interseções do projeto.
 **Rotatória elevada (platô)** e **ilha em calota**: em *Ilha central e anel*, marque *Rotatória elevada* para a pista
 giratória subir (altura e comprimento das rampas editáveis; rampas geradas em cada ramo) – solução de moderação de
 tráfego em vias locais, que exige A-18/A-32b e atenção à drenagem. A ilha **Calota rampada** é um tronco de cone baixo de
-concreto (altura no centro editável), galgável pelas rodas traseiras de veículos longos, usada em minirrotatórias e
+concreto (altura no centro, tamanho do platô superior e **platô gramado** opcionais), galgável pelas rodas traseiras de veículos longos, usada em minirrotatórias e
 rotatórias compactas.
 
 **Tipos** (escolha em *Tipo de rotatória* – os valores de referência são aplicados e **tudo continua

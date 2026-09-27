@@ -329,45 +329,67 @@ public static class QuantityCalculator
             })
             .OrderBy(r => r.Color).ToList();
 
-    /// <summary>CSV no padrão brasileiro (separador ";" e vírgula decimal), pronto para o Excel – separado por categoria.</summary>
-    public static string ToCsv(IEnumerable<QuantityRow> rows, IEnumerable<QuantityRow>? summary = null)
+    /// <summary>
+    /// CSV no padrão brasileiro (";" e vírgula decimal, UTF-8 com BOM) organizado como a janela: cabeçalho do projeto,
+    /// um bloco por categoria e subcategoria com as colunas que fazem sentido para ela (memorial: modelo e quantidade;
+    /// horizontal: cor, material, área, extensão e consumo), subtotais e resumos ao final.
+    /// </summary>
+    public static string ToCsv(IEnumerable<QuantityRow> rows, IEnumerable<QuantityRow>? summary = null, string? projectName = null)
     {
         var pt = CultureInfo.GetCultureInfo("pt-BR");
         var sb = new StringBuilder();
-        const string header = "Categoria;Hierarquia viária;Subcategoria;Código;Descrição;Cor;Material;Quantidade;Unidade;Área (m²);Extensão (m);Unidades;Elementos;Consumo estimado;Unidade consumo;Microesferas (kg);Referência";
-        void Row(QuantityRow r) => sb.AppendLine(string.Join(";",
-            Esc(r.CategoryName), Esc(r.HierarchyName), Esc(r.SubcategoryName), Esc(r.Code), Esc(r.Name), r.Color, Esc(r.Material),
-            r.MainQuantity.ToString("0.00", pt), Esc(r.Unit),
-            r.Area.ToString("0.00", pt), r.PaintedLength.ToString("0.00", pt), r.Units, r.Elements,
-            r.MaterialConsumption.ToString("0.00", pt), Esc(r.ConsumptionUnit), r.GlassBeadsKg.ToString("0.00", pt), Esc(r.Reference)));
+        string N(double v) => v.ToString("0.00", pt);
+        string Q(double v) => v.ToString("0.##", pt);
         var list = rows.ToList();
+        sb.AppendLine("QUANTITATIVO DE SINALIZAÇÃO VIÁRIA E URBANIZAÇÃO");
+        if (!string.IsNullOrWhiteSpace(projectName)) sb.AppendLine(Esc("Projeto: " + projectName));
+        sb.AppendLine(Esc($"Emitido em {DateTime.Now:dd/MM/yyyy HH:mm} – SinalizaBIM"));
+        sb.AppendLine(Esc($"{list.Count} item(ns) em {list.Select(r => r.Category).Distinct().Count()} categoria(s)"));
+        sb.AppendLine();
         foreach (var g in list.GroupBy(r => r.Category).OrderBy(g => g.Key))
         {
+            var memorial = QuantityRow.IsMemorialCategory(g.Key);
             sb.AppendLine(Esc(QuantityRow.CategoryLabel(g.Key).ToUpperInvariant()));
-            sb.AppendLine(header);
-            foreach (var r in g) Row(r);
+            sb.AppendLine(memorial
+                ? "Item;Código;Descrição;Quantidade;Un.;Elementos no modelo;Hierarquia viária;Referência"
+                : "Item;Código;Descrição;Cor;Material;Quantidade;Un.;Área (m²);Extensão (m);Unidades;Consumo estimado;Un. consumo;Microesferas (kg);Hierarquia viária;Referência");
+            var n = 0;
+            foreach (var sg in g.GroupBy(r => r.SubcategoryName).OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                sb.AppendLine(Esc("  " + sg.Key));
+                foreach (var r in sg)
+                {
+                    n++;
+                    if (memorial)
+                        sb.AppendLine(string.Join(";", n, Esc(r.Code), Esc(r.Name), Q(r.MainQuantity), Esc(r.Unit), r.Elements, Esc(r.HierarchyName), Esc(r.Reference)));
+                    else
+                        sb.AppendLine(string.Join(";", n, Esc(r.Code), Esc(r.Name), Esc(r.IsFamily ? "" : r.ColorLabel), Esc(r.Material), Q(r.MainQuantity), Esc(r.Unit),
+                            N(r.Area), N(r.PaintedLength), r.Units, r.MaterialConsumption > 1e-6 ? N(r.MaterialConsumption) : "", Esc(r.MaterialConsumption > 1e-6 ? r.ConsumptionUnit : ""),
+                            r.GlassBeadsKg > 1e-6 ? N(r.GlassBeadsKg) : "", Esc(r.HierarchyName), Esc(r.Reference)));
+                }
+            }
             var sub = CategorySummary(g).First();
-            sb.AppendLine(string.Join(";", "", "", "", "SUBTOTAL", "", "", "", "", "", sub.Area.ToString("0.00", pt), sub.PaintedLength.ToString("0.00", pt),
-                sub.Units, sub.Elements, sub.MaterialConsumption.ToString("0.00", pt), "", sub.GlassBeadsKg.ToString("0.00", pt), ""));
+            sb.AppendLine(memorial
+                ? string.Join(";", "", "SUBTOTAL", "", sub.Units, "un", sub.Elements, "", "")
+                : string.Join(";", "", "SUBTOTAL", "", "", "", "", "", N(sub.Area), N(sub.PaintedLength), sub.Units, N(sub.MaterialConsumption), "", N(sub.GlassBeadsKg), "", ""));
             sb.AppendLine();
         }
         sb.AppendLine("RESUMO POR CATEGORIA");
-        sb.AppendLine("Categoria;Área (m²);Extensão (m);Unidades;Elementos");
+        sb.AppendLine("Categoria;Itens;Área (m²);Extensão (m);Unidades;Consumo de tinta");
         foreach (var c in CategorySummary(list))
-            sb.AppendLine(string.Join(";", Esc(c.Name), c.Area.ToString("0.00", pt), c.PaintedLength.ToString("0.00", pt), c.Units, c.Elements));
+            sb.AppendLine(string.Join(";", Esc(c.Name), c.Elements, N(c.Area), N(c.PaintedLength), c.Units, N(c.MaterialConsumption)));
         sb.AppendLine();
         sb.AppendLine("RESUMO POR HIERARQUIA VIÁRIA (CTB art. 60)");
         sb.AppendLine("Hierarquia;Extensão de vias (m);Pavimento (m²);Área pintada (m²);Extensão pintada (m);Placas (un);Elementos;Consumo de tinta");
         foreach (var h in HierarchySummary(list))
-            sb.AppendLine(string.Join(";", Esc(h.Name), h.RoadLength.ToString("0.00", pt), h.PavementArea.ToString("0.00", pt), h.PaintedArea.ToString("0.00", pt),
-                h.PaintedLength.ToString("0.00", pt), h.Signs, h.Elements, h.PaintConsumption.ToString("0.00", pt)));
-        if (summary != null)
+            sb.AppendLine(string.Join(";", Esc(h.Name), N(h.RoadLength), N(h.PavementArea), N(h.PaintedArea), N(h.PaintedLength), h.Signs, h.Elements, N(h.PaintConsumption)));
+        if (summary != null && summary.Any())
         {
             sb.AppendLine();
-            sb.AppendLine("RESUMO DE PINTURA POR COR E MATERIAL");
-            sb.AppendLine("Cor;Material;Área (m²);Consumo estimado;Unidade consumo;Microesferas (kg)");
+            sb.AppendLine("PINTURA POR COR E MATERIAL");
+            sb.AppendLine("Cor;Material;Área (m²);Consumo estimado;Un. consumo;Microesferas (kg)");
             foreach (var r in summary)
-                sb.AppendLine(string.Join(";", r.Color, Esc(r.Material), r.Area.ToString("0.00", pt), r.MaterialConsumption.ToString("0.00", pt), Esc(r.ConsumptionUnit), r.GlassBeadsKg.ToString("0.00", pt)));
+                sb.AppendLine(string.Join(";", Esc(r.ColorLabel), Esc(r.Material), N(r.Area), N(r.MaterialConsumption), Esc(r.ConsumptionUnit), N(r.GlassBeadsKg)));
         }
         return sb.ToString();
     }

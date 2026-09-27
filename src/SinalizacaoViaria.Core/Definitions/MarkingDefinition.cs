@@ -1158,6 +1158,8 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public double CrosswalkSetback { get; set; } = 1.0;
     public bool StopLines { get; set; } = true;
     public bool Ramps { get; set; } = true;
+    /// <summary>Esquinas com a mesma composição da calçada das vias (meio-fio + faixa de serviço gramada + passeio).</summary>
+    public bool MatchRoadSection { get; set; } = true;
 
     /// <summary>Via preferencial (pavimento). Nulo = automática (a que atravessa o nó, mais larga e mais longa).</summary>
     public string? MainRoadId { get; set; }
@@ -1354,6 +1356,10 @@ public sealed class RoundaboutDefinition : MarkingDefinition
     public double ApronHeight { get; set; } = 0.06;
     /// <summary>Ilha em calota: altura no centro (m).</summary>
     public double DomeHeight { get; set; } = 0.15;
+    /// <summary>Ilha em calota: proporção do platô superior em relação ao raio da ilha (0,1 a 0,9).</summary>
+    public double DomeTopRatio { get; set; } = 0.35;
+    /// <summary>Ilha em calota: platô superior gramado.</summary>
+    public bool DomeGrassTop { get; set; }
     /// <summary>Rotatória elevada (platô): a pista giratória fica acima das vias, com rampas nas entradas/saídas (moderação de tráfego).</summary>
     public bool Raised { get; set; }
     /// <summary>Altura do platô (m) – 0,08 a 0,15 m.</summary>

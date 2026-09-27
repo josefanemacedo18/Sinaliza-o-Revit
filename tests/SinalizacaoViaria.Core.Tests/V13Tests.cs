@@ -150,7 +150,10 @@ public class V13Tests
         Assert.Equal(CategoriaQuantitativo.MobiliarioUrbano, poste.Category);
         var subs = QuantityCalculator.SubcategorySummary(all).Where(s => s.Category == CategoriaQuantitativo.MobiliarioUrbano).ToList();
         Assert.Contains(subs, s => s.Name == UrbanCategories.Label(CategoriaUrbana.Iluminacao) && s.Units == 2);
-        Assert.Contains("Subcategoria", QuantityCalculator.ToCsv(all));
+        var csv = QuantityCalculator.ToCsv(all, null, "Projeto teste");
+        Assert.Contains(UrbanCategories.Label(CategoriaUrbana.Iluminacao), csv);
+        Assert.Contains("Projeto: Projeto teste", csv);
+        Assert.Contains("SUBTOTAL", csv);
         Assert.Contains("Famílias/tipos", poste.DetailText);
     }
 

@@ -25,16 +25,53 @@ public sealed class GeometryPreview : FrameworkElement
     /// <summary>Vista 3D (isométrica) em vez de planta – alternada pelo botão no canto da prévia.</summary>
     public bool Iso { get; set; }
 
-    private Rect _toggleRect;
+    private Rect _togglePlan, _toggle3D;
+    private double _zoom = 1;
+    private Vector _pan;
+    private Point? _dragStart;
+    private Vector _panStart;
 
     public GeometryPreview()
     {
+        ClipToBounds = true;
         MouseLeftButtonDown += (_, e) =>
         {
-            if (!_toggleRect.Contains(e.GetPosition(this))) return;
-            Iso = !Iso;
+            var p = e.GetPosition(this);
+            if (_togglePlan.Contains(p)) { Iso = false; InvalidateVisual(); return; }
+            if (_toggle3D.Contains(p)) { Iso = true; InvalidateVisual(); return; }
+            if (e.ClickCount == 2) { _zoom = 1; _pan = new Vector(); InvalidateVisual(); return; }
+            _dragStart = p;
+            _panStart = _pan;
+            CaptureMouse();
+        };
+        MouseMove += (_, e) =>
+        {
+            if (_dragStart is not { } d0) return;
+            _pan = _panStart + (e.GetPosition(this) - d0);
             InvalidateVisual();
         };
+        MouseLeftButtonUp += (_, _) => { _dragStart = null; ReleaseMouseCapture(); };
+        MouseWheel += (_, e) =>
+        {
+            // Zoom com a roda do mouse em torno do cursor (duplo clique volta ao enquadramento).
+            var f = e.Delta > 0 ? 1.2 : 1 / 1.2;
+            var nz = Math.Clamp(_zoom * f, 0.2, 40);
+            f = nz / _zoom;
+            var c = e.GetPosition(this);
+            var center = new Point(ActualWidth / 2, ActualHeight / 2);
+            _pan = new Vector(c.X - center.X - (c.X - center.X - _pan.X) * f, c.Y - center.Y - (c.Y - center.Y - _pan.Y) * f);
+            _zoom = nz;
+            InvalidateVisual();
+            e.Handled = true;
+        };
+    }
+
+    private TransformGroup ViewTransform()
+    {
+        var tg = new TransformGroup();
+        tg.Children.Add(new ScaleTransform(_zoom, _zoom, ActualWidth / 2, ActualHeight / 2));
+        tg.Children.Add(new TranslateTransform(_pan.X, _pan.Y));
+        return tg;
     }
 
     private static readonly Brush Asphalt = Freeze(new SolidColorBrush(Color.FromRgb(62, 66, 72)));
@@ -91,6 +128,7 @@ public sealed class GeometryPreview : FrameworkElement
         var oy = (h - (maxY - minY) * s) / 2;
         Point P(Vec2 v) => new(ox + (v.X - minX) * s, h - (oy + (v.Y - minY) * s));
 
+        dc.PushTransform(ViewTransform());
         foreach (var pav in _pavement) dc.DrawGeometry(Asphalt, null, ToGeometry(pav, P));
         if (_geometry != null)
         {
@@ -107,10 +145,11 @@ public sealed class GeometryPreview : FrameworkElement
             for (int i = 1; i < g.Count; i++) dc.DrawLine(GuidePen, P(g[i - 1]), P(g[i]));
         }
         if (_geometry != null) DrawAnnotations(dc, s, P);
+        dc.Pop();
 
         if (Paper) return;
         DrawToggle(dc, w);
-        DrawScaleBar(dc, s, h);
+        DrawScaleBar(dc, s * _zoom, h);
         if (_message != null) DrawText(dc, _message, new Point(8, 6), Brushes.White, 11);
         if (_geometry != null)
         {
@@ -120,14 +159,24 @@ public sealed class GeometryPreview : FrameworkElement
         }
     }
 
-    /// <summary>Botão "3D / Planta" no canto superior direito.</summary>
+    /// <summary>Seletor "Planta | 3D" no canto superior direito (o modo ativo fica destacado).</summary>
     private void DrawToggle(DrawingContext dc, double w)
     {
-        var label = Iso ? "Planta" : "3D";
-        var ft = new FormattedText(label, UiHelpers.PtBr, FlowDirection.LeftToRight, new Typeface("Segoe UI"), 11, Brushes.White, VisualTreeHelper.GetDpi(this).PixelsPerDip);
-        _toggleRect = new Rect(w - ft.Width - 22, 6, ft.Width + 16, ft.Height + 6);
-        dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromArgb(170, 30, 90, 160)), new Pen(Brushes.White, 1), _toggleRect, 4, 4);
-        dc.DrawText(ft, new Point(_toggleRect.X + 8, _toggleRect.Y + 3));
+        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var ftP = new FormattedText("Planta", UiHelpers.PtBr, FlowDirection.LeftToRight, new Typeface("Segoe UI"), 11, Brushes.White, dpi);
+        var ft3 = new FormattedText("3D", UiHelpers.PtBr, FlowDirection.LeftToRight, new Typeface("Segoe UI"), 11, Brushes.White, dpi);
+        var hgt = ftP.Height + 6;
+        _toggle3D = new Rect(w - ft3.Width - 20, 6, ft3.Width + 14, hgt);
+        _togglePlan = new Rect(_toggle3D.X - ftP.Width - 14, 6, ftP.Width + 14, hgt);
+        var on = new SolidColorBrush(Color.FromArgb(230, 30, 90, 160));
+        var off = new SolidColorBrush(Color.FromArgb(110, 40, 40, 40));
+        dc.DrawRoundedRectangle(Iso ? off : on, new Pen(Brushes.White, 1), _togglePlan, 4, 4);
+        dc.DrawRoundedRectangle(Iso ? on : off, new Pen(Brushes.White, 1), _toggle3D, 4, 4);
+        dc.DrawText(ftP, new Point(_togglePlan.X + 7, _togglePlan.Y + 3));
+        dc.DrawText(ft3, new Point(_toggle3D.X + 7, _toggle3D.Y + 3));
+        var hint = new FormattedText("roda = zoom · arrastar = mover · 2 cliques = enquadrar", UiHelpers.PtBr, FlowDirection.LeftToRight, new Typeface("Segoe UI"), 9,
+            new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)), dpi);
+        dc.DrawText(hint, new Point(_togglePlan.X - hint.Width - 10, 9));
     }
 
     /// <summary>
@@ -187,6 +236,7 @@ public sealed class GeometryPreview : FrameworkElement
         var s = Math.Min((w - 2 * margin) / Math.Max(0.01, maxX - minX), (h - 2 * margin) / Math.Max(0.01, maxY - minY));
         var ox = (w - (maxX - minX) * s) / 2;
         var oy = (h - (maxY - minY) * s) / 2;
+        dc.PushTransform(ViewTransform());
         foreach (var f in list.OrderByDescending(f => f.P.Average(q => q.D)))
         {
             var rgb = MarkingColors.Display(f.C);
@@ -204,7 +254,8 @@ public sealed class GeometryPreview : FrameworkElement
             sg.Freeze();
             dc.DrawGeometry(brush, null, sg);
         }
-        DrawText(dc, "Vista 3D (isométrica) – clique em Planta para voltar", new Point(8, h - 20), Brushes.White, 11);
+        dc.Pop();
+        DrawText(dc, "Vista 3D (isométrica)", new Point(8, h - 20), Brushes.White, 11);
     }
 
     private double TextModelHeight(AnnotationText t) => t.PaperHeightMm * ViewScale / 1000.0;

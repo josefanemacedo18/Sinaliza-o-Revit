@@ -368,11 +368,19 @@ public static class RoundaboutGenerator
                 // Tronco de cone baixo (rampado): anéis concêntricos da ilha até o topo.
                 var dh = Math.Clamp(d.DomeHeight, 0.05, 0.60);
                 List<Vec2> Scaled(double k) => L.Island.Outer.Select(v => d.Center + (v - d.Center) * k).ToList();
+                var top = Math.Clamp(d.DomeTopRatio, 0.1, 0.9);
                 var rings = new List<(List<Vec2> Ring, double Z)>
                 {
-                    (Scaled(1.0), hp), (Scaled(0.97), hp + dh * 0.12), (Scaled(0.8), hp + dh * 0.55), (Scaled(0.55), hp + dh * 0.88), (Scaled(0.3), hp + dh),
+                    (Scaled(1.0), hp), (Scaled(1 - (1 - top) * 0.05), hp + dh * 0.12), (Scaled(1 - (1 - top) * 0.35), hp + dh * 0.55),
+                    (Scaled(1 - (1 - top) * 0.75), hp + dh * 0.88), (Scaled(top), hp + dh),
                 };
                 geo.Pieces.Add(DeviceGenerator.Loft(rings, MarkingColor.PavimentoConcreto));
+                if (d.DomeGrassTop)
+                {
+                    // Platô superior gramado (canteiro sobre a calota).
+                    var plateau = new Polygon2(Scaled(top * 0.98));
+                    geo.Pieces.Add(new MarkingPiece(plateau, MarkingColor.Grama) { Elevation = hp + dh, Thickness = 0.04 });
+                }
                 break;
             }
             default: Raised(L.IslandCore, MarkingColor.Grama, d.CurbHeight, hp); break;

@@ -80,7 +80,9 @@ internal static class IntersectionForms
          .Check("Faixas de pedestres em cada ramo", () => d.Crosswalks, v => d.Crosswalks = v)
          .Number("Largura da faixa de pedestres (m)", () => d.CrosswalkWidth, v => d.CrosswalkWidth = v, 3, 10)
          .Number("Recuo da faixa em relação à esquina (m)", () => d.CrosswalkSetback, v => d.CrosswalkSetback = v, 0, 20)
-         .Check("Rebaixamentos de calçada nas travessias (NBR 9050)", () => d.Ramps, v => d.Ramps = v);
+         .Check("Rebaixamentos de calçada nas travessias (NBR 9050)", () => d.Ramps, v => d.Ramps = v)
+         .Check("Esquinas com a mesma composição das calçadas das vias (meio-fio + faixa gramada + passeio)", () => d.MatchRoadSection, v => d.MatchRoadSection = v,
+             "Repete nas esquinas a faixa de serviço gramada definida na seção das vias que se cruzam, alinhando o desenho com as vias.");
 
         var ilhas = new[] { ("Nenhuma", TipoIlha.Nenhuma), ("Física (meio-fio)", TipoIlha.Fisica), ("Pintada (zebrado)", TipoIlha.Pintada) };
         w.Section("Tipo II – ilha separadora (gota) na via secundária", "A pista é alargada em volta da ilha; a travessia passa por um refúgio no nível da pista.")
@@ -265,6 +267,8 @@ internal static class RoundaboutForms
              ("Galgável (cúpula pintada, sem meio-fio)", TipoIlhaCentral.Galgavel), ("Pintada – LCA 0,20 m + tachões (MIR, sem obra civil)", TipoIlhaCentral.Pintada),
              ("Calota rampada (tronco de cone de concreto, galgável)", TipoIlhaCentral.Calota) }, () => d.IslandType, v => d.IslandType = v)
          .Number("Calota: altura no centro (m)", () => d.DomeHeight, v => d.DomeHeight = v, 0.05, 0.6, tooltip: "Ilha em tronco de cone baixo, transponível pelas rodas traseiras de veículos longos (minirrotatórias e compactas).")
+         .Number("Calota: platô superior (proporção do raio)", () => d.DomeTopRatio, v => d.DomeTopRatio = v, 0.1, 0.9)
+         .Check("Calota: platô superior gramado", () => d.DomeGrassTop, v => d.DomeGrassTop = v)
          .Number("Raio da ilha central (m)", () => d.IslandRadius, v => d.IslandRadius = v, 1, 100)
          .Number("Alongamento (1 = circular; > 1 = oval)", () => d.Elongation, v => d.Elongation = v, 1, 4)
          .Number("Direção do eixo maior da oval (°)", () => d.OvalAngleDeg, v => d.OvalAngleDeg = v, -360, 360, "0")

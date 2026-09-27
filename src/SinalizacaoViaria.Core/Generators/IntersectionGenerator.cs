@@ -60,6 +60,8 @@ public sealed class IntersectionLayout
     public List<Polygon2> Pavement { get; } = new();
     public List<Polygon2> Curb { get; } = new();
     public List<Polygon2> Sidewalk { get; } = new();
+    /// <summary>Faixa de serviço gramada das calçadas (composição repetida das vias) – subconjunto de Sidewalk.</summary>
+    public List<Polygon2> SidewalkService { get; } = new();
     public List<Polygon2> MedianCurb { get; } = new();
     public List<Polygon2> MedianCore { get; } = new();
     /// <summary>Ilhas físicas (gota e ilhas triangulares das esquinas), já sem as passagens de pedestres.</summary>
@@ -768,6 +770,23 @@ public static class IntersectionGenerator
         var curbRing = PolygonOps.Difference(PolygonOps.Offset(pav, cw, true), pav);
         L.Curb.AddRange(PolygonOps.Intersect(curbRing, sides));
         L.Sidewalk.AddRange(PolygonOps.Difference(sides, L.Curb).Where(p => p.Area > 0.05));
+        if (d.MatchRoadSection)
+        {
+            // Faixa de serviço gramada com a largura da seção das vias (a maior entre as vias com grama).
+            var service = 0.0;
+            foreach (var r in L.Roads)
+            {
+                var setup = Automation.RoadTemplates.FromJson(r.Def.SetupJson);
+                if (setup == null) continue;
+                foreach (var e in setup.Right.Concat(setup.Left).Where(e => e.Tipo == Automation.TipoElementoSecao.Calcada && e.ServicoGramado))
+                    service = Math.Max(service, Math.Clamp(e.FaixaServico, cw, e.Largura) - cw);
+            }
+            if (service > 0.05)
+            {
+                var band = PolygonOps.Difference(PolygonOps.Offset(pav, cw + service, true), PolygonOps.Offset(pav, cw, true));
+                L.SidewalkService.AddRange(PolygonOps.Intersect(band, L.Sidewalk).Where(p => p.Area > 0.05));
+            }
+        }
 
         var medParts = PolygonOps.Intersect(medT.SelectMany(x => x), core0).ToList();
         for (int i = 0; i < L.Roads.Count; i++)
@@ -870,14 +889,21 @@ public static class IntersectionGenerator
             {
                 var sw = PolygonOps.Difference(L.Sidewalk, ramps);
                 var cb = PolygonOps.Difference(L.Curb, ramps);
+                var sv = PolygonOps.Difference(L.SidewalkService, ramps);
                 L.Sidewalk.Clear(); L.Sidewalk.AddRange(sw);
                 L.Curb.Clear(); L.Curb.AddRange(cb);
+                L.SidewalkService.Clear(); L.SidewalkService.AddRange(sv);
             }
         }
         if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
             Raised(L.Pavement, L.PavementColor, L.PavementThickness, -L.PavementThickness);
         Raised(L.Curb, MarkingColor.Concreto, L.CurbHeight);
-        Raised(L.Sidewalk, MarkingColor.Concreto, L.CurbHeight);
+        if (L.SidewalkService.Count > 0)
+        {
+            Raised(PolygonOps.Difference(L.Sidewalk, L.SidewalkService), MarkingColor.Concreto, L.CurbHeight);
+            Raised(L.SidewalkService, MarkingColor.Grama, L.CurbHeight);
+        }
+        else Raised(L.Sidewalk, MarkingColor.Concreto, L.CurbHeight);
         Raised(L.MedianCurb, MarkingColor.Concreto, L.CurbHeight);
         Raised(L.MedianCore, MarkingColor.Grama, L.CurbHeight);
         foreach (var isl in L.Islands)
