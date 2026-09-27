@@ -482,8 +482,25 @@ public static class SidewalkGenerator
         var walk = PolygonOps.Intersect(PolygonOps.Difference(PolygonOps.Offset(pav, cw + Math.Max(0, d.SidewalkWidth), true), PolygonOps.Offset(pav, cw, true)), half);
 
         List<Polygon2> W(IEnumerable<Polygon2> local) => local.Select(frame.ToWorld).ToList();
+        var profile = d.MatchRoadSection ? d.EdgeProfile : new List<Automation.EdgeBand>();
+        if (profile.Count > 0)
+        {
+            // Mesmos elementos da via (meio-fio, sarjeta, faixa gramada, passeio) em volta do balão.
+            var width = Math.Max(cw, Automation.EdgeProfile.OuterWidth(profile));
+            var region = PolygonOps.Intersect(PolygonOps.Difference(PolygonOps.Offset(pav, width, true), pav), half);
+            var (pieces, inside) = Automation.EdgeProfile.Apply(pav, region, profile);
+            if (d.Pavement) AddRaised(geo, W(inside.Count > 0 ? PolygonOps.Difference(roadway, inside) : roadway), MarkingColor.Asfalto, d.PavementThickness, -d.PavementThickness);
+            foreach (var p in pieces)
+                foreach (var w in W(new[] { p.Shape }))
+                {
+                    var ss = w.Simplified();
+                    if (ss != null && ss.Area > 1e-4) geo.Pieces.Add(p with { Shape = ss });
+                }
+        }
+        else
+        {
         if (d.Pavement) AddRaised(geo, W(roadway), MarkingColor.Asfalto, d.PavementThickness, -d.PavementThickness);
-        AddRaised(geo, W(curb), MarkingColor.Concreto, d.Height, 0.001);
+        foreach (var c in W(curb)) geo.Pieces.Add(new MarkingPiece(c, MarkingColor.Concreto) { Thickness = d.Height, Layer = "MEIO-FIO" });
         if (d.SidewalkWidth > 0.05)
         {
             // Composição da via: faixa de serviço (gramada) e sarjeta.
@@ -496,6 +513,7 @@ public static class SidewalkGenerator
             else AddRaised(geo, W(walk), MarkingColor.Concreto, d.Height);
         }
         if (d.GutterWidth > 0.05) AddRaised(geo, W(Automation.SectionMatch.GutterBand(roadway, curb, d.GutterWidth)), MarkingColor.Concreto, 0.005);
+        }
         if (island != null)
         {
             var islandCore = PolygonOps.Offset(new[] { island }, -cw);
@@ -505,7 +523,8 @@ public static class SidewalkGenerator
         if (d.EdgeLine)
         {
             var band = PolygonOps.Difference(PolygonOps.Offset(pav, -0.30, true), PolygonOps.Offset(pav, -0.40, true));
-            band = PolygonOps.Intersect(band, new[] { Polygon2.Rectangle(new Vec2(-5000, 0.3), new Vec2(5000, 5000)) });
+            // Sem a linha atravessando o início do balão (a via continua ali).
+            band = PolygonOps.Intersect(band, new[] { Polygon2.Rectangle(new Vec2(-5000, 0.5), new Vec2(5000, 5000)) });
             if (island != null) band = PolygonOps.Difference(band, PolygonOps.Offset(new[] { island }, 0.3, true));
             foreach (var s in W(band)) geo.Pieces.Add(new MarkingPiece(s, MarkingColor.Branca));
         }

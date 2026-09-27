@@ -382,8 +382,13 @@ partir do pavimento – confira antes de aplicar.
 
 ## 10. Quantitativos
 
-**Miniaturas.** Cada linha mostra a **imagem do item** (planta para pintura, 3D para placas, dispositivos, mobiliário
-e rampas) no lugar da amostra de cor; a cor fica numa coluna de texto.
+**Miniaturas.** Cada linha mostra a **imagem da própria sinalização**, não do trecho do projeto: a face da placa, um
+trecho da linha com o seu tracejado, o símbolo, a legenda, o zebrado, uma unidade do dispositivo em perspectiva ou a
+amostra do material (pavimento, concreto, grama). A coluna de cor foi retirada da janela e da planilha (continua no CSV).
+
+**Tabela no Revit.** *Criar tabela no Revit* e *Tabelas por categoria* abrem a tabela criada e mostram um resumo com o
+nome e o número de linhas de cada uma (Navegador de projeto → Tabelas/Quantidades); se algo impedir a criação, o motivo
+aparece na mensagem.
 
 **Exportação Excel (.xlsx).** Botão principal da janela: planilha formatada como a janela – título e dados do projeto,
 um bloco por categoria com as subcategorias, **miniatura de cada item**, colunas fixas e alinhadas (item, código,
@@ -583,6 +588,11 @@ em uma vista dedicada.
 
 ## 17. Calçadas
 
+**Cul-de-sac.** Clique na **ponta** de uma via para fechá-la com o balão, ou **sobre** uma via (fora da ponta) e depois no
+centro do balão para criar uma **rua sem saída** saindo dela: o ramal recebe uma cópia exata da seção da via (pista,
+linhas, sarjeta, meio-fio, grama, calçada), a interseção em T é feita automaticamente e o balão usa o mesmo perfil de
+calçada. Com ESC, o balão é posicionado livremente por dois cliques.
+
 * **Orelha de Calçada**: desenhe (ou clique dois pontos) na **face do meio-fio** existente, no trecho
   do avanço – em linha reta (meio de quadra) ou **contornando a esquina** (selecione as linhas/arco da
   esquina ou desenhe os pontos em volta dela; o meio-fio da orelha acompanha a esquina com raio =
@@ -716,10 +726,18 @@ tipos e o controle escolhidos a todas as interseções do projeto.
 
 ## 20. Rotatórias
 
-**Seguir a composição das vias.** Rotatórias e cul-de-sacs ligados a vias leem a seção das vias (faixa de serviço
+**Seguir exatamente os elementos das vias.** Interseções, rotatórias e cul-de-sacs leem os **elementos reais** do grupo de
+cada via ligada – sarjeta, meio-fio, faixa gramada, passeio, com as larguras, alturas e materiais de cada um, inclusive
+em vias montadas com *Pista* + elementos junto ao bordo – e aplicam o mesmo perfil em volta da própria pista. O meio-fio
+vira piso próprio, a sarjeta sai do pavimento (sem pisos sobrepostos) e, no lado oposto de um T, a sarjeta da via
+continua. Rotatórias e cul-de-sacs sem via ligada usam os campos de faixa de serviço, grama e sarjeta. Antes: rotatórias e cul-de-sacs ligados a vias leem a seção das vias (faixa de serviço
 gramada e sarjeta) e a continuam pelas próprias calçadas – opção *Seguir a composição das calçadas das vias ligadas*,
 ligada por padrão; desligada, a faixa de serviço, a grama e a sarjeta são informadas nos campos ao lado. A **ilha
 ajardinada** ganhou faixa pavimentada entre o meio-fio e a grama e grama elevada (canteiro).
+
+**Concordâncias da rotatória.** A curva de entrada/saída de cada ramo é tangente ao bordo do ramo e ao círculo
+externo do anel (traçado usual), com o raio daquele lado – não há mais o "dente" que aparecia entre os raios de entrada e
+de saída na calçada.
 
 **Rotatória elevada (platô)** e **ilha em calota**: em *Ilha central e anel*, marque *Rotatória elevada* para a pista
 giratória subir (altura e comprimento das rampas editáveis; rampas geradas em cada ramo) – solução de moderação de

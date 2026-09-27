@@ -22,6 +22,12 @@ public sealed record MarkingPiece(Polygon2 Shape, MarkingColor Color)
 
     /// <summary>Sólido poliédrico (faces planas quaisquer, ex.: rampas e abas). <see cref="Shape"/> é a projeção em planta.</summary>
     public Polyhedron? Solid { get; init; }
+
+    /// <summary>
+    /// Camada da peça (ex.: MEIO-FIO, CALCADA): peças da mesma cor e altura mas de camadas diferentes viram pisos
+    /// separados no Revit (o meio-fio não se funde ao passeio).
+    /// </summary>
+    public string? Layer { get; init; }
 }
 
 public readonly record struct Vec3(double X, double Y, double Z)

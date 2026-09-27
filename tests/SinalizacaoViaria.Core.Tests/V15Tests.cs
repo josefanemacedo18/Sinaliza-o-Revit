@@ -181,7 +181,7 @@ public class V16Tests
         var geo = MarkingBuilder.Build(rb, null, Ctx);
         Assert.Contains(geo.Pieces, p => p.Color == MarkingColor.Grama);
         Assert.Contains(geo.Pieces, p => p.Color == MarkingColor.Concreto && Math.Abs(p.Thickness - 0.005) < 1e-9);   // sarjeta
-        Assert.Contains(geo.Pieces, p => p.Color == MarkingColor.Concreto && Math.Abs(p.Elevation - 0.001) < 1e-9);   // meio-fio separado
+        Assert.Contains(geo.Pieces, p => p.Layer == "MEIO-FIO");   // meio-fio como piso próprio
 
         var c = new CulDeSacDefinition { ServiceStripWidth = 0.7, GutterWidth = 0.3, SidewalkWidth = 2.5 };
         var cg = MarkingBuilder.Build(c, new Polyline2(new[] { new Vec2(0, 0), new Vec2(0, 25) }), Ctx);
@@ -236,5 +236,110 @@ public class V16Tests
         }
         var csv = QuantityCalculator.ToCsv(rows, null, "Projeto X");
         Assert.Contains("Item;Código;Descrição;Quantidade", csv);
+    }
+}
+
+public class V17Tests
+{
+    private static readonly Catalogo Cat = CatalogService.LoadDefault();
+    private static readonly BuildContext Ctx = new() { Catalog = Cat };
+
+    private static (RoadPavementDefinition Pav, List<MarkingDefinition> Defs) Road()
+    {
+        var setup = RoadTemplates.All[1].Create();
+        setup.Hierarchy = HierarquiaViaria.Local;
+        var defs = setup.Build(PathReference.FromPoints(new[] { new Vec2(-60, 0), new Vec2(60, 0) }, 0), new OutputSettings(), Cat);
+        return (defs.OfType<RoadPavementDefinition>().Single(), defs);
+    }
+
+    [Fact]
+    public void EdgeProfile_ReadsRealElementsOfTheRoad()
+    {
+        var (pav, defs) = Road();
+        var prof = EdgeProfile.FromRoad(pav, defs, Ctx);
+        Assert.Contains(prof, b => b.Code == "SARJETA" && b.Inside);
+        var curb = prof.Single(b => b.Code == "MEIO-FIO");
+        Assert.Equal(0, curb.D0, 3);
+        Assert.Equal(0.15, curb.D1, 3);
+        Assert.Contains(prof, b => b.Code == "GRAMADO" && b.Color == MarkingColor.Grama);
+        Assert.Contains(prof, b => b.Code == "CALCADA");
+        Assert.Equal(pav.RightSidewalk, EdgeProfile.OuterWidth(prof), 2);
+        // Bandas contíguas, sem buracos, do meio-fio ao fim da calçada
+        var outer = prof.Where(b => !b.Inside).OrderBy(b => b.D0).ToList();
+        for (int i = 1; i < outer.Count; i++) Assert.Equal(outer[i - 1].D1, outer[i].D0, 2);
+    }
+
+    [Fact]
+    public void Roundabout_WithRoadProfile_HasCurbGutterGrassAndWalkLayers()
+    {
+        var (pav, defs) = Road();
+        var d = new RoundaboutDefinition();
+        d.ApplyPreset(TipoRotatoria.UmaFaixa);
+        foreach (var a in new[] { 45.0, -45, 225 }) d.Legs.Add(new RoundaboutLeg { AngleDeg = a, Width = 7, Sidewalk = 3 });
+        d.EdgeProfile = EdgeProfile.FromRoad(pav, defs, Ctx);
+        d.SidewalkWidth = EdgeProfile.OuterWidth(d.EdgeProfile) - d.CurbWidth;
+        var geo = RoundaboutGenerator.Build(d, Ctx);
+        var layers = geo.Pieces.Select(p => p.Layer).Where(l => l != null).Distinct().ToList();
+        Assert.Contains("MEIO-FIO", layers);
+        Assert.Contains("SARJETA", layers);
+        Assert.Contains("GRAMADO", layers);
+        Assert.Contains("CALCADA", layers);
+        // A sarjeta não se sobrepõe ao pavimento (sem pisos sobrepostos no Revit)
+        var gutter = geo.Pieces.Where(p => p.Layer == "SARJETA").Select(p => p.Shape).ToList();
+        var asphalt = geo.Pieces.Where(p => p.Color == MarkingColor.Asfalto && p.Profile == null).Select(p => p.Shape).ToList();
+        Assert.True(PolygonOps.Intersect(gutter, asphalt).Sum(p => p.Area) < 0.05);
+    }
+
+    [Fact]
+    public void Roundabout_CornersHaveNoNotch()
+    {
+        var d = new RoundaboutDefinition();
+        d.ApplyPreset(TipoRotatoria.UmaFaixa);
+        foreach (var a in new[] { 45.0, -45, 225 }) d.Legs.Add(new RoundaboutLeg { AngleDeg = a, Width = 7, Sidewalk = 3 });
+        var L = RoundaboutGenerator.Layout(d);
+        // Entre os ramos a 45° e −45°, a pista deve alcançar o círculo externo do anel (sem dente para dentro).
+        var probe = d.Center + new Vec2(d.OuterRadius - 0.3, 0);
+        Assert.Contains(L.Pavement, p => p.Contains(probe));
+    }
+
+    [Fact]
+    public void CulDeSac_WithRoadProfile_NoLineAcrossTheStart()
+    {
+        var (pav, defs) = Road();
+        var c = new CulDeSacDefinition { EdgeProfile = EdgeProfile.FromRoad(pav, defs, Ctx), Island = true };
+        c.SidewalkWidth = EdgeProfile.OuterWidth(c.EdgeProfile) - c.CurbWidth;
+        var geo = MarkingBuilder.Build(c, new Polyline2(new[] { new Vec2(0, 0), new Vec2(0, 30) }), Ctx);
+        Assert.Contains(geo.Pieces, p => p.Layer == "MEIO-FIO");
+        Assert.Contains(geo.Pieces, p => p.Layer == "SARJETA");
+        Assert.Contains(geo.Pieces, p => p.Layer == "GRAMADO");
+        Assert.DoesNotContain(geo.Pieces, p => p.Color == MarkingColor.Branca && p.Shape.Bounds.Min.Y < 0.45);
+    }
+
+    [Fact]
+    public void QuantitySamples_ShowTheSignItself()
+    {
+        var (g1, k1) = QuantitySamples.Sample(new LinearMarkingDefinition { Code = "LFO-2", Offset = 3.5 }, MarkingColor.Amarela, Ctx);
+        Assert.Equal(TipoMiniatura.Planta, k1);
+        Assert.All(g1!.Pieces, p => Assert.InRange(p.Shape.Centroid.Y, -0.5, 0.5));   // sem o deslocamento do projeto
+        Assert.Equal(TipoMiniatura.Placa, QuantitySamples.Sample(new SignDefinition { Code = "R-1" }, MarkingColor.Branca, Ctx).Kind);
+        Assert.Equal(TipoMiniatura.Material, QuantitySamples.Sample(new RoadPavementDefinition(), MarkingColor.Asfalto, Ctx).Kind);
+        var (g4, k4) = QuantitySamples.Sample(new LinearMarkingDefinition { Code = "TACHAO" }, MarkingColor.Amarela, Ctx);
+        Assert.Equal(TipoMiniatura.Perspectiva, k4);
+        Assert.InRange(g4!.UnitCount, 1, 2);
+        var (g5, _) = QuantitySamples.Sample(new SymbolMarkingDefinition { Code = "SDP", Length = 3.6, Position = new Vec2(500, 500) }, MarkingColor.Branca, Ctx);
+        Assert.True(g5!.Pieces[0].Shape.Centroid.Length < 5);
+    }
+
+    [Fact]
+    public void Workbook_HasNoColorColumn()
+    {
+        var line = new LinearMarkingDefinition { Code = "LFO-1" };
+        var rows = QuantityCalculator.Compute(new List<(MarkingDefinition, MarkingGeometry)> { (line, MarkingBuilder.Build(line, new Polyline2(new[] { new Vec2(0, 0), new Vec2(20, 0) }), Ctx)) }, Cat);
+        var bytes = QuantityWorkbook.Build(rows, null, "P", null);
+        using var zip = new System.IO.Compression.ZipArchive(new MemoryStream(bytes));
+        using var sr = new StreamReader(zip.GetEntry("xl/worksheets/sheet1.xml")!.Open());
+        var sheet = sr.ReadToEnd();
+        Assert.Contains(">Imagem<", sheet);
+        Assert.DoesNotContain(">Cor<", sheet);
     }
 }

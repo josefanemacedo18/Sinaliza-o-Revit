@@ -76,7 +76,7 @@
             <TabItem Header="Itens detalhados">
                 <DataGrid x:Name="GridRows" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
                           GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" AlternatingRowBackground="#FAFBFD"
-                          RowDetailsVisibilityMode="VisibleWhenSelected" SelectionMode="Single" BorderBrush="#D5DBE3" RowHeight="44">
+                          RowDetailsVisibilityMode="VisibleWhenSelected" SelectionMode="Single" BorderBrush="#D5DBE3" RowHeight="54">
                     <DataGrid.GroupStyle>
                         <!-- Nível 1: categoria -->
                         <GroupStyle>
@@ -124,11 +124,11 @@
                         </GroupStyle>
                     </DataGrid.GroupStyle>
                     <DataGrid.Columns>
-                        <DataGridTemplateColumn Header="Imagem" Width="76">
+                        <DataGridTemplateColumn Header="Imagem" Width="92">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Border Background="#3E4248" CornerRadius="3" Margin="3,2" Width="64" Height="38">
-                                        <Image Source="{Binding Code, Converter={x:Static ui:ThumbnailConverter.Instance}}" Stretch="Uniform"/>
+                                    <Border Background="#3E4248" CornerRadius="3" Margin="3,2" Width="80" Height="48" ClipToBounds="True">
+                                        <Image Source="{Binding Converter={x:Static ui:ThumbnailConverter.Instance}}" Stretch="Uniform"/>
                                     </Border>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
@@ -157,7 +157,6 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
                         <DataGridTextColumn Header="Hierarquia" Binding="{Binding HierarchyName}" Width="120"/>
-                        <DataGridTextColumn x:Name="ColColor" Header="Cor" Binding="{Binding ColorLabel}" Width="80"/>
                         <DataGridTextColumn x:Name="ColMaterial" Header="Material" Binding="{Binding Material}" Width="140"/>
                         <DataGridTextColumn x:Name="ColConsumption" Header="Consumo" Binding="{Binding ConsumptionText}" Width="100"/>
                     </DataGrid.Columns>

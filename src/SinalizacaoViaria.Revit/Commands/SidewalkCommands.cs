@@ -1,4 +1,5 @@
 using Autodesk.Revit.Attributes;
+using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Definitions;
@@ -407,7 +408,7 @@ public sealed class CmdCulDeSac : CommandBase
     {
         // Na ponta de uma via: o balão se liga a ela (acompanha o eixo e recorta a via). Senão, posicionamento livre.
         var doc = uidoc.Document;
-        var pick = Picking.PickPoint(uidoc, "Clique perto da PONTA da via que receberá o balão (ESC: posicionar livremente por dois cliques)");
+        var pick = Picking.PickPoint(uidoc, "Cul-de-sac: clique na PONTA de uma via (balão nela) ou SOBRE uma via (rua sem saída saindo dela, com a mesma seção) – ESC: posicionar livremente");
         if (pick != null)
         {
             var svc = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
@@ -425,8 +426,90 @@ public sealed class CmdCulDeSac : CommandBase
                 Report("Cul-de-sac", IntersectionRunner.Run(uidoc, "SV - Cul-de-sac", s => s.AddCulDeSac(target.Road, target.AtEnd, d)).Where(r => r.Warnings.Count > 0).ToList());
                 return Result.Succeeded;
             }
-            TaskDialog.Show(AppTitle, "Nenhuma ponta livre de via perto do ponto clicado – posicione o balão por dois cliques.");
+            // Clique sobre uma via (fora da ponta): rua sem saída saindo dela, com a mesma seção + balão.
+            var p0 = UnitConv.ToVec2(pick);
+            var svc2 = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
+            var host = svc2.Roads().Select(r => (Road: r, Proj: IntersectionGenerator.Project(r.Axis, p0)))
+                .Where(x => x.Proj.Distance <= Math.Max(x.Road.Def.TotalLeft, x.Road.Def.TotalRight) + 1.0)
+                .OrderBy(x => x.Proj.Distance).FirstOrDefault();
+            if (host.Road != null) return BranchWithCulDeSac(uidoc, svc2, host.Road, host.Proj.Point, pick.Z);
+            TaskDialog.Show(AppTitle, "Nenhuma via perto do ponto clicado – posicione o balão por dois cliques.");
         }
         return SidewalkCommandRunner.Run(uidoc, SidewalkCommandRunner.Last<CulDeSacDefinition>(), d => SidewalkForms.CulDeSac((CulDeSacDefinition)d, false));
+    }
+
+    /// <summary>
+    /// Rua sem saída a partir de uma via existente: o ramal recebe exatamente os mesmos elementos da via (pista, linhas,
+    /// sarjeta, meio-fio, faixa gramada, calçada), a interseção em T é feita com a via e o balão, com o mesmo perfil de
+    /// calçada, fecha a outra ponta.
+    /// </summary>
+    private Result BranchWithCulDeSac(UIDocument uidoc, IntersectionService svc, IntersectionRoad host, Vec2 start, double zFt)
+    {
+        var doc = uidoc.Document;
+        var endPick = Picking.PickPoint(uidoc, "Rua sem saída: clique o CENTRO do balão (fim da rua) – ESC cancela");
+        if (endPick == null) return Result.Cancelled;
+        var end = UnitConv.ToVec2(endPick);
+        var d = SidewalkCommandRunner.Last<CulDeSacDefinition>();
+        var minLen = Math.Max(host.Def.TotalLeft, host.Def.TotalRight) + Math.Max(d.BulbRadius, 6) + 8;
+        if (start.DistanceTo(end) < minLen)
+            throw new UserMessageException($"Rua sem saída muito curta: o centro do balão deve ficar a pelo menos {minLen:0} m do eixo da via.");
+        d.MatchRoadSection = true;
+        var form = SidewalkForms.CulDeSac(d, true);
+        if (form == null || UiHelpers.ShowModal(form) != true) return Result.Cancelled;
+        UiHelpers.Remember(nameof(CulDeSacDefinition), d);
+        PluginContext.SaveSettings();
+
+        // Eixo do ramal: do eixo da via existente até o centro do balão (linhas de modelo associativas).
+        List<ElementId> ids;
+        using (var t = new Transaction(doc, "SV - Eixo da rua sem saída"))
+        {
+            t.Start();
+            ids = Picking.CreateAxis(doc, uidoc.ActiveView, RoadConnection.Fillet(new[] { start, end }, 0), zFt);
+            t.Commit();
+        }
+        var uids = ids.Select(id => doc.GetElement(id).UniqueId).ToList();
+
+        // Cópia exata da seção da via existente (todos os elementos no mesmo eixo dela).
+        var key = RoadSectionInference.PathKey(host.Def.Path);
+        var members = MarkingStorage.Definitions(doc)
+            .Where(m => m.GroupId != null && m.GroupId == host.Def.GroupId && m.Path != null && RoadSectionInference.PathKey(m.Path) == key
+                        && m is not (IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition))
+            .ToList();
+        if (members.Count == 0) members.Add(host.Def);
+        var gid = Guid.NewGuid().ToString("N");
+        var defs = new List<MarkingDefinition>();
+        foreach (var m in members)
+        {
+            var c = m.CloneWithNewId();
+            c.GroupId = gid;
+            c.Exclusions.Clear();
+            var pr = PathReference.FromElements(uids);
+            pr.Z = host.Def.Path?.Z ?? pr.Z;
+            c.SetPath(pr);
+            if (c is LinearMarkingDefinition l) { l.StartSetback = 0; l.EndSetback = 0; }
+            if (c is RoadPavementDefinition pv) { pv.StartSetback = 0; pv.EndSetback = 0; }
+            defs.Add(c);
+        }
+        var results = MarkingCreator.Commit(uidoc, defs, "SV - Rua sem saída");
+        var newPav = defs.OfType<RoadPavementDefinition>().FirstOrDefault();
+        if (newPav != null)
+        {
+            var template = IntersectionService.AutoTemplate();
+            template.Output = newPav.Output.Clone();
+            var rb = UiHelpers.Remembered<RoundaboutDefinition>("Rotatoria") ?? new RoundaboutDefinition();
+            try
+            {
+                results.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões da rua sem saída",
+                    sv => sv.Connect(newPav, TipoConexao.Intersecao, FimLivre.CulDeSac, template, rb, d, radiusByHierarchy: true)).Where(r => r.Warnings.Count > 0));
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Rua sem saída – conexões", ex);
+                results.Add(new RenderResult { Geometry = null });
+                results[^1].Warnings.Add("A interseção ou o balão não puderam ser criados: " + ex.Message);
+            }
+        }
+        Report("Rua sem saída", results);
+        return Result.Succeeded;
     }
 }

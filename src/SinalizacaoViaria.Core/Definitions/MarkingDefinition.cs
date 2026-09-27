@@ -834,6 +834,9 @@ public enum TipoCulDeSac
 /// <summary>Balão de retorno (cul-de-sac) no fim de uma via: pavimento, meio-fio, calçada, ilha e linha de bordo.</summary>
 public sealed class CulDeSacDefinition : MarkingDefinition
 {
+    /// <summary>Perfil de borda (meio-fio, sarjeta, grama, calçada) copiado das vias ligadas – aplicado em volta da pista.</summary>
+    public List<Automation.EdgeBand> EdgeProfile { get; set; } = new();
+
     /// <summary>1º ponto: início do balão no eixo; 2º ponto: centro do balão / fim da via.</summary>
     public PathReference PathRef { get; set; } = new();
     public TipoCulDeSac Type { get; set; } = TipoCulDeSac.Circular;
@@ -1150,6 +1153,9 @@ public sealed class RoadPavementDefinition : MarkingDefinition
 /// <summary>Interseção entre vias do "Sinalizar via": esquinas arredondadas, meio-fio, recortes e travessias.</summary>
 public sealed class IntersectionDefinition : MarkingDefinition
 {
+    /// <summary>Perfil de borda (meio-fio, sarjeta, grama, calçada) copiado das vias ligadas – aplicado em volta da pista.</summary>
+    public List<Automation.EdgeBand> EdgeProfile { get; set; } = new();
+
     /// <summary>Ponto de cruzamento dos eixos (m).</summary>
     public Vec2 Node { get; set; }
     public double Z { get; set; }
@@ -1349,6 +1355,9 @@ public enum TipoIlhaCentral
 /// <summary>Rotatória com ilha central, pista giratória, faixa galgável e ramos com ilhas separadoras.</summary>
 public sealed class RoundaboutDefinition : MarkingDefinition
 {
+    /// <summary>Perfil de borda (meio-fio, sarjeta, grama, calçada) copiado das vias ligadas – aplicado em volta da pista.</summary>
+    public List<Automation.EdgeBand> EdgeProfile { get; set; } = new();
+
     public TipoRotatoria Type { get; set; } = TipoRotatoria.UmaFaixa;
     /// <summary>Alongamento da ilha (1 = circular; 1,5 = oval com eixo maior 1,5× o menor).</summary>
     public double Elongation { get; set; } = 1.0;

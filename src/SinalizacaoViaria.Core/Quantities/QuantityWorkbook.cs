@@ -14,9 +14,9 @@ public static class QuantityWorkbook
 {
     private static readonly string[] Headers =
     {
-        "Item", "Imagem", "Código", "Descrição", "Quantidade", "Un.", "Área (m²)", "Extensão (m)", "Unidades", "Elementos", "Cor", "Material", "Consumo est.", "Hierarquia viária", "Referência",
+        "Item", "Imagem", "Código", "Descrição", "Quantidade", "Un.", "Área (m²)", "Extensão (m)", "Unidades", "Elementos", "Material", "Consumo est.", "Hierarquia viária", "Referência",
     };
-    private static readonly double[] Widths = { 6, 10, 12, 46, 12, 6, 11, 12, 10, 10, 11, 22, 13, 18, 48 };
+    private static readonly double[] Widths = { 6, 14, 12, 46, 12, 6, 11, 12, 10, 10, 24, 13, 18, 48 };
 
     // estilos (índices de cellXfs)
     private const int StTitle = 1, StHeader = 2, StCategory = 3, StSub = 4, StText = 5, StNum = 6, StInt = 7, StSubTotText = 8, StSubTotNum = 9, StMeta = 10, StTextCenter = 11;
@@ -82,22 +82,21 @@ public static class QuantityWorkbook
                     if (memorial) { Blank(6, StText); Blank(7, StText); } else { Num(6, q.Area, StNum); Num(7, q.PaintedLength, StNum); }
                     Num(8, q.Units, StInt);
                     Num(9, q.Elements, StInt);
-                    Text(10, memorial || q.IsFamily ? "" : q.ColorLabel, StTextCenter);
-                    Text(11, memorial ? "" : q.Material, StText);
-                    Text(12, memorial || q.MaterialConsumption <= 1e-6 ? "" : q.ConsumptionText, StText);
-                    Text(13, q.HierarchyName, StText);
-                    Text(14, q.Reference, StText);
+                    Text(10, memorial ? "" : q.Material, StText);
+                    Text(11, memorial || q.MaterialConsumption <= 1e-6 ? "" : q.ConsumptionText, StText);
+                    Text(12, q.HierarchyName, StText);
+                    Text(13, q.Reference, StText);
                     if (png != null) images.Add((r, png));
-                    Row(png != null ? 30 : null);
+                    Row(png != null ? 42 : null);
                 }
             }
             var sub = QuantityCalculator.CategorySummary(g).First();
             Blank(0, StSubTotText); Blank(1, StSubTotText); Text(2, "SUBTOTAL", StSubTotText); Blank(3, StSubTotText); Blank(4, StSubTotText); Blank(5, StSubTotText);
             if (memorial) { Blank(6, StSubTotText); Blank(7, StSubTotText); } else { Num(6, sub.Area, StSubTotNum); Num(7, sub.PaintedLength, StSubTotNum); }
             Num(8, sub.Units, StSubTotNum); Num(9, sub.Elements, StSubTotNum);
-            Blank(10, StSubTotText); Blank(11, StSubTotText);
-            Text(12, memorial || sub.MaterialConsumption <= 1e-6 ? "" : (sub.MaterialConsumption.ToString("N2", CultureInfo.GetCultureInfo("pt-BR")) + " " + sub.ConsumptionUnit).Trim(), StSubTotText);
-            Blank(13, StSubTotText); Blank(14, StSubTotText);
+            Blank(10, StSubTotText);
+            Text(11, memorial || sub.MaterialConsumption <= 1e-6 ? "" : (sub.MaterialConsumption.ToString("N2", CultureInfo.GetCultureInfo("pt-BR")) + " " + sub.ConsumptionUnit).Trim(), StSubTotText);
+            Blank(12, StSubTotText); Blank(13, StSubTotText);
             Row();
             Row();
         }
@@ -183,9 +182,17 @@ public static class QuantityWorkbook
                 {
                     var (row, png) = images[i];
                     var id = i + 1;
-                    dr.Append($"<xdr:oneCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>{3 * emu}</xdr:colOff><xdr:row>{row - 1}</xdr:row><xdr:rowOff>{2 * emu}</xdr:rowOff></xdr:from>" +
-                              $"<xdr:ext cx=\"{60 * emu}\" cy=\"{36 * emu}\"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id=\"{id + 1}\" name=\"Imagem {id}\"/><xdr:cNvPicPr><a:picLocks noChangeAspect=\"1\"/></xdr:cNvPicPr></xdr:nvPicPr>" +
-                              $"<xdr:blipFill><a:blip r:embed=\"rId{id}\"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"{60 * emu}\" cy=\"{36 * emu}\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>");
+                    var (pw, ph) = PngSize(png);
+                    const double boxW = 90, boxH = 50;
+                    var k = pw > 0 && ph > 0 ? Math.Min(boxW / pw, boxH / ph) : 1;
+                    var iw = pw > 0 ? pw * k : boxW;
+                    var ih = ph > 0 ? ph * k : boxH;
+                    var ox = (long)((100 - iw) / 2 * emu);
+                    var oy = (long)((56 - ih) / 2 * emu);
+                    long cx = (long)(iw * emu), cy = (long)(ih * emu);
+                    dr.Append($"<xdr:oneCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>{Math.Max(0, ox)}</xdr:colOff><xdr:row>{row - 1}</xdr:row><xdr:rowOff>{Math.Max(0, oy)}</xdr:rowOff></xdr:from>" +
+                              $"<xdr:ext cx=\"{cx}\" cy=\"{cy}\"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id=\"{id + 1}\" name=\"Imagem {id}\"/><xdr:cNvPicPr><a:picLocks noChangeAspect=\"1\"/></xdr:cNvPicPr></xdr:nvPicPr>" +
+                              $"<xdr:blipFill><a:blip r:embed=\"rId{id}\"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"{cx}\" cy=\"{cy}\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>");
                     rels.Append($"<Relationship Id=\"rId{id}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/image{id}.png\"/>");
                     var e = zip.CreateEntry($"xl/media/image{id}.png", CompressionLevel.NoCompression);
                     using var st = e.Open();
@@ -198,6 +205,14 @@ public static class QuantityWorkbook
             }
         }
         return ms.ToArray();
+    }
+
+    /// <summary>Largura e altura (px) lidas do cabeçalho IHDR do PNG.</summary>
+    private static (int W, int H) PngSize(byte[] png)
+    {
+        if (png.Length < 24 || png[0] != 0x89 || png[1] != 0x50) return (0, 0);
+        int Be(int o) => (png[o] << 24) | (png[o + 1] << 16) | (png[o + 2] << 8) | png[o + 3];
+        return (Be(16), Be(20));
     }
 
     private const string Styles = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +

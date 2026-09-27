@@ -34,22 +34,12 @@ public partial class QuantitiesWindow : Window
 
     private readonly Dictionary<string, BitmapSource> _thumbs = new();
 
-    public QuantitiesWindow(List<QuantityRow> rows, string projectName, Dictionary<string, MarkingGeometry>? samples = null)
+    public QuantitiesWindow(List<QuantityRow> rows, string projectName, Dictionary<string, BitmapSource>? thumbnails = null)
     {
         InitializeComponent();
         _rows = rows;
         _projectName = projectName;
-        // Miniaturas: 3D para elementos com volume (placas, dispositivos, mobiliário, rampas), planta para pintura.
-        if (samples != null)
-            foreach (var (code, geo) in samples)
-            {
-                try
-                {
-                    var iso = geo.Pieces.Any(p => p.Solid != null || p.Profile != null || p.Thickness > 0.03);
-                    _thumbs[code] = GeometryPreview.Snapshot(geo, 120, 72, iso);
-                }
-                catch (Exception ex) { Log.Error("Miniatura " + code, ex); }
-            }
+        if (thumbnails != null) foreach (var (k, v) in thumbnails) _thumbs[k] = v;
         ThumbnailConverter.Images = _thumbs;
         CbCategory.Items.Add(new Option("Todas as categorias", null));
         foreach (var c in rows.Select(r => r.Category).Distinct().OrderBy(c => c))
@@ -97,7 +87,6 @@ public partial class QuantitiesWindow : Window
         // Categorias de memorial: sem colunas de cor, material, consumo, área e extensão.
         var memorialOnly = Category is { } cat && QuantityRow.IsMemorialCategory(cat);
         var vis = memorialOnly ? Visibility.Collapsed : Visibility.Visible;
-        ColColor.Visibility = vis;
         ColMaterial.Visibility = vis;
         ColConsumption.Visibility = vis;
         ColLength.Visibility = vis;
@@ -173,9 +162,10 @@ public partial class QuantitiesWindow : Window
             var pngCache = new Dictionary<string, byte[]?>();
             byte[]? Png(QuantityRow r)
             {
-                if (pngCache.TryGetValue(r.Code, out var b)) return b;
-                b = _thumbs.TryGetValue(r.Code, out var bmp) ? GeometryPreview.Png(bmp) : null;
-                pngCache[r.Code] = b;
+                var key = QuantityThumbnails.Key(r.Code, r.Color);
+                if (pngCache.TryGetValue(key, out var b)) return b;
+                b = ThumbnailConverter.Find(r) is { } bmp ? GeometryPreview.Png(bmp) : null;
+                pngCache[key] = b;
                 return b;
             }
             File.WriteAllBytes(dlg.FileName, QuantityWorkbook.Build(v, QuantityCalculator.Summary(v), _projectName, Png));
@@ -273,16 +263,4 @@ public sealed class MarkingColorBrushConverter : IValueConverter
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
-}
-
-/// <summary>Miniatura do item (por código) para a coluna "Imagem" do quantitativo.</summary>
-public sealed class ThumbnailConverter : IValueConverter
-{
-    public static ThumbnailConverter Instance { get; } = new();
-    public static Dictionary<string, BitmapSource> Images { get; set; } = new();
-
-    public object? Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
-        value is string code && Images.TryGetValue(code, out var bmp) ? bmp : null;
-
-    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }

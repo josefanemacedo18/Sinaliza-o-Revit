@@ -278,13 +278,13 @@ public sealed class MarkingService
                 var failed = new List<MarkingPiece>();
                 string? reason = null;
                 foreach (var grp in floorPieces.Where(p => !locked.Contains(p.Color))
-                             .GroupBy(p => (p.Color, E: Math.Round(p.Elevation, 3), T: Math.Round(p.Thickness, 3))))
+                             .GroupBy(p => (p.Color, E: Math.Round(p.Elevation, 3), T: Math.Round(p.Thickness, 3), p.Layer)))
                 {
                     // Peças vizinhas do mesmo material viram um piso só (calçadas, trechos recortados).
                     var merged = PolygonOps.Union(grp.Select(p => p.Shape)).Where(p => p.Area > 0.01).ToList();
                     foreach (var shape in merged)
                     {
-                        var piece = new MarkingPiece(shape, grp.Key.Color) { Elevation = grp.Key.E, Thickness = grp.Key.T };
+                        var piece = new MarkingPiece(shape, grp.Key.Color) { Elevation = grp.Key.E, Thickness = grp.Key.T, Layer = grp.Key.Layer };
                         var floors = CreateFloors(piece, baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(grp.Key.Color), ref reason, terrain);
                         if (floors.Count == 0) { failed.Add(piece); continue; }
                         foreach (var f in floors)

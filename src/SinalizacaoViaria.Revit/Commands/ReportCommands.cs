@@ -52,40 +52,46 @@ public sealed class CmdQuantitativos : CommandBase
         var rows = QuantityCalculator.Compute(items, PluginContext.Catalog, PluginContext.Settings.DefaultMaterial);
         // Famílias do Revit do usuário classificadas como elementos urbanos (Elementos Urbanos → Famílias do Revit).
         if (families.Count > 0) rows = QuantityCalculator.AddFamilies(rows, families);
-        // Amostra de geometria por código (miniaturas do quantitativo e da planilha): marcas lineares num trecho curto.
-        var samples = new Dictionary<string, MarkingGeometry>();
-        var ctx = new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs };
-        foreach (var (d, g) in items)
+        // Miniaturas da própria sinalização (face da placa, trecho da linha, unidade do dispositivo, amostra de material).
+        var thumbs = QuantityThumbnails.Build(items);
+        var w = new QuantitiesWindow(rows, doc.Title, thumbs);
+        if (UiHelpers.ShowModal(w) == true && (w.CreateSchedule || w.SchedulesByCategory))
         {
-            var code = MarkingBuilder.Describe(d, PluginContext.Catalog).Code;
-            if (samples.ContainsKey(code) || g.Pieces.Count == 0) continue;
-            try
+            var created = new List<ViewSchedule>();
+            var errors = new List<string>();
+            void Try(CategoriaQuantitativo? c)
             {
-                if (d is LinearMarkingDefinition or DeviceMarkingDefinition or RepeatedMarkingDefinition or TactileRouteDefinition)
+                try
                 {
-                    var sample = MarkingBuilder.Build(d, new Core.Geometry.Polyline2(new[] { new Core.Geometry.Vec2(0, 0), new Core.Geometry.Vec2(8, 0) }), ctx);
-                    samples[code] = sample.Pieces.Count > 0 ? sample : g;
+                    if (CreateSchedule(doc, c) is { } v) created.Add(v);
                 }
-                else samples[code] = g;
-            }
-            catch { samples[code] = g; }
-        }
-        var w = new QuantitiesWindow(rows, doc.Title, samples);
-        if (UiHelpers.ShowModal(w) == true)
-        {
-            ViewSchedule? view = null;
-            if (w.CreateSchedule) view = CreateSchedule(doc, null);
-            if (w.SchedulesByCategory)
-            {
-                foreach (var c in w.Categories)
+                catch (Exception ex)
                 {
-                    var v = CreateSchedule(doc, c);
-                    view ??= v;
+                    Log.Error("Tabela de quantitativos", ex);
+                    errors.Add((c is { } cc ? QuantityRow.CategoryLabel(cc) : "Quantitativos") + ": " + ex.Message);
                 }
             }
-            if (view != null) uidoc.ActiveView = view;
+            if (w.CreateSchedule) Try(null);
+            if (w.SchedulesByCategory) foreach (var c in w.Categories) Try(c);
+            if (created.Count > 0)
+            {
+                try { uidoc.ActiveView = created[0]; }
+                catch (Exception ex) { Log.Error("Abrir tabela", ex); }
+            }
+            var lines = created.Select(v => $"• {v.Name} – {Rows(v)} linha(s)").ToList();
+            var msg = created.Count > 0
+                ? "Tabela(s) criada(s) no Revit (Navegador de projeto → Tabelas/Quantidades):\n" + string.Join("\n", lines)
+                : "Nenhuma tabela foi criada.";
+            if (errors.Count > 0) msg += "\n\nProblemas:\n" + string.Join("\n", errors);
+            TaskDialog.Show(AppTitle, msg);
         }
         return Result.Succeeded;
+    }
+
+    private static int Rows(ViewSchedule v)
+    {
+        try { return Math.Max(0, v.GetTableData().GetSectionData(SectionType.Body).NumberOfRows); }
+        catch { return 0; }
     }
 
     private static ViewSchedule? CreateSchedule(Document doc, CategoriaQuantitativo? category)
@@ -105,15 +111,29 @@ public sealed class CmdQuantitativos : CommandBase
         var fields = def.GetSchedulableFields();
         ScheduleField? Add(SharedParameters.Def d, bool total = false)
         {
-            var spe = SharedParameterElement.Lookup(doc, d.Guid);
-            if (spe == null) return null;
-            var sf = fields.FirstOrDefault(f => f.ParameterId == spe.Id);
-            if (sf == null) return null;
-            var field = def.AddField(sf);
-            if (total) field.DisplayType = ScheduleFieldDisplayType.Totals;
-            return field;
+            try
+            {
+                var spe = SharedParameterElement.Lookup(doc, d.Guid);
+                if (spe == null) return null;
+                var sf = fields.FirstOrDefault(f => f.ParameterId == spe.Id);
+                if (sf == null) return null;
+                var field = def.AddField(sf);
+                if (total)
+                {
+                    try { field.DisplayType = ScheduleFieldDisplayType.Totals; }
+                    catch (Exception ex) { Log.Error($"Totais {d.Name}", ex); }
+                }
+                return field;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Campo {d.Name} da tabela", ex);
+                return null;
+            }
         }
 
+        if (SharedParameterElement.Lookup(doc, SharedParameters.Codigo.Guid) == null)
+            throw new InvalidOperationException("os parâmetros SV_* não existem no projeto (crie ou atualize alguma sinalização e tente de novo).");
         var categoria = Add(SharedParameters.Categoria);
         var hierarquia = Add(SharedParameters.Hierarquia);
         var grupo = Add(SharedParameters.Grupo);
@@ -125,9 +145,10 @@ public sealed class CmdQuantitativos : CommandBase
         Add(SharedParameters.Extensao, true);
         Add(SharedParameters.Quantidade, true);
 
-        if (codigo != null)
+        if (codigo == null) throw new InvalidOperationException("o campo SV_Codigo não está disponível para tabelas multicategoria.");
         {
-            def.AddFilter(new ScheduleFilter(codigo.FieldId, ScheduleFilterType.HasValue));
+            try { def.AddFilter(new ScheduleFilter(codigo.FieldId, ScheduleFilterType.HasValue)); }
+            catch (Exception ex) { Log.Error("Filtro da tabela", ex); }
             if (categoria != null)
             {
                 if (category is { } c) def.AddFilter(new ScheduleFilter(categoria.FieldId, ScheduleFilterType.Equal, QuantityRow.CategoryLabel(c)));

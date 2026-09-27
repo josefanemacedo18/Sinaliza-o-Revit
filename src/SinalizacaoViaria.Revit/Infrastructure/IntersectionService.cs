@@ -181,6 +181,22 @@ public sealed class IntersectionService
         return results;
     }
 
+    /// <summary>Perfil de borda (meio-fio, sarjeta, grama, calçada) lido dos elementos reais do grupo da via.</summary>
+    public List<EdgeBand> ProfileOf(RoadPavementDefinition pav)
+    {
+        if (pav.GroupId == null) return new();
+        try
+        {
+            var members = MarkingStorage.Definitions(_doc).Where(d => d.GroupId == pav.GroupId && d.Id != pav.Id).ToList();
+            return EdgeProfile.FromRoad(pav, members, new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs });
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Perfil de borda da via", ex);
+            return new();
+        }
+    }
+
     /// <summary>Regenera as interseções, rotatórias e cul-de-sacs que dependem das marcas indicadas (vias alteradas).</summary>
     public List<RenderResult> RefreshDependents(IEnumerable<MarkingDefinition> changed)
     {
@@ -215,6 +231,7 @@ public sealed class IntersectionService
             return results;
         }
         it.Node = node.Node;
+        it.EdgeProfile = it.MatchRoadSection ? EdgeProfile.Best(roads.Select(r => ProfileOf(r.Def))) : new List<EdgeBand>();
         var layout = IntersectionGenerator.Layout(it, roads);
         if (layout.Roads.Count > 0) it.Hierarchy = layout.Roads[layout.Main].Def.Hierarchy;
 
@@ -270,11 +287,15 @@ public sealed class IntersectionService
             var hs = legs.Select(l => roads.FirstOrDefault(r => r.Def.Id == l.RoadId)?.Def.Hierarchy).OrderByDescending(Hierarquia.Rank).FirstOrDefault();
             if (hs != null) rb.Hierarchy = hs;
         }
+        rb.EdgeProfile = new List<EdgeBand>();
         if (rb.MatchRoadSection)
         {
+            // Os mesmos elementos das vias ligadas (meio-fio, sarjeta, grama, passeio) em volta da rotatória.
             var ids = rb.Legs.Select(l => l.RoadId).Where(i => i != null).ToHashSet();
-            var pavs = MarkingStorage.Definitions(_doc).OfType<RoadPavementDefinition>().Where(p => ids.Contains(p.Id));
-            if (SectionMatch.From(pavs, RoadSetup.CurbWidth) is { } sec)
+            var pavs = MarkingStorage.Definitions(_doc).OfType<RoadPavementDefinition>().Where(p => ids.Contains(p.Id)).ToList();
+            rb.EdgeProfile = EdgeProfile.Best(pavs.Select(ProfileOf));
+            if (rb.EdgeProfile.Count > 0) rb.SidewalkWidth = Math.Max(0, EdgeProfile.OuterWidth(rb.EdgeProfile) - rb.CurbWidth);
+            else if (SectionMatch.From(pavs, RoadSetup.CurbWidth) is { } sec)
             {
                 rb.ServiceStripWidth = sec.Service;
                 rb.ServiceStripGrass = sec.Grass;
@@ -380,7 +401,9 @@ public sealed class IntersectionService
         var others = roads.Where(r => r.Def.Id != road.Def.Id).ToList();
         if (!RoadConnection.FreeEnds(road, others).Any(e => e.AtEnd == c.AtRoadEnd)) { Remove(c); return results; }
         var cut = RoadConnection.FitCulDeSac(c, road, road.Def.Path?.Z ?? 0);
-        if (c.MatchRoadSection && SectionMatch.From(road.Def, c.CurbWidth) is { } sec)
+        c.EdgeProfile = c.MatchRoadSection ? ProfileOf(road.Def) : new List<EdgeBand>();
+        if (c.EdgeProfile.Count > 0) c.SidewalkWidth = Math.Max(0, EdgeProfile.OuterWidth(c.EdgeProfile) - c.CurbWidth);
+        else if (c.MatchRoadSection && SectionMatch.From(road.Def, c.CurbWidth) is { } sec)
         {
             c.ServiceStripWidth = sec.Service;
             c.ServiceStripGrass = sec.Grass;

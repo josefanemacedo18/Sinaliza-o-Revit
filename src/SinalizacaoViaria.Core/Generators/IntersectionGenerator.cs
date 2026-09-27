@@ -848,6 +848,15 @@ public static class IntersectionGenerator
     {
         var phys = L.PhysicalCuts.GetValueOrDefault(road) ?? new List<Polygon2> { L.Zone };
         if (member is IAnnotationDefinition) return new();
+        if (member is LinearMarkingDefinition { Code: "SARJETA" } && road < L.Roads.Count)
+        {
+            // A sarjeta só é refeita pela interseção onde o meio-fio ao lado também é: junto ao meio-fio que a via mantém
+            // (ex.: lado oposto de um T) ela continua a da própria via.
+            var r = L.Roads[road];
+            var carriage = RoadGenerator.Band(r.Axis, -r.Def.RightWidth, r.Def.LeftWidth);
+            var outside = PolygonOps.Difference(phys, carriage);
+            return outside.Count == 0 ? new() : PolygonOps.Intersect(phys, PolygonOps.Offset(outside, 0.6, true));
+        }
         if (member is RoadPavementDefinition || IsPhysical(member)) return phys;
         if (member is ParkingMarkingDefinition) return L.ParkingCuts.GetValueOrDefault(road) ?? new();
         if (member is DeviceMarkingDefinition) return PolygonOps.Union(phys.Concat(L.PaintCuts.GetValueOrDefault(road) ?? new()));
@@ -886,16 +895,31 @@ public static class IntersectionGenerator
                 L.SidewalkService.Clear(); L.SidewalkService.AddRange(sv);
             }
         }
-        if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
-            Raised(L.Pavement, L.PavementColor, L.PavementThickness, -L.PavementThickness);
-        Raised(L.Curb, MarkingColor.Concreto, L.CurbHeight, 0.001);   // 1 mm: piso próprio, separado do passeio
-        Raised(L.Gutter, MarkingColor.Concreto, 0.005);
-        if (L.SidewalkService.Count > 0)
+        var profile = d.MatchRoadSection ? d.EdgeProfile : new List<Automation.EdgeBand>();
+        if (profile.Count > 0 && (L.Curb.Count > 0 || L.Sidewalk.Count > 0))
         {
-            Raised(PolygonOps.Difference(L.Sidewalk, L.SidewalkService), MarkingColor.Concreto, L.CurbHeight);
-            Raised(L.SidewalkService, MarkingColor.Grama, L.CurbHeight);
+            // Mesmos elementos das vias (meio-fio, sarjeta, faixa gramada, passeio) em volta da pista da interseção.
+            var region = PolygonOps.Union(L.Curb.Concat(L.Sidewalk));
+            var (pieces, inside) = Automation.EdgeProfile.Apply(L.Pavement, region, profile, new[] { L.Zone });
+            // Sarjetas que as vias mantêm dentro da zona (junto ao meio-fio delas) também saem do pavimento da interseção.
+            inside.AddRange(KeptGutters(L));
+            if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
+                Raised(inside.Count > 0 ? PolygonOps.Difference(L.Pavement, inside) : L.Pavement, L.PavementColor, L.PavementThickness, -L.PavementThickness);
+            AddPieces(geo, pieces);
         }
-        else Raised(L.Sidewalk, MarkingColor.Concreto, L.CurbHeight);
+        else
+        {
+            if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
+                Raised(L.Gutter.Count > 0 ? PolygonOps.Difference(L.Pavement, L.Gutter) : L.Pavement, L.PavementColor, L.PavementThickness, -L.PavementThickness);
+            AddPieces(geo, L.Curb.Select(c => new MarkingPiece(c, MarkingColor.Concreto) { Thickness = L.CurbHeight, Layer = "MEIO-FIO" }));
+            Raised(L.Gutter, MarkingColor.Concreto, 0.005);
+            if (L.SidewalkService.Count > 0)
+            {
+                Raised(PolygonOps.Difference(L.Sidewalk, L.SidewalkService), MarkingColor.Concreto, L.CurbHeight);
+                Raised(L.SidewalkService, MarkingColor.Grama, L.CurbHeight);
+            }
+            else Raised(L.Sidewalk, MarkingColor.Concreto, L.CurbHeight);
+        }
         Raised(L.MedianCurb, MarkingColor.Concreto, L.CurbHeight);
         Raised(L.MedianCore, MarkingColor.Grama, L.CurbHeight);
         foreach (var isl in L.Islands)
@@ -908,6 +932,34 @@ public static class IntersectionGenerator
         geo.UnitCount = 1;
         geo.PathLength = L.Legs.Count;
         return geo;
+    }
+
+    /// <summary>Faixas de sarjeta das vias (vãos do pavimento junto ao meio-fio) que não são recortadas pela interseção.</summary>
+    private static List<Polygon2> KeptGutters(IntersectionLayout L)
+    {
+        var res = new List<Polygon2>();
+        for (int i = 0; i < L.Roads.Count; i++)
+        {
+            var r = L.Roads[i];
+            var gutter = new LinearMarkingDefinition { Code = "SARJETA" };
+            var cut = CutsFor(gutter, i, L);
+            foreach (var g in r.Def.Gaps.Where(g => !g.Median))
+            {
+                var band = RoadGenerator.Band(r.Axis, g.Offset - g.Width / 2, g.Offset + g.Width / 2);
+                res.AddRange(PolygonOps.Intersect(cut.Count > 0 ? PolygonOps.Difference(band, cut) : band, new[] { L.Zone }));
+            }
+        }
+        return res;
+    }
+
+    /// <summary>Acrescenta peças já prontas (simplificadas, sem lascas).</summary>
+    internal static void AddPieces(MarkingGeometry geo, IEnumerable<MarkingPiece> pieces)
+    {
+        foreach (var p in pieces)
+        {
+            var ss = p.Shape.Simplified();
+            if (ss != null && ss.Area > 1e-4) geo.Pieces.Add(p with { Shape = ss });
+        }
     }
 
     public static List<IntersectionRoad> ResolveRoads(IntersectionDefinition d, BuildContext ctx)

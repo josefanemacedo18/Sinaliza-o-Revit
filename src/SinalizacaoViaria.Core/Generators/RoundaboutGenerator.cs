@@ -164,7 +164,7 @@ public static class RoundaboutGenerator
                 parts.AddRange(PolygonOps.Strip(new[] { c + u * t0, c + u * (zoneR + 5) }, Math.Max(3, leg.Width)));
             }
             var raw = PolygonOps.Union(parts);
-            full = PolygonOps.Intersect(CloseCorners(d, raw, c, zoneR), zone);
+            full = PolygonOps.Intersect(CloseCorners(d, raw, c, zoneR, outer), zone);
 
             // Faixas de conversão livre à direita (by-pass): entre cada ramo e o seguinte no sentido de giro.
             if (d.Bypass && d.Legs.Count >= 2)
@@ -279,35 +279,41 @@ public static class RoundaboutGenerator
     /// Concordância dos cantos entre ramos vizinhos com raios distintos por ramo: metade do canto junto ao ramo que
     /// chega (raio de entrada dele) e metade junto ao ramo que sai (raio de saída dele). Circulação anti-horária.
     /// </summary>
-    private static List<Polygon2> CloseCorners(RoundaboutDefinition d, List<Polygon2> raw, Vec2 c, double zoneR)
+    /// <summary>
+    /// Concordâncias de entrada e de saída de cada ramo: curvas tangentes ao bordo do ramo e ao círculo externo do anel
+    /// (traçado usual de rotatórias), e não de um ramo direto ao vizinho – assim a calçada acompanha o anel sem
+    /// ondulações entre os ramos. De cada lado do ramo vale o raio daquele lado (entrada no sentido anti-horário
+    /// seguinte, saída no anterior), com os valores gerais ou os do próprio ramo.
+    /// </summary>
+    private static List<Polygon2> CloseCorners(RoundaboutDefinition d, List<Polygon2> raw, Vec2 c, double zoneR, Polygon2 outer)
     {
         var re0 = Math.Max(0, d.EntryRadius);
         var rx0 = Math.Max(0, d.ExitRadius ?? d.EntryRadius);
         var legs = d.Legs.OrderBy(l => Norm(l.AngleDeg)).ToList();
-        if (legs.Count < 2) return Close(raw, re0);
-        var cache = new Dictionary<int, List<Polygon2>>();
-        List<Polygon2> Closed(double r)
-        {
-            var key = (int)Math.Round(r * 10);
-            if (!cache.TryGetValue(key, out var v)) cache[key] = v = Close(raw, r);
-            return v;
-        }
+        if (legs.Count == 0) return raw;
         var pieces = new List<Polygon2>(raw);
         for (int i = 0; i < legs.Count; i++)
         {
-            var A = legs[i];
-            var B = legs[(i + 1) % legs.Count];
-            var a = Norm(A.AngleDeg);
-            var b = Norm(B.AngleDeg);
-            var span = b - a;
-            while (span <= 0) span += 360;
-            var mid = a + span / 2;
-            var re = Math.Max(0, A.EntryRadius ?? re0);
-            var rx = Math.Max(0, B.ExitRadius ?? rx0);
-            pieces.AddRange(PolygonOps.Intersect(Closed(re), new[] { Sector(c, a, mid, zoneR + 10) }));
-            pieces.AddRange(PolygonOps.Intersect(Closed(rx), new[] { Sector(c, mid, b, zoneR + 10) }));
+            var X = legs[i];
+            var th = Norm(X.AngleDeg);
+            var next = legs.Count > 1 ? Norm(legs[(i + 1) % legs.Count].AngleDeg) : th + 360;
+            var prev = legs.Count > 1 ? Norm(legs[(i - 1 + legs.Count) % legs.Count].AngleDeg) : th - 360;
+            var spanN = next - th; while (spanN <= 0) spanN += 360;
+            var spanP = th - prev; while (spanP <= 0) spanP += 360;
+            var u = Dir(X.AngleDeg);
+            var t0 = Math.Max(0.5, Ray(outer, c, u) * 0.6);
+            var strip = PolygonOps.Strip(new[] { c + u * t0, c + u * (zoneR + 5) }, Math.Max(3, X.Width));
+            var baseUnion = PolygonOps.Union(strip.Append(outer));
+            var rEntry = Math.Max(0, X.EntryRadius ?? re0);
+            var rExit = Math.Max(0, X.ExitRadius ?? rx0);
+            if (rEntry > 0.05)
+                pieces.AddRange(PolygonOps.Intersect(Close(baseUnion, rEntry), new[] { Sector(c, th, th + Math.Min(spanN / 2, 179), zoneR + 10) }));
+            if (rExit > 0.05)
+                pieces.AddRange(PolygonOps.Intersect(Close(baseUnion, rExit), new[] { Sector(c, th - Math.Min(spanP / 2, 179), th, zoneR + 10) }));
         }
-        return PolygonOps.Union(pieces);
+        var merged = PolygonOps.Union(pieces);
+        // Fechamento leve: concordâncias vizinhas que se encontram entre ramos próximos ficam contínuas.
+        return PolygonOps.Offset(PolygonOps.Offset(merged, 1.0, true), -1.0, true);
     }
 
     public static MarkingGeometry Build(RoundaboutDefinition d, BuildContext ctx)
@@ -404,14 +410,39 @@ public static class RoundaboutGenerator
         Raised(L.Dividers, MarkingColor.Concreto, 0.10, hp);
         Raised(L.SplitterCurb, MarkingColor.Concreto, d.CurbHeight);
         Raised(L.SplitterCore, MarkingColor.Concreto, d.CurbHeight);
-        Raised(L.Curb, MarkingColor.Concreto, d.CurbHeight, 0.001);
-        Raised(L.Gutter, MarkingColor.Concreto, 0.005);
-        if (L.SidewalkService.Count > 0)
+        var profile = d.MatchRoadSection ? d.EdgeProfile : new List<Automation.EdgeBand>();
+        if (profile.Count > 0 && L.Curb.Count > 0)
         {
-            Raised(PolygonOps.Difference(L.Sidewalk, L.SidewalkService), MarkingColor.Concreto, d.CurbHeight);
-            Raised(L.SidewalkService, d.ServiceStripGrass ? MarkingColor.Grama : MarkingColor.Concreto, d.CurbHeight + (d.ServiceStripGrass ? 0.0 : 0.001));
+            // Mesmos elementos das vias ligadas (meio-fio, sarjeta, faixa gramada, passeio) em volta da rotatória.
+            var region = PolygonOps.Union(L.Curb.Concat(L.Sidewalk));
+            var (pieces, inside) = Automation.EdgeProfile.Apply(L.Pavement, region, profile, new[] { L.Zone });
+            IntersectionGenerator.AddPieces(geo, pieces);
+            if (inside.Count > 0)
+            {
+                // Pavimento sob a sarjeta: a sarjeta substitui essa faixa do asfalto (sem pisos sobrepostos).
+                foreach (var p in geo.Pieces.Where(p => p.Color == pavColor && p.Profile == null && p.Solid == null && p.Elevation < -1e-6).ToList())
+                {
+                    geo.Pieces.Remove(p);
+                    foreach (var r in PolygonOps.Difference(new[] { p.Shape }, inside))
+                    {
+                        var ss = r.Simplified();
+                        if (ss != null && ss.Area > 1e-4) geo.Pieces.Add(p with { Shape = ss });
+                    }
+                }
+            }
         }
-        else Raised(L.Sidewalk, MarkingColor.Concreto, d.CurbHeight);
+        else
+        {
+            IntersectionGenerator.AddPieces(geo, L.Curb.Select(c => new MarkingPiece(c, MarkingColor.Concreto) { Thickness = d.CurbHeight, Layer = "MEIO-FIO" }));
+            Raised(L.Gutter, MarkingColor.Concreto, 0.005);
+            if (L.SidewalkService.Count > 0)
+            {
+                Raised(PolygonOps.Difference(L.Sidewalk, L.SidewalkService), MarkingColor.Concreto, d.CurbHeight);
+                Raised(L.SidewalkService, d.ServiceStripGrass ? MarkingColor.Grama : MarkingColor.Concreto, d.CurbHeight + (d.ServiceStripGrass ? 0.0 : 0.001));
+            }
+            else Raised(L.Sidewalk, MarkingColor.Concreto, d.CurbHeight);
+        }
+
 
         if (d.Landscaping && d.IslandType == TipoIlhaCentral.Ajardinada && d.IslandRadius >= 3 && ctx.Catalog.Movel("ARVORE") is { } tree)
         {

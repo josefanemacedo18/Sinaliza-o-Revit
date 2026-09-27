@@ -30,15 +30,15 @@ public sealed class GeometryPreview : FrameworkElement
     /// <summary>Miniatura: sem seletor, barra de escala e textos.</summary>
     public bool Compact { get; set; }
 
-    /// <summary>Miniatura (bitmap) de uma geometria – usada no quantitativo e na planilha.</summary>
-    public static BitmapSource Snapshot(MarkingGeometry geo, int width, int height, bool iso)
+    /// <summary>Miniatura (bitmap) de uma geometria – desenhada sem janela (DrawingVisual), usada no quantitativo e na planilha.</summary>
+    public static BitmapSource Snapshot(MarkingGeometry geo, int width, int height, bool iso, bool paper = false)
     {
-        var pv = new GeometryPreview { Iso = iso, Compact = true, Width = width, Height = height };
+        var pv = new GeometryPreview { Iso = iso, Compact = true, Paper = paper };
         pv.Show(geo);
-        pv.Measure(new Size(width, height));
-        pv.Arrange(new Rect(0, 0, width, height));
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen()) pv.Draw(dc, width, height);
         var bmp = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        bmp.Render(pv);
+        bmp.Render(dv);
         bmp.Freeze();
         return bmp;
     }
@@ -85,7 +85,7 @@ public sealed class GeometryPreview : FrameworkElement
             var nz = Math.Clamp(_zoom * f, 0.2, 40);
             f = nz / _zoom;
             var c = e.GetPosition(this);
-            var center = new Point(ActualWidth / 2, ActualHeight / 2);
+            var center = new Point(_w / 2, _h / 2);
             _pan = new Vector(c.X - center.X - (c.X - center.X - _pan.X) * f, c.Y - center.Y - (c.Y - center.Y - _pan.Y) * f);
             _zoom = nz;
             InvalidateVisual();
@@ -96,7 +96,7 @@ public sealed class GeometryPreview : FrameworkElement
     private TransformGroup ViewTransform()
     {
         var tg = new TransformGroup();
-        tg.Children.Add(new ScaleTransform(_zoom, _zoom, ActualWidth / 2, ActualHeight / 2));
+        tg.Children.Add(new ScaleTransform(_zoom, _zoom, _w / 2, _h / 2));
         tg.Children.Add(new TranslateTransform(_pan.X, _pan.Y));
         return tg;
     }
@@ -119,10 +119,14 @@ public sealed class GeometryPreview : FrameworkElement
         InvalidateVisual();
     }
 
-    protected override void OnRender(DrawingContext dc)
+    private double _w, _h;
+
+    protected override void OnRender(DrawingContext dc) => Draw(dc, ActualWidth, ActualHeight);
+
+    private void Draw(DrawingContext dc, double w, double h)
     {
-        var w = ActualWidth;
-        var h = ActualHeight;
+        _w = w;
+        _h = h;
         if (w < 10 || h < 10) return;
         dc.DrawRectangle(Paper ? Brushes.White : _pavement.Count > 0 ? Surround : Asphalt, null, new Rect(0, 0, w, h));
         if (Iso && !Paper && _geometry != null && _geometry.Pieces.Count > 0)
@@ -346,7 +350,7 @@ public sealed class GeometryPreview : FrameworkElement
     {
         var candidates = new[] { 0.5, 1, 2, 5, 10, 20, 50, 100 };
         var len = candidates.FirstOrDefault(c => c * s > 50, 100);
-        var x0 = ActualWidth - len * s - 14;
+        var x0 = _w - len * s - 14;
         var y0 = h - 30;
         var pen = new Pen(Brushes.White, 2);
         dc.DrawLine(pen, new Point(x0, y0), new Point(x0 + len * s, y0));
