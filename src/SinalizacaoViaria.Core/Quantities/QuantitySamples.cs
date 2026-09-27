@@ -34,6 +34,12 @@ public static class QuantitySamples
             {
                 case SignDefinition:
                     return (null, TipoMiniatura.Placa);
+                case RailwayDefinition rw:
+                {
+                    var c = (RailwayDefinition)MarkingDefinition.FromJson(rw.ToJson())!;
+                    c.Tracks = 1; c.Offset = 0; c.Ditches = false;
+                    return (MarkingBuilder.Build(c, new Polyline2(new[] { new Vec2(0, 0), new Vec2(3.0, 0) }), ctx), TipoMiniatura.Perspectiva);
+                }
                 case RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition
                     or SidewalkAreaDefinition or CurbExtensionDefinition or PlanterDefinition:
                     return (Swatch(color), TipoMiniatura.Material);

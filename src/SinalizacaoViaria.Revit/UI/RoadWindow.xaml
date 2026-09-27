@@ -52,7 +52,7 @@
                 <GroupBox x:Name="GbCenter" Header="Eixo / canteiro central">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Text="Tratamento do eixo" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Column="1" x:Name="CbCenter" SelectionChanged="AnyChanged"/>
                         <TextBlock Grid.Row="1" Text="Canteiro central – largura (m)" Style="{StaticResource FieldLabel}"/>
@@ -62,6 +62,12 @@
                         <TextBlock Grid.Row="3" Text="Dispositivo no eixo" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Row="3" Grid.Column="1" x:Name="CbMedianDevice" SelectionChanged="AnyChanged" ToolTip="Ex.: barreira New Jersey sobre o canteiro, balizadores sobre a LFO."/>
                         <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkInvertCenter" Content="LFO-4: contínua do lado direito" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <TextBlock Grid.Row="5" Text="Canteiro físico – nível guia / vegetação (m)" Style="{StaticResource FieldLabel}"/>
+                        <Grid Grid.Row="5" Grid.Column="1">
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="6"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBox x:Name="TbMedianHeight" Text="0,15" TextChanged="AnyChanged" ToolTip="Topo dos meios-fios em relação à pista (0,15 usual)."/>
+                            <TextBox Grid.Column="2" x:Name="TbMedianVeg" TextChanged="AnyChanged" ToolTip="Topo da vegetação: vazio = no nível da guia; negativo = canteiro rebaixado (jardim de chuva)."/>
+                        </Grid>
                     </Grid>
                 </GroupBox>
 
@@ -72,6 +78,7 @@
                             <DataGrid.Columns>
                                 <DataGridComboBoxColumn x:Name="ColTypeRight" Header="Elemento" Width="*" SelectedValueBinding="{Binding Tipo}" SelectedValuePath="Value" DisplayMemberPath="Label"/>
                                 <DataGridTextColumn Header="Largura (m)" Width="90" Binding="{Binding LarguraTexto}"/>
+                                <DataGridTextColumn Header="Nível (m)" Width="70" Binding="{Binding AlturaTexto}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                         <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
@@ -91,6 +98,7 @@
                             <DataGrid.Columns>
                                 <DataGridComboBoxColumn x:Name="ColTypeLeft" Header="Elemento" Width="*" SelectedValueBinding="{Binding Tipo}" SelectedValuePath="Value" DisplayMemberPath="Label"/>
                                 <DataGridTextColumn Header="Largura (m)" Width="90" Binding="{Binding LarguraTexto}"/>
+                                <DataGridTextColumn Header="Nível (m)" Width="70" Binding="{Binding AlturaTexto}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                         <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
@@ -113,6 +121,7 @@
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <TextBlock x:Name="LblVaga" Text="Tipo de vaga" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="CbVaga" Grid.Column="1" SelectionChanged="DetailChanged"/>
@@ -154,6 +163,12 @@
                             <TextBlock x:Name="LblDistSeta" Grid.Row="15" Text="Distância símbolo → seta (m)" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="TbDistSeta" Grid.Row="15" Grid.Column="1" TextChanged="DetailChanged"/>
                             <CheckBox x:Name="CkLinhaCentral" Grid.Row="16" Grid.ColumnSpan="2" Content="Linha central amarela (bidirecional)" Checked="DetailChanged" Unchecked="DetailChanged"/>
+                            <TextBlock x:Name="LblAltura" Grid.Row="17" Text="Nível do topo em relação à pista (m)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbAltura" Grid.Row="17" Grid.Column="1" TextChanged="DetailChanged"
+                                     ToolTip="0,15 = nível de calçada; 0 = nível da pista; negativo = rebaixado (só calçada e canteiro). Faixas acima de 0 viram plataforma elevada com meio-fio no degrau."/>
+                            <TextBlock x:Name="LblVegetacao" Grid.Row="18" Text="Nível da vegetação (m, vazio = igual)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbVegetacao" Grid.Row="18" Grid.Column="1" TextChanged="DetailChanged"
+                                     ToolTip="Faixa gramada da calçada ou vegetação do canteiro: mais alta (floreira), no nível ou rebaixada (jardim de chuva)."/>
                         </Grid>
                     </StackPanel>
                 </GroupBox>

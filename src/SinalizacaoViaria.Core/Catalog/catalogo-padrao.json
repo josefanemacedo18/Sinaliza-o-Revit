@@ -1561,6 +1561,28 @@
       ]
     },
     {
+      "codigo": "PLATAFORMA",
+      "nome": "Plataforma elevada (ciclovia, faixa ou estacionamento em nível próprio)",
+      "grupo": "Urbanizacao",
+      "cor": "Concreto",
+      "espessura": 0.15,
+      "descricao": "Laje de concreto que eleva (ou rebaixa) um elemento da seção – ciclovia no nível da calçada, estacionamento elevado, faixa compartilhada – com meio-fio no degrau.",
+      "referencia": "Prática usual de projeto viário (seção transversal com níveis)",
+      "larguraMin": 0.3,
+      "larguraMax": 20.0,
+      "variantes": [
+        {
+          "nome": "Largura 1,50 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 1.5
+            }
+          ]
+        }
+      ]
+    },
+    {
       "codigo": "SARJETAO",
       "nome": "Sarjetão (travessia de águas)",
       "grupo": "Urbanizacao",

@@ -15,10 +15,10 @@ Convenções usadas em todo o plugin:
 
 | Painel | Ferramentas |
 |---|---|
-| **Vias** | **Via** (Via · Pista · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Orelha · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
-| **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (tachas · piso tátil · ciclovia · quebra-mola) |
-| **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive guard rail) |
-| **Detalhamento** | **Detalhar** (anotar · cotar seção · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
+| **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Orelha · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
+| **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (piso tátil · ciclovia · quebra-mola · cruzamento rodoferroviário) |
+| **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive **tachas e tachões** e guard rail) |
+| **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
 | **Editar** | Editar · Atualizar Todas · Selecionar Conjunto · Alternar 2D/3D · Configurações · Catálogo · Normas |
 
 Os botões com seta (▾) agrupam ferramentas afins; o botão mostra a última usada do grupo.
@@ -91,6 +91,22 @@ centros, mais próximo).
 | Faixa de segurança / transição | Zebrado com linhas de canalização (buffer entre fluxos, ciclofaixa etc.). |
 | Canteiro lateral físico / pintado | Meios-fios + grama (0,15 m) ou zebrado. |
 | Calçada | Meio-fio, faixa de serviço (gramada ou em concreto), faixa livre e faixa de acesso; aviso se a faixa livre for menor que 1,20 m (NBR 9050). |
+
+**Nível de cada elemento (coluna *Nível (m)* e campo *Nível do topo em relação à pista*).** Cada elemento da seção
+tem o seu nível, medido do topo do pavimento: vazio/padrão = calçada e canteiro físico a **+0,15**, faixas a **0**.
+
+* **Faixas acima de 0** (ciclofaixa, estacionamento, ônibus, faixa de caminhada, rolamento) viram **plataforma
+  elevada** (código PLATAFORMA – laje de concreto; vermelha na ciclofaixa com pintura de fundo) com **meio-fio no
+  degrau**, e a pintura, os símbolos e as legendas do elemento ficam assentados sobre ela. Ex.: ciclovia no nível da
+  calçada – ciclofaixa a 0,15: um meio-fio entre a pista e a ciclovia e **nenhum** entre a ciclovia e a calçada;
+  sem sarjeta atrás da plataforma.
+* **Calçada**: qualquer nível (0 = calçada no nível da pista; 0,20 = guia alta; negativo = rebaixada). O meio-fio só é
+  criado onde há degrau para o elemento interno, com o topo no nível mais alto.
+* **Vegetação** (faixa de serviço gramada da calçada e canteiro físico, campo *Nível da vegetação*): mais alta
+  (floreira), no nível ou **rebaixada** (jardim de chuva / biovaleta). No canteiro rebaixado as guias ficam a 0,10 m.
+* **Canteiro central físico**: *nível guia / vegetação* no quadro do eixo.
+* Níveis acima da pista: o sólido nasce na pista; no nível ou abaixo dela vira uma laje de 0,10 m com o topo no nível
+  pedido. As conexões (interseções, rotatórias, cul-de-sac) copiam esses níveis, pois leem os elementos da via.
 
 5. **Elemento selecionado**: opções do elemento (tipo de vaga, legenda e espaçamento, faixas da
    calçada, pintura da ciclofaixa, **segregação física** na divisa interna – tartarugas, balizadores,
@@ -195,7 +211,10 @@ asfalto → **Editar** → *Raio das curvas do eixo* (0 = cantos como desenhados
 ## 2.4 Bloqueios físicos
 
 Comando **Bloqueios Físicos** (painel *Sinalização Vertical*) – **uma única ferramenta** para todos os
-dispositivos físicos, inclusive as **defensas metálicas (guard rail)**, que antes tinham um botão próprio
+dispositivos físicos. As **tachas e tachões refletivos** fazem parte dela: aparecem no topo da lista (grupo *Tachas e
+tachões refletivos*); ao escolher um e clicar *Continuar ›* abre a janela das tachas já nesse tipo (variante mono/
+bidirecional, cor, cadência pela velocidade, caminho). O botão *Tachas e Tachões* saiu de *Complementos* e ficou como
+atalho no menu de **Bloqueios Físicos**. Também estão aqui inclusive as **defensas metálicas (guard rail)**, que antes tinham um botão próprio
 (o que duplicava a ferramenta). A lista é agrupada por família: *segregadores e tachões*, *balizadores,
 pilaretes e frades*, *barreiras de concreto*, *defensas metálicas (guard rail)*, *gradis e floreiras* e
 *canalização provisória (obras)*. Na **Sinalizar Via**, um mesmo dispositivo nunca é repetido no mesmo
@@ -420,9 +439,16 @@ desdobrar por cor nem por material da chapa. Cores e materiais (consumo de tinta
   **resumo por hierarquia viária** e resumo de pintura
   (separador `;` e vírgula decimal – abre direto no Excel em português). Exporta a categoria/pesquisa
   atual.
-* **Criar tabela no Revit**: *SV - Quantitativos de sinalização* agrupada por **categoria** (com
-  cabeçalho e subtotal), hierarquia viária, grupo, código e cor. **Tabelas por categoria** cria uma tabela para cada
-  categoria. O parâmetro compartilhado **SV_Categoria** também pode ser usado em filtros de vista.
+* **Criar tabela no Revit**: *SV - Quantitativos de sinalização* com o **mesmo layout da janela** – título
+  *QUANTITATIVO DE SINALIZAÇÃO VIÁRIA E URBANIZAÇÃO* em faixa azul, cabeçalhos em azul claro, blocos por
+  **categoria** e **subcategoria** (cabeçalho e subtotal), colunas **Imagem · Código · Descrição · Quantidade · Un. ·
+  Área (m²) · Extensão (m) · Unid. · Hierarquia · Material** e **TOTAL GERAL**. O Revit aceita no máximo **4 níveis de
+  classificação** (era a causa do erro *"sorting/grouping field count would be greater than 4"*): categoria →
+  subcategoria → código → cor (oculta, só separa a pintura por cor). Itens de memorial (placas, dispositivos,
+  mobiliário) ficam numa linha por modelo. A coluna *Quantidade/Un.* usa os novos parâmetros **SV_QtdMedicao** e
+  **SV_Unidade**, preenchidos também nos elementos antigos ao criar a tabela. A **miniatura** de cada item vai para o
+  parâmetro *Imagem* dos elementos e a tabela é colocada numa **folha SV-Q01** – o Revit só desenha imagens de
+  tabela em folhas. **Tabelas por categoria** cria uma tabela para cada categoria. O parâmetro compartilhado **SV_Categoria** também pode ser usado em filtros de vista.
 * Para a prancha, use **Detalhamento → Quadro de Quantitativos** (seção 16).
 
 **Janela redesenhada**: cabeçalho com o projeto, **cartões de resumo** (elementos, área pintada, extensão
@@ -555,7 +581,16 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   clicando os vértices (ESC termina) – ou só redesenhe a linha, mude a **ponta** da chamada (para
   apontar para a face da placa, o poste etc.) ou volte à chamada automática. Tudo fica relativo ao
   suporte: movendo a placa, o detalhe acompanha.
-* **Cotar Seção** (refeito): cadeia de cotas com **nome de cada trecho** (calçada, meio-fio, faixa de
+* **Cotar Seção – perfil transversal** (rodada G): **um clique sobre a via** gera o corte perpendicular ao eixo, de
+  alinhamento a alinhamento (ou *Dois pontos livres*); depois clique onde desenhar o **PERFIL TRANSVERSAL**. O perfil
+  é o corte do próprio modelo: pavimento, sarjetas, meios-fios, calçadas, faixas gramadas, canteiros, plataformas,
+  dispositivos e pintura, cada camada **preenchida com o seu material e contornada**, na escala escolhida (1:50 por
+  padrão, com **exagero vertical** opcional), com **nome de cada trecho** e chamada, **níveis** (▽ +0,15 / ±0,00),
+  **caimento da pista** (i = 2,0 % para fora do eixo, editável), **cotas verticais** dos desníveis (meio-fio,
+  plataforma, canteiro), **cotas horizontais** e total sob o perfil, **eixo**, linha do terreno, **legenda dos
+  materiais** com espessuras e o título **SEÇÃO TRANSVERSAL A–A** com a escala. A letra avança sozinha (A, B, C…).
+  Tudo se atualiza quando a via muda; a cadeia de cotas em planta é opcional.
+* **Cotar Seção** (cadeia em planta): cadeia de cotas com **nome de cada trecho** (calçada, meio-fio, faixa de
   rolamento, ciclofaixa, faixa de ônibus, faixa de caminhada, canteiro, estacionamento, zebrado),
   **eixo da via** em traço-ponto com a inscrição EIXO (opcionalmente dividindo as cotas em
   meias-larguras), **cota total**, **marcas de corte** nas pontas (letra no círculo + seta do sentido de
@@ -868,6 +903,29 @@ monta o conjunto do **MBST Vol. IX / Vol. IV 5.8** e do **DER-SP (projeto-tipo 1
 
 Largura da pista, faixas por sentido, número de linhas férreas, bitola, distâncias e larguras são editáveis; o
 conjunto é um grupo (Selecionar Conjunto pega tudo).
+
+## 23.1 Via férrea
+
+**Vias ▾ → Via Férrea**: desenhe ou selecione o **eixo** (entre as linhas, se houver mais de uma). A ferramenta modela
+a via permanente completa em 3D, tudo editável (Editar):
+
+| Parâmetro | Opções |
+|---|---|
+| Superestrutura | **em lastro** (convencional), **em laje** (fixação direta) ou **embutida no pavimento** (VLT/bonde) |
+| Bitola | larga 1,600 · métrica 1,000 · padrão 1,435 · **mista** 1,000 + 1,600 (3 trilhos) · personalizada |
+| Trilho | TR-45, TR-57, TR-68, UIC-60 e **Ri-60 de canaleta** – patim, alma e boleto com as dimensões reais |
+| Linhas | 1 a 8 linhas paralelas, **entrevia** eixo a eixo e deslocamento do conjunto |
+| Dormentes | concreto monobloco, **bibloco** (dois blocos + barra), madeira ou aço; espaçamento (0,60 m), comprimento pela bitola, largura e altura editáveis; **placas de apoio e fixações** |
+| Lastro | altura sob o dormente (0,30 m), ombro (0,40 m), **talude** (1,5 : 1) – sólido trapezoidal contínuo em brita |
+| Sublastro | espessura (0,20 m) e largura além do pé do lastro, em solo compactado |
+| Drenagem | **valetas de concreto** (fundo e paredes) dos dois lados, largura e profundidade |
+| Laje / embutida | espessura e largura da laje; revestimento da via embutida (concreto, asfalto, **grama – via verde**, bloquete) com as canaletas livres; topo do trilho rente ao piso |
+
+Nível zero: topo da plataforma (via embutida: topo do pavimento). A janela mostra a prévia em planta/3D e o memorial
+**por km** (trilhos em m e t, dormentes, fixações, lastro, sublastro e concreto em m³, revestimento, valetas). No
+quantitativo a via entra em *Pavimentação e geometria viária*, em metros de via (unidades = dormentes). Materiais
+novos: **Brita (lastro)** e **Sublastro**. Referências: ABNT NBR 7641, NBR 7590, NBR 11709 e NBR 5564. Para a
+sinalização da passagem em nível use o **Cruzamento Rodoferroviário** (seção 23).
 
 ## 24. O que foi aplicado dos manuais
 

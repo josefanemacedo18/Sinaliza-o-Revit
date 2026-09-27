@@ -34,6 +34,10 @@ public enum MarkingColor
     Madeira,
     /// <summary>Relevo do piso tátil (domos e barras) – tom escuro para contraste em planta.</summary>
     RelevoTatil,
+    /// <summary>Brita (lastro ferroviário) – elemento físico.</summary>
+    Brita,
+    /// <summary>Solo compactado / sublastro – elemento físico.</summary>
+    Terra,
 }
 
 public readonly record struct Rgb(byte R, byte G, byte B)
@@ -59,7 +63,8 @@ public static class MarkingColors
     /// <summary>Verdadeiro para cores de demarcação (tinta); falso para materiais físicos.</summary>
     public static bool IsPaint(MarkingColor c) =>
         c is not (MarkingColor.Concreto or MarkingColor.Grama or MarkingColor.Metal or MarkingColor.Asfalto or MarkingColor.Bloquete
-            or MarkingColor.PavimentoConcreto or MarkingColor.Folhagem or MarkingColor.Vidro or MarkingColor.Madeira or MarkingColor.RelevoTatil);
+            or MarkingColor.PavimentoConcreto or MarkingColor.Folhagem or MarkingColor.Vidro or MarkingColor.Madeira or MarkingColor.RelevoTatil
+            or MarkingColor.Brita or MarkingColor.Terra);
 
     /// <summary>Materiais de pavimento da pista.</summary>
     public static bool IsPavement(MarkingColor c) => c is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto;
@@ -85,6 +90,8 @@ public static class MarkingColors
         MarkingColor.Vidro => new Rgb(176, 208, 226),
         MarkingColor.Madeira => new Rgb(164, 116, 66),
         MarkingColor.RelevoTatil => new Rgb(150, 92, 22),
+        MarkingColor.Brita => new Rgb(126, 124, 118),
+        MarkingColor.Terra => new Rgb(150, 118, 84),
         _ => new Rgb(128, 128, 128),
     };
 
@@ -109,6 +116,8 @@ public static class MarkingColors
         MarkingColor.Vidro => "Painéis de vidro (abrigos).",
         MarkingColor.Madeira => "Bancos, decks e parklets em madeira.",
         MarkingColor.RelevoTatil => "Relevo (domos e barras) do piso tátil.",
+        MarkingColor.Brita => "Lastro de brita da via férrea.",
+        MarkingColor.Terra => "Sublastro / solo compactado da plataforma ferroviária.",
         _ => "",
     };
 

@@ -449,7 +449,14 @@ public sealed class CmdDispositivos : CommandBase
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
         var w = new DeviceWindow();
-        if (UiHelpers.ShowModal(w) != true || w.Result == null) return Result.Cancelled;
+        if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
+        if (w.StudCode != null)
+        {
+            // Tachas e tachões (dentro de Bloqueios Físicos): janela de marcas lineares já no tipo escolhido.
+            PluginContext.Settings.Set(CmdTachas.SettingsKey, w.StudCode);
+            return LinearCommandBase.RunWindow(uidoc, CmdTachas.Title, CmdTachas.StudGroups, PathMode.Linhas);
+        }
+        if (w.Result == null) return Result.Cancelled;
         PluginContext.SaveSettings();
         EnsureDetailView(uidoc, w.Result.Output);
         if (w.PickSurfaces && MarkingCreator.PickSurfaces(uidoc) is { } s) w.Result.Output.SurfaceIds = s;

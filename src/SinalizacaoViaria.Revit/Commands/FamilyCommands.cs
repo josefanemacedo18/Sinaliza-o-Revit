@@ -415,6 +415,8 @@ internal static class FamilyClassifier
         SharedParameters.Set(fi, SharedParameters.Codigo, code);
         SharedParameters.Set(fi, SharedParameters.Descricao, description);
         SharedParameters.Set(fi, SharedParameters.Quantidade, 1);
+        SharedParameters.Set(fi, SharedParameters.Unidade, "un");
+        SharedParameters.Set(fi, SharedParameters.QtdMedicao, 1.0);
         SharedParameters.Set(fi, SharedParameters.Referencia, "Família do Revit (projeto)");
         if (hierarchy != HierarquiaViaria.NaoDefinida) SharedParameters.Set(fi, SharedParameters.Hierarquia, Hierarquia.Label(hierarchy));
     }

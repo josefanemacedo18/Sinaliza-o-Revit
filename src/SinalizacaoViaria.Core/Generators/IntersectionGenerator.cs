@@ -169,7 +169,7 @@ public sealed class IntersectionLayout
 public static class IntersectionGenerator
 {
     public const double NodeMergeDistance = 3.0;
-    private static readonly string[] PhysicalCodes = { "CALCADA", "GRAMADO", "SARJETA", "SARJETAO" };
+    private static readonly string[] PhysicalCodes = { "CALCADA", "GRAMADO", "SARJETA", "SARJETAO", "PLATAFORMA" };
 
     public static bool IsPhysical(MarkingDefinition d) =>
         d is LinearMarkingDefinition l && (PhysicalCodes.Contains(l.Code) || l.Code.StartsWith("MEIO-FIO"));

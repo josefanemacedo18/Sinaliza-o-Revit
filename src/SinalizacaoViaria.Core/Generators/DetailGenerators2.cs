@@ -138,8 +138,8 @@ public static partial class DetailGenerator
             or RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or TactileRouteDefinition)
             return false;
         var physical = d is DeviceMarkingDefinition or RampDefinition or TrafficCalmingDefinition or CurbExtensionDefinition or SidewalkAreaDefinition
-            or PlanterDefinition or CulDeSacDefinition
-            || d is LinearMarkingDefinition l && (l.Code is "CALCADA" or "GRAMADO" or "SARJETA" or "SARJETAO" || l.Code.StartsWith("MEIO-FIO"));
+            or PlanterDefinition or CulDeSacDefinition or RailwayDefinition
+            || d is LinearMarkingDefinition l && (l.Code is "CALCADA" or "GRAMADO" or "SARJETA" or "SARJETAO" or "PLATAFORMA" || l.Code.StartsWith("MEIO-FIO"));
         return physical ? sd.Physical : sd.Horizontal;
     }
 
@@ -225,7 +225,7 @@ public static partial class DetailGenerator
 
         var stagger = false;
         var labelMm = sd.TextMm * 0.8;
-        for (int i = 0; i + 1 < st.Count; i++)
+        for (int i = 0; sd.PlanChain && i + 1 < st.Count; i++)
         {
             var len = st[i + 1] - st[i];
             var text = len.ToString(fmt, Pt);
@@ -248,9 +248,9 @@ public static partial class DetailGenerator
             if (off > ctx.Mm(labelMm * 1.6 * nl + 2)) geo.Annotations.Add(new AnnotationText(mid, lines, labelMm) { Rotation = rot });
         }
         var totalOff = off + ctx.Mm(sd.TextMm * 3.2 + 2);
-        if (sd.Total && st.Count > 2)
+        if (sd.PlanChain && sd.Total && st.Count > 2)
             Dimension(geo, ctx, P(st[0]), P(st[^1]), n, totalOff, (st[^1] - st[0]).ToString(fmt, Pt), sd.TextMm, terminal: sd.Terminal);
-        var outer = sd.Total && st.Count > 2 ? totalOff : off;
+        var outer = !sd.PlanChain ? ctx.Mm(2) : sd.Total && st.Count > 2 ? totalOff : off;
 
         // Linha de seção (traço fino) para referência.
         geo.Annotations.Add(new AnnotationLine(new[] { a, b }, MarkingColor.Vermelha));
@@ -294,6 +294,8 @@ public static partial class DetailGenerator
             var tPos = (a + b) / 2 + tUp * (outer + ctx.Mm(sd.TextMm * 1.6 + 6 + 2 * tMm * 1.45));
             geo.Annotations.Add(new AnnotationText(tPos, title + "\n(cotas em metros)", tMm) { Rotation = titleRot });
         }
+        if (sd.Profile && sd.ProfilePosition is { } pos)
+            SectionProfile(geo, sd, ctx, withGeo, st, axes, pos, letter);
         geo.UnitCount = st.Count - 1;
         return geo;
     }
@@ -372,6 +374,7 @@ public static partial class DetailGenerator
                 },
                 SidewalkAreaDefinition or CurbExtensionDefinition => ("Calçada", 1),
                 PlanterDefinition => ("Canteiro", 1),
+                RailwayDefinition => ("Via férrea", 2),
                 DeviceMarkingDefinition => ("Segregador", 3),
                 HatchMarkingDefinition h => (h.Code.StartsWith("ZPA", StringComparison.OrdinalIgnoreCase) ? "Zebrado" : "Canalização", 3),
                 ParkingMarkingDefinition => ("Estacionamento", 3),
@@ -386,26 +389,30 @@ public static partial class DetailGenerator
     /// <summary>Via de exemplo (pontos, definições e geometrias) para a pré-visualização das cotas de seção.</summary>
     public static (List<MarkingDefinition> Defs, Func<MarkingDefinition, MarkingGeometry?> Geometry, Func<MarkingDefinition, Polyline2?> Path) SectionSample()
     {
+        // Via local típica: calçada 3,00 m (faixa gramada 0,70 m + passeio) a +0,15, meio-fio, sarjeta 0,30 m, ciclofaixa, duas faixas.
         var defs = new List<MarkingDefinition>();
         var geos = new Dictionary<MarkingDefinition, MarkingGeometry>();
-        void Add(MarkingDefinition d, double y0, double y1, MarkingColor c, double elev = 0)
+        void Add(MarkingDefinition d, double y0, double y1, MarkingColor c, double elev = 0, double thick = 0.0006)
         {
             defs.Add(d);
             if (!geos.TryGetValue(d, out var g)) geos[d] = g = new MarkingGeometry();
-            g.Pieces.Add(new MarkingPiece(Polygon2.Rectangle(new Vec2(0, y0), new Vec2(30, y1)), c) { Elevation = elev });
+            g.Pieces.Add(new MarkingPiece(Polygon2.Rectangle(new Vec2(0, y0), new Vec2(30, y1)), c) { Elevation = elev, Thickness = thick });
         }
         var road = new RoadPavementDefinition();
         defs.Add(road);
         geos[road] = new MarkingGeometry();
-        geos[road].Pieces.Add(new MarkingPiece(Polygon2.Rectangle(new Vec2(0, -5.3), new Vec2(30, 5.3)), MarkingColor.Asfalto));
-        Add(new LinearMarkingDefinition { Code = "CALCADA" }, 5.45, 8.45, MarkingColor.Concreto);
-        Add(new LinearMarkingDefinition { Code = "CALCADA" }, -8.45, -5.45, MarkingColor.Concreto);
-        Add(new LinearMarkingDefinition { Code = "MEIO-FIO" }, 5.3, 5.45, MarkingColor.Concreto);
-        Add(new LinearMarkingDefinition { Code = "MEIO-FIO" }, -5.45, -5.3, MarkingColor.Concreto);
-        Add(new LinearMarkingDefinition { Code = "CIC-FD" }, 3.5, 5.0, MarkingColor.Vermelha);
-        Add(new LinearMarkingDefinition { Code = "LBO" }, 3.3, 3.5, MarkingColor.Branca);
+        geos[road].Pieces.Add(new MarkingPiece(Polygon2.Rectangle(new Vec2(0, -5.0), new Vec2(30, 5.0)), MarkingColor.Asfalto) { Elevation = -0.05, Thickness = 0.05 });
+        foreach (var sg in new[] { 1, -1 })
+        {
+            Add(new LinearMarkingDefinition { Code = "SARJETA" }, sg > 0 ? 5.0 : -5.3, sg > 0 ? 5.3 : -5.0, MarkingColor.Concreto, -0.08, 0.08);
+            Add(new LinearMarkingDefinition { Code = "MEIO-FIO" }, sg > 0 ? 5.3 : -5.45, sg > 0 ? 5.45 : -5.3, MarkingColor.Concreto, 0, 0.15);
+            Add(new LinearMarkingDefinition { Code = "GRAMADO" }, sg > 0 ? 5.45 : -6.0, sg > 0 ? 6.0 : -5.45, MarkingColor.Grama, 0, 0.15);
+            Add(new LinearMarkingDefinition { Code = "CALCADA" }, sg > 0 ? 6.0 : -8.45, sg > 0 ? 8.45 : -6.0, MarkingColor.Concreto, 0, 0.15);
+        }
+        Add(new LinearMarkingDefinition { Code = "CIC-FD" }, 3.3, 4.8, MarkingColor.Vermelha);
+        Add(new LinearMarkingDefinition { Code = "LBO" }, 3.1, 3.3, MarkingColor.Branca);
         Add(new LinearMarkingDefinition { Code = "LFO-2" }, -0.05, 0.05, MarkingColor.Amarela);
-        Add(new LinearMarkingDefinition { Code = "LBO" }, -5.2, -5.1, MarkingColor.Branca);
+        Add(new LinearMarkingDefinition { Code = "LBO" }, -4.9, -4.8, MarkingColor.Branca);
         var paths = new Dictionary<MarkingDefinition, Polyline2> { [road] = new(new[] { new Vec2(0, 0), new Vec2(30, 0) }) };
         return (defs.Distinct().ToList(), d => geos.GetValueOrDefault(d), d => paths.GetValueOrDefault(d));
     }

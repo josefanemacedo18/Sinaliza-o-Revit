@@ -7,6 +7,16 @@ using SinalizacaoViaria.Revit.Infrastructure;
 
 namespace SinalizacaoViaria.Revit.UI;
 
+/// <summary>Tacha/tachão refletivo listado entre os bloqueios físicos (criado pela janela de marcas lineares).</summary>
+public sealed class StudEntry
+{
+    public const string Group = "Tachas e tachões refletivos";
+    public TipoLinearDef Type { get; }
+    public StudEntry(TipoLinearDef t) => Type = t;
+    public string Familia => Group;
+    public override string ToString() => $"{Type.Codigo} – {Type.Nome}";
+}
+
 /// <summary>Segregadores, balizadores, pilaretes, prismas, barreiras e defensas ao longo de um caminho.</summary>
 public partial class DeviceWindow : Window
 {
@@ -17,14 +27,19 @@ public partial class DeviceWindow : Window
     public DeviceMarkingDefinition? Result { get; private set; }
     public PathMode PathMode { get; private set; }
     public bool PickSurfaces => Output.PickSurfaces;
+    /// <summary>Tacha/tachão escolhido: o comando segue para a janela de tachas com este tipo.</summary>
+    public string? StudCode { get; private set; }
 
     public DeviceWindow(DeviceMarkingDefinition? existing = null, string? initialCode = null)
     {
         InitializeComponent();
         _existing = existing;
         // Lista única, agrupada por família (segregadores, balizadores, barreiras, defensas/guard rail, gradis, obras).
-        var view = new System.Windows.Data.ListCollectionView(_cat.Dispositivos.GroupBy(d => d.Codigo, StringComparer.OrdinalIgnoreCase).Select(g => g.First())
-            .OrderBy(d => d.Familia).ToList());
+        // Tachas e tachões são bloqueios físicos: aparecem no topo da lista (criados ao longo de linhas, com cadência).
+        var items = new List<object>();
+        if (existing == null) items.AddRange(_cat.LinearesDoGrupo(new[] { GrupoMarca.Dispositivo }).Select(t => new StudEntry(t)));
+        items.AddRange(_cat.Dispositivos.GroupBy(d => d.Codigo, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).OrderBy(d => d.Familia));
+        var view = new System.Windows.Data.ListCollectionView(items);
         view.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(DispositivoDef.Familia)));
         LbTypes.ItemsSource = view;
         foreach (var c in UiHelpers.ColorItems()) CbColor.Items.Add(c);
@@ -64,6 +79,24 @@ public partial class DeviceWindow : Window
 
     private void TypeChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (LbTypes.SelectedItem is StudEntry st)
+        {
+            TxtDescription.Text = $"{st.Type.Codigo} – {st.Type.Nome}\n\n{st.Type.Descricao}";
+            TxtReference.Text = st.Type.Referencia;
+            BtnOk.Content = "Continuar ›";
+            TxtWarnings.Text = "Tachas e tachões: clique em Continuar para escolher a variante (mono/bidirecional, cor, cadência) e o caminho.";
+            if (_loading) return;
+            try
+            {
+                var def = new LinearMarkingDefinition { Code = st.Type.Codigo };
+                var sample = new Polyline2(new[] { new Vec2(0, 0), new Vec2(20, 0) });
+                var geo = MarkingBuilder.Build(def, sample, new BuildContext { Catalog = _cat });
+                Preview.Show(geo, new[] { sample.Points }, new[] { Polygon2.Rectangle(new Vec2(-1, -3), new Vec2(21, 3)) });
+            }
+            catch (Exception ex) { TxtWarnings.Text = ex.Message; }
+            return;
+        }
+        if (_existing == null) BtnOk.Content = "Criar";
         var d = Device;
         if (d == null) return;
         TxtDescription.Text = $"{d.Codigo} – {d.Nome}\n\n{d.Descricao}";
@@ -109,7 +142,7 @@ public partial class DeviceWindow : Window
 
     private void UpdatePreview()
     {
-        if (_loading || Preview == null) return;
+        if (_loading || Preview == null || LbTypes.SelectedItem is StudEntry) return;
         try
         {
             var d = BuildDefinition();
@@ -130,6 +163,12 @@ public partial class DeviceWindow : Window
 
     private void OkClick(object sender, RoutedEventArgs e)
     {
+        if (LbTypes.SelectedItem is StudEntry st)
+        {
+            StudCode = st.Type.Codigo;
+            DialogResult = true;
+            return;
+        }
         try
         {
             Result = BuildDefinition();

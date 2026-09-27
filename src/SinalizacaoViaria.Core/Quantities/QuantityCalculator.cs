@@ -130,7 +130,7 @@ public sealed class QuantityRow
     public static CategoriaQuantitativo Categorize(MarkingDefinition def, GrupoMarca group) => def switch
     {
         RampDefinition or TactileRouteDefinition => CategoriaQuantitativo.Acessibilidade,
-        RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition => CategoriaQuantitativo.PavimentacaoGeometria,
+        RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or RailwayDefinition => CategoriaQuantitativo.PavimentacaoGeometria,
         _ => group switch
         {
             GrupoMarca.SinalizacaoVertical => CategoriaQuantitativo.SinalizacaoVertical,
@@ -198,7 +198,7 @@ public static class QuantityCalculator
                 row.Area += area;
                 // Consumo de tinta apenas para demarcação (não para calçadas, canteiros e dispositivos físicos).
                 if (!memorial && mat != null && MarkingColors.IsPaint(color) && def is not (DeviceMarkingDefinition or SignDefinition or UrbanElementDefinition or RampDefinition or TactileRouteDefinition)
-                    && !(def is LinearMarkingDefinition { Code: "PTA" or "PTD" }))
+                    && !(def is LinearMarkingDefinition { Code: "PTA" or "PTD" or "PLATAFORMA" }))
                 {
                     row.MaterialConsumption += area * mat.Consumo;
                     row.GlassBeadsKg += area * mat.MicroesferasKgM2;

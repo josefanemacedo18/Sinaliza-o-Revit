@@ -113,6 +113,32 @@ public sealed class ElementoSecao
     /// <summary>Cor da pintura de fundo da faixa de ônibus.</summary>
     public MarkingColor CorOnibus { get; set; } = MarkingColor.Vermelha;
 
+    // ---- Níveis
+    /// <summary>
+    /// Nível do topo do elemento em relação ao topo da pista (m). Nulo = padrão do tipo (calçada e canteiro físico 0,15;
+    /// demais 0). Acima de 0 as faixas pintadas (ciclofaixa, estacionamento, ônibus...) viram plataforma elevada com
+    /// meio-fio no degrau; calçada e canteiro aceitam também valores negativos (rebaixados).
+    /// </summary>
+    public double? Altura { get; set; }
+
+    /// <summary>Calçada (faixa de serviço gramada) e canteiro físico: nível do topo da vegetação (m). Nulo = igual ao elemento.</summary>
+    public double? AlturaVegetacao { get; set; }
+
+    public static double AlturaPadrao(TipoElementoSecao t) =>
+        t is TipoElementoSecao.Calcada or TipoElementoSecao.CanteiroFisico ? RoadSetup.CurbHeight : 0;
+
+    /// <summary>Nível efetivo do topo (m).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public double AlturaEfetiva => Altura ?? AlturaPadrao(Tipo);
+
+    /// <summary>Nível efetivo da vegetação (m).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public double AlturaVegetacaoEfetiva => AlturaVegetacao ?? AlturaEfetiva;
+
+    /// <summary>Elemento de pista (pintado) elevado acima do pavimento: vira plataforma com laje própria.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool Elevado => Tipo is not (TipoElementoSecao.Calcada or TipoElementoSecao.CanteiroFisico) && AlturaEfetiva >= 0.01;
+
     public ElementoSecao Clone() => (ElementoSecao)MemberwiseClone();
 
     public static string Rotulo(TipoElementoSecao t) => t switch
@@ -160,6 +186,13 @@ public sealed class ElementoSecao
 public sealed class RoadSetup
 {
     public const double CurbWidth = 0.15;
+    /// <summary>Altura usual do meio-fio / nível da calçada acima da pista (m).</summary>
+    public const double CurbHeight = 0.15;
+
+    /// <summary>Canteiro central físico: nível do topo dos meios-fios (m).</summary>
+    public double MedianHeight { get; set; } = CurbHeight;
+    /// <summary>Canteiro central físico: nível do topo da vegetação (m). Nulo = igual aos meios-fios.</summary>
+    public double? MedianVegetationHeight { get; set; }
 
     /// <summary>Mão dupla (eixo = divisão de sentidos) ou mão única (todas as faixas no sentido do eixo).</summary>
     public bool TwoWay { get; set; } = true;
@@ -222,17 +255,19 @@ public sealed class RoadSetup
     {
         var gaps = new List<PavementGap>();
         double a = MedianHalf;
+        ElementoSecao? prev = null;
         foreach (var e in side)
         {
             var w = Math.Max(0.05, e.Largura);
             if (e.Tipo == TipoElementoSecao.Calcada)
             {
-                var gutter = PhysicalElements ? Math.Max(0, e.Sarjeta) : 0;
+                var gutter = PhysicalElements && prev is not { Elevado: true } ? Math.Max(0, e.Sarjeta) : 0;
                 if (gutter > 0.01) gaps.Add(new PavementGap(sigma * (a - gutter / 2), gutter, Median: false));
                 return (a, w, gaps);
             }
             if (e.Tipo == TipoElementoSecao.CanteiroFisico && PhysicalElements) gaps.Add(new PavementGap(sigma * (a + w / 2), w));
             a += w;
+            prev = e;
         }
         return (a, 0, gaps);
     }
@@ -326,13 +361,16 @@ public sealed class RoadSetup
             EndSetback = EndSetback,
         });
 
-        LinearMarkingDefinition Physical(string code, double offset, double width) => Add(new LinearMarkingDefinition
+        LinearMarkingDefinition Physical(string code, double offset, double width, double? top = null, MarkingColor? color = null) => Add(new LinearMarkingDefinition
         {
             Code = code,
             Offset = offset,
             WidthOverride = width,
             StartSetback = StartSetback,
             EndSetback = EndSetback,
+            // Nível só gravado quando difere do catálogo (0,15 m apoiado na pista) – vias antigas continuam iguais.
+            Height = top is { } t && Math.Abs(t - CurbHeight) > 1e-6 ? t : null,
+            ColorOverride = color,
         });
 
         void Hatch(string code, double offset, double width) => Add(new HatchMarkingDefinition
@@ -363,7 +401,7 @@ public sealed class RoadSetup
                 case CenterTreatment.Canteiro:
                     if (MedianType == TipoCanteiro.Fisico)
                     {
-                        if (PhysicalElements) PhysicalMedian(0, MedianWidth);
+                        if (PhysicalElements) PhysicalMedian(0, MedianWidth, MedianHeight, MedianVegetationHeight ?? MedianHeight);
                         if (EdgeLines)
                         {
                             if (IsLane(Left, 0)) Line(EdgeCode, half + EdgeInset);
@@ -395,15 +433,34 @@ public sealed class RoadSetup
         void BuildSide(List<ElementoSecao> side, int sigma, bool reverseTraffic)
         {
             double a = half;
+            // Níveis (topo) de cada elemento; faixas pintadas não aceitam nível negativo (ficariam sob o pavimento).
+            var hs = side.Select(x => x.Tipo is TipoElementoSecao.Calcada or TipoElementoSecao.CanteiroFisico ? x.AlturaEfetiva : Math.Max(0, x.AlturaEfetiva)).ToList();
+            foreach (var x in side.Where(x => x.Tipo is not (TipoElementoSecao.Calcada or TipoElementoSecao.CanteiroFisico) && x.AlturaEfetiva < -1e-6))
+                Warnings.Add($"{ElementoSecao.Rotulo(x.Tipo)}: nível negativo não se aplica a faixas da pista – usado 0.");
+            double H(int k) => k < 0 || k >= side.Count ? 0 : hs[k];
+            // Degrau entre dois elementos vizinhos de pista (canteiros e calçadas têm os próprios meios-fios).
+            bool Step(int k) => k > 0 && k < side.Count && Math.Abs(H(k) - H(k - 1)) > 0.02
+                                && side[k].Tipo is not (TipoElementoSecao.Calcada or TipoElementoSecao.CanteiroFisico)
+                                && side[k - 1].Tipo != TipoElementoSecao.CanteiroFisico;
             for (int i = 0; i < side.Count; i++)
             {
                 var e = side[i];
                 var w = Math.Max(0.05, e.Largura);
                 var b = a + w;
                 var c = (a + b) / 2;
+                var h = hs[i];
 
-                // Linha na divisa interna (entre o elemento anterior e este)
-                if (i > 0) BoundaryLine(side[i - 1], e, a, sigma);
+                // Linha na divisa interna (entre o elemento anterior e este) – ou meio-fio, quando há degrau.
+                if (i == 0 && e.Elevado && PhysicalElements)
+                    Physical("MEIO-FIO", sigma * (a + CurbWidth / 2), CurbWidth, h);
+                if (i > 0 && Step(i) && PhysicalElements)
+                {
+                    // Meio-fio do lado mais alto, com o topo no nível dele.
+                    var up = H(i) > H(i - 1);
+                    Physical("MEIO-FIO", sigma * (up ? a + CurbWidth / 2 : a - CurbWidth / 2), CurbWidth, Math.Max(H(i), H(i - 1)));
+                }
+                else if (i > 0) BoundaryLine(side[i - 1], e, a, sigma);
+                var first = res.Count;
                 // Um único dispositivo por alinhamento (evita bloqueios/defensas sobrepostos na mesma divisa).
                 if (!string.IsNullOrWhiteSpace(e.Dispositivo)
                     && !res.OfType<DeviceMarkingDefinition>().Any(x => string.Equals(x.Code, e.Dispositivo, StringComparison.OrdinalIgnoreCase) && Math.Abs(x.Offset - sigma * a) < 0.05))
@@ -495,13 +552,31 @@ public sealed class RoadSetup
                         break;
 
                     case TipoElementoSecao.CanteiroFisico:
-                        if (PhysicalElements) PhysicalMedian(sigma * c, w);
+                        if (PhysicalElements) PhysicalMedian(sigma * c, w, h, e.AlturaVegetacaoEfetiva);
                         break;
 
                     case TipoElementoSecao.Calcada:
-                        if (PhysicalElements) Sidewalk(e, a, b, sigma);
+                        if (PhysicalElements) Sidewalk(e, a, b, sigma, h, H(i - 1));
                         if (i < side.Count - 1) Warnings.Add("A calçada deve ser o último elemento do lado (alinhamento do lote).");
                         break;
+                }
+
+                // Faixa elevada (ciclovia no nível da calçada, estacionamento elevado...): laje própria entre os meios-fios
+                // e a pintura do elemento (fundo, símbolos, legendas) assentada sobre ela.
+                if (e.Elevado && PhysicalElements)
+                {
+                    for (int k = first; k < res.Count; k++)
+                        if (!(res[k] is LinearMarkingDefinition pl && RoadSectionInference.IsPhysical(pl.Code)))
+                            res[k].Output.ElevationOffset = h + 0.001;
+                    var curbIn = i == 0 || Step(i) && H(i) > H(i - 1) ? CurbWidth : 0;
+                    var curbOut = i + 1 < side.Count && Step(i + 1) && H(i) > H(i + 1)
+                                  || i + 1 == side.Count ? CurbWidth : 0;
+                    if (i + 1 == side.Count) Physical("MEIO-FIO", sigma * (b - CurbWidth / 2), CurbWidth, h);
+                    var pw = w - curbIn - curbOut;
+                    if (pw > 0.05)
+                        Physical("PLATAFORMA", sigma * (a + curbIn + pw / 2), pw, h,
+                            e.Tipo == TipoElementoSecao.Ciclofaixa && e.PinturaFundo ? MarkingColor.Vermelha
+                            : ElementoSecao.EhFaixaDeTrafego(e.Tipo) ? MarkingColor.PavimentoConcreto : null);
                 }
 
                 a = b;
@@ -537,7 +612,8 @@ public sealed class RoadSetup
                 return;
             }
             // Sarjeta da calçada: ocupa a borda da pista; a linha de bordo fica além dela.
-            var gutter = to == TipoElementoSecao.Calcada && PhysicalElements ? Math.Max(0, outer.Sarjeta) : 0;
+            // (sem sarjeta atrás de uma faixa elevada: a água corre no nível da pista, não sobre a plataforma)
+            var gutter = to == TipoElementoSecao.Calcada && PhysicalElements && !inner.Elevado ? Math.Max(0, outer.Sarjeta) : 0;
             if (gutter > 0.01) Physical("SARJETA", sigma * (at - gutter / 2), gutter);
             if (!EdgeLines) return;
             static bool EdgeLike(TipoElementoSecao t) => t is TipoElementoSecao.Acostamento or TipoElementoSecao.CanteiroFisico or TipoElementoSecao.Calcada;
@@ -545,29 +621,38 @@ public sealed class RoadSetup
             else if (lo && EdgeLike(ti)) Line(EdgeCode, sigma * (at + EdgeInset));
         }
 
-        void PhysicalMedian(double centerOffset, double width)
+        void PhysicalMedian(double centerOffset, double width, double top, double vegetation)
         {
+            // Meios-fios com o topo no nível do canteiro; num canteiro rebaixado (jardim de chuva) a guia fica 0,10 m acima da pista.
+            var curbTop = top > 0.01 ? top : 0.10;
             if (width <= 2 * CurbWidth + 0.05)
             {
-                Physical("MEIO-FIO", centerOffset, width);
+                Physical("MEIO-FIO", centerOffset, width, curbTop);
                 return;
             }
-            Physical("MEIO-FIO", centerOffset + (width / 2 - CurbWidth / 2), CurbWidth);
-            Physical("MEIO-FIO", centerOffset - (width / 2 - CurbWidth / 2), CurbWidth);
-            Physical("GRAMADO", centerOffset, width - 2 * CurbWidth);
+            Physical("MEIO-FIO", centerOffset + (width / 2 - CurbWidth / 2), CurbWidth, curbTop);
+            Physical("MEIO-FIO", centerOffset - (width / 2 - CurbWidth / 2), CurbWidth, curbTop);
+            Physical("GRAMADO", centerOffset, width - 2 * CurbWidth, vegetation);
         }
 
-        void Sidewalk(ElementoSecao e, double a, double b, int sigma)
+        void Sidewalk(ElementoSecao e, double a, double b, int sigma, double top, double inner)
         {
             var width = b - a;
-            Physical("MEIO-FIO", sigma * (a + CurbWidth / 2), CurbWidth);
+            // Meio-fio só onde há degrau para o elemento interno (calçada no nível de uma ciclovia elevada não tem guia entre elas).
+            var curb = Math.Abs(top - inner) > 0.02 ? CurbWidth : 0;
+            if (curb > 0) Physical("MEIO-FIO", sigma * (a + CurbWidth / 2), CurbWidth, Math.Max(top, inner));
             var service = Math.Clamp(e.FaixaServico, CurbWidth, width) - CurbWidth;
             var access = Math.Clamp(e.FaixaAcesso, 0, Math.Max(0, width - CurbWidth - service));
             var free = width - CurbWidth - service - access;
             var s0 = a + CurbWidth;
-            if (service > 0.02) Physical(e.ServicoGramado ? "GRAMADO" : "CALCADA", sigma * (s0 + service / 2), service);
-            if (free > 0.02) Physical("CALCADA", sigma * (s0 + service + free / 2), free);
-            if (access > 0.02) Physical("CALCADA", sigma * (b - access / 2), access);
+            if (curb == 0) { service += CurbWidth; s0 = a; }
+            if (service > 0.02)
+            {
+                if (e.ServicoGramado) Physical("GRAMADO", sigma * (s0 + service / 2), service, e.AlturaVegetacaoEfetiva);
+                else Physical("CALCADA", sigma * (s0 + service / 2), service, top);
+            }
+            if (free > 0.02) Physical("CALCADA", sigma * (s0 + service + free / 2), free, top);
+            if (access > 0.02) Physical("CALCADA", sigma * (b - access / 2), access, top);
             if (free < 1.20 - 1e-6)
                 Warnings.Add($"Calçada com faixa livre de {free:0.00} m – a NBR 9050 exige no mínimo 1,20 m.");
         }

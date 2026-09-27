@@ -30,6 +30,8 @@ public sealed class StyleService
         MarkingColor.Metal => "Metal",
         MarkingColor.PavimentoConcreto => "Pavimento de concreto",
         MarkingColor.RelevoTatil => "Relevo tátil",
+        MarkingColor.Brita => "Brita (lastro)",
+        MarkingColor.Terra => "Sublastro",
         _ => c.ToString(),
     };
 
@@ -66,6 +68,8 @@ public sealed class StyleService
                 MarkingColor.Metal => "Metal",
                 MarkingColor.Vidro => "Vidro",
                 MarkingColor.Madeira => "Madeira",
+                MarkingColor.Brita => "Pedra",
+                MarkingColor.Terra => "Terra",
                 MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto => "Pavimento",
                 _ => "Concreto",
             };

@@ -24,6 +24,9 @@ public static class RibbonBuilder
                 "acrescenta os demais elementos junto ao bordo."),
             Data(typeof(CmdPista), "Pista", "pista",
                 "Só a pista dos veículos (asfalto, bloquete ou concreto), já conectada. Monte o resto passo a passo com Calçadas → 'Junto ao bordo de uma via'."),
+            Data(typeof(CmdFerrovia), "Via Férrea", "ferrovia",
+                "Via férrea completa e personalizável: lastro com taludes, sublastro, dormentes (concreto, bibloco, madeira, aço), fixações e trilhos " +
+                "TR-45/57/68, UIC-60 ou Ri-60 – ou via em laje e via embutida no pavimento (VLT) –, bitola larga, métrica, padrão ou mista, várias linhas e valetas."),
             Data(typeof(CmdDesenharEixo), "Desenhar Eixo", "eixo",
                 "Eixo com a ferramenta nativa Linha de modelo (reta, arco, spline, cadeia, snaps) ou por pontos com encaixe nas vias."));
         Split(via, "SvConexoes", "Conexões",
@@ -73,7 +76,6 @@ public static class RibbonBuilder
         Large(hor, typeof(CmdVagas), "Vagas", "vaga",
             "Vagas paralelas ou em ângulo, PcD, idoso, carga e descarga, ônibus, táxi...");
         Split(hor, "SvComplementos", "Complementos",
-            Data(typeof(CmdTachas), "Tachas", "tacha", "Tachas e tachões refletivos ao longo de linhas."),
             Data(typeof(CmdPisoTatil), "Piso Tátil", "tatil", "Piso tátil de alerta e direcional (NBR 16537)."),
             Data(typeof(CmdCiclovia), "Ciclovia / Faixa de Caminhada", "ciclo", "Ciclofaixa uni/bidirecional, ciclovia segregada ou faixa de caminhada completa: fundo, linhas, símbolos, setas e segregação."),
             Data(typeof(CmdCicloviaLinhas), "Marcas de Ciclovia Avulsas", "ciclo", "CIC-LD, CIC-FD, CIC-LC e cruzamento rodocicloviário (MCC) ao longo de linhas."),
@@ -89,15 +91,17 @@ public static class RibbonBuilder
             Data(typeof(CmdMoverChamadaPlaca), "Mover Chamada de Placa", "detalheplaca", "Leve o símbolo detalhado para onde quiser e desenhe a linha de chamada clicando os vértices – ou mude a ponta da chamada."),
             Data(typeof(CmdQuadroPlacas), "Quadro de Placas", "quadroplacas", "Símbolo, numeração, código, descrição, dimensões e quantidade de cada placa."),
             Data(typeof(CmdQuadroLegenda), "Quadro de Legenda", "quadrolegenda", "Legenda das placas do projeto, com desenho e descrição."));
-        Large(vert, typeof(CmdDispositivos), "Bloqueios Físicos", "bloqueio",
-            "Todos os dispositivos físicos numa só ferramenta: segregadores e tachões, balizadores, pilaretes e frades, New Jersey, " +
-            "defensas metálicas (guard rail simples, dupla e de cabos), gradis, floreiras e canalização provisória de obras.");
+        Split(vert, "SvBloqueios", "Bloqueios Físicos",
+            Data(typeof(CmdDispositivos), "Bloqueios Físicos", "bloqueio",
+                "Todos os dispositivos físicos numa só ferramenta: tachas e tachões refletivos, segregadores, balizadores, pilaretes e frades, New Jersey, " +
+                "defensas metálicas (guard rail simples, dupla e de cabos), gradis, floreiras e canalização provisória de obras."),
+            Data(typeof(CmdTachas), "Tachas e Tachões", "tacha", "Tachas e tachões refletivos ao longo de linhas (mono/bidirecionais, cadência pela velocidade) – atalho de Bloqueios Físicos."));
 
         // ---------------------------------------------------------------- Detalhamento e quantitativos
         var det = app.CreateRibbonPanel(TabName, "Detalhamento");
         Split(det, "SvDetalhar", "Detalhar",
             Data(typeof(CmdAnotar), "Anotar", "anotar", "Chamada com texto automático para qualquer sinalização."),
-            Data(typeof(CmdCotarSecao), "Cotar Seção", "cotasecao", "Cadeia de cotas automática atravessando a via."),
+            Data(typeof(CmdCotarSecao), "Cotar Seção", "cotasecao", "Um clique sobre a via: perfil transversal em corte (camadas, níveis, caimento, cotas horizontais e verticais, materiais) + cotas e marcas do corte na planta."),
             Data(typeof(CmdDetalheTipico), "Detalhe Típico", "detalhetipico", "Detalhe ampliado e cotado de uma marca ou placa."),
             Data(typeof(CmdQuadroQuantitativos), "Quadro de Quantitativos", "quadroqtd", "Tabela de quantidades desenhada na prancha."),
             Data(typeof(CmdNotas), "Notas Gerais", "notas", "Bloco de notas numeradas do projeto."),

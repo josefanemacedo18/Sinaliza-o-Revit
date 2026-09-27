@@ -31,9 +31,11 @@ internal static class DetailForms
 
     public static FormWindow Section(SectionDimensionDefinition d, bool edit) =>
         new FormWindow(edit ? "Editar cota de seção" : "Cotar seção transversal", "Cota automática da seção",
-                "Clique dois pontos atravessando a via (ex.: de alinhamento a alinhamento). O plugin encontra as linhas, faixas, canteiros, " +
-                "meios-fios e calçadas cortados e cria a cadeia de cotas (larguras eixo a eixo das linhas), os nomes de cada trecho, o eixo, " +
-                "a cota total e as marcas do corte (SEÇÃO A–A). A cota se atualiza quando a sinalização muda. Repete até ESC.",
+                "Clique sobre uma via (corte perpendicular ao eixo, de alinhamento a alinhamento) ou dois pontos atravessando-a; depois clique onde " +
+                "desenhar o PERFIL TRANSVERSAL. O plugin corta pavimento, sarjetas, meios-fios, calçadas, canteiros, plataformas e pintura e desenha: " +
+                "o corte em escala com as camadas preenchidas, nome e nível de cada trecho, caimento da pista, cotas horizontais e verticais (desníveis), " +
+                "eixo, legenda dos materiais e o título SEÇÃO TRANSVERSAL A–A – além da cadeia de cotas e das marcas do corte na planta. " +
+                "Tudo se atualiza quando a via muda. Repete até ESC.",
                 d, () =>
                 {
                     // Pré-visualização numa via de exemplo (calçadas, meios-fios, ciclofaixa, linhas e eixo).
@@ -41,6 +43,7 @@ internal static class DetailForms
                     var c = (SectionDimensionDefinition)MarkingDefinition.FromJson(d.ToJson())!;
                     c.Start = new Vec2(15, -8.45);
                     c.End = new Vec2(15, 8.45);
+                    c.ProfilePosition = c.Profile ? new Vec2(0, -11) : null;
                     var ctx = new BuildContext
                     {
                         Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs, ViewScale = 100,
@@ -50,7 +53,21 @@ internal static class DetailForms
                     foreach (var x in defs) if (geo(x) is { } gx) g.Pieces.InsertRange(0, gx.Pieces);
                     return new FormPreview(g, Paper: true, ViewScale: 100, Info: "Exemplo: via com calçadas de 3,00 m, ciclofaixa e duas faixas por sentido.");
                 }, false, edit ? "Aplicar" : "Iniciar", 1100, 720)
-            .Section("Cadeia de cotas")
+            .Section("Como cortar")
+            .Choice("Linha de corte", new[] { ("Um clique sobre a via (perpendicular ao eixo)", true), ("Dois pontos livres", false) },
+                () => d.PerpendicularToRoad, v => d.PerpendicularToRoad = v)
+            .Number("Folga além das calçadas (m)", () => d.RoadMargin, v => d.RoadMargin = v, 0, 20, "0.##", "Corte perpendicular: quanto a linha avança além do alinhamento.")
+            .Section("Perfil transversal (corte)")
+            .Check("Desenhar o perfil transversal (clique onde posicioná-lo)", () => d.Profile, v => d.Profile = v)
+            .Number("Escala do perfil 1:", () => d.ProfileScale, v => d.ProfileScale = v, 5, 500, "0", "Ampliado em relação à vista (ex.: vista 1:100, perfil 1:50).")
+            .Number("Exagero vertical (×)", () => d.VerticalExaggeration, v => d.VerticalExaggeration = v, 1, 10, "0.#",
+                "1 = verdadeira grandeza. 2 a 5 realça meios-fios e desníveis (a escala vertical aparece no título).")
+            .Number("Caimento transversal indicado na pista (%)", () => d.CrossSlopePct, v => d.CrossSlopePct = v, 0, 10, "0.#", "0 = não indicar.")
+            .Check("Níveis de cada trecho (+0,15 / ±0,00)", () => d.ProfileLevels, v => d.ProfileLevels = v)
+            .Check("Cotas verticais dos desníveis", () => d.ProfileHeights, v => d.ProfileHeights = v)
+            .Check("Legenda dos materiais cortados", () => d.ProfileLegend, v => d.ProfileLegend = v)
+            .Section("Cadeia de cotas em planta")
+            .Check("Cadeia de cotas ao longo do corte, na planta", () => d.PlanChain, v => d.PlanChain = v)
             .Number("Afastamento da linha de cota (mm)", () => d.OffsetMm, v => d.OffsetMm = v, -100, 100, "0.#", "+ à esquerda do sentido 1º→2º clique.")
             .Number("Altura do texto (mm)", () => d.TextMm, v => d.TextMm = v, 0.8, 10, "0.#")
             .Choice("Terminal da cota", Terminals, () => d.Terminal, v => d.Terminal = v)
@@ -210,21 +227,67 @@ public sealed class CmdCotarSecao : CommandBase
         UiHelpers.Remember("CotaSecao", template);
         PluginContext.SaveSettings();
         var results = new List<RenderResult>();
+        var letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        var used = MarkingStorage.Definitions(uidoc.Document).OfType<SectionDimensionDefinition>().Select(x => x.SectionLetter).ToHashSet();
         while (true)
         {
-            var a = Picking.PickPoint(uidoc, "Cotar seção: clique o 1º ponto (ex.: alinhamento/borda da calçada) – ESC encerra");
-            if (a == null) break;
-            var b = Picking.PickPoint(uidoc, "Cotar seção: clique o 2º ponto do outro lado da via");
-            if (b == null) break;
+            Vec2 start, end;
+            if (template.PerpendicularToRoad)
+            {
+                var p = Picking.PickPoint(uidoc, "Cotar seção: clique SOBRE a via no ponto do corte (perpendicular ao eixo) – ESC encerra");
+                if (p == null) break;
+                var cut = PerpendicularCut(uidoc.Document, DetailHelpers.ToCore(p), template.RoadMargin);
+                if (cut == null)
+                {
+                    TaskDialog.Show(AppTitle, "Nenhuma via (pavimento criado pelo plugin) sob o ponto clicado. Clique sobre a pista ou use \"Dois pontos livres\".");
+                    continue;
+                }
+                (start, end) = cut.Value;
+            }
+            else
+            {
+                var a = Picking.PickPoint(uidoc, "Cotar seção: clique o 1º ponto (ex.: alinhamento/borda da calçada) – ESC encerra");
+                if (a == null) break;
+                var b = Picking.PickPoint(uidoc, "Cotar seção: clique o 2º ponto do outro lado da via");
+                if (b == null) break;
+                (start, end) = (DetailHelpers.ToCore(a), DetailHelpers.ToCore(b));
+            }
             var d = (SectionDimensionDefinition)template.CloneWithNewId();
-            d.Start = DetailHelpers.ToCore(a);
-            d.End = DetailHelpers.ToCore(b);
+            d.Start = start;
+            d.End = end;
+            // Letra seguinte livre (A, B, C...) quando a do modelo já foi usada.
+            if (!string.IsNullOrEmpty(d.SectionLetter) && used.Contains(d.SectionLetter))
+                d.SectionLetter = letters.Select(ch => ch.ToString()).FirstOrDefault(x => !used.Contains(x)) ?? d.SectionLetter;
+            used.Add(d.SectionLetter);
+            if (d.Profile)
+            {
+                var at = Picking.PickPoint(uidoc, $"Clique o canto superior esquerdo do PERFIL TRANSVERSAL {d.SectionLetter}–{d.SectionLetter} (ESC = só as cotas em planta)");
+                d.ProfilePosition = at == null ? null : DetailHelpers.ToCore(at);
+            }
             DetailHelpers.PrepareOutput(d, view);
             results.AddRange(MarkingCreator.Commit(uidoc, new[] { d }, "SV - Cotar seção"));
         }
         if (results.Count == 0) return Result.Cancelled;
         Report("Cota de seção", results);
         return Result.Succeeded;
+    }
+
+    /// <summary>Linha de corte perpendicular ao eixo da via mais próxima do ponto, de alinhamento a alinhamento (+ folga).</summary>
+    private static (Vec2 Start, Vec2 End)? PerpendicularCut(Document doc, Vec2 p, double margin)
+    {
+        (double Dist, Vec2 A, Vec2 B)? best = null;
+        foreach (var pav in MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>())
+        {
+            var axis = PathResolver.Resolve(doc, pav.Path)?.Main;
+            if (axis == null || axis.Length < 0.5) continue;
+            var (station, dist, onAxis) = IntersectionGenerator.Project(axis, p);
+            if (dist > Math.Max(pav.TotalLeft, pav.TotalRight) + 1.0) continue;
+            if (best != null && dist >= best.Value.Dist) continue;
+            var t = axis.TangentAt(Math.Clamp(station, 0, axis.Length));
+            var left = t.PerpLeft;
+            best = (dist, onAxis - left * (pav.TotalRight + margin), onAxis + left * (pav.TotalLeft + margin));
+        }
+        return best is { } b ? (b.A, b.B) : null;
     }
 }
 

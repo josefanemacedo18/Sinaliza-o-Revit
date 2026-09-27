@@ -30,6 +30,7 @@ public sealed class SectionRow : INotifyPropertyChanged
             if (value == TipoElementoSecao.Ciclofaixa) Element.Espacamento = 30;
             OnChanged();
             OnChanged(nameof(LarguraTexto));
+            OnChanged(nameof(AlturaTexto));
         }
     }
 
@@ -40,6 +41,19 @@ public sealed class SectionRow : INotifyPropertyChanged
         {
             var v = UiHelpers.ParseOpt(value);
             if (v is > 0.05 and < 100) Element.Largura = v.Value;
+            OnChanged();
+        }
+    }
+
+    /// <summary>Nível do topo (m) em relação à pista; vazio = padrão do tipo (calçada/canteiro 0,15; faixas 0).</summary>
+    public string AlturaTexto
+    {
+        get => UiHelpers.F(Element.AlturaEfetiva);
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) Element.Altura = null;
+            else if (UiHelpers.ParseOpt(value) is { } v and >= -2 and <= 5)
+                Element.Altura = Math.Abs(v - ElementoSecao.AlturaPadrao(Element.Tipo)) < 1e-6 ? null : v;
             OnChanged();
         }
     }
@@ -194,6 +208,8 @@ public partial class RoadWindow : Window
         Select(CbCenter, s.Center);
         TbMedian.Text = UiHelpers.F(s.MedianWidth);
         Select(CbMedianType, s.MedianType);
+        TbMedianHeight.Text = UiHelpers.F(s.MedianHeight);
+        TbMedianVeg.Text = s.MedianVegetationHeight is { } mv ? UiHelpers.F(mv) : "";
         Select(CbMedianDevice, s.MedianDevice);
         CkInvertCenter.IsChecked = s.InvertCenter;
         TbSpeed.Text = UiHelpers.F(s.Speed, "0");
@@ -243,6 +259,8 @@ public partial class RoadWindow : Window
             Center = Selected<CenterTreatment>(CbCenter),
             MedianWidth = UiHelpers.Parse(TbMedian, 2, "Canteiro central", 0.1, 100),
             MedianType = Selected<TipoCanteiro>(CbMedianType),
+            MedianHeight = UiHelpers.Parse(TbMedianHeight, RoadSetup.CurbHeight, "Nível do canteiro central", -2, 5),
+            MedianVegetationHeight = UiHelpers.ParseOpt(TbMedianVeg.Text) is { } mvh and >= -2 and <= 5 ? mvh : null,
             MedianDevice = Selected<string?>(CbMedianDevice),
             InvertCenter = CkInvertCenter.IsChecked == true,
             LaneDividerCode = CbDivider.SelectedItem as string ?? "LMS-2",
@@ -336,6 +354,8 @@ public partial class RoadWindow : Window
         var median = Selected<CenterTreatment>(CbCenter) == CenterTreatment.Canteiro;
         TbMedian.IsEnabled = median;
         CbMedianType.IsEnabled = median;
+        TbMedianHeight.IsEnabled = median;
+        TbMedianVeg.IsEnabled = median;
     }
 
     private void FillTemplates(string? select)
@@ -476,6 +496,8 @@ public partial class RoadWindow : Window
             Show(bus, CkFundoOnibus, LblCorOnibus, CbCorOnibus);
             Show(t is not (TipoElementoSecao.Calcada or TipoElementoSecao.FaixaSeguranca), LblDisp, CbDispositivo);
             Show(walk, LblSarjeta, TbSarjeta);
+            Show(walk || t == TipoElementoSecao.CanteiroFisico, LblVegetacao, TbVegetacao);
+            Show(true, LblAltura, TbAltura);
             Show(t == TipoElementoSecao.FaixaCaminhada, LblCorCaminhada, CbCorCaminhada, LblEsp, TbEspacamento);
             if (bus || bike) Show(true, LblEsp, TbEspacamento);
             Show(bike, LblLarguraLinha, TbLarguraLinha, CkSeccionada, LblTraco, PanelTraco, LblSimbolo, PanelSimbolo, LblDistSeta, TbDistSeta, CkLinhaCentral);
@@ -501,6 +523,8 @@ public partial class RoadWindow : Window
             TbTamSeta.Text = UiHelpers.F(e.TamanhoSeta);
             TbDistSeta.Text = UiHelpers.F(e.DistanciaSeta);
             CkLinhaCentral.IsChecked = e.LinhaCentral;
+            TbAltura.Text = UiHelpers.F(e.AlturaEfetiva);
+            TbVegetacao.Text = e.AlturaVegetacao is { } av ? UiHelpers.F(av) : "";
         }
         finally
         {
@@ -539,6 +563,8 @@ public partial class RoadWindow : Window
         el.TamanhoSeta = Num(TbTamSeta, el.TamanhoSeta);
         el.DistanciaSeta = Num(TbDistSeta, el.DistanciaSeta);
         el.LinhaCentral = CkLinhaCentral.IsChecked == true;
+        if (sender == TbAltura) _selected.AlturaTexto = TbAltura.Text;
+        el.AlturaVegetacao = UiHelpers.ParseOpt(TbVegetacao.Text) is { } veg and >= -2 and <= 5 ? veg : null;
         SchedulePreview();
     }
 

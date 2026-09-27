@@ -15,9 +15,11 @@ public abstract class LinearCommandBase : CommandBase
     protected abstract GrupoMarca[] Groups { get; }
     protected virtual PathMode DefaultMode => PathMode.Linhas;
 
-    protected override Result Run(UIApplication app, UIDocument uidoc)
+    protected override Result Run(UIApplication app, UIDocument uidoc) => RunWindow(uidoc, WindowTitle, Groups, DefaultMode);
+
+    public static Result RunWindow(UIDocument uidoc, string title, GrupoMarca[] groups, PathMode mode)
     {
-        var w = new LinearWindow(WindowTitle, Groups, null, DefaultMode);
+        var w = new LinearWindow(title, groups, null, mode);
         if (UiHelpers.ShowModal(w) != true || w.Result == null) return Result.Cancelled;
         PluginContext.SaveSettings();
         var template = w.Result;
@@ -50,8 +52,12 @@ public sealed class CmdLinhaTransversal : LinearCommandBase
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdTachas : LinearCommandBase
 {
-    protected override string WindowTitle => "Tachas e tachões";
-    protected override GrupoMarca[] Groups => new[] { GrupoMarca.Dispositivo };
+    public const string Title = "Tachas e tachões (bloqueios físicos)";
+    public static readonly GrupoMarca[] StudGroups = { GrupoMarca.Dispositivo };
+    /// <summary>Chave da última tacha usada (a janela linear abre nela).</summary>
+    public const string SettingsKey = "linear:Dispositivo";
+    protected override string WindowTitle => Title;
+    protected override GrupoMarca[] Groups => StudGroups;
 }
 
 [Transaction(TransactionMode.Manual)]

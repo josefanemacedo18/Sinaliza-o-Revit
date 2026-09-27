@@ -155,6 +155,7 @@ public enum Justificacao
 [JsonDerivedType(typeof(RoundaboutDefinition), "rotatoria")]
 [JsonDerivedType(typeof(TactileRouteDefinition), "rota-tatil")]
 [JsonDerivedType(typeof(ChannelizationDefinition), "canalizacao")]
+[JsonDerivedType(typeof(RailwayDefinition), "ferrovia")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;
@@ -245,6 +246,11 @@ public sealed class LinearMarkingDefinition : MarkingDefinition
     public double? LrvToKmh { get; set; }
     /// <summary>Sarjetão: flecha (profundidade da depressão no centro, m). Nulo = 0,05 m.</summary>
     public double? Depth { get; set; }
+    /// <summary>
+    /// Nível do TOPO do elemento em relação ao topo do pavimento da pista (m): 0,15 = calçada usual, 0 = no nível da pista,
+    /// negativo = rebaixado (jardim de chuva, canteiro rebaixado). Nulo = espessura do catálogo apoiada na pista.
+    /// </summary>
+    public double? Height { get; set; }
 
     public override string KindName => "Linear";
     public override string DisplayCode => Code;
@@ -1000,8 +1006,36 @@ public sealed class SectionDimensionDefinition : MarkingDefinition, IProjectWide
     public TerminalCota Terminal { get; set; } = TerminalCota.Traco;
     public int Decimals { get; set; } = 2;
 
+    /// <summary>Cadeia de cotas em planta, ao longo da linha de corte.</summary>
+    public bool PlanChain { get; set; } = true;
+    /// <summary>Desenha o perfil transversal (corte) com as camadas, níveis, cotas horizontais e verticais e caimentos.</summary>
+    public bool Profile { get; set; } = true;
+    /// <summary>Canto superior esquerdo do perfil (m). Nulo = sem perfil.</summary>
+    public Vec2? ProfilePosition { get; set; }
+    /// <summary>Escala do perfil (1:n) – ampliado em relação à vista.</summary>
+    public double ProfileScale { get; set; } = 50;
+    /// <summary>Exagero vertical (1 = verdadeira grandeza; 2 a 5 realça meios-fios e desníveis).</summary>
+    public double VerticalExaggeration { get; set; } = 1;
+    /// <summary>Caimento transversal indicado na pista (%). 0 = não indicar.</summary>
+    public double CrossSlopePct { get; set; } = 2;
+    /// <summary>Níveis (+0,15 / ±0,00) de cada trecho no perfil.</summary>
+    public bool ProfileLevels { get; set; } = true;
+    /// <summary>Cotas verticais dos desníveis (meios-fios, plataformas, canteiros).</summary>
+    public bool ProfileHeights { get; set; } = true;
+    /// <summary>Tabela de materiais (legenda das camadas) ao lado do perfil.</summary>
+    public bool ProfileLegend { get; set; } = true;
+    /// <summary>Criação: um clique sobre a via gera o corte perpendicular ao eixo, de alinhamento a alinhamento.</summary>
+    public bool PerpendicularToRoad { get; set; } = true;
+    /// <summary>Folga além das calçadas no corte perpendicular (m).</summary>
+    public double RoadMargin { get; set; } = 0.5;
+
     public string? TargetId => null;
-    public override void Translate(Vec2 delta, double dz) { Start += delta; End += delta; }
+    public override void Translate(Vec2 delta, double dz)
+    {
+        Start += delta;
+        End += delta;
+        if (ProfilePosition is { } pp) ProfilePosition = pp + delta;
+    }
     public override string KindName => "Cota de seção";
     public override string DisplayCode => "COTA-SEC";
 }
@@ -1524,6 +1558,128 @@ public sealed class TactileRouteDefinition : MarkingDefinition
 
     public override string KindName => "Rota tátil";
     public override string DisplayCode => AlertOnly ? "PTA" : "ROTA-TATIL";
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) => PathRef = path;
+}
+
+/// <summary>Bitola da via férrea (distância entre as faces internas dos boletos).</summary>
+public enum BitolaFerroviaria
+{
+    /// <summary>Bitola larga (1,600 m) – malha brasileira de carga e passageiros.</summary>
+    Larga,
+    /// <summary>Bitola métrica (1,000 m).</summary>
+    Metrica,
+    /// <summary>Bitola padrão/internacional (1,435 m) – metrôs e VLTs.</summary>
+    Padrao,
+    /// <summary>Bitola mista (1,000 + 1,600 m, terceiro trilho).</summary>
+    Mista,
+    Personalizada,
+}
+
+/// <summary>Tipo de superestrutura da via.</summary>
+public enum TipoViaFerrea
+{
+    /// <summary>Via em lastro de brita sobre sublastro (convencional).</summary>
+    Lastro,
+    /// <summary>Via em laje de concreto (fixação direta).</summary>
+    Laje,
+    /// <summary>Via embutida no pavimento (VLT/bonde em via urbana): trilhos de canaleta rentes ao piso.</summary>
+    Embutida,
+}
+
+public enum TipoDormente
+{
+    ConcretoMonobloco,
+    ConcretoBibloco,
+    Madeira,
+    Aco,
+}
+
+/// <summary>Perfil do trilho (altura, boleto e patim).</summary>
+public enum PerfilTrilho
+{
+    TR45,
+    TR57,
+    TR68,
+    UIC60,
+    /// <summary>Trilho de canaleta (grooved) Ri60 – vias embutidas de VLT/bonde.</summary>
+    Ri60,
+}
+
+/// <summary>Acabamento da superfície da via embutida.</summary>
+public enum SuperficieViaEmbutida
+{
+    Asfalto,
+    Concreto,
+    Grama,
+    Bloquete,
+}
+
+/// <summary>
+/// Via férrea completa ao longo de um eixo: plataforma, sublastro, lastro com taludes, dormentes, placas de apoio e trilhos
+/// – ou via em laje / embutida no pavimento (VLT) –, com uma ou mais linhas paralelas, valetas de drenagem e todos os
+/// parâmetros personalizáveis.
+/// </summary>
+public sealed class RailwayDefinition : MarkingDefinition
+{
+    public PathReference PathRef { get; set; } = new();
+    public TipoViaFerrea Type { get; set; } = TipoViaFerrea.Lastro;
+    public BitolaFerroviaria Gauge { get; set; } = BitolaFerroviaria.Larga;
+    /// <summary>Bitola personalizada (m).</summary>
+    public double CustomGauge { get; set; } = 1.60;
+    public PerfilTrilho Rail { get; set; } = PerfilTrilho.TR57;
+    /// <summary>Número de linhas paralelas.</summary>
+    public int Tracks { get; set; } = 1;
+    /// <summary>Entrevia: distância entre eixos de linhas vizinhas (m).</summary>
+    public double TrackSpacing { get; set; } = 4.50;
+    /// <summary>Deslocamento lateral do conjunto em relação ao eixo desenhado (+ à esquerda).</summary>
+    public double Offset { get; set; }
+
+    // ---- dormentes
+    public TipoDormente Sleeper { get; set; } = TipoDormente.ConcretoMonobloco;
+    /// <summary>Espaçamento entre eixos de dormentes (m).</summary>
+    public double SleeperSpacing { get; set; } = 0.60;
+    /// <summary>Comprimento do dormente (m). 0 = pela bitola (larga 2,80; padrão 2,60; métrica 2,00).</summary>
+    public double SleeperLength { get; set; }
+    /// <summary>Largura da base do dormente (m). 0 = pelo tipo.</summary>
+    public double SleeperWidth { get; set; }
+    /// <summary>Altura do dormente (m). 0 = pelo tipo.</summary>
+    public double SleeperHeight { get; set; }
+    /// <summary>Placas de apoio e fixações (grampos) sobre os dormentes.</summary>
+    public bool Fastenings { get; set; } = true;
+
+    // ---- lastro e plataforma
+    /// <summary>Altura do lastro sob o dormente (m).</summary>
+    public double BallastDepth { get; set; } = 0.30;
+    /// <summary>Ombro do lastro além da ponta do dormente (m).</summary>
+    public double BallastShoulder { get; set; } = 0.40;
+    /// <summary>Talude do lastro (horizontal : 1 vertical).</summary>
+    public double BallastSlope { get; set; } = 1.5;
+    /// <summary>Espessura do sublastro (m). 0 = sem sublastro.</summary>
+    public double SubBallastDepth { get; set; } = 0.20;
+    /// <summary>Largura do sublastro além do pé do lastro, de cada lado (m).</summary>
+    public double SubBallastExtra { get; set; } = 0.60;
+    /// <summary>Valetas de drenagem de concreto nas bordas da plataforma.</summary>
+    public bool Ditches { get; set; } = true;
+    public double DitchWidth { get; set; } = 0.60;
+    public double DitchDepth { get; set; } = 0.40;
+
+    // ---- laje / via embutida
+    /// <summary>Espessura da laje de concreto (via em laje ou base da via embutida) (m).</summary>
+    public double SlabThickness { get; set; } = 0.30;
+    /// <summary>Largura da laje/faixa da via embutida por linha (m). 0 = bitola + 1,40 m.</summary>
+    public double SlabWidth { get; set; }
+    public SuperficieViaEmbutida Surface { get; set; } = SuperficieViaEmbutida.Concreto;
+    /// <summary>Via embutida: nível do topo do trilho em relação ao pavimento (m) – 0 = rente.</summary>
+    public double RailTopLevel { get; set; }
+
+    public override string KindName => "Via férrea";
+    public override string DisplayCode => Type switch
+    {
+        TipoViaFerrea.Embutida => "VLT-EMB",
+        TipoViaFerrea.Laje => "FERROVIA-LAJE",
+        _ => "FERROVIA",
+    };
     public override PathReference? Path => PathRef;
     public override void SetPath(PathReference path) => PathRef = path;
 }

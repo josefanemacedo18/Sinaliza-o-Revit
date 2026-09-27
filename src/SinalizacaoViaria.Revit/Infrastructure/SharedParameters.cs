@@ -26,7 +26,13 @@ public static class SharedParameters
 
     public static readonly Def Hierarquia = new("SV_Hierarquia", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B0C"), SpecTypeId.String.Text, "Hierarquia viária (CTB art. 60): trânsito rápido, arterial, coletora, local, rodovia, estrada.");
 
-    public static IReadOnlyList<Def> All { get; } = new[] { Codigo, Descricao, Grupo, Cor, Material, Area, Extensao, Quantidade, Referencia, Id, Categoria, Hierarquia };
+    /// <summary>Unidade de medição do item (m², m ou un) – coluna "Un." da tabela de quantitativos.</summary>
+    public static readonly Def Unidade = new("SV_Unidade", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B0D"), SpecTypeId.String.Text, "Unidade de medição do item: m², m ou un.");
+
+    /// <summary>Quantidade na unidade de medição do item (área, extensão ou unidades) – coluna "Quantidade", somada na tabela.</summary>
+    public static readonly Def QtdMedicao = new("SV_QtdMedicao", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B0E"), SpecTypeId.Number, "Quantidade na unidade de medição (m², m ou un).");
+
+    public static IReadOnlyList<Def> All { get; } = new[] { Codigo, Descricao, Grupo, Cor, Material, Area, Extensao, Quantidade, Referencia, Id, Categoria, Hierarquia, Unidade, QtdMedicao };
 
     private const string GroupName = "Sinalizacao Viaria";
 

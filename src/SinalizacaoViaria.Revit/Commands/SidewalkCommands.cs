@@ -342,6 +342,74 @@ internal static class SidewalkForms
         return w;
     }
 
+    public static FormWindow? Railway(RailwayDefinition d, bool edit)
+    {
+        var sample = new Polyline2(new[] { Vec2.Zero, new Vec2(12, 0) });
+        var w = new FormWindow(edit ? "Editar via férrea" : "Via férrea", "Via férrea completa e personalizável",
+            "Desenhe ou selecione o EIXO da via (entre as linhas, quando houver mais de uma). Gera a superestrutura completa em 3D: " +
+            "sublastro, lastro com taludes, dormentes, placas de apoio e trilhos com perfil real – ou via em laje (fixação direta) / via " +
+            "embutida no pavimento (VLT) –, com várias linhas, entrevia e valetas de drenagem. Nível zero: topo da plataforma " +
+            "(via embutida: topo do pavimento). Use 'Cruzamento Rodoferroviário' para a sinalização da passagem em nível.",
+            d, () =>
+            {
+                var geo = Build(d, sample);
+                return new FormPreview(geo, null, new[] { sample.Points },
+                    "Por km: " + RailwayGenerator.Summary(d, 1000) + (geo.Warnings.Count > 0 ? "\n⚠ " + string.Join("\n⚠ ", geo.Warnings.Distinct()) : ""));
+            }, okText: edit ? "Aplicar" : "Inserir");
+        w.Section("Tipo de via")
+         .Choice("Superestrutura", new[]
+            {
+                ("Em lastro de brita (convencional)", TipoViaFerrea.Lastro), ("Em laje de concreto (fixação direta)", TipoViaFerrea.Laje),
+                ("Embutida no pavimento (VLT / bonde)", TipoViaFerrea.Embutida),
+            }, () => d.Type, v => d.Type = v)
+         .Choice("Bitola", new[]
+            {
+                ("Larga – 1,600 m", BitolaFerroviaria.Larga), ("Métrica – 1,000 m", BitolaFerroviaria.Metrica),
+                ("Padrão – 1,435 m (metrô / VLT)", BitolaFerroviaria.Padrao), ("Mista – 1,000 + 1,600 m (3 trilhos)", BitolaFerroviaria.Mista),
+                ("Personalizada", BitolaFerroviaria.Personalizada),
+            }, () => d.Gauge, v => d.Gauge = v)
+         .Number("Bitola personalizada (m)", () => d.CustomGauge, v => d.CustomGauge = v, 0.5, 2.5, "0.000")
+         .Choice("Perfil do trilho", new[]
+            {
+                ("TR-45", PerfilTrilho.TR45), ("TR-57", PerfilTrilho.TR57), ("TR-68 (carga pesada)", PerfilTrilho.TR68),
+                ("UIC-60", PerfilTrilho.UIC60), ("Ri-60 – canaleta (via embutida)", PerfilTrilho.Ri60),
+            }, () => d.Rail, v => d.Rail = v)
+         .Integer("Número de linhas", () => d.Tracks, v => d.Tracks = v, 1, 8)
+         .Number("Entrevia – eixo a eixo (m)", () => d.TrackSpacing, v => d.TrackSpacing = v, 2.5, 20, "0.00", "Usual: 4,00 a 5,25 m (carga), 3,50 a 4,00 m (metrô/VLT).")
+         .Number("Deslocamento lateral do conjunto (m)", () => d.Offset, v => d.Offset = v, -50, 50, "0.00", "+ à esquerda do sentido do eixo.")
+         .Section("Dormentes e fixações", "Via em lastro (o espaçamento vale também para as fixações da via em laje).")
+         .Choice("Dormente", new[]
+            {
+                ("Concreto monobloco protendido", TipoDormente.ConcretoMonobloco), ("Concreto bibloco", TipoDormente.ConcretoBibloco),
+                ("Madeira", TipoDormente.Madeira), ("Aço", TipoDormente.Aco),
+            }, () => d.Sleeper, v => d.Sleeper = v)
+         .Number("Espaçamento entre dormentes (m)", () => d.SleeperSpacing, v => d.SleeperSpacing = v, 0.3, 1.2, "0.00", "Usual 0,60 m (1.667 dormentes/km).")
+         .Number("Comprimento do dormente (m, 0 = pela bitola)", () => d.SleeperLength, v => d.SleeperLength = v, 0, 4)
+         .Number("Largura da base do dormente (m, 0 = pelo tipo)", () => d.SleeperWidth, v => d.SleeperWidth = v, 0, 0.5)
+         .Number("Altura do dormente (m, 0 = pelo tipo)", () => d.SleeperHeight, v => d.SleeperHeight = v, 0, 0.4)
+         .Check("Placas de apoio e fixações", () => d.Fastenings, v => d.Fastenings = v)
+         .Section("Lastro, sublastro e drenagem")
+         .Number("Altura do lastro sob o dormente (m)", () => d.BallastDepth, v => d.BallastDepth = v, 0.1, 1, "0.00", "Usual 0,30 m (carga).")
+         .Number("Ombro do lastro (m)", () => d.BallastShoulder, v => d.BallastShoulder = v, 0, 1.5)
+         .Number("Talude do lastro (H : 1 V)", () => d.BallastSlope, v => d.BallastSlope = v, 0.5, 4, "0.0")
+         .Number("Espessura do sublastro (m, 0 = sem)", () => d.SubBallastDepth, v => d.SubBallastDepth = v, 0, 1)
+         .Number("Sublastro além do pé do lastro (m)", () => d.SubBallastExtra, v => d.SubBallastExtra = v, 0, 5)
+         .Check("Valetas de drenagem de concreto", () => d.Ditches, v => d.Ditches = v)
+         .Number("Valeta – largura (m)", () => d.DitchWidth, v => d.DitchWidth = v, 0.3, 3)
+         .Number("Valeta – profundidade (m)", () => d.DitchDepth, v => d.DitchDepth = v, 0.1, 2)
+         .Section("Laje / via embutida")
+         .Number("Espessura da laje de concreto (m)", () => d.SlabThickness, v => d.SlabThickness = v, 0.1, 1)
+         .Number("Largura da laje / faixa por linha (m, 0 = automática)", () => d.SlabWidth, v => d.SlabWidth = v, 0, 10)
+         .Choice("Revestimento da via embutida", new[]
+            {
+                ("Concreto", SuperficieViaEmbutida.Concreto), ("Asfalto", SuperficieViaEmbutida.Asfalto),
+                ("Grama (via verde)", SuperficieViaEmbutida.Grama), ("Bloquete", SuperficieViaEmbutida.Bloquete),
+            }, () => d.Surface, v => d.Surface = v)
+         .Number("Topo do trilho em relação ao pavimento (m)", () => d.RailTopLevel, v => d.RailTopLevel = v, -0.1, 0.1, "0.000", "0 = rente ao piso.");
+        if (!edit) w.Modes(("Desenhar o eixo por pontos", PathMode.Desenhar), ("Selecionar linhas existentes", PathMode.Linhas), ("Dois cliques", PathMode.DoisPontos));
+        return w;
+    }
+
     /// <summary>Janela de edição para as definições de calçada (null se o tipo não for daqui).</summary>
     public static (FormWindow Window, MarkingDefinition Working)? ForEdit(MarkingDefinition def)
     {
@@ -353,6 +421,7 @@ internal static class SidewalkForms
             PlanterDefinition pl => Planter(pl, true),
             CulDeSacDefinition cd => CulDeSac(cd, true),
             TactileRouteDefinition tr => Tactile(tr, true),
+            RailwayDefinition rw => Railway(rw, true),
             _ => null,
         };
         return w == null ? null : (w, working);
@@ -392,6 +461,14 @@ public sealed class CmdAreaCalcada : CommandBase
 {
     protected override Result Run(UIApplication app, UIDocument uidoc) =>
         SidewalkCommandRunner.Run(uidoc, SidewalkCommandRunner.Last<SidewalkAreaDefinition>(), d => SidewalkForms.Area((SidewalkAreaDefinition)d, false), closed: true);
+}
+
+/// <summary>Via férrea completa (lastro, laje ou embutida – VLT).</summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdFerrovia : CommandBase
+{
+    protected override Result Run(UIApplication app, UIDocument uidoc) =>
+        SidewalkCommandRunner.Run(uidoc, SidewalkCommandRunner.Last<RailwayDefinition>(), d => SidewalkForms.Railway((RailwayDefinition)d, false));
 }
 
 [Transaction(TransactionMode.Manual)]

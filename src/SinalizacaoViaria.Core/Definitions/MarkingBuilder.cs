@@ -153,6 +153,7 @@ public static class MarkingBuilder
         PlanterDefinition pl => path == null ? Missing("Linha dos canteiros não encontrada.") : SidewalkGenerator.Planter(pl, path, ctx),
         CulDeSacDefinition cd => path == null ? Missing("Eixo do cul-de-sac não encontrado.") : SidewalkGenerator.CulDeSac(cd, path),
         TrafficCalmingDefinition tc => path == null || path.Points.Count < 2 ? Missing("Bordos da pista não encontrados.") : TrafficCalmingGenerator.Generate(tc, path, ctx.Catalog),
+        RailwayDefinition rw => path == null || path.Points.Count < 2 ? Missing("Eixo da via férrea não encontrado.") : RailwayGenerator.Build(rw, path),
         ChannelizationDefinition cz => path == null || path.Points.Count < 2 ? Missing("Linha de referência da canalização não encontrada.") : ChannelizationGenerator.Generate(cz, path, ctx),
         _ => throw new NotSupportedException(def.GetType().Name),
     };
@@ -196,7 +197,7 @@ public static class MarkingBuilder
             return TactileGenerator.Linear(trimmed, w, d.Code == "PTA", d.ColorOverride ?? type.Cor, d.Offset);
         }
 
-        return LinearPatternGenerator.Generate(path, type, variant, new LinearOptions
+        var lin = LinearPatternGenerator.Generate(path, type, variant, new LinearOptions
         {
             Offset = d.Offset,
             Alignment = d.Alignment,
@@ -210,6 +211,27 @@ public static class MarkingBuilder
             ColorOverride = d.ColorOverride,
             MaxPieceLength = ctx.MaxPieceLength,
         });
+        if (d.Height is { } top) ApplyTopLevel(lin, top);
+        return lin;
+    }
+
+    /// <summary>Espessura mínima da laje de um elemento rebaixado ou no nível da pista (m).</summary>
+    public const double FlushSlab = 0.10;
+
+    /// <summary>
+    /// Leva o topo das peças ao nível <paramref name="top"/> (m, relativo ao topo da pista): acima da pista o sólido
+    /// nasce na pista; no nível ou abaixo dela vira uma laje de <see cref="FlushSlab"/> com o topo no nível pedido.
+    /// </summary>
+    public static void ApplyTopLevel(MarkingGeometry geo, double top)
+    {
+        for (int i = 0; i < geo.Pieces.Count; i++)
+        {
+            var p = geo.Pieces[i];
+            if (p.Solid != null || p.Profile != null) continue;
+            geo.Pieces[i] = top >= 0.01
+                ? p with { Elevation = 0, Thickness = top }
+                : p with { Elevation = top - FlushSlab, Thickness = FlushSlab };
+        }
     }
 
     public static VarianteDef? ResolveVariant(TipoLinearDef type, string? variant, double? speed)
@@ -600,6 +622,20 @@ public static class MarkingBuilder
                     TipoModeracao.FaixaElevada => "Faixa elevada para travessia de pedestres",
                     _ => "Lombada invertida (valeta transversal)",
                 }, GrupoMarca.Moderacao, "Resoluções CONTRAN sobre ondulações transversais e faixas elevadas (conferir versão vigente)", "un");
+            case RailwayDefinition rw:
+                return new MarkingInfo(rw.DisplayCode, rw.Type switch
+                {
+                    TipoViaFerrea.Embutida => $"Via férrea embutida no pavimento (VLT) – {RailwayGenerator.GaugeLabel(rw)}, trilho {RailwayGenerator.Profile(rw.Rail).Name}",
+                    TipoViaFerrea.Laje => $"Via férrea em laje (fixação direta) – {RailwayGenerator.GaugeLabel(rw)}, trilho {RailwayGenerator.Profile(rw.Rail).Name}",
+                    _ => $"Via férrea em lastro – {RailwayGenerator.GaugeLabel(rw)}, trilho {RailwayGenerator.Profile(rw.Rail).Name}, dormente de " + rw.Sleeper switch
+                    {
+                        TipoDormente.Madeira => "madeira",
+                        TipoDormente.Aco => "aço",
+                        TipoDormente.ConcretoBibloco => "concreto bibloco",
+                        _ => "concreto monobloco",
+                    },
+                } + (rw.Tracks > 1 ? $" ({rw.Tracks} linhas)" : ""), GrupoMarca.Urbanizacao,
+                    "ABNT NBR 7641 (via permanente), NBR 7590 (trilhos), NBR 11709 (dormentes), NBR 5564 (lastro)", "m");
             case IAnnotationDefinition:
                 return new MarkingInfo(def.DisplayCode, def.KindName, GrupoMarca.Detalhamento, "", "");
             default:

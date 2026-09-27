@@ -10,7 +10,7 @@ namespace SinalizacaoViaria.Core.Automation;
 /// </summary>
 public static class RoadSectionInference
 {
-    private static readonly string[] Physical = { "CALCADA", "GRAMADO", "SARJETA" };
+    private static readonly string[] Physical = { "CALCADA", "GRAMADO", "SARJETA", "PLATAFORMA" };
     private static readonly string[] Longitudinal = { "LBO", "CALCADA", "GRAMADO" };
 
     public static bool IsPhysical(string code) => Physical.Contains(code) || code.StartsWith("MEIO-FIO");

@@ -56,117 +56,68 @@ public sealed class CmdQuantitativos : CommandBase
         var thumbs = QuantityThumbnails.Build(items);
         var w = new QuantitiesWindow(rows, doc.Title, thumbs);
         if (UiHelpers.ShowModal(w) == true && (w.CreateSchedule || w.SchedulesByCategory))
-        {
-            var created = new List<ViewSchedule>();
-            var errors = new List<string>();
-            void Try(CategoriaQuantitativo? c)
-            {
-                try
-                {
-                    if (CreateSchedule(doc, c) is { } v) created.Add(v);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error("Tabela de quantitativos", ex);
-                    errors.Add((c is { } cc ? QuantityRow.CategoryLabel(cc) : "Quantitativos") + ": " + ex.Message);
-                }
-            }
-            if (w.CreateSchedule) Try(null);
-            if (w.SchedulesByCategory) foreach (var c in w.Categories) Try(c);
-            if (created.Count > 0)
-            {
-                try { uidoc.ActiveView = created[0]; }
-                catch (Exception ex) { Log.Error("Abrir tabela", ex); }
-            }
-            var lines = created.Select(v => $"• {v.Name} – {Rows(v)} linha(s)").ToList();
-            var msg = created.Count > 0
-                ? "Tabela(s) criada(s) no Revit (Navegador de projeto → Tabelas/Quantidades):\n" + string.Join("\n", lines)
-                : "Nenhuma tabela foi criada.";
-            if (errors.Count > 0) msg += "\n\nProblemas:\n" + string.Join("\n", errors);
-            TaskDialog.Show(AppTitle, msg);
-        }
+            CreateSchedules(uidoc, rows, thumbs, w.CreateSchedule, w.SchedulesByCategory ? w.Categories : Array.Empty<CategoriaQuantitativo>());
         return Result.Succeeded;
     }
 
-    private static int Rows(ViewSchedule v)
+    private static void CreateSchedules(UIDocument uidoc, IReadOnlyList<QuantityRow> rows, IReadOnlyDictionary<string, System.Windows.Media.Imaging.BitmapSource> thumbs,
+        bool general, IEnumerable<CategoriaQuantitativo> categories)
     {
-        try { return Math.Max(0, v.GetTableData().GetSectionData(SectionType.Body).NumberOfRows); }
-        catch { return 0; }
-    }
+        var doc = uidoc.Document;
+        var created = new List<ViewSchedule>();
+        var errors = new List<string>();
+        var notes = new List<string>();
+        ViewSheet? sheet = null;
+        (int Elements, int Images) prep = (0, 0);
 
-    private static ViewSchedule? CreateSchedule(Document doc, CategoriaQuantitativo? category)
-    {
-        using var t = new Transaction(doc, "SV - Tabela de quantitativos");
-        t.Start();
-        SharedParameters.Ensure(doc);
-        // Multicategoria: formas diretas (modelos genéricos) e pisos (pavimento, calçadas, meios-fios...) juntos.
-        var sched = ViewSchedule.CreateSchedule(doc, ElementId.InvalidElementId);
-        var name = category is { } cc ? $"SV - {QuantityRow.CategoryLabel(cc)}" : ScheduleName;
-        var baseName = name;
-        var existing = new FilteredElementCollector(doc).OfClass(typeof(ViewSchedule)).Cast<ViewSchedule>().Select(v => v.Name).ToHashSet();
-        for (int i = 2; existing.Contains(name); i++) name = $"{baseName} ({i})";
-        sched.Name = name;
+        // 1) Parâmetros das colunas e imagens nos elementos (transação própria: um erro aqui não impede a tabela).
+        try
+        {
+            using var t = new Transaction(doc, "SV - Preparar quantitativos");
+            t.Start();
+            prep = QuantitySchedule.Prepare(doc, rows, thumbs);
+            t.Commit();
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Preparar quantitativos", ex);
+            notes.Add("preparação dos elementos: " + ex.Message);
+        }
 
-        var def = sched.Definition;
-        var fields = def.GetSchedulableFields();
-        ScheduleField? Add(SharedParameters.Def d, bool total = false)
+        // 2) Uma transação por tabela.
+        void Try(CategoriaQuantitativo? c)
         {
             try
             {
-                var spe = SharedParameterElement.Lookup(doc, d.Guid);
-                if (spe == null) return null;
-                var sf = fields.FirstOrDefault(f => f.ParameterId == spe.Id);
-                if (sf == null) return null;
-                var field = def.AddField(sf);
-                if (total)
-                {
-                    try { field.DisplayType = ScheduleFieldDisplayType.Totals; }
-                    catch (Exception ex) { Log.Error($"Totais {d.Name}", ex); }
-                }
-                return field;
+                using var t = new Transaction(doc, "SV - Tabela de quantitativos");
+                t.Start();
+                var v = QuantitySchedule.Create(doc, c, notes);
+                if (c == null) sheet = QuantitySchedule.PlaceOnSheet(doc, v, notes);
+                t.Commit();
+                created.Add(v);
             }
             catch (Exception ex)
             {
-                Log.Error($"Campo {d.Name} da tabela", ex);
-                return null;
+                Log.Error("Tabela de quantitativos", ex);
+                errors.Add((c is { } cc ? QuantityRow.CategoryLabel(cc) : "Quantitativos") + ": " + ex.Message);
             }
         }
-
-        if (SharedParameterElement.Lookup(doc, SharedParameters.Codigo.Guid) == null)
-            throw new InvalidOperationException("os parâmetros SV_* não existem no projeto (crie ou atualize alguma sinalização e tente de novo).");
-        var categoria = Add(SharedParameters.Categoria);
-        var hierarquia = Add(SharedParameters.Hierarquia);
-        var grupo = Add(SharedParameters.Grupo);
-        var codigo = Add(SharedParameters.Codigo);
-        Add(SharedParameters.Descricao);
-        var cor = Add(SharedParameters.Cor);
-        Add(SharedParameters.Material);
-        Add(SharedParameters.Area, true);
-        Add(SharedParameters.Extensao, true);
-        Add(SharedParameters.Quantidade, true);
-
-        if (codigo == null) throw new InvalidOperationException("o campo SV_Codigo não está disponível para tabelas multicategoria.");
+        if (general) Try(null);
+        foreach (var c in categories) Try(c);
+        if (created.Count > 0)
         {
-            try { def.AddFilter(new ScheduleFilter(codigo.FieldId, ScheduleFilterType.HasValue)); }
-            catch (Exception ex) { Log.Error("Filtro da tabela", ex); }
-            if (categoria != null)
-            {
-                if (category is { } c) def.AddFilter(new ScheduleFilter(categoria.FieldId, ScheduleFilterType.Equal, QuantityRow.CategoryLabel(c)));
-                // Agrupado por categoria, com cabeçalho e subtotal.
-                def.AddSortGroupField(new ScheduleSortGroupField(categoria.FieldId) { ShowHeader = true, ShowFooter = true, ShowBlankLine = true });
-                if (category != null) categoria.IsHidden = true;
-            }
-            if (hierarquia != null) def.AddSortGroupField(new ScheduleSortGroupField(hierarquia.FieldId));
-            if (grupo != null) def.AddSortGroupField(new ScheduleSortGroupField(grupo.FieldId));
-            def.AddSortGroupField(new ScheduleSortGroupField(codigo.FieldId));
-            if (cor != null) def.AddSortGroupField(new ScheduleSortGroupField(cor.FieldId));
+            try { uidoc.ActiveView = created[0]; }
+            catch (Exception ex) { Log.Error("Abrir tabela", ex); }
         }
-        def.IsItemized = false;
-        def.ShowGrandTotal = true;
-        def.ShowGrandTotalCount = false;
-        def.ShowGrandTotalTitle = true;
-        t.Commit();
-        return sched;
+        var lines = created.Select(v => $"• {v.Name} – {QuantitySchedule.Rows(v)} linha(s)").ToList();
+        var msg = created.Count > 0
+            ? "Tabela(s) criada(s) no Revit (Navegador de projeto → Tabelas/Quantidades):\n" + string.Join("\n", lines) +
+              $"\n\n{prep.Elements} elemento(s) de sinalização; {prep.Images} com imagem." +
+              (sheet != null ? $"\nFolha {sheet.SheetNumber} – {sheet.Name}: a coluna Imagem mostra as miniaturas quando a tabela está na folha (limitação do Revit)." : "")
+            : "Nenhuma tabela foi criada.";
+        if (errors.Count > 0) msg += "\n\nProblemas:\n" + string.Join("\n", errors);
+        if (notes.Count > 0) msg += "\n\nObservações:\n• " + string.Join("\n• ", notes.Distinct().Take(12));
+        TaskDialog.Show(AppTitle, msg);
     }
 }
 

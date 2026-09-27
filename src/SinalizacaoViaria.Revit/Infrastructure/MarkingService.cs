@@ -1057,12 +1057,23 @@ public sealed class MarkingService
                 ? UrbanCategories.Label(UrbanCategories.Of(mv.Forma)) : QuantityRow.GroupLabel(info.Group));
             SharedParameters.Set(e, SharedParameters.Categoria, def is IAnnotationDefinition ? "Detalhamento" : QuantityRow.CategoryLabel(QuantityRow.Categorize(def, info.Group)));
             SharedParameters.Set(e, SharedParameters.Hierarquia, def is IAnnotationDefinition ? "" : Core.Definitions.Hierarquia.Label(def.Hierarchy));
-            SharedParameters.Set(e, SharedParameters.Cor, StyleService.ColorName(color));
-            SharedParameters.Set(e, SharedParameters.Material, material);
+            // Memorial (placas, dispositivos, mobiliário...): contado por modelo, sem desdobrar por cor nem material
+            // – igual à janela de quantitativos; as peças coloridas de uma placa ficam numa só linha da tabela.
+            var memorial = def is not IAnnotationDefinition && QuantityRow.IsMemorialCategory(QuantityRow.Categorize(def, info.Group));
+            SharedParameters.Set(e, SharedParameters.Cor, memorial ? "" : StyleService.ColorName(color));
+            SharedParameters.Set(e, SharedParameters.Material, memorial ? "" : material);
             SharedParameters.Set(e, SharedParameters.Area, UnitConv.Ft2(areaM2));
             SharedParameters.Set(e, SharedParameters.Extensao, primary ? UnitConv.Ft(geo.PaintedLength) : 0.0);
             SharedParameters.Set(e, SharedParameters.Quantidade, primary ? geo.UnitCount : 0);
             SharedParameters.Set(e, SharedParameters.Referencia, info.Reference);
+            // Coluna "Quantidade / Un." da tabela do Revit (igual à janela de quantitativos).
+            SharedParameters.Set(e, SharedParameters.Unidade, info.Unit);
+            SharedParameters.Set(e, SharedParameters.QtdMedicao, info.Unit switch
+            {
+                "m²" => areaM2,
+                "m" => primary ? geo.PaintedLength : 0.0,
+                _ => primary ? Math.Max(geo.UnitCount, 1) : 0.0,
+            });
             SharedParameters.Set(e, SharedParameters.Id, def.Id);
         }
         catch (Exception ex)

@@ -212,7 +212,8 @@ public class V13Tests
         Assert.Contains("EIXO", texts);
         Assert.Contains(texts, t => t.StartsWith("SEÇÃO A–A"));
         Assert.Contains("16,90", texts);                                          // total de alinhamento a alinhamento
-        Assert.Contains("3,00", texts);                                           // calçada
+        Assert.Contains("2,45", texts);                                           // passeio da calçada
+        Assert.Contains("0,55", texts);                                           // faixa gramada
         Assert.Contains("0,15", texts);                                           // meio-fio cotado à parte
         Assert.Contains("1,60", texts);                                           // ciclofaixa: do eixo da LBO à borda da pintura
 
