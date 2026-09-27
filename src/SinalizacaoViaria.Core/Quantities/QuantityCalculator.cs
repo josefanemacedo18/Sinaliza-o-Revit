@@ -17,6 +17,8 @@ public enum CategoriaQuantitativo
     ModeracaoTrafego,
     MobiliarioUrbano,
     PavimentacaoGeometria,
+    Drenagem,
+    ObrasDeArteTerraplenagem,
 }
 
 /// <summary>Uma linha do quadro de quantidades.</summary>
@@ -54,7 +56,8 @@ public sealed class QuantityRow
     /// <summary>Categorias contadas por modelo (memorial), sem linhas por cor/material.</summary>
     public static bool IsMemorialCategory(CategoriaQuantitativo c) =>
         c is CategoriaQuantitativo.SinalizacaoVertical or CategoriaQuantitativo.DispositivosSegregacao or CategoriaQuantitativo.MobiliarioUrbano
-            or CategoriaQuantitativo.ModeracaoTrafego or CategoriaQuantitativo.Acessibilidade;
+            or CategoriaQuantitativo.ModeracaoTrafego or CategoriaQuantitativo.Acessibilidade or CategoriaQuantitativo.Drenagem
+            or CategoriaQuantitativo.ObrasDeArteTerraplenagem;
 
     /// <summary>Tipos de família do Revit consolidados na linha (famílias do usuário).</summary>
     public string FamilyTypes { get; set; } = "";
@@ -123,6 +126,8 @@ public sealed class QuantityRow
         CategoriaQuantitativo.ModeracaoTrafego => "6. Moderação de tráfego",
         CategoriaQuantitativo.MobiliarioUrbano => "7. Mobiliário e elementos urbanos",
         CategoriaQuantitativo.PavimentacaoGeometria => "8. Pavimentação e geometria viária",
+        CategoriaQuantitativo.Drenagem => "9. Drenagem (bocas de lobo, grelhas, PVs)",
+        CategoriaQuantitativo.ObrasDeArteTerraplenagem => "10. Obras de arte, contenções e terraplenagem",
         _ => c.ToString(),
     };
 
@@ -130,6 +135,8 @@ public sealed class QuantityRow
     public static CategoriaQuantitativo Categorize(MarkingDefinition def, GrupoMarca group) => def switch
     {
         RampDefinition or TactileRouteDefinition => CategoriaQuantitativo.Acessibilidade,
+        DrainageDefinition => CategoriaQuantitativo.Drenagem,
+        BridgeDefinition or TunnelDefinition or TrenchDefinition or RetainingWallDefinition or SlopeDefinition or InterchangeDefinition => CategoriaQuantitativo.ObrasDeArteTerraplenagem,
         RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or RailwayDefinition => CategoriaQuantitativo.PavimentacaoGeometria,
         _ => group switch
         {

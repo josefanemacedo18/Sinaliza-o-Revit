@@ -38,6 +38,8 @@ public enum MarkingColor
     Brita,
     /// <summary>Solo compactado / sublastro – elemento físico.</summary>
     Terra,
+    /// <summary>Lâmina d'água (rios sob pontes) – referência visual semitransparente.</summary>
+    Agua,
 }
 
 public readonly record struct Rgb(byte R, byte G, byte B)
@@ -64,7 +66,7 @@ public static class MarkingColors
     public static bool IsPaint(MarkingColor c) =>
         c is not (MarkingColor.Concreto or MarkingColor.Grama or MarkingColor.Metal or MarkingColor.Asfalto or MarkingColor.Bloquete
             or MarkingColor.PavimentoConcreto or MarkingColor.Folhagem or MarkingColor.Vidro or MarkingColor.Madeira or MarkingColor.RelevoTatil
-            or MarkingColor.Brita or MarkingColor.Terra);
+            or MarkingColor.Brita or MarkingColor.Terra or MarkingColor.Agua);
 
     /// <summary>Materiais de pavimento da pista.</summary>
     public static bool IsPavement(MarkingColor c) => c is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto;
@@ -92,6 +94,7 @@ public static class MarkingColors
         MarkingColor.RelevoTatil => new Rgb(150, 92, 22),
         MarkingColor.Brita => new Rgb(126, 124, 118),
         MarkingColor.Terra => new Rgb(150, 118, 84),
+        MarkingColor.Agua => new Rgb(86, 150, 196),
         _ => new Rgb(128, 128, 128),
     };
 
@@ -117,7 +120,8 @@ public static class MarkingColors
         MarkingColor.Madeira => "Bancos, decks e parklets em madeira.",
         MarkingColor.RelevoTatil => "Relevo (domos e barras) do piso tátil.",
         MarkingColor.Brita => "Lastro de brita da via férrea.",
-        MarkingColor.Terra => "Sublastro / solo compactado da plataforma ferroviária.",
+        MarkingColor.Terra => "Sublastro, aterros e solo compactado.",
+        MarkingColor.Agua => "Lâmina d'água (referência sob pontes).",
         _ => "",
     };
 

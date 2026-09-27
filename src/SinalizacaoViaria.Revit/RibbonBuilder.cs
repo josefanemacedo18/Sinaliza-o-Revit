@@ -98,6 +98,34 @@ public static class RibbonBuilder
             Data(typeof(CmdTachas), "Tachas e Tachões", "tacha", "Tachas e tachões refletivos ao longo de linhas (mono/bidirecionais, cadência pela velocidade) – atalho de Bloqueios Físicos."));
 
         // ---------------------------------------------------------------- Detalhamento e quantitativos
+        // ---------------------------------------------------------------- Infraestrutura (drenagem, obras de arte, contenções, terreno)
+        var inf = app.CreateRibbonPanel(TabName, "Infraestrutura");
+        Split(inf, "SvDrenagem", "Drenagem",
+            Data(typeof(CmdBocaDeLobo), "Boca de Lobo / PV", "bocadelobo",
+                "Bocas de lobo simples, dupla, com grelha e combinada (guia chapéu, caixa, tampa, rebaixo da sarjeta) e poços de visita – alinhadas ao meio-fio com um clique."),
+            Data(typeof(CmdGrelha), "Grelha de Drenagem", "grelha",
+                "Grelhas de sarjeta e de piso com caixa, e canaleta com grelha contínua ao longo de linhas (barras transversais seguras para ciclistas)."));
+        Split(inf, "SvObrasArte", "Obras de Arte",
+            Data(typeof(CmdViaduto), "Viaduto", "viaduto",
+                "Viaduto com rampas de acesso em aterro, encontros, pilares, vigas/caixão/laje, barreiras, passeios, juntas, iluminação e faixas – greide com curvas verticais."),
+            Data(typeof(CmdPonte), "Ponte", "ponte",
+                "Ponte em vigas, caixão, arco inferior, arco superior, estaiada ou treliça, com pilares até o terreno/rio e lâmina d'água opcional."),
+            Data(typeof(CmdPassarela), "Passarela", "passarela",
+                "Passarela de pedestres em treliça com cobertura, rampas ≤ 8,33 % (NBR 9050) e guarda-corpos."),
+            Data(typeof(CmdTunel), "Túnel", "tunel",
+                "Túnel em ferradura (NATM), circular (TBM) ou retangular, com revestimento, passeios, iluminação, ventiladores e emboques (testa, bisel ou pala)."),
+            Data(typeof(CmdTrincheira), "Trincheira", "trincheira",
+                "Via rebaixada entre muros (flexão, cortina atirantada ou terra armada), com rampas, guarda-corpos, canaletas e laje de travessia."));
+        Split(inf, "SvContencoes", "Contenções",
+            Data(typeof(CmdMuroArrimo), "Muro de Arrimo", "muro",
+                "Muros de flexão, gravidade, contrafortes, gabião, terra armada e cortina atirantada – base no terreno, barbacãs, coroamento e reaterro no Toposolid."),
+            Data(typeof(CmdTalude), "Talude", "talude",
+                "Taludes de corte e aterro com bermas, canaletas de crista, pé e bermas, descidas d'água e revestimento – aplicados ao Toposolid."));
+        Large(inf, typeof(CmdNoViario), "Nó Viário", "noviario",
+            "Interseção em desnível: diamante, diamante com rotatórias, trevo completo, trevo parcial, trombeta e rotatória em dois níveis – viadutos, rampas e laços com greide.");
+        Large(inf, typeof(CmdTerraplenagem), "Terraplenagem", "terraplenagem",
+            "Ajusta o Toposolid (Massa e terreno) às vias, conexões e obras: plataformas, taludes de corte e aterro até o terreno natural, reaterro de muros e escavação – com volumes de corte e aterro.");
+
         var det = app.CreateRibbonPanel(TabName, "Detalhamento");
         Split(det, "SvDetalhar", "Detalhar",
             Data(typeof(CmdAnotar), "Anotar", "anotar", "Chamada com texto automático para qualquer sinalização."),

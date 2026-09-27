@@ -211,10 +211,18 @@ public sealed class MarkingGeometry
         foreach (var s in shapes) Add(s, color, thickness, isUnit);
     }
 
+    /// <summary>Faixas de projeto (bordas cotadas) para ajustar o terreno – terraplenagem com taludes de corte e aterro.</summary>
+    public List<GradeCorridor> Corridors { get; } = new();
+
+    /// <summary>Plataformas planas (polígono numa cota) para ajustar o terreno.</summary>
+    public List<GradePad> Pads { get; } = new();
+
     public void Merge(MarkingGeometry other)
     {
         Pieces.AddRange(other.Pieces);
         Annotations.AddRange(other.Annotations);
+        Corridors.AddRange(other.Corridors);
+        Pads.AddRange(other.Pads);
         PaintedLength += other.PaintedLength;
         UnitCount += other.UnitCount;
         PathLength = Math.Max(PathLength, other.PathLength);
@@ -236,4 +244,35 @@ public sealed class MarkingGeometry
             return (new Vec2(minX, minY), new Vec2(maxX, maxY));
         }
     }
+}
+
+/// <summary>
+/// Faixa de projeto para a terraplenagem: bordas esquerda e direita (mesmo número de pontos, par a par por estação) com a
+/// cota de projeto do terreno (m, relativa à base da marca). Fora das bordas o terreno é concordado por taludes de corte ou
+/// aterro até encontrar o terreno natural (offset/"daylight").
+/// </summary>
+public sealed class GradeCorridor
+{
+    public List<Vec3> Left { get; } = new();
+    public List<Vec3> Right { get; } = new();
+    /// <summary>Talude de corte (horizontal : 1 vertical).</summary>
+    public double CutSlope { get; set; } = 1.0;
+    /// <summary>Talude de aterro (horizontal : 1 vertical).</summary>
+    public double FillSlope { get; set; } = 1.5;
+    /// <summary>Concordar o lado esquerdo/direito com taludes (falso = muro/estrutura: o terreno fica como está além da borda).</summary>
+    public bool DaylightLeft { get; set; } = true;
+    public bool DaylightRight { get; set; } = true;
+    public string Label { get; set; } = "";
+}
+
+/// <summary>Plataforma plana (interseções, rotatórias, encontros) numa cota de projeto do terreno (m, relativa à base).</summary>
+public sealed class GradePad
+{
+    public GradePad(Polygon2 area, double z) { Area = area; Z = z; }
+    public Polygon2 Area { get; }
+    public double Z { get; }
+    public double CutSlope { get; set; } = 1.0;
+    public double FillSlope { get; set; } = 1.5;
+    public bool Daylight { get; set; } = true;
+    public string Label { get; set; } = "";
 }

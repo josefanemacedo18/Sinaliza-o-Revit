@@ -198,10 +198,7 @@ public static partial class DetailGenerator
         var b = sd.End;
         var L = a.DistanceTo(b);
         if (L < 0.2) { geo.Warnings.Add("Linha de seção muito curta."); return geo; }
-        var defs = ctx.AllDefinitions?.Invoke() ?? Array.Empty<MarkingDefinition>();
-        var withGeo = defs.Select(d => (Def: d, Geo: SectionIncludes(d, sd) || IsPavement(d) ? ctx.GeometryOf?.Invoke(d) : null))
-            .Where(x => x.Geo != null).Select(x => (x.Def, Geo: x.Geo!)).ToList();
-        var st = SectionStations(sd, withGeo.Where(x => SectionIncludes(x.Def, sd)).Select(x => x.Geo));
+        var (withGeo, st, allAxes) = SectionData(sd, ctx);
         if (st.Count < 2) { geo.Warnings.Add("Nenhum elemento cortado pela linha de seção."); return geo; }
 
         var u = (b - a) / L;
@@ -212,11 +209,7 @@ public static partial class DetailGenerator
         if (sd.Decimals <= 0) fmt = "0";
 
         // Eixo(s) de via cruzados pela seção.
-        var axes = new List<double>();
-        if (sd.AxisMarker || sd.SplitAtAxis)
-            foreach (var d in defs.OfType<RoadPavementDefinition>())
-                if (ctx.PathOf?.Invoke(d) is { } path)
-                    foreach (var t in Crossings(path, a, b)) if (!axes.Any(x => Math.Abs(x - t * L) < 0.05)) axes.Add(t * L);
+        var axes = sd.AxisMarker || sd.SplitAtAxis ? allAxes : new List<double>();
         if (sd.SplitAtAxis)
         {
             foreach (var s0 in axes) if (!st.Any(x => Math.Abs(x - s0) < 0.02)) st.Add(s0);
@@ -294,9 +287,43 @@ public static partial class DetailGenerator
             var tPos = (a + b) / 2 + tUp * (outer + ctx.Mm(sd.TextMm * 1.6 + 6 + 2 * tMm * 1.45));
             geo.Annotations.Add(new AnnotationText(tPos, title + "\n(cotas em metros)", tMm) { Rotation = titleRot });
         }
+        // Seções antigas com o perfil embutido (hoje o perfil é um detalhe separado – SectionProfileDefinition).
         if (sd.Profile && sd.ProfilePosition is { } pos)
-            SectionProfile(geo, sd, ctx, withGeo, st, axes, pos, letter);
+            SectionProfile(geo, sd, SectionProfileDefinition.From(sd, pos), ctx, withGeo, SectionData(sd, ctx).Stations, allAxes, pos, letter);
         geo.UnitCount = st.Count - 1;
+        return geo;
+    }
+
+    /// <summary>Elementos cortados, estações (bordas e eixos de linhas) e eixos de via cruzados pela linha de seção.</summary>
+    public static (List<(MarkingDefinition Def, MarkingGeometry Geo)> WithGeo, List<double> Stations, List<double> Axes) SectionData(
+        SectionDimensionDefinition sd, BuildContext ctx)
+    {
+        var a = sd.Start;
+        var b = sd.End;
+        var L = a.DistanceTo(b);
+        var defs = ctx.AllDefinitions?.Invoke() ?? Array.Empty<MarkingDefinition>();
+        var withGeo = defs.Select(d => (Def: d, Geo: SectionIncludes(d, sd) || IsPavement(d) ? ctx.GeometryOf?.Invoke(d) : null))
+            .Where(x => x.Geo != null).Select(x => (x.Def, Geo: x.Geo!)).ToList();
+        var st = SectionStations(sd, withGeo.Where(x => SectionIncludes(x.Def, sd)).Select(x => x.Geo));
+        var axes = new List<double>();
+        foreach (var d in defs.OfType<RoadPavementDefinition>())
+            if (ctx.PathOf?.Invoke(d) is { } path)
+                foreach (var t in Crossings(path, a, b)) if (!axes.Any(x => Math.Abs(x - t * L) < 0.05)) axes.Add(t * L);
+        return (withGeo, st, axes);
+    }
+
+    /// <summary>Perfil transversal separado da cota (posicionado onde o usuário clicou, agrupado no Revit).</summary>
+    public static MarkingGeometry SectionProfileDrawing(SectionProfileDefinition pd, BuildContext ctx)
+    {
+        if (ctx.Lookup?.Invoke(pd.SectionId) is not SectionDimensionDefinition sd) return Missing(MissingTarget + " (cota de seção excluída).");
+        var geo = new MarkingGeometry();
+        if (sd.Start.DistanceTo(sd.End) < 0.2) { geo.Warnings.Add("Linha de seção muito curta."); return geo; }
+        var (withGeo, st, axes) = SectionData(sd, ctx);
+        if (st.Count < 2) { geo.Warnings.Add("Perfil transversal: nada cortado pela linha de seção."); return geo; }
+        var letter = (sd.SectionLetter ?? "").Trim().ToUpperInvariant();
+        pd.Letter = letter.Length > 0 ? letter : pd.Letter;
+        SectionProfile(geo, sd, pd, ctx, withGeo, st, axes, pd.Position, letter);
+        geo.UnitCount = 1;
         return geo;
     }
 

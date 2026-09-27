@@ -156,6 +156,14 @@ public enum Justificacao
 [JsonDerivedType(typeof(TactileRouteDefinition), "rota-tatil")]
 [JsonDerivedType(typeof(ChannelizationDefinition), "canalizacao")]
 [JsonDerivedType(typeof(RailwayDefinition), "ferrovia")]
+[JsonDerivedType(typeof(SectionProfileDefinition), "perfil-secao")]
+[JsonDerivedType(typeof(DrainageDefinition), "drenagem")]
+[JsonDerivedType(typeof(BridgeDefinition), "obra-de-arte")]
+[JsonDerivedType(typeof(TunnelDefinition), "tunel")]
+[JsonDerivedType(typeof(TrenchDefinition), "trincheira")]
+[JsonDerivedType(typeof(RetainingWallDefinition), "muro-arrimo")]
+[JsonDerivedType(typeof(SlopeDefinition), "talude")]
+[JsonDerivedType(typeof(InterchangeDefinition), "no-viario")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;
@@ -899,6 +907,63 @@ public interface IAnnotationDefinition
 public interface IProjectWideAnnotation : IAnnotationDefinition { }
 
 /// <summary>
+/// Detalhe posicionado livremente na vista: se o usuário mover os elementos (ou o grupo), a nova posição é lida na
+/// próxima regeneração – o detalhe não "volta" para o lugar antigo.
+/// </summary>
+public interface IPlacedAnnotation
+{
+    /// <summary>Canto inferior esquerdo das linhas desenhadas na última geração (m).</summary>
+    Vec2? DrawnAnchor { get; set; }
+}
+
+/// <summary>Detalhe cujos elementos formam um grupo de detalhes do Revit (seleciona e move tudo junto).</summary>
+public interface IGroupedAnnotation
+{
+    string GroupName { get; }
+}
+
+/// <summary>
+/// Perfil transversal (corte) desenhado a partir de uma cota de seção: fica onde o usuário clicar, é um grupo de detalhes
+/// e acompanha as mudanças da via.
+/// </summary>
+public sealed class SectionProfileDefinition : MarkingDefinition, IProjectWideAnnotation, IPlacedAnnotation, IGroupedAnnotation
+{
+    /// <summary>Cota de seção de origem (linha de corte).</summary>
+    public string SectionId { get; set; } = "";
+    /// <summary>Canto superior esquerdo do perfil (m).</summary>
+    public Vec2 Position { get; set; }
+    public double ProfileScale { get; set; } = 50;
+    public double VerticalExaggeration { get; set; } = 1;
+    public double CrossSlopePct { get; set; } = 2;
+    public bool ProfileLevels { get; set; } = true;
+    public bool ProfileHeights { get; set; } = true;
+    public bool ProfileLegend { get; set; } = true;
+    public double TextMm { get; set; } = 2.0;
+    public int Decimals { get; set; } = 2;
+    public TerminalCota Terminal { get; set; } = TerminalCota.Traco;
+    /// <summary>Moldura em volta do perfil.</summary>
+    public bool FrameBox { get; set; }
+    public Vec2? DrawnAnchor { get; set; }
+    /// <summary>Letra do corte na última geração (nome do grupo).</summary>
+    public string Letter { get; set; } = "A";
+
+    public string? TargetId => SectionId;
+    public string GroupName => $"SV - Perfil transversal {Letter}-{Letter}";
+    public override void Translate(Vec2 delta, double dz) => Position += delta;
+    public override string KindName => "Perfil transversal";
+    public override string DisplayCode => "PERFIL-SEC";
+
+    /// <summary>Copia as opções do perfil guardadas na cota (modelo da ferramenta).</summary>
+    public static SectionProfileDefinition From(SectionDimensionDefinition sd, Vec2 position) => new()
+    {
+        SectionId = sd.Id, Position = position, ProfileScale = sd.ProfileScale, VerticalExaggeration = sd.VerticalExaggeration,
+        CrossSlopePct = sd.CrossSlopePct, ProfileLevels = sd.ProfileLevels, ProfileHeights = sd.ProfileHeights, ProfileLegend = sd.ProfileLegend,
+        TextMm = sd.TextMm, Decimals = sd.Decimals, Terminal = sd.Terminal, Letter = string.IsNullOrWhiteSpace(sd.SectionLetter) ? "A" : sd.SectionLetter,
+        Output = sd.Output.Clone(),
+    };
+}
+
+/// <summary>
 /// Detalhe de placa em planta: a face da placa desenhada em escala de papel, afastada do suporte,
 /// com linha de chamada até o poste e identificação (código e nome).
 /// </summary>
@@ -960,7 +1025,7 @@ public sealed class LabelDefinition : MarkingDefinition, IAnnotationDefinition
 }
 
 /// <summary>Quadro de legenda com amostra e descrição de cada tipo de sinalização usada no projeto.</summary>
-public sealed class LegendDefinition : MarkingDefinition, IProjectWideAnnotation
+public sealed class LegendDefinition : MarkingDefinition, IProjectWideAnnotation, IPlacedAnnotation
 {
     /// <summary>Canto superior esquerdo (m).</summary>
     public Vec2 Position { get; set; }
@@ -974,6 +1039,7 @@ public sealed class LegendDefinition : MarkingDefinition, IProjectWideAnnotation
     public bool Physical { get; set; } = true;
 
     public string? TargetId => null;
+    public Vec2? DrawnAnchor { get; set; }
     public override void Translate(Vec2 delta, double dz) => Position += delta;
     public override string KindName => "Quadro de legenda";
     public override string DisplayCode => "LEGENDA";
@@ -1041,7 +1107,7 @@ public sealed class SectionDimensionDefinition : MarkingDefinition, IProjectWide
 }
 
 /// <summary>Detalhe típico cotado (em escala ampliada) de uma marca do projeto: linha, zebrado, vaga ou placa em elevação.</summary>
-public sealed class TypicalDetailDefinition : MarkingDefinition, IAnnotationDefinition
+public sealed class TypicalDetailDefinition : MarkingDefinition, IAnnotationDefinition, IPlacedAnnotation
 {
     public string MarkingTargetId { get; set; } = "";
     /// <summary>Canto superior esquerdo (m).</summary>
@@ -1055,13 +1121,14 @@ public sealed class TypicalDetailDefinition : MarkingDefinition, IAnnotationDefi
     public bool FrameBox { get; set; } = true;
 
     public string? TargetId => MarkingTargetId;
+    public Vec2? DrawnAnchor { get; set; }
     public override void Translate(Vec2 delta, double dz) => Position += delta;
     public override string KindName => "Detalhe típico";
     public override string DisplayCode => "DET-TIP";
 }
 
 /// <summary>Quadro de quantitativos (ou de placas) desenhado na prancha, separado por categoria.</summary>
-public sealed class QuantityTableDefinition : MarkingDefinition, IProjectWideAnnotation
+public sealed class QuantityTableDefinition : MarkingDefinition, IProjectWideAnnotation, IPlacedAnnotation
 {
     public Vec2 Position { get; set; }
     public string Title { get; set; } = "QUADRO DE QUANTITATIVOS – SINALIZAÇÃO VIÁRIA";
@@ -1073,13 +1140,14 @@ public sealed class QuantityTableDefinition : MarkingDefinition, IProjectWideAnn
     public double TextMm { get; set; } = 2.0;
 
     public string? TargetId => null;
+    public Vec2? DrawnAnchor { get; set; }
     public override void Translate(Vec2 delta, double dz) => Position += delta;
     public override string KindName => SignsOnly ? "Quadro de placas" : "Quadro de quantitativos";
     public override string DisplayCode => SignsOnly ? "QUADRO-PLACAS" : "QUADRO-QTD";
 }
 
 /// <summary>Bloco de notas gerais do projeto de sinalização.</summary>
-public sealed class NotesDefinition : MarkingDefinition, IAnnotationDefinition
+public sealed class NotesDefinition : MarkingDefinition, IAnnotationDefinition, IPlacedAnnotation
 {
     public const string DefaultText =
         "Cotas em metros, salvo indicação em contrário.\n" +
@@ -1098,6 +1166,7 @@ public sealed class NotesDefinition : MarkingDefinition, IAnnotationDefinition
     public bool Numbered { get; set; } = true;
 
     public string? TargetId => null;
+    public Vec2? DrawnAnchor { get; set; }
     public override void Translate(Vec2 delta, double dz) => Position += delta;
     public override string KindName => "Notas gerais";
     public override string DisplayCode => "NOTAS";

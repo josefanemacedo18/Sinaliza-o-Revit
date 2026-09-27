@@ -34,6 +34,48 @@ public static class QuantitySamples
             {
                 case SignDefinition:
                     return (null, TipoMiniatura.Placa);
+                case DrainageDefinition dr:
+                {
+                    var c = (DrainageDefinition)MarkingDefinition.FromJson(dr.ToJson())!;
+                    c.Position = Vec2.Zero; c.Along = Vec2.UnitX; c.Modules = 1;
+                    return (MarkingBuilder.Build(c, c.IsLinear ? new Polyline2(new[] { new Vec2(-1, 0), new Vec2(1, 0) }) : null, ctx), TipoMiniatura.Perspectiva);
+                }
+                case BridgeDefinition br:
+                {
+                    var c = (BridgeDefinition)MarkingDefinition.FromJson(br.ToJson())!;
+                    c.FollowTerrain = false; c.Lighting = false; c.ApproachStart = c.ApproachEnd = false; c.MainSpan = 0; c.SpanLength = 20;
+                    return (MarkingBuilder.Build(c, new Polyline2(new[] { new Vec2(0, 0), new Vec2(40, 0) }), ctx), TipoMiniatura.Perspectiva);
+                }
+                case TunnelDefinition tn:
+                {
+                    var c = (TunnelDefinition)MarkingDefinition.FromJson(tn.ToJson())!;
+                    c.JetFans = false; c.ApproachCut = 0; c.StartZ = c.EndZ = 0;
+                    return (MarkingBuilder.Build(c, new Polyline2(new[] { new Vec2(0, 0), new Vec2(12, 0) }), ctx), TipoMiniatura.Perspectiva);
+                }
+                case TrenchDefinition tr:
+                {
+                    var c = (TrenchDefinition)MarkingDefinition.FromJson(tr.ToJson())!;
+                    c.FollowTerrain = false; c.Lighting = false; c.CoverLength = 0;
+                    return (MarkingBuilder.Build(c, new Polyline2(new[] { new Vec2(0, 0), new Vec2(2 * c.Depth / Math.Max(0.02, c.MaxGrade) + 30, 0) }), ctx), TipoMiniatura.Perspectiva);
+                }
+                case RetainingWallDefinition mw:
+                {
+                    var c = (RetainingWallDefinition)MarkingDefinition.FromJson(mw.ToJson())!;
+                    c.FollowTerrain = false;
+                    return (MarkingBuilder.Build(c, new Polyline2(new[] { new Vec2(0, 0), new Vec2(6, 0) }), ctx), TipoMiniatura.Perspectiva);
+                }
+                case SlopeDefinition sl:
+                {
+                    var c = (SlopeDefinition)MarkingDefinition.FromJson(sl.ToJson())!;
+                    c.FollowTerrain = false;
+                    return (MarkingBuilder.Build(c, new Polyline2(new[] { new Vec2(0, 0), new Vec2(20, 0) }), ctx), TipoMiniatura.Perspectiva);
+                }
+                case InterchangeDefinition ic:
+                {
+                    var c = (InterchangeDefinition)MarkingDefinition.FromJson(ic.ToJson())!;
+                    c.FollowTerrain = false; c.Position = Vec2.Zero; c.Lighting = false; c.Markings = false;
+                    return (MarkingBuilder.Build(c, null, ctx), TipoMiniatura.Planta);
+                }
                 case RailwayDefinition rw:
                 {
                     var c = (RailwayDefinition)MarkingDefinition.FromJson(rw.ToJson())!;

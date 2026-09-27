@@ -171,7 +171,8 @@ public sealed class MarkingUpdater : IUpdater
     private static void RemoveOrphanDetails(Document doc)
     {
         var all = MarkingStorage.All(doc);
-        var ids = all.Where(r => r.Definition is not Core.Definitions.IAnnotationDefinition).Select(r => r.MarkingId).ToHashSet();
+        // Detalhes podem apontar para marcas ou para outros detalhes (perfil transversal → cota de seção).
+        var ids = all.Select(r => r.MarkingId).ToHashSet();
         var orphans = all.Where(r => r.Definition is Core.Definitions.IAnnotationDefinition { TargetId: { } t } && !ids.Contains(t))
             .Select(r => r.Element.Id).ToList();
         foreach (var id in orphans)

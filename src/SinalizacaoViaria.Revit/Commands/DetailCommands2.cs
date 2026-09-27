@@ -31,8 +31,8 @@ internal static class DetailForms
 
     public static FormWindow Section(SectionDimensionDefinition d, bool edit) =>
         new FormWindow(edit ? "Editar cota de seção" : "Cotar seção transversal", "Cota automática da seção",
-                "Clique sobre uma via (corte perpendicular ao eixo, de alinhamento a alinhamento) ou dois pontos atravessando-a; depois clique onde " +
-                "desenhar o PERFIL TRANSVERSAL. O plugin corta pavimento, sarjetas, meios-fios, calçadas, canteiros, plataformas e pintura e desenha: " +
+                "Clique sobre uma via (corte perpendicular ao eixo, de alinhamento a alinhamento) ou dois pontos atravessando-a: a seção em planta é criada. " +
+                "Em seguida clique onde colocar o PERFIL TRANSVERSAL (ESC = sem perfil) – ele é um grupo separado, que se move inteiro. O plugin corta pavimento, sarjetas, meios-fios, calçadas, canteiros, plataformas e pintura e desenha: " +
                 "o corte em escala com as camadas preenchidas, nome e nível de cada trecho, caimento da pista, cotas horizontais e verticais (desníveis), " +
                 "eixo, legenda dos materiais e o título SEÇÃO TRANSVERSAL A–A – além da cadeia de cotas e das marcas do corte na planta. " +
                 "Tudo se atualiza quando a via muda. Repete até ESC.",
@@ -84,6 +84,21 @@ internal static class DetailForms
             .Check("Marcar o eixo da via (traço-ponto)", () => d.AxisMarker, v => d.AxisMarker = v)
             .Check("Dividir as cotas no eixo (meias-larguras)", () => d.SplitAtAxis, v => d.SplitAtAxis = v)
             .Text("Letra do corte (vazio = sem marcas/título)", () => d.SectionLetter, v => d.SectionLetter = (v ?? "").Trim().ToUpperInvariant());
+
+    public static FormWindow Profile(SectionProfileDefinition d, SectionDimensionDefinition? section) =>
+        new FormWindow("Editar perfil transversal", "Perfil transversal (corte)",
+                "Perfil desenhado a partir da cota de seção " + (section?.SectionLetter ?? "") + ". Para mudar a linha de corte, edite a cota de seção; " +
+                "para mudar a posição, mova o grupo do perfil (a nova posição é mantida).",
+                d, () => new FormPreview(null, Info: "A prévia usa o projeto: aplique para ver o resultado."), false, "Aplicar", 760, 560)
+            .Number("Escala do perfil 1:", () => d.ProfileScale, v => d.ProfileScale = v, 5, 500, "0")
+            .Number("Exagero vertical (×)", () => d.VerticalExaggeration, v => d.VerticalExaggeration = v, 1, 10, "0.#")
+            .Number("Caimento transversal indicado na pista (%)", () => d.CrossSlopePct, v => d.CrossSlopePct = v, 0, 10, "0.#", "0 = não indicar.")
+            .Number("Altura do texto (mm)", () => d.TextMm, v => d.TextMm = v, 0.8, 10, "0.#")
+            .Choice("Terminal da cota", Terminals, () => d.Terminal, v => d.Terminal = v)
+            .Check("Níveis de cada trecho (+0,15 / ±0,00)", () => d.ProfileLevels, v => d.ProfileLevels = v)
+            .Check("Cotas verticais dos desníveis", () => d.ProfileHeights, v => d.ProfileHeights = v)
+            .Check("Legenda dos materiais cortados", () => d.ProfileLegend, v => d.ProfileLegend = v)
+            .Check("Moldura em volta do perfil", () => d.FrameBox, v => d.FrameBox = v);
 
     public static FormWindow Typical(TypicalDetailDefinition d, MarkingDefinition target, double scale, bool edit)
     {
@@ -154,6 +169,7 @@ internal static class DetailForms
         FormWindow? w = working switch
         {
             SectionDimensionDefinition sd => Section(sd, true),
+            SectionProfileDefinition sp => Profile(sp, MarkingStorage.ById(doc, sp.SectionId).FirstOrDefault()?.Definition as SectionDimensionDefinition),
             TypicalDetailDefinition td when MarkingStorage.ById(doc, td.MarkingTargetId).FirstOrDefault()?.Definition is { } t => Typical(td, t, scale, true),
             QuantityTableDefinition qt => Table(qt, scale, MarkingStorage.Definitions(doc), new MarkingService(doc, uidoc.ActiveView).BuildGeometryOrNull, true),
             NotesDefinition nt => Notes(nt, scale, true),
@@ -259,13 +275,22 @@ public sealed class CmdCotarSecao : CommandBase
             if (!string.IsNullOrEmpty(d.SectionLetter) && used.Contains(d.SectionLetter))
                 d.SectionLetter = letters.Select(ch => ch.ToString()).FirstOrDefault(x => !used.Contains(x)) ?? d.SectionLetter;
             used.Add(d.SectionLetter);
-            if (d.Profile)
-            {
-                var at = Picking.PickPoint(uidoc, $"Clique o canto superior esquerdo do PERFIL TRANSVERSAL {d.SectionLetter}–{d.SectionLetter} (ESC = só as cotas em planta)");
-                d.ProfilePosition = at == null ? null : DetailHelpers.ToCore(at);
-            }
+            // 1) A seção em planta (linha de corte, marcas A–A e cotas) é criada primeiro...
+            d.ProfilePosition = null;
             DetailHelpers.PrepareOutput(d, view);
             results.AddRange(MarkingCreator.Commit(uidoc, new[] { d }, "SV - Cotar seção"));
+            // 2) ...e só depois o perfil transversal, onde o usuário clicar: um detalhe separado, agrupado (move tudo
+            //    junto) e ligado à seção – acompanha as mudanças da via.
+            if (d.Profile)
+            {
+                var at = Picking.PickPoint(uidoc, $"Clique onde colocar o PERFIL TRANSVERSAL {d.SectionLetter}–{d.SectionLetter} (canto superior esquerdo) – ESC = sem perfil");
+                if (at != null)
+                {
+                    var profile = SectionProfileDefinition.From(d, DetailHelpers.ToCore(at));
+                    DetailHelpers.PrepareOutput(profile, view);
+                    results.AddRange(MarkingCreator.Commit(uidoc, new[] { profile }, "SV - Perfil transversal"));
+                }
+            }
         }
         if (results.Count == 0) return Result.Cancelled;
         Report("Cota de seção", results);

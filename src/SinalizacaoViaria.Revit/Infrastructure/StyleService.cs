@@ -31,7 +31,8 @@ public sealed class StyleService
         MarkingColor.PavimentoConcreto => "Pavimento de concreto",
         MarkingColor.RelevoTatil => "Relevo tátil",
         MarkingColor.Brita => "Brita (lastro)",
-        MarkingColor.Terra => "Sublastro",
+        MarkingColor.Terra => "Solo compactado",
+        MarkingColor.Agua => "Água",
         _ => c.ToString(),
     };
 
@@ -70,10 +71,12 @@ public sealed class StyleService
                 MarkingColor.Madeira => "Madeira",
                 MarkingColor.Brita => "Pedra",
                 MarkingColor.Terra => "Terra",
+                MarkingColor.Agua => "Líquido",
                 MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto => "Pavimento",
                 _ => "Concreto",
             };
             if (color == MarkingColor.Vidro) mat.Transparency = 60;
+            if (color == MarkingColor.Agua) mat.Transparency = 45;
             if (color == MarkingColor.Metal) mat.Shininess = 90;
             mat.MaterialCategory = MarkingColors.IsPaint(color) ? "Sinalização viária" : "Elementos viários";
             var solid = SolidFillPattern();

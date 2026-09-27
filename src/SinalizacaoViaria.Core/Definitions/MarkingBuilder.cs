@@ -35,6 +35,15 @@ public sealed class BuildContext
     /// <summary>Geometria de outra marca do projeto (cotas de seção, quadros de quantitativos).</summary>
     public Func<MarkingDefinition, MarkingGeometry?>? GeometryOf { get; init; }
 
+    /// <summary>
+    /// Cota do terreno natural (m, relativa à base da marca) num ponto – obras que acompanham a topografia (pilares até o
+    /// chão, muros e taludes apoiados no terreno, emboques de túnel). Nulo = sem terreno (plano da base).
+    /// </summary>
+    public Func<Vec2, double?>? Ground { get; init; }
+
+    /// <summary>Cota do terreno no ponto, ou 0 (plano da base) sem terreno.</summary>
+    public double GroundAt(Vec2 p) => Ground?.Invoke(p) ?? 0;
+
     /// <summary>Converte mm de papel em metros de modelo.</summary>
     public double Mm(double paperMm) => paperMm * ViewScale / 1000.0;
 }
@@ -140,6 +149,7 @@ public static class MarkingBuilder
         LabelDefinition lb => DetailGenerator.Label(lb, ctx),
         LegendDefinition lg => DetailGenerator.Legend(lg, ctx),
         SectionDimensionDefinition sd2 => DetailGenerator.SectionDimensions(sd2, ctx),
+        SectionProfileDefinition sp => DetailGenerator.SectionProfileDrawing(sp, ctx),
         TypicalDetailDefinition td => DetailGenerator.TypicalDetail(td, ctx),
         QuantityTableDefinition qt => DetailGenerator.QuantityTable(qt, ctx),
         NotesDefinition nt => DetailGenerator.Notes(nt, ctx),
@@ -153,6 +163,13 @@ public static class MarkingBuilder
         PlanterDefinition pl => path == null ? Missing("Linha dos canteiros não encontrada.") : SidewalkGenerator.Planter(pl, path, ctx),
         CulDeSacDefinition cd => path == null ? Missing("Eixo do cul-de-sac não encontrado.") : SidewalkGenerator.CulDeSac(cd, path),
         TrafficCalmingDefinition tc => path == null || path.Points.Count < 2 ? Missing("Bordos da pista não encontrados.") : TrafficCalmingGenerator.Generate(tc, path, ctx.Catalog),
+        DrainageDefinition dr => DrainageGenerator.Build(dr, path),
+        TunnelDefinition tn => path == null || path.Points.Count < 2 ? Missing("Eixo do túnel não encontrado.") : EarthworksGenerator.Tunnel(tn, path, ctx),
+        TrenchDefinition tr2 => path == null || path.Points.Count < 2 ? Missing("Eixo da trincheira não encontrado.") : EarthworksGenerator.Trench(tr2, path, ctx),
+        RetainingWallDefinition rw2 => path == null || path.Points.Count < 2 ? Missing("Linha do muro não encontrada.") : EarthworksGenerator.RetainingWall(rw2, path, ctx),
+        SlopeDefinition sl => path == null || path.Points.Count < 2 ? Missing("Linha do pé do talude não encontrada.") : EarthworksGenerator.Slope(sl, path, ctx),
+        InterchangeDefinition ic => InterchangeGenerator.Build(ic, ctx),
+        BridgeDefinition br => path == null || path.Points.Count < 2 ? Missing("Eixo da obra de arte não encontrado.") : BridgeGenerator.Build(br, path, ctx),
         RailwayDefinition rw => path == null || path.Points.Count < 2 ? Missing("Eixo da via férrea não encontrado.") : RailwayGenerator.Build(rw, path),
         ChannelizationDefinition cz => path == null || path.Points.Count < 2 ? Missing("Linha de referência da canalização não encontrada.") : ChannelizationGenerator.Generate(cz, path, ctx),
         _ => throw new NotSupportedException(def.GetType().Name),
@@ -622,6 +639,69 @@ public static class MarkingBuilder
                     TipoModeracao.FaixaElevada => "Faixa elevada para travessia de pedestres",
                     _ => "Lombada invertida (valeta transversal)",
                 }, GrupoMarca.Moderacao, "Resoluções CONTRAN sobre ondulações transversais e faixas elevadas (conferir versão vigente)", "un");
+            case DrainageDefinition dr:
+                return new MarkingInfo(dr.DisplayCode, dr.Type switch
+                {
+                    TipoDrenagem.BocaDeLoboSimples => "Boca de lobo simples (guia chapéu)",
+                    TipoDrenagem.BocaDeLoboDupla => "Boca de lobo dupla",
+                    TipoDrenagem.BocaDeLoboGrelha => "Boca de lobo com grelha",
+                    TipoDrenagem.BocaDeLoboCombinada => "Boca de lobo combinada (guia + grelha)",
+                    TipoDrenagem.GrelhaSarjeta => "Grelha de sarjeta com caixa",
+                    TipoDrenagem.GrelhaQuadrada => "Grelha de piso com caixa",
+                    TipoDrenagem.GrelhaContinua => "Canaleta com grelha contínua",
+                    _ => "Poço de visita (PV) com tampão",
+                } + (dr.IsLinear ? $" – {dr.GrateWidth * 100:0} cm" : dr.Type == TipoDrenagem.PocoDeVisita ? $" – Ø {dr.BoxLength:0.00} m, h = {dr.BoxDepth:0.00} m" : $" – caixa {dr.BoxLength:0.00} × {dr.BoxWidth:0.00} m"),
+                    GrupoMarca.Urbanizacao, "DNIT 030/2004-ES; ABNT NBR 10160 (grelhas e tampões); PMSP – diretrizes de drenagem", dr.IsLinear ? "m" : "un");
+            case BridgeDefinition br:
+                return new MarkingInfo(br.DisplayCode, $"{br.KindName} – " + br.System switch
+                {
+                    SistemaEstrutural.CaixaoCelular => "viga caixão",
+                    SistemaEstrutural.LajeMacica => "laje maciça",
+                    SistemaEstrutural.ArcoInferior => "arco inferior",
+                    SistemaEstrutural.ArcoSuperior => "arco superior atirantado",
+                    SistemaEstrutural.Estaiada => "estaiada",
+                    SistemaEstrutural.Trelica => "treliça metálica",
+                    _ => "vigas pré-moldadas",
+                } + $", vãos de {br.SpanLength:0} m, tabuleiro (área em planta)", GrupoMarca.Urbanizacao,
+                    "ABNT NBR 7188, NBR 7187, NBR 9050 (passarelas); DNIT – Manual de OAE (gabarito 5,50 m)", "m²");
+            case TunnelDefinition tn:
+                return new MarkingInfo(tn.DisplayCode, "Túnel " + tn.Section switch { SecaoTunel.Circular => "circular", SecaoTunel.Retangular => "retangular (vala coberta)", _ => "em ferradura (NATM)" } +
+                    $" – {tn.Lanes} faixa(s), gabarito {tn.ClearHeight:0.00} m", GrupoMarca.Urbanizacao, "DNIT – túneis rodoviários; gabarito vertical ≥ 5,50 m", "m");
+            case TrenchDefinition tr:
+                return new MarkingInfo(tr.DisplayCode, $"Trincheira (via rebaixada) – rebaixo {tr.Depth:0.0} m, contenção " + tr.Wall switch
+                {
+                    TipoContencaoTrincheira.CortinaAtirantada => "em cortina atirantada",
+                    TipoContencaoTrincheira.TerraArmada => "em terra armada",
+                    _ => "em muros de flexão",
+                }, GrupoMarca.Urbanizacao, "DNIT – Manual de Projeto de Interseções; NBR 5629 (tirantes), NBR 9286 (terra armada)", "m");
+            case RetainingWallDefinition mw:
+                return new MarkingInfo(mw.DisplayCode, "Muro de arrimo " + mw.Type switch
+                {
+                    TipoMuro.Gravidade => "de gravidade",
+                    TipoMuro.Contrafortes => "com contrafortes",
+                    TipoMuro.Gabiao => "em gabião",
+                    TipoMuro.TerraArmada => "em terra armada",
+                    TipoMuro.CortinaAtirantada => "– cortina atirantada",
+                    _ => "de flexão (concreto armado)",
+                } + " – área de face", GrupoMarca.Urbanizacao, "ABNT NBR 11682 (estabilidade de encostas), NBR 9286, NBR 5629", "m²");
+            case SlopeDefinition sl:
+                return new MarkingInfo(sl.DisplayCode, $"{sl.KindName} – {1:0} V : {sl.Ratio:0.0#} H, revestimento " + sl.Lining switch
+                {
+                    RevestimentoTalude.ConcretoProjetado => "em concreto projetado",
+                    RevestimentoTalude.Enrocamento => "em enrocamento",
+                    RevestimentoTalude.SoloExposto => "sem revestimento",
+                    _ => "vegetal (grama)",
+                }, GrupoMarca.Urbanizacao, "DNIT – Manual de Implantação Básica; NBR 11682", "m²");
+            case InterchangeDefinition ic:
+                return new MarkingInfo(ic.DisplayCode, "Interseção em desnível – " + ic.Type switch
+                {
+                    TipoNoViario.DiamanteRotatorias => "diamante com rotatórias",
+                    TipoNoViario.TrevoCompleto => "trevo completo",
+                    TipoNoViario.TrevoParcial => "trevo parcial (parclo)",
+                    TipoNoViario.Trombeta => "trombeta",
+                    TipoNoViario.RotatoriaElevada => "rotatória em dois níveis",
+                    _ => "diamante",
+                }, GrupoMarca.Urbanizacao, "DNIT – Manual de Projeto de Interseções (2005)", "un");
             case RailwayDefinition rw:
                 return new MarkingInfo(rw.DisplayCode, rw.Type switch
                 {

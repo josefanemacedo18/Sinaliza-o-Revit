@@ -88,6 +88,70 @@ public static class IconFactory
                 dc.DrawGeometry(null, P(White, 1.5), Close(taper));
                 dc.DrawLine(P(White, 1.5), new Point(3, 6), new Point(29, 6));
                 break;
+            case "bocadelobo":
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(2, 4, 28, 12));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(2, 16, 28, 14));
+                dc.DrawRectangle(B(Color.FromRgb(30, 30, 30)), null, new Rect(8, 14, 16, 3));
+                dc.DrawRectangle(B(Color.FromRgb(150, 150, 146)), null, new Rect(6, 11, 20, 3));
+                dc.DrawEllipse(B(Muted), P(White, 1), new Point(16, 7.5), 3.5, 2.2);
+                break;
+            case "grelha":
+                dc.DrawRectangle(B(Asphalt), null, new Rect(2, 2, 28, 28));
+                dc.DrawRectangle(B(Muted), P(White, 1.5), new Rect(6, 8, 20, 16));
+                for (int x = 9; x < 25; x += 3) dc.DrawLine(P(Color.FromRgb(30, 30, 30), 1.4), new Point(x, 10), new Point(x, 22));
+                break;
+            case "viaduto":
+            case "ponte":
+            case "passarela":
+            {
+                var water = key == "ponte";
+                if (water) dc.DrawRectangle(B(Color.FromRgb(86, 150, 196)), null, new Rect(1, 24, 30, 7));
+                dc.DrawRectangle(B(key == "passarela" ? Muted : Asphalt), null, new Rect(1, 9, 30, 4));
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(1, 13, 30, 3));
+                foreach (var x in new[] { 8.0, 22.0 }) dc.DrawRectangle(B(Color.FromRgb(160, 158, 152)), null, new Rect(x - 1.5, 16, 3, 14));
+                if (key == "ponte") dc.DrawGeometry(null, P(Muted, 2), Poly(new Point(2, 9), new Point(9, 3), new Point(16, 1.5), new Point(23, 3), new Point(30, 9)));
+                if (key == "passarela") for (int x = 3; x < 30; x += 6) dc.DrawLine(P(Muted, 1.2), new Point(x, 9), new Point(x + 3, 4));
+                if (key == "viaduto") dc.DrawLine(P(Yellow, 1), new Point(2, 11), new Point(30, 11));
+                break;
+            }
+            case "tunel":
+                dc.DrawRectangle(B(Color.FromRgb(120, 150, 90)), null, new Rect(1, 1, 30, 30));
+                dc.DrawGeometry(B(Color.FromRgb(188, 186, 180)), null, Close(Poly(new Point(4, 30), new Point(4, 14), new Point(9, 6), new Point(16, 4), new Point(23, 6), new Point(28, 14), new Point(28, 30))));
+                dc.DrawGeometry(B(Color.FromRgb(35, 35, 38)), null, Close(Poly(new Point(8, 30), new Point(8, 16), new Point(12, 10), new Point(16, 9), new Point(20, 10), new Point(24, 16), new Point(24, 30))));
+                dc.DrawLine(P(Yellow, 1.2), new Point(16, 22), new Point(16, 30));
+                break;
+            case "trincheira":
+                dc.DrawRectangle(B(Color.FromRgb(120, 150, 90)), null, new Rect(1, 1, 30, 12));
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(5, 8, 3, 22));
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(24, 8, 3, 22));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(8, 24, 16, 6));
+                dc.DrawLine(P(Muted, 1), new Point(5, 5), new Point(8, 5));
+                dc.DrawLine(P(Muted, 1), new Point(24, 5), new Point(27, 5));
+                break;
+            case "muro":
+                dc.DrawRectangle(B(Color.FromRgb(150, 118, 84)), null, new Rect(12, 6, 19, 24));
+                dc.DrawGeometry(B(Color.FromRgb(188, 186, 180)), null, Close(Poly(new Point(8, 4), new Point(13, 4), new Point(13, 26), new Point(20, 26), new Point(20, 30), new Point(4, 30), new Point(4, 26), new Point(8, 26))));
+                dc.DrawLine(P(Color.FromRgb(98, 158, 74), 2), new Point(1, 29), new Point(6, 29));
+                break;
+            case "talude":
+                dc.DrawGeometry(B(Color.FromRgb(98, 158, 74)), null, Close(Poly(new Point(1, 30), new Point(12, 18), new Point(17, 18), new Point(29, 5), new Point(31, 5), new Point(31, 30))));
+                dc.DrawLine(P(Color.FromRgb(188, 186, 180), 2), new Point(12, 18), new Point(17, 18));
+                dc.DrawLine(P(Color.FromRgb(188, 186, 180), 2), new Point(26, 5), new Point(31, 5));
+                break;
+            case "noviario":
+                dc.DrawRoundedRectangle(B(Color.FromRgb(120, 150, 90)), null, new Rect(1, 1, 30, 30), 4, 4);
+                dc.DrawLine(P(Asphalt, 5), new Point(1, 16), new Point(31, 16));
+                foreach (var (cx, cy) in new[] { (9.0, 8.0), (23.0, 8.0), (9.0, 24.0), (23.0, 24.0) })
+                    dc.DrawEllipse(null, P(Asphalt, 2), new Point(cx, cy), 5, 5);
+                dc.DrawLine(P(Color.FromRgb(90, 94, 102), 4), new Point(16, 1), new Point(16, 31));
+                dc.DrawLine(P(White, 1), new Point(13.5, 12), new Point(13.5, 20));
+                dc.DrawLine(P(White, 1), new Point(18.5, 12), new Point(18.5, 20));
+                break;
+            case "terraplenagem":
+                dc.DrawGeometry(B(Color.FromRgb(150, 118, 84)), null, Close(Poly(new Point(1, 30), new Point(1, 14), new Point(8, 10), new Point(12, 20), new Point(20, 20), new Point(24, 8), new Point(31, 12), new Point(31, 30))));
+                dc.DrawLine(P(Asphalt, 3), new Point(10, 20), new Point(22, 20));
+                dc.DrawGeometry(null, new Pen(B(Yellow), 1.2) { DashStyle = DashStyles.Dash }, Poly(new Point(1, 14), new Point(8, 10), new Point(15, 6), new Point(24, 8), new Point(31, 12)));
+                break;
             case "ferrovia":
                 RoadBackground(dc);
                 dc.DrawLine(P(White, 2), new Point(6, 6), new Point(26, 26));

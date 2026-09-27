@@ -92,27 +92,29 @@ public static partial class DetailGenerator
     /// Perfil transversal desenhado em escala ampliada: camadas cortadas preenchidas e contornadas, nome e nível de cada trecho,
     /// caimento da pista, cotas horizontais (larguras) e verticais (desníveis), eixo, legenda dos materiais e título.
     /// </summary>
-    private static void SectionProfile(MarkingGeometry geo, SectionDimensionDefinition sd, BuildContext ctx,
+    private static void SectionProfile(MarkingGeometry geo, SectionDimensionDefinition sd, SectionProfileDefinition pd, BuildContext ctx,
         IReadOnlyList<(MarkingDefinition Def, MarkingGeometry Geo)> withGeo, List<double> planStations, List<double> axes, Vec2 pos, string letter)
     {
         var a = sd.Start;
         var b = sd.End;
         var L = a.DistanceTo(b);
+        var firstAnnotation = geo.Annotations.Count;
+        var firstPiece = geo.Pieces.Count;
         var segs = ProfileSegments(a, b, withGeo);
         if (segs.Count == 0) { geo.Warnings.Add("Perfil transversal: nada cortado pela linha de seção."); return; }
 
-        var mag = ctx.ViewScale / Math.Max(1, sd.ProfileScale);
-        var vex = Math.Clamp(sd.VerticalExaggeration, 1, 10);
+        var mag = ctx.ViewScale / Math.Max(1, pd.ProfileScale);
+        var vex = Math.Clamp(pd.VerticalExaggeration, 1, 10);
         var vmag = mag * vex;
         var paintMin = ctx.Mm(0.35) / vmag;           // pintura: faixa fina visível no papel
         var zMax = segs.Max(x => x.Paint ? x.Z1 + paintMin : x.Z1);
         var zMin = Math.Min(segs.Min(x => x.Z0), 0);
-        var tMm = sd.TextMm;
-        var fmt = sd.Decimals <= 0 ? "0" : "0." + new string('0', Math.Clamp(sd.Decimals, 0, 3));
+        var tMm = pd.TextMm;
+        var fmt = pd.Decimals <= 0 ? "0" : "0." + new string('0', Math.Clamp(pd.Decimals, 0, 3));
 
         // Faixa superior de textos (nomes e níveis) e origem do desenho.
         var nameBand = ctx.Mm(tMm * 0.8 * 2.6 + 3);
-        var levelBand = sd.ProfileLevels ? ctx.Mm(tMm * 0.75 * 1.6 + 2) : 0;
+        var levelBand = pd.ProfileLevels ? ctx.Mm(tMm * 0.75 * 1.6 + 2) : 0;
         var x0 = pos.X + ctx.Mm(6);
         var yTop = pos.Y - ctx.Mm(4) - nameBand - levelBand;
         double X(double s) => x0 + s * mag;
@@ -167,7 +169,7 @@ public static partial class DetailGenerator
                     if (lineTop - surf > ctx.Mm(1)) geo.Annotations.Add(new AnnotationLine(new[] { new Vec2(X(mid), lineTop), new Vec2(X(mid), surf) }, MarkingColor.Preta));
                 }
             }
-            if (sd.ProfileLevels && (lastLevel == null || Math.Abs(lastLevel.Value - top.Value) > 0.005))
+            if (pd.ProfileLevels && (lastLevel == null || Math.Abs(lastLevel.Value - top.Value) > 0.005))
             {
                 var lt = Level(top.Value);
                 var lm = tMm * 0.75;
@@ -182,7 +184,7 @@ public static partial class DetailGenerator
                 }
             }
             // Caimento transversal da pista, para fora do eixo mais próximo.
-            if (sd.CrossSlopePct > 0 && name is "Faixa de rolamento" or "Pista" && w > ctx.Mm(14))
+            if (pd.CrossSlopePct > 0 && name is "Faixa de rolamento" or "Pista" && w > ctx.Mm(14))
             {
                 var ax = axes.Count > 0 ? axes.OrderBy(x => Math.Abs(x - mid)).First() : L / 2;
                 var dir = mid >= ax ? 1.0 : -1.0;
@@ -193,12 +195,12 @@ public static partial class DetailGenerator
                 geo.Annotations.Add(new AnnotationLine(new[] { from, to }, MarkingColor.Preta));
                 var ah = ctx.Mm(1.1);
                 geo.Pieces.Add(new MarkingPiece(new Polygon2(new[] { to, to + new Vec2(-dir * ah * 1.6, ah * 0.5), to + new Vec2(-dir * ah * 1.6, -ah * 0.5) }), MarkingColor.Preta));
-                geo.Annotations.Add(new AnnotationText(new Vec2(X(mid), y + ctx.Mm(tMm * 0.75 + 0.6)), $"i = {sd.CrossSlopePct.ToString("0.0", Pt)} %", tMm * 0.75));
+                geo.Annotations.Add(new AnnotationText(new Vec2(X(mid), y + ctx.Mm(tMm * 0.75 + 0.6)), $"i = {pd.CrossSlopePct.ToString("0.0", Pt)} %", tMm * 0.75));
             }
         }
 
         // Cotas verticais dos desníveis (degraus de meio-fio, plataformas, canteiros).
-        if (sd.ProfileHeights)
+        if (pd.ProfileHeights)
             for (int i = 1; i + 1 < stations.Count; i++)
             {
                 var s = stations[i];
@@ -209,7 +211,7 @@ public static partial class DetailGenerator
                 var high = Math.Max(left.Value, right.Value);
                 var towardLow = left.Value < right.Value ? -1.0 : 1.0;   // a cota fica sobre o lado mais baixo
                 Dimension(geo, ctx, P(s, low), P(s, high), new Vec2(towardLow, 0), ctx.Mm(3.5), (high - low).ToString("0.00", Pt), tMm * 0.8,
-                    terminal: sd.Terminal);
+                    terminal: pd.Terminal);
             }
 
         // Cotas horizontais (larguras) sob o perfil e total.
@@ -223,12 +225,12 @@ public static partial class DetailGenerator
             var fits = TextWidth(text, tMm, ctx) < len * mag * 0.9;
             stagger = !fits && !stagger;
             Dimension(geo, ctx, new Vec2(X(planStations[i]), dimY), new Vec2(X(planStations[i + 1]), dimY), new Vec2(0, -1), off, text, tMm,
-                fits || !stagger ? 0 : tMm * 1.4, terminal: sd.Terminal);
+                fits || !stagger ? 0 : tMm * 1.4, terminal: pd.Terminal);
         }
         var totalOff = off + ctx.Mm(tMm * 3.2 + 2);
         if (planStations.Count > 2)
             Dimension(geo, ctx, new Vec2(X(planStations[0]), dimY), new Vec2(X(planStations[^1]), dimY), new Vec2(0, -1), totalOff,
-                (planStations[^1] - planStations[0]).ToString(fmt, Pt), tMm, terminal: sd.Terminal);
+                (planStations[^1] - planStations[0]).ToString(fmt, Pt), tMm, terminal: pd.Terminal);
         var bottom = dimY - totalOff - ctx.Mm(tMm + 3);
 
         // Eixo da via (traço-ponto) atravessando o perfil.
@@ -240,8 +242,8 @@ public static partial class DetailGenerator
 
         // Título e escala.
         var title = letter.Length > 0 ? $"SEÇÃO TRANSVERSAL {letter}–{letter}" : "SEÇÃO TRANSVERSAL";
-        var scale = vex > 1.001 ? $"ESCALA H 1:{sd.ProfileScale:0} – V 1:{sd.ProfileScale / vex:0.#} (EXAGERO VERTICAL {vex:0.#}×) – COTAS EM METROS"
-                                : $"ESCALA 1:{sd.ProfileScale:0} – COTAS E NÍVEIS EM METROS";
+        var scale = vex > 1.001 ? $"ESCALA H 1:{pd.ProfileScale:0} – V 1:{pd.ProfileScale / vex:0.#} (EXAGERO VERTICAL {vex:0.#}×) – COTAS EM METROS"
+                                : $"ESCALA 1:{pd.ProfileScale:0} – COTAS E NÍVEIS EM METROS";
         var titleMm = tMm * 1.5;
         var ty = bottom - ctx.Mm(3);
         geo.Annotations.Add(new AnnotationText(new Vec2(X(L / 2), ty), title, titleMm));
@@ -251,7 +253,7 @@ public static partial class DetailGenerator
         geo.Annotations.Add(new AnnotationText(new Vec2(X(L / 2), uy - ctx.Mm(1.2)), scale, tMm * 0.75));
 
         // Legenda dos materiais cortados (amostra + nome + espessura).
-        if (sd.ProfileLegend)
+        if (pd.ProfileLegend)
         {
             var layers = segs.Where(x => !x.Paint || segs.All(y => y.Paint)).GroupBy(LayerName)
                 .Select(g => (Name: g.Key, g.First().Color, Thick: g.Max(x => x.Z1 - x.Z0))).ToList();
@@ -269,6 +271,18 @@ public static partial class DetailGenerator
                 var label = thick > 0.004 && !MarkingColors.IsPaint(color) ? $"{nm} (e = {(thick * 100).ToString("0.#", Pt)} cm)" : nm;
                 geo.Annotations.Add(new AnnotationText(new Vec2(lx + ctx.Mm(8), ly - ctx.Mm(0.2)), label, lm, TextAlign.Left));
                 ly -= ctx.Mm(4.4);
+            }
+        }
+        if (pd.FrameBox)
+        {
+            var pts = geo.Annotations.Skip(firstAnnotation).OfType<AnnotationLine>().SelectMany(l => l.Points)
+                .Concat(geo.Pieces.Skip(firstPiece).SelectMany(p => p.Shape.Outer)).ToList();
+            if (pts.Count > 0)
+            {
+                var pad = ctx.Mm(4);
+                var mn = new Vec2(pts.Min(p => p.X) - pad, pts.Min(p => p.Y) - pad - ctx.Mm(tMm * 2));
+                var mx = new Vec2(pts.Max(p => p.X) + pad, pos.Y);
+                Frame(geo, mn, mx);
             }
         }
         if (vex > 1.001) geo.Warnings.Add($"Perfil com exagero vertical de {vex:0.#}× (as alturas estão ampliadas em relação às larguras).");

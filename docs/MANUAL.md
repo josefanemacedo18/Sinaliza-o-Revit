@@ -18,6 +18,7 @@ Convenções usadas em todo o plugin:
 | **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Orelha · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
 | **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (piso tátil · ciclovia · quebra-mola · cruzamento rodoferroviário) |
 | **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive **tachas e tachões** e guard rail) |
+| **Infraestrutura** | **Drenagem** (boca de lobo / PV · grelha) · **Obras de Arte** (viaduto · ponte · passarela · túnel · trincheira) · **Contenções** (muro de arrimo · talude) · **Nó Viário** · **Terraplenagem** |
 | **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
 | **Editar** | Editar · Atualizar Todas · Selecionar Conjunto · Alternar 2D/3D · Configurações · Catálogo · Normas |
 
@@ -581,8 +582,12 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   clicando os vértices (ESC termina) – ou só redesenhe a linha, mude a **ponta** da chamada (para
   apontar para a face da placa, o poste etc.) ou volte à chamada automática. Tudo fica relativo ao
   suporte: movendo a placa, o detalhe acompanha.
-* **Cotar Seção – perfil transversal** (rodada G): **um clique sobre a via** gera o corte perpendicular ao eixo, de
-  alinhamento a alinhamento (ou *Dois pontos livres*); depois clique onde desenhar o **PERFIL TRANSVERSAL**. O perfil
+* **Cotar Seção – perfil transversal**: **um clique sobre a via** gera o corte perpendicular ao eixo, de
+  alinhamento a alinhamento (ou *Dois pontos livres*). A **seção em planta é criada primeiro**; só **depois** o plugin pede o
+  clique onde colocar o **PERFIL TRANSVERSAL** (ESC = sem perfil). O perfil é um **detalhe separado e agrupado** (grupo de
+  detalhes do Revit *SV - Perfil transversal A-A*): selecione e mova tudo junto – a nova posição é mantida nas próximas
+  atualizações. Editar o perfil muda escala, exagero vertical, caimento, níveis, cotas, legenda e moldura; apagar a cota
+  apaga o perfil. O perfil
   é o corte do próprio modelo: pavimento, sarjetas, meios-fios, calçadas, faixas gramadas, canteiros, plataformas,
   dispositivos e pintura, cada camada **preenchida com o seu material e contornada**, na escala escolhida (1:50 por
   padrão, com **exagero vertical** opcional), com **nome de cada trecho** e chamada, **níveis** (▽ +0,15 / ±0,00),
@@ -927,7 +932,75 @@ quantitativo a via entra em *Pavimentação e geometria viária*, em metros de v
 novos: **Brita (lastro)** e **Sublastro**. Referências: ABNT NBR 7641, NBR 7590, NBR 11709 e NBR 5564. Para a
 sinalização da passagem em nível use o **Cruzamento Rodoferroviário** (seção 23).
 
-## 24. O que foi aplicado dos manuais
+## 24. Infraestrutura – drenagem, obras de arte, contenções e nós viários
+
+Painel **Infraestrutura**. Todas as obras são paramétricas, editáveis (Editar), regeneradas quando o eixo muda e entram no
+quantitativo (categorias *9. Drenagem* e *10. Obras de arte, contenções e terraplenagem*). As peças são sólidos 3D
+(formas diretas) com materiais próprios: concreto, aço, asfalto, brita, solo compactado, grama e água.
+
+### 24.1 Drenagem
+* **Boca de Lobo / PV**: boca de lobo **simples** (guia chapéu), **dupla**, **com grelha**, **combinada** e **poço de
+  visita**. Clique junto ao **meio-fio** de uma via: o dispositivo se alinha à guia, com a **caixa de captação** (paredes,
+  fundo, laje e tampão) sob a calçada ou sob a sarjeta, o **rebaixo da sarjeta** com transições e o **tubo de ligação**.
+  Longe de vias, clique o ponto e a direção. Módulos lado a lado (bocas triplas).
+* **Grelha de Drenagem**: grelha de sarjeta e grelha quadrada de piso com caixa, e **canaleta com grelha contínua** ao
+  longo de linhas. Barras **transversais** (seguras para ciclistas), longitudinais ou diagonais; ferro fundido
+  (NBR 10160), aço ou concreto; caixilho, vão entre barras e todas as medidas editáveis.
+* Referências: DNIT 030/2004-ES, ABNT NBR 10160, diretrizes de drenagem da PMSP.
+
+### 24.2 Viaduto, ponte e passarela
+Desenhe o **eixo de ponta a ponta**. O greide sobe pela **rampa máxima** (com curvas verticais) até a altura do tabuleiro;
+onde o aterro passaria de 6 m começa a estrutura. Gera: **rampas de acesso em aterro** (taludes ou **terra armada**),
+**encontros** com alas, **pilares** (pórtico, circular, duplo, parede, martelo) sobre blocos, **aparelhos de apoio**,
+superestrutura em **vigas pré-moldadas**, **viga caixão**, **laje maciça**, **arco inferior**, **arco superior atirantado**
+(pendurais e contraventamento), **estaiada** (mastro em H e estais em leque) ou **treliça metálica**, tabuleiro, pavimento,
+**passeios**, **barreiras New Jersey** e/ou **guarda-corpos**, **juntas de dilatação**, **iluminação** e **faixas pintadas**.
+Ponte: **lâmina d'água** opcional. Passarela: treliça coberta, rampas ≤ 8,33 % (NBR 9050). Pilares descem até o terreno.
+Quantitativo em m² de tabuleiro. Referências: NBR 7188/7187, DNIT (gabarito 5,50 m).
+
+### 24.3 Túnel e trincheira
+* **Túnel** em **ferradura** (NATM), **circular** (TBM) ou **retangular** (vala coberta): revestimento, arco invertido/laje,
+  pavimento, **passeios de serviço**, **iluminação** contínua, **ventiladores de jato** e **emboques** em parede de testa,
+  **bisel** ou **pala**. Gabarito vertical garantido. As trincheiras de acesso diante dos emboques são terraplenadas; o plugin
+  tenta **escavar o Toposolid** com o túnel (Revit 2025+: *Toposolid → Escavar*), quando o Revit aceita o elemento.
+* **Trincheira**: via rebaixada que desce pela rampa máxima até o rebaixo e sobe no fim, entre **muros de flexão**,
+  **cortina atirantada** (cabeças de tirantes) ou **terra armada** (placas), com **guarda-corpo** no topo, canaletas ao pé,
+  iluminação e **laje de travessia** para a via transversal. O terreno entre os muros é escavado.
+
+### 24.4 Muro de arrimo e talude
+* **Muro de arrimo**: **flexão** (parede + sapata com ponta e talão), **gravidade**, **contrafortes**, **gabião** em
+  degraus, **terra armada** (placas desencontradas + maciço reforçado) e **cortina atirantada**. Altura variável (início/fim),
+  ficha, coroamento, **barbacãs** a cada 2 m, guarda-corpo. A base acompanha o terreno e o **reaterro** atrás do muro é
+  levado até o topo no Toposolid. Medido em m² de face.
+* **Talude** de **corte** ou **aterro**: inclinação H:V, **bermas** a cada *n* metros de altura, **canaletas** de crista, de pé
+  e das bermas, **descidas d'água em degraus** e revestimento (grama, concreto projetado, enrocamento ou solo). A face do
+  talude é aplicada ao Toposolid e concordada com o terreno no pé e na crista.
+
+### 24.5 Nó viário (interseção em desnível)
+**Diamante**, **diamante com rotatórias**, **trevo completo**, **trevo parcial (parclo)**, **trombeta** e **rotatória em dois
+níveis**. Clique o **centro** – sobre o cruzamento de duas vias do plugin, a direção e o ângulo vêm dos eixos (a mais larga é a
+principal) – ou um ponto livre e a direção. Gera a via principal em pista dupla (barreira central, iluminação), a transversal
+em viaduto, rampas e **laços** com greide (rampa máxima, curvas verticais), rotatórias com ilhas gramadas, aterros com
+taludes, barreiras e faixas. **Onde um ramo passa sobre outro vira ponte automaticamente** (tabuleiro, vigas, pilares,
+encontros). Gabarito vertical, largura das rampas, raio dos laços (≈ 50 m – 40 km/h), distância dos terminais e extensões
+são editáveis; as extensões crescem sozinhas quando as rampas não cabem. Referência: DNIT – Manual de Projeto de
+Interseções.
+
+### 24.6 Terraplenagem e topografia (Massa e terreno)
+* **Terraplenagem** ajusta o **Toposolid** nativo às **vias, interseções, rotatórias, cul-de-sacs e obras**: as vias e
+  conexões continuam **planas no seu nível** (estáveis como sempre) e o terreno se ajusta a elas – plataforma sob a
+  estrutura do pavimento, **taludes de corte e aterro** (H:V configuráveis) até encontrar o terreno natural, reaterro de muros,
+  faces de taludes, escavação de trincheiras e emboques. Os pontos do Toposolid dentro da área de projeto são substituídos
+  pela superfície de projeto (*Modificar subelementos* do Toposolid). A mensagem final traz a **área terraplenada** e os
+  **volumes de corte e aterro**. Use **Desfazer** para voltar ao terreno anterior.
+* As obras com **"Ajustar o Toposolid ao criar"** marcado fazem isso sozinhas ao criar/editar; com **"Acompanhar o terreno
+  natural"**, pilares descem até o chão, muros e taludes apoiam-se no terreno e as rampas de acesso começam na cota do
+  terreno. O **terreno natural de referência fica guardado** na obra na primeira geração: depois da terraplenagem o projeto não
+  "afunda" ao ser regenerado.
+* Precisa de um **Toposolid** (Massa e terreno → Toposolid; uma topografia antiga pode ser convertida). Sem Toposolid, as
+  obras são geradas sobre o plano da base.
+
+## 25. O que foi aplicado dos manuais
 
 O plugin incorporou regras dos manuais estudados (DER-SP Vol. I – Projeto, 2023; MBST Vol. I, II, III, IV, VI, IX;
 CET-SP Vol. 10/11/13, Medidas Moderadoras e Dispositivos Delimitadores). O resumo do estudo, com o que cada

@@ -104,7 +104,7 @@ public sealed class CmdEditar : CommandBase
             Report("Cul-de-sac", IntersectionRunner.Run(uidoc, "SV - Editar cul-de-sac", s => s.Refresh(linked)).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;
         }
-        if ((SidewalkForms.ForEdit(stored.Definition) ?? DetailForms.ForEdit(uidoc, stored.Definition)) is { } form)
+        if ((SidewalkForms.ForEdit(stored.Definition) ?? InfraForms.ForEdit(stored.Definition) ?? DetailForms.ForEdit(uidoc, stored.Definition)) is { } form)
         {
             if (UiHelpers.ShowModal(form.Window) != true) return Result.Cancelled;
             var def = form.Working;
@@ -112,6 +112,7 @@ public sealed class CmdEditar : CommandBase
             EnsureDetailView(uidoc, def.Output, keepExistingView: true);
             var r = MarkingCreator.Commit(uidoc, new[] { def }, $"SV - Editar {def.DisplayCode}");
             FootprintCutter.ApplyFor(uidoc, def);
+            TerrainActions.AfterCreate(uidoc, def);
             Report("Edição", r);
             return Result.Succeeded;
         }

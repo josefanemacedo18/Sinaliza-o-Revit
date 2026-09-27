@@ -45,8 +45,10 @@ public static class PluginContext
     public static BuildContext BuildContext(bool drape, double viewScale = 100,
         Func<string, MarkingDefinition?>? lookup = null, Func<IReadOnlyList<MarkingDefinition>>? all = null,
         Func<MarkingDefinition, SinalizacaoViaria.Core.Model.MarkingGeometry?>? geometryOf = null,
-        Func<MarkingDefinition, SinalizacaoViaria.Core.Geometry.Polyline2?>? pathOf = null) => new()
+        Func<MarkingDefinition, SinalizacaoViaria.Core.Geometry.Polyline2?>? pathOf = null,
+        Func<SinalizacaoViaria.Core.Geometry.Vec2, double?>? ground = null) => new()
     {
+        Ground = ground,
         Catalog = Catalog,
         Glyphs = Glyphs,
         MaxPieceLength = 0,

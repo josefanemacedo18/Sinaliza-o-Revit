@@ -127,9 +127,14 @@ public sealed class MarkingService
     /// <summary>Gera a geometria (sem tocar no modelo) – usado também em quantitativos e prévias.</summary>
     public MarkingGeometry BuildGeometry(MarkingDefinition def, out double baseZ, List<string>? warnings = null, View? view = null)
     {
+        // Obras que acompanham a topografia leem o terreno natural (Toposolid) relativo à base da marca.
+        var groundBase = def.Path == null ? def.PointZ ?? 0 : PathResolver.Resolve(_doc, def.Path)?.Z ?? 0;
+        Func<Vec2, double?>? ground = null;
+        if (def is ITerrainAware { FollowTerrain: true } ta && (ta.GroundLine == null || ta.GroundLine.Count < 2 || def is InterchangeDefinition))
+            ground = TerrainFunction(groundBase);
         var ctx = PluginContext.BuildContext(def.Output.Drape && def.Output.Mode == OutputMode.Modelo3D,
             view?.Scale ?? 100, id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList(), OtherGeometry,
-            d => PathResolver.Resolve(_doc, d.Path)?.Main);
+            d => PathResolver.Resolve(_doc, d.Path)?.Main, ground);
         if (def.Path == null)
         {
             baseZ = def.PointZ ?? 0;
@@ -159,6 +164,23 @@ public sealed class MarkingService
         foreach (var chain in path.Chains)
             geo.Merge(MarkingBuilder.Build(def, chain, ctx));
         return geo;
+    }
+
+    /// <summary>Cota do terreno (Toposolid/topografia, m) relativa a <paramref name="baseZ"/>; nulo sem terreno ou sem vista 3D.</summary>
+    private Func<Vec2, double?>? TerrainFunction(double baseZ)
+    {
+        try
+        {
+            var sampler = new SurfaceSampler(_doc, Array.Empty<string>(), _interactive, terrainOnly: true);
+            if (!sampler.IsAvailable) return null;
+            var hint = UnitConv.Ft(baseZ);
+            return p => sampler.TrySample(UnitConv.Ft(p.X), UnitConv.Ft(p.Y), hint, out var z, out _) ? UnitConv.M(z) - baseZ : null;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Terreno natural", ex);
+            return null;
+        }
     }
 
     // ------------------------------------------------------------------ criação / regeneração
@@ -202,11 +224,17 @@ public sealed class MarkingService
             }
         }
 
+        // Detalhe movido à mão (ou o grupo dele): a nova posição passa a valer antes de regenerar.
+        if (def is IPlacedAnnotation placed) FollowManualMove(def, placed, existing);
+        // Grupo de detalhes: desfeito para trocar os elementos e refeito no fim.
+        if (def is IGroupedAnnotation) Ungroup(existing);
+
         MarkingGeometry geo;
         double baseZ;
         try
         {
             geo = BuildGeometry(def, out baseZ, result.Warnings, view);
+            if (def is IPlacedAnnotation pa && LinesAnchor(geo) is { } anchor) pa.DrawnAnchor = anchor;
         }
         catch (Exception ex)
         {
@@ -415,8 +443,80 @@ public sealed class MarkingService
         foreach (var old in existing.Where(r => !keep.Contains(r.Element.Id)))
             SafeDelete(old.Element.Id);
 
+        if (def is IGroupedAnnotation grouped && keep.Count > 1) MakeGroup(keep, grouped.GroupName, result);
+
         result.Elements.AddRange(keep);
         return result;
+    }
+
+    /// <summary>Canto inferior esquerdo das linhas de detalhe da geometria (m).</summary>
+    private static Vec2? LinesAnchor(MarkingGeometry geo)
+    {
+        var pts = geo.Annotations.OfType<AnnotationLine>().SelectMany(l => l.Points).ToList();
+        return pts.Count == 0 ? null : new Vec2(pts.Min(p => p.X), pts.Min(p => p.Y));
+    }
+
+    /// <summary>Compara as linhas de detalhe existentes com a última geração: se foram movidas, desloca o detalhe junto.</summary>
+    private static void FollowManualMove(MarkingDefinition def, IPlacedAnnotation placed, List<StoredMarking> existing)
+    {
+        if (placed.DrawnAnchor is not { } drawn) return;
+        double minX = double.MaxValue, minY = double.MaxValue;
+        var any = false;
+        foreach (var r in existing)
+        {
+            if (r.Element is not CurveElement { ViewSpecific: true } ce) continue;
+            Curve? c;
+            try { c = ce.GeometryCurve; } catch { continue; }
+            if (c == null || !c.IsBound) continue;
+            foreach (var p in new[] { c.GetEndPoint(0), c.GetEndPoint(1) })
+            {
+                minX = Math.Min(minX, UnitConv.M(p.X));
+                minY = Math.Min(minY, UnitConv.M(p.Y));
+                any = true;
+            }
+        }
+        if (!any) return;
+        var delta = new Vec2(minX - drawn.X, minY - drawn.Y);
+        if (delta.Length < 0.001) return;
+        def.Translate(delta, 0);
+        placed.DrawnAnchor = drawn + delta;
+    }
+
+    private void Ungroup(IEnumerable<StoredMarking> existing)
+    {
+        foreach (var gid in existing.Select(r => r.Element.GroupId).Where(id => id != ElementId.InvalidElementId).Distinct().ToList())
+        {
+            try
+            {
+                if (_doc.GetElement(gid) is not Group g) continue;
+                var typeId = g.GetTypeId();
+                g.UngroupMembers();
+                // Tipo de grupo sem outras instâncias: removido para não acumular tipos no projeto.
+                var others = new FilteredElementCollector(_doc).OfClass(typeof(Group)).Any(x => x.GetTypeId() == typeId);
+                if (!others) SafeDelete(typeId);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Desagrupar detalhe", ex);
+            }
+        }
+    }
+
+    private void MakeGroup(ICollection<ElementId> ids, string name, RenderResult result)
+    {
+        try
+        {
+            var group = _doc.Create.NewGroup(ids);
+            var names = new FilteredElementCollector(_doc).OfClass(typeof(GroupType)).Select(t => t.Name).ToHashSet();
+            var unique = name;
+            for (int i = 2; names.Contains(unique); i++) unique = $"{name} ({i})";
+            try { group.GroupType.Name = unique; } catch { /* nome é opcional */ }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Agrupar detalhe", ex);
+            result.Warnings.Add($"Os elementos do detalhe não puderam ser agrupados ({ex.Message}) – use Selecionar Conjunto para movê-los juntos.");
+        }
     }
 
     /// <summary>Remove recortes cuja marca de origem (ex.: rampa) não existe mais.</summary>
