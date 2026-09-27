@@ -323,7 +323,7 @@ public sealed class CmdAtualizarTodas : CommandBase
             t.Commit();
         }
         // Marcas sobrepostas (faixas de pedestres, zebrados) e lombadas invertidas refazem os recortes.
-        foreach (var d in MarkingStorage.Definitions(doc).Where(d => d.Overlay || d is TrafficCalmingDefinition { Type: TipoModeracao.LombadaInvertida }))
+        foreach (var d in MarkingStorage.Definitions(doc).Where(d => d.Overlay || d is TrafficCalmingDefinition { Type: TipoModeracao.LombadaInvertida } or DrainageDefinition { CutFloors: true }))
         {
             try { FootprintCutter.ApplyFor(uidoc, d); }
             catch (Exception ex) { Log.Error("Recortes de sobreposição", ex); }

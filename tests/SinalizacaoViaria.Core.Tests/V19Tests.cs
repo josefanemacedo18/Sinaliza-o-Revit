@@ -49,7 +49,9 @@ public class V19Tests
         var curved = new MarkingGeometry();
         var arc = new Polyline2(CurveTools.Arc(Vec2.Zero, 50, 0, Math.PI / 2, 0.05));
         SolidSweep.Along(curved, arc, _ => SolidSweep.Rect(-2, 2, 0, 1), MarkingColor.Concreto, 0, double.NaN, 4);
-        Assert.True(curved.Pieces.Count > 5);
+        // Curva: um sólido só (casca fechada, sem emendas internas) com as faces laterais de cada trecho.
+        Assert.Single(curved.Pieces);
+        Assert.True(curved.Pieces[0].Solid!.Faces.Count > 5 * 4);
     }
 
     // ------------------------------------------------------------------ terraplenagem
@@ -221,7 +223,7 @@ public class V19Tests
         var g = MarkingBuilder.Build(d, Straight(400), Ctx);
         Assert.Empty(g.Warnings);
         var road = g.Pieces.Where(p => p.Layer == "PISTA").ToList();
-        Assert.InRange(road.Min(p => p.Solid!.MaxZ), -6.6, -6.4);
+        Assert.InRange(road.SelectMany(p => p.Solid!.Faces.SelectMany(f => f)).Min(v => v.Z), -6.7, -6.4);
         Assert.Contains(g.Pieces, p => p.Layer == "MURO");
         Assert.Contains(g.Pieces, p => p.Layer == "LAJE");
         Assert.Contains(g.Corridors, c => !c.DaylightLeft && !c.DaylightRight);   // muros contêm o terreno

@@ -177,6 +177,18 @@ public sealed class MarkingUpdater : IUpdater
             .Select(r => r.Element.Id).ToList();
         foreach (var id in orphans)
             try { doc.Delete(id); } catch { /* já removido */ }
+        // Recortes de uma marca apagada (boca de lobo, grelha, rampa...): o piso/meio-fio/calçada volta a ser contínuo.
+        var stale = all.Select(r => r.Definition).GroupBy(d => d.Id).Select(g => g.First())
+            .Where(d => d.Exclusions.Any(z => !string.IsNullOrEmpty(z.SourceId) && !z.SourceId!.Contains(':') && !ids.Contains(z.SourceId!)))
+            .ToList();
+        if (stale.Count == 0) return;
+        var service = new MarkingService(doc, null, interactive: false);
+        foreach (var d in stale)
+        {
+            d.Exclusions.RemoveAll(z => !string.IsNullOrEmpty(z.SourceId) && !z.SourceId!.Contains(':') && !ids.Contains(z.SourceId!));
+            try { service.Render(d); }
+            catch (Exception ex) { Log.Error($"Recortes órfãos {d.DisplayCode}", ex); }
+        }
     }
 
     public UpdaterId GetUpdaterId() => _id;

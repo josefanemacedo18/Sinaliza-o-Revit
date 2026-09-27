@@ -584,6 +584,7 @@ public sealed class MarkingService
                     var z = zBaseFt;
                     var c = piece.Shape.Centroid;
                     if (draped && sampler!.TrySample(UnitConv.Ft(c.X), UnitConv.Ft(c.Y), zBaseFt, out var sz, out _)) z = sz + above;
+                    if (piece.Round is { } round && RoundGeometry(round, z + lift, options) is { } exact) { res.Add(exact); continue; }
                     if (piece.Solid is { } poly) res.AddRange(PolyhedronGeometry(poly, z + lift, materialId));
                     else res.Add(ProfileSolidGeometry(piece.Profile!, z + lift, options));
                     continue;
@@ -685,6 +686,56 @@ public sealed class MarkingService
         foreach (var h in halves.Where(h => h.Area > 1e-4))
             foreach (var part in DrapedParts(h, s, zHintFt, depth + 1))
                 yield return part;
+    }
+
+    /// <summary>
+    /// Sólido de revolução com superfície curva exata: cilindro (extrusão de círculo), tronco de cone (transição entre dois
+    /// círculos) ou anel/tubo com raio interno (revolução). Nulo se o Revit recusar – a peça cai na aproximação poliédrica.
+    /// </summary>
+    private static Solid? RoundGeometry(RoundSolid r, double zBaseFt, SolidOptions options)
+    {
+        try
+        {
+            XYZ P(Vec3 v) => new XYZ(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), zBaseFt + UnitConv.Ft(v.Z));
+            var a = P(r.A);
+            var b = P(r.B);
+            var axis = b - a;
+            var len = axis.GetLength();
+            if (len < 0.005) return null;
+            var dz = axis.Normalize();
+            var refv = Math.Abs(dz.Z) > 0.95 ? XYZ.BasisX : XYZ.BasisZ;
+            var ux = dz.CrossProduct(refv).Normalize();
+            var uy = dz.CrossProduct(ux).Normalize();
+            double ra = UnitConv.Ft(r.RA), rb = UnitConv.Ft(r.RB), ia = UnitConv.Ft(r.InnerA), ib = UnitConv.Ft(r.InnerB);
+            CurveLoop Circle(XYZ c, double rad)
+            {
+                var plane = Plane.CreateByOriginAndBasis(c, ux, uy);
+                var loop = new CurveLoop();
+                loop.Append(Arc.Create(plane, rad, 0, Math.PI));
+                loop.Append(Arc.Create(plane, rad, Math.PI, 2 * Math.PI));
+                return loop;
+            }
+            var hollow = ia > 0.003 || ib > 0.003;
+            if (Math.Abs(ra - rb) < 1e-6 && (!hollow || Math.Abs(ia - ib) < 1e-6))
+            {
+                var loops = new List<CurveLoop> { Circle(a, ra) };
+                if (hollow && ia < ra - 0.003) loops.Add(Circle(a, ia));
+                return GeometryCreationUtilities.CreateExtrusionGeometry(loops, dz, len, options);
+            }
+            if (!hollow)
+                return GeometryCreationUtilities.CreateLoftGeometry(new List<CurveLoop> { Circle(a, Math.Max(0.003, ra)), Circle(b, Math.Max(0.003, rb)) }, options);
+            // Anel cônico (paredes de poço, cones de redução): revolução de um trapézio fora do eixo.
+            XYZ Q(double x, double z) => a + ux * x + dz * z;
+            var pts = new[] { Q(Math.Max(0.003, ia), 0), Q(ra, 0), Q(rb, len), Q(Math.Max(0.003, ib), len) };
+            var profile = new CurveLoop();
+            for (int i = 0; i < pts.Length; i++) profile.Append(Line.CreateBound(pts[i], pts[(i + 1) % pts.Length]));
+            return GeometryCreationUtilities.CreateRevolvedGeometry(new Frame(a, ux, uy, dz), new List<CurveLoop> { profile }, 0, 2 * Math.PI, options);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("RoundGeometry", ex);
+            return null;
+        }
     }
 
     /// <summary>Poliedro (rampas, abas) via TessellatedShapeBuilder – sólido quando possível, senão malha.</summary>

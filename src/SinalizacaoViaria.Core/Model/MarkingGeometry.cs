@@ -28,7 +28,19 @@ public sealed record MarkingPiece(Polygon2 Shape, MarkingColor Color)
     /// separados no Revit (o meio-fio não se funde ao passeio).
     /// </summary>
     public string? Layer { get; init; }
+
+    /// <summary>
+    /// Sólido de revolução exato (cilindro, tronco de cone, anel) – no Revit vira superfície curva de verdade, sem facetas;
+    /// <see cref="Solid"/> guarda a aproximação poliédrica (prévias, quantitativos e plano B se o Revit recusar).
+    /// </summary>
+    public RoundSolid? Round { get; init; }
 }
+
+/// <summary>
+/// Sólido de revolução entre os pontos <see cref="A"/> e <see cref="B"/> (eixo qualquer): raio externo <see cref="RA"/> em A e
+/// <see cref="RB"/> em B; raio interno opcional (tubos, anéis, câmaras de poço de visita).
+/// </summary>
+public sealed record RoundSolid(Vec3 A, Vec3 B, double RA, double RB, double InnerA = 0, double InnerB = 0);
 
 public readonly record struct Vec3(double X, double Y, double Z)
 {
@@ -48,6 +60,33 @@ public readonly record struct Vec3(double X, double Y, double Z)
 public sealed class Polyhedron
 {
     public List<List<Vec3>> Faces { get; }
+
+    /// <summary>Projeção em planta informada por quem montou o sólido (varreduras em curva não são convexas).</summary>
+    public Polygon2? Plan { get; init; }
+
+    /// <summary>
+    /// Casca fechada com a orientação dada pelo construtor (faces vizinhas percorrem a aresta comum em sentidos opostos):
+    /// só é invertida por inteiro se o volume sair negativo. Serve para sólidos não convexos (varreduras em curva, perfis
+    /// em "I", barreiras).
+    /// </summary>
+    public static Polyhedron Shell(IEnumerable<IEnumerable<Vec3>> faces, Polygon2? plan = null)
+    {
+        var list = faces.Select(f => f.ToList()).Where(f => f.Count >= 3).ToList();
+        double vol = 0;
+        foreach (var f in list)
+            for (int i = 1; i + 1 < f.Count; i++) vol += f[0].Dot(f[i].Cross(f[i + 1]));
+        if (vol < 0) foreach (var f in list) f.Reverse();
+        return new Polyhedron(list, true) { Plan = plan };
+    }
+
+    private Polyhedron(List<List<Vec3>> faces, bool _) => Faces = faces;
+
+    /// <summary>Aplica uma transformação a todos os vértices, mantendo a orientação das faces.</summary>
+    public Polyhedron Transform(Func<Vec3, Vec3> f, bool mirror = false)
+    {
+        var faces = Faces.Select(face => { var l = face.Select(f).ToList(); if (mirror) l.Reverse(); return l; }).ToList();
+        return new Polyhedron(faces, true) { Plan = Plan == null ? null : new Polygon2(Plan.Outer.Select(p => f(Vec3.At(p, 0)).XY)) };
+    }
 
     public Polyhedron(IEnumerable<IEnumerable<Vec3>> faces)
     {
@@ -82,9 +121,10 @@ public sealed class Polyhedron
     public double MaxZ => Faces.SelectMany(f => f).Max(v => v.Z);
     public double MinZ => Faces.SelectMany(f => f).Min(v => v.Z);
 
-    /// <summary>Projeção em planta (envoltória convexa dos vértices).</summary>
+    /// <summary>Projeção em planta (a informada ou a envoltória convexa dos vértices).</summary>
     public Polygon2 Footprint()
     {
+        if (Plan != null && Plan.Outer.Count >= 3) return Plan;
         var pts = Faces.SelectMany(f => f).Select(v => v.XY).Distinct().OrderBy(p => p.X).ThenBy(p => p.Y).ToList();
         if (pts.Count < 3) return new Polygon2(pts);
         double Cross(Vec2 o, Vec2 a, Vec2 b) => (a - o).Cross(b - o);

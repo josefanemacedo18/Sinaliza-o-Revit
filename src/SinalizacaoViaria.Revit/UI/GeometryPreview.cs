@@ -220,11 +220,11 @@ public sealed class GeometryPreview : FrameworkElement
         foreach (var pav in _pavement) faces.Add((pav.Outer.Select(v => Vec3.At(v, -0.02)).ToList(), MarkingColor.Asfalto));
         foreach (var p in _geometry!.Pieces)
         {
-            if (p.Solid != null) { foreach (var f in p.Solid.Faces) faces.Add((f, p.Color)); continue; }
+            if (p.Solid != null) { foreach (var f in p.Solid.Faces) faces.Add((f.Select(v => v with { Z = v.Z + p.Elevation }).ToList(), p.Color)); continue; }
             if (p.Profile != null)
             {
                 var pr = p.Profile;
-                var ring = pr.Profile.Outer.Select(q => Vec3.At(pr.Origin + pr.XDir * q.X, q.Y)).ToList();
+                var ring = pr.Profile.Outer.Select(q => Vec3.At(pr.Origin + pr.XDir * q.X, q.Y + p.Elevation)).ToList();
                 var dz = pr.ExtrudeDir * pr.Depth;
                 var ring2 = ring.Select(v => new Vec3(v.X + dz.X, v.Y + dz.Y, v.Z)).ToList();
                 faces.Add((ring, p.Color));

@@ -37,8 +37,8 @@ public static class QuantitySamples
                 case DrainageDefinition dr:
                 {
                     var c = (DrainageDefinition)MarkingDefinition.FromJson(dr.ToJson())!;
-                    c.Position = Vec2.Zero; c.Along = Vec2.UnitX; c.Modules = 1;
-                    return (MarkingBuilder.Build(c, c.IsLinear ? new Polyline2(new[] { new Vec2(-1, 0), new Vec2(1, 0) }) : null, ctx), TipoMiniatura.Perspectiva);
+                    c.Modules = 1;
+                    return (Generators.DrainageGenerator.Demo(c, 4), TipoMiniatura.Perspectiva);
                 }
                 case BridgeDefinition br:
                 {

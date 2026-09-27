@@ -19,6 +19,8 @@ public enum PathMode
     BordoDaVia,
     /// <summary>Arestas de pisos, calçadas, lajes, topografia ou outros elementos (associativo).</summary>
     Bordas,
+    /// <summary>Em série ao longo de um meio-fio (dois cliques: início e fim, espaçamento fixo).</summary>
+    Serie,
 }
 
 /// <summary>Janela genérica para marcas lineares (longitudinais, transversais, tachas, piso tátil, ciclovia).</summary>

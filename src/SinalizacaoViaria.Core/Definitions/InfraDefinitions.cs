@@ -50,6 +50,37 @@ public enum OrientacaoBarras
 
 public enum MaterialGrelha { FerroFundido, AcoGalvanizado, Concreto }
 
+/// <summary>Desenho do tampo da grelha.</summary>
+public enum EstiloGrelha
+{
+    /// <summary>Barras paralelas com nervura central (padrão de sarjeta).</summary>
+    Barras,
+    /// <summary>Malha quadriculada (barras nos dois sentidos).</summary>
+    Malha,
+    /// <summary>Chapa com fendas (rasgos) desencontradas – calçadões e áreas de pedestres.</summary>
+    Fendas,
+}
+
+/// <summary>Tampa de inspeção da caixa.</summary>
+public enum TipoTampa
+{
+    /// <summary>Tampa de concreto removível com alças, rente à calçada.</summary>
+    Concreto,
+    /// <summary>Tampão de ferro fundido circular em aro quadrado (NBR 10160).</summary>
+    FerroFundido,
+    /// <summary>Sem tampa (laje contínua).</summary>
+    Nenhuma,
+}
+
+/// <summary>Saída do tubo de ligação da caixa.</summary>
+public enum SaidaTubo
+{
+    /// <summary>Para baixo da pista (ramal até a galeria / PV no eixo).</summary>
+    SobAPista,
+    /// <summary>Ao longo do meio-fio.</summary>
+    AoLongo,
+}
+
 /// <summary>
 /// Dispositivos de drenagem superficial urbana: bocas de lobo, grelhas, canaletas e poços de visita – com a caixa de
 /// captação, a tampa de inspeção e o rebaixo da sarjeta. Posicionados junto ao meio-fio (alinhados à via) ou livres.
@@ -75,8 +106,11 @@ public sealed class DrainageDefinition : MarkingDefinition
     public double BarWidth { get; set; } = 0.025;
     public double BarGap { get; set; } = 0.035;
     public OrientacaoBarras Bars { get; set; } = OrientacaoBarras.Transversal;
+    public EstiloGrelha GrateStyle { get; set; } = EstiloGrelha.Barras;
     public double FrameWidth { get; set; } = 0.05;
     public MaterialGrelha Material { get; set; } = MaterialGrelha.FerroFundido;
+    /// <summary>Afastamento da grelha em relação à face do meio-fio (m).</summary>
+    public double GrateOffset { get; set; } = 0.05;
 
     // ---- boca na guia
     public double OpeningLength { get; set; } = 1.00;
@@ -94,12 +128,27 @@ public sealed class DrainageDefinition : MarkingDefinition
     public double BoxWidth { get; set; } = 0.80;
     public double BoxDepth { get; set; } = 1.00;
     public double WallThickness { get; set; } = 0.15;
-    /// <summary>Tampa de inspeção circular na laje da caixa.</summary>
+    /// <summary>Tampa de inspeção na laje da caixa.</summary>
     public bool Lid { get; set; } = true;
+    public TipoTampa LidType { get; set; } = TipoTampa.Concreto;
     public double LidDiameter { get; set; } = 0.60;
+    /// <summary>Espessura da laje de cobertura da caixa (m).</summary>
+    public double SlabThickness { get; set; } = 0.12;
     /// <summary>Tubo de ligação (saída) da caixa.</summary>
     public bool OutletPipe { get; set; } = true;
     public double PipeDiameter { get; set; } = 0.40;
+    public SaidaTubo PipeDirection { get; set; } = SaidaTubo.SobAPista;
+    public double PipeLength { get; set; } = 2.5;
+    /// <summary>Degraus de acesso (poço de visita).</summary>
+    public bool Steps { get; set; } = true;
+
+    // ---- encaixe na via
+    /// <summary>Recorta os pisos da via, sarjeta, meio-fio, calçada e as faixas pintadas sob o dispositivo (ele os substitui).</summary>
+    public bool CutFloors { get; set; } = true;
+    /// <summary>Ao clicar junto a um meio-fio, adota a altura e a largura dele.</summary>
+    public bool AutoFit { get; set; } = true;
+    /// <summary>Espaçamento na colocação em série ao longo do meio-fio (m).</summary>
+    public double SeriesSpacing { get; set; } = 40;
 
     public override string KindName => "Drenagem";
     public override string DisplayCode => Type switch

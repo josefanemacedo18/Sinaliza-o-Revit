@@ -30,7 +30,11 @@ public sealed class FormWindow : Window
     private bool _loading = true;
 
     public bool PickSurfaces => _output?.PickSurfaces == true;
-    public PathMode PathMode => _modes.FirstOrDefault(m => m.Button.IsChecked == true).Mode;
+    /// <summary>Modo marcado no grupo visível (formulários com grupos de inserção condicionais).</summary>
+    public PathMode PathMode =>
+        (_modes.Where(m => m.Button.IsChecked == true && m.Button.IsVisible).Select(m => (PathMode?)m.Mode).FirstOrDefault()
+         ?? _modes.Where(m => m.Button.IsChecked == true).Select(m => (PathMode?)m.Mode).FirstOrDefault()) ?? default;
+    private int _modeGroups;
 
     public FormWindow(string title, string heading, string? hint, MarkingDefinition? def, Func<FormPreview?>? preview,
         bool showOutput = true, string okText = "Inserir", double width = 960, double height = 640)
@@ -98,18 +102,60 @@ public sealed class FormWindow : Window
 
     // ------------------------------------------------------------------ campos
 
+    private Func<bool>? _cond;
+    private readonly List<(UIElement Element, Func<bool> Visible)> _conditional = new();
+
+    /// <summary>
+    /// Campos que só aparecem quando <paramref name="condition"/> é verdadeira (reavaliada a cada mudança) – ex.: opções
+    /// próprias de um tipo de obra.
+    /// </summary>
+    public FormWindow If(Func<bool> condition, Action<FormWindow> build)
+    {
+        var prev = _cond;
+        _cond = prev == null ? condition : () => prev() && condition();
+        _grid = null;
+        build(this);
+        _grid = null;
+        _cond = prev;
+        return this;
+    }
+
+    private void Track(UIElement e)
+    {
+        if (_cond != null) _conditional.Add((e, _cond));
+    }
+
+    private void UpdateVisibility()
+    {
+        foreach (var (e, visible) in _conditional)
+        {
+            bool v;
+            try { v = visible(); } catch { v = true; }
+            e.Visibility = v ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
     public FormWindow Section(string header, string? hint = null)
     {
         _grid = null;
-        _fields.Children.Add(new TextBlock { Text = header, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 10, 0, 2) });
-        if (hint != null) _fields.Children.Add(new TextBlock { Text = hint, Style = (Style)Resources["Hint"] });
+        var h = new TextBlock { Text = header, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 10, 0, 2) };
+        _fields.Children.Add(h);
+        Track(h);
+        if (hint != null)
+        {
+            var tb = new TextBlock { Text = hint, Style = (Style)Resources["Hint"] };
+            _fields.Children.Add(tb);
+            Track(tb);
+        }
         return this;
     }
 
     public FormWindow Hint(string text)
     {
         _grid = null;
-        _fields.Children.Add(new TextBlock { Text = text, Style = (Style)Resources["Hint"] });
+        var tb = new TextBlock { Text = text, Style = (Style)Resources["Hint"] };
+        _fields.Children.Add(tb);
+        Track(tb);
         return this;
     }
 
@@ -131,6 +177,8 @@ public sealed class FormWindow : Window
         if (tooltip != null) control.ToolTip = tooltip;
         _grid.Children.Add(tb);
         _grid.Children.Add(control);
+        Track(tb);
+        Track(control);
     }
 
     public FormWindow Number(string label, Func<double> get, Action<double> set, double min, double max, string fmt = "0.00", string? tooltip = null)
@@ -232,9 +280,12 @@ public sealed class FormWindow : Window
         // Onde se pode escolher linhas, também se pode escolher bordas de pisos/calçadas.
         var k = list.FindIndex(m => m.Mode == PathMode.Linhas);
         if (k >= 0 && list.All(m => m.Mode != PathMode.Bordas)) list.Insert(k + 1, (UiHelpers.EdgesLabel, PathMode.Bordas));
+        var group = "modes" + GetHashCode() + "_" + _modeGroups++;
+        var first = true;
         foreach (var (l, m) in list)
         {
-            var rb = new RadioButton { Content = l, GroupName = "modes" + GetHashCode(), IsChecked = _modes.Count == 0, Margin = new Thickness(0, 2, 0, 2) };
+            var rb = new RadioButton { Content = l, GroupName = group, IsChecked = first, Margin = new Thickness(0, 2, 0, 2) };
+            first = false;
             sp.Children.Add(rb);
             _modes.Add((rb, m));
         }
@@ -249,6 +300,7 @@ public sealed class FormWindow : Window
         }
         box.Content = sp;
         _fields.Children.Add(box);
+        Track(box);
         return this;
     }
 
@@ -272,12 +324,14 @@ public sealed class FormWindow : Window
 
     public void Refresh()
     {
-        if (_loading || _previewFunc == null) return;
+        if (_loading) return;
         if (!ApplyAll(out var err))
         {
             _warnings.Text = "⚠ " + err;
             return;
         }
+        UpdateVisibility();
+        if (_previewFunc == null) return;
         try
         {
             var p = _previewFunc();

@@ -29,18 +29,42 @@ internal static class FootprintCutter
         d is LinearMarkingDefinition l && SidewalkCodes.Contains(l.Code)
         || d is SidewalkAreaDefinition { Type: TipoAreaCalcada.Calcada or TipoAreaCalcada.Canteiro };
 
+    /// <summary>Pisos e faixas que um dispositivo de drenagem substitui (pavimento, sarjeta, meio-fio, calçada, grama, pinturas).</summary>
+    public static bool DrainageTarget(MarkingDefinition d) =>
+        RoadMarking(d) || Sidewalk(d)
+        || d is RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or CurbExtensionDefinition or SidewalkAreaDefinition or PlanterDefinition
+        || d is LinearMarkingDefinition l && (l.Code is "SARJETA" or "PLATAFORMA" or "SARJETAO" || l.Code.StartsWith("MEIO-FIO"));
+
+    /// <summary>Recorta pavimento, sarjeta, meio-fio e calçada sob uma boca de lobo, grelha, PV ou canaleta.</summary>
+    public static int ApplyDrainage(UIDocument uidoc, DrainageDefinition d)
+    {
+        var path = d.IsLinear && d.Path != null ? PathResolver.Resolve(uidoc.Document, d.Path)?.Main : null;
+        var fp = d.CutFloors ? DrainageGenerator.Footprint(d, path) : new List<Polygon2>();
+        var center = d.IsLinear ? path?.PointAt(path.Length / 2) ?? d.Position : d.Position;
+        var radius = 45 + (path?.Length ?? 0) / 2;
+        return Apply(uidoc, d, fp, DrainageTarget, center, radius);
+    }
+
     /// <summary>Atualiza os recortes gerados por <paramref name="source"/>; devolve quantas marcas foram alteradas.</summary>
-    public static int Apply(UIDocument uidoc, MarkingDefinition source, IReadOnlyList<Polygon2> footprints, Func<MarkingDefinition, bool> filter)
+    /// <param name="near">Só examina marcas cujo eixo passa a menos de <paramref name="radius"/> m deste ponto (recorte local, rápido).</param>
+    public static int Apply(UIDocument uidoc, MarkingDefinition source, IReadOnlyList<Polygon2> footprints, Func<MarkingDefinition, bool> filter,
+        Vec2? near = null, double radius = 50)
     {
         var doc = uidoc.Document;
         var service = new MarkingService(doc, uidoc.ActiveView);
         var touched = new List<MarkingDefinition>();
+        bool Close(MarkingDefinition d)
+        {
+            if (near is not { } c || d.Path == null) return true;
+            var axis = PathResolver.Resolve(doc, d.Path)?.Main;
+            return axis == null || axis.Points.Count < 2 || CurbFinder.Project(axis, c).Distance <= radius;
+        }
         foreach (var d in MarkingStorage.Definitions(doc))
         {
             if (d.Id == source.Id || d is IAnnotationDefinition) continue;
             var had = d.Exclusions.RemoveAll(z => z.SourceId == source.Id) > 0;
             var hits = false;
-            if (footprints.Count > 0 && filter(d))
+            if (footprints.Count > 0 && filter(d) && Close(d))
             {
                 var copy = MarkingDefinition.FromJson(d.ToJson())!;
                 copy.Exclusions.Clear();
@@ -87,6 +111,9 @@ internal static class FootprintCutter
             case PlanterDefinition pl:
                 Apply(uidoc, pl, pl.CutSidewalk && path != null ? PolygonOps.Union(SidewalkGenerator.PlanterShapes(pl, path)) : Array.Empty<Polygon2>(), Sidewalk);
                 break;
+            case DrainageDefinition dr:
+                ApplyDrainage(uidoc, dr);
+                return;
             case TrafficCalmingDefinition { Type: TipoModeracao.LombadaInvertida } tc:
             {
                 // A lombada invertida fica abaixo do pavimento: a pista (piso) e as linhas são recortadas sobre ela.

@@ -1,6 +1,7 @@
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
@@ -35,54 +36,78 @@ internal static class InfraForms
     public static FormWindow Drainage(DrainageDefinition d, bool edit, bool inlets)
     {
         var types = inlets
-            ? new[] { ("Boca de lobo simples (guia chapéu)", TipoDrenagem.BocaDeLoboSimples), ("Boca de lobo dupla", TipoDrenagem.BocaDeLoboDupla),
-                      ("Boca de lobo com grelha", TipoDrenagem.BocaDeLoboGrelha), ("Boca de lobo combinada (guia + grelha)", TipoDrenagem.BocaDeLoboCombinada),
-                      ("Poço de visita (PV)", TipoDrenagem.PocoDeVisita) }
-            : new[] { ("Grelha de sarjeta (ralo) com caixa", TipoDrenagem.GrelhaSarjeta), ("Grelha quadrada de piso", TipoDrenagem.GrelhaQuadrada),
+            ? new[] { ("Boca de lobo simples (guia chapéu)", TipoDrenagem.BocaDeLoboSimples), ("Boca de lobo dupla (duas bocas e pilarete)", TipoDrenagem.BocaDeLoboDupla),
+                      ("Boca de lobo com grelha na sarjeta", TipoDrenagem.BocaDeLoboGrelha), ("Boca de lobo combinada (guia chapéu + grelha)", TipoDrenagem.BocaDeLoboCombinada),
+                      ("Poço de visita (PV) com tampão", TipoDrenagem.PocoDeVisita) }
+            : new[] { ("Grelha de sarjeta (ralo) com caixa", TipoDrenagem.GrelhaSarjeta), ("Grelha de piso com caixa (calçadas, praças, pátios)", TipoDrenagem.GrelhaQuadrada),
                       ("Canaleta com grelha contínua (ao longo de linha)", TipoDrenagem.GrelhaContinua) };
         if (!types.Any(t => t.Item2 == d.Type)) { d.Type = types[0].Item2; d.ApplyDefaults(); }
         var w = new FormWindow(edit ? "Editar drenagem" : inlets ? "Boca de lobo / PV" : "Grelha de drenagem",
             inlets ? "Bocas de lobo e poços de visita" : "Grelhas e canaletas de drenagem",
-            "Clique junto ao MEIO-FIO de uma via: o dispositivo se alinha à guia, com a caixa sob a calçada ou sob a sarjeta e o rebaixo da sarjeta. " +
-            "Longe de vias, clique o ponto e a direção. Repete até ESC. Grelhas com barras transversais ao fluxo são seguras para ciclistas.",
+            "Clique junto ao MEIO-FIO (de uma via, interseção, rotatória, orelha ou meio-fio avulso): o dispositivo encaixa na face da guia, " +
+            "adota a altura dela e SUBSTITUI o trecho de pavimento, sarjeta, meio-fio e calçada que ocupa (rebaixo, guia chapéu, laje e tampa). " +
+            "Em série: clique o início e o fim no mesmo meio-fio e os dispositivos saem a cada espaçamento. Grelhas com barras transversais ao fluxo são seguras para ciclistas.",
             d, () =>
             {
-                var c = (DrainageDefinition)MarkingDefinition.FromJson(d.ToJson())!;
-                c.Position = Vec2.Zero; c.Along = Vec2.UnitX; c.SidewalkLeft = true;
-                var g = Build(c, c.IsLinear ? new Polyline2(new[] { new Vec2(-3, -0.6), new Vec2(3, -0.6) }) : null);
-                var road = Polygon2.Rectangle(new Vec2(-4, -3.5), new Vec2(4, 0));
-                var walk = Polygon2.Rectangle(new Vec2(-4, 0), new Vec2(4, 2.5));
-                return new FormPreview(g, new[] { road, walk }, null, Info(g, "Cinza: pista (abaixo) e calçada (acima). Use 3D para ver a caixa."));
-            }, false, edit ? "Aplicar" : "Inserir", 1080, 720);
-        w.Choice("Tipo", types, () => d.Type, v => d.Type = v, preset: v => { d.Type = v; d.ApplyDefaults(); })
-         .Integer("Módulos lado a lado", () => d.Modules, v => d.Modules = v, 1, 4, "Bocas de lobo triplas, grelhas em série.")
-         .Section("Grelha")
-         .Number("Comprimento (m)", () => d.GrateLength, v => d.GrateLength = v, 0.2, 3)
-         .Number("Largura (m)", () => d.GrateWidth, v => d.GrateWidth = v, 0.1, 2)
-         .Number("Largura das barras (m)", () => d.BarWidth, v => d.BarWidth = v, 0.01, 0.1, "0.000")
-         .Number("Vão entre barras (m)", () => d.BarGap, v => d.BarGap = v, 0.01, 0.1, "0.000", "Até 25 mm em vias com bicicletas.")
-         .Choice("Barras", new[] { ("Transversais ao fluxo (ciclistas)", OrientacaoBarras.Transversal), ("Longitudinais", OrientacaoBarras.Longitudinal), ("Diagonais", OrientacaoBarras.Diagonal) },
-            () => d.Bars, v => d.Bars = v)
-         .Choice("Material", new[] { ("Ferro fundido dúctil (NBR 10160)", MaterialGrelha.FerroFundido), ("Aço galvanizado", MaterialGrelha.AcoGalvanizado), ("Concreto", MaterialGrelha.Concreto) },
-            () => d.Material, v => d.Material = v);
-        if (inlets)
-            w.Section("Boca na guia e sarjeta")
+                var g = DrainageGenerator.Demo(d);
+                return new FormPreview(g, null, null, Info(g, "Prévia numa rua de exemplo: pista, sarjeta, meio-fio e calçada recortados. Use 3D para ver a caixa."));
+            }, false, edit ? "Aplicar" : "Inserir", 1080, 760);
+        w.Choice("Tipo", types, () => d.Type, v => d.Type = v, preset: v => { d.Type = v; d.ApplyDefaults(); });
+        bool Pv() => d.Type == TipoDrenagem.PocoDeVisita;
+        bool Opening() => d.Type is TipoDrenagem.BocaDeLoboSimples or TipoDrenagem.BocaDeLoboDupla or TipoDrenagem.BocaDeLoboCombinada;
+        bool HasGrate() => !Pv() && d.Type is not (TipoDrenagem.BocaDeLoboSimples or TipoDrenagem.BocaDeLoboDupla);
+        bool AtCurb() => !Pv() && d.Type is not (TipoDrenagem.GrelhaQuadrada or TipoDrenagem.GrelhaContinua);
+        w.If(() => !Pv() && !d.IsLinear, x => x.Integer("Módulos lado a lado", () => d.Modules, v => d.Modules = v, 1, 4, "Bocas de lobo triplas, grelhas em série."));
+        w.If(HasGrate, x => x.Section("Grelha")
+             .Number("Comprimento (m)", () => d.GrateLength, v => d.GrateLength = v, 0.2, 3)
+             .Number("Largura (m)", () => d.GrateWidth, v => d.GrateWidth = v, 0.1, 2)
+             .Choice("Desenho do tampo", new[] { ("Barras com nervura central", EstiloGrelha.Barras), ("Malha quadriculada", EstiloGrelha.Malha), ("Chapa com fendas (pedestres)", EstiloGrelha.Fendas) },
+                () => d.GrateStyle, v => d.GrateStyle = v)
+             .If(() => d.GrateStyle == EstiloGrelha.Barras, y => y.Choice("Barras", new[] { ("Transversais ao fluxo (ciclistas)", OrientacaoBarras.Transversal), ("Longitudinais", OrientacaoBarras.Longitudinal), ("Diagonais", OrientacaoBarras.Diagonal) },
+                () => d.Bars, v => d.Bars = v))
+             .Number("Largura das barras (m)", () => d.BarWidth, v => d.BarWidth = v, 0.01, 0.1, "0.000")
+             .Number("Vão entre barras / fendas (m)", () => d.BarGap, v => d.BarGap = v, 0.008, 0.1, "0.000", "Até 25 mm em vias com bicicletas; 10–15 mm em calçadas.")
+             .Number("Largura do aro (m)", () => d.FrameWidth, v => d.FrameWidth = v, 0.02, 0.15)
+             .If(AtCurb, y => y.Number("Afastamento da guia (m)", () => d.GrateOffset, v => d.GrateOffset = v, 0.02, 1.0, "0.00", "Distância da face do meio-fio à grelha."))
+             .Choice("Material", new[] { ("Ferro fundido dúctil (NBR 10160)", MaterialGrelha.FerroFundido), ("Aço galvanizado", MaterialGrelha.AcoGalvanizado), ("Concreto", MaterialGrelha.Concreto) },
+                () => d.Material, v => d.Material = v));
+        w.If(Opening, x => x.Section("Boca na guia (guia chapéu)")
              .Number("Comprimento da boca (m)", () => d.OpeningLength, v => d.OpeningLength = v, 0.5, 6)
-             .Number("Altura da boca (m)", () => d.OpeningHeight, v => d.OpeningHeight = v, 0.08, 0.3)
-             .Number("Altura do meio-fio (m)", () => d.CurbHeight, v => d.CurbHeight = v, 0.05, 0.3);
-        w.Number("Rebaixo da sarjeta (m)", () => d.Depression, v => d.Depression = v, 0, 0.2, "0.00", "Depressão junto à boca: aumenta a captação (PMSP).")
-         .Number("Transição do rebaixo (m)", () => d.DepressionLength, v => d.DepressionLength = v, 0.2, 5)
-         .Number("Largura da sarjeta (m)", () => d.GutterWidth, v => d.GutterWidth = v, 0.3, 1.5)
-         .Section("Caixa de captação")
-         .Number("Comprimento interno (m)", () => d.BoxLength, v => d.BoxLength = v, 0.3, 6, "0.00", "PV: diâmetro interno da câmara.")
-         .Number("Largura interna (m)", () => d.BoxWidth, v => d.BoxWidth = v, 0.3, 3)
-         .Number("Profundidade (m)", () => d.BoxDepth, v => d.BoxDepth = v, 0.3, 8)
-         .Number("Espessura das paredes (m)", () => d.WallThickness, v => d.WallThickness = v, 0.08, 0.4)
-         .Check("Tampa de inspeção", () => d.Lid, v => d.Lid = v)
-         .Number("Diâmetro do tampão (m)", () => d.LidDiameter, v => d.LidDiameter = v, 0.4, 1.2)
-         .Check("Tubo de ligação", () => d.OutletPipe, v => d.OutletPipe = v)
-         .Number("Diâmetro do tubo (m)", () => d.PipeDiameter, v => d.PipeDiameter = v, 0.2, 1.5, "0.00", "Usual ≥ 0,40 m em redes urbanas.");
-        if (!edit && !inlets) w.Modes(("Clicar junto ao meio-fio / pontos (grelhas)", PathMode.DoisPontos), ("Canaleta: desenhar a linha", PathMode.Desenhar), ("Canaleta: selecionar linhas", PathMode.Linhas));
+             .Number("Altura livre da boca (m)", () => d.OpeningHeight, v => d.OpeningHeight = v, 0.08, 0.3));
+        w.If(AtCurb, x => x.Section("Sarjeta e meio-fio")
+             .Number("Rebaixo da sarjeta (m)", () => d.Depression, v => d.Depression = v, 0, 0.2, "0.00", "Depressão junto à boca: aumenta a captação (PMSP: 5–10 cm).")
+             .Number("Transição do rebaixo (m)", () => d.DepressionLength, v => d.DepressionLength = v, 0.2, 5)
+             .Number("Largura do rebaixo (m)", () => d.GutterWidth, v => d.GutterWidth = v, 0.3, 1.5)
+             .Number("Altura do meio-fio (m)", () => d.CurbHeight, v => d.CurbHeight = v, 0.05, 0.3)
+             .Number("Largura do meio-fio (m)", () => d.CurbWidth, v => d.CurbWidth = v, 0.08, 0.3)
+             .Check("Adotar a altura e a largura do meio-fio clicado", () => d.AutoFit, v => d.AutoFit = v));
+        w.If(() => !d.IsLinear, x => x.Section("Caixa / câmara")
+             .Number("Comprimento interno / diâmetro do PV (m)", () => d.BoxLength, v => d.BoxLength = v, 0.3, 6)
+             .If(() => !Pv(), y => y.Number("Largura interna (m)", () => d.BoxWidth, v => d.BoxWidth = v, 0.3, 3)));
+        w.If(() => d.IsLinear, x => x.Section("Canaleta"));
+        w.Number("Profundidade (m)", () => d.BoxDepth, v => d.BoxDepth = v, 0.15, 8)
+         .Number("Espessura das paredes (m)", () => d.WallThickness, v => d.WallThickness = v, 0.06, 0.4);
+        w.If(Opening, x => x.Number("Laje de cobertura (m)", () => d.SlabThickness, v => d.SlabThickness = v, 0.06, 0.3)
+             .Check("Tampa de inspeção na calçada", () => d.Lid, v => d.Lid = v)
+             .Choice("Tampa", new[] { ("Concreto com alças (rente à calçada)", TipoTampa.Concreto), ("Tampão de ferro fundido com relevo", TipoTampa.FerroFundido) },
+                () => d.LidType == TipoTampa.Nenhuma ? TipoTampa.Concreto : d.LidType, v => d.LidType = v)
+             .Number("Lado da tampa (m)", () => d.LidDiameter, v => d.LidDiameter = v, 0.4, 1.2));
+        w.If(Pv, x => x.Number("Diâmetro do tampão (m)", () => d.LidDiameter, v => d.LidDiameter = v, 0.5, 1.0, "0.00", "NBR 10160: Ø 0,60 m livre.")
+             .Check("Degraus de ferro", () => d.Steps, v => d.Steps = v));
+        w.If(() => !d.IsLinear, x => x.Check("Tubo(s) de ligação", () => d.OutletPipe, v => d.OutletPipe = v)
+             .Number("Diâmetro do tubo (m)", () => d.PipeDiameter, v => d.PipeDiameter = v, 0.2, 1.5, "0.00", "Usual ≥ 0,40 m em redes urbanas.")
+             .Number("Comprimento do tubo (m)", () => d.PipeLength, v => d.PipeLength = v, 0.5, 30)
+             .If(AtCurb, y => y.Choice("Saída do tubo", new[] { ("Sob a pista (ramal até a galeria)", SaidaTubo.SobAPista), ("Ao longo do meio-fio", SaidaTubo.AoLongo) },
+                () => d.PipeDirection, v => d.PipeDirection = v)));
+        w.Section("Encaixe na via")
+         .Check("Recortar pavimento, sarjeta, meio-fio, calçada e pinturas sob o dispositivo", () => d.CutFloors, v => d.CutFloors = v);
+        if (!edit)
+        {
+            w.If(AtCurb, x => x.Number("Espaçamento na série (m)", () => d.SeriesSpacing, v => d.SeriesSpacing = v, 5, 200, "0", "Usual 30–60 m, conforme a vazão da sarjeta.")
+                .Modes(("Um a um: clicar junto ao meio-fio", PathMode.DoisPontos), ("Em série ao longo do meio-fio (início e fim)", PathMode.Serie)));
+            w.If(() => d.IsLinear, x => x.Modes(("Canaleta: desenhar a linha", PathMode.Desenhar), ("Canaleta: selecionar linhas", PathMode.Linhas)));
+            w.If(() => d.Type is TipoDrenagem.PocoDeVisita or TipoDrenagem.GrelhaQuadrada, x => x.Modes(("Clicar o ponto (repete até ESC)", PathMode.DoisPontos)));
+        }
         return w;
     }
 
@@ -473,7 +498,10 @@ public sealed class CmdTalude : CommandBase
         InfraRunner.Run(uidoc, "infra:talude", () => new SlopeDefinition(), d => InfraForms.Slope(d, false));
 }
 
-/// <summary>Drenagem: bocas de lobo e PVs, ou grelhas e canaletas – alinhadas ao meio-fio quando clicadas junto a uma via.</summary>
+/// <summary>
+/// Drenagem: bocas de lobo e PVs, ou grelhas e canaletas – encaixadas na face do meio-fio (um a um ou em série) e recortando
+/// o pavimento, a sarjeta, o meio-fio e a calçada que substituem.
+/// </summary>
 internal static class DrainageCommand
 {
     public static Result Run(UIDocument uidoc, bool inlets)
@@ -486,58 +514,80 @@ internal static class DrainageCommand
         UiHelpers.Remember(key, template);
         PluginContext.SaveSettings();
         if (template.IsLinear)
-            return MarkingCreator.CreateAlongPath(uidoc, template, w.PathMode == PathMode.DoisPontos ? PathMode.Desenhar : w.PathMode, template.DisplayCode);
+            return MarkingCreator.CreateAlongPath(uidoc, template, w.PathMode is PathMode.DoisPontos or PathMode.Serie ? PathMode.Desenhar : w.PathMode, template.DisplayCode,
+                false, d => FootprintCutter.ApplyFor(uidoc, d));
         var doc = uidoc.Document;
+        var scanner = new CurbScanner(doc, uidoc.ActiveView);
         var results = new List<RenderResult>();
-        var free = template.Type is TipoDrenagem.GrelhaQuadrada or TipoDrenagem.PocoDeVisita;
+        var free = template.Type is TipoDrenagem.PocoDeVisita or TipoDrenagem.GrelhaQuadrada;
+        var series = !free && w.PathMode == PathMode.Serie;
         while (true)
         {
             var p = Picking.PickPoint(uidoc, free
-                ? $"{template.DisplayCode}: clique o centro – ESC encerra"
-                : $"{template.DisplayCode}: clique junto ao MEIO-FIO da via, do lado da calçada – ESC encerra");
+                ? $"{template.DisplayCode}: clique o centro (sobre a pista, a calçada ou um ponto livre) – ESC encerra"
+                : series ? $"{template.DisplayCode}: clique o INÍCIO da série junto ao meio-fio – ESC encerra"
+                : $"{template.DisplayCode}: clique junto ao MEIO-FIO, do lado da pista – ESC encerra");
             if (p == null) break;
-            var d = (DrainageDefinition)template.CloneWithNewId();
             var pt = UnitConv.ToVec2(p);
-            d.Z = UnitConv.M(p.Z);
-            if (!free && Curb(doc, pt) is { } c)
+            var batch = new List<DrainageDefinition>();
+            if (free)
             {
-                d.Position = c.Position; d.Along = c.Along; d.SidewalkLeft = c.SidewalkLeft; d.Z = c.Z;
+                var d = (DrainageDefinition)template.CloneWithNewId();
+                d.Position = pt;
+                d.Z = scanner.SurfaceZ(pt) ?? UnitConv.M(p.Z);
+                // Alinhada à via mais próxima (quando houver).
+                if (CurbFinder.Nearest(scanner.Faces(pt), pt, 30) is { } near) d.Along = near.Along;
+                batch.Add(d);
             }
             else
             {
-                d.Position = pt;
-                if (!free)
+                var faces = scanner.Faces(pt);
+                var hit = CurbFinder.Nearest(faces, pt);
+                if (hit == null)
                 {
-                    var q = Picking.PickPoint(uidoc, "Nenhuma via por perto: clique a direção do meio-fio (a calçada fica à esquerda) – ESC = eixo X");
-                    if (q != null && UnitConv.ToVec2(q).DistanceTo(pt) > 0.05) d.Along = (UnitConv.ToVec2(q) - pt).Normalized();
+                    TaskDialog.Show(CommandBase.AppTitle, "Nenhum meio-fio encontrado perto do clique. Clique junto à face de uma guia do plugin " +
+                        "(via com calçada, interseção, rotatória, orelha ou meio-fio avulso) – ou use o tipo livre (grelha de piso / PV).");
+                    continue;
+                }
+                var hits = new List<CurbHit> { hit };
+                if (series)
+                {
+                    var q = Picking.PickPoint(uidoc, $"{template.DisplayCode}: clique o FIM da série no mesmo meio-fio – ESC cancela");
+                    if (q == null) break;
+                    hits = CurbFinder.Series(hit.Face, pt, UnitConv.ToVec2(q), template.SeriesSpacing);
+                }
+                foreach (var h in hits)
+                {
+                    var d = (DrainageDefinition)template.CloneWithNewId();
+                    Fit(d, h);
+                    batch.Add(d);
                 }
             }
-            results.AddRange(MarkingCreator.Commit(uidoc, new[] { d }, $"SV - {d.DisplayCode}"));
+            var created = MarkingCreator.Commit(uidoc, batch, $"SV - {template.DisplayCode}");
+            results.AddRange(created);
+            foreach (var d in batch.Where(x => x.CutFloors))
+            {
+                try { FootprintCutter.ApplyDrainage(uidoc, d); }
+                catch (Exception ex) { Log.Error("Recorte da drenagem", ex); }
+            }
+            scanner = new CurbScanner(doc, uidoc.ActiveView);           // pisos recortados: lê de novo
         }
         if (results.Count == 0) return Result.Cancelled;
-        CommandBaseReport.Show(d0: template.DisplayCode, results);
+        CommandBaseReport.Show(template.DisplayCode, results);
         return Result.Succeeded;
     }
 
-    /// <summary>Face do meio-fio da via mais próxima do ponto: posição, direção e lado da calçada.</summary>
-    public static (Vec2 Position, Vec2 Along, bool SidewalkLeft, double Z)? Curb(Document doc, Vec2 p)
+    /// <summary>Encaixa o dispositivo na face do meio-fio (posição, direção, cota e medidas da guia).</summary>
+    private static void Fit(DrainageDefinition d, CurbHit h)
     {
-        (double Dist, Vec2 Pos, Vec2 Along, bool Left, double Z)? best = null;
-        foreach (var road in MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>())
-        {
-            var resolved = PathResolver.Resolve(doc, road.Path);
-            if (resolved?.Main is not { } axis || axis.Length < 1) continue;
-            var (st, dist, on) = IntersectionGenerator.Project(axis, p);
-            if (dist > Math.Max(road.TotalLeft, road.TotalRight) + 2) continue;
-            var t = axis.TangentAt(Math.Clamp(st, 0, axis.Length));
-            var n = t.PerpLeft;
-            var left = (p - on).Dot(n) >= 0;
-            var edge = left ? road.LeftWidth : road.RightWidth;
-            var pos = on + n * (left ? edge : -edge);
-            var d = Math.Abs(p.DistanceTo(pos));
-            if (best == null || d < best.Value.Dist) best = (d, pos, t, left, resolved.Z);
-        }
-        return best is { } b && b.Dist < 6 ? (b.Pos, b.Along, b.Left, b.Z) : null;
+        d.Position = h.Position;
+        d.Along = h.Along;
+        d.SidewalkLeft = true;
+        d.Z = h.Face.BaseZ;
+        if (!d.AutoFit) return;
+        if (h.Face.CurbHeight is > 0.04 and < 0.5) d.CurbHeight = Math.Round(h.Face.CurbHeight, 3);
+        if (h.Face.CurbWidth is > 0.06 and < 0.5) d.CurbWidth = h.Face.CurbWidth;
+        if (h.Face.GutterWidth > 0.05) d.GutterWidth = Math.Max(d.GutterWidth, h.Face.GutterWidth + 0.10);
     }
 }
 
