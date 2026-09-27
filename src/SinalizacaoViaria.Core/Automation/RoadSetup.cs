@@ -298,10 +298,10 @@ public sealed class RoadSetup
     public double CarriagewayWidth => Right.Concat(Left).Where(e => e.Tipo is not (TipoElementoSecao.Calcada or TipoElementoSecao.CanteiroFisico)).Sum(e => e.Largura);
 
     /// <summary>Gera todas as definições (todas associadas ao mesmo caminho).</summary>
-    public List<MarkingDefinition> Build(PathReference path, OutputSettings output, Catalogo? catalog = null)
+    public List<MarkingDefinition> Build(PathReference path, OutputSettings output, Catalogo? catalog = null, string? existingGroupId = null, string? existingPavementId = null)
     {
         Warnings.Clear();
-        var groupId = Guid.NewGuid().ToString("N");
+        var groupId = existingGroupId ?? Guid.NewGuid().ToString("N");
         var res = new List<MarkingDefinition>();
 
         T Add<T>(T d) where T : MarkingDefinition
@@ -343,7 +343,12 @@ public sealed class RoadSetup
         });
 
         // ------------------------------------------------ pavimento (sempre registrado: guarda a seção para interseções)
-        if (Pavement != TipoPavimento.Nenhum) Add(PavementDefinition());
+        if (Pavement != TipoPavimento.Nenhum)
+        {
+            var pav = Add(PavementDefinition());
+            pav.SetupJson = RoadTemplates.ToJson(this);
+            if (existingPavementId != null) pav.Id = existingPavementId;
+        }
 
         // ------------------------------------------------ eixo central
         var half = MedianHalf;

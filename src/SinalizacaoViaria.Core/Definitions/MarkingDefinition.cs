@@ -1102,6 +1102,8 @@ public sealed class RoadPavementDefinition : MarkingDefinition
     public double EndSetback { get; set; }
     /// <summary>Raio das esquinas (face do meio-fio) nas conexões automáticas desta via. Nulo = pela hierarquia.</summary>
     public double? CornerRadius { get; set; }
+    /// <summary>Seção transversal completa (RoadSetup em JSON) usada para gerar a via – permite editar a via inteira depois.</summary>
+    public string? SetupJson { get; set; }
 
     public double DefaultThickness => Material switch { TipoPavimento.Bloquete => 0.08, TipoPavimento.Concreto => 0.15, _ => 0.05 };
     public double ActualThickness => Thickness is > 0 ? Thickness.Value : DefaultThickness;
@@ -1319,6 +1321,8 @@ public enum TipoIlhaCentral
     Galgavel,
     /// <summary>Minirrotatória pintada (MIR): linha de canalização branca de 0,20 m com tachões, zebrado opcional – sem obra civil.</summary>
     Pintada,
+    /// <summary>Calota galgável rampada: ilha em tronco de cone baixo (concreto), transponível pelas rodas traseiras de veículos longos.</summary>
+    Calota,
 }
 
 /// <summary>Rotatória com ilha central, pista giratória, faixa galgável e ramos com ilhas separadoras.</summary>
@@ -1334,6 +1338,14 @@ public sealed class RoundaboutDefinition : MarkingDefinition
     public TipoIlhaCentral IslandType { get; set; } = TipoIlhaCentral.Ajardinada;
     /// <summary>Altura da faixa galgável (m).</summary>
     public double ApronHeight { get; set; } = 0.06;
+    /// <summary>Ilha em calota: altura no centro (m).</summary>
+    public double DomeHeight { get; set; } = 0.15;
+    /// <summary>Rotatória elevada (platô): a pista giratória fica acima das vias, com rampas nas entradas/saídas (moderação de tráfego).</summary>
+    public bool Raised { get; set; }
+    /// <summary>Altura do platô (m) – 0,08 a 0,15 m.</summary>
+    public double RaisedHeight { get; set; } = 0.10;
+    /// <summary>Comprimento das rampas de acesso ao platô (m).</summary>
+    public double RampLength { get; set; } = 1.50;
     /// <summary>Turbo: divisores físicos entre as faixas do anel.</summary>
     public bool TurboDividers { get; set; }
     public double DividerWidth { get; set; } = 0.30;

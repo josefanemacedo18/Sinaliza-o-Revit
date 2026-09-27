@@ -262,12 +262,18 @@ internal static class RoundaboutForms
              "Desligado: as vias ficam exatamente como estão – a rotatória é só desenhada por cima.")
          .Section("Ilha central e anel")
          .Choice("Ilha central", new[] { ("Ajardinada (meio-fio + grama + árvores)", TipoIlhaCentral.Ajardinada), ("Pavimentada (meio-fio + concreto)", TipoIlhaCentral.Pavimentada),
-             ("Galgável (cúpula pintada, sem meio-fio)", TipoIlhaCentral.Galgavel), ("Pintada – LCA 0,20 m + tachões (MIR, sem obra civil)", TipoIlhaCentral.Pintada) }, () => d.IslandType, v => d.IslandType = v)
+             ("Galgável (cúpula pintada, sem meio-fio)", TipoIlhaCentral.Galgavel), ("Pintada – LCA 0,20 m + tachões (MIR, sem obra civil)", TipoIlhaCentral.Pintada),
+             ("Calota rampada (tronco de cone de concreto, galgável)", TipoIlhaCentral.Calota) }, () => d.IslandType, v => d.IslandType = v)
+         .Number("Calota: altura no centro (m)", () => d.DomeHeight, v => d.DomeHeight = v, 0.05, 0.6, tooltip: "Ilha em tronco de cone baixo, transponível pelas rodas traseiras de veículos longos (minirrotatórias e compactas).")
          .Number("Raio da ilha central (m)", () => d.IslandRadius, v => d.IslandRadius = v, 1, 100)
          .Number("Alongamento (1 = circular; > 1 = oval)", () => d.Elongation, v => d.Elongation = v, 1, 4)
          .Number("Direção do eixo maior da oval (°)", () => d.OvalAngleDeg, v => d.OvalAngleDeg = v, -360, 360, "0")
          .Number("Faixa galgável em volta da ilha (m)", () => d.ApronWidth, v => d.ApronWidth = v, 0, 10, tooltip: "Para o giro de ônibus e caminhões (bloquete elevado). Ignorada na ilha pintada.")
          .Number("Altura da faixa galgável (m)", () => d.ApronHeight, v => d.ApronHeight = v, 0.02, 0.15, "0.000")
+         .Check("Rotatória elevada (platô de moderação de tráfego, com rampas nas entradas)", () => d.Raised, v => d.Raised = v,
+             tooltip: "A pista giratória fica acima das vias; rampas em cada ramo. Obriga sinalização vertical (A-18 / A-32b) e cuidado com a drenagem.")
+         .Number("Platô: altura (m)", () => d.RaisedHeight, v => d.RaisedHeight = v, 0.03, 0.3, "0.00")
+         .Number("Platô: comprimento das rampas (m)", () => d.RampLength, v => d.RampLength = v, 0.5, 6)
          .Check("Ilha pintada: preencher com zebrado", () => d.PaintedIslandFill, v => d.PaintedIslandFill = v)
          .Number("Ilha pintada: espaçamento dos tachões (m, 0 = sem)", () => d.StudSpacing, v => d.StudSpacing = v, 0, 5, tooltip: "MBST Vol. IV: 0,25 a 0,50 m.")
          .Integer("Faixas na pista giratória", () => d.Lanes, v => d.Lanes = v, 1, 4)

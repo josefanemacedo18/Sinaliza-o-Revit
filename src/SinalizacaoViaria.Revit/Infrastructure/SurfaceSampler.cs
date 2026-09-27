@@ -58,6 +58,22 @@ public sealed class SurfaceSampler
         return ok;
     }
 
+    /// <summary>Referência da face (piso, topografia) sob o ponto – para hospedar famílias baseadas em face ou em piso.</summary>
+    public Reference? HitReference(double xFt, double yFt, double zHintFt)
+    {
+        if (_intersector == null) return null;
+        try
+        {
+            var hit = _intersector.FindNearest(new XYZ(xFt, yFt, zHintFt + 300), -XYZ.BasisZ)
+                      ?? _intersector.FindNearest(new XYZ(xFt, yFt, zHintFt - 300), XYZ.BasisZ);
+            return hit?.GetReference();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private bool Sample(double xFt, double yFt, double zHintFt, out double zFt, out XYZ normal)
     {
         zFt = zHintFt;

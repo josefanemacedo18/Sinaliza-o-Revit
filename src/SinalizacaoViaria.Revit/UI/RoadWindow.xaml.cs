@@ -169,6 +169,20 @@ public partial class RoadWindow : Window
 
     // ------------------------------------------------------------------ carregar / montar
 
+    /// <summary>Abre a janela com a seção de uma via existente (Editar → via inteira).</summary>
+    public void LoadForEdit(RoadSetup s)
+    {
+        Title = "Editar via – seção transversal";
+        LoadSetup(s);
+        if (CbTemplate.Items.Count > 0) CbTemplate.SelectedIndex = -1;
+        RbCurves.IsChecked = true;
+        RbDraw.IsEnabled = false;
+        RbCurves.IsEnabled = false;
+        CkSnap.IsEnabled = false;
+        BtnOk.Content = "Aplicar à via";
+        SchedulePreview();
+    }
+
     private void LoadSetup(RoadSetup s)
     {
         var was = _loading;

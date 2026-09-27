@@ -141,7 +141,7 @@ public static class RoundaboutGenerator
         if (d.Lanes * d.LaneWidth < 4.0) L.Warnings.Add("Pista giratória com menos de 4 m – confira a largura para os veículos de projeto.");
         var inscribed = 2 * (ri + ring);
         if (d.Type == TipoRotatoria.Mini && inscribed > 28) L.Warnings.Add($"Minirrotatória com diâmetro inscrito de {inscribed:0.0} m (referência: 13 a 25 m).");
-        if (d.Type != TipoRotatoria.Mini && d.IslandType is not (TipoIlhaCentral.Galgavel or TipoIlhaCentral.Pintada) && ri < 4 && d.Legs.Count > 0)
+        if (d.Type != TipoRotatoria.Mini && d.IslandType is not (TipoIlhaCentral.Galgavel or TipoIlhaCentral.Pintada or TipoIlhaCentral.Calota) && ri < 4 && d.Legs.Count > 0)
             L.Warnings.Add("Ilha central pequena (< 4 m): em rotatórias compactas prefira ilha galgável ou pintada (minirrotatória).");
         if (d.Lanes >= 2 && d.Type is TipoRotatoria.Compacta or TipoRotatoria.Mini) L.Warnings.Add("Rotatórias compactas/mini devem ter uma faixa no anel.");
         if (!complete && d.Legs.Any(l => l.RoadId == null && l.GroupId == null) && d.Legs.Count > 0)
@@ -230,7 +230,7 @@ public static class RoundaboutGenerator
         {
             // Sem obra civil: a ilha é a linha de canalização + tachões (+ zebrado), gerados como marcas filhas.
         }
-        else if (d.IslandType == TipoIlhaCentral.Galgavel) L.IslandCore.Add(island);
+        else if (d.IslandType is TipoIlhaCentral.Galgavel or TipoIlhaCentral.Calota) L.IslandCore.Add(island);
         else
         {
             var core = PolygonOps.Offset(new[] { island }, -cw);
@@ -332,17 +332,52 @@ public static class RoundaboutGenerator
         }
         var pavColor = d.Pavement switch { TipoPavimento.Bloquete => MarkingColor.Bloquete, TipoPavimento.Concreto => MarkingColor.PavimentoConcreto, _ => MarkingColor.Asfalto };
         var pt = d.Pavement switch { TipoPavimento.Bloquete => 0.08, TipoPavimento.Concreto => 0.15, _ => 0.05 };
-        if (d.Pavement != TipoPavimento.Nenhum) Raised(L.Pavement, pavColor, pt, -pt);
-        Raised(L.Apron, MarkingColor.Bloquete, Math.Clamp(d.ApronHeight, 0.02, 0.15));   // galgável: bloquete elevado
-        Raised(L.IslandCurb, MarkingColor.Concreto, d.CurbHeight);
+        // Rotatória elevada (platô): a pista giratória sobe 'hp' em relação às vias; rampas nos ramos.
+        var hp = d.Raised ? Math.Clamp(d.RaisedHeight, 0.03, 0.30) : 0;
+        if (d.Pavement != TipoPavimento.Nenhum)
+        {
+            if (hp > 0)
+            {
+                var ring = PolygonOps.Intersect(L.Pavement, new[] { L.Outer });
+                var rest = PolygonOps.Difference(L.Pavement, new[] { L.Outer });
+                Raised(ring, pavColor, pt + hp, -pt);
+                Raised(rest, pavColor, pt, -pt);
+                var rl = Math.Clamp(d.RampLength, 0.5, 6);
+                foreach (var g in L.Legs)
+                {
+                    var r0 = L.ToOuter(d.Center, g.Dir);
+                    if (r0 <= 0) continue;
+                    var w = Math.Max(3, g.Leg.Width);
+                    var origin = d.Center + g.Dir * (r0 + rl) - g.Left * (w / 2);
+                    var prof = new Polygon2(new[] { new Vec2(0, 0), new Vec2(rl + 0.6, 0), new Vec2(rl + 0.6, hp), new Vec2(rl, hp) });
+                    geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(origin, -g.Dir, prof, g.Left, w), pavColor));
+                }
+                geo.Warnings.Add($"Rotatória elevada: platô de {hp * 100:0} cm com rampas de {rl:0.0} m – sinalize com A-18/A-32b e confira a drenagem.");
+            }
+            else Raised(L.Pavement, pavColor, pt, -pt);
+        }
+        Raised(L.Apron, MarkingColor.Bloquete, Math.Clamp(d.ApronHeight, 0.02, 0.15), hp);   // galgável: bloquete elevado
+        Raised(L.IslandCurb, MarkingColor.Concreto, d.CurbHeight, hp);
         switch (d.IslandType)
         {
-            case TipoIlhaCentral.Galgavel: Raised(L.IslandCore, MarkingColor.Branca, 0.07); break;   // cúpula galgável pintada
-            case TipoIlhaCentral.Pavimentada: Raised(L.IslandCore, MarkingColor.Concreto, d.CurbHeight); break;
+            case TipoIlhaCentral.Galgavel: Raised(L.IslandCore, MarkingColor.Branca, 0.07, hp); break;   // cúpula galgável pintada
+            case TipoIlhaCentral.Pavimentada: Raised(L.IslandCore, MarkingColor.Concreto, d.CurbHeight, hp); break;
             case TipoIlhaCentral.Pintada: break;                                                     // marcas filhas (LCA, tachões, zebrado)
-            default: Raised(L.IslandCore, MarkingColor.Grama, d.CurbHeight); break;
+            case TipoIlhaCentral.Calota:
+            {
+                // Tronco de cone baixo (rampado): anéis concêntricos da ilha até o topo.
+                var dh = Math.Clamp(d.DomeHeight, 0.05, 0.60);
+                List<Vec2> Scaled(double k) => L.Island.Outer.Select(v => d.Center + (v - d.Center) * k).ToList();
+                var rings = new List<(List<Vec2> Ring, double Z)>
+                {
+                    (Scaled(1.0), hp), (Scaled(0.97), hp + dh * 0.12), (Scaled(0.8), hp + dh * 0.55), (Scaled(0.55), hp + dh * 0.88), (Scaled(0.3), hp + dh),
+                };
+                geo.Pieces.Add(DeviceGenerator.Loft(rings, MarkingColor.PavimentoConcreto));
+                break;
+            }
+            default: Raised(L.IslandCore, MarkingColor.Grama, d.CurbHeight, hp); break;
         }
-        Raised(L.Dividers, MarkingColor.Concreto, 0.10);
+        Raised(L.Dividers, MarkingColor.Concreto, 0.10, hp);
         Raised(L.SplitterCurb, MarkingColor.Concreto, d.CurbHeight);
         Raised(L.SplitterCore, MarkingColor.Concreto, d.CurbHeight);
         Raised(L.Curb, MarkingColor.Concreto, d.CurbHeight);

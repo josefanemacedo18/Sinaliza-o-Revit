@@ -45,6 +45,17 @@ public sealed class QuantityRow
     /// <summary>Família do Revit inserida pelo usuário (não gerada pelo plugin).</summary>
     public bool IsFamily { get; set; }
 
+    /// <summary>
+    /// Linha de memorial: o item é contado por modelo (placas, dispositivos, mobiliário, moderação, rampas), sem
+    /// desdobrar por cor nem material da pintura – cores e materiais entram só na sinalização horizontal.
+    /// </summary>
+    public bool Memorial { get; set; }
+
+    /// <summary>Categorias contadas por modelo (memorial), sem linhas por cor/material.</summary>
+    public static bool IsMemorialCategory(CategoriaQuantitativo c) =>
+        c is CategoriaQuantitativo.SinalizacaoVertical or CategoriaQuantitativo.DispositivosSegregacao or CategoriaQuantitativo.MobiliarioUrbano
+            or CategoriaQuantitativo.ModeracaoTrafego or CategoriaQuantitativo.Acessibilidade;
+
     /// <summary>Tipos de família do Revit consolidados na linha (famílias do usuário).</summary>
     public string FamilyTypes { get; set; } = "";
 
@@ -100,7 +111,7 @@ public sealed class QuantityRow
     };
 
     /// <summary>Área em planta: pintada (tintas) ou ocupada (concreto, grama, metal...).</summary>
-    public string AreaKind => MarkingColors.IsPaint(Color) ? "pintada" : "em planta";
+    public string AreaKind => Memorial ? "total" : MarkingColors.IsPaint(Color) ? "pintada" : "em planta";
 
     public static string CategoryLabel(CategoriaQuantitativo c) => c switch
     {
@@ -165,15 +176,19 @@ public static class QuantityCalculator
             var mat = catalog.Material(matName);
             var byColor = geo.AreaByColor;
             var first = true;
+            var category = QuantityRow.Categorize(def, info.Group);
+            var memorial = QuantityRow.IsMemorialCategory(category);
             foreach (var (color, area) in byColor.OrderByDescending(kv => kv.Value))
             {
-                var key = (info.Code, color, matName, def.Hierarchy);
+                // Memorial: uma linha por modelo (todas as cores e materiais somados); horizontal: por cor e material.
+                var key = memorial ? (info.Code, MarkingColor.Preta, "", def.Hierarchy) : (info.Code, color, matName, def.Hierarchy);
                 if (!rows.TryGetValue(key, out var row))
                 {
                     row = new QuantityRow
                     {
-                        Code = info.Code, Name = info.Name, Group = info.Group, Color = color, Material = MarkingColors.IsPaint(color) ? matName : "",
-                        Category = QuantityRow.Categorize(def, info.Group),
+                        Code = info.Code, Name = info.Name, Group = info.Group, Color = color, Material = !memorial && MarkingColors.IsPaint(color) ? matName : "",
+                        Memorial = memorial,
+                        Category = category,
                         Subcategory = def is UrbanElementDefinition u && catalog.Movel(u.Code) is { } mv ? UrbanCategories.Label(UrbanCategories.Of(mv.Forma)) : "",
                         Hierarchy = def.Hierarchy,
                         Unit = info.Unit, Reference = info.Reference, ConsumptionUnit = mat?.UnidadeConsumo ?? "",
@@ -182,7 +197,7 @@ public static class QuantityCalculator
                 }
                 row.Area += area;
                 // Consumo de tinta apenas para demarcação (não para calçadas, canteiros e dispositivos físicos).
-                if (mat != null && MarkingColors.IsPaint(color) && def is not (DeviceMarkingDefinition or SignDefinition or UrbanElementDefinition or RampDefinition or TactileRouteDefinition)
+                if (!memorial && mat != null && MarkingColors.IsPaint(color) && def is not (DeviceMarkingDefinition or SignDefinition or UrbanElementDefinition or RampDefinition or TactileRouteDefinition)
                     && !(def is LinearMarkingDefinition { Code: "PTA" or "PTD" }))
                 {
                     row.MaterialConsumption += area * mat.Consumo;

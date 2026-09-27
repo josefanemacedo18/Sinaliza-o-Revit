@@ -120,6 +120,36 @@ public static class DeviceGenerator
 
     // ------------------------------------------------------------------ unidades
 
+    /// <summary>
+    /// Tacha (corpo baixo com face refletiva) ou tachão (tronco trapezoidal com refletivos nas duas faces de aproximação),
+    /// em coordenadas locais (+Y ao longo do caminho, +X à direita), para as marcas lineares de unidades (TAC-A/B, TACHÃO).
+    /// </summary>
+    public static IEnumerable<MarkingPiece> StudPieces(double L, double W, double H, MarkingColor color, bool bidirectional)
+    {
+        L = Math.Max(0.03, L); W = Math.Max(0.03, W); H = Math.Max(0.008, H);
+        var sides = bidirectional ? new[] { 1.0, -1.0 } : new[] { -1.0 };
+        var reflective = color == MarkingColor.Amarela ? MarkingColor.Amarela : MarkingColor.Branca;
+        if (H <= 0.035)
+        {
+            // Tacha: corpo com faces chanfradas; face refletiva voltada para o tráfego.
+            yield return Loft(new[] { (RectRing(W, L), 0.0), (RectRing(W * 0.96, L * 0.96), H * 0.35), (RectRing(W * 0.62, L * 0.55), H) }, color);
+            foreach (var sg in sides)
+                yield return Block(new Vec2(0, sg * L * 0.34), W * 0.62, L * 0.08, H * 0.25, H * 0.92, reflective == color ? MarkingColor.Branca : reflective);
+            yield break;
+        }
+        // Tachão: tronco trapezoidal com refletivos.
+        yield return Loft(new[] { (RectRing(W, L), 0.0), (RectRing(W * 0.9, L * 0.86), H * 0.55), (RectRing(W * 0.62, L * 0.58), H) }, color);
+        foreach (var sg in sides)
+            yield return Block(new Vec2(0, sg * L * 0.37), W * 0.55, L * 0.07, H * 0.25, H * 0.5, MarkingColor.Branca);
+    }
+
+    /// <summary>Leva peças locais (+Y ao longo, +X à direita) para o mundo.</summary>
+    public static IEnumerable<MarkingPiece> Place(IEnumerable<MarkingPiece> local, Vec2 origin, Vec2 forward)
+    {
+        var f = new LocalFrame(origin, forward);
+        foreach (var p in local) yield return ToWorld(p, f) with { IsUnit = true };
+    }
+
     /// <summary>Peças de uma unidade em coordenadas locais (+Y ao longo do caminho, +X à direita).</summary>
     public static IEnumerable<MarkingPiece> UnitPieces(DispositivoDef def, double L, double W, double H, MarkingColor color, int index = 0)
     {

@@ -71,54 +71,32 @@ public sealed class CmdEditar : CommandBase
             Report("Interseção", IntersectionRunner.Run(uidoc, "SV - Editar interseção", s => s.Refresh(inter)).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;
         }
-        if (stored.Definition is RoadPavementDefinition pv)
+        // Elemento de uma via: escolher o que editar (só ele, a via inteira ou o pavimento/raios).
+        if (stored.Definition.GroupId is { } gid && stored.Definition is not (IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition))
         {
-            // Pavimento da via: material, espessura e raio das esquinas (larguras e faixas: Sinalizar via / Pista).
-            var work = (RoadPavementDefinition)MarkingDefinition.FromJson(pv.ToJson())!;
-            var thick = work.ActualThickness;
-            var radius = work.CornerRadius ?? 0;
-            var h = work.Hierarchy ?? HierarquiaViaria.Local;
-            var axisR = work.PathRef.SmoothRadius ?? 0;
-            var minR = RoadSetup.MinAxisRadius(Math.Max(work.TotalLeft, work.TotalRight));
-            var fw = new FormWindow("Editar pavimento da via", "Pavimento da via",
-                    "Material, espessura, hierarquia e raio das esquinas. As interseções desta via são refeitas com o novo raio.",
-                    null, null, false, "Aplicar", 600, 380)
-                .Choice("Pavimento", new[] { ("Asfalto (CBUQ)", TipoPavimento.Asfalto), ("Bloquete / intertravado", TipoPavimento.Bloquete), ("Concreto", TipoPavimento.Concreto) },
-                    () => work.Material, v => work.Material = v)
-                .Number("Espessura (m)", () => thick, v => thick = v, 0.01, 1)
-                .Choice("Hierarquia viária (CTB art. 60)", Hierarquia.Definidas.Select(x => (Hierarquia.Label(x), x)), () => h, v => h = v)
-                .Number("Raio das esquinas (m, 0 = pela hierarquia)", () => radius, v => radius = v, 0, 60,
-                    tooltip: "Raio de concordância na face do meio-fio. Qualquer valor a partir de 0,5 m gera curva.")
-                .Number($"Raio das curvas do eixo (m, 0 = cantos como desenhados; mín. {UiHelpers.F(minR, "0.0")})", () => axisR, v => axisR = v, 0, 2000,
-                    tooltip: "Arredonda os cantos vivos do eixo: pavimento, linhas de bordo, meios-fios e calçadas passam a fazer a curva " +
-                             "(a borda interna também). Valores menores que a meia largura + 1,5 m são aumentados.");
-            if (UiHelpers.ShowModal(fw) != true) return Result.Cancelled;
-            work.Thickness = Math.Abs(thick - work.DefaultThickness) > 1e-6 ? thick : null;
-            work.CornerRadius = radius > 0.01 ? radius : null;
-            work.Hierarchy = h;
-            double? newR = axisR > 0.01 ? Math.Max(axisR, minR) : null;
-            var group = new List<MarkingDefinition> { work };
-            if (newR != work.PathRef.SmoothRadius && work.GroupId != null)
-                group.AddRange(MarkingStorage.Definitions(uidoc.Document).Where(d => d.GroupId == work.GroupId && d.Id != work.Id && d.Path != null
-                    && d is not IntersectionDefinition));
-            foreach (var g in group) g.Path!.SmoothRadius = newR;
-            var res = MarkingCreator.Commit(uidoc, group, "SV - Editar pavimento");
-            res.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões", s =>
+            var members = MarkingStorage.Definitions(uidoc.Document).Where(d => d.GroupId == gid).ToList();
+            var pavement = members.OfType<RoadPavementDefinition>().FirstOrDefault();
+            if (pavement != null && members.Count > 1)
             {
-                var r = new List<RenderResult>();
-                var pavs = MarkingStorage.Definitions(uidoc.Document).OfType<RoadPavementDefinition>().ToDictionary(p => p.Id);
-                foreach (var it in s.DependentOn(new[] { work }))
+                var info = MarkingBuilder.Describe(stored.Definition, PluginContext.Catalog);
+                var td = new TaskDialog(AppTitle)
                 {
-                    it.CornerRadius = Hierarquia.NodeRadius(it.RoadIds.Select(id => pavs.GetValueOrDefault(id)).Where(p => p != null)!);
-                    r.AddRange(s.Refresh(it));
-                }
-                foreach (var rb in s.RoundaboutsDependentOn(new[] { work })) r.AddRange(s.Refresh(rb));
-                foreach (var c in s.CulDeSacsDependentOn(new[] { work })) r.AddRange(s.Refresh(c));
-                return r;
-            }));
-            Report("Pavimento", res.Where(r => r.Warnings.Count > 0).ToList());
-            return Result.Succeeded;
+                    MainInstruction = "O que você quer editar?",
+                    MainContent = $"Elemento selecionado: {info.Code} – {info.Name}.\nEle faz parte de uma via com {members.Count} elementos (pista, linhas, calçadas, meios-fios...).",
+                };
+                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Só este elemento", "Parâmetros deste elemento: largura, variante, deslocamento, cor...");
+                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "A via inteira (seção transversal)",
+                    "Faixas, calçadas, meios-fios, sarjetas, canteiros, ciclofaixas e linhas – adicionar, remover ou alterar. A via é regenerada mantendo o eixo, o pavimento e as conexões.");
+                td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Pavimento, hierarquia e raios", "Material, espessura, hierarquia viária, raio das esquinas e das curvas do eixo.");
+                td.CommonButtons = TaskDialogCommonButtons.Cancel;
+                var choice = td.Show();
+                if (choice == TaskDialogResult.CommandLink2) return EditWholeRoad(uidoc, pavement, members);
+                if (choice == TaskDialogResult.CommandLink3) return EditPavement(uidoc, pavement);
+                if (choice != TaskDialogResult.CommandLink1) return Result.Cancelled;
+                if (stored.Definition is RoadPavementDefinition) return EditPavement(uidoc, pavement);
+            }
         }
+        if (stored.Definition is RoadPavementDefinition pv) return EditPavement(uidoc, pv);
         if (stored.Definition is CulDeSacDefinition { RoadId: not null } linked)
         {
             var form0 = SidewalkForms.CulDeSac(linked, true);
@@ -165,6 +143,122 @@ public sealed class CmdEditar : CommandBase
         if (edited is RampDefinition ramp) RampCutter.Apply(uidoc, ramp);
         if (edited is LinearMarkingDefinition or TrafficCalmingDefinition or HatchMarkingDefinition or ChannelizationDefinition || edited.Overlay) FootprintCutter.ApplyFor(uidoc, edited);
         Report("Edição", results);
+        return Result.Succeeded;
+    }
+
+
+    /// <summary>Pavimento da via: material, espessura, hierarquia e raios (larguras e faixas: editar a via inteira).</summary>
+    private Result EditPavement(UIDocument uidoc, RoadPavementDefinition pv)
+    {
+        // Pavimento da via: material, espessura e raio das esquinas (larguras e faixas: Sinalizar via / Pista).
+        var work = (RoadPavementDefinition)MarkingDefinition.FromJson(pv.ToJson())!;
+        var thick = work.ActualThickness;
+        var radius = work.CornerRadius ?? 0;
+        var h = work.Hierarchy ?? HierarquiaViaria.Local;
+        var axisR = work.PathRef.SmoothRadius ?? 0;
+        var minR = RoadSetup.MinAxisRadius(Math.Max(work.TotalLeft, work.TotalRight));
+        var fw = new FormWindow("Editar pavimento da via", "Pavimento da via",
+                "Material, espessura, hierarquia e raio das esquinas. As interseções desta via são refeitas com o novo raio.",
+                null, null, false, "Aplicar", 600, 380)
+            .Choice("Pavimento", new[] { ("Asfalto (CBUQ)", TipoPavimento.Asfalto), ("Bloquete / intertravado", TipoPavimento.Bloquete), ("Concreto", TipoPavimento.Concreto) },
+                () => work.Material, v => work.Material = v)
+            .Number("Espessura (m)", () => thick, v => thick = v, 0.01, 1)
+            .Choice("Hierarquia viária (CTB art. 60)", Hierarquia.Definidas.Select(x => (Hierarquia.Label(x), x)), () => h, v => h = v)
+            .Number("Raio das esquinas (m, 0 = pela hierarquia)", () => radius, v => radius = v, 0, 60,
+                tooltip: "Raio de concordância na face do meio-fio. Qualquer valor a partir de 0,5 m gera curva.")
+            .Number($"Raio das curvas do eixo (m, 0 = cantos como desenhados; mín. {UiHelpers.F(minR, "0.0")})", () => axisR, v => axisR = v, 0, 2000,
+                tooltip: "Arredonda os cantos vivos do eixo: pavimento, linhas de bordo, meios-fios e calçadas passam a fazer a curva " +
+                         "(a borda interna também). Valores menores que a meia largura + 1,5 m são aumentados.");
+        if (UiHelpers.ShowModal(fw) != true) return Result.Cancelled;
+        work.Thickness = Math.Abs(thick - work.DefaultThickness) > 1e-6 ? thick : null;
+        work.CornerRadius = radius > 0.01 ? radius : null;
+        work.Hierarchy = h;
+        double? newR = axisR > 0.01 ? Math.Max(axisR, minR) : null;
+        var group = new List<MarkingDefinition> { work };
+        if (newR != work.PathRef.SmoothRadius && work.GroupId != null)
+            group.AddRange(MarkingStorage.Definitions(uidoc.Document).Where(d => d.GroupId == work.GroupId && d.Id != work.Id && d.Path != null
+                && d is not IntersectionDefinition));
+        foreach (var g in group) g.Path!.SmoothRadius = newR;
+        var res = MarkingCreator.Commit(uidoc, group, "SV - Editar pavimento");
+        res.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões", s =>
+        {
+            var r = new List<RenderResult>();
+            var pavs = MarkingStorage.Definitions(uidoc.Document).OfType<RoadPavementDefinition>().ToDictionary(p => p.Id);
+            foreach (var it in s.DependentOn(new[] { work }))
+            {
+                it.CornerRadius = Hierarquia.NodeRadius(it.RoadIds.Select(id => pavs.GetValueOrDefault(id)).Where(p => p != null)!);
+                r.AddRange(s.Refresh(it));
+            }
+            foreach (var rb in s.RoundaboutsDependentOn(new[] { work })) r.AddRange(s.Refresh(rb));
+            foreach (var c in s.CulDeSacsDependentOn(new[] { work })) r.AddRange(s.Refresh(c));
+            return r;
+        }));
+        Report("Pavimento", res.Where(r => r.Warnings.Count > 0).ToList());
+        return Result.Succeeded;
+    }
+
+    /// <summary>
+    /// Edita a seção transversal completa de uma via existente: reabre a janela da via com a seção guardada, regenera
+    /// todos os elementos do grupo sobre o mesmo eixo (o pavimento mantém o Id, então interseções e rotatórias continuam
+    /// ligadas) e refaz as conexões.
+    /// </summary>
+    private Result EditWholeRoad(UIDocument uidoc, RoadPavementDefinition pav, List<MarkingDefinition> members)
+    {
+        var doc = uidoc.Document;
+        var setup = RoadTemplates.FromJson(pav.SetupJson);
+        if (setup == null)
+        {
+            // Via de versão anterior (sem a seção guardada): reconstrói o básico a partir do pavimento.
+            setup = new RoadSetup { TwoWay = pav.TwoWay, Hierarchy = pav.Hierarchy ?? HierarquiaViaria.Local, Pavement = pav.Material, PavementThickness = pav.Thickness, CornerRadius = pav.CornerRadius };
+            void Side(List<ElementoSecao> side, double carriage, double sidewalk)
+            {
+                var n = Math.Max(1, (int)Math.Round(carriage / 3.5));
+                for (int i = 0; i < n; i++) side.Add(new ElementoSecao { Tipo = TipoElementoSecao.FaixaRolamento, Largura = carriage / n });
+                if (sidewalk > 0.05) side.Add(new ElementoSecao { Tipo = TipoElementoSecao.Calcada, Largura = sidewalk });
+            }
+            Side(setup.Right, pav.RightWidth, pav.RightSidewalk);
+            Side(setup.Left, pav.LeftWidth, pav.LeftSidewalk);
+            TaskDialog.Show(AppTitle, "Esta via foi criada por uma versão anterior e não guardou a seção completa: a janela abre com pista e calçadas " +
+                                      "reconstruídas a partir do pavimento. Confira faixas, linhas e elementos antes de aplicar.");
+        }
+        var w = new RoadWindow(false);
+        w.LoadForEdit(setup);
+        if (UiHelpers.ShowModal(w) != true || w.Setup == null || w.OutputSettings == null) return Result.Cancelled;
+        PluginContext.SaveSettings();
+        EnsureDetailView(uidoc, w.OutputSettings, keepExistingView: true);
+
+        var defs = w.Setup.Build(pav.PathRef, w.OutputSettings, PluginContext.Catalog, pav.GroupId, pav.Id);   // Build clona o caminho por marca
+        var newPav = defs.OfType<RoadPavementDefinition>().FirstOrDefault();
+        if (newPav != null)
+        {
+            newPav.CornerRadius ??= pav.CornerRadius;
+            newPav.Hierarchy ??= pav.Hierarchy;
+            newPav.Exclusions.AddRange(pav.Exclusions);
+        }
+        // Recortes das conexões (interseções, rotatórias, rampas) são reaplicados pelo RefreshDependents.
+        var results = new List<RenderResult>();
+        using (MarkingService.RenderScope())
+        using (var t = new Transaction(doc, "SV - Editar via (remover elementos antigos)"))
+        {
+            t.Start();
+            var service = new MarkingService(doc, uidoc.ActiveView);
+            foreach (var m in members.Where(m => m.Id != pav.Id)) service.Delete(m.Id);
+            if (newPav == null) service.Delete(pav.Id);
+            t.Commit();
+        }
+        results.AddRange(MarkingCreator.Commit(uidoc, defs, "SV - Editar via"));
+        if (w.Setup.Warnings.Count > 0 && results.Count > 0) results[0].Warnings.InsertRange(0, w.Setup.Warnings);
+        try
+        {
+            results.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões da via", sv => sv.RefreshDependents(defs)).Where(r => r.Warnings.Count > 0));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Editar via – conexões", ex);
+            results.Add(new RenderResult { Geometry = null });
+            results[^1].Warnings.Add("As conexões da via não puderam ser refeitas: " + ex.Message);
+        }
+        Report("Via", results);
         return Result.Succeeded;
     }
 

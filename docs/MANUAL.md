@@ -233,7 +233,8 @@ a lista de tipos.
 | Inverter sentido / lados | Inverte o caminho; espelha linhas duplas (LFO-4). |
 | LRV: velocidade inicial → final | Só para a LRV: informe de quanto para quanto a velocidade deve cair (ex.: 60 → 30 km/h). O espaçamento **decrescente** das linhas é calculado pelo **método do MBST Vol. IV** (desaceleração de 1,47 m/s², 1 s entre linhas) e a largura da linha (0,20 / 0,30 / 0,40 m) pela velocidade; a última linha fica 2 m antes do ponto crítico. Vazio = padrão da variante. |
 
-**Tachas/tachões** contam unidades (coluna *Unid.* nos quantitativos). As variantes de **TAC-A/TAC-B** seguem a
+**Tachas/tachões** são modelados com a forma real – tacha baixa com faces chanfradas e face refletiva; tachão em tronco
+trapezoidal com refletivos nas duas faces de aproximação – e contam unidades (coluna *Unid.* nos quantitativos). As variantes de **TAC-A/TAC-B** seguem a
 Tabela 4.6 do MBST Vol. VI (8 / 12 / 16 m pela velocidade em situação normal; 6 / 9 / 12 m em situação especial –
 neblina, curvas, declives – e 2 / 4 m no trecho que antecede) e as do **TACHÃO** a Tabela 4.7 (4 m ao lado do fluxo,
 1 m em fluxos divergentes, 0,25–0,50 m em minirrotatórias). **LFO-5** (DER/SP) é a linha seccionada de transição com
@@ -348,6 +349,20 @@ Painel **Representação no Revit** (em todas as janelas):
 
 ## 9. Edição e atualização
 
+### 9.1 Editar por categoria (elemento, via inteira ou pavimento)
+
+Ao clicar em **Editar** sobre um elemento que pertence a uma via (calçada, meio-fio, linha, ciclofaixa, pavimento...), o
+plugin pergunta o que você quer editar:
+
+| Opção | O que abre |
+|---|---|
+| **Só este elemento** | a janela do próprio elemento (largura, variante, deslocamento, cor...). |
+| **A via inteira (seção transversal)** | a janela da via com a **seção guardada** na criação: acrescente, remova ou altere faixas, calçadas, meios-fios, sarjetas, canteiros e ciclofaixas. A via é regenerada sobre o mesmo eixo, o pavimento mantém a identidade e as interseções, rotatórias e cul-de-sacs ligados são refeitos. |
+| **Pavimento, hierarquia e raios** | material, espessura, hierarquia viária, raio das esquinas e raio das curvas do eixo. |
+
+Vias criadas por versões anteriores não guardaram a seção completa: a janela abre com pista e calçadas reconstruídas a
+partir do pavimento – confira antes de aplicar.
+
 * **Editar**: selecione uma marca (qualquer elemento dela) → a janela abre com os valores atuais →
   *Aplicar* regenera a marca mantendo o mesmo identificador (tabelas e seleções continuam válidas).
   No **pavimento da via** (clique no asfalto) a edição altera material, espessura, hierarquia e **raio das
@@ -366,6 +381,11 @@ Painel **Representação no Revit** (em todas as janelas):
 ---
 
 ## 10. Quantitativos
+
+**Memorial × quantidades.** As categorias **Sinalização vertical, Dispositivos, Mobiliário, Moderação de tráfego e
+Acessibilidade** são listadas como **memorial**: **uma linha por modelo** (ex.: *R-1 – Parada obrigatória: 3 un*), sem
+desdobrar por cor nem por material da chapa. Cores e materiais (consumo de tinta, microesferas) continuam só na
+**Sinalização horizontal**, onde interessam ao orçamento.
 
 * Somente o que **existe no modelo**: partes apagadas de uma marca saem do quantitativo, e pisos entram
   com a **área real** (inclusive os editados à mão).
@@ -666,6 +686,12 @@ Travessias, retenções, placas, zebrados e linhas deslocadas da interseção s�
 tipos e o controle escolhidos a todas as interseções do projeto.
 
 ## 20. Rotatórias
+
+**Rotatória elevada (platô)** e **ilha em calota**: em *Ilha central e anel*, marque *Rotatória elevada* para a pista
+giratória subir (altura e comprimento das rampas editáveis; rampas geradas em cada ramo) – solução de moderação de
+tráfego em vias locais, que exige A-18/A-32b e atenção à drenagem. A ilha **Calota rampada** é um tronco de cone baixo de
+concreto (altura no centro editável), galgável pelas rodas traseiras de veículos longos, usada em minirrotatórias e
+rotatórias compactas.
 
 **Tipos** (escolha em *Tipo de rotatória* – os valores de referência são aplicados e **tudo continua
 editável**):

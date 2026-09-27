@@ -122,7 +122,7 @@ public class LinearTests
         var v16 = t.Variantes.First(v => v.Nome.Contains("16 m"));   // MBST Vol. VI: V > 90 km/h, situação normal
         var geo = LinearPatternGenerator.Generate(Straight(160), t, v16);
         Assert.Equal(10, geo.UnitCount);
-        Assert.All(geo.Pieces, p => Assert.Equal(0.02, p.Thickness, 6));
+        Assert.All(geo.Pieces, p => Assert.InRange(p.Thickness, 0.001, 0.02 + 1e-6));   // corpo da tacha + face refletiva
     }
 
     [Fact]

@@ -70,6 +70,7 @@ public static class LinearPatternGenerator
         }
 
         var alignment = opt.Alignment ?? type.Alinhamento;
+        var units = 0;
 
         foreach (var stripeDef in variant.Faixas)
         {
@@ -85,12 +86,23 @@ public static class LinearPatternGenerator
             foreach (var (s0, s1) in intervals)
             {
                 geo.PaintedLength += s1 - s0;
-                foreach (var (c0, c1) in Chunk(s0, s1, type.Unidades ? 0 : opt.MaxPieceLength))
+                if (type.Unidades)
+                {
+                    // Tachas e tachões com forma real (corpo chanfrado/trapezoidal e faces refletivas), uma unidade por traço.
+                    var sm = (s0 + s1) / 2;
+                    var h = stripe.Espessura > 0 ? stripe.Espessura : type.Espessura;
+                    var bidir = color == MarkingColor.Amarela || type.Codigo.Contains("TACHAO", StringComparison.OrdinalIgnoreCase);
+                    var local = DeviceGenerator.StudPieces(s1 - s0, stripe.Largura, h, color, bidir);
+                    geo.Pieces.AddRange(DeviceGenerator.Place(local, offPath.PointAtParam(p.ParamAt(sm)), p.TangentAt(sm)));
+                    units++;
+                    continue;
+                }
+                foreach (var (c0, c1) in Chunk(s0, s1, opt.MaxPieceLength))
                 {
                     var pts = offPath.SubPoints(p.ParamAt(c0), p.ParamAt(c1));
                     if (pts.Count < 2) continue;
                     var polys = PolygonOps.Strip(pts, stripe.Largura);
-                    geo.AddRange(polys, color, stripe.Espessura > 0 ? stripe.Espessura : type.Espessura, type.Unidades);
+                    geo.AddRange(polys, color, stripe.Espessura > 0 ? stripe.Espessura : type.Espessura, false);
                 }
             }
 
@@ -98,7 +110,7 @@ public static class LinearPatternGenerator
                 geo.Warnings.Add($"{type.Codigo}: largura {stripe.Largura:0.00} m fora do intervalo de referência ({type.LarguraMin:0.00}–{type.LarguraMax:0.00} m).");
         }
 
-        geo.UnitCount = type.Unidades ? geo.Pieces.Count : 0;
+        geo.UnitCount = type.Unidades ? units : 0;
         return geo;
     }
 

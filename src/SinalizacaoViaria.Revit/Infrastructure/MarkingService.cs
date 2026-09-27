@@ -336,8 +336,19 @@ public sealed class MarkingService
                 catch (Exception ex)
                 {
                     Log.Error($"SetShape {info.Code}", ex);
-                    result.Warnings.Add($"{info.Code}: o Revit recusou a geometria ({ex.Message}).");
-                    continue;
+                    // Segunda tentativa com os contornos limpos (lascas, espinhos e vértices quase coincidentes removidos).
+                    var cleaned = g.Select(p => p.Solid != null || p.Profile != null ? p
+                        : PolygonOps.Clean(new[] { p.Shape }, 0.01).Select(c => c.Simplified(0.02) ?? c).Select(c => p with { Shape = c }).FirstOrDefault() ?? p).ToList();
+                    var retry = BuildSolids(cleaned, baseZ + def.Output.ElevationOffset + lift, thickness, sampler, Styles.Material(g.Key), new List<string>(), def.Output.ElevationOffset + lift);
+                    var ok = false;
+                    if (retry.Count > 0)
+                        try { ds.SetShape(retry); ok = true; } catch (Exception ex2) { Log.Error($"SetShape (limpo) {info.Code}", ex2); }
+                    if (!ok)
+                    {
+                        result.Warnings.Add($"{info.Code}: o Revit recusou a geometria ({ex.Message}).");
+                        if (ds.IsValidObject && !existing.Any(r => r.Element.Id == ds.Id)) SafeDelete(ds.Id);
+                        continue;
+                    }
                 }
                 try { ds.SetName($"SV {info.Code} {StyleService.ColorName(g.Key)}"); } catch { /* nome é opcional */ }
                 Tag(ds, def, info, g.Key, materialName, g.Sum(p => p.Shape.Area), geo, primary);
@@ -371,6 +382,33 @@ public sealed class MarkingService
                 }
                 else MarkingStorage.Write(e, def, MarkingColor.Preta);
                 keep.Add(e.Id);
+            }
+        }
+
+        if (keep.Count == 0 && def.Output.Mode == OutputMode.Modelo3D && geo.Pieces.Count > 0)
+        {
+            // Último recurso: nenhuma peça pôde ser modelada. Um marcador mínimo guarda a definição para a via/marca não
+            // desaparecer do projeto (conexões continuam a enxergá-la) – corrija a geometria e use Atualizar.
+            try
+            {
+                var c = geo.Pieces.OrderByDescending(p => p.Shape.Area).First().Shape.Centroid;
+                var cz = UnitConv.Ft(baseZ + def.Output.ElevationOffset);
+                var box = Polygon2.Rectangle(new Vec2(c.X - 0.15, c.Y - 0.15), new Vec2(c.X + 0.15, c.Y + 0.15));
+                var loops = ToCurveLoops(box, cz);
+                var solid = GeometryCreationUtilities.CreateExtrusionGeometry(loops, XYZ.BasisZ, UnitConv.Ft(0.02), new SolidOptions(Styles.Material(MarkingColor.Preta), ElementId.InvalidElementId));
+                var anchor = DirectShape.CreateElement(_doc, new ElementId(BuiltInCategory.OST_GenericModel));
+                anchor.ApplicationId = "SinalizacaoViaria";
+                anchor.ApplicationDataId = def.Id;
+                anchor.SetShape(new List<GeometryObject> { solid });
+                try { anchor.SetName($"SV {info.Code} (marcador – geometria recusada)"); } catch { /* opcional */ }
+                Tag(anchor, def, info, MarkingColor.Preta, materialName, 0, geo, true);
+                keep.Add(anchor.Id);
+                result.Warnings.Add($"{info.Code}: NENHUMA peça pôde ser modelada pelo Revit – ficou só um marcador de 30 cm em ({c.X:0.0}; {c.Y:0.0}). " +
+                                    "Veja o arquivo log.txt (Sobre) e envie ao suporte; depois de corrigir, use Atualizar.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Marcador de último recurso", ex);
             }
         }
 
@@ -597,6 +635,35 @@ public sealed class MarkingService
         return GeometryCreationUtilities.CreateExtrusionGeometry(loops, dir, UnitConv.Ft(Math.Max(0.001, depth)), options);
     }
 
+    /// <summary>
+    /// Remove vértices quase coincidentes e "espinhos" (ida e volta na mesma direção) que fazem o Revit recusar o
+    /// contorno – aparecem em recortes oblíquos e em curvas com raio pequeno.
+    /// </summary>
+    private static List<XYZ> Sanitize(List<XYZ> pts, double tol)
+    {
+        bool changed = true;
+        for (int pass = 0; pass < 6 && changed && pts.Count >= 3; pass++)
+        {
+            changed = false;
+            var res = new List<XYZ>(pts.Count);
+            for (int i = 0; i < pts.Count; i++)
+            {
+                var a = pts[(i - 1 + pts.Count) % pts.Count];
+                var b = pts[i];
+                var c = pts[(i + 1) % pts.Count];
+                var u = b - a;
+                var v = c - b;
+                var lu = u.GetLength();
+                var lv = v.GetLength();
+                if (lu <= tol) { changed = true; continue; }
+                if (lu > 1e-9 && lv > 1e-9 && u.DotProduct(v) / (lu * lv) < -0.9995) { changed = true; continue; }   // espinho
+                res.Add(b);
+            }
+            pts = res;
+        }
+        return pts;
+    }
+
     private CurveLoop? ToCurveLoop3D(List<XYZ> raw)
     {
         var tol = _doc.Application.ShortCurveTolerance * 1.5;
@@ -604,6 +671,7 @@ public sealed class MarkingService
         foreach (var p in raw)
             if (pts.Count == 0 || pts[^1].DistanceTo(p) > tol) pts.Add(p);
         while (pts.Count > 2 && pts[0].DistanceTo(pts[^1]) <= tol) pts.RemoveAt(pts.Count - 1);
+        pts = Sanitize(pts, tol);
         if (pts.Count < 3) return null;
         var loop = new CurveLoop();
         for (int i = 0; i < pts.Count; i++) loop.Append(Line.CreateBound(pts[i], pts[(i + 1) % pts.Count]));
@@ -634,6 +702,7 @@ public sealed class MarkingService
             if (pts.Count == 0 || pts[^1].DistanceTo(p) > tol) pts.Add(p);
         }
         while (pts.Count > 2 && pts[0].DistanceTo(pts[^1]) <= tol) pts.RemoveAt(pts.Count - 1);
+        pts = Sanitize(pts, tol);
         if (pts.Count < 3) return null;
         var loop = new CurveLoop();
         for (int i = 0; i < pts.Count; i++)

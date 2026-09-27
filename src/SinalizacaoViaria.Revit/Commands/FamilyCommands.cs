@@ -95,17 +95,24 @@ public sealed class CmdElementoFamilia : CommandBase
 
         if (doc.GetElement(new ElementId(o.SymbolId)) is not FamilySymbol symbol) return Result.Cancelled;
         var placementType = symbol.Family.FamilyPlacementType;
-        if (placementType is not (FamilyPlacementType.OneLevelBased or FamilyPlacementType.WorkPlaneBased or FamilyPlacementType.TwoLevelsBased))
+        if (placementType is not (FamilyPlacementType.OneLevelBased or FamilyPlacementType.WorkPlaneBased or FamilyPlacementType.TwoLevelsBased or FamilyPlacementType.OneLevelBasedHosted))
         {
-            TaskDialog.Show(AppTitle, $"A família \"{symbol.FamilyName}\" é do tipo {placementType} (hospedada em parede/face, baseada em linha ou adaptativa) " +
-                                      "e não pode ser inserida por ponto. Use uma família baseada em nível ou em plano de trabalho " +
+            TaskDialog.Show(AppTitle, $"A família \"{symbol.FamilyName}\" é do tipo {placementType} (hospedada em parede, baseada em linha ou adaptativa) " +
+                                      "e não pode ser inserida por ponto. Use uma família baseada em nível, em plano de trabalho ou em face " +
                                       "(ex.: modelo genérico, mobiliário, plantio, luminária independente) – ou insira-a pelo Revit e use 'Classificar famílias já inseridas'.");
             return Result.Cancelled;
         }
 
         var placer = new Placer(doc, symbol, o);
         var count = o.Mode == 1 ? AlongPath(uidoc, placer, o) : ByClicks(uidoc, placer, o);
-        if (count == 0) return Result.Cancelled;
+        if (count == 0)
+        {
+            if (placer.LastError != null)
+                TaskDialog.Show(AppTitle, $"Não foi possível inserir \"{symbol.FamilyName} : {symbol.Name}\" ({placementType}).\n\nMotivo informado pelo Revit:\n{placer.LastError}\n\n" +
+                                          "Dicas: famílias baseadas em face precisam de um piso/topografia sob o ponto (ou desmarque 'Assentar sobre a superfície' " +
+                                          "para usar o plano do nível); famílias hospedadas em parede/teto não podem ser inseridas por ponto – insira-as pelo Revit e use 'Classificar famílias já inseridas'.");
+            return Result.Cancelled;
+        }
         TaskDialog.Show(AppTitle, $"{count} elemento(s) \"{symbol.FamilyName} : {symbol.Name}\" inserido(s) e classificado(s) em " +
                                   $"\"{UrbanCategories.Label(o.Category)}\" (código {placer.Code}).\n\n" +
                                   "Eles entram no Quantitativo (categoria 7 – Mobiliário e elementos urbanos) e nas tabelas do Revit.");
@@ -167,7 +174,7 @@ public sealed class CmdElementoFamilia : CommandBase
     private static List<FamilySymbol> Symbols(Document doc) =>
         new FilteredElementCollector(doc).OfClass(typeof(FamilySymbol)).Cast<FamilySymbol>()
             .Where(s => s.Category is { CategoryType: CategoryType.Model } && s.Family != null
-                        && s.Family.FamilyPlacementType is FamilyPlacementType.OneLevelBased or FamilyPlacementType.WorkPlaneBased or FamilyPlacementType.TwoLevelsBased
+                        && s.Family.FamilyPlacementType is FamilyPlacementType.OneLevelBased or FamilyPlacementType.WorkPlaneBased or FamilyPlacementType.TwoLevelsBased or FamilyPlacementType.OneLevelBasedHosted
                         && !MarkingStorage.IsMarking(s))
             .OrderBy(s => Preferred.Contains(Bic(s)) ? 0 : 1).ThenBy(s => s.Category!.Name).ThenBy(s => s.FamilyName).ThenBy(s => s.Name)
             .ToList();
@@ -236,6 +243,8 @@ public sealed class CmdElementoFamilia : CommandBase
         public FamilySymbol Symbol { get; }
         public string Code { get; }
         public string Description { get; }
+        /// <summary>Última mensagem de erro do Revit ao inserir (para explicar ao usuário quando nada foi inserido).</summary>
+        public string? LastError { get; private set; }
 
         public Placer(Document doc, FamilySymbol symbol, FamilyPlacementOptions o)
         {
@@ -255,14 +264,59 @@ public sealed class CmdElementoFamilia : CommandBase
 
         public void Prepare()
         {
-            if (!Symbol.IsActive) Symbol.Activate();
-            if (Symbol.Category != null) SharedParameters.BindTo(_doc, Symbol.Category);
-            else SharedParameters.Ensure(_doc);
-            if (_o.OnSurface && _sampler == null)
+            try
+            {
+                if (!Symbol.IsActive) { Symbol.Activate(); _doc.Regenerate(); }
+            }
+            catch (Exception ex) { Log.Error("Ativar tipo de família", ex); }
+            try
+            {
+                if (Symbol.Category != null) SharedParameters.BindTo(_doc, Symbol.Category);
+                else SharedParameters.Ensure(_doc);
+            }
+            catch (Exception ex) { Log.Error("Parâmetros SV_* na categoria da família", ex); }
+            var needsSurface = _o.OnSurface || Symbol.Family.FamilyPlacementType is FamilyPlacementType.WorkPlaneBased or FamilyPlacementType.OneLevelBasedHosted;
+            if (needsSurface && _sampler == null)
             {
                 try { _sampler = new SurfaceSampler(_doc, Array.Empty<string>(), allowCreateView: true); }
                 catch (Exception ex) { Log.Error("Elemento urbano: superfície", ex); }
             }
+        }
+
+        /// <summary>Insere a instância pelo tipo de hospedagem da família, com alternativas quando o Revit recusa.</summary>
+        private FamilyInstance Create(XYZ p, double z, Level? level)
+        {
+            var kind = Symbol.Family.FamilyPlacementType;
+            Reference? faceRef = _sampler is { IsAvailable: true } ? _sampler.HitReference(p.X, p.Y, z) : null;
+            var errors = new List<string>();
+            FamilyInstance? Try(Func<FamilyInstance> f, string what)
+            {
+                try { return f(); }
+                catch (Exception ex) { errors.Add($"{what}: {ex.Message}"); return null; }
+            }
+            FamilyInstance? fi = null;
+            if (kind == FamilyPlacementType.WorkPlaneBased)
+            {
+                // 1) plano de trabalho horizontal na cota; 2) face do piso/terreno sob o ponto (famílias baseadas em face); 3) nível.
+                fi = Try(() =>
+                {
+                    var key = (long)Math.Round(z * 1000);
+                    if (!_planes.TryGetValue(key, out var sp) || !sp.IsValidObject)
+                        _planes[key] = sp = SketchPlane.Create(_doc, Plane.CreateByNormalAndOrigin(XYZ.BasisZ, new XYZ(0, 0, z)));
+                    return _doc.Create.NewFamilyInstance(sp.GetPlaneReference(), p, XYZ.BasisX, Symbol);
+                }, "plano de trabalho");
+                if (fi == null && faceRef != null) fi = Try(() => _doc.Create.NewFamilyInstance(faceRef, p, XYZ.BasisX, Symbol), "face sob o ponto");
+            }
+            else if (kind == FamilyPlacementType.OneLevelBasedHosted)
+            {
+                var host = faceRef != null ? _doc.GetElement(faceRef.ElementId) : null;
+                if (host != null && level != null) fi = Try(() => _doc.Create.NewFamilyInstance(p, Symbol, host, level, StructuralType.NonStructural), "hospedeiro sob o ponto");
+                if (fi == null && faceRef != null) fi = Try(() => _doc.Create.NewFamilyInstance(faceRef, p, XYZ.BasisX, Symbol), "face sob o ponto");
+            }
+            if (fi == null && level != null) fi = Try(() => _doc.Create.NewFamilyInstance(p, Symbol, level, StructuralType.NonStructural), "nível");
+            if (fi == null) fi = Try(() => _doc.Create.NewFamilyInstance(p, Symbol, StructuralType.NonStructural), "ponto");
+            if (fi == null) throw new InvalidOperationException(string.Join("\n", errors));
+            return fi;
         }
 
         public FamilyInstance? Place(XYZ point, XYZ facing)
@@ -274,19 +328,10 @@ public sealed class CmdElementoFamilia : CommandBase
             FamilyInstance? fi = null;
             try
             {
-                if (Symbol.Family.FamilyPlacementType == FamilyPlacementType.WorkPlaneBased)
+                var level = _levels.LastOrDefault(l => l.Elevation <= z + 1e-3) ?? _levels.FirstOrDefault();
+                fi = Create(p, z, level);
+                if (Symbol.Family.FamilyPlacementType != FamilyPlacementType.WorkPlaneBased)
                 {
-                    var key = (long)Math.Round(z * 1000);
-                    if (!_planes.TryGetValue(key, out var sp) || !sp.IsValidObject)
-                        _planes[key] = sp = SketchPlane.Create(_doc, Plane.CreateByNormalAndOrigin(XYZ.BasisZ, new XYZ(0, 0, z)));
-                    fi = _doc.Create.NewFamilyInstance(sp.GetPlaneReference(), p, XYZ.BasisX, Symbol);
-                }
-                else
-                {
-                    var level = _levels.LastOrDefault(l => l.Elevation <= z + 1e-3) ?? _levels.FirstOrDefault();
-                    fi = level != null
-                        ? _doc.Create.NewFamilyInstance(p, Symbol, level, StructuralType.NonStructural)
-                        : _doc.Create.NewFamilyInstance(p, Symbol, StructuralType.NonStructural);
                     _doc.Regenerate();
                     // Garante a cota: ajusta o deslocamento do nível quando o Revit ignora o Z do ponto.
                     if (fi.Location is LocationPoint lp && Math.Abs(lp.Point.Z - z) > 1e-3)
@@ -307,6 +352,7 @@ public sealed class CmdElementoFamilia : CommandBase
             catch (Exception ex)
             {
                 Log.Error($"Elemento urbano {Symbol.FamilyName}", ex);
+                LastError = ex.Message;
                 if (fi != null && fi.IsValidObject) try { _doc.Delete(fi.Id); } catch { /* ignora */ }
                 return null;
             }
