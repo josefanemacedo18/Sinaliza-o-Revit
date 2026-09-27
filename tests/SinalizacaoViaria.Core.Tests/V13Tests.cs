@@ -49,7 +49,7 @@ public class V13Tests
         var mini = Roundabout(TipoRotatoria.Mini);
         var two = Roundabout(TipoRotatoria.DuasFaixas);
         Assert.True(mini.OuterRadius * 2 < 28, $"mini D = {mini.OuterRadius * 2:0.0}");
-        Assert.Equal(TipoIlhaCentral.Galgavel, mini.IslandType);
+        Assert.Equal(TipoIlhaCentral.Pintada, mini.IslandType);
         Assert.Equal(2, two.Lanes);
         Assert.True(two.OuterRadius > mini.OuterRadius);
         var oval = Roundabout(TipoRotatoria.Oval);

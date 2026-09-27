@@ -151,12 +151,13 @@ public sealed class MarkingService
             return route.Exclusions.Count == 0 ? g : MarkingBuilder.ApplyExclusions(g, route.Exclusions);
         }
 
+        // Zebrado por contorno: todos os contornos juntos – o interno vira furo (anel em volta de uma rotatória).
+        if (def is HatchMarkingDefinition { IsStrip: false } hatch)
+            return MarkingBuilder.BuildHatch(hatch, path.Chains.Where(c => c.Points.Count >= 3).ToList(), ctx);
+
         var geo = new MarkingGeometry();
         foreach (var chain in path.Chains)
-        {
-            if (def is HatchMarkingDefinition { IsStrip: false } && chain.Points.Count < 3) continue;
             geo.Merge(MarkingBuilder.Build(def, chain, ctx));
-        }
         return geo;
     }
 

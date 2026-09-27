@@ -52,6 +52,8 @@ public static class SymbolBuilder
             FormaSimbolo.CruzSantoAndre => SaintAndrew(L, widthFactor),
             FormaSimbolo.ServicoSaude => HealthCross(L),
             FormaSimbolo.Pedestre => Pedestrian(L),
+            FormaSimbolo.SetaCurvaEsquerda => CurvedArrow(L, -1, widthFactor),
+            FormaSimbolo.SetaCurvaDireita => CurvedArrow(L, +1, widthFactor),
             _ => StraightArrow(L, widthFactor),
         };
 
@@ -84,6 +86,22 @@ public static class SymbolBuilder
         var n = dir.PerpLeft * (headW / 2);
         parts.Add(new Polygon2(new[] { baseC - n, tip, baseC + n }));
         return PolygonOps.Union(parts);
+    }
+
+    /// <summary>
+    /// Seta de movimento em curva (IMC – MBST Vol. IV 8.1.3): haste em arco (raio ≈ 3,5·L) inclinando para o lado da
+    /// curva, com ponta triangular. sigma = +1 curva à direita, −1 à esquerda.
+    /// </summary>
+    private static List<Polygon2> CurvedArrow(double L, int sigma, double wf)
+    {
+        var d = Dims(L, wf);
+        // Arco de raio r tangente ao eixo na base, deflexão total ~28° (r1 = 15,75 m para L = 4,50 m).
+        var r = 3.5 * L;
+        var center = new Vec2(sigma * r, 0);
+        var start = sigma > 0 ? Math.PI : 0;
+        var sweep = -sigma * (L / r);
+        var pts = CurveTools.Arc(center, r, start, sweep, 0.003);
+        return StrokeArrow(pts, d.Shaft * 1.6, d.HeadW * 1.3, d.HeadL * 0.8);
     }
 
     private static List<Polygon2> StraightArrow(double L, double wf)

@@ -153,6 +153,7 @@ public static class MarkingBuilder
         PlanterDefinition pl => path == null ? Missing("Linha dos canteiros não encontrada.") : SidewalkGenerator.Planter(pl, path, ctx),
         CulDeSacDefinition cd => path == null ? Missing("Eixo do cul-de-sac não encontrado.") : SidewalkGenerator.CulDeSac(cd, path),
         TrafficCalmingDefinition tc => path == null || path.Points.Count < 2 ? Missing("Bordos da pista não encontrados.") : TrafficCalmingGenerator.Generate(tc, path, ctx.Catalog),
+        ChannelizationDefinition cz => path == null || path.Points.Count < 2 ? Missing("Linha de referência da canalização não encontrada.") : ChannelizationGenerator.Generate(cz, path, ctx),
         _ => throw new NotSupportedException(def.GetType().Name),
     };
 
@@ -164,6 +165,23 @@ public static class MarkingBuilder
         if (path == null) { geo.Warnings.Add("Caminho da marca não encontrado (a linha de referência foi excluída?)."); return geo; }
         var variant = ResolveVariant(type, d.Variant, d.Speed);
         if (variant == null) { geo.Warnings.Add($"{d.Code}: nenhuma variante no catálogo."); return geo; }
+        if (d.Code == "LRV" && d.LrvFromKmh is > 0)
+        {
+            // Linhas de estímulo à redução de velocidade dimensionadas pelo método do MBST Vol. IV (5.2).
+            var v0 = d.LrvFromKmh.Value;
+            var vf = Math.Clamp(d.LrvToKmh ?? v0 / 2, 0, v0 - 5);
+            var lw = Automation.DesignRules.LrvLineWidth(v0);
+            var pattern = Automation.DesignRules.LrvPattern(v0, vf, lw);
+            var vc = new VarianteDef { Nome = variant.Nome, VelocidadeMax = variant.VelocidadeMax, Observacao = variant.Observacao };
+            foreach (var f in variant.Faixas)
+            {
+                var fc = f.Clone();
+                fc.Padrao = pattern;
+                fc.Repetir = false;
+                vc.Faixas.Add(fc);
+            }
+            variant = vc;
+        }
         if (d.Code == "SARJETAO")
         {
             var w = d.WidthOverride ?? variant.Faixas.Max(f => f.Largura);
@@ -205,22 +223,36 @@ public static class MarkingBuilder
         return type.Variantes.FirstOrDefault();
     }
 
-    public static MarkingGeometry BuildHatch(HatchMarkingDefinition d, Polyline2? path, BuildContext ctx)
+    public static MarkingGeometry BuildHatch(HatchMarkingDefinition d, Polyline2? path, BuildContext ctx) =>
+        BuildHatch(d, path == null ? Array.Empty<Polyline2>() : new[] { path }, ctx);
+
+    /// <summary>
+    /// Zebrado de vários contornos: contornos fechados um dentro do outro formam furos (regra par-ímpar) – ex.: anel
+    /// em volta de uma rotatória (círculo externo + círculo interno); contornos separados viram áreas independentes.
+    /// </summary>
+    public static MarkingGeometry BuildHatch(HatchMarkingDefinition d, IReadOnlyList<Polyline2> contours, BuildContext ctx)
     {
         var geo = new MarkingGeometry();
         var preset = ctx.Catalog.Hachura(d.Code);
         if (preset == null) { geo.Warnings.Add($"Código {d.Code} não existe no catálogo."); return geo; }
         if (d.IsStrip)
         {
-            if (path == null) { geo.Warnings.Add("Caminho da faixa não encontrado."); return geo; }
-            return BuildHatchStrip(d, preset, path, ctx);
+            if (contours.Count == 0) { geo.Warnings.Add("Caminho da faixa não encontrado."); return geo; }
+            foreach (var path in contours) geo.Merge(BuildHatchStrip(d, preset, path, ctx));
+            return geo;
         }
-        if (path == null || path.Points.Count < 3) { geo.Warnings.Add("Contorno da área não encontrado ou aberto."); return geo; }
+        var rings = new List<IReadOnlyList<Vec2>>();
+        foreach (var path in contours)
+        {
+            if (path.Points.Count < 3) continue;
+            var pts = path.Points.ToList();
+            if (pts.Count > 3 && pts[0].AlmostEquals(pts[^1], 1e-4)) pts.RemoveAt(pts.Count - 1);
+            rings.Add(pts);
+        }
+        if (rings.Count == 0) { geo.Warnings.Add("Contorno da área não encontrado ou aberto."); return geo; }
 
-        var pts = path.Points.ToList();
-        if (pts.Count > 3 && pts[0].AlmostEquals(pts[^1], 1e-4)) pts.RemoveAt(pts.Count - 1);
-        // Resolve autointerseções/contornos invertidos.
-        var regions = PolygonOps.FromContours(new[] { (IReadOnlyList<Vec2>)pts });
+        // Resolve autointerseções/contornos invertidos; com mais de um contorno, o interno vira furo (par-ímpar).
+        var regions = rings.Count > 1 ? PolygonOps.FromContoursEvenOdd(rings) : PolygonOps.FromContours(rings);
         foreach (var region in regions)
         {
             geo.Merge(HatchGenerator.Generate(region, preset, new HatchOptions
@@ -243,6 +275,40 @@ public static class MarkingBuilder
     }
 
     /// <summary>
+    /// Deslocamento lateral da faixa conforme o lado escolhido: à esquerda/direita do caminho ou, em contornos
+    /// fechados, para dentro/para fora (independentemente do sentido em que o contorno foi desenhado).
+    /// </summary>
+    public static double StripShift(HatchMarkingDefinition d, Polyline2 path, double width)
+    {
+        switch (d.StripSide)
+        {
+            case LadoFaixa.Esquerda: return width / 2;
+            case LadoFaixa.Direita: return -width / 2;
+            case LadoFaixa.Interno:
+            case LadoFaixa.Externo:
+            {
+                // Área com sinal: positiva = anti-horário = o interior fica à esquerda do sentido.
+                var ccw = SignedArea(path.Points) >= 0;
+                var inside = d.StripSide == LadoFaixa.Interno;
+                return (ccw == inside ? 1 : -1) * width / 2;
+            }
+            default: return 0;
+        }
+    }
+
+    private static double SignedArea(IReadOnlyList<Vec2> pts)
+    {
+        double a = 0;
+        for (int i = 0; i < pts.Count; i++)
+        {
+            var p = pts[i];
+            var q = pts[(i + 1) % pts.Count];
+            a += p.X * q.Y - q.X * p.Y;
+        }
+        return a / 2;
+    }
+
+    /// <summary>
     /// Zebrado em faixa ao longo do caminho (canteiro pintado, faixa de segurança): dividido em trechos
     /// para que as barras mantenham o ângulo em relação ao eixo mesmo em curvas; contorno contínuo.
     /// </summary>
@@ -252,14 +318,15 @@ public static class MarkingBuilder
         var width = d.StripWidth!.Value;
         var border = d.BorderWidth ?? preset.LarguraBorda;
         var borderColor = d.BorderColor ?? preset.CorBorda;
-        var axis = path.Offset(d.StripOffset);
+        var off = d.StripOffset + StripShift(d, path, width);
+        var axis = path.Offset(off);
         geo.PathLength = path.Length;
 
         if (border > 0 && width > 2 * border)
         {
             foreach (var side in new[] { 1.0, -1.0 })
             {
-                var edge = path.Offset(d.StripOffset + side * (width / 2 - border / 2));
+                var edge = path.Offset(off + side * (width / 2 - border / 2));
                 foreach (var (c0, c1) in LinearPatternGenerator.Chunk(0, path.Length, ctx.MaxPieceLength))
                     geo.AddRange(PolygonOps.Strip(edge.SubPoints(path.ParamAt(c0), path.ParamAt(c1)), border), borderColor);
             }

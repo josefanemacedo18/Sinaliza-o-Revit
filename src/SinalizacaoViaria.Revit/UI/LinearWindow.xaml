@@ -45,7 +45,7 @@
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <TextBlock Text="Variante" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Column="1" x:Name="CbVariant" SelectionChanged="AnyChanged"/>
@@ -61,7 +61,14 @@
                         </Grid>
                         <TextBlock Grid.Row="4" Text="Cor" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Row="4" Grid.Column="1" x:Name="CbColor" SelectionChanged="AnyChanged"/>
-                        <TextBlock Grid.Row="5" Grid.ColumnSpan="2" x:Name="TxtPattern" Style="{StaticResource Hint}"/>
+                        <TextBlock Grid.Row="5" x:Name="LblLrv" Text="LRV: velocidade inicial → final (km/h)" Style="{StaticResource FieldLabel}" Visibility="Collapsed"
+                                   ToolTip="Espaçamento decrescente calculado pelo método do MBST Vol. IV (desaceleração de 1,47 m/s², 1 s entre linhas). Vazio = padrão da variante."/>
+                        <Grid Grid.Row="5" Grid.Column="1" x:Name="PnLrv" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="6"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBox x:Name="TbLrvFrom" TextChanged="AnyChanged" ToolTip="Velocidade regulamentada antes da redução (km/h)"/>
+                            <TextBox Grid.Column="2" x:Name="TbLrvTo" TextChanged="AnyChanged" ToolTip="Velocidade desejada no ponto crítico (km/h)"/>
+                        </Grid>
+                        <TextBlock Grid.Row="6" Grid.ColumnSpan="2" x:Name="TxtPattern" Style="{StaticResource Hint}"/>
                     </Grid>
                 </GroupBox>
                 <GroupBox Header="Posicionamento">

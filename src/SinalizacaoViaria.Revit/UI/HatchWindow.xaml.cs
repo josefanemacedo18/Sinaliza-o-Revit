@@ -27,6 +27,10 @@ public partial class HatchWindow : Window
         foreach (var c in UiHelpers.ColorItems()) { CbBarColor.Items.Add(c); CbBorderColor.Items.Add(c); }
         CbBarColor.SelectedIndex = 0;
         CbBorderColor.SelectedIndex = 0;
+        foreach (var (l, v) in new[] { ("Para dentro do contorno (anel interno)", LadoFaixa.Interno), ("Para fora do contorno (anel externo)", LadoFaixa.Externo),
+                     ("Centrada na linha", LadoFaixa.Centro), ("À esquerda do sentido da linha", LadoFaixa.Esquerda), ("À direita do sentido da linha", LadoFaixa.Direita) })
+            CbStripSide.Items.Add(new SideItem(l, v));
+        CbStripSide.SelectedIndex = 0;
         Output.Changed += (_, _) => UpdatePreview();
 
         if (existing != null)
@@ -48,7 +52,15 @@ public partial class HatchWindow : Window
         UpdatePreview();
     }
 
+    private sealed record SideItem(string Label, LadoFaixa Value)
+    {
+        public override string ToString() => Label;
+    }
+
     private HachuraDef? Preset => LbTypes.SelectedItem as HachuraDef;
+
+    /// <summary>Faixa (anel) ao longo do contorno em vez de área preenchida.</summary>
+    public bool IsStrip => UiHelpers.ParseOpt(TbStrip?.Text) is > 0.01;
 
     private void TypeChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -83,6 +95,8 @@ public partial class HatchWindow : Window
         CkCrossed.IsChecked = d.Crossed ?? p?.Cruzado;
         UiHelpers.SelectColor(CbBarColor, d.BarColor);
         UiHelpers.SelectColor(CbBorderColor, d.BorderColor);
+        TbStrip.Text = UiHelpers.F(d.StripWidth ?? 0, "0.##");
+        foreach (var it in CbStripSide.Items) if (it is SideItem si && si.Value == d.StripSide) CbStripSide.SelectedItem = it;
     }
 
     private void AnyChanged(object sender, RoutedEventArgs e) => UpdatePreview();
@@ -101,6 +115,9 @@ public partial class HatchWindow : Window
         d.Crossed = CkCrossed.IsChecked == true;
         d.BarColor = UiHelpers.SelectedColor(CbBarColor);
         d.BorderColor = UiHelpers.SelectedColor(CbBorderColor);
+        var strip = UiHelpers.Parse(TbStrip, 0, "Largura da faixa", 0, 50);
+        d.StripWidth = strip > 0.01 ? strip : null;
+        d.StripSide = (CbStripSide.SelectedItem as SideItem)?.Value ?? LadoFaixa.Interno;
         d.Overlay = CkOverlay.IsChecked == true;
         d.Output = Output.Save(d.Output);
         return d;
@@ -116,9 +133,23 @@ public partial class HatchWindow : Window
             var sample = new Polyline2(new[] { new Vec2(0, 0), new Vec2(30, 0), new Vec2(30, 3.5), new Vec2(8, 1.2) }, closed: true);
             var probe = (HatchMarkingDefinition)MarkingDefinition.FromJson(d.ToJson())!;
             probe.ReferenceDirection ??= Vec2.UnitX;
-            var geo = MarkingBuilder.Build(probe, sample, new BuildContext { Catalog = _cat });
-            var pav = Polygon2.Rectangle(new Vec2(-3, -4), new Vec2(33, 7.5));
-            Preview.Show(geo, new[] { sample.Points }, new[] { pav });
+            Core.Model.MarkingGeometry geo;
+            Polygon2 pav;
+            if (probe.IsStrip)
+            {
+                // Anel em volta de uma ilha circular de exemplo (raio 8 m).
+                var ring = new Polyline2(CurveTools.Circle(new Vec2(15, 2), 8, 0.02), closed: true);
+                probe.ReferenceDirection = null;
+                geo = MarkingBuilder.Build(probe, ring, new BuildContext { Catalog = _cat });
+                pav = Polygon2.Rectangle(new Vec2(-3, -12), new Vec2(33, 16));
+                Preview.Show(geo, new[] { ring.Points }, new[] { pav });
+            }
+            else
+            {
+                geo = MarkingBuilder.Build(probe, sample, new BuildContext { Catalog = _cat });
+                pav = Polygon2.Rectangle(new Vec2(-3, -4), new Vec2(33, 7.5));
+                Preview.Show(geo, new[] { sample.Points }, new[] { pav });
+            }
             TxtWarnings.Text = string.Join("\n", geo.Warnings.Distinct());
         }
         catch (Exception ex)

@@ -165,6 +165,10 @@ public enum FormaSimbolo
     CruzSantoAndre,
     ServicoSaude,
     Pedestre,
+    /// <summary>Seta indicativa de movimento em curva (IMC) – curva à esquerda (rotatórias, anti-horário).</summary>
+    SetaCurvaEsquerda,
+    /// <summary>Seta indicativa de movimento em curva (IMC) – curva à direita.</summary>
+    SetaCurvaDireita,
 }
 
 public sealed class SimboloDef

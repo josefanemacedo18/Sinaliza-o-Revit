@@ -32,6 +32,7 @@ public partial class CalmingWindow : Window
         CbType.Items.Add(new Option("Quebra-mola – ondulação transversal tipo B", TipoModeracao.OndulacaoB));
         CbType.Items.Add(new Option("Faixa elevada para travessia de pedestres", TipoModeracao.FaixaElevada));
         CbType.Items.Add(new Option("Lombada invertida (valeta transversal)", TipoModeracao.LombadaInvertida));
+        CbType.Items.Add(new Option("Almofada (speed cushion) – uma por faixa, transponível por ônibus", TipoModeracao.Almofada));
         foreach (var c in UiHelpers.ColorItems()) CbColor.Items.Add(c);
         CbColor.SelectedIndex = 0;
         Output.Changed += (_, _) => UpdatePreview();
@@ -53,10 +54,14 @@ public partial class CalmingWindow : Window
         TbLength.Text = UiHelpers.F(d?.Length ?? l);
         TbHeight.Text = UiHelpers.F(d?.Height ?? h);
         TbRamp.Text = UiHelpers.F(d?.RampLength ?? r);
-        TbRamp.IsEnabled = t == TipoModeracao.FaixaElevada;
+        TbRamp.IsEnabled = t is TipoModeracao.FaixaElevada or TipoModeracao.Almofada;
         CkCrosswalk.IsEnabled = t == TipoModeracao.FaixaElevada;
+        var cushion = t == TipoModeracao.Almofada;
+        LblCushionW.Visibility = TbCushionW.Visibility = LblCushionN.Visibility = TbCushionN.Visibility = cushion ? Visibility.Visible : Visibility.Collapsed;
         if (d != null)
         {
+            TbCushionW.Text = UiHelpers.F(d.CushionWidth);
+            TbCushionN.Text = d.CushionCount.ToString();
             CkMarking.IsChecked = d.Marking;
             CkCrosswalk.IsChecked = d.Crosswalk;
             UiHelpers.SelectColor(CbColor, d.MarkingColor);
@@ -88,6 +93,11 @@ public partial class CalmingWindow : Window
         d.Marking = CkMarking.IsChecked == true;
         d.MarkingColor = UiHelpers.SelectedColor(CbColor);
         d.Crosswalk = CkCrosswalk.IsChecked == true;
+        if (d.Type == TipoModeracao.Almofada)
+        {
+            d.CushionWidth = UiHelpers.Parse(TbCushionW, 1.70, "Largura da almofada", 0.8, 3.0);
+            d.CushionCount = (int)UiHelpers.Parse(TbCushionN, 0, "Quantidade de almofadas", 0, 12);
+        }
         d.Output = Output.Save(d.Output);
         return d;
     }
@@ -104,6 +114,7 @@ public partial class CalmingWindow : Window
             Preview.Show(geo, null, new[] { road });
             var top = geo.Pieces.Where(p => p.Profile != null).Select(p => p.Profile!.Profile.Bounds).ToList();
             var info = top.Count == 0 ? "" : $"Altura máxima {UiHelpers.F(top.Max(b => b.Max.Y))} m; mínima {UiHelpers.F(top.Min(b => b.Min.Y))} m.";
+            if (d.Type == TipoModeracao.Almofada) info += " Almofadas: 6 a 7,5 cm de altura, 3,0 a 3,5 m de extensão, largura 1,60–1,90 m (CET-SP).";
             TxtWarnings.Text = info + "\nDimensões padrão conforme as resoluções do CONTRAN sobre ondulações transversais e faixas elevadas – confira a versão vigente e a sinalização vertical obrigatória (A-18 e placas de velocidade)." +
                                (geo.Warnings.Count > 0 ? "\n⚠ " + string.Join("\n⚠ ", geo.Warnings) : "");
         }

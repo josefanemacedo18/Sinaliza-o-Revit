@@ -60,6 +60,17 @@
                         <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbBorderColor" SelectionChanged="AnyChanged"/>
                     </Grid>
                 </GroupBox>
+                <GroupBox Header="Faixa ao longo do contorno (anel)">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Largura da faixa (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Column="1" x:Name="TbStrip" Text="0" TextChanged="AnyChanged" ToolTip="0 = preencher toda a área do contorno. Maior que 0 = só uma faixa desta largura ao longo do contorno (ex.: anel em volta de uma rotatória, faixa junto a um bordo)."/>
+                        <TextBlock Grid.Row="1" Text="Lado da faixa" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbStripSide" SelectionChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Style="{StaticResource Hint}" Text="Dica: selecionando dois contornos (externo e interno), a área entre eles é zebrada e o interior fica livre."/>
+                    </Grid>
+                </GroupBox>
                 <GroupBox x:Name="GbPath" Header="Contorno e direção">
                     <StackPanel>
                         <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas do contorno fechado" IsChecked="True"/>

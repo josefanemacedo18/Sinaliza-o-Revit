@@ -211,9 +211,11 @@ internal static class RoundaboutForms
     {
         string? angles = hasRoads ? null : string.Join("; ", d.Legs.Select(l => l.AngleDeg.ToString("0.#", UiHelpers.PtBr)));
         var legWidth = d.Legs.FirstOrDefault()?.Width ?? 7.0;
+        var legIdx = 0;
+        RoundaboutLeg Leg() => d.Legs.Count == 0 ? new RoundaboutLeg() : d.Legs[Math.Clamp(legIdx, 0, d.Legs.Count - 1)];
         var w = new FormWindow(edit ? "Editar rotatória" : "Rotatória", "Rotatória",
             hasRoads
-                ? "Os ramos foram detectados a partir das vias do \"Sinalizar via\" que passam pelo centro; as vias são recortadas e ligadas à rotatória."
+                ? "Os ramos foram detectados a partir das vias que passam pelo centro. Escolha como a rotatória se integra a elas: remodelando as entradas, só o anel, ou só a ilha central sobre a pista existente."
                 : "Informe os ângulos dos ramos (graus, 0 = leste, anti-horário) e a largura das pistas dos ramos.",
             d, () =>
             {
@@ -226,14 +228,19 @@ internal static class RoundaboutForms
                 {
                     var p = ch.Path ?? (ch as HatchMarkingDefinition)?.Boundary;
                     if (ch is SignDefinition) continue;
-                    g.Merge(MarkingBuilder.Build(ch, p == null ? null : new Core.Geometry.Polyline2(p.Points, p.Closed), ctx));
+                    try { g.Merge(MarkingBuilder.Build(ch, p == null ? null : new Core.Geometry.Polyline2(p.Points, p.Closed), ctx)); }
+                    catch (Exception ex) { g.Warnings.Add(ex.Message); }
                 }
-                return new FormPreview(g, null, null, $"Diâmetro inscrito: {UiHelpers.F(2 * c.OuterRadius, "0.0")} m" +
-                    (c.Elongation > 1.001 ? $" (eixo maior) × {UiHelpers.F(2 * (c.IslandRadius + c.ApronWidth + c.Lanes * c.LaneWidth), "0.0")} m" : ""));
-            }, false, edit ? "Aplicar" : "Criar", 1080, 720);
+                // Nos modos que não geram a pista dos ramos, mostra pistas de exemplo por baixo.
+                var roads = c.Integration == IntegracaoRotatoria.Completa ? null : RoundaboutGenerator.PreviewRoads(c, L);
+                var info = $"Diâmetro inscrito: {UiHelpers.F(2 * c.OuterRadius, "0.0")} m" +
+                           (c.Elongation > 1.001 ? $" (eixo maior) × {UiHelpers.F(2 * (c.IslandRadius + c.ApronWidth + c.Lanes * c.LaneWidth), "0.0")} m" : "") +
+                           $" – {c.Legs.Count} ramo(s)";
+                return new FormPreview(g, roads, null, info);
+            }, false, edit ? "Aplicar" : "Criar", 1120, 760);
         w.Choice("Tipo de rotatória", new[]
              {
-                 ("Minirrotatória – ilha galgável (Ø inscrito 13–25 m)", TipoRotatoria.Mini),
+                 ("Minirrotatória pintada – MIR (Ø inscrito 13–25 m)", TipoRotatoria.Mini),
                  ("Compacta urbana – 1 faixa (Ø 25–35 m)", TipoRotatoria.Compacta),
                  ("Convencional – 1 faixa (Ø 30–45 m)", TipoRotatoria.UmaFaixa),
                  ("Duas faixas no anel (Ø 45–70 m)", TipoRotatoria.DuasFaixas),
@@ -242,23 +249,39 @@ internal static class RoundaboutForms
                  ("Com by-pass (conversão livre à direita)", TipoRotatoria.ComBypass),
                  ("Personalizada", TipoRotatoria.Personalizada),
              }, () => d.Type, v => d.Type = v,
-             "Escolher um tipo preenche os valores de referência (DNIT/FHWA); depois todos os campos podem ser alterados.",
+             "Escolher um tipo preenche os valores de referência (MBST/DER-SP/DNIT); depois todos os campos podem ser alterados.",
              preset: t => d.ApplyPreset(t))
+         .Section("Integração com as vias", "O quanto a rotatória altera as vias que chegam a ela.")
+         .Choice("Modo", new[]
+             {
+                 ("Completa – remodela as entradas (raios, ilhas separadoras, calçada em volta)", IntegracaoRotatoria.Completa),
+                 ("Só o anel – ilha + pista giratória + marcas; vias recortadas só dentro do anel", IntegracaoRotatoria.Anel),
+                 ("Somente a ilha central sobre a pista existente (pintura interrompida no anel)", IntegracaoRotatoria.SomenteIlha),
+             }, () => d.Integration, v => d.Integration = v)
+         .Check("Recortar as vias (pavimento e pintura) na área da rotatória", () => d.CutRoads, v => d.CutRoads = v,
+             "Desligado: as vias ficam exatamente como estão – a rotatória é só desenhada por cima.")
          .Section("Ilha central e anel")
          .Choice("Ilha central", new[] { ("Ajardinada (meio-fio + grama + árvores)", TipoIlhaCentral.Ajardinada), ("Pavimentada (meio-fio + concreto)", TipoIlhaCentral.Pavimentada),
-             ("Galgável (cúpula pintada, sem meio-fio)", TipoIlhaCentral.Galgavel) }, () => d.IslandType, v => d.IslandType = v)
+             ("Galgável (cúpula pintada, sem meio-fio)", TipoIlhaCentral.Galgavel), ("Pintada – LCA 0,20 m + tachões (MIR, sem obra civil)", TipoIlhaCentral.Pintada) }, () => d.IslandType, v => d.IslandType = v)
          .Number("Raio da ilha central (m)", () => d.IslandRadius, v => d.IslandRadius = v, 1, 100)
          .Number("Alongamento (1 = circular; > 1 = oval)", () => d.Elongation, v => d.Elongation = v, 1, 4)
          .Number("Direção do eixo maior da oval (°)", () => d.OvalAngleDeg, v => d.OvalAngleDeg = v, -360, 360, "0")
-         .Number("Faixa galgável em volta da ilha (m)", () => d.ApronWidth, v => d.ApronWidth = v, 0, 10, tooltip: "Para o giro de ônibus e caminhões (bloquete elevado).")
+         .Number("Faixa galgável em volta da ilha (m)", () => d.ApronWidth, v => d.ApronWidth = v, 0, 10, tooltip: "Para o giro de ônibus e caminhões (bloquete elevado). Ignorada na ilha pintada.")
          .Number("Altura da faixa galgável (m)", () => d.ApronHeight, v => d.ApronHeight = v, 0.02, 0.15, "0.000")
+         .Check("Ilha pintada: preencher com zebrado", () => d.PaintedIslandFill, v => d.PaintedIslandFill = v)
+         .Number("Ilha pintada: espaçamento dos tachões (m, 0 = sem)", () => d.StudSpacing, v => d.StudSpacing = v, 0, 5, tooltip: "MBST Vol. IV: 0,25 a 0,50 m.")
          .Integer("Faixas na pista giratória", () => d.Lanes, v => d.Lanes = v, 1, 4)
          .Number("Largura de cada faixa (m)", () => d.LaneWidth, v => d.LaneWidth = v, 3, 10)
+         .Choice("Linha entre as faixas do anel", new[] { ("LMS-2 – seccionada", "LMS-2"), ("LMS-1 – contínua", "LMS-1") }, () => d.RingLaneLine, v => d.RingLaneLine = v)
+         .Check("Linha de bordo externa (entre os ramos)", () => d.OuterEdgeLine, v => d.OuterEdgeLine = v)
+         .Check("Linha de bordo junto à ilha / faixa galgável", () => d.InnerEdgeLine, v => d.InnerEdgeLine = v)
+         .Check("Setas de movimento em curva (IMC) no anel", () => d.RingArrows, v => d.RingArrows = v, "Uma por faixa após cada entrada – usual em minirrotatórias.")
          .Check("Divisores físicos entre faixas (turbo)", () => d.TurboDividers, v => d.TurboDividers = v)
          .Number("Largura dos divisores (m)", () => d.DividerWidth, v => d.DividerWidth = v, 0.15, 1)
-         .Section("Entradas e saídas")
-         .Number("Raio de entrada (m)", () => d.EntryRadius, v => d.EntryRadius = v, 0, 80, tooltip: "Concordância do lado de chegada (reduz a velocidade de entrada).")
+         .Section("Entradas e saídas (valores gerais)")
+         .Number("Raio de entrada (m)", () => d.EntryRadius, v => d.EntryRadius = v, 0, 80, tooltip: "Concordância do lado de chegada (reduz a velocidade de entrada). Cada ramo pode ter o seu.")
          .Number("Raio de saída (m)", () => d.ExitRadius ?? d.EntryRadius, v => d.ExitRadius = v, 0, 120, tooltip: "Normalmente maior que o de entrada.")
+         .Number("Velocidade de aproximação (km/h)", () => d.ApproachSpeed, v => d.ApproachSpeed = v, 20, 120, "0", "Dimensiona o símbolo 'dê a preferência' (3,60 / 6,00 m), a legenda PARE e a distância da placa de advertência.")
          .Check("By-pass: conversão livre à direita em todos os ramos", () => d.Bypass, v => d.Bypass = v)
          .Number("Largura da faixa de by-pass (m)", () => d.BypassWidth, v => d.BypassWidth = v, 3, 8)
          .Number("Raio do by-pass (m)", () => d.BypassRadius, v => d.BypassRadius = v, 10, 150)
@@ -270,19 +293,52 @@ internal static class RoundaboutForms
              .Number("Largura das pistas dos ramos (m)", () => legWidth, v =>
              {
                  legWidth = v;
-                 d.Legs = ParseAngles(angles).Select(a => new RoundaboutLeg { AngleDeg = a, Width = legWidth, Sidewalk = d.SidewalkWidth }).ToList();
+                 var fresh = ParseAngles(angles).Select(a => new RoundaboutLeg { AngleDeg = a, Width = legWidth, Sidewalk = d.SidewalkWidth }).ToList();
+                 d.Legs = RoundaboutGenerator.MergeLegSettings(d.Legs, fresh);
              }, 3, 40);
-        w.Section("Ramos e sinalização")
+        w.Section("Ilhas separadoras, travessias e placas (valores gerais)")
          .Check("Ilhas separadoras (gota) nos ramos", () => d.SplitterIslands, v => d.SplitterIslands = v)
+         .Choice("Ilha separadora padrão", new[] { ("Física (meio-fio + concreto)", IlhaSeparadora.Fisica), ("Pintada (zebrado + linha de canalização)", IlhaSeparadora.Pintada), ("Nenhuma", IlhaSeparadora.Nenhuma) },
+             () => d.SplitterStyle, v => d.SplitterStyle = v)
          .Number("Comprimento das ilhas separadoras (m)", () => d.SplitterLength, v => d.SplitterLength = v, 3, 60)
          .Number("Largura das ilhas junto à pista (m)", () => d.SplitterWidth, v => d.SplitterWidth = v, 0.8, 10)
+         .Check("Linha dupla contínua (LFO-3) nas aproximações de mão dupla", () => d.ApproachDoubleLine, v => d.ApproachDoubleLine = v)
          .Check("Linhas de dê a preferência, símbolos e zebrados", () => d.Markings, v => d.Markings = v)
          .Check("Travessias de pedestres e rebaixamentos", () => d.Crosswalks, v => d.Crosswalks = v)
          .Number("Distância da travessia ao anel (m)", () => d.CrosswalkDistance, v => d.CrosswalkDistance = v, 2, 30, tooltip: "Uma a duas faixas de veículo (5–10 m) antes da linha de dê a preferência.")
          .Number("Largura da faixa de pedestres (m)", () => d.CrosswalkWidth, v => d.CrosswalkWidth = v, 2, 10)
-         .Check("Placas R-2 e R-33 em cada entrada", () => d.Signs, v => d.Signs = v)
+         .Check("Placas nas entradas (R-2 / R-1)", () => d.Signs, v => d.Signs = v)
+         .Choice("Placas de sentido de circulação", new[]
+             {
+                 ("Automático – R-33 (ilha < 12 m ou pintada) ou R-24a na ilha", PlacaSentidoRotatoria.Automatico),
+                 ("R-33 nas entradas", PlacaSentidoRotatoria.R33NasEntradas),
+                 ("R-24a na ilha, de frente para cada entrada", PlacaSentidoRotatoria.R24aNaIlha),
+                 ("Ambas", PlacaSentidoRotatoria.Ambas),
+                 ("Nenhuma", PlacaSentidoRotatoria.Nenhuma),
+             }, () => d.DirectionSigns, v => d.DirectionSigns = v, "MBST Vol. I / DER-SP: R-33 em rotatórias com raio < 12 m; R-24a na ilha nas maiores.")
+         .Check("Advertência A-12 com \"A ... m\" antes de cada entrada", () => d.AdvanceWarning, v => d.AdvanceWarning = v,
+             "À distância de desaceleração da velocidade de aproximação (MBST Vol. II).")
+         .Check("Marcadores de alinhamento na ilha (de frente para as entradas)", () => d.AlignmentMarkers, v => d.AlignmentMarkers = v)
          .Check("Paisagismo na ilha central (árvores)", () => d.Landscaping, v => d.Landscaping = v)
          .Integer("Número de árvores (0 = automático)", () => d.Trees, v => d.Trees = v, 0, 30);
+
+        if (d.Legs.Count > 0)
+        {
+            w.Section("Personalizar cada ramo", "Escolha o ramo e ajuste só o que difere dos valores gerais.")
+             .Choice("Ramo", d.Legs.Select((l, i) => ($"{l.Label} – pista {UiHelpers.F(l.Width)} m{(l.TwoWay ? "" : ", mão única")}", i)).ToList(), () => legIdx, v => legIdx = v,
+                 preset: v => legIdx = v)
+             .Number("Largura da pista do ramo (m)", () => Leg().Width, v => Leg().Width = v, 3, 40)
+             .Check("Mão dupla (ilha pintada amarela; mão única = branca)", () => Leg().TwoWay, v => Leg().TwoWay = v)
+             .Choice("Ilha separadora", new[] { ("Padrão da rotatória", IlhaSeparadora.Padrao), ("Física", IlhaSeparadora.Fisica), ("Pintada (zebrado)", IlhaSeparadora.Pintada), ("Nenhuma", IlhaSeparadora.Nenhuma) },
+                 () => Leg().Splitter, v => Leg().Splitter = v)
+             .Number("Comprimento da ilha separadora (m, 0 = geral)", () => Leg().SplitterLength ?? 0, v => Leg().SplitterLength = v > 0.01 ? v : null, 0, 60)
+             .Choice("Travessia de pedestres", new[] { ("Padrão", (bool?)null), ("Sim", (bool?)true), ("Não", (bool?)false) }, () => Leg().Crosswalk, v => Leg().Crosswalk = v)
+             .Number("Raio de entrada (m, 0 = geral)", () => Leg().EntryRadius ?? 0, v => Leg().EntryRadius = v > 0.01 ? v : null, 0, 80)
+             .Number("Raio de saída (m, 0 = geral)", () => Leg().ExitRadius ?? 0, v => Leg().ExitRadius = v > 0.01 ? v : null, 0, 120)
+             .Choice("Controle da entrada", new[] { ("Padrão (dê a preferência)", ControleRamo.Padrao), ("Dê a preferência – LDP + símbolo + R-2", ControleRamo.DeAPreferencia), ("Parada obrigatória – LRE + PARE + R-1", ControleRamo.Pare) },
+                 () => Leg().Control, v => Leg().Control = v)
+             .Choice("Placas neste ramo", new[] { ("Padrão", (bool?)null), ("Sim", (bool?)true), ("Não", (bool?)false) }, () => Leg().Signs, v => Leg().Signs = v);
+        }
         return w;
     }
 
@@ -325,7 +381,7 @@ public sealed class CmdRotatoria : CommandBase
             foreach (var a in new[] { 0.0, 90, 180, 270 }) d.Legs.Add(new RoundaboutLeg { AngleDeg = a, Width = 7, Sidewalk = d.SidewalkWidth });
         CommandBase.EnsureDetailViewPublic(uidoc, d.Output);
         if (UiHelpers.ShowModal(RoundaboutForms.Roundabout(d, false, hasRoads)) != true) return Result.Cancelled;
-        if (hasRoads) d.Legs = RoundaboutGenerator.LegsFromRoads(center, roads, d.OuterRadius + 25);
+        if (hasRoads) d.Legs = RoundaboutGenerator.MergeLegSettings(d.Legs, RoundaboutGenerator.LegsFromRoads(center, roads, d.OuterRadius + 25));
         UiHelpers.Remember("Rotatoria", d);
         PluginContext.SaveSettings();
 

@@ -37,7 +37,11 @@ public class CmdSinalizarVia : CommandBase
 
         var defs = w.BuildDefinitions(path);
         RoadSetup.ApplyAxisRadius(defs, w.CurveRadius);
-        var results = MarkingCreator.Commit(uidoc, defs, "SV - Sinalizar via");
+        // Mesma sequência da ferramenta Pista: primeiro a pista (pavimento, linhas, dispositivos), depois as conexões e, por fim,
+        // calçadas, meios-fios, sarjetas e canteiros junto ao bordo – assim uma falha num elemento externo não impede a conexão.
+        var outer = defs.Where(IsEdgeElement).ToList();
+        var core = defs.Where(d => !outer.Contains(d)).ToList();
+        var results = MarkingCreator.Commit(uidoc, core, "SV - Via");
         if (w.Setup.Warnings.Count > 0 && results.Count > 0) results[0].Warnings.InsertRange(0, w.Setup.Warnings);
         if (defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav && (w.AutoIntersect || w.FreeEnds != Core.Automation.FimLivre.Nenhum))
         {
@@ -60,11 +64,29 @@ public class CmdSinalizarVia : CommandBase
                 results[^1].Warnings.Add("Não foi possível ligar a via às vias existentes: " + ex.Message);
             }
         }
+        if (outer.Count > 0)
+        {
+            try
+            {
+                results.AddRange(MarkingCreator.Commit(uidoc, outer, "SV - Via (calçadas, meios-fios e canteiros)"));
+                results.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões da via", sv => sv.RefreshDependents(outer)).Where(r => r.Warnings.Count > 0));
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Elementos junto ao bordo da via", ex);
+                results.Add(new RenderResult { Geometry = null });
+                results[^1].Warnings.Add("Calçadas/meios-fios da via não puderam ser criados: " + ex.Message);
+            }
+        }
         if (snapped.Count > 0 && results.Count > 0)
             results[0].Warnings.Insert(0, "Conexões: " + string.Join("; ", snapped.Distinct()) + ".");
-        Report("Sinalizar via", results);
+        Report("Via", results);
         return Result.Succeeded;
     }
+
+    /// <summary>Elementos da seção fora da pista dos veículos (o que a ferramenta Pista deixa para "junto ao bordo").</summary>
+    private static bool IsEdgeElement(MarkingDefinition d) =>
+        d is PlanterDefinition || IntersectionGenerator.IsPhysical(d);
 }
 
 /// <summary>Obtém o eixo de uma via: desenhado por pontos (com encaixe e curvas) ou linhas selecionadas.</summary>
@@ -297,9 +319,10 @@ public sealed class CmdZebrado : CommandBase
         EnsureDetailView(uidoc, def.Output);
         if (w.PickSurfaces && MarkingCreator.PickSurfaces(uidoc) is { } s) def.Output.SurfaceIds = s;
 
-        var boundary = MarkingCreator.PickPath(uidoc, w.PathMode, "Contorno FECHADO do zebrado", closed: true);
+        var boundary = MarkingCreator.PickPath(uidoc, w.PathMode, def.IsStrip ? "Caminho da faixa zebrada (linhas ou contorno)" : "Contorno FECHADO do zebrado (pode ter mais de um: o interno vira furo)", closed: !def.IsStrip);
         if (boundary == null) return Result.Cancelled;
-        boundary.Closed = true;
+        // Faixa: o caminho pode ser aberto ou fechado (anel); área: sempre fechada.
+        boundary.Closed = !def.IsStrip;
         def.Boundary = boundary;
 
         if (w.PickReferenceDirection)

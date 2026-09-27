@@ -65,6 +65,9 @@ public static class PolygonOps
         return FromTree(tree);
     }
 
+    /// <summary>Contornos com regra par-ímpar: um contorno dentro de outro vira furo (anéis, ilhas).</summary>
+    public static List<Polygon2> FromContoursEvenOdd(IEnumerable<IReadOnlyList<Vec2>> contours) => FromContours(contours, FillRule.EvenOdd);
+
     public static double TotalArea(IEnumerable<Polygon2> polys) => polys.Sum(p => p.Area);
 
     /// <summary>

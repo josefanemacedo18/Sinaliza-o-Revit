@@ -154,6 +154,7 @@ public enum Justificacao
 [JsonDerivedType(typeof(IntersectionDefinition), "intersecao")]
 [JsonDerivedType(typeof(RoundaboutDefinition), "rotatoria")]
 [JsonDerivedType(typeof(TactileRouteDefinition), "rota-tatil")]
+[JsonDerivedType(typeof(ChannelizationDefinition), "canalizacao")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;
@@ -238,6 +239,10 @@ public sealed class LinearMarkingDefinition : MarkingDefinition
     public double? WidthOverride { get; set; }
     public double[]? PatternOverride { get; set; }
     public MarkingColor? ColorOverride { get; set; }
+    /// <summary>LRV: velocidade inicial (km/h) – as linhas são espaçadas pelo método do MBST Vol. IV (a = 1,47 m/s², 1 s). 0/nulo = padrão da variante.</summary>
+    public double? LrvFromKmh { get; set; }
+    /// <summary>LRV: velocidade final desejada (km/h).</summary>
+    public double? LrvToKmh { get; set; }
     /// <summary>Sarjetão: flecha (profundidade da depressão no centro, m). Nulo = 0,05 m.</summary>
     public double? Depth { get; set; }
 
@@ -245,6 +250,20 @@ public sealed class LinearMarkingDefinition : MarkingDefinition
     public override string DisplayCode => Code;
     public override PathReference? Path => PathRef;
     public override void SetPath(PathReference path) => PathRef = path;
+}
+
+/// <summary>Lado de uma faixa (zebrado em faixa) em relação ao caminho de referência.</summary>
+public enum LadoFaixa
+{
+    Centro,
+    /// <summary>À esquerda do sentido do caminho.</summary>
+    Esquerda,
+    /// <summary>À direita do sentido do caminho.</summary>
+    Direita,
+    /// <summary>Contorno fechado: para dentro (anel interno à borda).</summary>
+    Interno,
+    /// <summary>Contorno fechado: para fora (anel externo à borda).</summary>
+    Externo,
 }
 
 public sealed class HatchMarkingDefinition : MarkingDefinition
@@ -270,6 +289,8 @@ public sealed class HatchMarkingDefinition : MarkingDefinition
     /// </summary>
     public double? StripWidth { get; set; }
     public double StripOffset { get; set; }
+    /// <summary>Posição da faixa em relação ao caminho: centrada, para um dos lados ou (contorno fechado) para dentro/para fora.</summary>
+    public LadoFaixa StripSide { get; set; } = LadoFaixa.Centro;
 
     [JsonIgnore]
     public bool IsStrip => StripWidth is > 0;
@@ -561,6 +582,8 @@ public enum TipoModeracao
     FaixaElevada,
     /// <summary>Lombada invertida (valeta/depressão transversal).</summary>
     LombadaInvertida,
+    /// <summary>Almofada (speed cushion): elevação estreita por faixa, transponível por ônibus e veículos de emergência.</summary>
+    Almofada,
 }
 
 /// <summary>Dispositivo de moderação de tráfego atravessando a pista (caminho = bordo A → bordo B).</summary>
@@ -578,6 +601,10 @@ public sealed class TrafficCalmingDefinition : MarkingDefinition
     public MarkingColor? MarkingColor { get; set; }
     /// <summary>Faixa elevada: pintar faixa de pedestres zebrada no platô.</summary>
     public bool Crosswalk { get; set; } = true;
+    /// <summary>Almofada: largura de cada almofada (m) – 1,60 a 1,90 m (CET – Medidas Moderadoras).</summary>
+    public double CushionWidth { get; set; } = 1.70;
+    /// <summary>Almofada: quantidade na largura da pista (0 = uma por faixa de ~3,5 m).</summary>
+    public int CushionCount { get; set; }
 
     public override string KindName => "Moderação de tráfego";
     public override string DisplayCode => Type switch
@@ -585,7 +612,63 @@ public sealed class TrafficCalmingDefinition : MarkingDefinition
         TipoModeracao.OndulacaoA => "OND-A",
         TipoModeracao.OndulacaoB => "OND-B",
         TipoModeracao.FaixaElevada => "FX-ELEV",
+        TipoModeracao.Almofada => "ALMOFADA",
         _ => "LOMB-INV",
+    };
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) => PathRef = path;
+}
+
+/// <summary>Marcas de canalização em transição (MBST Vol. IV 6.2; DER/SP B.3).</summary>
+public enum TipoCanalizacao
+{
+    /// <summary>MTL – alteração de largura de pista (estreitamento/alargamento): triângulo de transição.</summary>
+    TransicaoLargura,
+    /// <summary>MAO – aproximação de ilha ou obstáculo fixo na pista: transição de entrada, obstáculo e transição de saída.</summary>
+    Obstaculo,
+    /// <summary>MAP – início/fim/estreitamento de acostamento pavimentado: transição + trecho tangente.</summary>
+    Acostamento,
+}
+
+/// <summary>
+/// Área neutra de canalização (zebrado com linha de canalização) ao longo de uma linha de referência – o bordo da faixa
+/// antes da transição, no sentido do tráfego. Comprimentos pela velocidade (l = 0,5·V·d), tudo editável.
+/// </summary>
+public sealed class ChannelizationDefinition : MarkingDefinition
+{
+    public TipoCanalizacao Type { get; set; } = TipoCanalizacao.TransicaoLargura;
+    public PathReference PathRef { get; set; } = new();
+    public double Speed { get; set; } = 60;
+    /// <summary>Variação de largura d (m): quanto o bordo se desloca; positivo = para a esquerda do sentido do caminho.</summary>
+    public double WidthChange { get; set; } = 3.5;
+    /// <summary>Comprimento da transição (m). 0 = calculado: l = 0,5·V·d (mínimos: 30 m urbana / 60 m rodovia junto a obstáculos).</summary>
+    public double Length { get; set; }
+    /// <summary>Estação (m) do início da transição ao longo do caminho.</summary>
+    public double StartStation { get; set; }
+    /// <summary>Obstáculo: extensão ao longo da via (m).</summary>
+    public double ObstacleLength { get; set; } = 6;
+    /// <summary>Obstáculo: afastamento lateral a, da linha de canalização ao obstáculo (0,30 a 0,60 m).</summary>
+    public double Clearance { get; set; } = 0.45;
+    /// <summary>Obstáculo: transição de saída (m). 0 = igual à de entrada.</summary>
+    public double ExitLength { get; set; }
+    /// <summary>Obstáculo no eixo de via de mão dupla: área neutra dos dois lados da linha (amarela).</summary>
+    public bool BothSides { get; set; }
+    /// <summary>Acostamento: trecho tangente L (m). 0 = transição do acostamento ta pela velocidade (30/40/50 m).</summary>
+    public double TangentLength { get; set; }
+    public bool Rural { get; set; }
+    public double BarWidth { get; set; } = 0.50;
+    /// <summary>Espaçamento das barras (m). 0 = pela velocidade: 1,50 m (V &lt; 80) ou 2,50 m.</summary>
+    public double Gap { get; set; }
+    public double LineWidth { get; set; } = 0.20;
+    /// <summary>Branca entre fluxos de mesmo sentido; amarela entre fluxos opostos.</summary>
+    public MarkingColor Color { get; set; } = MarkingColor.Branca;
+
+    public override string KindName => "Canalização";
+    public override string DisplayCode => Type switch
+    {
+        TipoCanalizacao.Obstaculo => "MAO",
+        TipoCanalizacao.Acostamento => "MAP",
+        _ => "MTL",
     };
     public override PathReference? Path => PathRef;
     public override void SetPath(PathReference path) => PathRef = path;
@@ -1139,6 +1222,71 @@ public sealed class RoundaboutLeg
     public string? RoadId { get; set; }
     /// <summary>Grupo (Sinalizar via) da via ligada – recebe o recorte da rotatória.</summary>
     public string? GroupId { get; set; }
+    /// <summary>Via de mão dupla (ilha separadora pintada amarela, entre fluxos opostos; mão única = branca).</summary>
+    public bool TwoWay { get; set; } = true;
+
+    // ---- personalização por ramo (nulo/Padrao = valor geral da rotatória)
+    public IlhaSeparadora Splitter { get; set; } = IlhaSeparadora.Padrao;
+    public double? SplitterLength { get; set; }
+    public bool? Crosswalk { get; set; }
+    public double? EntryRadius { get; set; }
+    public double? ExitRadius { get; set; }
+    public ControleRamo Control { get; set; } = ControleRamo.Padrao;
+    public bool? Signs { get; set; }
+
+    [JsonIgnore]
+    public string Label => $"Ramo a {AngleDeg:0}°";
+
+    /// <summary>Copia a personalização de outro ramo (ramos redetectados a partir das vias mantêm os ajustes).</summary>
+    public void CopySettingsFrom(RoundaboutLeg o)
+    {
+        Splitter = o.Splitter; SplitterLength = o.SplitterLength; Crosswalk = o.Crosswalk; EntryRadius = o.EntryRadius;
+        ExitRadius = o.ExitRadius; Control = o.Control; Signs = o.Signs;
+    }
+}
+
+/// <summary>Como a rotatória se integra às vias que chegam a ela.</summary>
+public enum IntegracaoRotatoria
+{
+    /// <summary>Remodela as entradas (raios de entrada/saída, ilhas separadoras, calçada em volta); as vias são recortadas em toda a zona.</summary>
+    Completa,
+    /// <summary>Ilha + anel (pista giratória) + marcas; as vias são recortadas só dentro do anel – a geometria das entradas fica como está.</summary>
+    Anel,
+    /// <summary>Somente a ilha central (com faixa galgável) sobre a pista existente; a pintura das vias é interrompida no anel.</summary>
+    SomenteIlha,
+}
+
+/// <summary>Ilha separadora (gota) do ramo.</summary>
+public enum IlhaSeparadora
+{
+    /// <summary>Usa o padrão da rotatória.</summary>
+    Padrao,
+    /// <summary>Meio-fio e núcleo de concreto.</summary>
+    Fisica,
+    /// <summary>Zebrado com linha de canalização (amarelo entre fluxos opostos, branco em mão única).</summary>
+    Pintada,
+    Nenhuma,
+}
+
+/// <summary>Controle da entrada do ramo.</summary>
+public enum ControleRamo
+{
+    Padrao,
+    /// <summary>Linha de dê a preferência + símbolo + R-2.</summary>
+    DeAPreferencia,
+    /// <summary>Linha de retenção + legenda PARE + R-1.</summary>
+    Pare,
+}
+
+/// <summary>Placas de sentido de circulação da rotatória.</summary>
+public enum PlacaSentidoRotatoria
+{
+    /// <summary>R-33 nas entradas quando o raio da ilha é menor que 12 m (ou ilha pintada); senão R-24a na ilha (MBST Vol. I / DER).</summary>
+    Automatico,
+    R33NasEntradas,
+    R24aNaIlha,
+    Ambas,
+    Nenhuma,
 }
 
 /// <summary>Tipos de rotatória (DNIT – Manual de Projeto de Interseções; CONTRAN/MBST; FHWA NCHRP 672).</summary>
@@ -1163,7 +1311,15 @@ public enum TipoRotatoria
 }
 
 /// <summary>Acabamento da ilha central.</summary>
-public enum TipoIlhaCentral { Ajardinada, Pavimentada, Galgavel }
+public enum TipoIlhaCentral
+{
+    Ajardinada,
+    Pavimentada,
+    /// <summary>Cúpula galgável (pintada, sem meio-fio).</summary>
+    Galgavel,
+    /// <summary>Minirrotatória pintada (MIR): linha de canalização branca de 0,20 m com tachões, zebrado opcional – sem obra civil.</summary>
+    Pintada,
+}
 
 /// <summary>Rotatória com ilha central, pista giratória, faixa galgável e ramos com ilhas separadoras.</summary>
 public sealed class RoundaboutDefinition : MarkingDefinition
@@ -1190,6 +1346,36 @@ public sealed class RoundaboutDefinition : MarkingDefinition
     public double CrosswalkWidth { get; set; } = 3.0;
     /// <summary>Árvores na ilha central (0 = automático pelo tamanho).</summary>
     public int Trees { get; set; }
+
+    // ---- integração com as vias e elementos opcionais (MBST Vol. IV – MIR; DER/SP projetos-tipo 15/16)
+    public IntegracaoRotatoria Integration { get; set; } = IntegracaoRotatoria.Completa;
+    /// <summary>Recorta as vias ligadas (pavimento e pintura) na área da rotatória. Desligado: nada das vias é alterado.</summary>
+    public bool CutRoads { get; set; } = true;
+    /// <summary>Estilo padrão das ilhas separadoras (cada ramo pode ter o seu).</summary>
+    public IlhaSeparadora SplitterStyle { get; set; } = IlhaSeparadora.Fisica;
+    /// <summary>Ilha pintada: preencher com zebrado (senão só a linha de canalização).</summary>
+    public bool PaintedIslandFill { get; set; }
+    /// <summary>Ilha pintada: largura da linha de canalização (m).</summary>
+    public double PaintedLineWidth { get; set; } = 0.20;
+    /// <summary>Ilha pintada: espaçamento dos tachões junto à linha (m; 0 = sem tachões). MBST: 0,25 a 0,50 m.</summary>
+    public double StudSpacing { get; set; } = 0.50;
+    /// <summary>Setas de movimento em curva (IMC) na pista giratória, após cada entrada.</summary>
+    public bool RingArrows { get; set; }
+    /// <summary>Linha de bordo (LBO) junto ao limite externo do anel, entre os ramos.</summary>
+    public bool OuterEdgeLine { get; set; } = true;
+    /// <summary>Linha de bordo em volta da ilha/faixa galgável.</summary>
+    public bool InnerEdgeLine { get; set; } = true;
+    /// <summary>Linha entre as faixas do anel (LMS-2 seccionada, LMS-1 contínua).</summary>
+    public string RingLaneLine { get; set; } = "LMS-2";
+    /// <summary>Linha dupla contínua (LFO-3) nas aproximações de mão dupla, entre a ilha separadora e o fim da zona remodelada.</summary>
+    public bool ApproachDoubleLine { get; set; } = true;
+    /// <summary>Velocidade de aproximação (km/h) – dimensiona o símbolo "dê a preferência" e a placa de advertência.</summary>
+    public double ApproachSpeed { get; set; } = 40;
+    /// <summary>Placa A-12 (interseção em círculo) com "A ... m" antes de cada entrada, à distância de desaceleração.</summary>
+    public bool AdvanceWarning { get; set; }
+    public PlacaSentidoRotatoria DirectionSigns { get; set; } = PlacaSentidoRotatoria.Automatico;
+    /// <summary>Marcadores de alinhamento na ilha central, de frente para cada entrada.</summary>
+    public bool AlignmentMarkers { get; set; }
 
     public Vec2 Center { get; set; }
     public double Z { get; set; }
@@ -1223,11 +1409,14 @@ public sealed class RoundaboutDefinition : MarkingDefinition
     {
         Type = t;
         Elongation = 1; TurboDividers = false; Bypass = false; IslandType = TipoIlhaCentral.Ajardinada; ExitRadius = null;
+        RingArrows = false; SplitterStyle = IlhaSeparadora.Fisica;
         switch (t)
         {
             case TipoRotatoria.Mini:
+                // MBST Vol. IV (MIR 6.a) / DER projeto-tipo 15: ilha pintada (LCA 0,20 m + tachões), gotas pintadas e setas IMC no anel.
                 IslandRadius = 2.5; ApronWidth = 0; Lanes = 1; LaneWidth = 6.0; EntryRadius = 8; ExitRadius = 10;
-                IslandType = TipoIlhaCentral.Galgavel; SplitterIslands = false; Landscaping = false; CrosswalkDistance = 5; break;
+                IslandType = TipoIlhaCentral.Pintada; StudSpacing = 0.50; RingArrows = true; SplitterIslands = true; SplitterStyle = IlhaSeparadora.Pintada;
+                SplitterLength = 8; SplitterWidth = 1.5; Landscaping = false; CrosswalkDistance = 5; break;
             case TipoRotatoria.Compacta:
                 IslandRadius = 6; ApronWidth = 1.5; Lanes = 1; LaneWidth = 5.5; EntryRadius = 12; ExitRadius = 15;
                 SplitterIslands = true; SplitterLength = 10; SplitterWidth = 2.0; CrosswalkDistance = 6; break;

@@ -206,7 +206,9 @@ public static class SignGenerator
         }
         geo.UnitCount = 1;
         geo.PathLength = 0;
-        if (bottom < 2.0 && d.Support != TipoSuporte.Nenhum)
+        // Marcadores de alinhamento/perigo ficam a 0,80 m (DER/SP A.3.2): sem aviso de altura livre.
+        var marker = d.Code.StartsWith("MA-", StringComparison.OrdinalIgnoreCase) || d.Code.StartsWith("MP-", StringComparison.OrdinalIgnoreCase);
+        if (bottom < 2.0 && d.Support != TipoSuporte.Nenhum && !marker)
             geo.Warnings.Add($"Altura livre de {bottom:0.00} m – em calçadas o MBST recomenda no mínimo 2,10 m sob a placa.");
         return geo;
     }
@@ -445,6 +447,7 @@ public static class TrafficCalmingGenerator
         TipoModeracao.OndulacaoA => (3.70, 0.08, 0),
         TipoModeracao.OndulacaoB => (1.50, 0.06, 0),
         TipoModeracao.FaixaElevada => (8.00, 0.15, 1.50),
+        TipoModeracao.Almofada => (3.00, 0.075, 0.80),
         _ => (2.50, 0.10, 0),
     };
 
@@ -467,7 +470,7 @@ public static class TrafficCalmingGenerator
         {
             var ax = Math.Abs(x);
             if (ax >= L / 2) return 0;
-            if (d.Type == TipoModeracao.FaixaElevada)
+            if (d.Type is TipoModeracao.FaixaElevada or TipoModeracao.Almofada)
                 return ax <= L / 2 - R ? H : H * (L / 2 - ax) / R;
             var k = 2 * ax / L;
             var z = H * (1 - k * k);
@@ -494,6 +497,28 @@ public static class TrafficCalmingGenerator
             ring = new List<Vec2>(top);
         }
         var profile = PolygonOps.FromContours(new[] { (IReadOnlyList<Vec2>)ring });
+        if (d.Type == TipoModeracao.Almofada)
+        {
+            // Almofadas (CET – Medidas Moderadoras do Tráfego): uma por faixa, 1,60–1,90 m de largura, transponíveis por
+            // ônibus/emergência (rodas passam ao lado). Pintura: barras brancas nas rampas, como nas ondulações.
+            var cw = Math.Clamp(d.CushionWidth, 0.8, 3.0);
+            var count = d.CushionCount > 0 ? d.CushionCount : Math.Max(1, (int)Math.Round(width / 3.5));
+            for (int i = 0; i < count; i++)
+            {
+                var cx = width * (i + 0.5) / count;
+                var origin = a + u * (cx - cw / 2);
+                foreach (var p in profile) geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(origin, t, p, u, cw), MarkingColor.Asfalto));
+                if (d.Marking && cat.Hachura("MOT") is { } motC)
+                {
+                    var fp = new Polygon2(new[] { origin - t * (L / 2), origin + u * cw - t * (L / 2), origin + u * cw + t * (L / 2), origin + t * (L / 2) });
+                    var h = HatchGenerator.Generate(fp, motC, new HatchOptions { ReferenceDirection = u, BorderWidth = 0, BarColor = d.MarkingColor });
+                    geo.Pieces.AddRange(DrapeOnProfile(h.Pieces.Select(p => (p.Shape, p.Color)), a, t, Z, -L / 2, L / 2));
+                }
+            }
+            geo.UnitCount = count;
+            geo.PathLength = width;
+            return geo;
+        }
         foreach (var p in profile)
             geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(a, t, p, u, width), dip ? MarkingColor.Concreto : MarkingColor.Asfalto));
 

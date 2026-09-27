@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="clr-namespace:SinalizacaoViaria.Revit.UI"
-        Title="Sinalizar via – seção transversal completa" Width="1280" Height="820" MinWidth="980" MinHeight="640">
+        Title="Via – seção transversal completa a partir do eixo" Width="1280" Height="820" MinWidth="980" MinHeight="640">
     <Window.Resources>
         <ResourceDictionary Source="pack://application:,,,/SinalizaBIM;component/UI/Styles.xaml"/>
     </Window.Resources>
@@ -22,7 +22,7 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
             <StackPanel>
                 <TextBlock Text="Seção transversal" Style="{StaticResource Title}"/>
-                <TextBlock Style="{StaticResource Hint}" Text="Selecione (ou desenhe) o EIXO da via. Monte cada lado do eixo para fora: faixas, ciclofaixa, estacionamento, canteiros, calçada... O lado direito é o da direita de quem percorre o eixo no sentido em que foi desenhado."/>
+                <TextBlock Style="{StaticResource Hint}" Text="Desenhe (ou selecione) o EIXO da via. Monte cada lado do eixo para fora: faixas, ciclofaixa, estacionamento, canteiros, calçada... O lado direito é o da direita de quem percorre o eixo no sentido em que foi desenhado. A pista e as conexões são criadas como na ferramenta Pista; calçadas, meios-fios e sarjetas entram em seguida junto ao bordo."/>
 
                 <GroupBox Header="Modelo (prontos e personalizados ★)">
                     <StackPanel>

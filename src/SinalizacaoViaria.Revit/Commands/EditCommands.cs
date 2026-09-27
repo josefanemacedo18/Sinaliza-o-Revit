@@ -150,6 +150,7 @@ public sealed class CmdEditar : CommandBase
             UrbanElementDefinition ue => Show(new UrbanWindow(ue), w => w.Result),
             RampDefinition rp => Show(new RampWindow(rp), w => w.Result),
             TrafficCalmingDefinition tc => Show(new CalmingWindow(tc), w => w.Result),
+            ChannelizationDefinition cz => EditChannelization(cz),
             SignPlanDetailDefinition sp => Show(new SignDetailWindow(DetailScale(uidoc, sp),
                 MarkingStorage.ById(uidoc.Document, sp.SignId).FirstOrDefault()?.Definition as SignDefinition, sp), w => w.Result),
             LabelDefinition lb => Show(new LabelWindow(lb), w => w.Result),
@@ -162,7 +163,7 @@ public sealed class CmdEditar : CommandBase
         EnsureDetailView(uidoc, edited.Output, keepExistingView: true);
         var results = MarkingCreator.Commit(uidoc, new[] { edited }, $"SV - Editar {edited.DisplayCode}");
         if (edited is RampDefinition ramp) RampCutter.Apply(uidoc, ramp);
-        if (edited is LinearMarkingDefinition or TrafficCalmingDefinition or HatchMarkingDefinition || edited.Overlay) FootprintCutter.ApplyFor(uidoc, edited);
+        if (edited is LinearMarkingDefinition or TrafficCalmingDefinition or HatchMarkingDefinition or ChannelizationDefinition || edited.Overlay) FootprintCutter.ApplyFor(uidoc, edited);
         Report("Edição", results);
         return Result.Succeeded;
     }
@@ -172,6 +173,12 @@ public sealed class CmdEditar : CommandBase
 
     private static MarkingDefinition? Show<TW>(TW w, Func<TW, MarkingDefinition?> result) where TW : System.Windows.Window =>
         UiHelpers.ShowModal(w) == true ? result(w) : null;
+
+    private static MarkingDefinition? EditChannelization(ChannelizationDefinition cz)
+    {
+        var copy = (ChannelizationDefinition)MarkingDefinition.FromJson(cz.ToJson())!;
+        return UiHelpers.ShowModal(ManualForms.Channelization(copy, true)) == true ? copy : null;
+    }
 
     private static void EnsureDetailView(UIDocument uidoc, OutputSettings o, bool keepExistingView)
     {

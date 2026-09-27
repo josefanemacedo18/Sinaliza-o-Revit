@@ -93,7 +93,8 @@ public sealed class CmdCiclovia : CommandBase
                     var geo = new Core.Model.MarkingGeometry();
                     var tmp = new BikeLaneSetup
                     {
-                        Type = s.Type, Width = s.Width, Background = s.Background, WalkColor = s.WalkColor, Lines = s.Lines, DashedLines = s.DashedLines,
+                        Type = s.Type, Width = s.Width, Background = s.Background, RedContrastLines = s.RedContrastLines, ContrastWidth = s.ContrastWidth,
+                        WalkColor = s.WalkColor, Lines = s.Lines, DashedLines = s.DashedLines,
                         LineWidth = s.LineWidth, CenterDash = s.CenterDash, CenterGap = s.CenterGap, SymbolSpacing = Math.Min(s.SymbolSpacing, 10),
                         SymbolLength = s.SymbolLength, Arrows = s.Arrows, ArrowLength = s.ArrowLength, Segregation = s.Segregation,
                         Justify = holder.Justify == Justificacao.Clique ? Justificacao.Esquerda : holder.Justify,
@@ -109,6 +110,9 @@ public sealed class CmdCiclovia : CommandBase
                 }, () => s.Type, v => s.Type = v)
             .Number("Largura total (m)", () => s.Width, v => s.Width = v, 0.8, 6, tooltip: "Unidirecional ≥ 1,20 m (recomendado 1,50 m); bidirecional ≥ 2,50 m.")
             .Check("Pintura de fundo (vermelha / azul-verde)", () => s.Background, v => s.Background = v)
+            .Check("Sem fundo: linha vermelha de contraste por dentro da linha branca (CET-SP Vol. 13, padrão II)", () => s.RedContrastLines, v => s.RedContrastLines = v,
+                tooltip: "Padrão II da CET: faixa branca de 0,25 m acompanhada de faixa vermelha de 0,15 m pelo lado interno, em vez da pintura total do fundo.")
+            .Number("Largura da linha vermelha de contraste (m)", () => s.ContrastWidth, v => s.ContrastWidth = v, 0.05, 0.5)
             .Choice("Cor da faixa de caminhada", new[] { ("Azul", Core.Model.MarkingColor.Azul), ("Verde", Core.Model.MarkingColor.Verde) }, () => s.WalkColor, v => s.WalkColor = v)
             .Section("Linhas")
             .Choice("Linha de delimitação", new[] { ("À esquerda do eixo", LadoLinha.Esquerda), ("À direita do eixo", LadoLinha.Direita), ("Dos dois lados", LadoLinha.Ambos), ("Sem linha", LadoLinha.Nenhum) },

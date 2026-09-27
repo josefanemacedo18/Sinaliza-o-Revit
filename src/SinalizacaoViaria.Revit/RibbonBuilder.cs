@@ -18,10 +18,10 @@ public static class RibbonBuilder
         // ---------------------------------------------------------------- Vias
         var via = app.CreateRibbonPanel(TabName, "Vias");
         Split(via, "SvVias", "Via",
-            Data(typeof(CmdNovaVia), "Nova Via", "novavia",
-                "Desenha uma via nova por pontos (curvas concordadas) com a seção completa. Clique sobre outra via para conectar – ou, depois, puxe a ponta de qualquer eixo até outra via: ela se conecta sozinha (ímã), em qualquer ângulo."),
-            Data(typeof(CmdSinalizarVia), "Sinalizar Via", "via",
-                "Seção transversal completa a partir de um eixo existente: faixas, ciclofaixas, estacionamento, canteiros, calçadas e toda a sinalização. Modelos prontos e personalizados."),
+            Data(typeof(CmdSinalizarVia), "Via", "via",
+                "Via completa a partir do eixo – desenhado por pontos (curvas concordadas, encaixe nas vias existentes) ou selecionado: faixas, ciclofaixas, " +
+                "estacionamento, canteiros, calçadas e toda a sinalização, com modelos prontos e personalizados. Cria a pista e as conexões como a ferramenta Pista e " +
+                "acrescenta os demais elementos junto ao bordo."),
             Data(typeof(CmdPista), "Pista", "pista",
                 "Só a pista dos veículos (asfalto, bloquete ou concreto), já conectada. Monte o resto passo a passo com Calçadas → 'Junto ao bordo de uma via'."),
             Data(typeof(CmdDesenharEixo), "Desenhar Eixo", "eixo",
@@ -62,8 +62,11 @@ public static class RibbonBuilder
             Data(typeof(CmdLinhaLongitudinal), "Linha Longitudinal", "linha", "LFO-1 a LFO-4, LMS, LBO, LCO, faixas exclusivas, LCA e LPP."),
             Data(typeof(CmdLinhaTransversal), "Linha Transversal", "transversal", "LRE, LDP, LRV, FTP e demais marcas transversais."),
             Data(typeof(CmdFaixaPedestres), "Faixa de Pedestres", "pedestre", "FTP-1 zebrada ou FTP-2 paralela com linhas de retenção."));
-        Large(hor, typeof(CmdZebrado), "Zebrado", "zebrado",
-            "Zebrados (ZPA, ZPA-A), chevrons, marcação de área de conflito (MAC, quadriculado) e lombadas em qualquer contorno, com linha de canalização.");
+        Split(hor, "SvZebrado", "Zebrado",
+            Data(typeof(CmdZebrado), "Zebrado", "zebrado",
+                "Zebrados (ZPA, ZPA-A), chevrons, marcação de área de conflito (MAC), quadriculado (MAE) em qualquer contorno – com furos – ou como faixa ao longo de um anel."),
+            Data(typeof(CmdCanalizacao), "Canalização (MTL / MAO / MAP)", "canalizacao",
+                "Área neutra de transição de largura, aproximação de obstáculo ou acostamento, dimensionada pela velocidade (l = 0,5·V·d) ao longo de uma linha de referência."));
         Split(hor, "SvInscricoes", "Inscrições",
             Data(typeof(CmdSimbolos), "Setas e Símbolos", "seta", "Setas PEM, mudança de faixa, SIA, bicicleta, dê a preferência..."),
             Data(typeof(CmdLegendas), "Legendas", "legenda", "Legendas alongadas (PARE, ÔNIBUS, ESCOLA...) com qualquer fonte."));
@@ -74,7 +77,9 @@ public static class RibbonBuilder
             Data(typeof(CmdPisoTatil), "Piso Tátil", "tatil", "Piso tátil de alerta e direcional (NBR 16537)."),
             Data(typeof(CmdCiclovia), "Ciclovia / Faixa de Caminhada", "ciclo", "Ciclofaixa uni/bidirecional, ciclovia segregada ou faixa de caminhada completa: fundo, linhas, símbolos, setas e segregação."),
             Data(typeof(CmdCicloviaLinhas), "Marcas de Ciclovia Avulsas", "ciclo", "CIC-LD, CIC-FD, CIC-LC e cruzamento rodocicloviário (MCC) ao longo de linhas."),
-            Data(typeof(CmdModeracao), "Quebra-mola e Lombadas", "quebramola", "Ondulações transversais, faixa elevada e lombada invertida."));
+            Data(typeof(CmdModeracao), "Quebra-mola e Lombadas", "quebramola", "Ondulações transversais, faixa elevada, lombada invertida e almofadas (speed cushion)."),
+            Data(typeof(CmdCruzamentoFerroviario), "Cruzamento Rodoferroviário", "ferrovia",
+                "Passagem em nível completa: linha de retenção dupla, retângulo de advertência com cruz de Santo André, linha dupla, PARE, LRV e placas A-41/R-1/A-39."));
 
         // ---------------------------------------------------------------- Sinalização vertical e dispositivos
         var vert = app.CreateRibbonPanel(TabName, "Sinalização Vertical");

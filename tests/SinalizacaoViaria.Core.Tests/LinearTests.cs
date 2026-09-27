@@ -119,7 +119,8 @@ public class LinearTests
     public void Studs_CountUnits()
     {
         var t = Cat.Linear("TAC-A")!;
-        var geo = LinearPatternGenerator.Generate(Straight(160), t, t.Variantes[0]);
+        var v16 = t.Variantes.First(v => v.Nome.Contains("16 m"));   // MBST Vol. VI: V > 90 km/h, situação normal
+        var geo = LinearPatternGenerator.Generate(Straight(160), t, v16);
         Assert.Equal(10, geo.UnitCount);
         Assert.All(geo.Pieces, p => Assert.Equal(0.02, p.Thickness, 6));
     }

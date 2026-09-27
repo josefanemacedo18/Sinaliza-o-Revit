@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Catalog;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Generators;
@@ -107,6 +108,8 @@ public partial class LinearWindow : Window
         CkReverse.IsChecked = d.Reverse;
         CkInvert.IsChecked = d.InvertSides;
         if (d.Depth is { } dp) TbDepth.Text = UiHelpers.F(dp, "0.###");
+        TbLrvFrom.Text = UiHelpers.F(d.LrvFromKmh, "0");
+        TbLrvTo.Text = UiHelpers.F(d.LrvToKmh, "0");
         UiHelpers.FillJustify(CbJustify, d.Justify);
         CkOverlay.IsChecked = d.Overlay;
         UiHelpers.SelectColor(CbColor, d.ColorOverride);
@@ -134,6 +137,13 @@ public partial class LinearWindow : Window
         if (_existing == null) CkOverlay.IsChecked = t.Transversal && t.Grupo != GrupoMarca.Urbanizacao;
         var sj = t.Codigo == "SARJETAO";
         LblDepth.Visibility = TbDepth.Visibility = sj ? Visibility.Visible : Visibility.Collapsed;
+        var lrv = t.Codigo == "LRV";
+        LblLrv.Visibility = PnLrv.Visibility = lrv ? Visibility.Visible : Visibility.Collapsed;
+        if (lrv && _existing == null && string.IsNullOrWhiteSpace(TbLrvFrom.Text))
+        {
+            TbLrvFrom.Text = UiHelpers.F(PluginContext.Settings.DefaultSpeed, "0");
+            TbLrvTo.Text = UiHelpers.F(Math.Max(20, Math.Round(PluginContext.Settings.DefaultSpeed / 2 / 10) * 10), "0");
+        }
         if (sj && _existing == null) RbTwoPoints.IsChecked = true;   // atravessa a via: dois cliques de sarjeta a sarjeta
         UpdatePreview();
     }
@@ -161,6 +171,9 @@ public partial class LinearWindow : Window
         d.ColorOverride = UiHelpers.SelectedColor(CbColor);
         d.Alignment = CbAlign.SelectedItem is AlinhamentoPadrao a ? a : null;
         d.Depth = t.Codigo == "SARJETAO" ? UiHelpers.Parse(TbDepth, 0.05, "Flecha do sarjetão", 0, 0.25) : null;
+        d.LrvFromKmh = t.Codigo == "LRV" ? UiHelpers.ParseNullable(TbLrvFrom, "Velocidade inicial", 10, 200) : null;
+        d.LrvToKmh = t.Codigo == "LRV" ? UiHelpers.ParseNullable(TbLrvTo, "Velocidade final", 0, 200) : null;
+        if (d.LrvFromKmh is { } v0 && d.LrvToKmh is { } v1 && v1 >= v0) throw new FormatException("LRV: a velocidade final deve ser menor que a inicial.");
         d.Justify = UiHelpers.SelectedJustify(CbJustify);
         d.Overlay = CkOverlay.IsChecked == true;
         if (_existing != null && d.Justify == Justificacao.Clique) d.Justify = _existing.Justify == Justificacao.Clique ? Justificacao.Centro : _existing.Justify;
@@ -177,6 +190,14 @@ public partial class LinearWindow : Window
             var t = SelectedType!;
             var variant = MarkingBuilder.ResolveVariant(t, d.Variant, d.Speed);
             TxtPattern.Text = variant == null ? "" : "Variante aplicada: " + variant.Nome + (variant.Observacao != null ? $" – {variant.Observacao}" : "");
+            if (t.Codigo == "LRV" && d.LrvFromKmh is > 0)
+            {
+                var v0 = d.LrvFromKmh.Value;
+                var vf = Math.Clamp(d.LrvToKmh ?? v0 / 2, 0, v0 - 5);
+                var st = DesignRules.LrvStations(v0, vf);
+                TxtPattern.Text += $"\nLRV {v0:0} → {vf:0} km/h (método do MBST Vol. IV): {st.Count} linhas de {UiHelpers.F(DesignRules.LrvLineWidth(v0))} m " +
+                                   $"em {UiHelpers.F(st[^1], "0.0")} m; a última linha fica 2 m antes do ponto crítico.";
+            }
 
             Polyline2 sample;
             var pavement = new List<Polygon2>();

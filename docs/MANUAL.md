@@ -15,7 +15,7 @@ Convenções usadas em todo o plugin:
 
 | Painel | Ferramentas |
 |---|---|
-| **Vias** | **Via** (Nova Via · Sinalizar Via · Pista · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Orelha · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
+| **Vias** | **Via** (Via · Pista · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Orelha · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
 | **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (tachas · piso tátil · ciclovia · quebra-mola) |
 | **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive guard rail) |
 | **Detalhamento** | **Detalhar** (anotar · cotar seção · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
@@ -132,7 +132,7 @@ Para vias já existentes (ou criadas por versões anteriores) use **Via → Hier
 elementos das vias e escolha a hierarquia (opcionalmente ajustando a velocidade das linhas); as
 interseções, rotatórias e cul-de-sacs dessas vias são atualizados.
 
-## 2.2 Nova via – conexão natural com o sistema viário
+## 2.2 Via desenhada por pontos – conexão natural com o sistema viário
 
 ### Ímã de conexão (como no InfraWorks)
 
@@ -147,7 +147,8 @@ Quando uma via ligada é **movida**, as vias que chegam nela **acompanham**: a p
 cruzamento é levada ao novo eixo. O mesmo ímã vale ao criar a via (desenhada ou por linhas
 selecionadas). Pode ser desligado em **Configurações → Ímã de conexão**.
 
-**Via → Nova Via** (ou *Sinalizar Via* com *Desenhar a via por pontos*) desenha a via clicando os pontos do
+**Via → Via** com *Desenhar a via por pontos* (o antigo botão *Nova Via* foi unificado com *Sinalizar Via* – é a
+mesma ferramenta) desenha a via clicando os pontos do
 eixo, como no InfraWorks, e o sistema viário se ajusta sozinho:
 
 * **Encaixe** (opção *Encaixar nas pontas e nos eixos das vias existentes*): clique **sobre uma via** –
@@ -230,8 +231,13 @@ a lista de tipos.
 | Fase | Desloca o tracejado ao longo do caminho. |
 | Recuo início/fim | Interrompe a marca antes das extremidades. |
 | Inverter sentido / lados | Inverte o caminho; espelha linhas duplas (LFO-4). |
+| LRV: velocidade inicial → final | Só para a LRV: informe de quanto para quanto a velocidade deve cair (ex.: 60 → 30 km/h). O espaçamento **decrescente** das linhas é calculado pelo **método do MBST Vol. IV** (desaceleração de 1,47 m/s², 1 s entre linhas) e a largura da linha (0,20 / 0,30 / 0,40 m) pela velocidade; a última linha fica 2 m antes do ponto crítico. Vazio = padrão da variante. |
 
-**Tachas/tachões** contam unidades (coluna *Unid.* nos quantitativos). **Piso tátil** (PTA/PTD)
+**Tachas/tachões** contam unidades (coluna *Unid.* nos quantitativos). As variantes de **TAC-A/TAC-B** seguem a
+Tabela 4.6 do MBST Vol. VI (8 / 12 / 16 m pela velocidade em situação normal; 6 / 9 / 12 m em situação especial –
+neblina, curvas, declives – e 2 / 4 m no trecho que antecede) e as do **TACHÃO** a Tabela 4.7 (4 m ao lado do fluxo,
+1 m em fluxos divergentes, 0,25–0,50 m em minirrotatórias). **LFO-5** (DER/SP) é a linha seccionada de transição com
+três segmentos longos antes da linha contínua (10×6 / 15×9 / 20×12 m). **Piso tátil** (PTA/PTD)
 segue a NBR 16537 (larguras de 0,25 a 0,60 m).
 
 ---
@@ -261,6 +267,25 @@ As barras da FTP-1 são sempre inteiras e centralizadas entre os bordos.
   dois cliques (que também define o eixo do chevron).
 * O contorno pode ter qualquer forma, inclusive côncava; as barras são recortadas corretamente e não
   se sobrepõem ao contorno.
+* **Contorno com furo (anel)**: selecione mais de um contorno fechado – o interno vira furo. É o caso do zebrado
+  em volta de uma rotatória ou de uma ilha: o zebrado fica **só na coroa**, sem cobrir o miolo.
+* **Faixa ao longo do contorno**: informe uma *largura da faixa* (0 = preencher a área) e o lado – **interno**,
+  **externo**, centro, esquerda ou direita. O zebrado acompanha a linha (aberta ou fechada) com essa largura,
+  como uma "borda zebrada" de um anel, sem precisar desenhar o segundo contorno.
+* **MAE / MAE-A** (MBST Vol. IV 5.7): quadriculado de quadrados ≥ 1,00 m para a travessia de faixa exclusiva,
+  branco (no fluxo) ou amarelo (contrafluxo).
+
+### 5.1 Canalização em transição (MTL / MAO / MAP)
+
+**Zebrado ▾ → Canalização**: a área neutra de uma **transição de largura** (MTL – estreitamento/alargamento),
+da **aproximação de obstáculo ou ilha** (MAO – transição de entrada, obstáculo e transição de saída, com
+afastamento lateral *a* de 0,30–0,60 m) ou do **acostamento** (MAP – início/fim/estreitamento com trecho tangente).
+Selecione ou desenhe a **linha de referência no sentido do tráfego** (o bordo da faixa antes da transição); a
+variação de largura *d* positiva abre o zebrado para a esquerda e negativa para a direita. Os comprimentos vêm da
+velocidade – **l = 0,5 · V · d** (MBST Vol. IV 6.2 / DER-SP B.3), mínimos de 30 m (urbana) e 60 m (rodovia) junto a
+obstáculos, transição de acostamento *ta* de 30/40/50 m (DER-SP Quadro B-9) – e as barras de 0,50 m a 45° ficam a
+cada 1,50 m (V < 80) ou 2,50 m (DER-SP Quadro B-10), com linha de canalização de 0,20 m. Tudo editável; branco entre
+fluxos de mesmo sentido e amarelo entre fluxos opostos (com a opção *dois lados* para obstáculo no eixo).
 
 ---
 
@@ -439,7 +464,9 @@ vigente do manual. O catálogo pode ser alterado (seção `placas`, campo `picto
 ## 14. Moderação de tráfego
 
 Quebra-molas tipo A (3,70 m × 0,08 m) e tipo B (1,50 m × 0,06 m), faixa elevada (platô + rampas de
-1,50 m, 0,15 m de altura, zebrado no platô) e lombada invertida. Clique os dois bordos da pista.
+1,50 m, 0,15 m de altura, zebrado no platô), lombada invertida e **almofada** (*speed cushion*, CET-SP – Medidas
+Moderadoras do Tráfego: 3,0 m × 6–7,5 cm, largura de 1,60–1,90 m, **uma por faixa** – ônibus e veículos de emergência
+passam com as rodas ao lado; quantidade e largura editáveis). Clique os dois bordos da pista.
 A **lombada invertida** recorta o pavimento (piso) e as linhas sobre ela, ficando visível a depressão em concreto.
 As dimensões padrão devem ser conferidas com as resoluções do CONTRAN vigentes; lembre-se da
 sinalização vertical obrigatória (ex.: A-18).
@@ -453,6 +480,10 @@ esquerda, ambas ou nenhuma; contínuas ou seccionadas), linha central amarela, b
 setas a cada N metros e segregadores. As linhas e símbolos ficam ligeiramente acima da pintura de fundo,
 eliminando os "quadrados" que apareciam na vista. A ferramenta antiga (só linhas) continua em
 **Ciclofaixa – linhas**.
+
+**Padrão II da CET-SP (Vol. 13)**: desmarcando a pintura de fundo, a linha branca de delimitação é acompanhada por
+uma **linha vermelha de contraste** de 0,15 m pelo lado interno (largura editável) – a alternativa econômica à
+pintura total. Na ciclovia segregada a linha vermelha acompanha a LBO.
 
 No **Sinalizar Via**, selecione a ciclofaixa para ajustar: largura, largura da linha de delimitação,
 linha contínua ou seccionada (traço/espaço), tamanho do símbolo da bicicleta e da seta, distância
@@ -650,9 +681,38 @@ editável**):
 | **Com by-pass** | conversão à direita livre | faixa de by-pass (largura e raio) com ilhas separadoras |
 | **Personalizada** | qualquer | todos os parâmetros livres |
 
-Parâmetros adicionais: tipo da ilha (**ajardinada**, **pavimentada** ou **galgável**), altura da faixa
+Parâmetros adicionais: tipo da ilha (**ajardinada**, **pavimentada**, **galgável** ou **pintada**), altura da faixa
 galgável, **raios de entrada e de saída** separados, largura dos divisores, largura/raio do by-pass,
 distância e largura das **travessias**, número de **árvores**. A janela mostra o **diâmetro inscrito**.
+
+### 20.1 Integração com as vias – só a rotatória, sem refazer o cruzamento
+
+| Modo | O que a rotatória gera / recorta |
+|---|---|
+| **Completa** | como antes: pista dos ramos, esquinas, calçadas, meio-fio; as vias são recortadas na zona toda. |
+| **Somente o anel** | a pista giratória e a ilha; as vias ligadas são recortadas **apenas dentro do anel** (a pista delas continua até o anel); a sinalização dos ramos (LDP, SDP, ilhas separadoras, placas) é gerada sobre as vias existentes. |
+| **Somente a ilha** | apenas a ilha central e as marcas do anel/ramos; as vias **não são recortadas** (só a ilha é subtraída) – ideal para inserir uma rotatória num cruzamento já modelado sem mexer nele. |
+
+**Recortar as vias ligadas** pode ser desligado em qualquer modo (a rotatória fica só sobreposta). O recorte separa
+o que é **físico** (pavimento, meio-fio, calçada – zona da rotatória) do que é **pintura** (linhas e marcas – só o
+anel), então as linhas de bordo e de eixo das vias param no anel sem apagar a pista.
+
+### 20.2 Minirrotatória pintada e marcação do anel (MBST Vol. IV – MIR)
+
+A ilha **pintada** (preset *Mini*) é uma **LCA** contínua de 0,20 m (largura editável) com **tachões** a cada
+0,25–0,50 m em volta, zebrado interno opcional; ilhas separadoras **pintadas** em amarelo (fluxos opostos) ou
+branco (mão única, por ramo), **setas curvas IMC** no anel (uma por faixa, logo após cada entrada), LBO externa
+entre as aberturas dos ramos, **LMS-1/LMS-2** entre as faixas do anel, LDP de 0,40 m com SDP de 3,60 / 6,00 m pela
+velocidade de aproximação e **LFO-3** nas aproximações de mão dupla. Placas: **R-2 + R-33** nas entradas (quando o
+raio da ilha é pequeno) ou **R-24a na ilha** (DER-SP projetos-tipo 15/16 – escolha em *Placas de sentido*),
+**A-12 com "A … m"** (distância pela desaceleração de 2 m/s² do MBST Vol. II) e **marcadores de alinhamento** na ilha.
+
+### 20.3 Personalizar cada ramo
+
+Na seção *Personalizar cada ramo* escolha o ramo (pelo ângulo) e ajuste: largura, **mão dupla/única**, ilha
+separadora (**física, pintada ou nenhuma**) e seu comprimento, **travessia** (sim/não), **raios de entrada e de
+saída**, **controle** (Dê a preferência ou **PARE** – LRE de 0,40 m + legenda) e placas. As escolhas ficam
+guardadas por via: ao redetectar os ramos (mover eixos, ligar outra via) elas são preservadas.
 
 **Vias → Conexões → Rotatória** (seta do botão *Conexões*): clique o centro (o ponto é encaixado no cruzamento de vias mais próximo). Os ramos
 são detectados das vias que passam pelo centro (ou informados por ângulo, para uma rotatória isolada).
@@ -663,8 +723,8 @@ gota com **zebrado** de aproximação, **linha de dê a preferência** e **símb
 entrada (circulação anti-horária), **travessia de pedestres** passando pela ilha, **rebaixamentos** e
 placas **R-2** e **R-33**. As vias ligadas são recortadas e a interseção existente no mesmo nó é
 substituída (com os recortes que ela fazia). A rotatória ligada às vias **acompanha o nó** quando os eixos
-são movidos e ganha um **ramo novo** quando uma via é desenhada até ela (**Nova Via**, clicando dentro da
-rotatória); também pode ser criada direto na conexão (**Nova Via → Rotatória** ou **Conexão**). Confira as dimensões com o manual do DNIT / órgão local e com o veículo de projeto.
+são movidos e ganha um **ramo novo** quando uma via é desenhada até ela (**Via** desenhada por pontos, clicando dentro da
+rotatória); também pode ser criada direto na conexão (**Via → Rotatória** ou **Conexões → Trocar Conexão**). Confira as dimensões com o manual do DNIT / órgão local e com o veículo de projeto.
 
 ## 21. Piso tátil (NBR 16537)
 
@@ -709,3 +769,34 @@ apoios de aço com braços; **lixeira** cônica com tampa; **poste** cônico com
 **poste de pedestres**; **abrigo de ônibus** com vidro, painel e banco; **paraciclo** tubular; **hidrante**;
 **floreira** com arbustos; **placa de rua** e **semáforo** com anteparo e pestanas. Elementos urbanos e
 placas são assentados no **topo da calçada** (nível da base 0,15 m, ajustável na janela; 0 = nível da pista).
+
+---
+
+## 23. Cruzamento rodoferroviário (MCF)
+
+**Complementos ▾ → Cruzamento Rodoferroviário**: clique o ponto onde a ferrovia cruza uma via do SinalizaBIM
+(sem via, clique dois pontos do eixo) e, opcionalmente, dois pontos sobre o trilho para a **esconsidade**. A ferramenta
+monta o conjunto do **MBST Vol. IX / Vol. IV 5.8** e do **DER-SP (projeto-tipo 13)**, em cada aproximação:
+
+* **Linha de retenção dupla** (MCF, 2 × 0,40 m) **paralela ao trilho**, a 3,0 m do trilho externo (MBST; DER-SP
+  usa 5,0 m sem cancela e 2,0 m antes da cancela – editável);
+* **retângulo de advertência** (duas linhas transversais a 15 m) a 15–150 m da retenção, com a **cruz de Santo
+  André (CSA) de 6,00 m por faixa**;
+* **LFO-3** (linha dupla contínua) na aproximação de mão dupla, **PARE** por faixa (1,60 / 2,40 m pela velocidade),
+  **LRV** opcional dimensionada pelo método do MBST e **MAC** sobre a passagem;
+* placas **A-41** (cruz de Santo André, com "1 LINHA" / "n LINHAS") e **R-1** no mesmo suporte a 3,60 m do eixo da
+  ferrovia, **A-39** (sem barreira) ou **A-40** (com barreira) a uma distância calculada pela desaceleração
+  (2 m/s² – MBST Vol. II) e **R-19** antecipada em vias acima de 40 km/h.
+
+Largura da pista, faixas por sentido, número de linhas férreas, bitola, distâncias e larguras são editáveis; o
+conjunto é um grupo (Selecionar Conjunto pega tudo).
+
+## 24. O que foi aplicado dos manuais
+
+O plugin incorporou regras dos manuais estudados (DER-SP Vol. I – Projeto, 2023; MBST Vol. I, II, III, IV, VI, IX;
+CET-SP Vol. 10/11/13, Medidas Moderadoras e Dispositivos Delimitadores). O resumo do estudo, com o que cada
+regra virou no plugin, está em `docs/ESTUDO-MANUAIS.md`. Em resumo, ficam **calculados pela velocidade** (e sempre
+editáveis): distância das placas de advertência e da mensagem "A … m", espaçamento das LRV, comprimento das
+transições de canalização, espaçamento das barras do zebrado de canalização, espaçamento de tachas e tachões,
+tamanho do SDP, altura das legendas e largura das linhas longitudinais.
+

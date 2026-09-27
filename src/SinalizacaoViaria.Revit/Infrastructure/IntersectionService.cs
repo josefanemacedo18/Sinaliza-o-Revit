@@ -168,9 +168,28 @@ public sealed class IntersectionService
                     it.CornerRadius = Hierarquia.NodeRadius(ids.Select(i => roads[i].Def));
             }
             foreach (var i in ids) if (!it.RoadIds.Contains(roads[i].Def.Id)) it.RoadIds.Add(roads[i].Def.Id);
-            results.AddRange(Refresh(it));
+            // Uma interseção com problema não impede as demais conexões da via.
+            try { results.AddRange(Refresh(it)); }
+            catch (Exception ex)
+            {
+                Log.Error($"Interseção em ({node.X:0.0}; {node.Y:0.0})", ex);
+                results.Add(new RenderResult { Geometry = null });
+                results[^1].Warnings.Add($"Interseção em ({node.X:0.0}; {node.Y:0.0}) não pôde ser criada: {ex.Message}");
+            }
             processed.Add(it.Id);
         }
+        return results;
+    }
+
+    /// <summary>Regenera as interseções, rotatórias e cul-de-sacs que dependem das marcas indicadas (vias alteradas).</summary>
+    public List<RenderResult> RefreshDependents(IEnumerable<MarkingDefinition> changed)
+    {
+        var list = changed.ToList();
+        var results = new List<RenderResult>();
+        _service.Invalidate();
+        foreach (var it in DependentOn(list)) results.AddRange(Refresh(it));
+        foreach (var rb in RoundaboutsDependentOn(list)) results.AddRange(Refresh(rb));
+        foreach (var c in CulDeSacsDependentOn(list)) results.AddRange(Refresh(c));
         return results;
     }
 
@@ -247,7 +266,7 @@ public sealed class IntersectionService
             var node = IntersectionGenerator.FindNodes(near).OrderBy(n => n.Node.DistanceTo(rb.Center)).FirstOrDefault();
             if (node.Roads != null && node.Node.DistanceTo(rb.Center) < 20) rb.Center = node.Node;
             var legs = RoundaboutGenerator.LegsFromRoads(rb.Center, roads, rb.OuterRadius + 25);
-            if (legs.Count >= 2) rb.Legs = legs;
+            if (legs.Count >= 2) rb.Legs = RoundaboutGenerator.MergeLegSettings(rb.Legs, legs);
             var hs = legs.Select(l => roads.FirstOrDefault(r => r.Def.Id == l.RoadId)?.Def.Hierarchy).OrderByDescending(Hierarquia.Rank).FirstOrDefault();
             if (hs != null) rb.Hierarchy = hs;
         }
@@ -272,8 +291,15 @@ public sealed class IntersectionService
         {
             if (m.Id == rb.Id || children.Any(c => c.Id == m.Id)) continue;
             m.Exclusions.RemoveAll(e => e.SourceId == rb.Id);
-            if (m.GroupId != null && groups.Contains(m.GroupId))
-                m.Exclusions.Add(new ExclusionZone { SourceId = rb.Id, Points = layout.Zone.Outer.ToList() });
+            if (rb.CutRoads && m.GroupId != null && groups.Contains(m.GroupId))
+            {
+                // Elementos físicos (pavimento, calçadas, meios-fios) recortados na zona; pintura e dispositivos só no anel
+                // (nos modos "anel" e "somente ilha" as vias ficam como estão fora da pista giratória).
+                var physical = m is RoadPavementDefinition || IntersectionGenerator.IsPhysical(m);
+                var zone = physical ? layout.Zone : layout.PaintZone;
+                if (rb.Integration == IntegracaoRotatoria.Completa) zone = layout.Zone;
+                m.Exclusions.Add(new ExclusionZone { SourceId = rb.Id, Points = zone.Outer.ToList() });
+            }
             try { results.Add(_service.Render(m)); }
             catch (Exception ex) { Log.Error($"Rotatória – via {m.DisplayCode}", ex); }
         }

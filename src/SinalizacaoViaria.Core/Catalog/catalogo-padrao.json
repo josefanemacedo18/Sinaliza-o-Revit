@@ -234,6 +234,88 @@
       ]
     },
     {
+      "codigo": "LFO-5",
+      "nome": "Linha seccionada de transição (aproximação de proibição de ultrapassagem)",
+      "grupo": "Longitudinal",
+      "cor": "Amarela",
+      "descricao": "Três segmentos longos (cada um com dois traços e um espaço da LFO-2) antes do início da linha contínua. DER/SP Quadro B-4: 10×6 / 15×9 / 20×12 m (normal) ou 8×4 / 12×6 / 16×8 m (especial).",
+      "referencia": "DER/SP – Manual de Sinalização Rodoviária Vol. I (2023), B.2.1.5 – LFO-5",
+      "alinhamento": "Fim",
+      "larguraMin": 0.1,
+      "larguraMax": 0.15,
+      "variantes": [
+        {
+          "nome": "V < 60 km/h – 10 × 6 m (3 segmentos)",
+          "velocidadeMax": 59,
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "repetir": false,
+              "padrao": [10.0, 6.0, 10.0, 6.0, 10.0, 6.0]
+            }
+          ]
+        },
+        {
+          "nome": "60 ≤ V < 80 km/h – 15 × 9 m",
+          "velocidadeMax": 79,
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "repetir": false,
+              "padrao": [15.0, 9.0, 15.0, 9.0, 15.0, 9.0]
+            }
+          ]
+        },
+        {
+          "nome": "V ≥ 80 km/h – 20 × 12 m",
+          "velocidadeMax": 999,
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.15,
+              "repetir": false,
+              "padrao": [20.0, 12.0, 20.0, 12.0, 20.0, 12.0]
+            }
+          ]
+        },
+        {
+          "nome": "Situação especial V < 60 – 8 × 4 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "repetir": false,
+              "padrao": [8.0, 4.0, 8.0, 4.0, 8.0, 4.0]
+            }
+          ]
+        },
+        {
+          "nome": "Situação especial 60–80 – 12 × 6 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "repetir": false,
+              "padrao": [12.0, 6.0, 12.0, 6.0, 12.0, 6.0]
+            }
+          ]
+        },
+        {
+          "nome": "Situação especial V ≥ 80 – 16 × 8 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.15,
+              "repetir": false,
+              "padrao": [16.0, 8.0, 16.0, 8.0, 16.0, 8.0]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "codigo": "LMS-1",
       "nome": "Linha simples contínua – divisão de fluxos de mesmo sentido",
       "grupo": "Longitudinal",
@@ -573,6 +655,59 @@
       ]
     },
     {
+      "codigo": "MCF",
+      "nome": "Cruzamento rodoferroviário – linha de retenção dupla",
+      "grupo": "Transversal",
+      "cor": "Branca",
+      "transversal": true,
+      "alinhamento": "Centro",
+      "descricao": "Duas linhas de 0,30 a 0,60 m com igual espaçamento entre elas, paralelas ao trilho, a no mínimo 3,00 m do trilho externo (MBST). Use a ferramenta Cruzamento Rodoferroviário para o conjunto completo (retângulo de advertência, cruz, LFO-3, PARE e placas).",
+      "referencia": "MBST Vol. IV – 5.8 MCF; MBST Vol. IX; ABNT NBR 12180 / 15942",
+      "larguraMin": 0.3,
+      "larguraMax": 0.6,
+      "variantes": [
+        {
+          "nome": "0,40 m (2 linhas)",
+          "faixas": [
+            {
+              "deslocamento": 0.4,
+              "largura": 0.4
+            },
+            {
+              "deslocamento": -0.4,
+              "largura": 0.4
+            }
+          ]
+        },
+        {
+          "nome": "0,30 m (2 linhas)",
+          "faixas": [
+            {
+              "deslocamento": 0.3,
+              "largura": 0.3
+            },
+            {
+              "deslocamento": -0.3,
+              "largura": 0.3
+            }
+          ]
+        },
+        {
+          "nome": "0,60 m (2 linhas)",
+          "faixas": [
+            {
+              "deslocamento": 0.6,
+              "largura": 0.6
+            },
+            {
+              "deslocamento": -0.6,
+              "largura": 0.6
+            }
+          ]
+        }
+      ]
+    },
+    {
       "codigo": "LDP",
       "nome": "Linha de \"Dê a preferência\"",
       "grupo": "Transversal",
@@ -584,6 +719,16 @@
       "larguraMin": 0.2,
       "larguraMax": 0.4,
       "variantes": [
+        {
+          "nome": "0,40 m (0,50 × 0,50 m) – DER/SP",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.4,
+              "padrao": [0.5, 0.5]
+            }
+          ]
+        },
         {
           "nome": "0,30 m (0,50 × 0,50 m)",
           "faixas": [
@@ -773,8 +918,8 @@
       "nome": "Linhas de estímulo à redução de velocidade",
       "grupo": "Transversal",
       "cor": "Branca",
-      "descricao": "Desenhe o caminho no SENTIDO do tráfego, ao longo da faixa. A 'largura' é a extensão transversal das linhas (largura da faixa de rolamento). Espaçamentos decrescentes – ajuste conforme o estudo de redução de velocidade.",
-      "referencia": "MBST Vol. IV – Marcas transversais (LRV)",
+      "descricao": "Desenhe o caminho no SENTIDO do tráfego, ao longo da faixa (a 'largura' é a extensão transversal das linhas). Informe as velocidades inicial e final: o espaçamento decrescente é calculado pelo método do MBST Vol. IV (a = 1,47 m/s², 1 s entre linhas); largura das linhas 0,20 / 0,30 / 0,40 m pela velocidade. A última linha fica 2 m antes do ponto onde a velocidade já deve estar reduzida.",
+      "referencia": "MBST Vol. IV – 5.2 LRV (método de cálculo); DER/SP Vol. I – B.4.3",
       "larguraMin": 2.5,
       "larguraMax": 12.0,
       "variantes": [
@@ -880,23 +1025,14 @@
       "cor": "Amarela",
       "unidades": true,
       "espessura": 0.02,
-      "descricao": "Dispositivos auxiliares refletivos sobre linhas de divisão de fluxos opostos. Cada peça é contada como unidade.",
-      "referencia": "MBST Vol. IV – Dispositivos auxiliares / DNIT",
+      "descricao": "Dispositivos auxiliares refletivos sobre linhas de divisão de fluxos opostos. Cada peça é contada como unidade. Espaçamento pela velocidade (MBST Vol. VI, Tabela 4.6): 8/12/16 m normal; 6/9/12 m em situação especial (neblina, curvas, declives).",
+      "referencia": "MBST Vol. VI – Tachas (Tabela 4.6) / MBST Vol. IV",
       "larguraMin": 0.08,
       "larguraMax": 0.15,
       "variantes": [
         {
-          "nome": "Espaçamento 16 m (tangente)",
-          "faixas": [
-            {
-              "deslocamento": 0,
-              "largura": 0.1,
-              "padrao": [0.1, 15.9]
-            }
-          ]
-        },
-        {
-          "nome": "Espaçamento 8 m (curvas)",
+          "nome": "V < 80 km/h – 8 m (normal)",
+          "velocidadeMax": 79,
           "faixas": [
             {
               "deslocamento": 0,
@@ -906,12 +1042,74 @@
           ]
         },
         {
-          "nome": "Espaçamento 4 m (pontos críticos)",
+          "nome": "80 ≤ V ≤ 90 km/h – 12 m (normal)",
+          "velocidadeMax": 90,
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [0.1, 11.9]
+            }
+          ]
+        },
+        {
+          "nome": "V > 90 km/h – 16 m (normal)",
+          "velocidadeMax": 999,
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [0.1, 15.9]
+            }
+          ]
+        },
+        {
+          "nome": "Situação especial V < 80 – 6 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [0.1, 5.9]
+            }
+          ]
+        },
+        {
+          "nome": "Situação especial 80–90 – 9 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [0.1, 8.9]
+            }
+          ]
+        },
+        {
+          "nome": "Situação especial V > 90 – 12 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [0.1, 11.9]
+            }
+          ]
+        },
+        {
+          "nome": "Trecho que antecede situação especial – 4 m",
           "faixas": [
             {
               "deslocamento": 0,
               "largura": 0.1,
               "padrao": [0.1, 3.9]
+            }
+          ]
+        },
+        {
+          "nome": "Trecho que antecede situação especial – 2 m (bordo)",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [0.1, 1.9]
             }
           ]
         }
@@ -924,13 +1122,36 @@
       "cor": "Branca",
       "unidades": true,
       "espessura": 0.02,
-      "descricao": "Tachas sobre linhas de bordo e de divisão de fluxos de mesmo sentido.",
-      "referencia": "MBST Vol. IV – Dispositivos auxiliares / DNIT",
+      "descricao": "Tachas sobre linhas de bordo e de divisão de fluxos de mesmo sentido. Espaçamento pela velocidade (MBST Vol. VI, Tabela 4.6): 8/12/16 m normal; 6/9/12 m em situação especial (neblina, curvas, declives).",
+      "referencia": "MBST Vol. VI – Tachas (Tabela 4.6) / MBST Vol. IV",
       "larguraMin": 0.08,
       "larguraMax": 0.15,
       "variantes": [
         {
-          "nome": "Espaçamento 16 m (tangente)",
+          "nome": "V < 80 km/h – 8 m (normal)",
+          "velocidadeMax": 79,
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [0.1, 7.9]
+            }
+          ]
+        },
+        {
+          "nome": "80 ≤ V ≤ 90 km/h – 12 m (normal)",
+          "velocidadeMax": 90,
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [0.1, 11.9]
+            }
+          ]
+        },
+        {
+          "nome": "V > 90 km/h – 16 m (normal)",
+          "velocidadeMax": 999,
           "faixas": [
             {
               "deslocamento": 0,
@@ -940,12 +1161,52 @@
           ]
         },
         {
-          "nome": "Espaçamento 8 m (curvas)",
+          "nome": "Situação especial V < 80 – 6 m",
           "faixas": [
             {
               "deslocamento": 0,
               "largura": 0.1,
-              "padrao": [0.1, 7.9]
+              "padrao": [0.1, 5.9]
+            }
+          ]
+        },
+        {
+          "nome": "Situação especial 80–90 – 9 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [0.1, 8.9]
+            }
+          ]
+        },
+        {
+          "nome": "Situação especial V > 90 – 12 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [0.1, 11.9]
+            }
+          ]
+        },
+        {
+          "nome": "Trecho que antecede situação especial – 4 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [0.1, 3.9]
+            }
+          ]
+        },
+        {
+          "nome": "Trecho que antecede situação especial – 2 m (bordo)",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [0.1, 1.9]
             }
           ]
         }
@@ -959,10 +1220,20 @@
       "unidades": true,
       "espessura": 0.05,
       "descricao": "Tachões para canalização e separação física leve de fluxos.",
-      "referencia": "MBST Vol. IV – Dispositivos auxiliares",
+      "referencia": "MBST Vol. VI – Tachão (Tabela 4.7)",
       "larguraMin": 0.15,
       "larguraMax": 0.25,
       "variantes": [
+        {
+          "nome": "Canalização ao lado do fluxo – a cada 4,00 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.15,
+              "padrao": [0.25, 3.75]
+            }
+          ]
+        },
         {
           "nome": "Espaçamento 2 m",
           "faixas": [
@@ -974,12 +1245,32 @@
           ]
         },
         {
-          "nome": "Espaçamento 4 m",
+          "nome": "Fluxos divergentes/convergentes – a cada 1,00 m",
           "faixas": [
             {
               "deslocamento": 0,
               "largura": 0.15,
-              "padrao": [0.25, 3.75]
+              "padrao": [0.25, 0.75]
+            }
+          ]
+        },
+        {
+          "nome": "Minirrotatória – a cada 0,50 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.15,
+              "padrao": [0.25, 0.25]
+            }
+          ]
+        },
+        {
+          "nome": "Minirrotatória – contíguos (0,25 m)",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.15,
+              "padrao": [0.25, 0.01]
             }
           ]
         }
@@ -1516,7 +1807,7 @@
       "codigo": "ZPA",
       "nome": "Zebrado de preenchimento de área de pavimento não utilizável (branco)",
       "grupo": "Canalizacao",
-      "descricao": "Áreas de canalização entre fluxos de mesmo sentido (afunilamentos, ilhas pintadas, narizes de acesso).",
+      "descricao": "Áreas de canalização entre fluxos de mesmo sentido (afunilamentos, ilhas pintadas, narizes de acesso). MBST: barras 0,30–0,50 m a cada 1,10–3,50 m (circulação). DER/SP: barras 0,50 m a cada 1,50 m (V < 80) ou 2,50 m (V ≥ 80), a 45°, com linha de canalização de 0,20 m.",
       "referencia": "MBST Vol. IV – Marcas de canalização (ZPA/LCA)",
       "corBarras": "Branca",
       "corBorda": "Branca",
@@ -1529,7 +1820,7 @@
       "codigo": "ZPA-A",
       "nome": "Zebrado de preenchimento de área (amarelo – fluxos opostos)",
       "grupo": "Canalizacao",
-      "descricao": "Áreas de canalização entre fluxos de sentidos opostos.",
+      "descricao": "Áreas de canalização entre fluxos de sentidos opostos. MBST: barras 0,30–0,50 m a cada 1,10–3,50 m (circulação). DER/SP: barras 0,50 m a cada 1,50 m (V < 80) ou 2,50 m (V ≥ 80), a 45°, com linha de canalização de 0,20 m.",
       "referencia": "MBST Vol. IV – Marcas de canalização (ZPA/LCA)",
       "corBarras": "Amarela",
       "corBorda": "Amarela",
@@ -1578,6 +1869,34 @@
       "angulo": 45,
       "larguraBorda": 0.15,
       "cruzado": true
+    },
+    {
+      "codigo": "MAE",
+      "nome": "Marcação de área de cruzamento com faixa exclusiva (branca – no fluxo)",
+      "grupo": "Transversal",
+      "corBarras": "Branca",
+      "corBorda": "Branca",
+      "larguraBarra": 0.1,
+      "espacamento": 0.9,
+      "angulo": 0,
+      "larguraBorda": 0.15,
+      "cruzado": true,
+      "descricao": "Quadriculado de quadrados de no mínimo 1,00 m de lado cobrindo a área da faixa exclusiva na travessia da via transversal (retângulo). Branca para faixas no fluxo.",
+      "referencia": "MBST Vol. IV – 5.7 MAE"
+    },
+    {
+      "codigo": "MAE-A",
+      "nome": "Marcação de área de cruzamento com faixa exclusiva (amarela – contra fluxo)",
+      "grupo": "Transversal",
+      "corBarras": "Amarela",
+      "corBorda": "Amarela",
+      "larguraBarra": 0.1,
+      "espacamento": 0.9,
+      "angulo": 0,
+      "larguraBorda": 0.15,
+      "cruzado": true,
+      "descricao": "Quadriculado de quadrados de no mínimo 1,00 m de lado; amarela para faixas exclusivas no contra fluxo, em todas as aproximações não semaforizadas.",
+      "referencia": "MBST Vol. IV – 5.7 MAE"
     },
     {
       "codigo": "MOT",
@@ -1722,6 +2041,24 @@
       "cor": "Branca",
       "comprimentos": [1.5, 1.8],
       "referencia": "MBST Vol. IV – Ciclofaixas"
+    },
+    {
+      "codigo": "IMC",
+      "nome": "Seta curva – circulação na rotatória (anti-horária)",
+      "forma": "SetaCurvaEsquerda",
+      "cor": "Branca",
+      "comprimentos": [4.5, 6.0],
+      "descricao": "Seta curva indicando o sentido de circulação no anel da rotatória (MBST Vol. IV, Fig. 5.x – marcação de interseção em rotatória). Insira uma por faixa do anel, logo após cada entrada.",
+      "referencia": "MBST Vol. IV – 5.9 MIR (marcação de interseção em rotatória)"
+    },
+    {
+      "codigo": "IMC-D",
+      "nome": "Seta curva à direita",
+      "forma": "SetaCurvaDireita",
+      "cor": "Branca",
+      "comprimentos": [4.5, 6.0],
+      "descricao": "Seta curva para a direita (circulação horária ou indicação de curva).",
+      "referencia": "MBST Vol. IV – Setas"
     },
     {
       "codigo": "SDP",

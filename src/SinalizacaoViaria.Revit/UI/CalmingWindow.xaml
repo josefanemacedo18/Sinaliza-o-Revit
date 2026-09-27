@@ -24,7 +24,7 @@
                 <TextBlock Style="{StaticResource Hint}" Text="Clique os dois bordos da pista no eixo do dispositivo (repete até ESC), ou selecione uma linha atravessando a pista."/>
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <TextBlock Text="Tipo" Style="{StaticResource FieldLabel}"/>
                     <ComboBox Grid.Column="1" x:Name="CbType" SelectionChanged="TypeChanged"/>
                     <TextBlock Grid.Row="1" Text="Extensão no sentido do tráfego (m)" Style="{StaticResource FieldLabel}"/>
@@ -37,6 +37,11 @@
                     <TextBlock Grid.Row="5" Text="Cor da pintura" Style="{StaticResource FieldLabel}"/>
                     <ComboBox Grid.Row="5" Grid.Column="1" x:Name="CbColor" SelectionChanged="AnyChanged"/>
                     <CheckBox Grid.Row="6" Grid.ColumnSpan="2" x:Name="CkCrosswalk" Content="Faixa de pedestres zebrada no platô" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                    <TextBlock Grid.Row="7" x:Name="LblCushionW" Text="Almofada: largura de cada uma (m)" Style="{StaticResource FieldLabel}" Visibility="Collapsed"/>
+                    <TextBox Grid.Row="7" Grid.Column="1" x:Name="TbCushionW" Text="1,70" TextChanged="AnyChanged" Visibility="Collapsed"
+                             ToolTip="1,60 a 1,90 m: mais estreita que a bitola de ônibus e veículos de emergência, que passam com as rodas ao lado (CET-SP – Medidas Moderadoras do Tráfego)."/>
+                    <TextBlock Grid.Row="8" x:Name="LblCushionN" Text="Almofada: quantidade na pista (0 = uma por faixa)" Style="{StaticResource FieldLabel}" Visibility="Collapsed"/>
+                    <TextBox Grid.Row="8" Grid.Column="1" x:Name="TbCushionN" Text="0" TextChanged="AnyChanged" Visibility="Collapsed"/>
                 </Grid>
                 <GroupBox x:Name="GbPath" Header="Posição">
                     <StackPanel>

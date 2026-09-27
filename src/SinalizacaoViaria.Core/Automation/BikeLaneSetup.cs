@@ -26,6 +26,10 @@ public sealed class BikeLaneSetup
     public TipoCiclo Type { get; set; } = TipoCiclo.CiclofaixaUnidirecional;
     public double Width { get; set; } = 1.50;
     public bool Background { get; set; } = true;
+    /// <summary>Sem fundo total: linha vermelha de contraste (0,15 m) por dentro da linha de delimitação – padrão II da CET-SP (Vol. 13).</summary>
+    public bool RedContrastLines { get; set; } = true;
+    /// <summary>Largura da linha vermelha de contraste (m).</summary>
+    public double ContrastWidth { get; set; } = 0.15;
     public MarkingColor WalkColor { get; set; } = MarkingColor.Azul;
     /// <summary>Lado da linha de delimitação (em relação ao sentido do eixo).</summary>
     public LadoLinha Lines { get; set; } = LadoLinha.Esquerda;
@@ -111,7 +115,13 @@ public sealed class BikeLaneSetup
         {
             var o = sg * (hw - lineW / 2);
             if (walk) Line("FCA-BD", o, lineW);
-            else Line("CIC-LD", o, lineW, DashedLines ? "Seccionada 0,20 m (1 × 1 m)" : "Contínua 0,20 m");
+            else
+            {
+                Line("CIC-LD", o, lineW, DashedLines ? "Seccionada 0,20 m (1 × 1 m)" : "Contínua 0,20 m");
+                // CET-SP Vol. 13 (padrão II): sem pintura total, a linha branca é acompanhada de linha vermelha interna.
+                if (!Background && RedContrastLines && ContrastWidth > 0.02)
+                    Line("CIC-FD", sg * (hw - lineW - ContrastWidth / 2), ContrastWidth);
+            }
         }
         if (Type == TipoCiclo.CiclofaixaBidirecional)
             Line("CIC-LC", 0, 0.10, "Seccionada 0,10 m (1 × 1 m)", pattern: new[] { Math.Max(0.3, CenterDash), Math.Max(0.3, CenterGap) });

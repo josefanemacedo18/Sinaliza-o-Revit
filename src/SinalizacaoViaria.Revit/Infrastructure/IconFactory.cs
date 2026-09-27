@@ -79,6 +79,21 @@ public static class IconFactory
                 dc.Pop();
                 dc.DrawGeometry(null, P(White, 1.5), Close(tri));
                 break;
+            case "canalizacao":
+                RoadBackground(dc);
+                var taper = Poly(new Point(3, 26), new Point(29, 26), new Point(29, 12));
+                dc.PushClip(taper);
+                for (int i = -30; i < 40; i += 5) dc.DrawLine(P(White, 1.6), new Point(i, 30), new Point(i + 20, 8));
+                dc.Pop();
+                dc.DrawGeometry(null, P(White, 1.5), Close(taper));
+                dc.DrawLine(P(White, 1.5), new Point(3, 6), new Point(29, 6));
+                break;
+            case "ferrovia":
+                RoadBackground(dc);
+                dc.DrawLine(P(White, 2), new Point(6, 6), new Point(26, 26));
+                dc.DrawLine(P(White, 2), new Point(26, 6), new Point(6, 26));
+                dc.DrawRectangle(B(White), null, new Rect(3, 27, 26, 2));
+                break;
             case "seta":
                 RoadBackground(dc);
                 dc.DrawGeometry(B(White), null, Close(Poly(new Point(14.5, 29), new Point(17.5, 29), new Point(17.5, 13), new Point(23, 13),
