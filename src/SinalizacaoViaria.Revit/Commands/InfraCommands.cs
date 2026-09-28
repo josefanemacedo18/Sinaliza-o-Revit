@@ -349,16 +349,28 @@ internal static class InfraForms
          .Number("Extensão modelada (m)", () => d.CrossLength, v => d.CrossLength = v, 160, 3000, "0")
          .Section("Ramos")
          .Number("Largura das rampas (m)", () => d.RampWidth, v => d.RampWidth = v, 4.5, 12)
-         .Number("Raio dos laços (m)", () => d.LoopRadius, v => d.LoopRadius = v, 30, 150, "0", "≈ 50 m para 40 km/h (DNIT).")
+         .If(() => d.Type is TipoNoViario.TrevoCompleto or TipoNoViario.TrevoParcial or TipoNoViario.Trombeta,
+             x => x.Number("Raio dos laços (m)", () => d.LoopRadius, v => d.LoopRadius = v, 30, 150, "0", "≈ 50 m para 40 km/h (DNIT).")
+                   .Percent("Superelevação dos laços (%)", () => d.Superelevation, v => d.Superelevation = v, 0, 0.10, "DNIT: até 8 %."))
+         .Number("Raio das curvas dos ramos (m)", () => d.RampRadius, v => d.RampRadius = v, 60, 600, "0")
+         .Number("Espirais de transição (m)", () => d.SpiralLength, v => d.SpiralLength = v, 0, 150, "0", "Clotoides entre a tangente e a curva circular.")
+         .Number("Faixa de mudança de velocidade (m)", () => d.SpeedChangeLength, v => d.SpeedChangeLength = v, 30, 300, "0", "Desaceleração/aceleração paralela à principal.")
          .Percent("Rampa máxima dos ramos (%)", () => d.RampGrade, v => d.RampGrade = v, 0.02, 0.08)
-         .Number("Distância dos terminais ao centro (m)", () => d.TerminalDistance, v => d.TerminalDistance = v, 40, 600, "0")
-         .Number("Raio das rotatórias (m)", () => d.RoundaboutRadius, v => d.RoundaboutRadius = v, 12, 80)
+         .If(() => d.Type is TipoNoViario.Diamante or TipoNoViario.DiamanteRotatorias or TipoNoViario.TrevoParcial,
+             x => x.Number("Distância dos terminais ao centro (m)", () => d.TerminalDistance, v => d.TerminalDistance = v, 40, 600, "0"))
+         .If(() => d.Type is TipoNoViario.DiamanteRotatorias or TipoNoViario.RotatoriaElevada,
+             x => x.Number("Raio das rotatórias (m)", () => d.RoundaboutRadius, v => d.RoundaboutRadius = v, 12, 80))
          .Number("Gabarito vertical (m)", () => d.Clearance, v => d.Clearance = v, 4.5, 8, "0.00", "DNIT: 5,50 m.")
          .Number("Altura estrutural do tabuleiro (m)", () => d.DeckDepth, v => d.DeckDepth = v, 0.8, 4)
          .Number("Talude dos aterros (H : 1 V)", () => d.FillSlope, v => d.FillSlope = v, 1, 4, "0.0")
+         .Section("Acabamento")
          .Check("Barreiras", () => d.Barriers, v => d.Barriers = v)
+         .Check("Defensas metálicas nos aterros altos", () => d.Guardrails, v => d.Guardrails = v)
          .Check("Faixas pintadas", () => d.Markings, v => d.Markings = v)
-         .Check("Iluminação", () => d.Lighting, v => d.Lighting = v)
+         .Check("Zebrados nos narizes e setas nos ramos", () => d.GoreMarkings, v => d.GoreMarkings = v)
+         .Check("Pórticos de sinalização antes das saídas", () => d.Gantries, v => d.Gantries = v)
+         .Check("Iluminação (postes)", () => d.Lighting, v => d.Lighting = v)
+         .Check("Torres de iluminação nos laços e rotatórias", () => d.HighMasts, v => d.HighMasts = v)
          .Terrain(() => d.FollowTerrain, v => d.FollowTerrain = v, () => d.AdjustTerrain, v => d.AdjustTerrain = v);
         return w;
     }

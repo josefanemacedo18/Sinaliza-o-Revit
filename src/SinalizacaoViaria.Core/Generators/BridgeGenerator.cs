@@ -42,7 +42,12 @@ public sealed record DeckSpec
     /// <summary>Meia largura total do tabuleiro (m).</summary>
     public double DeckHalf => RoadHalf + BarrierWidth + (SidewalkWidth > 0.01 ? SidewalkWidth + 0.25 : 0.05);
 
-    public DeckSurface Surface(VerticalProfile prof) => new() { Profile = prof, CrossSlope = Pedestrian ? 0.01 : CrossSlope, Crown = true };
+    /// <summary>Superelevação (caimento único, m/m, + sobe para a esquerda); 0 = abaulamento de duas águas.</summary>
+    public double Superelevation { get; init; }
+
+    public DeckSurface Surface(VerticalProfile prof) => Math.Abs(Superelevation) > 1e-6
+        ? new DeckSurface { Profile = prof, CrossSlope = Superelevation, Crown = false }
+        : new DeckSurface { Profile = prof, CrossSlope = Pedestrian ? 0.01 : CrossSlope, Crown = true };
 }
 
 /// <summary>
@@ -575,8 +580,12 @@ public static class BridgeGenerator
         SolidSweep.Add(geo, SolidSweep.Box(p + back * 1.45, t, 0.30, width, seat, deckTop - Infra.Wearing), MarkingColor.Concreto, "ENCONTRO");
         // Parede frontal/pilares enterrados até a fundação.
         SolidSweep.Add(geo, SolidSweep.Box(p + back * 0.9, t, 1.0, width - 0.4, g - 1.5, seat - 1.2), MarkingColor.Concreto, "ENCONTRO");
-        // Laje de transição sob o pavimento.
-        SolidSweep.Add(geo, SolidSweep.Box(p + back * 5.0, t, 6.0, 2 * d.RoadHalf, deckTop - Infra.Wearing - 0.35, deckTop - Infra.Wearing - 0.05), MarkingColor.Concreto, "ENCONTRO");
+        // Laje de transição sob o pavimento (acompanha o greide e o caimento).
+        var sa = Math.Clamp(s - inward * 7.6, 0, path.Length);
+        var sb = Math.Clamp(s - inward * 1.6, 0, path.Length);
+        if (Math.Abs(sb - sa) > 0.5)
+            SolidSweep.Along(geo, path, x => Infra.Band(-d.RoadHalf, d.RoadHalf, y => surf.Z(x, y) - Infra.Wearing - 0.05, 0.30),
+                MarkingColor.Concreto, Math.Min(sa, sb), Math.Max(sa, sb), 3, "ENCONTRO");
         // Alas.
         var h = deckTop - g;
         var wingLen = Math.Clamp(h * Math.Max(1, fillSlope) * 0.9, 2.5, 14);
@@ -589,9 +598,11 @@ public static class BridgeGenerator
             var plan = new List<Vec2> { root - ortho * (th / 2), root + dir * wingLen - ortho * (th / 2), root + dir * wingLen + ortho * (th / 2), root + ortho * (th / 2) };
             double TopAt(Vec2 q)
             {
-                var x = Math.Clamp((q - root).Dot(dir) / wingLen, 0, 1);
-                // Paralelas: topo no greide; abertas: descem com a saia do aterro até 0,5 m acima do terreno.
-                return d.WingWalls == TipoAla.Paralelas ? deckTop + 0.9 : deckTop + 0.9 - x * Math.Max(0, h - 0.5);
+                // Paralelas: topo 0,3 m acima do greide; abertas: descem com o talude do aterro (1 : talude) à medida que se
+                // afastam da borda do tabuleiro, até 0,5 m acima do terreno.
+                if (d.WingWalls == TipoAla.Paralelas) return deckTop + 0.3;
+                var lateral = Math.Max(0, (q - root).Dot(n * side));
+                return Math.Max(g + 0.5, deckTop + 0.3 - lateral / Math.Max(0.5, fillSlope));
             }
             SolidSweep.Add(geo, Polyhedron.Prism(plan, _ => g - 0.8, TopAt), MarkingColor.Concreto, "ALA");
         }

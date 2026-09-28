@@ -180,4 +180,56 @@ public class V20Tests
         Assert.Equal(3, series.Count);
         Assert.Equal(new[] { 10.0, 50.0, 90.0 }, series.Select(h => Math.Round(h.Position.X, 3)).OrderBy(x => x));
     }
+
+    // ------------------------------------------------------------------ nós viários
+
+    [Fact]
+    public void Tracado_SpiralCurve_IsSmoothAndReachesTangents()
+    {
+        var path = Tracado.Build(new List<Pi> { new(new Vec2(0, 0)), new(new Vec2(300, 0), 150, 40), new(new Vec2(300, 300)) });
+        // Deflexão entre pontos vizinhos pequena (sem quinas) e extremos preservados.
+        for (int i = 1; i + 1 < path.Points.Count; i++)
+        {
+            var a = (path.Points[i] - path.Points[i - 1]).Normalized();
+            var b = (path.Points[i + 1] - path.Points[i]).Normalized();
+            Assert.True(Math.Acos(Math.Clamp(a.Dot(b), -1, 1)) < 3 * Math.PI / 180);
+        }
+        Assert.Equal(new Vec2(300, 300), path.Points[^1]);
+        // O fim da transição cai sobre a tangente de saída (x = 300).
+        Assert.True(path.Points.Where(p => p.Y > 160).All(p => Math.Abs(p.X - 300) < 0.3));
+    }
+
+    [Fact]
+    public void Cloverleaf_LoopsStayInOwnQuadrants_WithOuterRamps()
+    {
+        var d = new InterchangeDefinition { Type = TipoNoViario.TrevoCompleto };
+        var list = InterchangeGenerator.Layout(d, _ => 0, new List<string>());
+        var loops = list.Where(a => a.Role == PapelRamo.Laco).ToList();
+        Assert.Equal(4, loops.Count);
+        Assert.Equal(4, list.Count(a => a.Role == PapelRamo.Externo));
+        foreach (var l in loops)
+        {
+            // Parte curva do laço num único quadrante.
+            var mid = l.Path.Points.Skip(l.Path.Points.Count / 4).Take(l.Path.Points.Count / 2).ToList();
+            Assert.True(mid.All(p => Math.Sign(p.X) == Math.Sign(mid[0].X) && Math.Sign(p.Y) == Math.Sign(mid[0].Y)));
+        }
+        var g = MarkingBuilder.Build(d, null, Ctx);
+        Assert.Contains(g.Pieces, p => p.Layer == "ZEBRADO");
+        Assert.Contains(g.Pieces, p => p.Layer == "SETA");
+        Assert.Contains(g.Pieces, p => p.Layer == "PORTICO");
+        Assert.Contains(g.Pieces, p => p.Layer == "DEFENSA");
+    }
+
+    [Fact]
+    public void NativeTerrain_SkipsEarthSolids()
+    {
+        var b = new BridgeDefinition();
+        var solid = MarkingBuilder.Build(b, Straight(400), Ctx);
+        var native = MarkingBuilder.Build(b, Straight(400), new BuildContext { Catalog = Cat, NativeTerrain = true });
+        Assert.Contains(solid.Pieces, p => p.Color == MarkingColor.Terra);
+        Assert.DoesNotContain(native.Pieces, p => p.Color == MarkingColor.Terra);
+        Assert.NotEmpty(native.Corridors);
+        var slope = MarkingBuilder.Build(new SlopeDefinition(), Straight(30), new BuildContext { Catalog = Cat, NativeTerrain = true });
+        Assert.NotEmpty(slope.TerrainFinishes);
+    }
 }

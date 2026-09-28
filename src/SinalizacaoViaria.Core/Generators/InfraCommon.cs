@@ -181,11 +181,14 @@ public static class Infra
     }
 
     /// <summary>Um poste: placa de base, coluna cônica, braço curvo de 2,2 m e luminária LED achatada.</summary>
-    public static void Pole(MarkingGeometry geo, Vec2 basePt, double z, double height, Vec2 arm, Vec2 along, double armLength = 2.2)
+    public static void Pole(MarkingGeometry geo, Vec2 basePt, double z, double height, Vec2 arm, Vec2 along, double armLength = 2.2, bool column = true)
     {
         arm = arm.Normalized();
-        SolidSweep.Add(geo, SolidSweep.Box(basePt, along, 0.40, 0.40, z, z + 0.03), MarkingColor.Metal, "ILUMINACAO");
-        SolidSweep.AddRound(geo, Vec3.At(basePt, z + 0.03), Vec3.At(basePt, z + height - 0.4), 0.10, 0.06, MarkingColor.Metal, "ILUMINACAO", true, n: 20);
+        if (column)
+        {
+            SolidSweep.Add(geo, SolidSweep.Box(basePt, along, 0.40, 0.40, z, z + 0.03), MarkingColor.Metal, "ILUMINACAO");
+            SolidSweep.AddRound(geo, Vec3.At(basePt, z + 0.03), Vec3.At(basePt, z + height - 0.4), 0.10, 0.06, MarkingColor.Metal, "ILUMINACAO", true, n: 20);
+        }
         // Braço em arco (4 trechos) subindo 0,6 m.
         var prev = Vec3.At(basePt, z + height - 0.45);
         for (int i = 1; i <= 4; i++)

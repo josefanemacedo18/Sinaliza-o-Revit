@@ -586,6 +586,22 @@ public sealed class InterchangeDefinition : MarkingDefinition, ITerrainAware
     public bool Barriers { get; set; } = true;
     public bool Markings { get; set; } = true;
     public bool Lighting { get; set; } = true;
+    /// <summary>Superelevação dos laços (m/m) – DNIT: até 8 %.</summary>
+    public double Superelevation { get; set; } = 0.06;
+    /// <summary>Comprimento das espirais de transição (clotoides) dos ramos (m).</summary>
+    public double SpiralLength { get; set; } = 40;
+    /// <summary>Raio das curvas dos ramos diagonais e externos (m).</summary>
+    public double RampRadius { get; set; } = 150;
+    /// <summary>Comprimento da faixa de desaceleração/aceleração paralela (m).</summary>
+    public double SpeedChangeLength { get; set; } = 90;
+    /// <summary>Zebrados nos narizes de bifurcação e setas nos ramos.</summary>
+    public bool GoreMarkings { get; set; } = true;
+    /// <summary>Pórticos de sinalização indicativa antes das saídas.</summary>
+    public bool Gantries { get; set; } = true;
+    /// <summary>Torres de iluminação (30 m) no centro dos laços e rotatórias.</summary>
+    public bool HighMasts { get; set; } = true;
+    /// <summary>Defensas metálicas nos aterros altos dos ramos.</summary>
+    public bool Guardrails { get; set; } = true;
     public bool FollowTerrain { get; set; } = true;
     public bool AdjustTerrain { get; set; } = true;
     public List<Vec2>? GroundLine { get; set; }
