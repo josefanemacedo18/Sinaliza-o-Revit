@@ -143,6 +143,9 @@ public static class RibbonBuilder
         // ---------------------------------------------------------------- Editar e configurações
         var edit = app.CreateRibbonPanel(TabName, "Editar");
         Large(edit, typeof(CmdEditar), "Editar", "editar", "Edita os parâmetros de uma marca, via, interseção ou rotatória e a regenera.");
+        Large(edit, typeof(CmdApagarTrecho), "Apagar Trecho", "apagartrecho",
+            "Apaga só uma parte da sinalização (um traço, um trecho entre dois pontos ou tudo numa janela) – a marca continua a mesma e " +
+            "os trechos apagados podem ser desativados (voltam a aparecer), reativados ou removidos quando quiser.");
         Stack(edit,
             Data(typeof(CmdAtualizarTodas), "Atualizar Todas", "atualizar", "Regenera todas as marcas do projeto."),
             Data(typeof(CmdSelecionarConjunto), "Selecionar Conjunto", "selecionar", "Seleciona todos os elementos da mesma marca ou da mesma via."),

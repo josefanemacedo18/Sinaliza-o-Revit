@@ -253,6 +253,15 @@ public sealed class CmdEditar : CommandBase
             newPav.Hierarchy ??= pav.Hierarchy;
             newPav.Exclusions.AddRange(pav.Exclusions);
         }
+        // Trechos apagados à mão (Apagar Trecho) passam para a marca equivalente da seção nova (mesmo tipo e código).
+        var used = new HashSet<string>();
+        foreach (var d in defs.Where(d => d is not RoadPavementDefinition))
+        {
+            var old = members.FirstOrDefault(m => !used.Contains(m.Id) && m.GetType() == d.GetType() && m.DisplayCode == d.DisplayCode && m.Exclusions.Any(z => z.Manual));
+            if (old == null) continue;
+            used.Add(old.Id);
+            d.Exclusions.AddRange(old.Exclusions.Where(z => z.Manual));
+        }
         // Recortes das conexões (interseções, rotatórias, rampas) são reaplicados pelo RefreshDependents.
         var results = new List<RenderResult>();
         using (MarkingService.RenderScope())

@@ -68,7 +68,7 @@ public static class MarkingBuilder
         if (path != null && def.Justify is Justificacao.Esquerda or Justificacao.Direita && SupportsJustify(def) && path.Points.Count >= 2)
             path = JustifiedPath(def, path, ctx);
         var geo = BuildRaw(def, path, ctx);
-        return def.Exclusions.Count == 0 ? geo : ApplyExclusions(geo, def.Exclusions);
+        return def.Exclusions.All(z => !z.Enabled) ? geo : ApplyExclusions(geo, def.Exclusions);
     }
 
     /// <summary>Marcas ao longo de caminho que aceitam borda sobre a linha (em vez de centralizadas).</summary>
@@ -122,7 +122,7 @@ public static class MarkingBuilder
     /// <summary>Recorta as peças pelas zonas de exclusão (ex.: calçada sob um rebaixamento).</summary>
     public static MarkingGeometry ApplyExclusions(MarkingGeometry geo, IEnumerable<ExclusionZone> zones)
     {
-        var holes = zones.Where(z => z.Points.Count >= 3).Select(z => new Polygon2(z.Points)).ToList();
+        var holes = zones.Where(z => z.Enabled && z.Points.Count >= 3).Select(z => new Polygon2(z.Points)).ToList();
         if (holes.Count == 0) return geo;
         var res = new MarkingGeometry { PaintedLength = geo.PaintedLength, PathLength = geo.PathLength, UnitCount = geo.UnitCount };
         res.Warnings.AddRange(geo.Warnings);

@@ -18,6 +18,9 @@ public sealed class GradeSampler : ISurface
     private readonly double _baseM;
     public GradeSampler(Core.Geometry.GradeSurface surface, double baseM) { _surface = surface; _baseM = baseM; }
     public Core.Geometry.GradeSurface Surface => _surface;
+    private List<double>? _grid;
+    /// <summary>Estacas comuns a todos os pisos da via (malha limpa e juntas coincidentes).</summary>
+    public List<double> Grid => _grid ??= Core.Geometry.GradeFloors.Grid(_surface);
     public bool IsAvailable => true;
     public bool LiftsSolids => false;
     public bool TrySample(double xFt, double yFt, double zHintFt, out double zFt, out XYZ normal)

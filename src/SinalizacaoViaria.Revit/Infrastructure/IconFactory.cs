@@ -292,6 +292,14 @@ public static class IconFactory
                 dc.DrawRectangle(B(Color.FromRgb(235, 238, 243)), P(Asphalt, 1), new Rect(3, 6, 20, 23));
                 dc.DrawGeometry(B(Yellow), P(Asphalt, 1), Close(Poly(new Point(12, 24), new Point(26, 6), new Point(30, 10), new Point(16, 28), new Point(11, 29))));
                 break;
+            case "apagartrecho":
+                // Faixa tracejada com um traço riscado (apagado) e a borracha.
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 12, 30, 9));
+                foreach (var x in new[] { 3.0, 21.0 }) dc.DrawRectangle(B(White), null, new Rect(x, 15.5, 7, 2));
+                dc.DrawRectangle(null, new Pen(B(White), 1) { DashStyle = DashStyles.Dot }, new Rect(12, 15, 7, 3));
+                dc.DrawLine(P(Magenta, 2), new Point(11, 23), new Point(20, 9));
+                dc.DrawGeometry(B(Color.FromRgb(236, 120, 150)), P(Asphalt, 1), Close(Poly(new Point(19, 2), new Point(27, 2), new Point(23, 9), new Point(15, 9))));
+                break;
             case "atualizar":
                 dc.DrawGeometry(null, P(Blue, 3), Arc(new Point(16, 16), 10, 20, 290));
                 dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(22, 3), new Point(29, 9), new Point(20, 11))));

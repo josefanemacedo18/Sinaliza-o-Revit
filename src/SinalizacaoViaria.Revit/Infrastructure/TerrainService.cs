@@ -367,6 +367,8 @@ public static class TerrainService
             if (kept.Add(Key(q.X, q.Y))) add.Add(q);
         }
         if (add.Count == 0) return;
+        // O topo não pode descer abaixo do fundo do Toposolid ("muito fino para seu tipo"): engrossa o tipo antes, se preciso.
+        EnsureThickness(doc, topo, add.Min(q => q.Z), report);
         AddPoints(editor, add, report, true);
         doc.Regenerate();
 
@@ -394,6 +396,47 @@ public static class TerrainService
         if (Math.Abs(median) > 0.05 || spread > 0.25)
             report.Notes.Add($"Aviso: o topo do Toposolid ficou até {Math.Abs(median) + spread:0.00} m fora da superfície de projeto em parte dos pontos – " +
                              "confira se o Toposolid tem \"superfície suavizada\" ativa ou pontos de outra fonte na área.");
+    }
+
+    /// <summary>
+    /// Garante que o fundo do Toposolid fique pelo menos 1,5 m abaixo do ponto mais baixo do projeto: senão o Revit recusa a
+    /// edição ("o sólido topográfico é muito fino"). O tipo é duplicado ("… SV") com a camada mais grossa aumentada.
+    /// </summary>
+    public static void EnsureThickness(Document doc, Toposolid topo, double minZFt, TerrainReport report)
+    {
+        try
+        {
+            var bb = topo.get_BoundingBox(null);
+            if (bb == null) return;
+            var margin = UnitConv.Ft(1.5);
+            var lack = bb.Min.Z - (minZFt - margin);
+            if (lack <= 0) return;
+            if (doc.GetElement(topo.GetTypeId()) is not ToposolidType type) return;
+            var cs = type.GetCompoundStructure();
+            if (cs == null || cs.LayerCount == 0) return;
+            // Folga extra (redondo em metros) para as próximas obras não exigirem outro tipo.
+            var addM = Math.Ceiling(UnitConv.M(lack) + 2);
+            var baseName = type.Name.Contains(" SV +") ? type.Name[..type.Name.IndexOf(" SV +", StringComparison.Ordinal)] : type.Name;
+            var total = UnitConv.M(cs.GetWidth()) + addM;
+            var name = $"{baseName} SV +{total:0} m";
+            var target = new FilteredElementCollector(doc).OfClass(typeof(ToposolidType)).Cast<ToposolidType>().FirstOrDefault(x => x.Name == name);
+            if (target == null)
+            {
+                target = (ToposolidType)type.Duplicate(name);
+                var ncs = target.GetCompoundStructure();
+                var idx = Enumerable.Range(0, ncs.LayerCount).OrderByDescending(i => ncs.GetLayerWidth(i)).First();
+                ncs.SetLayerWidth(idx, ncs.GetLayerWidth(idx) + UnitConv.Ft(addM));
+                target.SetCompoundStructure(ncs);
+            }
+            topo.ChangeTypeId(target.Id);
+            doc.Regenerate();
+            report.Notes.Add($"Toposolid engrossado para {total:0} m (tipo \"{name}\"): o corte chega a {UnitConv.M(minZFt):0.0} m e o fundo estava acima disso.");
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Espessura do Toposolid", ex);
+            report.Notes.Add("Aviso: não foi possível engrossar o Toposolid para o corte – aumente a espessura do tipo (Editar tipo → Estrutura) se o Revit recusar.");
+        }
     }
 
     private static void AddPoints(SlabShapeEditor editor, List<XYZ> add, TerrainReport report, bool count)

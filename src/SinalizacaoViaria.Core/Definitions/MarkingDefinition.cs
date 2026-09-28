@@ -458,6 +458,10 @@ public sealed class ExclusionZone
 {
     public string? SourceId { get; set; }
     public List<Vec2> Points { get; set; } = new();
+    /// <summary>Trecho apagado à mão (ferramenta Apagar Trecho) – não é limpo automaticamente.</summary>
+    public bool Manual { get; set; }
+    /// <summary>Desativado: o recorte fica guardado, mas a marca volta a aparecer inteira (liga/desliga).</summary>
+    public bool Enabled { get; set; } = true;
 }
 
 public enum TipoSuporte

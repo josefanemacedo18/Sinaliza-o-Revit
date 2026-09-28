@@ -142,11 +142,12 @@ public static class InfraDemo
     /// Peça plana deformada pelo greide vértice a vértice (como o piso do Revit com edição de forma): face superior contínua,
     /// sem degraus entre os trechos.
     /// </summary>
-    private static MarkingPiece Draped(MarkingPiece p, Polygon2 part, GradeSurface surf)
+    private static MarkingPiece Draped(MarkingPiece p, Polygon2 part, GradeSurface surf, List<double> grid)
     {
         if (part.Holes.Count > 0) return p with { Shape = part, Elevation = p.Elevation + surf.Z(part.Centroid) };
-        var ring = CurveTools.Densify(part.Outer.Append(part.Outer[0]).ToList(), 2.0);
-        ring.RemoveAt(ring.Count - 1);
+        // Mesma malha do Revit: vértices do contorno nas estacas da grade + pontos na crista do abaulamento.
+        var ring = GradeFloors.Resample(part, surf, grid).Outer.ToList();
+        ring.AddRange(GradeFloors.Supports(part, surf, grid));
         var top = ring.Select(v => Vec3.At(v, surf.Z(v) + p.Elevation + Math.Max(0.001, p.Thickness))).ToList();
         // Triângulos (Delaunay dos vértices do contorno, só os de dentro): contornos côncavos nas curvas ficam certos.
         var faces = new List<List<Vec3>>();
@@ -166,30 +167,15 @@ public static class InfraDemo
     /// <summary>Peças planas (pisos, pinturas) cortadas em trechos ao longo do eixo e levantadas até o greide.</summary>
     public static void LiftFlat(MarkingGeometry geo, GradeSurface surf, Polyline2 axis, double step)
     {
-        var strips = new List<(Polygon2 Strip, double S)>();
-        var L = axis.Length;
-        for (var s = 0.0; s < L - 1e-6; s += step)
-        {
-            var e = Math.Min(L, s + step);
-            var a = axis.PointAt(s);
-            var b = axis.PointAt(e);
-            var na = axis.TangentAt(s).PerpLeft * 80;
-            var nb = axis.TangentAt(e).PerpLeft * 80;
-            strips.Add((new Polygon2(new[] { a - na, b - nb, b + nb, a + na }), (s + e) / 2));
-        }
+        _ = axis; _ = step;
+        var grid = GradeFloors.Grid(surf);
         var res = new List<MarkingPiece>();
         foreach (var p in geo.Pieces)
         {
             if (p.Solid != null || p.Profile != null) { res.Add(p); continue; }
-            var (mn, mx) = p.Shape.Bounds;
-            if (Math.Max(mx.X - mn.X, mx.Y - mn.Y) <= step * 1.2)
-            {
-                res.Add(Draped(p, p.Shape, surf));
-                continue;
-            }
-            foreach (var (strip, _) in strips)
-                foreach (var part in PolygonOps.Intersect(new[] { p.Shape }, new[] { strip }).Where(x => x.Area > 1e-4))
-                    res.Add(Draped(p, part, surf));
+            // Como no Revit: pisos em trechos de até 40 m cortados nas estacas da grade.
+            foreach (var part in GradeFloors.Chunks(p.Shape, surf, 40, grid))
+                res.Add(Draped(p, part, surf, grid));
         }
         geo.Pieces.Clear();
         geo.Pieces.AddRange(res);

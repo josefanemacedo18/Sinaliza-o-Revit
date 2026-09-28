@@ -499,6 +499,24 @@ internal static class InfraForms
 }
 
 /// <summary>Terraplenagem logo após criar/editar uma obra que conversa com o terreno.</summary>
+/// <summary>Recolhe os erros do Revit na terraplenagem (avisos são descartados) e desfaz a transação em vez de travar a tela.</summary>
+internal sealed class TerrainFailures : IFailuresPreprocessor
+{
+    public List<string> Errors { get; } = new();
+
+    public FailureProcessingResult PreprocessFailures(FailuresAccessor a)
+    {
+        var error = false;
+        foreach (var f in a.GetFailureMessages())
+        {
+            if (f.GetSeverity() == FailureSeverity.Warning) { a.DeleteWarning(f); continue; }
+            Errors.Add(f.GetDescriptionText());
+            error = true;
+        }
+        return error ? FailureProcessingResult.ProceedWithRollBack : FailureProcessingResult.Continue;
+    }
+}
+
 internal static class TerrainActions
 {
     /// <summary>
@@ -528,10 +546,22 @@ internal static class TerrainActions
         using var t = new Transaction(doc, name);
         try
         {
+            // Erros do Revit na edição do Toposolid viram texto no relatório (sem a janela "não pode ser ignorado").
+            var failures = new TerrainFailures();
+            var fho = t.GetFailureHandlingOptions();
+            fho.SetFailuresPreprocessor(failures);
+            fho.SetClearAfterRollback(true);
+            t.SetFailureHandlingOptions(fho);
             t.Start();
             var service = new MarkingService(doc, uidoc.ActiveView);
             var report = TerrainService.Apply(doc, service, defs, opt);
-            t.Commit();
+            var status = t.Commit();
+            if (status != TransactionStatus.Committed || failures.Errors.Count > 0)
+            {
+                TaskDialog.Show(CommandBase.AppTitle, "O Revit recusou o ajuste do terreno e ele foi desfeito:\n\n" + string.Join("\n", failures.Errors.Distinct()) +
+                    "\n\nSe a mensagem falar em sólido \"muito fino\", aumente a espessura do tipo do Toposolid (Editar tipo → Estrutura) e rode Terraplenagem.");
+                return null;
+            }
             return report;
         }
         catch (Exception ex)

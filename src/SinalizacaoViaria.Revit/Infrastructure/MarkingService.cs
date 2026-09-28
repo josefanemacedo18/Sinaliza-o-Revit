@@ -359,7 +359,7 @@ public sealed class MarkingService
                     // Peças vizinhas do mesmo material viram um piso só (calçadas, trechos recortados).
                     var merged = PolygonOps.Union(grp.Select(p => p.Shape)).Where(p => p.Area > 0.01).ToList();
                     // No greide: pisos em trechos de até 40 m ao longo do eixo (edição de forma leve e fiel ao perfil).
-                    if (terrain is GradeSampler gs) merged = merged.SelectMany(m => GradeFloors.Chunks(m, gs.Surface, 40)).ToList();
+                    if (terrain is GradeSampler gs) merged = merged.SelectMany(m => GradeFloors.Chunks(m, gs.Surface, 40, gs.Grid)).ToList();
                     foreach (var shape in merged)
                     {
                         var piece = new MarkingPiece(shape, grp.Key.Color) { Elevation = grp.Key.E, Thickness = grp.Key.T, Layer = grp.Key.Layer };
@@ -996,6 +996,16 @@ public sealed class MarkingService
         var name = $"SV - {StyleService.ColorName(color)} {mm / 10.0:0.#} cm";
         var types = new FilteredElementCollector(_doc).OfClass(typeof(FloorType)).Cast<FloorType>().ToList();
         var ft = types.FirstOrDefault(t => t.Name == name);
+        if (ft != null)
+        {
+            // Tipos criados por versões anteriores podem ter herdado a camada variável do tipo base.
+            try
+            {
+                var cs0 = ft.GetCompoundStructure();
+                if (cs0 != null && cs0.VariableLayerIndex >= 0) { cs0.VariableLayerIndex = -1; ft.SetCompoundStructure(cs0); }
+            }
+            catch (Exception ex) { Log.Error("FloorType (camada variável)", ex); }
+        }
         if (ft == null)
         {
             var baseType = types.FirstOrDefault(t => !t.IsFoundationSlab) ?? types.FirstOrDefault();
@@ -1013,6 +1023,9 @@ public sealed class MarkingService
                 cs.SetMaterialId(0, Styles.Material(color));
                 cs.SetLayerFunction(0, MaterialFunctionAssignment.Structure);
                 cs.EndCap = EndCapCondition.NoEndCap;
+                // Sem camada variável: na edição de forma o piso inteiro acompanha o greide com espessura constante (com camada
+                // variável o Revit afina a laje e recusa: "muito fino para seu tipo").
+                cs.VariableLayerIndex = -1;
                 ft.SetCompoundStructure(cs);
             }
             catch (Exception ex)
@@ -1076,7 +1089,8 @@ public sealed class MarkingService
         // No terreno/greide, o contorno ganha vértices a cada 2–3 m (pontos de apoio da deformação do piso). O contorno já
         // preparado NÃO passa de novo pela limpeza (ela removeria os vértices colineares e as bordas longas ficariam retas).
         var shaped = groundFt != null;
-        Polygon2 Prep(Polygon2 p) => !shaped ? p : Densified(p, terrain is GradeSampler ? 2.0 : 3.0);
+        // No greide: vértices nas estacas da grade da via (dos dois lados, emparelhados) – malha regular e limpa.
+        Polygon2 Prep(Polygon2 p) => !shaped ? p : terrain is GradeSampler gsp ? GradeFloors.Resample(p, gsp.Surface, gsp.Grid) : Densified(p, 3.0);
         var attempts = new List<Func<List<Polygon2>>>
         {
             () => new List<Polygon2> { Prep(Prepare(piece.Shape)) },
@@ -1139,7 +1153,7 @@ public sealed class MarkingService
             // Pontos internos: no greide, linhas paralelas ao eixo (inclui a crista do abaulamento); no terreno, malha regular.
             var inner = new List<XYZ>();
             if (terrain is GradeSampler gs)
-                inner.AddRange(GradeFloors.Supports(shape, gs.Surface).Select(v => new XYZ(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), top)));
+                inner.AddRange(GradeFloors.Supports(shape, gs.Surface, gs.Grid).Select(v => new XYZ(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), top)));
             else
             {
                 var (mn, mx) = shape.Bounds;

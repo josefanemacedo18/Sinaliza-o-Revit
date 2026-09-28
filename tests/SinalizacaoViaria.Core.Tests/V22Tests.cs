@@ -174,8 +174,58 @@ public class V22Tests
         Assert.Equal(5, chunks.Count);
         Assert.Equal(shape.Area, chunks.Sum(c => c.Area), 1);
         var sup = GradeFloors.Supports(shape, surf);
-        Assert.Contains(sup, p => Math.Abs(p.Y) < 1e-6);                      // crista do abaulamento
-        Assert.True(sup.Count > 200);
+        Assert.All(sup, p => Assert.Equal(0, p.Y, 6));                         // só a crista do abaulamento
+        Assert.InRange(sup.Count, 45, 55);                                     // uma por estaca (4 m)
+    }
+
+    [Fact]
+    public void GradeFloors_ResampleAlignsBothEdgesOnCurve()
+    {
+        // Via em curva (R = 60 m): o contorno do piso tem vértices a cada 0,5 m, diferentes dos dois lados.
+        var axis = new Polyline2(Enumerable.Range(0, 121).Select(i => { var a = i / 120.0 * Math.PI / 2; return new Vec2(60 * Math.Sin(a), 60 - 60 * Math.Cos(a)); }).ToList());
+        var surf = new GradeSurface(axis, new RoadGrade { Points = { new(0, 0), new(axis.Length, 4) } });
+        var left = CurveTools.Densify(axis.Offset(7).Points.ToList(), 0.5);
+        var right = CurveTools.Densify(axis.Offset(-7).Points.ToList(), 0.37);
+        var shape = new Polygon2(left.Concat(Enumerable.Reverse(right)).ToList());
+        var grid = GradeFloors.Grid(surf);
+        Assert.True(grid.Zip(grid.Skip(1), (a, b) => b - a).Max() < 3.6);     // passo menor na curva
+        var r = GradeFloors.Resample(shape, surf, grid);
+        Assert.True(r.Outer.Count < shape.Outer.Count / 2);                    // bem menos vértices
+        Assert.Equal(shape.Area, r.Area, 0);
+        // Cada vértice interno das bordas está numa estaca da grade, dos dois lados.
+        foreach (var g in grid.Where(g => g > 1 && g < axis.Length - 1))
+        {
+            var c = axis.PointAt(g);
+            var n = axis.TangentAt(g).PerpLeft;
+            Assert.Contains(r.Outer, v => v.DistanceTo(c + n * 7) < 0.02);
+            Assert.Contains(r.Outer, v => v.DistanceTo(c - n * 7) < 0.02);
+        }
+    }
+
+    [Fact]
+    public void Grade_CloseVerticalCurvesDoNotOverlap()
+    {
+        // PIVs próximos com curvas longas: antes as parábolas se sobrepunham e o greide dava degraus (calombos no piso).
+        var g = new RoadGrade { DefaultCurve = 120, Points = { new(0, 0), new(60, 4), new(90, 4), new(150, 0), new(200, 0) } };
+        for (var s = 0.0; s < 200; s += 0.25) Assert.True(Math.Abs(g.Z(s + 0.25) - g.Z(s)) < 0.05, $"salto em {s}");
+        // Sem curva pedida, a mínima (K = 10 m/%) evita quinas.
+        var k = new RoadGrade { DefaultCurve = 0, Points = { new(0, 0), new(100, 6), new(200, 0) } };
+        Assert.True(k.Z(100) < 5.8);
+    }
+
+    [Fact]
+    public void ManualExclusion_CanBeDisabled()
+    {
+        var cat = CatalogService.LoadDefault();
+        var d = new LinearMarkingDefinition { Code = "LFO-2" };
+        var path = Straight(100);
+        var ctx = new BuildContext { Catalog = cat };
+        var full = MarkingBuilder.Build(d, path, ctx).Pieces.Sum(p => p.Shape.Area);
+        d.Exclusions.Add(new ExclusionZone { Manual = true, Points = Polygon2.Rectangle(new Vec2(40, -1), new Vec2(60, 1)).Outer.ToList() });
+        var cut = MarkingBuilder.Build(d, path, ctx).Pieces.Sum(p => p.Shape.Area);
+        Assert.True(cut < full * 0.85);
+        d.Exclusions[0].Enabled = false;
+        Assert.Equal(full, MarkingBuilder.Build(d, path, ctx).Pieces.Sum(p => p.Shape.Area), 6);
     }
 
     [Fact]

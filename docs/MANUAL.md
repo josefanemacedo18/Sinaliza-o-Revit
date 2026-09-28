@@ -20,7 +20,7 @@ Convenções usadas em todo o plugin:
 | **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive **tachas e tachões** e guard rail) |
 | **Infraestrutura** | **Drenagem** (boca de lobo / PV · grelha) · **Obras de Arte** (viaduto · ponte · passarela · túnel · trincheira) · **Contenções** (muro de arrimo · talude) · **Nó Viário** · **Terraplenagem** |
 | **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
-| **Editar** | Editar · Atualizar Todas · Selecionar Conjunto · Alternar 2D/3D · Configurações · Catálogo · Normas |
+| **Editar** | Editar · Apagar Trecho · Atualizar Todas · Selecionar Conjunto · Alternar 2D/3D · Configurações · Catálogo · Normas |
 
 Os botões com seta (▾) agrupam ferramentas afins; o botão mostra a última usada do grupo.
 
@@ -393,6 +393,17 @@ partir do pavimento – confira antes de aplicar.
   configurações).
 * **Cópias**: copiar/colar uma marca cria uma marca independente, com o caminho convertido em pontos
   na nova posição.
+
+### 9.2 Apagar Trecho (partes da sinalização)
+Apaga **só uma parte** de uma marca sem desfazê-la – por exemplo alguns traços da linha de eixo diante de uma entrada:
+* **Clicar nas peças**: cada clique apaga o traço, seta, símbolo ou dispositivo sob o cursor (em linhas contínuas, 3 m em
+  volta do clique). ESC termina.
+* **Trecho entre dois pontos**: clique a marca e o início e o fim ao longo dela.
+* **Janela**: clique a marca e dois cantos – apaga tudo dela dentro do retângulo.
+* **Desativar / reativar / remover**: os trechos apagados ficam guardados na marca; **desativar** mostra a marca inteira de
+  novo (liga/desliga quando quiser), **reativar** volta a apagar, **remover** descarta os recortes.
+Os recortes acompanham a marca em Editar, Atualizar e na edição da seção da via, e os quantitativos consideram só o que
+ficou pintado.
 
 > Mover ou girar diretamente os sólidos/regiões gerados não altera a definição: na próxima
 > regeneração a marca volta para o caminho. Para reposicionar, edite as linhas de referência ou use
@@ -1063,8 +1074,17 @@ Revit triangula de novo. Por isso cada obra entrega os pontos certos:
 * **Greide suavizado** – rampa máxima e curvas verticais, com cortes e aterros maiores em talude;
 * **Plana** – sem alterar o terreno.
 Taludes de corte/aterro e a rampa máxima ficam na mesma janela. Depois, **Perfil da Via** ajusta o greide e cria as obras.
-Os pisos da via acompanham o greide com a edição de forma nativa: cada piso tem até 40 m, vértices a cada 2 m no contorno e
-linhas de apoio paralelas ao eixo (inclui a crista do abaulamento).
+Os pisos da via acompanham o greide com a edição de forma nativa, em **malha limpa**: uma grade de estacas ao longo do eixo
+(a cada 4 m, mais curta nas curvas para a flecha ficar ≤ 1 cm) é comum a todos os pisos da via – os vértices das bordas
+ficam nessas estacas dos dois lados, as juntas entre pisos (até 40 m cada) também, e só há pontos internos no eixo do
+abaulamento. O Revit forma quadriláteros regulares, sem o emaranhado de triângulos. As curvas verticais do greide nunca se
+sobrepõem (antes, PIVs próximos geravam degraus) e têm comprimento mínimo K = 10 m por % de variação de rampa.
+
+**Espessura do Toposolid**: o fundo do Toposolid precisa ficar abaixo do corte mais fundo – senão o Revit recusa ("o sólido
+topográfico é muito fino para seu tipo"). O plugin confere antes e, se preciso, cria um tipo "… SV +N m" com a camada mais
+grossa aumentada e aplica ao Toposolid. Se mesmo assim o Revit recusar, o ajuste é desfeito com uma mensagem explicando o
+motivo (sem a janela que não pode ser ignorada). Os tipos de piso do plugin não usam camada variável (a laje sobe e desce
+inteira, sem afinar).
 
 * O terreno é **sempre o Toposolid nativo** (Massa e terreno → Sólido topográfico): aterros, cortes, taludes, saias e
   reaterros nunca viram sólidos. **Sem Toposolid, o plugin cria um** plano sob as obras automaticamente.

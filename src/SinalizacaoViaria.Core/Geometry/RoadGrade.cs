@@ -80,12 +80,15 @@ public sealed class RoadGrade
         if (s >= p[^1].S) return p[^1].Z;
         for (int i = 1; i + 1 < p.Count; i++)
         {
-            var lv = Math.Min(p[i].Curve ?? DefaultCurve, 1.8 * Math.Min(p[i].S - p[i - 1].S, p[i + 1].S - p[i].S));
+            var g1 = Slope(p[i - 1], p[i]);
+            var g2 = Slope(p[i], p[i + 1]);
+            // Curva pedida ou, no mínimo, K = 10 m por % de variação de rampa (sem "quinas" no greide); limitada para que as
+            // curvas de PIVs vizinhos nunca se sobreponham (a sobreposição criava degraus e calombos na pista).
+            var want = Math.Max(p[i].Curve ?? DefaultCurve, 10 * Math.Abs(g2 - g1) * 100);
+            var lv = Math.Min(want, 0.98 * Math.Min(p[i].S - p[i - 1].S, p[i + 1].S - p[i].S));
             if (lv < 0.01) continue;
             var x0 = p[i].S - lv / 2;
             if (s < x0 || s > p[i].S + lv / 2) continue;
-            var g1 = Slope(p[i - 1], p[i]);
-            var g2 = Slope(p[i], p[i + 1]);
             var x = s - x0;
             return p[i].Z - g1 * lv / 2 + g1 * x + (g2 - g1) / (2 * lv) * x * x;
         }
@@ -341,7 +344,7 @@ public static class GradeLift
 public static class GradeFloors
 {
     /// <summary>Corta o contorno em trechos de até <paramref name="length"/> m ao longo do eixo (cortes perpendiculares).</summary>
-    public static List<Polygon2> Chunks(Polygon2 shape, GradeSurface surf, double length = 40)
+    public static List<Polygon2> Chunks(Polygon2 shape, GradeSurface surf, double length = 40, List<double>? grid = null)
     {
         var axis = surf.Axis;
         var loc = shape.Outer.Select(surf.Locate).ToList();
@@ -350,17 +353,24 @@ public static class GradeFloors
         var s1 = loc.Max(l => l.S);
         var w = loc.Max(l => Math.Abs(l.Y)) + 2;
         if (s1 - s0 <= length * 1.25) return new List<Polygon2> { shape };
+        grid ??= Grid(surf);
         var n = (int)Math.Ceiling((s1 - s0) / length);
-        var res = new List<Polygon2>();
-        for (int k = 0; k < n; k++)
+        // Cortes sempre em estacas da grade: os pisos vizinhos compartilham os vértices da junta.
+        var bounds = new List<double> { s0 - 5 };
+        for (int k = 1; k < n; k++)
         {
-            var a = s0 + (s1 - s0) * k / n;
-            var b = s0 + (s1 - s0) * (k + 1) / n;
-            // Faixa [a, b] ao longo do eixo (as pontas passam um pouco das extremidades do contorno).
-            var a2 = k == 0 ? a - 5 : a;
-            var b2 = k == n - 1 ? b + 5 : b;
-            var st = new List<double>();
-            for (var s = a2; s < b2; s += 2) st.Add(s);
+            var target = s0 + (s1 - s0) * k / n;
+            bounds.Add(grid.OrderBy(x => Math.Abs(x - target)).First());
+        }
+        bounds.Add(s1 + 5);
+        bounds = bounds.Distinct().OrderBy(x => x).ToList();
+        var res = new List<Polygon2>();
+        for (int k = 0; k + 1 < bounds.Count; k++)
+        {
+            var a2 = bounds[k];
+            var b2 = bounds[k + 1];
+            var st = new List<double> { a2 };
+            st.AddRange(grid.Where(x => x > a2 + 1e-6 && x < b2 - 1e-6));
             st.Add(b2);
             Vec2 P(double s, double y)
             {
@@ -375,23 +385,134 @@ public static class GradeFloors
         return res.Count > 0 ? res : new List<Polygon2> { shape };
     }
 
-    /// <summary>
-    /// Pontos internos de apoio (planta): linhas paralelas ao eixo (inclui o eixo, onde fica a crista do abaulamento) a cada
-    /// <paramref name="ds"/> m, afastadas <paramref name="margin"/> m do contorno.
-    /// </summary>
-    public static List<Vec2> Supports(Polygon2 shape, GradeSurface surf, double ds = 3, double dy = 2.5, double margin = 0.3, int max = 1500)
+    /// <summary>Estacas da grade (m): passo até <paramref name="maxStep"/>, menor nas curvas (flecha ≤ 1 cm).</summary>
+    public static List<double> Grid(GradeSurface surf, double maxStep = 4.0)
     {
         var axis = surf.Axis;
+        var L = axis.Length;
+        var res = new List<double> { 0 };
+        var s = 0.0;
+        while (s < L - 1e-6)
+        {
+            // Raio local pela variação da tangente em ±2 m.
+            var a = axis.TangentAt(Math.Max(0, s - 2));
+            var b = axis.TangentAt(Math.Min(L, s + 2));
+            var ang = Math.Acos(Math.Clamp(a.Dot(b), -1, 1));
+            var r = ang < 1e-6 ? double.MaxValue : (Math.Min(L, s + 2) - Math.Max(0, s - 2)) / ang;
+            var ds = Math.Clamp(Math.Sqrt(8 * Math.Min(r, 1e6) * 0.01), 0.75, maxStep);
+            s = Math.Min(L, s + ds);
+            if (L - s < ds * 0.3) s = L;
+            res.Add(s);
+        }
+        return res;
+    }
+
+    /// <summary>
+    /// Contorno com os trechos longitudinais (bordas ao longo do eixo) reamostrados nas estacas da grade: os vértices dos dois
+    /// lados ficam emparelhados. Cantos (quebra &gt; 3°) e trechos transversais são mantidos.
+    /// </summary>
+    public static Polygon2 Resample(Polygon2 shape, GradeSurface surf, List<double>? grid = null)
+    {
+        grid ??= Grid(surf);
+        var g = grid;
+        List<Vec2> Ring(IReadOnlyList<Vec2> ring)
+        {
+            var n = ring.Count;
+            if (n < 3) return ring.ToList();
+            var loc = ring.Select(surf.Locate).ToList();
+            bool Long(int i)
+            {
+                var j = (i + 1) % n;
+                var ds = loc[j].S - loc[i].S;
+                var dy = loc[j].Y - loc[i].Y;
+                return Math.Abs(ds) > 0.05 && Math.Abs(ds) > 1.5 * Math.Abs(dy);
+            }
+            int Dir(int i) => Math.Sign(loc[(i + 1) % n].S - loc[i].S);
+            bool Corner(int i)
+            {
+                var u = (ring[i] - ring[(i - 1 + n) % n]).Normalized();
+                var v = (ring[(i + 1) % n] - ring[i]).Normalized();
+                return Math.Acos(Math.Clamp(u.Dot(v), -1, 1)) > 3 * Math.PI / 180;
+            }
+            // Vértice "de passagem": dentro de uma corrida longitudinal, mesmo sentido e sem canto – sai e dá lugar às estacas.
+            var drop = new bool[n];
+            for (int i = 0; i < n; i++)
+            {
+                var prev = (i - 1 + n) % n;
+                drop[i] = Long(prev) && Long(i) && Dir(prev) == Dir(i) && !Corner(i);
+            }
+            if (drop.All(d => d)) return ring.ToList();
+            var start = Enumerable.Range(0, n).First(i => !drop[i]);
+            var res = new List<Vec2>();
+            var k = start;
+            do
+            {
+                res.Add(ring[k]);
+                if (Long(k))
+                {
+                    var run = new List<int> { k };
+                    var m = (k + 1) % n;
+                    while (drop[m]) { run.Add(m); m = (m + 1) % n; }
+                    run.Add(m);
+                    var sa = loc[k].S;
+                    var sb = loc[m].S;
+                    var lo = Math.Min(sa, sb) + 0.3;
+                    var hi = Math.Max(sa, sb) - 0.3;
+                    var gs = g.Where(x => x > lo && x < hi).ToList();
+                    if (sb < sa) gs.Reverse();
+                    foreach (var st in gs)
+                        for (int q = 0; q + 1 < run.Count; q++)
+                        {
+                            var s1 = loc[run[q]].S;
+                            var s2 = loc[run[q + 1]].S;
+                            if ((st - s1) * (st - s2) > 0 || Math.Abs(s2 - s1) < 1e-9) continue;
+                            // Ponto exatamente na normal da estaca, no afastamento da borda ali: os dois lados ficam emparelhados.
+                            var y = loc[run[q]].Y + (loc[run[q + 1]].Y - loc[run[q]].Y) * ((st - s1) / (s2 - s1));
+                            var sc = Math.Clamp(st, 0, surf.Axis.Length);
+                            res.Add(surf.Axis.PointAt(sc) + surf.Axis.TangentAt(sc).PerpLeft * y);
+                            break;
+                        }
+                    k = m;
+                }
+                else k = (k + 1) % n;
+            }
+            while (k != start);
+            return res;
+        }
+        try
+        {
+            var outer = Ring(shape.Outer);
+            var holes = shape.Holes.Select(h => (IEnumerable<Vec2>)Ring(h)).ToList();
+            var r = new Polygon2(outer, holes);
+            return Math.Abs(r.Area - shape.Area) < Math.Max(0.02, shape.Area * 0.01) ? r : shape;
+        }
+        catch { return shape; }
+    }
+
+    /// <summary>
+    /// Pontos internos de apoio: só onde a seção quebra – eixo do abaulamento e o fim do caimento – nas estacas da grade,
+    /// afastados <paramref name="margin"/> m do contorno. Entre as bordas a seção é plana e não precisa de pontos.
+    /// </summary>
+    public static List<Vec2> Supports(Polygon2 shape, GradeSurface surf, List<double>? grid = null, double margin = 0.3, int max = 1500)
+    {
+        var axis = surf.Axis;
+        var gr = surf.Grade;
         var loc = shape.Outer.Select(surf.Locate).ToList();
         if (loc.Count == 0) return new();
-        double s0 = Math.Max(0, loc.Min(l => l.S)), s1 = Math.Min(axis.Length, loc.Max(l => l.S));
+        double s0 = loc.Min(l => l.S), s1 = loc.Max(l => l.S);
         double y0 = loc.Min(l => l.Y), y1 = loc.Max(l => l.Y);
         var ys = new List<double>();
-        for (var y = Math.Ceiling(y0 / dy) * dy; y <= y1; y += dy) ys.Add(y);
-        if (y0 < 0 && y1 > 0 && !ys.Any(y => Math.Abs(y) < 1e-6)) ys.Add(0);
+        if (Math.Abs(gr.Crossfall) > 1e-6 || gr.Superelevation.Count > 0)
+        {
+            ys.Add(0);
+            if (gr.CrossfallWidth > 0.5) { ys.Add(gr.CrossfallWidth); ys.Add(-gr.CrossfallWidth); }
+        }
+        ys = ys.Where(y => y > y0 + margin && y < y1 - margin).ToList();
+        if (ys.Count == 0) return new();
+        grid ??= Grid(surf);
         var inner = PolygonOps.Offset(new[] { shape }, -margin);
         var res = new List<Vec2>();
-        for (var s = s0 + ds / 2; s < s1; s += ds)
+        foreach (var s in grid.Where(x => x > s0 && x < s1))
         {
             var p = axis.PointAt(s);
             var nrm = axis.TangentAt(s).PerpLeft;
