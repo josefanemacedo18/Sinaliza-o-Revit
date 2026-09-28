@@ -377,6 +377,15 @@ public static class BridgeGenerator
 
         // ---- laje do tabuleiro com balanços, abas e pingadeiras (um perfil só)
         SolidSweep.Along(geo, path, s => DeckSlab(s, half, yRoot, slab, d.RoadHalf, Top), MarkingColor.Concreto, s0, s1, 3, "TABULEIRO");
+        // Cornija pré-moldada clara na face externa das abas (acabamento da borda do tabuleiro).
+        foreach (var side in new[] { -1, 1 })
+            SolidSweep.Along(geo, path, s =>
+            {
+                var te = Top(s, side * half);
+                var y0 = side * half;
+                var y1 = side * (half + 0.035);
+                return SolidSweep.Rect(Math.Min(y0, y1), Math.Max(y0, y1), te - 0.52, te - 0.02);
+            }, MarkingColor.PavimentoConcreto, s0, s1, 3, "CORNIJA");
         if (!d.RoadProvided)
         {
             Infra.Pavement(geo, path, surf, -d.RoadHalf, d.RoadHalf, s0, s1, d.Pedestrian ? MarkingColor.PavimentoConcreto : MarkingColor.Asfalto);
@@ -556,6 +565,21 @@ public static class BridgeGenerator
     // ================================================================== pilares
 
     private static void Pier(MarkingGeometry geo, Polyline2 path, DeckSpec d, double s, double top, Func<Vec2, double> ground, double half, double yRoot)
+    {
+        PierBody(geo, path, d, s, top, ground, half, yRoot);
+        // Tubo de descida de águas do tabuleiro junto ao pilar, com curva no pé e caixa de passagem.
+        var pp = path.PointAt(s);
+        var (tt, nn, _) = SkewFrame(path, s, d.Skew);
+        var gg = ground(pp);
+        if (top - gg > 2 && d.Drains)
+        {
+            var dp = pp + tt * (Math.Max(0.4, d.PierSize) / 2 + 0.25) + nn * (Math.Max(0.4, d.PierSize) * 0.2);
+            SolidSweep.AddRound(geo, Vec3.At(dp, gg + 0.3), Vec3.At(dp, top - 0.2), 0.075, 0.075, MarkingColor.Metal, "DRENO", false, 0.065, 0.065, 16);
+            SolidSweep.Add(geo, SolidSweep.Box(dp, tt, 0.6, 0.6, gg - 0.5, gg + 0.3), MarkingColor.Concreto, "DRENO");
+        }
+    }
+
+    private static void PierBody(MarkingGeometry geo, Polyline2 path, DeckSpec d, double s, double top, Func<Vec2, double> ground, double half, double yRoot)
     {
         var p = path.PointAt(s);
         var (t, n, sk) = SkewFrame(path, s, d.Skew);

@@ -268,17 +268,26 @@ public static class InterchangePlanner
             var pts = new List<Vec2>();
             var dirEnd = (arc[^1] - arc[^2]).Normalized();
             var dirStart = (arc[1] - arc[0]).Normalized();
+            // Faixas paralelas que correm em direção ao cruzamento param antes dele (viaduto / laço do outro lado).
+            double Par(Vec2 from, Vec2 dir, Vec2 axisDir, double margin)
+            {
+                var d0 = (from - o).Dot(axisDir);
+                var towards = Math.Sign(dir.Dot(axisDir)) == -Math.Sign(d0);
+                return towards ? Math.Clamp(Math.Abs(d0) - margin, 25, lsc) : lsc;
+            }
+            var mainMargin = crossOver ? 6 : underSpan + 6;
+            var crossMargin = crossOver ? underSpan + 6 : 6;
             if (exit)
             {
-                pts.Add(tm - mainTravel * lsc);
+                pts.Add(tm - mainTravel * Par(tm, -mainTravel, ex, mainMargin));
                 pts.AddRange(arc);
-                pts.Add(arc[^1] + dirEnd * lsc);
+                pts.Add(arc[^1] + dirEnd * Par(arc[^1], dirEnd, ec, crossMargin));
             }
             else
             {
-                pts.Add(arc[0] - dirStart * lsc);
+                pts.Add(arc[0] - dirStart * Par(arc[0], -dirStart, ec, crossMargin));
                 pts.AddRange(arc);
-                pts.Add(tm + mainTravel * lsc);
+                pts.Add(tm + mainTravel * Par(tm, mainTravel, ex, mainMargin));
             }
             var path = new Polyline2(pts);
             var name = $"Laço {Q(qx, qy)}";
