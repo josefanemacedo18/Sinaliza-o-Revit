@@ -214,22 +214,40 @@ public class V22Tests
     }
 
     [Fact]
-    public void NodeSurface_MatchesEachRoadAtItsPavement()
+    public void NodeSurface_IsTheMajorRoadFlatBeyondItsPavement()
     {
-        // Via A (x) em rampa de 4 %, via B (y) em nível 1 m acima da base de A; cruzam em (100, 0).
-        var a = new GradeSurface(Straight(200), new RoadGrade { Crossfall = 0.02, Points = { new(0, -3), new(200, 5) } });
+        // Via A (x) em rampa de 4 %, abaulamento de 2 % na pista de 7 m; B (y) secundária. O nó é a superfície de A, e além
+        // da pista de A segue em nível na transversal (a cota da borda).
+        var ga = new RoadGrade { Crossfall = 0.02, CrossfallWidth = 7, Points = { new(0, -3), new(200, 5) } };
+        var a = new GradeSurface(Straight(200), ga);
         var b = new GradeSurface(new Polyline2(new[] { new Vec2(100, -100), new Vec2(100, 100) }), new RoadGrade { Points = { new(0, 1), new(200, 1) } });
-        var node = new NodeSurface(new[] { new NodeSurface.Leg(a, 0, 7), new NodeSurface.Leg(b, 0, 7) });
-        // Na pista de A, longe de B: a cota é a de A (com o abaulamento).
-        Assert.Equal(a.Z(new Vec2(60, 3)), node.Z(new Vec2(60, 3)), 1);
-        // Na pista de B, longe de A: a cota é a de B.
-        Assert.Equal(1, node.Z(new Vec2(100, 40)), 1);
-        // No centro: entre as duas (as duas passam por 1 m ali).
-        Assert.Equal(1, node.Z(new Vec2(100, 0)), 1);
+        var node = new NodeSurface(new[] { new NodeSurface.Leg(a, 0, 7, 0, "a"), new NodeSurface.Leg(b, 0, 7, 1, "b") });
+        Assert.Equal("a", node.Major!.Id);
+        Assert.Equal(a.Z(new Vec2(100, 3)), node.Z(new Vec2(100, 3)), 6);
+        Assert.Equal(ga.Z(100, 7), node.Z(new Vec2(100, 15)), 6);
+        Assert.Equal(ga.Z(105, 7), node.Z(new Vec2(105, 12)), 6);
         // Contínua (sem degraus) em toda a área do nó.
         for (var x = 70.0; x < 130; x += 1)
             for (var y = -30.0; y < 30; y += 1)
-                Assert.True(Math.Abs(node.Z(new Vec2(x + 0.5, y)) - node.Z(new Vec2(x, y))) < 0.12);
+                Assert.True(Math.Abs(node.Z(new Vec2(x + 0.5, y)) - node.Z(new Vec2(x, y))) < 0.05);
+    }
+
+    [Fact]
+    public void MinorRoad_BlendsFromNodeSurfaceToItsOwnGrade()
+    {
+        var ga = new RoadGrade { Crossfall = 0.02, CrossfallWidth = 7, Points = { new(0, -3), new(200, 5) } };
+        var a = new GradeSurface(Straight(200), ga);
+        var bAxis = new Polyline2(new[] { new Vec2(100, 0), new Vec2(100, 100) });
+        var bGrade = new RoadGrade { Crossfall = 0.02, CrossfallWidth = 4, Points = { new(0, 1), new(100, 6) } };
+        var node = new NodeSurface(new[] { new NodeSurface.Leg(a, 0, 7, 0, "a"), new NodeSurface.Leg(new GradeSurface(bAxis, bGrade), 0, 4, 1, "b") });
+        var b = new GradeSurface(bAxis, bGrade);
+        b.Blends.Add(new NodeBlend(node, 0, 15, 20, 0));
+        // Até o limite do nó (15 m): exatamente a superfície do nó; depois de 35 m: o greide próprio.
+        foreach (var p in new[] { new Vec2(98, 10), new Vec2(102, 14.9) }) Assert.Equal(node.Z(p), b.Z(p), 6);
+        foreach (var p in new[] { new Vec2(98, 36), new Vec2(103, 50) }) Assert.Equal(bGrade.Z(p.Y, 100 - p.X), b.Z(p), 6);
+        // Suave: sem saltos.
+        for (var y = 10.0; y < 40; y += 0.25)
+            Assert.True(Math.Abs(b.Z(new Vec2(99, y + 0.25)) - b.Z(new Vec2(99, y))) < 0.05);
     }
 
     [Fact]
@@ -339,19 +357,28 @@ public class V22Tests
     }
 
     [Fact]
-    public void NodeSurface_MajorRoadKeepsItsGradeThroughTheNode()
+    public void NodeSurface_MajorByRankThenWidth()
     {
-        // Principal (x) em rampa de 6 %; secundária (y) em nível. No miolo vale a principal; na secundária, além do alcance, a dela.
         var a = new GradeSurface(new Polyline2(new[] { new Vec2(-80, 0), new Vec2(80, 0) }), new RoadGrade { Crossfall = 0.02, Points = { new(0, -4.8), new(160, 4.8) } });
         var b = new GradeSurface(new Polyline2(new[] { new Vec2(0, -80), new Vec2(0, 80) }), new RoadGrade { Crossfall = 0.02, Points = { new(0, 0), new(160, 0) } });
-        var node = new NodeSurface(new[] { new NodeSurface.Leg(b, 0, 5, 3, 10), new NodeSurface.Leg(a, 0, 7, 2) });
-        Assert.Same(a, node.Major!.Surface);
-        foreach (var p in new[] { new Vec2(4, 3), new Vec2(-5, -6), new Vec2(0, 0) }) Assert.Equal(a.Z(p), node.Z(p), 6);
-        Assert.Equal(b.Z(new Vec2(2, 20)), node.Z(new Vec2(2, 20)), 6);
-        // Contínua.
-        for (var x = -10.0; x < 10; x += 0.5)
-            for (var y = -25.0; y < 25; y += 0.5)
-                Assert.True(Math.Abs(node.Z(new Vec2(x, y + 0.5)) - node.Z(new Vec2(x, y))) < 0.05);
+        Assert.Same(a, new NodeSurface(new[] { new NodeSurface.Leg(b, 0, 5, 3), new NodeSurface.Leg(a, 0, 7, 2) }).Major!.Surface);
+        Assert.Same(a, new NodeSurface(new[] { new NodeSurface.Leg(b, 0, 5), new NodeSurface.Leg(a, 0, 7) }).Major!.Surface);
+        Assert.Same(b, new NodeSurface(new[] { new NodeSurface.Leg(b, 0, 5, 1), new NodeSurface.Leg(a, 0, 7, 2) }).Major!.Surface);
+    }
+
+    [Fact]
+    public void FloorPlanes_NodeGuidedByMajorGivesFewPlanes()
+    {
+        // Cruzamento em rampa: a superfície do nó é plana por partes (caimentos e faixas em nível além das bordas) – a divisão
+        // guiada pelo eixo da principal dá poucas partes, todas planas.
+        var ga = new RoadGrade { Crossfall = 0.02, CrossfallWidth = 7, Points = { new(0, -4.8), new(160, 4.8) } };
+        var a = new GradeSurface(new Polyline2(new[] { new Vec2(-80, 0), new Vec2(80, 0) }), ga);
+        var node = new NodeSurface(new[] { new NodeSurface.Leg(a, 0, 7) });
+        var area = Polygon2.Rectangle(new Vec2(-16, -16), new Vec2(16, 16));
+        var parts = FloorPlanes.Split(area, node.Z, 0.008, a);
+        Assert.True(parts.Count <= 4, $"{parts.Count} partes");
+        Assert.All(parts, p => Assert.False(p.Warped));
+        Assert.Equal(area.Area, parts.Sum(p => p.Part.Area), 1);
     }
 
     [Fact]
@@ -365,5 +392,41 @@ public class V22Tests
         Assert.Equal(0, z1, 6);
         Assert.Equal(0, z2, 6);
         Assert.Equal(NodeSurface.LegZ(leg, new Vec2(45, 3), out _), NodeSurface.LegZ(leg, new Vec2(58, 3), out _), 6);
+    }
+
+    [Fact]
+    public void TrimTools_ClickPicksTheDashAndLongLinesOnlyAroundTheClick()
+    {
+        var geo = new MarkingGeometry();
+        geo.Add(Polygon2.Rectangle(new Vec2(0, 0), new Vec2(3, 0.12)), MarkingColor.Branca);   // traço
+        geo.Add(Polygon2.Rectangle(new Vec2(6, 0), new Vec2(9, 0.12)), MarkingColor.Branca);   // traço
+        geo.Add(Polygon2.Rectangle(new Vec2(0, 3), new Vec2(60, 3.12)), MarkingColor.Branca);  // linha contínua
+        var dash = TrimTools.PieceAt(geo, new Vec2(7, 0.2));
+        Assert.NotNull(dash);
+        Assert.Equal(6, dash!.Shape.Bounds.Min.X, 3);
+        var z = TrimTools.ZoneFor(dash, new Vec2(7, 0.2))!;
+        Assert.True(z.Contains(new Vec2(6.01, 0.06)) && z.Contains(new Vec2(8.99, 0.06)) && !z.Contains(new Vec2(2.9, 0.06)));
+        var line = TrimTools.PieceAt(geo, new Vec2(30, 3.05))!;
+        var zl = TrimTools.ZoneFor(line, new Vec2(30, 3.05), 3)!;
+        var (mn, mx) = zl.Bounds;
+        Assert.InRange(mx.X - mn.X, 2.8, 3.2);
+        Assert.Null(TrimTools.PieceAt(geo, new Vec2(30, 1.5)));
+        Assert.Equal(2, TrimTools.ZonesInWindow(geo, new Vec2(-1, -1), new Vec2(10, 1)).Count);
+    }
+
+    [Fact]
+    public void CutSlope_EndsCloseToTerrainAndCrestChannelSitsOnGround()
+    {
+        double T(Vec2 p) => 0.30 * p.Y;
+        var c = new BuildContext { Catalog = CatalogService.LoadDefault(), Ground = p => T(p), NativeTerrain = true };
+        var sl = new SlopeDefinition { Height = 8, Type = TipoTalude.Corte, Ratio = 1.0, UphillLeft = true, BermEvery = 4, BermWidth = 2 };
+        var geo = MarkingBuilder.Build(sl, new Polyline2(new[] { new Vec2(0, 0), new Vec2(60, 0) }), c);
+        Assert.All(geo.Corridors, k => Assert.True(k.WallStart && k.WallEnd && k.EndSpill));
+        // Canaleta de crista (última varredura "CANALETA" mais afastada): no terreno, não no ar.
+        var channels = geo.Pieces.Where(p => p.Layer == "CANALETA" && p.Solid != null).ToList();
+        var crest = channels.OrderByDescending(p => p.Shape.Centroid.Y).First();
+        var top = crest.Solid!.MaxZ;
+        var y = crest.Shape.Centroid.Y;
+        Assert.InRange(top, T(new Vec2(30, y)) - 0.3, T(new Vec2(30, y)) + 1.8);
     }
 }

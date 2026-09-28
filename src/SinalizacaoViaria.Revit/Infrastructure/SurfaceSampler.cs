@@ -43,7 +43,8 @@ public sealed class NodeSampler : ISurface
     public NodeSampler(Core.Geometry.NodeSurface node) => _node = node;
     public Core.Geometry.NodeSurface Node => _node;
     public bool IsAvailable => true;
-    public bool LiftsSolids => true;
+    // Sólidos do nó já vêm deformados vértice a vértice pela superfície (MarkingService.BuildGeometry).
+    public bool LiftsSolids => false;
     public bool TrySample(double xFt, double yFt, double zHintFt, out double zFt, out XYZ normal)
     {
         var p = new Core.Geometry.Vec2(UnitConv.M(xFt), UnitConv.M(yFt));

@@ -394,19 +394,19 @@ partir do pavimento – confira antes de aplicar.
 * **Cópias**: copiar/colar uma marca cria uma marca independente, com o caminho convertido em pontos
   na nova posição.
 
-### 9.2 Apagar Trecho (partes da sinalização)
-Apaga **só uma parte** de uma marca sem desfazê-la – por exemplo alguns traços da linha de eixo diante de uma entrada:
-* **Clicar nas peças**: clique sobre o traço, seta, símbolo, tacha ou dispositivo – só aquela peça some (um único traço de
-  uma linha tracejada, por exemplo). O plugin lê a **geometria real** dos elementos no Revit: cada traço é um sólido próprio
-  dentro da forma direta, e a pegada dele em planta vira o recorte (com 3 cm de folga). Pintura tem prioridade sobre o
-  pavimento e as calçadas que ficam por baixo; em linhas contínuas apaga 3 m em volta do clique. Funciona na **planta** (clique
-  de ponto) e na **vista 3D** (o ponto vem da face clicada). A peça some logo após o clique; ESC termina.
-* **Trecho entre dois pontos**: clique a marca e o início e o fim ao longo dela.
-* **Janela**: clique a marca e dois cantos – apaga tudo dela dentro do retângulo.
-* **Desativar / reativar / remover**: os trechos apagados ficam guardados na marca; **desativar** mostra a marca inteira de
-  novo (liga/desliga quando quiser), **reativar** volta a apagar, **remover** descarta os recortes.
-Os recortes acompanham a marca em Editar, Atualizar e na edição da seção da via, e os quantitativos consideram só o que
-ficou pintado.
+### 9.2 Apagar Trecho (sinalização horizontal)
+Apaga **partes da sinalização horizontal** – linhas, faixas de pedestres, zebrados, setas, legendas, marcas de vagas – sem
+desfazer a marca (pavimento, calçadas, placas e dispositivos não entram).
+1. Clique a marca (ou selecione-a antes de chamar a ferramenta). Funciona em planta e em 3D.
+2. Abre uma janela com a **planta da marca e as peças reais dela** (cada traço, seta, faixa):
+   * **clique numa peça** para apagá-la – ela fica **vermelha**; clique de novo na área vermelha para **devolver**;
+   * **Shift + arrastar** apaga tudo da marca dentro da janela;
+   * numa **linha contínua longa**, o clique apaga só o comprimento indicado (3 m por padrão) em volta do ponto;
+   * arrastar move a planta, roda do mouse dá zoom, dois cliques enquadram;
+   * **Desfazer último**, **Devolver tudo** e **Recortes ativos** (desmarque para mostrar a marca inteira sem perder os recortes).
+3. **Aplicar** regera a marca. Os trechos ficam guardados nela: chamar a ferramenta de novo mostra o que está apagado (em
+   vermelho) para devolver ou apagar mais. Os recortes acompanham Editar, Atualizar e a edição da seção da via, e os
+   quantitativos consideram só o que ficou pintado.
 
 > Mover ou girar diretamente os sólidos/regiões gerados não altera a definição: na próxima
 > regeneração a marca volta para o caminho. Para reposicionar, edite as linhas de referência ou use
@@ -1012,15 +1012,27 @@ estacas** que você indicar. Nem toda ponte é curva ou inclinada: a **Ponte** j
 * **Trincheira**: no trecho, a via desce pela rampa máxima até o rebaixo entre **muros** (flexão, cortina atirantada ou terra
   armada) com guarda-corpo, canaletas e laje de travessia; o terreno entre os muros é escavado no Toposolid.
 
-### 24.5 Perfil da Via – a via vira obra pela topografia
-Clique uma via: o plugin lê o **terreno natural ao longo do eixo** e propõe o greide:
-* **Acompanhar o terreno suavizado** (janela de suavização, alteamento), limitado pela **rampa máxima** e com **curvas
-  verticais**; **rampa constante** entre as pontas; **nivelado**; ou **PIVs digitados** (estaca; cota; curva).
-* **Obras automáticas**: onde o aterro passa do limite a via vira **viaduto/ponte**; onde o corte passa do limite, **túnel**;
-  cortes médios podem virar **trincheira**. Trechos curtos viram aterro/corte; obras próximas se unem. As obras usam os
-  últimos parâmetros de Viaduto/Ponte, Túnel e Trincheira.
-* A janela mostra o **perfil longitudinal** (terreno, greide, PIVs e as obras em faixas coloridas) e o resumo (rampa máxima,
-  obras, áreas de corte/aterro). Aplicar grava o greide em toda a via, cria as obras e **refaz o Toposolid**.
+### 24.5 Perfil da Via – a altura da via ao longo do terreno
+**Para que serve**: definir o **greide** – a cota do eixo da via ao longo do comprimento – sobre a topografia, e decidir onde a
+via vira obra. É o "perfil longitudinal" do projeto rodoviário.
+
+**Como ler o gráfico da janela** (um corte ao longo do eixo, com a escala vertical exagerada):
+* **marrom** = terreno natural; **linha escura** = a via (greide);
+* **vermelho** = terreno que será **cortado**; **verde** = **aterro**;
+* **faixas coloridas no alto** = trechos em obra (azul viaduto/ponte, preto túnel, laranja trincheira), com a extensão;
+* embaixo as **estacas** (km+m ao longo da via), à esquerda as **cotas**; os quadrados brancos são os **PIVs** (onde a rampa
+  muda, com a cota) e "i = %" é a **rampa** de cada trecho.
+
+**Como usar**:
+1. Clique a via.
+2. Escolha como o greide é traçado: **acompanhar o terreno suavizado** (menor terraplenagem; ajuste a suavização e o
+   alteamento), **rampa constante** entre as pontas, **nivelado** numa cota ou **PIVs digitados** (estaca; cota; curva).
+3. Limite a **rampa máxima** e o comprimento das **curvas verticais**.
+4. Diga a partir de que **altura de aterro** a via vira **viaduto/ponte**, de que **profundidade de corte** vira **túnel** e,
+   se quiser, **trincheira** (muros) nos cortes médios. O gráfico se atualiza a cada mudança.
+5. **Aplicar**: o greide passa a valer para a via inteira (pista, calçadas, linhas, dispositivos), as obras são criadas nos
+   trechos indicados (com os últimos parâmetros de Viaduto/Ponte, Túnel e Trincheira) e o **Toposolid é cortado/aterrado**
+   com taludes até o terreno natural.
 
 ### 24.6 Muro de arrimo e talude
 * **Muro de arrimo**: **flexão**, **gravidade**, **contrafortes**, **gabião**, **terra armada** e **cortina atirantada**, com
@@ -1028,6 +1040,10 @@ Clique uma via: o plugin lê o **terreno natural ao longo do eixo** e propõe o 
 * **Talude** de **corte** ou **aterro** com **bermas**, **canaletas meia-cana** (crista, pé e bermas), **descidas d'água em
   degraus** e revestimento. Com terreno nativo, a face do talude **é o próprio Toposolid** e a **grama vira subdivisão** do
   Toposolid; revestimentos rígidos ficam 3 cm acima da face.
+* As **pontas do talude fecham em rampa até o terreno** (fechamento lateral em talude, banqueta por banqueta) – antes o
+  Toposolid ligava a face ao terreno por triângulos soltos, com dentes e zigue-zague nas pontas. No **corte**, a **canaleta de
+  crista** fica 1,5 m além da crista **sobre o terreno** (ou sobre a face do talude, se a encosta continuar subindo) – antes
+  ela seguia a cota da crista e ficava solta no ar.
 
 ### 24.7 Nó viário (interseção em desnível) sobre as vias
 **Diamante**, **diamante com rotatórias**, **trevo completo**, **trevo parcial**, **trombeta** e **rotatória em dois níveis**.
@@ -1082,14 +1098,14 @@ Revit triangula de novo. Por isso cada obra entrega os pontos certos:
 * **Plana** – sem alterar o terreno.
 Taludes de corte/aterro e a rampa máxima ficam na mesma janela. Depois, **Perfil da Via** ajusta o greide e cria as obras.
 **Pisos planos, sem vincos**: sobre o greide, o nó ou o terreno, cada piso é dividido em **partes planas** (o topo de cada
-parte fica a no máximo 4 mm da superfície teórica; 3 cm sobre o Toposolid) e cada parte é um **piso plano inclinado** –
+parte fica a no máximo 8 mm da superfície teórica; 3 cm sobre o Toposolid) e cada parte é um **piso plano inclinado** –
 uma única face, sem as linhas de triangulação da edição de forma. As divisões seguem a lógica da obra: primeiro na
 **crista do abaulamento** (cada caimento é um plano), depois **perpendiculares ao eixo** (juntas retas, como as juntas de
 pavimentação). Numa rampa constante a pista inteira são só **dois pisos** (um por caimento); nas curvas verticais e
-horizontais as partes ficam mais curtas. Onde a superfície é realmente **torcida** (concordância de greides numa
-interseção, transição de superelevação) e nem partes pequenas ficam planas, a parte vira um piso com edição de forma em
-**malha regular de 1,5 m** – em vez de dezenas de lascas. A pintura fica 5 mm acima da superfície teórica para nunca
-"afundar" nos pisos planos. As curvas verticais do greide nunca se sobrepõem e têm comprimento mínimo K = 10 m por % de
+horizontais as partes ficam mais curtas. Ao longo das vias e nos nós a divisão continua sempre em faixas
+transversais até ficar plana (nunca triângulos); só em superfícies sem eixo de referência (terreno) uma parte torcida vira
+piso com edição de forma em malha regular. A pintura fica 1 cm acima da superfície teórica para nunca "afundar" nos pisos
+planos. As curvas verticais do greide nunca se sobrepõem e têm comprimento mínimo K = 10 m por % de
 variação de rampa.
 
 **Correção importante**: a localização de pontos em relação ao eixo (estaca e afastamento) errava para pontos a mais de
@@ -1097,10 +1113,14 @@ variação de rampa.
 "afundadas"). Corrigido: a busca agora amplia o raio até garantir o segmento mais próximo.
 
 **Interseções, rotatórias e cul-de-sacs no relevo** – como se projeta na prática: a **via principal** (maior hierarquia;
-empate = a mais larga) **atravessa o nó com o próprio greide e abaulamento**; as **secundárias se concordam** com ela, partindo
-da cota da borda da pista principal e chegando à própria superfície exatamente onde começa o piso delas (sem degrau na
-emenda), por uma transição suave. O miolo fica plano como a via principal – pisos planos grandes, sem os "leques" que
-apareciam nas esquinas. Além da ponta de um eixo o greide segue na rampa final e o abaulamento é medido na normal da ponta
+empate = a mais larga) **atravessa o nó com o próprio greide e abaulamento**, e além da pista dela a superfície segue **em
+nível na transversal** (a cota da borda). O nó inteiro – pavimento, esquinas, calçadas, rampas, ilhas – fica em **poucos
+planos grandes**, sem os triângulos e "leques" que apareciam. As **vias secundárias fazem a concordância fora do nó**, nos
+primeiros 20–40 m depois dele: partem exatamente da superfície do nó e passam suavemente (curva em S) para o próprio greide
+e abaulamento – os pisos dessa transição ficam em faixas planas transversais (juntas retas), a plataforma do Toposolid
+acompanha a mesma superfície. **Rampas de acessibilidade, meios-fios, ilhas e dispositivos do nó** acompanham a superfície
+**vértice a vértice** (antes subiam só pela cota do centro e ficavam tortos ou soltos). Defina a **hierarquia** das vias para
+escolher qual é a principal. Além da ponta de um eixo o greide segue na rampa final e o abaulamento é medido na normal da ponta
 (antes formava um cone em volta da ponta). Pisos,
 pinturas, faixas de pedestres, retenções e rampas do nó ficam nessa superfície (sem degrau na emenda com o piso da via), e o
 nó entra na terraplenagem sempre que **qualquer via ligada** a ele molda o terreno: plataforma inclinada sob o pavimento e as
@@ -1123,6 +1143,10 @@ inteira, sem afinar).
   **exceto sob pontes e viadutos** (o terreno fica natural) e nos túneis. Taludes vizinhos viram uma superfície só.
 * **Terraplenagem** (botão): refaz tudo; vias escolhidas sem greide passam a moldar o terreno. Opção **novo levantamento**:
   o Toposolid atual vira o terreno natural (depois de editá-lo à mão ou importar outro levantamento).
+* **Só calcular (simulação)**: calcula volumes e balanço **sem alterar o Toposolid**.
+* **Relatório**: área terraplenada, corte, aterro, **balanço de massas** com o **fator de homogeneização** (corte in situ por
+  m³ de aterro compactado, 1,20–1,40 – DNIT): indica **bota-fora** (sobra de corte) ou **empréstimo** (falta), e os
+  **volumes de cada elemento** (via, interseção, obra).
 * Cotas conferidas nos vértices inseridos (correção automática de deslocamento constante); **grama** de taludes, ilhas e laços
   como **subdivisões** do Toposolid; volumes de corte e aterro no relatório. Use **Desfazer** para voltar.
 

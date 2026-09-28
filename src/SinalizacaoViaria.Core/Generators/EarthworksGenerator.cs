@@ -700,7 +700,28 @@ public static class EarthworksGenerator
         if (d.Type == TipoTalude.Aterro && !ctx.NativeTerrain)
             SolidSweep.Along(geo, path, s => Sec((crestY, baseProf.Z(s)), (crestY + 2, baseProf.Z(s)), (crestY + 2, baseProf.Z(s) + hTot - 0.1), (crestY, baseProf.Z(s) + hTot - 0.1)),
                 MarkingColor.Terra, 0, L, 4, "ATERRO");
-        if (d.CrestChannel) Channel(geo, path, baseProf, u * (crestY + 1.5), hTot, L);
+        if (d.CrestChannel)
+        {
+            if (cut)
+            {
+                // Corte: a canaleta de crista fica 1,5 m além da crista, NO TERRENO (encosta acima) – não na cota da crista
+                // prolongada, que a deixava solta no ar ou enterrada.
+                var off = crestY + 1.5;
+                // Terreno lido direto na linha da canaleta (a linha guardada na marca é a da crista).
+                var cp = new VerticalProfile();
+                var nSt = Math.Max(2, (int)Math.Ceiling(L / Math.Max(1, L / 80)));
+                for (int k = 0; k <= nSt; k++)
+                {
+                    var s = L * k / nSt;
+                    var zc = baseProf.Z(s) + hTot;
+                    var zg = ctx.Ground?.Invoke(path.PointAt(s) + SolidSweep.Normal(path, s) * (u * off)) ?? zc;
+                    // Terreno subindo além da crista: o talude continua até ele; a canaleta fica na face (no máx. 1,5 m / razão acima).
+                    cp.Pvis.Add((s, zg > zc ? Math.Min(zg, zc + 1.5 / Math.Max(0.2, d.Ratio)) : zg));
+                }
+                Channel(geo, path, cp, u * off, 0, L);
+            }
+            else Channel(geo, path, baseProf, u * (crestY + 1.5), hTot, L);
+        }
         if (d.ToeChannel) Channel(geo, path, baseProf, -u * 0.8, 0, L);
         // Descidas d'água em degraus.
         if (d.DowndrainSpacing > 5)
@@ -743,12 +764,17 @@ public static class EarthworksGenerator
             }
             if (i == 0 && !cut) { if (u > 0) c.DaylightRight = true; else c.DaylightLeft = true; }
             if (i + 2 == prof.Count) { if (u > 0) c.DaylightLeft = true; else c.DaylightRight = true; }
+            // Pontas do talude: fechamento lateral em talude (saia) até o terreno – sem isso o Toposolid ligava a face ao
+            // terreno natural por triângulos soltos (dentes e zigue-zague nas pontas).
+            c.WallStart = c.WallEnd = true;
+            c.EndSpill = true;
             geo.Corridors.Add(c);
         }
         if (cut)
         {
             // Plataforma rebaixada à frente do pé do corte (com a canaleta), concordando com o terreno do lado de baixo.
-            var front = new GradeCorridor { DaylightLeft = u < 0, DaylightRight = u > 0, CutSlope = Math.Max(0.5, d.Ratio), FillSlope = 1.5, Label = "Pé do corte" };
+            var front = new GradeCorridor { DaylightLeft = u < 0, DaylightRight = u > 0, CutSlope = Math.Max(0.5, d.Ratio), FillSlope = 1.5, Label = "Pé do corte",
+                WallStart = true, WallEnd = true, EndSpill = true };
             foreach (var s in SolidSweep.Stations(path, 0, L, 2))
             {
                 var p = path.PointAt(s);

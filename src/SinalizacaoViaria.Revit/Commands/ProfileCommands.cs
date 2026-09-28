@@ -35,8 +35,15 @@ public sealed class CmdPerfilVia : CommandBase
         PerfilResultado Compute() => RoadProfileDesigner.Design(L, s => hasTerrain ? GroundAt(s) : road.Grade.Z(s), o);
 
         var w = new FormWindow("Perfil da via", "Perfil longitudinal e obras pela topografia",
-                $"Via de {L.ToString("0", pt)} m. O greide vale para a via inteira (pista, calçadas, linhas, dispositivos) e onde o terreno pede a via vira obra: " +
-                "viaduto/ponte nos aterros altos, túnel nos cortes profundos, trincheira nos cortes médios – o resto é aterro e corte no Toposolid." +
+                $"PARA QUE SERVE: definir a altura da via (o GREIDE) ao longo dos seus {L.ToString("0", pt)} m sobre a topografia.\n" +
+                "O GRÁFICO ao lado é um corte ao longo do eixo: em marrom o terreno natural, a linha escura é a via; em VERMELHO " +
+                "o terreno que será cortado, em VERDE o aterro. Embaixo as estacas (distância ao longo da via), à esquerda as cotas; " +
+                "os quadrados brancos são os PIVs (pontos onde a rampa muda) e \"i = %\" é a rampa de cada trecho.\n" +
+                "COMO USAR: 1) escolha como o greide é traçado (acompanhar o terreno, rampa constante, nível ou PIVs digitados); " +
+                "2) limite a rampa máxima; 3) diga a partir de que altura de aterro/corte a via vira obra (viaduto/ponte, trincheira, " +
+                "túnel – faixas coloridas no alto do gráfico). O gráfico se atualiza a cada mudança.\n" +
+                "AO APLICAR: o greide passa a valer para a via inteira (pista, calçadas, linhas, dispositivos), as obras são criadas " +
+                "nos trechos indicados e o Toposolid é cortado/aterrado com taludes até o terreno natural." +
                 (hasTerrain ? "" : "\n⚠ Sem Toposolid no projeto: o perfil parte do greide atual (crie o terreno em Massa e terreno para usar a topografia)."),
                 null, () =>
                 {
@@ -44,8 +51,7 @@ public sealed class CmdPerfilVia : CommandBase
                     var g = RoadProfileDesigner.Chart(r);
                     g.Warnings.AddRange(r.Warnings);
                     return new FormPreview(g, null, null,
-                        $"Perfil (terreno em marrom, greide em cinza, obras em faixas coloridas; escala vertical exagerada).\n{r.Summary()}\n" +
-                        $"Área de corte no eixo {r.CutM2.ToString("N0", pt)} m² · aterro {r.FillM2.ToString("N0", pt)} m²");
+                        $"{r.Summary()}\nÁrea de corte no eixo {r.CutM2.ToString("N0", pt)} m² · aterro {r.FillM2.ToString("N0", pt)} m²", Paper: true);
                 }, false, "Aplicar", 1240, 800)
             .Choice("Greide", new[]
             {

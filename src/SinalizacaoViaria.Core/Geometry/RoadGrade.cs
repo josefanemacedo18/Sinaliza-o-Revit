@@ -288,7 +288,56 @@ public sealed class GradeSurface
     public double Z(Vec2 p)
     {
         var (s, y) = Locate(p);
-        return _grade.Z(s, y);
+        var z = _grade.Z(s, y);
+        if (Blends.Count == 0) return z;
+        // Concordância com os nós em que esta via é secundária: parte da superfície do nó na borda dele.
+        NodeBlend? best = null;
+        var bd = double.MaxValue;
+        foreach (var b in Blends)
+        {
+            var d = Math.Abs(s - b.Station);
+            if (d < bd) { bd = d; best = b; }
+        }
+        if (best == null) return z;
+        var t = best.Weight(bd);
+        if (t >= 1) return z;
+        var zRef = best.Node.Z(p) - best.BaseZ;
+        return zRef + (z - zRef) * t;
+    }
+
+    /// <summary>
+    /// Estação e afastamento com o eixo prolongado em reta além das pontas (estação &lt; 0 ou &gt; comprimento, afastamento na
+    /// normal da ponta) – em vez da distância radial à ponta.
+    /// </summary>
+    public (double S, double Y) LocateExtended(Vec2 p)
+    {
+        var (s, y) = Locate(p);
+        var L = _axis.Length;
+        if (s > 1e-6 && s < L - 1e-6) return (s, y);
+        var atEnd = s >= L / 2;
+        var e = _axis.PointAt(atEnd ? L : 0);
+        var t = _axis.TangentAt(atEnd ? Math.Max(0, L - 1e-3) : 0);
+        var d = p - e;
+        var ext = d.Dot(t);
+        if (atEnd ? ext <= 0 : ext >= 0) return (s, y);
+        return ((atEnd ? L : 0) + ext, d.Dot(t.PerpLeft));
+    }
+
+    /// <summary>Concordâncias com os nós (interseções, rotatórias) em que a via é secundária.</summary>
+    public List<NodeBlend> Blends { get; } = new();
+}
+
+/// <summary>
+/// Concordância de uma via secundária com um nó: até <see cref="Start"/> m da estação do nó a via segue a superfície do nó
+/// (a da via principal); daí, em <see cref="Length"/> m, passa suavemente (curva em S) para o próprio greide e abaulamento.
+/// </summary>
+public sealed record NodeBlend(NodeSurface Node, double Station, double Start, double Length, double BaseZ)
+{
+    /// <summary>Peso do greide próprio (0 = superfície do nó, 1 = greide da via) à distância <paramref name="d"/> da estação do nó.</summary>
+    public double Weight(double d)
+    {
+        var t = Math.Clamp((d - Start) / Math.Max(1, Length), 0, 1);
+        return t * t * (3 - 2 * t);
     }
 }
 
@@ -299,8 +348,12 @@ public static class GradeLift
     /// Sólidos poliédricos são deformados vértice a vértice (barreiras e dispositivos acompanham curvas verticais); perfis
     /// e primitivas curvas sobem pela cota do centro. Peças planas (pisos, pinturas) ficam para o Revit, que as deforma.
     /// </summary>
-    public static void Apply(MarkingGeometry geo, GradeSurface surf)
+    public static void Apply(MarkingGeometry geo, GradeSurface surf) => Apply(geo, surf.Z);
+
+    /// <summary>Mesmo levantamento com uma superfície qualquer (cota relativa à base da marca).</summary>
+    public static void Apply(MarkingGeometry geo, Func<Vec2, double> z)
     {
+        var surf = new { Z = z };
         for (int i = 0; i < geo.Pieces.Count; i++)
         {
             var p = geo.Pieces[i];

@@ -70,6 +70,9 @@ public static class FloorPlanes
         GradeSurface? axis = null, double warpArea = 25, int maxDepth = 9, double ringStep = 1.0)
     {
         var res = new List<(Polygon2, Plane3, bool)>();
+        // Ao longo de uma via (ou de um nó guiado pela via principal) nunca há peça empenada: a divisão continua em faixas
+        // transversais (juntas retas) até ficar plana – triângulos de edição de forma só onde não há eixo de referência.
+        var along = axis != null;
         Go(shape, 0);
         return res;
 
@@ -77,38 +80,49 @@ public static class FloorPlanes
         {
             var (plane, dev) = Fit(Samples(p, z, ringStep));
             if (dev <= tol) { res.Add((p, plane, false)); return; }
-            if (p.Area < warpArea || depth >= maxDepth) { res.Add((p, plane, dev > 2 * tol)); return; }
-            var halves = Halves(p, axis);
-            if (halves.Count < 2) { res.Add((p, plane, dev > 2 * tol)); return; }
+            if (!along && (p.Area < warpArea || depth >= maxDepth)) { res.Add((p, plane, dev > 2 * tol)); return; }
+            if (along && depth >= 14) { res.Add((p, plane, false)); return; }
+            var halves = Halves(p, axis, along);
+            if (halves.Count < 2) { res.Add((p, plane, !along && dev > 2 * tol)); return; }
             foreach (var h in halves) Go(h, depth + 1);
         }
     }
 
-    private static List<Polygon2> Halves(Polygon2 p, GradeSurface? axis)
+    private static List<Polygon2> Halves(Polygon2 p, GradeSurface? axis, bool alongOnly = false)
     {
         try
         {
             if (axis != null)
             {
-                var loc = p.Outer.Select(axis.Locate).ToList();
+                var loc = p.Outer.Select(axis.LocateExtended).ToList();
                 double y0 = loc.Min(l => l.Y), y1 = loc.Max(l => l.Y), s0 = loc.Min(l => l.S), s1 = loc.Max(l => l.S);
                 var w = Math.Max(Math.Abs(y0), Math.Abs(y1)) + 2;
-                // Crista do abaulamento dentro da peça: separa os dois caimentos (cada lado é um plano).
-                if (y0 < -0.3 && y1 > 0.3 && Math.Abs(axis.Grade.Crossfall) > 1e-6)
+                // Linhas de quebra da superfície dentro da peça: crista do abaulamento e bordas da faixa abaulada (além
+                // delas a superfície é plana na transversal). Cada lado de uma quebra é um plano.
+                var breaks = new List<double>();
+                if (Math.Abs(axis.Grade.Crossfall) > 1e-6 || axis.Grade.Superelevation.Count > 0)
                 {
-                    var left = Band(axis, s0 - 3, s1 + 3, 0, w);
-                    var right = Band(axis, s0 - 3, s1 + 3, -w, 0);
-                    var a = PolygonOps.Intersect(new[] { p }, new[] { left }).Where(x => x.Area > 0.01).ToList();
-                    var b = PolygonOps.Intersect(new[] { p }, new[] { right }).Where(x => x.Area > 0.01).ToList();
-                    if (a.Count > 0 && b.Count > 0 && Covers(p, a, b)) return a.Concat(b).ToList();
+                    breaks.Add(0);
+                    var cw = axis.Grade.CrossfallWidth;
+                    if (cw > 0.5) { breaks.Add(cw); breaks.Add(-cw); }
                 }
-                if (s1 - s0 > 2)
+                foreach (var b in breaks)
+                {
+                    if (!(y0 < b - 0.3 && y1 > b + 0.3)) continue;
+                    var hi = Band(axis, s0 - 3, s1 + 3, b, w);
+                    var lo = Band(axis, s0 - 3, s1 + 3, -w, b);
+                    var a = PolygonOps.Intersect(new[] { p }, new[] { hi }).Where(x => x.Area > 0.01).ToList();
+                    var c = PolygonOps.Intersect(new[] { p }, new[] { lo }).Where(x => x.Area > 0.01).ToList();
+                    if (a.Count > 0 && c.Count > 0 && Covers(p, a, c)) return a.Concat(c).ToList();
+                }
+                if (s1 - s0 > 0.6)
                 {
                     var m = (s0 + s1) / 2;
                     var a = PolygonOps.Intersect(new[] { p }, new[] { Band(axis, s0 - 3, m, -w, w) }).Where(x => x.Area > 0.01).ToList();
                     var b = PolygonOps.Intersect(new[] { p }, new[] { Band(axis, m, s1 + 3, -w, w) }).Where(x => x.Area > 0.01).ToList();
                     if (a.Count > 0 && b.Count > 0 && Covers(p, a, b)) return a.Concat(b).ToList();
                 }
+                if (alongOnly) return new List<Polygon2>();
             }
             var (mn, mx) = p.Bounds;
             Polygon2 A, B;

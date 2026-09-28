@@ -5,312 +5,93 @@ using Autodesk.Revit.UI.Selection;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Core.Model;
+using SinalizacaoViaria.Core.Quantities;
 using SinalizacaoViaria.Revit.Infrastructure;
+using SinalizacaoViaria.Revit.UI;
 
 namespace SinalizacaoViaria.Revit.Commands;
 
 /// <summary>
-/// Apagar Trecho: apaga só uma parte de uma marca (um traço da linha de eixo, um trecho entre dois pontos, tudo numa janela)
-/// sem desfazer a marca – o trecho vira um recorte guardado na própria marca, que pode ser desativado (a marca volta inteira),
-/// reativado ou removido depois. Regerar/editar a marca mantém os recortes.
+/// Apagar Trecho (só sinalização horizontal): escolhe-se a marca (linha, faixa de pedestres, zebrado, seta, legenda...) e
+/// uma janela mostra a planta com as peças reais dela – clique em cada traço/peça para apagar, Shift + arrastar para apagar
+/// o que está numa janela. Os trechos viram recortes guardados na própria marca (podem ser devolvidos ou desativados depois);
+/// regerar/editar a marca mantém os recortes.
 /// </summary>
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdApagarTrecho : CommandBase
 {
-    private enum Modo { Tracos, DoisPontos, Janela, Gerenciar }
-
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
-        var td = new TaskDialog(AppTitle)
-        {
-            MainInstruction = "Apagar trecho de sinalização",
-            MainContent = "A marca continua a mesma (edição, quantitativos, conexões); o trecho apagado fica guardado nela e pode ser " +
-                          "desativado, reativado ou removido quando quiser.",
-        };
-        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Clicar nas peças a apagar", "Cada clique apaga o traço, seta, símbolo ou faixa sob o cursor. ESC termina.");
-        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Trecho entre dois pontos", "Clique a marca e depois o início e o fim do trecho ao longo dela (ex.: parte da linha de eixo).");
-        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Janela", "Clique a marca e dois cantos: apaga tudo dela dentro do retângulo.");
-        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink4, "Desativar / reativar / remover trechos apagados", "Clique a marca e escolha o que fazer com os recortes dela.");
-        td.CommonButtons = TaskDialogCommonButtons.Cancel;
-        var modo = td.Show() switch
-        {
-            TaskDialogResult.CommandLink1 => Modo.Tracos,
-            TaskDialogResult.CommandLink2 => Modo.DoisPontos,
-            TaskDialogResult.CommandLink3 => Modo.Janela,
-            TaskDialogResult.CommandLink4 => Modo.Gerenciar,
-            _ => (Modo?)null,
-        };
-        if (modo == null) return Result.Cancelled;
-        return modo switch
-        {
-            Modo.Tracos => Pieces(uidoc),
-            Modo.DoisPontos => Stretch(uidoc),
-            Modo.Janela => Window(uidoc),
-            _ => Manage(uidoc),
-        };
-    }
-
-    /// <summary>Marca clicada e o ponto do clique (m, planta).</summary>
-    private static (StoredMarking Stored, Vec2 Point)? PickAt(UIDocument uidoc, string prompt)
-    {
-        try
-        {
-            var r = uidoc.Selection.PickObject(ObjectType.Element, new MarkingSelectionFilter(), prompt);
-            var st = MarkingStorage.Read(uidoc.Document.GetElement(r));
-            return st == null ? null : (st, UnitConv.ToVec2(r.GlobalPoint ?? XYZ.Zero));
-        }
-        catch (Autodesk.Revit.Exceptions.OperationCanceledException)
-        {
-            return null;
-        }
-    }
-
-    private static Result Pieces(UIDocument uidoc)
-    {
-        var changed = new Dictionary<string, MarkingDefinition>();
-        var count = 0;
-        while (true)
-        {
-            // Clique de PONTO (na planta o clique de elemento nem sempre traz a coordenada): a marca é achada sob o ponto,
-            // dando preferência à pintura/dispositivo sobre o pavimento e as calçadas.
-            // Na vista 3D não há plano de trabalho para o clique de ponto: o ponto vem da face clicada (exato em planta
-            // mesmo com a via inclinada).
-            var xyz = uidoc.ActiveView is View3D ? PickOnFace(uidoc) : Picking.PickPoint(uidoc, "Apagar trecho: clique sobre o traço/peça a apagar – ESC termina");
-            if (xyz == null) break;
-            var p = UnitConv.ToVec2(xyz);
-            // 1º pela geometria real dos elementos no Revit (cada traço é um sólido próprio); 2º pela geometria da marca.
-            var found = FindInModel(uidoc, p, changed) ?? FindAt(uidoc, p, changed);
-            if (found == null)
-            {
-                TaskDialog.Show(AppTitle, "Nenhuma sinalização sob o ponto clicado – clique sobre a pintura (traço, seta, faixa) ou o dispositivo.");
-                continue;
-            }
-            var (def, zone) = found.Value;
-            def.Exclusions.Add(zone);
-            changed[def.Id] = def;
-            count++;
-            // Regenera já, para o traço sumir antes do próximo clique.
-            MarkingCreator.Commit(uidoc, new[] { def }, "SV - Apagar trecho");
-        }
-        return count > 0 ? Result.Succeeded : Result.Cancelled;
-    }
-
-    /// <summary>
-    /// Peça sob o ponto lida da geometria real dos elementos do plugin: cada traço/símbolo/dispositivo é um sólido separado
-    /// dentro da forma direta (ou um piso). A pegada do sólido (faces voltadas para cima, unidas) é o recorte – exatamente o
-    /// traço clicado. Pinturas têm prioridade sobre pisos (pavimento, calçada) que ficam por baixo.
-    /// </summary>
-    private static (MarkingDefinition Def, ExclusionZone Zone)? FindInModel(UIDocument uidoc, Vec2 p, Dictionary<string, MarkingDefinition> changed)
-    {
         var doc = uidoc.Document;
-        (StoredMarking St, Polygon2 Foot, int Rank)? best = null;
-        foreach (var r in MarkingStorage.All(doc))
-        {
-            var e = r.Element;
-            var bb = e.get_BoundingBox(null) ?? e.get_BoundingBox(uidoc.ActiveView);
-            if (bb == null) continue;
-            if (p.X < UnitConv.M(bb.Min.X) - 0.3 || p.X > UnitConv.M(bb.Max.X) + 0.3 || p.Y < UnitConv.M(bb.Min.Y) - 0.3 || p.Y > UnitConv.M(bb.Max.Y) + 0.3) continue;
-            if (r.Definition is IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or IAnnotationDefinition) continue;
-            if (MarkingService.IsBore(e)) continue;
-            var rank = e is Floor ? 2 : r.Definition is RoadPavementDefinition ? 3 : 0;
-            GeometryElement? ge;
-            try { ge = e.get_Geometry(new Options { ComputeReferences = false, DetailLevel = ViewDetailLevel.Fine }); }
-            catch { continue; }
-            if (ge == null) continue;
-            foreach (var solid in Solids(ge))
-            {
-                var foot = Footprint(solid);
-                if (foot == null) continue;
-                var d = foot.Contains(p) ? 0 : foot.DistanceTo(p);
-                if (d > 0.25) continue;
-                if (best == null || rank < best.Value.Rank || rank == best.Value.Rank && foot.Area < best.Value.Foot.Area)
-                    best = (r, foot, rank);
-            }
-        }
-        if (best == null) return null;
-        var def = changed.TryGetValue(best.Value.St.MarkingId, out var d0) ? d0 : best.Value.St.Definition;
-        var zone = ZoneOf(new MarkingPiece(best.Value.Foot, MarkingColor.Branca), p);
-        return zone == null ? null : (def, zone);
-    }
+        var stored = Preselected(uidoc) ?? Pick(uidoc);
+        if (stored == null) return Result.Cancelled;
+        var def = stored.Definition;
 
-    private static XYZ? PickOnFace(UIDocument uidoc)
-    {
-        try
-        {
-            var r = uidoc.Selection.PickObject(ObjectType.PointOnElement, new MarkingSelectionFilter(), "Apagar trecho: clique sobre o traço/peça a apagar – ESC termina");
-            return r?.GlobalPoint;
-        }
-        catch (Autodesk.Revit.Exceptions.OperationCanceledException)
-        {
-            return null;
-        }
-    }
-
-    private static IEnumerable<Solid> Solids(GeometryElement ge)
-    {
-        foreach (var o in ge)
-        {
-            if (o is Solid s && s.Faces.Size > 0 && s.Volume > 1e-9) yield return s;
-            else if (o is GeometryInstance gi)
-                foreach (var x in Solids(gi.GetInstanceGeometry())) yield return x;
-        }
-    }
-
-    /// <summary>Pegada em planta (m) de um sólido: união das faces voltadas para cima.</summary>
-    private static Polygon2? Footprint(Solid s)
-    {
-        var polys = new List<Polygon2>();
-        foreach (Face f in s.Faces)
-        {
-            try
-            {
-                var bb = f.GetBoundingBox();
-                if (f.ComputeNormal((bb.Min + bb.Max) / 2).Z < 0.3) continue;
-                var loop = f.GetEdgesAsCurveLoops().FirstOrDefault();
-                if (loop == null) continue;
-                var pts = new List<Vec2>();
-                foreach (var c in loop) foreach (var q in c.Tessellate().Take(Math.Max(1, c.Tessellate().Count - 1))) pts.Add(UnitConv.ToVec2(q));
-                if (pts.Count >= 3) polys.Add(new Polygon2(pts));
-            }
-            catch { /* face sem contorno */ }
-        }
-        if (polys.Count == 0) return null;
-        try { return PolygonOps.Union(polys).OrderByDescending(x => x.Area).FirstOrDefault(); }
-        catch { return polys.OrderByDescending(x => x.Area).First(); }
-    }
-
-    /// <summary>
-    /// Marca e recorte sob o ponto: procura entre as marcas cujos elementos cobrem o ponto; pinturas e dispositivos têm
-    /// prioridade sobre pavimento, calçadas e meios-fios (que ficam por baixo).
-    /// </summary>
-    private static (MarkingDefinition Def, ExclusionZone Zone)? FindAt(UIDocument uidoc, Vec2 p, Dictionary<string, MarkingDefinition> changed)
-    {
-        var doc = uidoc.Document;
+        // Geometria da marca SEM os recortes manuais (para poder devolver peças apagadas antes).
         var service = new MarkingService(doc, uidoc.ActiveView);
-        var cands = new List<MarkingDefinition>();
-        foreach (var g in MarkingStorage.All(doc).GroupBy(r => r.MarkingId))
-        {
-            var hit = g.Any(r =>
-            {
-                var bb = r.Element.get_BoundingBox(null) ?? r.Element.get_BoundingBox(uidoc.ActiveView);
-                if (bb == null) return false;
-                return UnitConv.M(bb.Min.X) - 0.5 <= p.X && p.X <= UnitConv.M(bb.Max.X) + 0.5 && UnitConv.M(bb.Min.Y) - 0.5 <= p.Y && p.Y <= UnitConv.M(bb.Max.Y) + 0.5;
-            });
-            if (hit) cands.Add(changed.TryGetValue(g.Key, out var d) ? d : g.First().Definition);
-        }
-        (MarkingDefinition Def, MarkingPiece Piece, int Rank, double Dist)? best = null;
-        foreach (var def in cands)
-        {
-            if (def is IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or IAnnotationDefinition) continue;
-            MarkingGeometry geo;
-            try { geo = service.BuildGeometry(def, out _); }
-            catch (Exception ex) { Log.Error("Apagar trecho – geometria", ex); continue; }
-            var rank = def is RoadPavementDefinition ? 3 : Core.Generators.IntersectionGenerator.IsPhysical(def) ? 2 : 0;
-            foreach (var pc in geo.Pieces)
-            {
-                var dist = pc.Shape.Contains(p) ? 0 : pc.Shape.DistanceTo(p);
-                if (dist > 0.4) continue;
-                var cand = (def, pc, rank, dist + pc.Shape.Area * 1e-4);
-                if (best == null || (cand.rank, cand.Item4) .CompareTo((best.Value.Rank, best.Value.Dist)) < 0) best = cand;
-            }
-        }
-        if (best == null) return null;
-        var zone = ZoneOf(best.Value.Piece, p);
-        return zone == null ? null : (best.Value.Def, zone);
-    }
-
-    /// <summary>Recorte da peça sob o ponto: o contorno dela com 3 cm de folga.</summary>
-    private static ExclusionZone? ZoneOf(MarkingPiece piece, Vec2 p)
-    {
-        var shape = piece.Shape;
-        // Peça muito longa (linha contínua): apaga só 3 m em volta do clique, ao longo da peça.
-        var (mn, mx) = shape.Bounds;
-        if (Math.Max(mx.X - mn.X, mx.Y - mn.Y) > 12)
-        {
-            var box = Polygon2.Rectangle(p - new Vec2(1.5, 1.5), p + new Vec2(1.5, 1.5));
-            var part = PolygonOps.Intersect(new[] { shape }, new[] { box }).OrderByDescending(x => x.Area).FirstOrDefault();
-            if (part != null) shape = part;
-        }
-        var grown = PolygonOps.Offset(new[] { shape }, 0.03).OrderByDescending(x => x.Area).FirstOrDefault() ?? shape;
-        return new ExclusionZone { Manual = true, Points = grown.Outer.ToList() };
-    }
-
-    private static Result Stretch(UIDocument uidoc)
-    {
-        var hit = PickAt(uidoc, "Apagar trecho: clique a MARCA (linha, bordo, zebrado...)");
-        if (hit == null) return Result.Cancelled;
-        var def = hit.Value.Stored.Definition;
-        var main = def.Path != null ? PathResolver.Resolve(uidoc.Document, def.Path)?.Main : null;
-        if (main == null)
-        {
-            TaskDialog.Show(AppTitle, "Essa marca não tem caminho (linha) – use Clicar nas peças ou Janela.");
-            return Result.Cancelled;
-        }
-        var a = Picking.PickPoint(uidoc, "Apagar trecho: clique o INÍCIO do trecho sobre a marca");
-        if (a == null) return Result.Cancelled;
-        var b = Picking.PickPoint(uidoc, "Apagar trecho: clique o FIM do trecho");
-        if (b == null) return Result.Cancelled;
-        var sa = main.Project(UnitConv.ToVec2(a)).Station;
-        var sb = main.Project(UnitConv.ToVec2(b)).Station;
-        if (Math.Abs(sb - sa) < 0.05) return Result.Cancelled;
-        // Faixa ao longo do caminho entre as duas estacas, larga o bastante para a marca (e só ela, pois o recorte é da marca).
-        var pts = main.SubPoints(Math.Min(sa, sb), Math.Max(sa, sb));
-        var geo = new MarkingService(uidoc.Document, uidoc.ActiveView).BuildGeometry(def, out _);
-        var width = 2 * Math.Max(0.5, geo.Pieces.Count == 0 ? 1 : geo.Pieces.SelectMany(x => x.Shape.Outer).Max(q => Math.Abs(main.SignedDistance(q))) + 0.2);
-        var strip = PolygonOps.Strip(pts, width).OrderByDescending(x => x.Area).FirstOrDefault();
-        if (strip == null) return Result.Cancelled;
-        def.Exclusions.Add(new ExclusionZone { Manual = true, Points = strip.Outer.ToList() });
-        ReportResults("Apagar trecho", MarkingCreator.Commit(uidoc, new[] { def }, "SV - Apagar trecho"));
-        return Result.Succeeded;
-    }
-
-    private static Result Window(UIDocument uidoc)
-    {
-        var hit = PickAt(uidoc, "Apagar trecho: clique a MARCA");
-        if (hit == null) return Result.Cancelled;
-        var def = hit.Value.Stored.Definition;
-        var a = Picking.PickPoint(uidoc, "Apagar trecho: primeiro canto da janela");
-        if (a == null) return Result.Cancelled;
-        var b = Picking.PickPoint(uidoc, "Apagar trecho: canto oposto");
-        if (b == null) return Result.Cancelled;
-        var p = UnitConv.ToVec2(a);
-        var q = UnitConv.ToVec2(b);
-        var rect = Polygon2.Rectangle(new Vec2(Math.Min(p.X, q.X), Math.Min(p.Y, q.Y)), new Vec2(Math.Max(p.X, q.X), Math.Max(p.Y, q.Y)));
-        if (rect.Area < 0.01) return Result.Cancelled;
-        def.Exclusions.Add(new ExclusionZone { Manual = true, Points = rect.Outer.ToList() });
-        ReportResults("Apagar trecho", MarkingCreator.Commit(uidoc, new[] { def }, "SV - Apagar trecho"));
-        return Result.Succeeded;
-    }
-
-    private static Result Manage(UIDocument uidoc)
-    {
-        var hit = PickAt(uidoc, "Trechos apagados: clique a MARCA");
-        if (hit == null) return Result.Cancelled;
-        var def = hit.Value.Stored.Definition;
         var manual = def.Exclusions.Where(z => z.Manual).ToList();
-        if (manual.Count == 0)
+        def.Exclusions.RemoveAll(z => z.Manual);
+        MarkingGeometry geo;
+        try { geo = service.BuildGeometry(def, out _); }
+        finally { def.Exclusions.AddRange(manual); }
+        if (geo.Pieces.Count == 0)
         {
-            TaskDialog.Show(AppTitle, "Essa marca não tem trechos apagados com a ferramenta Apagar Trecho.");
+            TaskDialog.Show(AppTitle, "Essa marca não tem peças para apagar.");
             return Result.Cancelled;
         }
-        var on = manual.Count(z => z.Enabled);
-        var td = new TaskDialog(AppTitle)
-        {
-            MainInstruction = $"{def.DisplayCode}: {manual.Count} trecho(s) apagado(s), {on} ativo(s)",
-            MainContent = "Desativar mostra a marca inteira de novo sem perder os recortes; reativar volta a apagar.",
-        };
-        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Desativar (mostrar a marca inteira)");
-        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Reativar (apagar de novo)");
-        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Remover todos os recortes desta marca");
-        td.CommonButtons = TaskDialogCommonButtons.Cancel;
-        switch (td.Show())
-        {
-            case TaskDialogResult.CommandLink1: foreach (var z in manual) z.Enabled = false; break;
-            case TaskDialogResult.CommandLink2: foreach (var z in manual) z.Enabled = true; break;
-            case TaskDialogResult.CommandLink3: def.Exclusions.RemoveAll(z => z.Manual); break;
-            default: return Result.Cancelled;
-        }
-        ReportResults("Trechos apagados", MarkingCreator.Commit(uidoc, new[] { def }, "SV - Trechos apagados"));
+        var info = MarkingBuilder.Describe(def, PluginContext.Catalog);
+        var existing = manual.Where(z => z.Points.Count >= 3).Select(z => new Polygon2(z.Points)).ToList();
+        var active = manual.Count == 0 || manual.Any(z => z.Enabled);
+        var w = new TrimWindow($"{info.Code} – {info.Name}", geo, existing, active);
+        if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
+
+        def.Exclusions.RemoveAll(z => z.Manual);
+        foreach (var z in w.Zones) def.Exclusions.Add(new ExclusionZone { Manual = true, Enabled = w.Active, Points = z.Outer.ToList() });
+        ReportResults("Apagar trecho", MarkingCreator.Commit(uidoc, new[] { def }, "SV - Apagar trecho"));
         return Result.Succeeded;
+    }
+
+    /// <summary>Sinalização horizontal (pinturas, legendas, zebrados, faixas) – o que a ferramenta aceita.</summary>
+    internal static bool IsHorizontal(MarkingDefinition def)
+    {
+        if (def is IAnnotationDefinition) return false;
+        try
+        {
+            var info = MarkingBuilder.Describe(def, PluginContext.Catalog);
+            return QuantityRow.Categorize(def, info.Group) == CategoriaQuantitativo.SinalizacaoHorizontal;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static StoredMarking? Preselected(UIDocument uidoc)
+    {
+        var ids = uidoc.Selection.GetElementIds();
+        if (ids.Count != 1) return null;
+        var st = MarkingStorage.Read(uidoc.Document.GetElement(ids.First()));
+        return st != null && IsHorizontal(st.Definition) ? st : null;
+    }
+
+    private static StoredMarking? Pick(UIDocument uidoc)
+    {
+        try
+        {
+            var r = uidoc.Selection.PickObject(ObjectType.Element, new HorizontalFilter(),
+                "Apagar trecho: clique a sinalização horizontal (linha, faixa de pedestres, zebrado, seta, legenda...)");
+            return MarkingStorage.Read(uidoc.Document.GetElement(r));
+        }
+        catch (Autodesk.Revit.Exceptions.OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
+    private sealed class HorizontalFilter : ISelectionFilter
+    {
+        public bool AllowElement(Element elem) =>
+            new MarkingSelectionFilter().AllowElement(elem) && MarkingStorage.Read(elem) is { } st && IsHorizontal(st.Definition);
+        public bool AllowReference(Reference reference, XYZ position) => false;
     }
 }

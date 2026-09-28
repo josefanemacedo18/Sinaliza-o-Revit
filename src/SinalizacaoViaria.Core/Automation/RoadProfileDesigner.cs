@@ -343,27 +343,75 @@ public static class RoadProfileDesigner
     {
         var geo = new MarkingGeometry();
         if (r.Ground.Count < 2) return geo;
+        var pt = CultureInfo.GetCultureInfo("pt-BR");
         var L = r.Ground[^1].X;
         var zs = r.Ground.Select(p => p.Y).Concat(r.Ground.Select(p => r.Grade.Z(p.X))).ToList();
-        var zmin = zs.Min() - 3;
-        var zmax = zs.Max() + 3;
+        var zmin = Math.Floor(zs.Min() - 3);
+        var zmax = Math.Ceiling(zs.Max() + 3);
         var k = exaggeration > 0 ? exaggeration : Math.Clamp(L * 0.35 / Math.Max(1, zmax - zmin), 1, 20);
         Vec2 P(double s, double z) => new(s, (z - zmin) * k);
         var H = (zmax - zmin) * k;
         var th = Math.Max(0.2, H * 0.006);
+        // Textos proporcionais ao gráfico (a prévia usa escala 1:100 → mm de papel = 10 × altura em metros).
+        double Mm(double modelHeight) => modelHeight * 10;
+        var tx = Math.Max(0.8, L * 0.013);
         MarkingColor? ColorOf(TipoTrecho t) => t switch
         {
             TipoTrecho.Viaduto => MarkingColor.Azul,
-            TipoTrecho.Tunel => MarkingColor.Vermelha,
-            TipoTrecho.Trincheira => MarkingColor.Amarela,
+            TipoTrecho.Tunel => MarkingColor.Preta,
+            TipoTrecho.Trincheira => MarkingColor.Laranja,
             _ => null,
         };
-        // Terreno (massa até a base do gráfico).
+        bool InStructure(double s) => r.Segments.Any(x => ColorOf(x.Kind) != null && s >= x.S0 && s <= x.S1);
+
+        // Grade de referência: cotas (horizontais) e estacas (verticais), com rótulos.
+        double Nice(double span, int n)
+        {
+            var raw = span / n;
+            var mag = Math.Pow(10, Math.Floor(Math.Log10(raw)));
+            foreach (var f in new[] { 1.0, 2.0, 5.0, 10.0 }) if (raw <= f * mag) return f * mag;
+            return 10 * mag;
+        }
+        var dz = Nice(zmax - zmin, 6);
+        for (var z = Math.Ceiling(zmin / dz) * dz; z <= zmax + 1e-9; z += dz)
+        {
+            geo.Annotations.Add(new AnnotationLine(new[] { P(0, z), P(L, z) }, MarkingColor.Concreto));
+            geo.Annotations.Add(new AnnotationText(P(0, z) + new Vec2(-tx * 0.6, -tx * 0.35), z.ToString("0.#", pt) + " m", Mm(tx * 0.8), TextAlign.Right));
+        }
+        var ds = Nice(L, 10);
+        for (var st = 0.0; st <= L + 1e-9; st += ds)
+        {
+            geo.Annotations.Add(new AnnotationLine(new[] { P(st, zmin), P(st, zmax) }, MarkingColor.Concreto));
+            geo.Annotations.Add(new AnnotationText(P(st, zmin) - new Vec2(0, tx * 1.4), $"{(int)(st / 1000)}+{st % 1000:000}", Mm(tx * 0.8)));
+        }
+        geo.Annotations.Add(new AnnotationText(new Vec2(0, -tx * 3.2), "Estaca (km+m) – distância ao longo do eixo da via", Mm(tx * 0.85), TextAlign.Left));
+
+        // Terreno natural (massa marrom até a base do gráfico).
         var ground = new List<Vec2> { P(0, zmin) };
         ground.AddRange(r.Ground.Select(p => P(p.X, p.Y)));
         ground.Add(P(L, zmin));
         geo.Add(new Polygon2(ground), MarkingColor.Terra);
-        // Greide: faixa fina; nos trechos de obra, na cor da obra e mais grossa.
+        // Corte (terreno acima do greide, vermelho) e aterro (greide acima do terreno, verde) – fora das obras.
+        var cutQuads = new List<Polygon2>();
+        var fillQuads = new List<Polygon2>();
+        for (int i = 0; i + 1 < r.Ground.Count; i++)
+        {
+            var (s0, g0) = (r.Ground[i].X, r.Ground[i].Y);
+            var (s1, g1) = (r.Ground[i + 1].X, r.Ground[i + 1].Y);
+            if (InStructure((s0 + s1) / 2)) continue;
+            double z0 = r.Grade.Z(s0), z1 = r.Grade.Z(s1);
+            if (Math.Abs(g0 - z0) < 0.05 && Math.Abs(g1 - z1) < 0.05) continue;
+            var quad = new Polygon2(new[] { P(s0, g0), P(s1, g1), P(s1, z1), P(s0, z0) });
+            if (Math.Abs(quad.Area) < 1e-6) continue;
+            ((g0 + g1) / 2 > (z0 + z1) / 2 ? cutQuads : fillQuads).Add(quad);
+        }
+        foreach (var (quads, col) in new[] { (cutQuads, MarkingColor.Vermelha), (fillQuads, MarkingColor.Verde) })
+        {
+            List<Polygon2> merged;
+            try { merged = PolygonOps.Union(quads); } catch { merged = quads; }
+            foreach (var q in merged.Where(x => x.Area > 1e-6)) geo.Pieces.Add(new MarkingPiece(q, col) { Elevation = 0.02 });
+        }
+        // Greide: faixa escura; nos trechos de obra, na cor da obra e mais grossa.
         Polygon2 Band(double a, double b, double half)
         {
             var top = new List<Vec2>();
@@ -378,21 +426,49 @@ public static class RoadProfileDesigner
             return new Polygon2(top.Concat(bot));
         }
         geo.Add(Band(0, L, th), MarkingColor.Asfalto);
+        var nSeg = 0;
         foreach (var seg in r.Segments)
         {
             if (ColorOf(seg.Kind) is not { } c) continue;
             geo.Add(Band(seg.S0, seg.S1, th * 2.5), c);
-            // Barra no alto do gráfico com o nome da obra.
+            // Barra no alto do gráfico com o nome e a extensão da obra (rótulos alternados em duas alturas).
             geo.Add(Polygon2.Rectangle(new Vec2(seg.S0, H + H * 0.04), new Vec2(seg.S1, H + H * 0.09)), c);
-            geo.Annotations.Add(new AnnotationText(new Vec2((seg.S0 + seg.S1) / 2, H + H * 0.18), PerfilResultado.Nome(seg.Kind), 3));
+            var yl = H + H * 0.09 + tx * (nSeg++ % 2 == 0 ? 1.4 : 2.8);
+            geo.Annotations.Add(new AnnotationText(new Vec2((seg.S0 + seg.S1) / 2, yl), $"{PerfilResultado.Nome(seg.Kind)} {seg.Length.ToString("0", pt)} m", Mm(tx * 0.8)));
         }
-        // PIVs.
+        // PIVs com a cota, e a rampa de cada tangente.
         var m = Math.Max(0.5, H * 0.012);
-        foreach (var p in r.Grade.Points)
-            geo.Add(Polygon2.Rectangle(P(p.S, p.Z) - new Vec2(m, m), P(p.S, p.Z) + new Vec2(m, m)), MarkingColor.Branca);
-        // Greide e PIVs sempre por cima do terreno (inclusive dentro dos túneis).
+        var pts = r.Grade.Points.OrderBy(q => q.S).ToList();
+        var lastLabel = double.MinValue;
+        foreach (var q in pts)
+        {
+            geo.Add(Polygon2.Rectangle(P(q.S, q.Z) - new Vec2(m, m), P(q.S, q.Z) + new Vec2(m, m)), MarkingColor.Branca);
+            if (q.S - lastLabel < L * 0.05) continue;
+            lastLabel = q.S;
+            geo.Annotations.Add(new AnnotationText(P(q.S, q.Z) + new Vec2(0, tx * 1.2), q.Z.ToString("0.00", pt), Mm(tx * 0.7)));
+        }
+        for (int i = 0; i + 1 < pts.Count && pts.Count <= 20; i++)
+        {
+            var len = pts[i + 1].S - pts[i].S;
+            if (len < L * 0.06) continue;
+            var g = (pts[i + 1].Z - pts[i].Z) / len;
+            var mid = (pts[i].S + pts[i + 1].S) / 2;
+            geo.Annotations.Add(new AnnotationText(P(mid, r.Grade.Z(mid)) + new Vec2(0, tx * 2.2), $"i = {(g * 100).ToString("0.0", pt)} %", Mm(tx * 0.75)));
+        }
+        // Legenda.
+        var lx = L * 0.01;
+        var ly = H + H * 0.09 + tx * 5;
+        foreach (var (c, t) in new[] { (MarkingColor.Terra, "Terreno natural"), (MarkingColor.Asfalto, "Greide (eixo da via)"), (MarkingColor.Vermelha, "Corte"),
+                     (MarkingColor.Verde, "Aterro"), (MarkingColor.Azul, "Viaduto/ponte"), (MarkingColor.Preta, "Túnel"), (MarkingColor.Laranja, "Trincheira") })
+        {
+            geo.Add(Polygon2.Rectangle(new Vec2(lx, ly), new Vec2(lx + tx * 1.6, ly + tx)), c);
+            geo.Annotations.Add(new AnnotationText(new Vec2(lx + tx * 2.1, ly + tx * 0.1), t, Mm(tx * 0.85), TextAlign.Left));
+            lx += tx * (3.0 + t.Length * 0.8);
+        }
+        geo.Annotations.Add(new AnnotationText(new Vec2(L, -tx * 3.2), $"Escala vertical exagerada {k.ToString("0.#", pt)}×", Mm(tx * 0.8), TextAlign.Right));
+        // Greide, obras e PIVs sempre por cima do terreno (inclusive dentro dos túneis).
         for (int i = 0; i < geo.Pieces.Count; i++)
-            if (geo.Pieces[i].Color != MarkingColor.Terra) geo.Pieces[i] = geo.Pieces[i] with { Elevation = 0.05 };
+            if (geo.Pieces[i].Color is not (MarkingColor.Terra or MarkingColor.Vermelha or MarkingColor.Verde)) geo.Pieces[i] = geo.Pieces[i] with { Elevation = 0.05 };
         return geo;
     }
 }

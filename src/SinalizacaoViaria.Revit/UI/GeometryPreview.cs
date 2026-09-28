@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using SinalizacaoViaria.Core.Geometry;
@@ -53,6 +54,25 @@ public sealed class GeometryPreview : FrameworkElement
     }
 
     private Rect _togglePlan, _toggle3D;
+
+    /// <summary>Modo seleção (Apagar Trecho): clique = <see cref="ModelClicked"/>; Shift + arrastar = <see cref="ModelWindow"/>.</summary>
+    public bool Selecting { get; set; }
+    /// <summary>Áreas marcadas (desenhadas em vermelho sobre a planta).</summary>
+    public List<Polygon2> Marked { get; } = new();
+    public event Action<Vec2>? ModelClicked;
+    public event Action<Vec2, Vec2>? ModelWindow;
+    private Point? _rectStart, _rectEnd;
+    // Mapeamento da última planta desenhada (para converter o clique em coordenadas do modelo).
+    private (double Ox, double Oy, double S, double MinX, double MinY, double H)? _map;
+
+    /// <summary>Ponto da tela (controle) → ponto do modelo (m) na planta.</summary>
+    public Vec2? ToModel(Point q)
+    {
+        if (_map is not { } m || m.S <= 0) return null;
+        var c = new Point(_w / 2, _h / 2);
+        var p = new Point(c.X + (q.X - _pan.X - c.X) / _zoom, c.Y + (q.Y - _pan.Y - c.Y) / _zoom);
+        return new Vec2(m.MinX + (p.X - m.Ox) / m.S, m.MinY + (m.H - p.Y - m.Oy) / m.S);
+    }
     // Órbita da vista 3D (graus): azimute e elevação, alterados arrastando com o botão direito.
     private double _az = -35, _el = 30;
     private Point? _orbitStart;
@@ -71,17 +91,45 @@ public sealed class GeometryPreview : FrameworkElement
             if (_togglePlan.Contains(p)) { Iso = false; InvalidateVisual(); return; }
             if (_toggle3D.Contains(p)) { Iso = true; InvalidateVisual(); return; }
             if (e.ClickCount == 2) { _zoom = 1; _pan = new Vector(); InvalidateVisual(); return; }
+            // Modo seleção (planta): Shift + arrastar = janela; clique simples = peça sob o cursor.
+            if (Selecting && !Iso && (Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+            {
+                _rectStart = p;
+                _rectEnd = p;
+                CaptureMouse();
+                return;
+            }
             _dragStart = p;
             _panStart = _pan;
             CaptureMouse();
         };
         MouseMove += (_, e) =>
         {
+            if (_rectStart != null) { _rectEnd = e.GetPosition(this); InvalidateVisual(); return; }
             if (_dragStart is not { } d0) return;
             _pan = _panStart + (e.GetPosition(this) - d0);
             InvalidateVisual();
         };
-        MouseLeftButtonUp += (_, _) => { _dragStart = null; ReleaseMouseCapture(); };
+        MouseLeftButtonUp += (_, e) =>
+        {
+            var p = e.GetPosition(this);
+            if (_rectStart is { } r0)
+            {
+                _rectStart = null;
+                ReleaseMouseCapture();
+                if ((p - r0).Length > 4 && ToModel(r0) is { } a && ToModel(p) is { } b) ModelWindow?.Invoke(a, b);
+                InvalidateVisual();
+                return;
+            }
+            var click = _dragStart is { } d0 && (p - d0).Length < 4;
+            _dragStart = null;
+            ReleaseMouseCapture();
+            if (click && Selecting && !Iso && ToModel(p) is { } m)
+            {
+                _pan = _panStart;
+                ModelClicked?.Invoke(m);
+            }
+        };
         MouseRightButtonDown += (_, e) =>
         {
             if (!Iso) return;
@@ -185,6 +233,7 @@ public sealed class GeometryPreview : FrameworkElement
         var ox = (w - (maxX - minX) * s) / 2;
         var oy = (h - (maxY - minY) * s) / 2;
         Point P(Vec2 v) => new(ox + (v.X - minX) * s, h - (oy + (v.Y - minY) * s));
+        _map = (ox, oy, s, minX, minY, h);
 
         dc.PushTransform(ViewTransform());
         foreach (var pav in _pavement) dc.DrawGeometry(Asphalt, null, ToGeometry(pav, P));
@@ -204,7 +253,20 @@ public sealed class GeometryPreview : FrameworkElement
             for (int i = 1; i < g.Count; i++) dc.DrawLine(GuidePen, P(g[i - 1]), P(g[i]));
         }
         if (_geometry != null) DrawAnnotations(dc, s, P);
+        if (Marked.Count > 0)
+        {
+            var fill = new SolidColorBrush(Color.FromArgb(150, 225, 30, 30));
+            fill.Freeze();
+            var pen = new Pen(new SolidColorBrush(Color.FromRgb(200, 0, 0)), 1.5 / _zoom);
+            pen.Freeze();
+            foreach (var m in Marked) dc.DrawGeometry(fill, pen, ToGeometry(m, P));
+        }
         dc.Pop();
+        if (_rectStart is { } ra && _rectEnd is { } rb)
+        {
+            var rp = new Pen(new SolidColorBrush(Color.FromRgb(255, 210, 0)), 1) { DashStyle = DashStyles.Dash };
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(40, 255, 210, 0)), rp, new Rect(ra, rb));
+        }
 
         if (Paper || Compact) return;
         DrawToggle(dc, w);

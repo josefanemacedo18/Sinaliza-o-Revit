@@ -144,8 +144,8 @@ public static class RibbonBuilder
         var edit = app.CreateRibbonPanel(TabName, "Editar");
         Large(edit, typeof(CmdEditar), "Editar", "editar", "Edita os parâmetros de uma marca, via, interseção ou rotatória e a regenera.");
         Large(edit, typeof(CmdApagarTrecho), "Apagar Trecho", "apagartrecho",
-            "Apaga só uma parte da sinalização (um traço, um trecho entre dois pontos ou tudo numa janela) – a marca continua a mesma e " +
-            "os trechos apagados podem ser desativados (voltam a aparecer), reativados ou removidos quando quiser.");
+            "Apaga partes da sinalização HORIZONTAL: escolha a marca e, na planta dela, clique em cada traço, seta ou faixa a apagar " +
+            "(Shift + arrastar apaga uma janela). A marca continua a mesma e as peças apagadas podem ser devolvidas depois.");
         Stack(edit,
             Data(typeof(CmdAtualizarTodas), "Atualizar Todas", "atualizar", "Regenera todas as marcas do projeto."),
             Data(typeof(CmdSelecionarConjunto), "Selecionar Conjunto", "selecionar", "Seleciona todos os elementos da mesma marca ou da mesma via."),

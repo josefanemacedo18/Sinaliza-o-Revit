@@ -914,11 +914,16 @@ public sealed class CmdTerraplenagem : CommandBase
         var resetOriginal = false;
         var form = new FormWindow("Terraplenagem", "Opções da terraplenagem",
                 $"{defs.Count} elemento(s). O terreno é refeito a partir do terreno ORIGINAL com todas as vias e obras que o moldam – " +
-                "regerar não acumula aterros e apagar uma obra devolve o terreno natural.", null, null, false, "Aplicar", 680, 520)
+                "regerar não acumula aterros e apagar uma obra devolve o terreno natural.\n" +
+                "O relatório traz corte, aterro, o balanço de massas (bota-fora ou empréstimo) e os volumes de cada elemento. " +
+                "Use \"Só calcular\" para ver os volumes sem mexer no terreno.", null, null, false, "Aplicar", 700, 620)
+            .Check("Só calcular (simulação: volumes e balanço, sem alterar o Toposolid)", () => opt.DryRun, v => opt.DryRun = v)
             .Number("Talude de corte (H : 1 V)", () => opt.CutSlope, v => opt.CutSlope = v, 0.3, 5, "0.0#", "Solo: 1 : 1; rocha: 0,5 : 1 (DNIT).")
             .Number("Talude de aterro (H : 1 V)", () => opt.FillSlope, v => opt.FillSlope = v, 1, 5, "0.0#", "Usual 1,5 : 1.")
             .Number("Profundidade do subleito sob o pavimento (m)", () => opt.Subgrade, v => opt.Subgrade = v, 0, 2)
             .Number("Alcance máximo dos taludes (m)", () => opt.MaxDaylight, v => opt.MaxDaylight = v, 5, 500, "0")
+            .Number("Fator de homogeneização (corte ÷ aterro compactado)", () => opt.Homogenization, v => opt.Homogenization = v, 1, 2, "0.00",
+                "Volume de corte (in situ) necessário por m³ de aterro compactado: 1,20–1,40 em solos (DNIT). Entra no balanço de massas.")
             .Check("Escavar o terreno com túneis e caixas (quando o Revit permitir)", () => opt.Excavate, v => opt.Excavate = v)
             .Check("Grama dos taludes e ilhas como subdivisões do Toposolid", () => opt.Finishes, v => opt.Finishes = v)
             .Check("Novo levantamento: o terreno atual passa a ser o terreno natural", () => resetOriginal, v => resetOriginal = v,
@@ -930,6 +935,7 @@ public sealed class CmdTerraplenagem : CommandBase
                 .Number("Margem do terreno criado (m)", () => opt.NewTerrainMargin, v => opt.NewTerrainMargin = v, 10, 1000, "0");
         }
         if (UiHelpers.ShowModal(form) != true) return Result.Cancelled;
+        if (opt.DryRun) opt.CreateIfMissing = false;
         // Vias escolhidas passam a moldar o terreno (greide plano quando ainda não têm um) e as obras, a ajustá-lo.
         var toCommit = new List<MarkingDefinition>();
         var roadGroups = defs.OfType<RoadPavementDefinition>().Where(r => r.GroupId != null && r.Output.Grade is not { AdjustTerrain: true })
@@ -955,15 +961,17 @@ public sealed class CmdTerraplenagem : CommandBase
             }
             toCommit.Add(d);
         }
-        if (toCommit.Count > 0) MarkingCreator.Commit(uidoc, toCommit, "SV - Elementos que moldam o terreno");
-        if (resetOriginal)
+        // Simulação: nada é gravado – as marcações acima valem só para o cálculo.
+        if (toCommit.Count > 0 && !opt.DryRun) MarkingCreator.Commit(uidoc, toCommit, "SV - Elementos que moldam o terreno");
+        if (resetOriginal && !opt.DryRun)
         {
             using var t = new Transaction(doc, "SV - Novo terreno natural");
             t.Start();
             TerrainService.ResetOriginal(doc);
             t.Commit();
         }
-        var report = TerrainActions.Apply(uidoc, toCommit, opt, "SV - Terraplenagem");
+        var report = TerrainActions.Apply(uidoc, opt.DryRun ? defs.Concat(toCommit).GroupBy(d => d.Id).Select(g => g.Last()).ToList() : toCommit, opt,
+            opt.DryRun ? "SV - Terraplenagem (simulação)" : "SV - Terraplenagem");
         if (report?.Created == true)
             MarkingCreator.Commit(uidoc, MarkingStorage.Definitions(doc).Where(x => x is ITerrainAware).ToList(), "SV - Obras sobre o terreno nativo");
         if (report != null) TaskDialog.Show(AppTitle, report.Text());

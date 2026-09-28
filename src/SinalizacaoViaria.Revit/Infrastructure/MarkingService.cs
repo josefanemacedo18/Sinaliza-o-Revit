@@ -135,6 +135,19 @@ public sealed class MarkingService
 
     public MarkingGeometry BuildGeometry(MarkingDefinition def, out double baseZ, List<string>? warnings = null, View? view = null)
     {
+        var geo = BuildGeometryCore(def, out baseZ, warnings, view);
+        // Nó no relevo: rampas, ilhas, meios-fios e dispositivos acompanham a superfície do nó vértice a vértice (antes só
+        // subiam pela cota do centro e ficavam tortos/soltos em interseções inclinadas).
+        if (def.Output.Mode == OutputMode.Modelo3D && NodeFor(def) is { } node)
+        {
+            var b = baseZ;
+            GradeLift.Apply(geo, v => node.Z(v) - b);
+        }
+        return geo;
+    }
+
+    private MarkingGeometry BuildGeometryCore(MarkingDefinition def, out double baseZ, List<string>? warnings, View? view)
+    {
         // Obras que acompanham a topografia leem o terreno natural (Toposolid) relativo à base da marca.
         var groundBase = def.Path == null ? def.PointZ ?? 0 : PathResolver.Resolve(_doc, def.Path)?.Z ?? 0;
         Func<Vec2, double?>? ground = null;
@@ -158,7 +171,13 @@ public sealed class MarkingService
         if (path == null || path.Chains.Count == 0) return MarkingBuilder.Build(def, null, ctx);
 
         // Rampas e moderadores usam apenas os extremos do primeiro trecho.
-        if (def is RampDefinition or TrafficCalmingDefinition or CulDeSacDefinition or CurbExtensionDefinition) return MarkingBuilder.Build(def, path.Main, ctx);
+        if (def is RampDefinition or TrafficCalmingDefinition or CulDeSacDefinition or CurbExtensionDefinition)
+        {
+            var g1 = MarkingBuilder.Build(def, path.Main, ctx);
+            // Na via com greide (fora de nós), rampas e moderadores acompanham o greide vértice a vértice.
+            if (Graded(def) && path.Main != null && NodeFor(def) == null) GradeLift.Apply(g1, SurfaceFor(def, path.Main));
+            return g1;
+        }
 
         if (def is TactileRouteDefinition route)
         {
@@ -179,7 +198,7 @@ public sealed class MarkingService
             var c = graded ? new Polyline2(CurveTools.Densify(chain.Points, 2.0), chain.Closed) : chain;
             geo.Merge(MarkingBuilder.Build(def, c, ctx));
         }
-        if (graded) GradeLift.Apply(geo, new GradeSurface(path.Main!, def.Output.Grade!));
+        if (graded) GradeLift.Apply(geo, SurfaceFor(def, path.Main!));
         return geo;
     }
 
@@ -194,7 +213,63 @@ public sealed class MarkingService
         if (def.Output.Mode == OutputMode.Modelo3D && NodeFor(def) is { } node) return new NodeSampler(node);
         if (!Graded(def)) return null;
         var axis = PathResolver.Resolve(_doc, def.Path)?.Main;
-        return axis == null ? null : new GradeSampler(new GradeSurface(axis, def.Output.Grade!), baseZ);
+        return axis == null ? null : new GradeSampler(SurfaceFor(def, axis), baseZ);
+    }
+
+    private readonly Dictionary<string, GradeSurface> _surfaces = new();
+
+    /// <summary>
+    /// Superfície do greide de uma marca da via: abaulamento só na largura da pista (calçadas em nível na transversal) e
+    /// concordância com os nós em que a via é SECUNDÁRIA – nos primeiros metros depois do nó ela parte exatamente da
+    /// superfície dele (a da via principal) e passa suavemente para o próprio greide.
+    /// </summary>
+    public GradeSurface SurfaceFor(MarkingDefinition def, Polyline2 axis)
+    {
+        var pav = RoadOf(def);
+        // Sempre o eixo da via (rampas, moderadores e outros membros têm caminho próprio, curto).
+        if (pav != null && !ReferenceEquals(pav, def) && PathResolver.Resolve(_doc, pav.Path)?.Main is { Points.Count: >= 2 } roadAxis) axis = roadAxis;
+        var key = (pav?.Id ?? def.Id) + "|" + axis.Length.ToString("0.###") + "|" + def.Output.Grade!.GetHashCode();
+        if (_surfaces.TryGetValue(key, out var cached)) return cached;
+        var grade = def.Output.Grade!.Clone();
+        if (pav != null) grade.CrossfallWidth = Math.Max(1, Math.Max(pav.LeftWidth, pav.RightWidth));
+        var surf = new GradeSurface(axis, grade);
+        if (pav != null)
+            foreach (var blend in BlendsFor(pav, surf, PathResolver.Resolve(_doc, pav.Path)?.Z ?? 0)) surf.Blends.Add(blend);
+        return _surfaces[key] = surf;
+    }
+
+    /// <summary>Pavimento da via a que a marca pertence (o próprio, ou o do mesmo grupo).</summary>
+    private RoadPavementDefinition? RoadOf(MarkingDefinition def)
+    {
+        if (def is RoadPavementDefinition p) return p;
+        if (def.GroupId == null) return null;
+        return Definitions.Values.OfType<RoadPavementDefinition>().FirstOrDefault(x => x.GroupId == def.GroupId);
+    }
+
+    /// <summary>Concordâncias da via com as interseções e rotatórias em que ela não é a principal.</summary>
+    private IEnumerable<NodeBlend> BlendsFor(RoadPavementDefinition pav, GradeSurface surf, double baseZ)
+    {
+        foreach (var owner in Definitions.Values)
+        {
+            var ids = owner switch
+            {
+                IntersectionDefinition it => it.RoadIds,
+                RoundaboutDefinition rb => rb.Legs.Select(l => l.RoadId).OfType<string>().ToList(),
+                _ => null,
+            };
+            if (ids == null || !ids.Contains(pav.Id)) continue;
+            if (NodeFor(owner) is not { } node || node.Major?.Id == pav.Id) continue;
+            // Recorte do nó sobre esta via: estação do centro e alcance ao longo do eixo.
+            var cut = pav.Exclusions.Where(e => e.SourceId == owner.Id).SelectMany(e => e.Points).ToList();
+            if (cut.Count == 0) continue;
+            var locs = cut.Select(surf.Locate).ToList();
+            var c = surf.Locate(new Polygon2(cut).Centroid).S;
+            var reach = locs.Max(l => Math.Abs(l.S - c));
+            // Concordância de 20 m (mais longa quando a diferença de rampa é grande, até 40 m).
+            var own = surf.Grade.GradeAt(Math.Clamp(c + reach + 10, 0, surf.Axis.Length));
+            var len = Math.Clamp(20 + 200 * Math.Abs(own), 20, 40);
+            yield return new NodeBlend(node, c, reach, len, baseZ);
+        }
     }
 
     /// <summary>
@@ -215,35 +290,21 @@ public sealed class MarkingService
             _ => Array.Empty<string?>(),
         };
         var legs = new List<NodeSurface.Leg>();
-        var cuts = new List<List<Vec2>>();
         foreach (var id in ids.Where(x => x != null).Distinct())
         {
             if (!defs.TryGetValue(id!, out var d) || d is not RoadPavementDefinition pav) continue;
             var path = PathResolver.Resolve(_doc, pav.Path);
             if (path?.Main == null || path.Main.Points.Count < 2) continue;
-            var grade = pav.Output.Grade ?? RoadGrade.Flat(path.Main.Length);
+            var half = Math.Max(1, Math.Max(pav.LeftWidth, pav.RightWidth));
+            var grade = (pav.Output.Grade ?? RoadGrade.Flat(path.Main.Length)).Clone();
+            grade.CrossfallWidth = half;
             // Prioridade pela hierarquia (CTB art. 60): a via principal atravessa o nó com o próprio greide.
             var rank = pav.Hierarchy is { } h && h != HierarquiaViaria.NaoDefinida ? (int)h : 10;
-            legs.Add(new NodeSurface.Leg(new GradeSurface(path.Main, grade), path.Z, Math.Max(1, Math.Max(pav.LeftWidth, pav.RightWidth)), rank));
-            // Recorte do nó sobre esta via: até onde o piso do nó avança nela.
-            cuts.Add(pav.Exclusions.Where(e => e.SourceId == owner.Id).SelectMany(e => e.Points).ToList());
+            legs.Add(new NodeSurface.Leg(new GradeSurface(path.Main, grade), path.Z, half, rank, pav.Id));
         }
         if (legs.Count == 0) return null;
         var node = new NodeSurface(legs);
-        if (node.IsFlat) return null;
-        // Alcance de cada via secundária: da borda da pista principal ao ponto mais distante do recorte do nó sobre ela – a
-        // concordância termina exatamente onde começa o piso da via (sem degrau na emenda).
-        if (legs.Count > 1 && node.Major is { } major)
-        {
-            for (int i = 0; i < legs.Count; i++)
-            {
-                if (ReferenceEquals(legs[i], major) || cuts[i].Count == 0) continue;
-                var reach = cuts[i].Max(v => { NodeSurface.LegZ(major, v, out var dm); return dm; });
-                legs[i] = legs[i] with { Reach = Math.Clamp(reach, 3, 60) };
-            }
-            node = new NodeSurface(legs);
-        }
-        return node;
+        return node.IsFlat ? null : node;
     }
 
     private Func<Vec2, double?>? _ground;
@@ -408,7 +469,7 @@ public sealed class MarkingService
                 {
                     // Peças vizinhas do mesmo material viram um piso só (calçadas, trechos recortados).
                     var merged = PolygonOps.Union(grp.Select(p => p.Shape)).Where(p => p.Area > 0.01).ToList();
-                    // Sobre greide/nó/terreno: o piso é dividido em partes PLANAS (desvio ≤ 4 mm no greide/nó; 3 cm no Toposolid) – cada
+                    // Sobre greide/nó/terreno: o piso é dividido em partes PLANAS (desvio ≤ 8 mm no greide/nó; 3 cm no Toposolid) – cada
                     // parte é um piso plano inclinado, sem os vincos da triangulação da edição de forma: pista limpa, com
                     // juntas retas perpendiculares ao eixo e na crista do abaulamento.
                     var parts = new List<(Polygon2 Shape, Plane3? Plane)>();
@@ -418,8 +479,8 @@ public sealed class MarkingService
                         try
                         {
                             var zf = SurfaceZ(terrain, UnitConv.Ft(baseZ + def.Output.ElevationOffset));
-                            var tol = terrain is SurfaceSampler ? 0.03 : 0.004;
-                            var split = FloorPlanes.Split(m, zf, tol, (terrain as GradeSampler)?.Surface, terrain is SurfaceSampler ? 60 : 25,
+                            var tol = terrain is SurfaceSampler ? 0.03 : 0.008;
+                            var split = FloorPlanes.Split(m, zf, tol, (terrain as GradeSampler)?.Surface ?? (terrain as NodeSampler)?.Node.Major?.Surface, terrain is SurfaceSampler ? 60 : 25,
                                 ringStep: terrain is SurfaceSampler ? 3.0 : 1.0);
                             // Partes empenadas (superfície torcida) seguem com edição de forma em malha regular.
                             parts.AddRange(split.Select(x => (x.Part, x.Warped ? null : (Plane3?)x.Plane)));
@@ -727,9 +788,9 @@ public sealed class MarkingService
         var zBaseFt = UnitConv.Ft(zMeters);
         var above = UnitConv.Ft(Math.Max(0.001, aboveSurfaceM));
         var draped = sampler is { IsAvailable: true };
-        // Sobre greide/nó a pista é feita de pisos planos (desvio ≤ 4 mm): a pintura fica 5 mm acima da superfície teórica
+        // Sobre greide/nó a pista é feita de pisos planos (desvio ≤ 8 mm): a pintura fica 1 cm acima da superfície teórica
         // para nunca "afundar" no piso.
-        if (sampler is GradeSampler or NodeSampler) above = Math.Max(above, UnitConv.Ft(0.005));
+        if (sampler is GradeSampler or NodeSampler) above = Math.Max(above, UnitConv.Ft(0.01));
 
         foreach (var piece in pieces)
         {
@@ -821,7 +882,7 @@ public sealed class MarkingService
         var dev = samples.Max(q => Math.Abs(mz + a * (q.X - mx) + b * (q.Y - my) - q.Z));
         var (mn, mxp) = shape.Bounds;
         var ext = Math.Max(mxp.X - mn.X, mxp.Y - mn.Y);
-        if (dev <= UnitConv.Ft(s is GradeSampler or NodeSampler ? 0.004 : 0.015) || depth >= 9 || ext < 0.8)
+        if (dev <= UnitConv.Ft(s is GradeSampler or NodeSampler ? 0.008 : 0.015) || depth >= 9 || ext < 0.8)
         {
             var zc = mz + a * (UnitConv.Ft(cen.X) - mx) + b * (UnitConv.Ft(cen.Y) - my);
             yield return (shape, zc, new XYZ(-a, -b, 1).Normalize());

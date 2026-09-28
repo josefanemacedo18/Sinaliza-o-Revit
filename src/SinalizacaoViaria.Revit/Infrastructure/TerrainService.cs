@@ -25,6 +25,12 @@ public sealed class GradingOptions
     public double NewTerrainMargin { get; set; } = 80;
     /// <summary>Grama de taludes e ilhas como subdivisões do Toposolid (material nativo).</summary>
     public bool Finishes { get; set; } = true;
+    /// <summary>Só calcular (volumes e relatório), sem alterar o Toposolid.</summary>
+    public bool DryRun { get; set; }
+    /// <summary>
+    /// Fator de homogeneização (volume de corte in situ necessário por m³ de aterro compactado; usual 1,2–1,4 – DNIT).
+    /// </summary>
+    public double Homogenization { get; set; } = 1.25;
 }
 
 public sealed class TerrainReport
@@ -42,12 +48,34 @@ public sealed class TerrainReport
     public double Fill { get; set; }
     public double Area { get; set; }
     public List<string> Notes { get; } = new();
+    public bool DryRun { get; set; }
+    public double Homogenization { get; set; } = 1.25;
+    /// <summary>Volumes de cada elemento (calculados isoladamente – a soma pode diferir do total onde taludes se sobrepõem).</summary>
+    public List<(string Name, double Cut, double Fill, double Area)> Items { get; } = new();
+
+    /// <summary>Balanço de massas: corte disponível menos o corte necessário para os aterros (× fator de homogeneização).</summary>
+    public double Balance => Cut - Fill * Homogenization;
 
     public string Text()
     {
         var pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
-        var s = $"Toposolid(s) ajustado(s): {Toposolids}\nPontos removidos / inseridos: {Removed} / {Added}\n" +
-                $"Área terraplenada: {Area.ToString("N0", pt)} m²\nCorte: {Cut.ToString("N1", pt)} m³ · Aterro: {Fill.ToString("N1", pt)} m³";
+        string N(double v) => v.ToString("N0", pt);
+        var s = DryRun
+            ? "SIMULAÇÃO – o terreno NÃO foi alterado.\n"
+            : $"Toposolid(s) ajustado(s): {Toposolids} · pontos removidos / inseridos: {Removed} / {Added}\n";
+        s += $"Área terraplenada: {N(Area)} m²\n" +
+             $"Corte: {N(Cut)} m³ · Aterro (compactado): {N(Fill)} m³\n" +
+             $"Corte necessário para os aterros (× {Homogenization.ToString("0.00", pt)}): {N(Fill * Homogenization)} m³\n" +
+             (Balance >= 0
+                 ? $"Balanço: sobram {N(Balance)} m³ de corte → BOTA-FORA (ou aproveitar em outros aterros)"
+                 : $"Balanço: faltam {N(-Balance)} m³ → EMPRÉSTIMO (jazida)");
+        if (Items.Count > 1)
+        {
+            s += "\n\nPor elemento (corte / aterro, m³):";
+            foreach (var it in Items.OrderByDescending(i => i.Cut + i.Fill).Take(15))
+                s += $"\n  • {it.Name}: {N(it.Cut)} / {N(it.Fill)}";
+            if (Items.Count > 15) s += $"\n  … e mais {Items.Count - 15}";
+        }
         if (Created) s = "Toposolid criado sob as obras (Massa e terreno).\n" + s;
         if (Checked > 0) s += $"\nConferência no terreno real: {Checked} pontos, desvio máximo {MaxDeviation.ToString("0.00", pt)} m";
         if (Skipped > 0) s += $"\nPontos recusados pelo Revit: {Skipped}";
@@ -106,7 +134,19 @@ public static class TerrainService
                 var s1 = Math.Max(s0 + 0.5, axis.Length - Math.Max(0, road.EndSetback));
                 var works = (all ?? Array.Empty<MarkingDefinition>()).Where(h => road.GroupId != null && h is IHostedStructure hs && hs.HostRoad == road.GroupId);
                 // Fora dos trechos em obra; junto a encontros e emboques a via termina numa face vertical (emboque: testa + talude).
-                corridors.AddRange(InfraRoads.RoadCorridors(axis, prof, right, left, s0, s1, opt.Subgrade, cut, fill, works).Select(c => c.WithOffset(z0)));
+                var roadCorr = InfraRoads.RoadCorridors(axis, prof, right, left, s0, s1, opt.Subgrade, cut, fill, works).Select(c => c.WithOffset(z0)).ToList();
+                // Concordância com os nós em que a via é secundária: a plataforma acompanha a mesma superfície dos pisos.
+                if (g != null && service?.SurfaceFor(road, axis) is { Blends.Count: > 0 } blended)
+                {
+                    var plain = new Core.Geometry.GradeSurface(axis, blended.Grade);
+                    double D(Vec3 v) => blended.Z(v.XY) - plain.Z(v.XY);
+                    foreach (var c in roadCorr)
+                    {
+                        for (int k = 0; k < c.Left.Count; k++) c.Left[k] = c.Left[k] with { Z = c.Left[k].Z + D(c.Left[k]) };
+                        for (int k = 0; k < c.Right.Count; k++) c.Right[k] = c.Right[k] with { Z = c.Right[k].Z + D(c.Right[k]) };
+                    }
+                }
+                corridors.AddRange(roadCorr);
                 break;
             }
             case IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition:
@@ -196,10 +236,12 @@ public static class TerrainService
             service.InvalidateTerrain();
         }
 
+        report.DryRun = opt.DryRun;
+        report.Homogenization = opt.Homogenization;
         // Superfície suavizada do Toposolid arredonda as faces de corte/aterro e os degraus dos muros: desligada para a terraplenagem.
         try
         {
-            if (Toposolid.IsSmoothedSurfaceEnabled(doc))
+            if (!opt.DryRun && Toposolid.IsSmoothedSurfaceEnabled(doc))
             {
                 Toposolid.SetSmoothedSurface(doc, false);
                 report.Notes.Add("A \"superfície suavizada\" dos Toposolids foi desligada (ela arredonda os taludes e as faces dos muros).");
@@ -211,6 +253,7 @@ public static class TerrainService
         var pads = new List<GradePad>();
         var excavators = new List<ElementId>();
         var finishes = new List<(Polygon2 Area, MarkingColor Color, string Id)>();
+        var perDef = new List<(MarkingDefinition Def, List<GradeCorridor> C, List<GradePad> P)>();
         foreach (var def in list)
         {
             try
@@ -219,6 +262,7 @@ public static class TerrainService
                 var (c, p) = Features(doc, def, geo, baseZ, opt, all, service);
                 corridors.AddRange(c);
                 pads.AddRange(p);
+                if (c.Count + p.Count > 0) perDef.Add((def, c, p));
                 finishes.AddRange(geo.TerrainFinishes.Select(f => (f.Area, f.Color, def.Id)));
                 if (opt.Excavate && def is TunnelDefinition or DrainageDefinition)
                 {
@@ -248,6 +292,19 @@ public static class TerrainService
         report.Fill = design.FillM3;
         report.Area = design.AreaM2;
         report.Notes.AddRange(design.Warnings);
+        // Volumes por elemento (cada um isolado).
+        if (perDef.Count > 1 && perDef.Count <= 60)
+            foreach (var (d, c, p) in perDef)
+            {
+                try
+                {
+                    var one = Grading.Design(c, p, Ground, 0, Math.Max(5, opt.MaxDaylight), 0.5, 4.0, 2.0);
+                    var name = d is RoadPavementDefinition rp ? $"Via {rp.DisplayCode}" : d.KindName;
+                    report.Items.Add((name, one.CutM3, one.FillM3, one.AreaM2));
+                }
+                catch (Exception ex) { Log.Error("Volumes por elemento", ex); }
+            }
+        if (opt.DryRun) return report;
         var footprint = design.Footprint.Count == 0 ? new List<Polygon2>() : PolygonOps.Union(design.Footprint).Where(f => f.Area > 0.5).ToList();
 
         foreach (var topo in topos)

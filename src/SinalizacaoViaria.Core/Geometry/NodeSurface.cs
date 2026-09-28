@@ -1,19 +1,19 @@
 namespace SinalizacaoViaria.Core.Geometry;
 
 /// <summary>
-/// Superfície de um nó em nível (interseção, rotatória, cul-de-sac) costurada às vias que chegam nele, como se projeta na
-/// prática: a via PRINCIPAL (maior hierarquia; empate = mais larga) atravessa o nó mantendo o seu greide e o seu abaulamento;
-/// as vias secundárias se concordam com ela – partem da cota da borda da pista principal e chegam à própria superfície no
-/// limite do nó (<see cref="Leg.Reach"/>), por uma transição suave. Resultado: o miolo é plano como a via principal (pisos
-/// planos grandes, sem "leques" nas esquinas) e não há degrau nas emendas com os pisos das vias.
+/// Superfície de um nó em nível (interseção, rotatória, cul-de-sac), como se projeta na prática: a via PRINCIPAL (maior
+/// hierarquia; empate = mais larga) atravessa o nó com o seu greide e o seu abaulamento, e além da pista dela a superfície
+/// segue em nível na direção transversal (a cota da borda da pista, como as calçadas da própria via). O nó inteiro fica
+/// formado por poucos planos – pisos planos grandes, esquinas e calçadas sem "leques". As vias secundárias fazem a
+/// concordância FORA do nó, nos seus primeiros metros (<see cref="NodeBlend"/>), partindo exatamente desta superfície.
 /// </summary>
 public sealed class NodeSurface
 {
     /// <summary>
     /// Via ligada ao nó: superfície do greide, cota da base do eixo (m, absoluta), meia largura da pista, prioridade
-    /// (menor = mais importante) e alcance do nó sobre ela (m, da borda da pista principal até onde começa o piso da via).
+    /// (menor = mais importante) e identificador da via.
     /// </summary>
-    public sealed record Leg(GradeSurface Surface, double BaseZ, double Half, int Rank = 0, double Reach = 15);
+    public sealed record Leg(GradeSurface Surface, double BaseZ, double Half, int Rank = 0, string? Id = null);
 
     private readonly List<Leg> _legs;
     private readonly Leg? _major;
@@ -26,29 +26,10 @@ public sealed class NodeSurface
 
     public int Count => _legs.Count;
     public Leg? Major => _major;
+    public IReadOnlyList<Leg> Legs => _legs;
 
-    /// <summary>Cota absoluta (m) no ponto.</summary>
-    public double Z(Vec2 p)
-    {
-        if (_legs.Count == 0 || _major == null) return 0;
-        var zMaj = LegZ(_major, p, out var dMaj);
-        if (_legs.Count == 1) return zMaj;
-        // Secundárias: média pesada pela proximidade (cada uma plena sobre a própria pista).
-        double sum = 0, wsum = 0, reach = 0;
-        foreach (var l in _legs)
-        {
-            if (ReferenceEquals(l, _major)) continue;
-            var z = LegZ(l, p, out var d);
-            var w = 1.0 / Math.Pow(d + 1.0, 3);
-            sum += w * z; wsum += w; reach += w * Math.Max(3, l.Reach);
-        }
-        var zMin = sum / wsum;
-        reach /= wsum;
-        // Da borda da pista principal (t = 0) ao limite do nó (t = 1): concordância em S (tangente nula nas duas pontas).
-        var t = Math.Clamp(dMaj / reach, 0, 1);
-        t = t * t * (3 - 2 * t);
-        return zMaj + (zMin - zMaj) * t;
-    }
+    /// <summary>Cota absoluta (m) no ponto: a superfície da via principal (plana na transversal além da pista).</summary>
+    public double Z(Vec2 p) => _major == null ? 0 : LegZ(_major, p, out _);
 
     /// <summary>
     /// Cota da via no ponto e distância à borda da pista dela. Além das pontas do eixo o greide segue na rampa final
