@@ -498,4 +498,32 @@ public class V22Tests
         var edge = verts.Where(v => Math.Abs(v.Y) > yMax - 0.6).Max(v => v.Z);
         Assert.True(center - edge > 0.05, $"{center - edge}");
     }
+
+    [Fact]
+    public void Viaduct_PiersAvoidTheRoadBelowAndFootingsStayUnderIt()
+    {
+        // Via de cima em x (greide 8 m acima), via de baixo em y cruzando em x = 100, em corte de 2 m abaixo do terreno.
+        var top = new RoadPavementDefinition { GroupId = "cima", RightWidth = 3.5, LeftWidth = 3.5, RightSidewalk = 2, LeftSidewalk = 2 };
+        top.SetPath(PathReference.FromPoints(new[] { new Vec2(0, 0), new Vec2(200, 0) }, 0));
+        top.Output.Grade = new RoadGrade { Points = { new(0, 8), new(200, 8) } };
+        var low = new RoadPavementDefinition { GroupId = "baixo", RightWidth = 3.5, LeftWidth = 3.5, RightSidewalk = 2, LeftSidewalk = 2 };
+        low.SetPath(PathReference.FromPoints(new[] { new Vec2(100, -100), new Vec2(100, 100) }, 0));
+        low.Output.Grade = new RoadGrade { Points = { new(0, -2), new(200, -2) } };
+        var b = new BridgeDefinition { HostRoad = "cima", HostStart = 40, HostEnd = 160, SpanLength = 20 };
+        b.ApplyKindDefaults();
+        b.SpanLength = 20;
+        b.SetPath(PathReference.FromPoints(new[] { new Vec2(0, 0), new Vec2(200, 0) }, 0));
+        var all = new List<MarkingDefinition> { top, low, b };
+        var ctx = new BuildContext
+        {
+            Catalog = CatalogService.LoadDefault(), Ground = _ => 0, AllDefinitions = () => all,
+            PathOf = d => d.Path is { Points.Count: >= 2 } pr ? new Polyline2(pr.Points) : null, BaseZOf = _ => 0,
+        };
+        var geo = MarkingBuilder.Build(b, new Polyline2(new[] { new Vec2(0, 0), new Vec2(200, 0) }), ctx);
+        // Faixa ocupada pela via de baixo: x de 100 − 6 a 100 + 6.
+        var inRoad = geo.Pieces.Where(p => p.Layer is "PILAR" or "FUNDACAO").Where(p => p.Shape.Bounds.Max.X > 94.2 && p.Shape.Bounds.Min.X < 105.8).ToList();
+        Assert.Empty(inRoad);
+        // O pilar deslocado continua perto (fora da pista), não sumiu.
+        Assert.Contains(geo.Pieces, p => p.Layer == "PILAR" && Math.Abs(p.Shape.Centroid.X - 100) < 16);
+    }
 }

@@ -276,11 +276,15 @@ public sealed class MarkingService
     /// Superfície do nó (interseção, rotatória, cul-de-sac – e as marcas filhas deles) costurada ao greide das vias ligadas;
     /// nulo quando nenhuma via ligada tem greide (o nó fica plano, como antes).
     /// </summary>
+    /// <summary>Nó (interseção, rotatória, cul-de-sac) dono da marca – ele mesmo ou o pai das marcas filhas.</summary>
+    private MarkingDefinition? NodeOwner(MarkingDefinition def) =>
+        def is IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition ? def
+            : Definitions.Values.FirstOrDefault(o => o is IntersectionDefinition i && i.ChildIds.Contains(def.Id) || o is RoundaboutDefinition r && r.ChildIds.Contains(def.Id));
+
     public NodeSurface? NodeFor(MarkingDefinition def)
     {
         var defs = Definitions;
-        var owner = def is IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition ? def
-            : defs.Values.FirstOrDefault(o => o is IntersectionDefinition i && i.ChildIds.Contains(def.Id) || o is RoundaboutDefinition r && r.ChildIds.Contains(def.Id));
+        var owner = NodeOwner(def);
         if (owner == null) return null;
         IEnumerable<string?> ids = owner switch
         {
@@ -369,6 +373,8 @@ public sealed class MarkingService
         _present = null;
         var existing = MarkingStorage.ById(_doc, def.Id);
         PruneExclusions(def);
+        // Traçado das linhas de referência guardado na marca: apagar a linha depois não faz a marca perder o caminho.
+        try { PathResolver.RefreshCache(_doc, def.Path); } catch (Exception ex) { Log.Error("Cache do caminho", ex); }
 
         // Detalhes, anotações e legendas existem somente na vista.
         if (def is IAnnotationDefinition) def.Output.Mode = OutputMode.Detalhe2D;
@@ -467,30 +473,7 @@ public sealed class MarkingService
                 foreach (var grp in floorPieces.Where(p => !locked.Contains(p.Color))
                              .GroupBy(p => (p.Color, E: Math.Round(p.Elevation, 3), T: Math.Round(p.Thickness, 3), p.Layer)))
                 {
-                    // Peças vizinhas do mesmo material viram um piso só (calçadas, trechos recortados).
-                    var merged = PolygonOps.Union(grp.Select(p => p.Shape)).Where(p => p.Area > 0.01).ToList();
-                    // Sobre greide/nó/terreno: o piso é dividido em partes PLANAS (desvio ≤ 12 mm no greide/nó; 3 cm no Toposolid) – cada
-                    // parte é um piso plano inclinado, sem os vincos da triangulação da edição de forma: pista limpa, com
-                    // juntas retas perpendiculares ao eixo e na crista do abaulamento.
-                    var parts = new List<(Polygon2 Shape, Plane3? Plane)>();
-                    foreach (var m in merged)
-                    {
-                        if (terrain == null) { parts.Add((m, null)); continue; }
-                        try
-                        {
-                            var zf = SurfaceZ(terrain, UnitConv.Ft(baseZ + def.Output.ElevationOffset));
-                            var tol = terrain is SurfaceSampler ? 0.03 : 0.012;
-                            var split = FloorPlanes.Split(m, zf, tol, (terrain as GradeSampler)?.Surface ?? (terrain as NodeSampler)?.Node.Major?.Surface, terrain is SurfaceSampler ? 60 : 25,
-                                ringStep: terrain is SurfaceSampler ? 3.0 : 1.0);
-                            // Partes empenadas (superfície torcida) seguem com edição de forma em malha regular.
-                            parts.AddRange(split.Select(x => (x.Part, x.Warped ? null : (Plane3?)x.Plane)));
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error("FloorPlanes", ex);
-                            parts.Add((m, null));
-                        }
-                    }
+                    var parts = FloorParts(def, grp.Select(p => p.Shape), terrain, baseZ);
                     foreach (var (shape, plane) in parts)
                     {
                         var piece = new MarkingPiece(shape, grp.Key.Color) { Elevation = grp.Key.E, Thickness = grp.Key.T, Layer = grp.Key.Layer };
@@ -520,6 +503,7 @@ public sealed class MarkingService
         if (def.Output.Mode == OutputMode.Modelo3D)
         {
             ISurface? sampler = GradeFor(def, baseZ);
+            if (sampler is GradeSampler or NodeSampler) sampler = TiledFor(def, sampler);
             if (sampler == null && def.Output.Drape)
             {
                 sampler = new SurfaceSampler(_doc, def.Output.SurfaceIds, _interactive);
@@ -790,7 +774,10 @@ public sealed class MarkingService
         var draped = sampler is { IsAvailable: true };
         // Sobre greide/nó a pista é feita de pisos planos (desvio ≤ 12 mm): a pintura fica 1,5 cm acima da superfície teórica
         // para nunca "afundar" no piso.
-        if (sampler is GradeSampler or NodeSampler) above = Math.Max(above, UnitConv.Ft(0.015));
+        // Sobre greide/nó a pista é feita de pisos planos: com os planos dela (TiledSampler) a pintura fica 4 mm acima do piso; sem
+        // eles, 2,5 cm acima da superfície teórica (os pisos se afastam dela até 2 cm).
+        if (sampler is TiledSampler) above = Math.Max(above, UnitConv.Ft(0.004));
+        else if (sampler is GradeSampler or NodeSampler) above = Math.Max(above, UnitConv.Ft(0.025));
 
         foreach (var piece in pieces)
         {
@@ -810,9 +797,9 @@ public sealed class MarkingService
                 }
                 // Sobre superfícies: a peça inteira num plano ajustado ao terreno; dividida só onde o terreno dobra
                 // (sem "quadradinhos" de tamanho fixo).
-                var parts = draped
-                    ? DrapedParts(piece.Shape, sampler!, zBaseFt, 0).ToList()
-                    : new List<(Polygon2, double, XYZ?)> { (piece.Shape, zBaseFt, null) };
+                var parts = !draped ? new List<(Polygon2, double, XYZ?)> { (piece.Shape, zBaseFt, null) }
+                    : sampler is TiledSampler ts && ts.Clip(piece.Shape) is { Count: > 0 } clipped ? clipped
+                    : DrapedParts(piece.Shape, sampler!, zBaseFt, 0).ToList();
                 foreach (var (shape, zPart, normal) in parts)
                 {
                     var z = draped ? zPart + above : zPart;
@@ -1271,6 +1258,70 @@ public sealed class MarkingService
             foreach (var f in created) SafeDelete(f.Id);
         }
         return res;
+    }
+
+    /// <summary>Tolerância de planicidade dos pisos planos sobre greide/nó (m) – no Toposolid, 3 cm.</summary>
+    public const double GradeFloorTolerance = 0.02;
+
+    /// <summary>
+    /// Partes dos pisos: peças vizinhas do mesmo material unidas num piso só; sobre greide/nó/terreno, divididas em partes
+    /// PLANAS (cada uma um piso plano inclinado, sem os vincos da edição de forma) – juntas retas perpendiculares ao eixo e na
+    /// crista do abaulamento, partes coplanares fundidas de volta. Plano nulo = piso na cota (sem superfície) ou empenado.
+    /// </summary>
+    private List<(Polygon2 Shape, Plane3? Plane)> FloorParts(MarkingDefinition def, IEnumerable<Polygon2> shapes, ISurface? terrain, double baseZ)
+    {
+        var merged = PolygonOps.Union(shapes).Where(p => p.Area > 0.01).ToList();
+        var parts = new List<(Polygon2 Shape, Plane3? Plane)>();
+        foreach (var m in merged)
+        {
+            if (terrain == null) { parts.Add((m, null)); continue; }
+            try
+            {
+                var zf = SurfaceZ(terrain, UnitConv.Ft(baseZ + def.Output.ElevationOffset));
+                var tol = terrain is SurfaceSampler ? 0.03 : GradeFloorTolerance;
+                var split = FloorPlanes.Split(m, zf, tol, (terrain as GradeSampler)?.Surface ?? (terrain as NodeSampler)?.Node.Major?.Surface,
+                    terrain is SurfaceSampler ? 60 : 25, ringStep: terrain is SurfaceSampler ? 3.0 : 1.0);
+                // Partes empenadas (superfície torcida, só sem eixo de referência) seguem com edição de forma.
+                parts.AddRange(split.Select(x => (x.Part, x.Warped ? null : (Plane3?)x.Plane)));
+            }
+            catch (Exception ex)
+            {
+                Log.Error("FloorPlanes", ex);
+                parts.Add((m, null));
+            }
+        }
+        return parts;
+    }
+
+    private readonly Dictionary<string, TiledSampler?> _tiles = new();
+
+    /// <summary>
+    /// Pintura sobre a pista com greide/nó: a superfície de apoio passa a ser a dos PISOS PLANOS da pista (mesmos planos,
+    /// recortados nas mesmas juntas) – a pintura fica 4 mm acima do piso em todo ponto, sem afundar nem flutuar.
+    /// </summary>
+    private ISurface TiledFor(MarkingDefinition def, ISurface baseSampler)
+    {
+        MarkingDefinition? src = NodeOwner(def) ?? RoadOf(def);
+        if (src == null || ReferenceEquals(src, def) || src.Id == def.Id) return baseSampler;
+        if (_tiles.TryGetValue(src.Id, out var cached)) return (ISurface?)cached ?? baseSampler;
+        TiledSampler? ts = null;
+        try
+        {
+            var g = BuildGeometry(src, out var b);
+            var terrain = GradeFor(src, b);
+            if (terrain != null)
+            {
+                var tiles = new List<(Polygon2, Plane3, double)>();
+                foreach (var grp in g.Pieces.Where(p => FloorEligible(src, p) && p.Color is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto)
+                             .GroupBy(p => (p.Color, E: Math.Round(p.Elevation, 3), T: Math.Round(p.Thickness, 3), p.Layer)))
+                    foreach (var (shape, plane) in FloorParts(src, grp.Select(p => p.Shape), terrain, b))
+                        if (plane is { } pl) tiles.Add((shape, pl, grp.Key.E + grp.Key.T));
+                if (tiles.Count > 0) ts = new TiledSampler(baseSampler, tiles);
+            }
+        }
+        catch (Exception ex) { Log.Error("Pisos da pista para a pintura", ex); }
+        _tiles[src.Id] = ts;
+        return (ISurface?)ts ?? baseSampler;
     }
 
     /// <summary>Cota (m) da superfície num ponto (m), com memória – a divisão em planos amostra os mesmos pontos várias vezes.</summary>

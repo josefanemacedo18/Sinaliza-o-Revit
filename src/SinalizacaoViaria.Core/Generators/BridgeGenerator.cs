@@ -38,6 +38,11 @@ public sealed record DeckSpec
     public bool Drains { get; init; } = true;
     /// <summary>Terreno nativo (Toposolid): aterros e saias ficam para a terraplenagem.</summary>
     public bool Native { get; init; }
+    /// <summary>
+    /// Pontos onde não pode haver pilar (pista/calçada de outra via que passa sob a obra): os pilares automáticos se deslocam
+    /// ao longo do eixo até um ponto livre.
+    /// </summary>
+    public Func<Vec2, bool>? Avoid { get; init; }
 
     public double BarrierWidth => Barrier == TipoGuarda.GuardaCorpoMetalico ? 0.15 : Infra.JerseyBase;
     /// <summary>Meia largura total do tabuleiro (m).</summary>
@@ -196,11 +201,21 @@ public static class BridgeGenerator
         var s1 = Math.Clamp(Math.Max(b.HostStart, b.HostEnd), 0, L);
         if (s1 - s0 < 5) { geo.Warnings.Add("Trecho da obra muito curto na via (mínimo 5 m)."); return geo; }
         var gp = Infra.GroundProfile(b, path, ctx);
-        Func<Vec2, double> ground = p => gp.Z(IntersectionGenerator.Project(path, p).Station);
+        // Vias que passam sob a obra: o terreno ali é o pavimento delas (fundações enterradas abaixo do subleito, nunca
+        // acima da pista) e os pilares evitam a pista e as calçadas delas.
+        var below = HostRoads.Crossing(ctx, b.HostRoad, ctx.BaseZOf?.Invoke(b) ?? 0);
+        Func<Vec2, double> ground = p =>
+        {
+            var g = gp.Z(IntersectionGenerator.Project(path, p).Station);
+            foreach (var r in below)
+                if (r.Footprint.Contains(p)) g = Math.Min(g, r.Z(p) - r.Wear - 0.3);
+            return g;
+        };
         var prof = grade.ToProfile(2);
         var pedestrian = b.Kind == TipoObraDeArte.Passarela;
         var spec = Spec(b, ctx.NativeTerrain) with
         {
+            Avoid = below.Count == 0 ? null : q => below.Any(r => r.Footprint.Contains(q)),
             RoadHalf = Math.Max(1, half), SidewalkWidth = 0, Markings = false, RoadProvided = true,
             Wear = host?.Wear ?? b.HostWear, EdgeRise = host?.EdgeRise ?? b.HostEdgeRise, HostSurface = grade.Z,
             Skew = b.Skew, PierStations = b.PierStations, Lanes = pedestrian ? 0 : host?.Lanes ?? b.Lanes,
@@ -361,6 +376,31 @@ public static class BridgeGenerator
         else if (arch) { Spans(s0, ma); Spans(mb, s1); if (ma - s0 > 2) piers.Add(ma); if (s1 - mb > 2) piers.Add(mb); }
         else Spans(s0, s1);
         piers = piers.Distinct().OrderBy(x => x).ToList();
+        // Pilares fora da pista das vias que passam por baixo (o apoio desliza ao longo do eixo até o ponto livre mais próximo).
+        if (d.Avoid is { } avoid && d.PierStations is not { Count: > 0 })
+        {
+            bool Blocked(double s)
+            {
+                var (t0, n0, k0) = SkewFrame(path, s, d.Skew);
+                var p0 = path.PointAt(s);
+                var w = (half + 0.6) * k0;
+                for (var y = -w; y <= w + 1e-6; y += Math.Max(0.5, w / 8))
+                    foreach (var dx in new[] { -1.5, 0, 1.5 })
+                        if (avoid(p0 + n0 * y + t0 * dx)) return true;
+                return false;
+            }
+            for (int i = 0; i < piers.Count; i++)
+            {
+                if (!Blocked(piers[i])) continue;
+                double? best = null;
+                for (var ds = 1.0; ds <= span * 0.6 && best == null; ds += 1.0)
+                    foreach (var cand in new[] { piers[i] - ds, piers[i] + ds })
+                        if (cand > s0 + 3 && cand < s1 - 3 && !Blocked(cand)) { best = cand; break; }
+                if (best is { } b) piers[i] = b;
+                else geo.Warnings.Add($"Pilar na estaca {piers[i]:0} fica sobre outra via e não há ponto livre próximo – ajuste os vãos ou as estacas dos pilares.");
+            }
+            piers = piers.Distinct().OrderBy(x => x).ToList();
+        }
         var supports = new List<double> { s0 }.Concat(piers).Append(s1).ToList();
 
         double Top(double s, double y) => surf.Z(s, Math.Clamp(y, -d.RoadHalf, d.RoadHalf)) - d.Wear;

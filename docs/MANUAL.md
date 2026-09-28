@@ -415,8 +415,12 @@ desfazer a marca (pavimento, calçadas, placas e dispositivos não entram).
    * numa **linha contínua longa**, o clique apaga só o comprimento indicado (3 m por padrão) em volta do ponto;
    * arrastar move a planta, roda do mouse dá zoom, dois cliques enquadram;
    * **Desfazer último**, **Devolver tudo** e **Recortes ativos** (desmarque para mostrar a marca inteira sem perder os recortes).
-   * se a geometria da marca não puder ser recalculada (caminho de referência perdido, marca antiga), as peças são lidas
-     direto dos elementos do modelo – funciona com o eixo criado pela Via e com qualquer sinalização horizontal avulsa.
+   * se a geometria da marca não puder ser recalculada (linha de referência apagada, marca antiga), as peças são lidas
+     direto dos elementos do modelo e o recorte é aplicado **nos próprios elementos** (sólidos recortados, regiões 2D
+     refeitas) – funciona com o eixo criado pela Via e com qualquer sinalização horizontal avulsa. Nesse caso as peças não
+     podem ser devolvidas depois (use Desfazer).
+   * as marcas agora **guardam o traçado da linha de referência** a cada geração: apagar a linha depois não faz a marca
+     perder o caminho – ela continua regenerável e editável normalmente.
 3. **Aplicar** regera a marca. Os trechos ficam guardados nela: chamar a ferramenta de novo mostra o que está apagado (em
    vermelho) para devolver ou apagar mais. Os recortes acompanham Editar, Atualizar e a edição da seção da via, e os
    quantitativos consideram só o que ficou pintado.
@@ -1018,6 +1022,11 @@ estacas** que você indicar. Nem toda ponte é curva ou inclinada: a **Ponte** j
   via sem calçada → **New Jersey**. Juntas, buzinotes e iluminação sobre a mureta/barreira.
 * A prévia mostra a via inteira sobre um vale, com o terreno já terraplenado.
 
+**Pilares fora das vias que passam por baixo**: o viaduto enxerga as outras vias do projeto sob ele – os pilares automáticos
+deslizam ao longo do eixo até sair da pista e das calçadas delas (aviso quando não há ponto livre), e as fundações ficam
+enterradas abaixo do pavimento da via de baixo (antes o bloco de fundação era posto no terreno natural e podia ficar acima de
+uma via em corte).
+
 **Juntas e encontros sem saliência**: as juntas de dilatação e a cortina dos encontros acompanham o abaulamento e a
 superelevação do tabuleiro ponto a ponto – antes eram caixas retas na cota do centro e ficavam alguns centímetros acima do
 asfalto nas bordas.
@@ -1118,15 +1127,15 @@ Revit triangula de novo. Por isso cada obra entrega os pontos certos:
 * **Plana** – sem alterar o terreno.
 Taludes de corte/aterro e a rampa máxima ficam na mesma janela. Depois, **Perfil da Via** ajusta o greide e cria as obras.
 **Pisos planos, sem vincos**: sobre o greide, o nó ou o terreno, cada piso é dividido em **partes planas** (o topo de cada
-parte fica a no máximo 12 mm da superfície teórica; 3 cm sobre o Toposolid) e cada parte é um **piso plano inclinado** –
+parte fica a no máximo 2 cm da superfície teórica; 3 cm sobre o Toposolid) e cada parte é um **piso plano inclinado** –
 uma única face, sem as linhas de triangulação da edição de forma. As divisões seguem a lógica da obra: primeiro na
 **crista do abaulamento** (cada caimento é um plano), depois **perpendiculares ao eixo** (juntas retas, como as juntas de
 pavimentação). Numa rampa constante a pista inteira são só **dois pisos** (um por caimento); nas curvas verticais e
 horizontais as partes ficam mais curtas. Ao longo das vias e nos nós a divisão continua sempre em faixas
 transversais até ficar plana (nunca triângulos); só em superfícies sem eixo de referência (terreno) uma parte torcida vira
 piso com edição de forma em malha regular. Partes vizinhas que juntas ainda cabem num plano são **fundidas de volta** (pisos grandes, poucas juntas) e o plano de
-cada parte passa **exatamente pela superfície nas juntas** – sem degraus entre partes. A pintura fica 1,5 cm acima da
-superfície teórica para nunca "afundar" nos pisos planos. O relevo **acompanhar o terreno** usa suavização e curvas de
+cada parte passa **exatamente pela superfície nas juntas** – sem degraus entre partes. A **pintura segue os próprios pisos**: é recortada nas mesmas juntas e
+assenta no plano de cada piso, 4 mm acima dele – sem afundar nem flutuar. O relevo **acompanhar o terreno** usa suavização e curvas de
 40 m (tangentes mais longas, pisos maiores). As curvas verticais do greide nunca se sobrepõem e têm comprimento mínimo K = 10 m por % de
 variação de rampa.
 

@@ -58,6 +58,84 @@ public sealed class NodeSampler : ISurface
 }
 
 /// <summary>
+/// Superfície dos pisos planos da pista (planos já divididos): cada ponto pega o plano do piso que o contém; fora deles, a
+/// superfície de base. A pintura fica exatamente sobre os pisos.
+/// </summary>
+public sealed class TiledSampler : ISurface
+{
+    private readonly ISurface _base;
+    private readonly List<(Core.Geometry.Polygon2 Part, Core.Geometry.Plane3 Plane, double Offset)> _tiles;
+    private readonly Dictionary<(int, int), List<int>> _index = new();
+    private const double Cell = 10;
+
+    public TiledSampler(ISurface baseSurface, List<(Core.Geometry.Polygon2, Core.Geometry.Plane3, double)> tiles)
+    {
+        _base = baseSurface;
+        _tiles = tiles;
+        for (int i = 0; i < tiles.Count; i++)
+        {
+            var (mn, mx) = tiles[i].Item1.Bounds;
+            for (var x = (int)Math.Floor(mn.X / Cell); x <= (int)Math.Floor(mx.X / Cell); x++)
+                for (var y = (int)Math.Floor(mn.Y / Cell); y <= (int)Math.Floor(mx.Y / Cell); y++)
+                {
+                    if (!_index.TryGetValue((x, y), out var l)) _index[(x, y)] = l = new List<int>();
+                    l.Add(i);
+                }
+        }
+    }
+
+    public bool IsAvailable => true;
+    public bool LiftsSolids => _base.LiftsSolids;
+
+    private int Find(Core.Geometry.Vec2 p)
+    {
+        if (!_index.TryGetValue(((int)Math.Floor(p.X / Cell), (int)Math.Floor(p.Y / Cell)), out var l)) return -1;
+        foreach (var i in l) if (_tiles[i].Part.Contains(p)) return i;
+        return -1;
+    }
+
+    public bool TrySample(double xFt, double yFt, double zHintFt, out double zFt, out XYZ normal)
+    {
+        var p = new Core.Geometry.Vec2(UnitConv.M(xFt), UnitConv.M(yFt));
+        var i = Find(p);
+        if (i < 0) return _base.TrySample(xFt, yFt, zHintFt, out zFt, out normal);
+        var (_, pl, off) = _tiles[i];
+        zFt = UnitConv.Ft(pl.Z(p) + off);
+        normal = new XYZ(-pl.B, -pl.C, 1).Normalize();
+        return true;
+    }
+
+    /// <summary>
+    /// Peça recortada pelos pisos: cada pedaço com a cota (pés, no centro) e a normal do plano do piso em que está. Vazio se a
+    /// peça não estiver sobre nenhum piso (usa-se então a superfície de base).
+    /// </summary>
+    public List<(Core.Geometry.Polygon2 Shape, double Z, XYZ? Normal)> Clip(Core.Geometry.Polygon2 shape)
+    {
+        var res = new List<(Core.Geometry.Polygon2, double, XYZ?)>();
+        var (mn, mx) = shape.Bounds;
+        var cand = new HashSet<int>();
+        for (var x = (int)Math.Floor(mn.X / Cell); x <= (int)Math.Floor(mx.X / Cell); x++)
+            for (var y = (int)Math.Floor(mn.Y / Cell); y <= (int)Math.Floor(mx.Y / Cell); y++)
+                if (_index.TryGetValue((x, y), out var l)) foreach (var i in l) cand.Add(i);
+        var covered = 0.0;
+        foreach (var i in cand)
+        {
+            var (part, pl, off) = _tiles[i];
+            List<Core.Geometry.Polygon2> pieces;
+            try { pieces = Core.Geometry.PolygonOps.Intersect(new[] { shape }, new[] { part }); } catch { continue; }
+            foreach (var q in pieces.Where(q => q.Area > 1e-5))
+            {
+                var c = q.Centroid;
+                res.Add((q, UnitConv.Ft(pl.Z(c) + off), new XYZ(-pl.B, -pl.C, 1).Normalize()));
+                covered += q.Area;
+            }
+        }
+        // Só vale se a peça estiver (quase) toda sobre os pisos; senão, a superfície de base decide.
+        return covered >= shape.Area * 0.98 ? res : new List<(Core.Geometry.Polygon2, double, XYZ?)>();
+    }
+}
+
+/// <summary>
 /// Projeta pontos verticalmente sobre superfícies (Toposolid, pisos, topografia) usando
 /// ReferenceIntersector, obtendo elevação e normal – permite que a sinalização acompanhe o greide.
 /// </summary>

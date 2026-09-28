@@ -43,10 +43,12 @@ public sealed class CmdApagarTrecho : CommandBase
         finally { def.Exclusions.AddRange(manual); }
         // Sem peças calculadas (caminho não resolvido, marca antiga...): as peças são lidas dos elementos do modelo – cada
         // traço/seta é um sólido próprio na forma direta (ou uma região preenchida no 2D).
+        var fromModel = false;
         if (geo.Pieces.Count == 0)
         {
             Log.Info($"Apagar trecho: geometria vazia para {def.DisplayCode} ({string.Join("; ", warnings)}) – lendo os elementos do modelo.");
             geo = ModelPieces(doc, stored.MarkingId);
+            fromModel = true;
         }
         if (geo.Pieces.Count == 0)
         {
@@ -61,8 +63,139 @@ public sealed class CmdApagarTrecho : CommandBase
 
         def.Exclusions.RemoveAll(z => z.Manual);
         foreach (var z in w.Zones) def.Exclusions.Add(new ExclusionZone { Manual = true, Enabled = w.Active, Points = z.Outer.ToList() });
+        if (fromModel)
+        {
+            // Marca sem caminho (linha de referência apagada): não dá para regenerar – o recorte é feito direto nos elementos.
+            var n = TrimElements(doc, stored.MarkingId, def, w.Active ? w.Zones : Array.Empty<Polygon2>());
+            TaskDialog.Show(AppTitle, $"Apagar trecho: {n} peça(s) recortada(s) direto no modelo.\n\n" +
+                "Esta marca perdeu a linha de referência, por isso o recorte foi aplicado aos elementos (não é possível devolver as peças " +
+                "depois – use Desfazer, Ctrl+Z, se precisar). Para voltar a editar pelos parâmetros, recrie a marca sobre uma linha.");
+            return Result.Succeeded;
+        }
         ReportResults("Apagar trecho", MarkingCreator.Commit(uidoc, new[] { def }, "SV - Apagar trecho"));
         return Result.Succeeded;
+    }
+
+    /// <summary>
+    /// Recorta os elementos da marca pelas áreas: sólidos da forma direta (diferença com um prisma alto de cada área),
+    /// regiões preenchidas (contorno menos as áreas) e pisos inteiramente dentro delas (apagados). Retorna as peças alteradas.
+    /// </summary>
+    private static int TrimElements(Document doc, string markingId, MarkingDefinition def, IReadOnlyList<Polygon2> zones)
+    {
+        var count = 0;
+        using var t = new Transaction(doc, "SV - Apagar trecho (direto no modelo)");
+        t.Start();
+        foreach (var r in MarkingStorage.ById(doc, markingId))
+        {
+            try
+            {
+                switch (r.Element)
+                {
+                    case DirectShape ds:
+                    {
+                        var ge = ds.get_Geometry(new Options { ComputeReferences = false, DetailLevel = ViewDetailLevel.Fine });
+                        if (ge == null) break;
+                        var keep = new List<GeometryObject>();
+                        var changed = false;
+                        foreach (var solid in Solids(ge))
+                        {
+                            var bb = solid.GetBoundingBox();
+                            var z0 = bb.Transform.OfPoint(bb.Min).Z - 1;
+                            var z1 = bb.Transform.OfPoint(bb.Max).Z + 1;
+                            var foot = Footprint(solid);
+                            var cur = solid;
+                            foreach (var z in zones)
+                            {
+                                if (foot == null || !Overlaps(foot, z)) continue;
+                                var prism = Prism(z, z0, z1);
+                                if (prism == null) continue;
+                                var diff = BooleanOperationsUtils.ExecuteBooleanOperation(cur, prism, BooleanOperationsType.Difference);
+                                cur = diff;
+                                changed = true;
+                                if (cur == null || cur.Volume < 1e-9) break;
+                            }
+                            if (cur != null && cur.Volume > 1e-9) keep.Add(cur);
+                        }
+                        if (!changed) break;
+                        count++;
+                        if (keep.Count == 0) doc.Delete(ds.Id);
+                        else ds.SetShape(keep);
+                        break;
+                    }
+                    case FilledRegion fr:
+                    {
+                        var polys = fr.GetBoundaries().Select(Ring).Where(x => x is { Count: >= 3 }).Select(x => new Polygon2(x!)).ToList();
+                        if (!polys.Any(p => zones.Any(z => Overlaps(p, z)))) break;
+                        var rest = PolygonOps.Difference(polys, zones).Where(p => p.Area > 1e-4).ToList();
+                        count++;
+                        var view = fr.OwnerViewId;
+                        var type = fr.GetTypeId();
+                        foreach (var p in rest)
+                        {
+                            var loops = new List<CurveLoop> { Loop(p.Outer) };
+                            loops.AddRange(p.Holes.Select(Loop));
+                            var nfr = FilledRegion.Create(doc, type, view, loops);
+                            MarkingStorage.Write(nfr, def, r.Color);
+                        }
+                        doc.Delete(fr.Id);
+                        break;
+                    }
+                    case Floor fl:
+                    {
+                        var ge = fl.get_Geometry(new Options());
+                        var foot = ge == null ? null : Solids(ge).Select(Footprint).FirstOrDefault(f => f != null);
+                        if (foot == null) break;
+                        var rest = PolygonOps.Difference(new[] { foot }, zones).Sum(p => p.Area);
+                        if (rest < 0.02 * foot.Area) { doc.Delete(fl.Id); count++; }
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex) { Log.Error("Apagar trecho – recorte direto", ex); }
+        }
+        // Os recortes ficam registrados na definição gravada nos elementos que sobraram.
+        foreach (var r in MarkingStorage.ById(doc, markingId)) MarkingStorage.Write(r.Element, def, r.Color);
+        t.Commit();
+        return count;
+    }
+
+    private static bool Overlaps(Polygon2 a, Polygon2 b)
+    {
+        try { return PolygonOps.Intersect(new[] { a }, new[] { b }).Any(x => x.Area > 1e-6); }
+        catch { return false; }
+    }
+
+    private static CurveLoop Loop(IReadOnlyList<Vec2> ring)
+    {
+        var loop = new CurveLoop();
+        for (int i = 0; i < ring.Count; i++)
+        {
+            var a = new XYZ(UnitConv.Ft(ring[i].X), UnitConv.Ft(ring[i].Y), 0);
+            var b = new XYZ(UnitConv.Ft(ring[(i + 1) % ring.Count].X), UnitConv.Ft(ring[(i + 1) % ring.Count].Y), 0);
+            if (a.DistanceTo(b) > 1e-3) loop.Append(Line.CreateBound(a, b));
+        }
+        return loop;
+    }
+
+    /// <summary>Prisma vertical da área entre as cotas (pés) – para a diferença booleana.</summary>
+    private static Solid? Prism(Polygon2 zone, double z0, double z1)
+    {
+        try
+        {
+            var ring = zone.Outer;
+            var loop = new CurveLoop();
+            for (int i = 0; i < ring.Count; i++)
+            {
+                var a = new XYZ(UnitConv.Ft(ring[i].X), UnitConv.Ft(ring[i].Y), z0);
+                var b = new XYZ(UnitConv.Ft(ring[(i + 1) % ring.Count].X), UnitConv.Ft(ring[(i + 1) % ring.Count].Y), z0);
+                if (a.DistanceTo(b) > 1e-3) loop.Append(Line.CreateBound(a, b));
+            }
+            return GeometryCreationUtilities.CreateExtrusionGeometry(new List<CurveLoop> { loop }, XYZ.BasisZ, z1 - z0);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>Peças da marca lidas dos elementos do Revit: pegada de cada sólido (faces para cima) e regiões preenchidas.</summary>

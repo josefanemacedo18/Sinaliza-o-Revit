@@ -22,6 +22,34 @@ public static class HostRoads
         return pav == null ? null : Of(pav);
     }
 
+    /// <summary>
+    /// Outras vias do projeto (exceto a hospedeira): faixa ocupada (pista + calçadas, com 0,5 m de folga) e a cota do
+    /// pavimento relativa à base <paramref name="baseZ"/> da obra – para as obras não invadirem as vias que passam por baixo.
+    /// </summary>
+    public static List<(Polygon2 Footprint, Func<Vec2, double> Z, double Wear)> Crossing(BuildContext ctx, string? hostGroup, double baseZ)
+    {
+        var res = new List<(Polygon2, Func<Vec2, double>, double)>();
+        if (ctx.AllDefinitions == null || ctx.PathOf == null) return res;
+        foreach (var pav in ctx.AllDefinitions().OfType<RoadPavementDefinition>())
+        {
+            if (hostGroup != null && pav.GroupId == hostGroup) continue;
+            if (ctx.PathOf(pav) is not { Points.Count: >= 2 } axis) continue;
+            try
+            {
+                var right = -(pav.TotalRight + 0.5);
+                var left = pav.TotalLeft + 0.5;
+                var mid = Math.Abs(left + right) < 1e-6 ? axis : axis.Offset((left + right) / 2);
+                var strip = PolygonOps.Strip(mid.Points.ToList(), left - right).OrderByDescending(x => x.Area).FirstOrDefault();
+                if (strip == null) continue;
+                var surf = new GradeSurface(axis, pav.Output.Grade ?? RoadGrade.Flat(axis.Length));
+                var dz = (ctx.BaseZOf?.Invoke(pav) ?? baseZ) - baseZ;
+                res.Add((strip, p => dz + surf.Z(p), pav.ActualThickness));
+            }
+            catch { /* via sem geometria válida */ }
+        }
+        return res;
+    }
+
     public static HostRoad Of(RoadPavementDefinition pav)
     {
         var edge = pav.RightSidewalk > 0.01 || pav.LeftSidewalk > 0.01 ? pav.CurbHeight : 0;

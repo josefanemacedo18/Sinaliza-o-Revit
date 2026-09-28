@@ -101,6 +101,31 @@ public static class PathResolver
         }
     }
 
+    /// <summary>
+    /// Atualiza o traçado guardado de cada referência que ainda existe (as perdidas mantêm o último traçado conhecido): se a
+    /// linha de referência for apagada depois, a marca continua regenerável – e editável pelo Apagar Trecho.
+    /// </summary>
+    public static void RefreshCache(Document doc, PathReference? path)
+    {
+        if (path == null || !path.IsAssociative) return;
+        var cache = new List<List<Vec2>>();
+        double zSum = 0;
+        var zCount = 0;
+        for (int k = 0; k < path.ElementIds.Count; k++)
+        {
+            var c = CurveOf(doc, path.ElementIds[k]);
+            if (c != null)
+            {
+                var pts = Tessellate(c);
+                cache.Add(pts.Select(UnitConv.ToVec2).ToList());
+                foreach (var p in pts) { zSum += UnitConv.M(p.Z); zCount++; }
+            }
+            else cache.Add(path.Cache != null && k < path.Cache.Count ? path.Cache[k] : new List<Vec2>());
+        }
+        path.Cache = cache;
+        if (zCount > 0) path.Z = zSum / zCount;
+    }
+
     /// <summary>Traçado (m) de cada referência – guardado no caminho para o caso de a referência deixar de existir.</summary>
     public static List<List<Vec2>> CacheOf(Document doc, IEnumerable<string> ids) =>
         ids.Select(id => CurveOf(doc, id) is { } c ? Tessellate(c).Select(UnitConv.ToVec2).ToList() : new List<Vec2>()).ToList();
