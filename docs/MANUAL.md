@@ -21,6 +21,7 @@ Convenções usadas em todo o plugin:
 | **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (piso tátil · ciclovia · quebra-mola · cruzamento rodoferroviário) |
 | **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive **tachas e tachões** e guard rail) |
 | **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
+| **Tráfego** | **Simulador de Tráfego** (capacidade, nível de serviço, microssimulação animada e diagnóstico do projeto – seção 26) |
 | **Editar** | Editar · Apagar Trecho · Atualizar Todas · Selecionar Conjunto · Alternar 2D/3D · Configurações · Catálogo · Normas |
 
 Guia **SinalizaBIM Infra**:
@@ -103,6 +104,19 @@ centros, mais próximo).
 | Faixa de segurança / transição | Zebrado com linhas de canalização (buffer entre fluxos, ciclofaixa etc.). |
 | Canteiro lateral físico / pintado | Meios-fios + grama (0,15 m) ou zebrado. |
 | Calçada | Meio-fio, faixa de serviço (gramada ou em concreto), faixa livre e faixa de acesso; aviso se a faixa livre for menor que 1,20 m (NBR 9050). |
+
+**Larguras da via: sarjeta e meio-fio contam na largura.** Com *A sarjeta soma na largura da pista* (ligado nas vias
+novas), a **sarjeta** fica entre a última faixa e o meio-fio e **soma** na largura da pista: uma coletora com faixas de
+3,30 + 3,50 m e sarjeta de 0,30 m tem **7,10 m** por lado até a face do meio-fio – as faixas continuam com a largura
+útil informada e a linha de bordo fica na faixa, 0,10 m antes da sarjeta. Desligado (e nas vias criadas por versões
+anteriores), a sarjeta fica dentro da faixa junto ao meio-fio, como antes. A **largura do meio-fio** (guia) também é
+personalizável na criação: selecione a calçada e informe *Largura do meio-fio (m)* (0,05 a 0,60; padrão 0,15). A janela
+mostra, sempre atualizadas:
+
+* **entre meios-fios** – faixas + sarjetas (a pista, de face a face das guias);
+* **com meios-fios** – a pista mais a largura das duas guias;
+* **total** – de fora a fora, com as calçadas e os canteiros;
+* e a composição (faixas, sarjetas, meios-fios, calçadas, canteiros e canteiro central).
 
 **Nível de cada elemento (coluna *Nível (m)* e campo *Nível do topo em relação à pista*).** Cada elemento da seção
 tem o seu nível, medido do topo do pavimento: vazio/padrão = calçada e canteiro físico a **+0,15**, faixas a **0**.
@@ -447,6 +461,7 @@ criada 400 m à direita de tudo o que existe no projeto:
 | Obras | viaduto sobre outra via, ponte no vale, passarela, túnel, trincheira, muros (todos), taludes, nós viários, terraplenagem (simulação, aplicação, mapa) |
 | Edição | editar linha/interseção/rotatória, mover eixo (atualização automática), Apagar Trecho (na via, fora da via, zebrado, sem linha de referência, devolver peças), 2D/3D, excluir, Atualizar Todas |
 | Detalhamento | detalhe de placas, anotação, legenda, cota de seção + perfil, detalhe típico, quadros, notas, norte, eixos, quantitativos e tabelas |
+| Tráfego | Simulador de Tráfego sobre a área de teste: leitura da rede, análise HCM e diagnóstico, microssimulação de 5 min e mapa de níveis de serviço na planta |
 | Verificações | pintura escondida sob o piso ou flutuando, buracos e degraus entre pisos da pista, terreno acima da pista ou sem encostar na seção, estruturas invadindo outras vias, formas sem geometria |
 
 Cada erro do plugin (inclusive os que antes só iam para o log), cada erro/aviso do Revit e cada verificação que falha
@@ -772,6 +787,15 @@ seção das vias continua pela curva, junto ao meio-fio.
 **Esquinas com a composição das vias.** Com *Esquinas com a mesma composição das calçadas das vias* (ligado por
 padrão), a faixa de serviço gramada definida na seção das vias continua pela curva da esquina, entre o meio-fio e o
 passeio, alinhando o cruzamento com as vias. Desligue para esquinas só em concreto.
+
+**Cruzando vias totalmente diferentes.** Cada via guarda o seu perfil de calçada (meio-fio, sarjeta, faixa de serviço,
+passeio, faixa de acesso) **de cada lado**. Na esquina entre duas vias diferentes a calçada é refeita como uma faixa
+contínua ao longo da curva do meio-fio: começa com o perfil do lado da via A, termina com o perfil do lado da via B e faz a
+**transição suave** entre eles (as faixas de mesmo tipo se casam; uma faixa que só existe numa das vias afina até zero;
+o meio-fio mantém a largura). Assim a calçada não se distorce nem abre buracos quando uma via tem calçada larga com
+grama e a outra calçada estreita, ou quando os lados de uma mesma via são diferentes. **Canteiros laterais** (entre a pista
+e o estacionamento, por exemplo) não são lidos como calçada: terminam antes da faixa de pedestres e a boca do cruzamento
+é repavimentada.
 
 ### 19.1 Via principal e controle
 
@@ -1218,3 +1242,70 @@ editáveis): distância das placas de advertência e da mensagem "A … m", espa
 transições de canalização, espaçamento das barras do zebrado de canalização, espaçamento de tachas e tachões,
 tamanho do SDP, altura das legendas e largura das linhas longitudinais.
 
+## 26. Simulador de Tráfego
+
+**Tráfego → Simulador de Tráfego** lê o projeto inteiro e responde: *a rede funciona? onde trava? por quê? o que fazer?*
+
+**O que é lido do projeto.** Vias (eixo, sentidos, número de faixas por sentido, faixas de ônibus, estacionamento,
+ciclofaixa, canteiro central, largura entre meios-fios, velocidade e **hierarquia** – CTB art. 60/61 – e o **greide**),
+**interseções** e o seu controle (PARE, Dê a preferência, semáforo, sem sinalização), **rotatórias** (raio, faixas),
+**balões** (cul-de-sac), cruzamentos de eixos sem interseção (preferência de quem vem pela direita – CTB art. 29, III –
+ou **em desnível** quando uma via passa sobre a outra), **placas** (R-1, R-2, R-19, A-14...), **faixas de pedestres**,
+**rampas**, **vagas** e **moderação** (lombadas, platôs). As pontas livres das vias e os balões são as **entradas e
+saídas** do tráfego.
+
+**Cenário (painel da esquerda).**
+
+* **Demanda**: baixa (entrepico), média, hora de pico ou saturada, com **crescimento** para o horizonte de projeto. Os
+  volumes de pico por faixa vêm da hierarquia de cada entrada; **informe as contagens** nas entradas (campos *Volumes
+  nas entradas*) para resultados de projeto – o campo mostra o volume estimado.
+* **Frota**: % de caminhões e ônibus (equivalentes em carros de passeio), **fator de hora de pico**.
+* **Pedestres** por travessia (verde mínimo de pedestres no semáforo e bloqueios nas travessias do meio da quadra).
+* **Semáforos**: ciclo **otimizado** (Webster) ou fixo.
+* **Microssimulação**: duração, aquecimento e semente aleatória.
+
+**Análise (HCM).** A demanda é distribuída entre as entradas (modelo gravitacional) e alocada na rede por **equilíbrio**
+(o motorista evita o cruzamento congestionado). Para cada cruzamento: capacidade, **v/c**, **atraso** e **nível de
+serviço** A–F de cada aproximação, **fila (95%)** e, no semáforo, o **plano**: fases, verdes, ciclo e – quando o produto
+conversão à esquerda × fluxo oposto passa do critério – **fase protegida** (verde antecipado ou fase de esquerdas).
+PARE/Dê a preferência e preferência à direita por aceitação de brechas; rotatórias pelo modelo do HCM 6; trechos pela
+velocidade (urbano) ou densidade (rodovias).
+
+**Microssimulação.** Cada veículo (carro, caminhão, ônibus) segue o da frente (modelo IDM), escolhe a faixa (à direita
+para converter à direita, à esquerda para converter à esquerda, a mais vazia para seguir), para no PARE, cede a
+preferência, espera o verde, converte à esquerda nas brechas do fluxo oposto (e no entreverdes), entra na rotatória
+quando o anel está livre, não entra no cruzamento sem espaço para sair (CTB art. 45), freia nas lombadas e para para os
+pedestres. A simulação mostra o que a análise nó a nó não vê: **filas que alcançam o cruzamento anterior** e travamentos
+em cadeia.
+
+**Mapa (centro).** Trechos coloridos por **nível de serviço**, v/c, velocidade, volume ou velocidade simulada; nós com o
+nível e o atraso; semáforos com a fase de cada instante (verde, amarelo, vermelho; ciano = esquerda protegida) e os
+**veículos animados** (cor pela velocidade – vermelho parado; caminhões cinza, ônibus azuis). Roda do mouse = zoom,
+arrastar = mover, **botão direito = enquadrar**, clique num nó ou trecho = detalhes. Controles de reprodução: ▶/❚❚,
+velocidade (1× a 20×) e linha do tempo.
+
+**Abas (direita).**
+
+* **Diagnóstico** – cada item com gravidade (crítico, atenção, informação), o problema, **por quê** e **o que fazer**:
+  capacidade (trechos saturados, aproximações E/F, fila que alcança o cruzamento anterior, ciclo longo, semáforo com
+  pouco tráfego, **critério de semáforo** do MBST Vol. V, fase protegida e faixa exclusiva de conversão), rede (vias
+  desconectadas, nós sem saída, viagens sem caminho, cruzamentos sem interseção, desníveis), sinalização (preferência
+  sem placa, via principal de hierarquia menor, falta de R-1/R-2, A-14 antes do semáforo, R-19), segurança (ângulo
+  agudo, via local ligada a rodovia, cruzamentos próximos demais), legislação (velocidade acima da máxima da hierarquia –
+  CTB art. 61; vagas a menos de 5 m da esquina – CTB art. 181), geometria (raio de curva e rampa para a velocidade),
+  moderação (lombada em arterial – Res. CONTRAN 600/2016), pedestres e acessibilidade (travessia no meio da quadra acima de
+  60 km/h, travessia longa sem refúgio, faixa sem rebaixamento – NBR 9050). Filtre por gravidade ou tema; **Ver no mapa**
+  (ou duplo clique) aproxima o local; **Selecionar no modelo** fecha a janela com os elementos envolvidos selecionados.
+* **Indicadores** – demanda, velocidade média, atraso total, cruzamento mais crítico, distribuição dos níveis, emissões
+  de CO₂ e os resultados da simulação (viagens, tempo médio, atraso, paradas).
+* **Cruzamentos** e **Trechos** – tabelas completas (movimentos por conversão, fases e verdes).
+* **Relatório** – o texto completo (rede, demanda, cruzamentos, trechos, diagnóstico, método e limitações).
+
+**Botões.** **Desenhar na vista ativa** cria na planta o **mapa de níveis de serviço** (regiões coloridas sobre as faixas
+de cada sentido, o nível e o atraso de cada cruzamento, título e legenda; desenhar de novo substitui o anterior nessa
+vista). **Exportar relatório** grava o texto (.txt) e a tabela das aproximações (.csv, abre no Excel) em
+`%AppData%\SinalizaBIM`. **Copiar relatório** leva o texto para a área de transferência.
+
+> A demanda padrão é **estimada**. Para decidir a implantação de semáforos, faixas adicionais ou rotatórias, use contagens
+> classificadas na hora de pico e confirme os critérios com contagens de 8 horas (MBST Vol. V). O simulador não modela
+> ainda ônibus em pontos de parada, pedestres nas fases do semáforo além do verde mínimo nem coordenação (onda verde).

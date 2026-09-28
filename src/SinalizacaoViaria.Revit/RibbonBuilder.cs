@@ -109,6 +109,13 @@ public static class RibbonBuilder
         Large(det, typeof(CmdQuantitativos), "Quantitativos", "quantitativos",
             "Quantidades por categoria e hierarquia viária (m², m, un, consumo), exportação CSV e tabelas do Revit.");
 
+        var traf = app.CreateRibbonPanel(TabName, "Tráfego");
+        Large(traf, typeof(CmdSimuladorTrafego), "Simulador de Tráfego", "trafego",
+            "Lê todo o projeto (vias, faixas, sentidos, hierarquia, velocidades, interseções e seus controles, rotatórias, balões, placas, " +
+            "faixas de pedestres, vagas, lombadas e greide), estima a demanda, calcula capacidade e nível de serviço (HCM) de cada cruzamento " +
+            "e trecho, otimiza os semáforos, anima a microssimulação dos veículos e gera o diagnóstico com recomendações (capacidade, segurança, " +
+            "sinalização, CTB, acessibilidade) – com mapa de níveis de serviço na planta e relatório.");
+
         // ---------------------------------------------------------------- Editar e configurações
         var edit = app.CreateRibbonPanel(TabName, "Editar");
         Large(edit, typeof(CmdEditar), "Editar", "editar", "Edita os parâmetros de uma marca, via, interseção ou rotatória e a regenera.");

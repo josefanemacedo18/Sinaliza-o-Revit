@@ -44,6 +44,7 @@ public sealed class CmdAutoteste : CommandBase
             .Check("Obras: viaduto sobre via, ponte, passarela, túnel, trincheira, muros, taludes, nó viário, terraplenagem", () => o.Works, v => o.Works = v)
             .Check("Edição: editar, mover eixo, Apagar Trecho (na via, fora da via, sem linha), 2D/3D, excluir, Atualizar Todas", () => o.Editing, v => o.Editing = v)
             .Check("Detalhamento e quantitativos (numa planta de teste)", () => o.Detailing, v => o.Detailing = v)
+            .Check("Simulador de Tráfego: rede do projeto, análise HCM, diagnóstico, microssimulação, mapa na planta", () => o.Traffic, v => o.Traffic = v)
             .Check("Verificações do modelo (pintura × pisos, continuidade, terreno × via, obras × vias)", () => o.Checks, v => o.Checks = v)
             .Section("Profundidade")
             .Check("Completo: todas as placas do catálogo e todos os tipos de nó viário (mais demorado)", () => o.Full, v => o.Full = v);
@@ -58,6 +59,7 @@ public sealed class CmdAutoteste : CommandBase
 internal sealed class AutoTestOptions
 {
     public bool Roads { get; set; } = true;
+    public bool Traffic { get; set; } = true;
     public bool Connections { get; set; } = true;
     public bool Horizontal { get; set; } = true;
     public bool Vertical { get; set; } = true;
@@ -149,6 +151,7 @@ internal sealed partial class AutoTestRunner
             if (_opt.Works) Works();
             if (_opt.Editing) Editing();
             if (_opt.Detailing) Detailing();
+            if (_opt.Traffic) Traffic();
             if (_opt.Checks) Checks();
         }
         catch (Exception ex)
@@ -186,6 +189,50 @@ internal sealed partial class AutoTestRunner
     }
 
     // ------------------------------------------------------------------ etapas
+
+    /// <summary>Simulador de Tráfego sobre tudo o que o teste criou (e o que já havia no projeto).</summary>
+    private void Traffic()
+    {
+        Core.Traffic.TrafficNetwork? net = null;
+        Core.Traffic.TrafficResult? res = null;
+        Step("Tráfego", "Rede do projeto", s =>
+        {
+            net = CmdSimuladorTrafego.BuildNetwork(_doc);
+            s.Note($"{net.Roads.Count} via(s), {net.Nodes.Count} nó(s) ({net.Nodes.Count(n => n.IsZone)} entradas), {net.Links.Count} trecho(s), " +
+                   $"{net.Signs.Count} placa(s), {net.Crosswalks.Count} travessia(s), {net.GradeSeparations.Count} cruzamento(s) em desnível.");
+            foreach (var n in net.Notes) s.Note("Rede: " + n);
+            if (net.Roads.Count == 0) s.Error("Nenhuma via lida do projeto.");
+            foreach (var nd in net.Nodes.Where(n => !n.IsZone && (n.In.Count == 0 || n.Out.Count == 0)))
+                s.Warn($"{nd.Label} ({nd.Kind}) sem tráfego de entrada ou de saída.");
+        });
+        if (net == null || net.Roads.Count == 0) return;
+        Step("Tráfego", "Análise HCM e diagnóstico", s =>
+        {
+            res = Core.Traffic.TrafficAnalysis.Run(net, new Core.Traffic.TrafficOptions { Demand = Core.Traffic.NivelDemanda.Pico });
+            s.Note($"Demanda {res.TotalDemand:0} veh/h, sem caminho {res.Unserved:0} veh/h, velocidade média {res.AvgSpeed:0.0} km/h, {res.Diagnostics.Count} diagnóstico(s).");
+            foreach (var nr in res.Nodes.Values.Where(n => !n.Node.IsZone && n.Node.Kind != Core.Traffic.TipoNo.Continuacao))
+                s.Note($"{nr.Node.Label} {nr.Node.Control}: nível {nr.LOS}, atraso {nr.Delay:0.0} s, {nr.Approaches.Count} aproximação(ões)" + (nr.Cycle > 0 ? $", ciclo {nr.Cycle:0} s" : ""));
+            if (res.TotalDemand < 1) s.Warn("Nenhuma viagem gerada (faltam pontas livres de via?).");
+            if (res.Unserved > 0.2 * Math.Max(1, res.TotalDemand + res.Unserved)) s.Warn("Mais de 20% das viagens sem caminho – confira as conexões lidas.");
+            foreach (var d in res.Diagnostics.Where(d => d.Severity == Core.Traffic.Gravidade.Critico).Take(15)) s.Note("Crítico: " + d.Title);
+            var txt = Core.Traffic.TrafficReport.Build(res, null, _doc.Title);
+            if (txt.Length < 500) s.Error("Relatório do tráfego vazio.");
+        });
+        if (res == null) return;
+        Step("Tráfego", "Microssimulação (5 min)", s =>
+        {
+            var r2 = Core.Traffic.TrafficAnalysis.Run(net, new Core.Traffic.TrafficOptions { Demand = Core.Traffic.NivelDemanda.Media, SimSeconds = 300, WarmupSeconds = 90 });
+            var sim = Core.Traffic.TrafficSimulation.Run(r2);
+            s.Note($"{sim.Spawned} veículos gerados, {sim.Completed} viagens concluídas, {sim.InNetwork} na rede, {sim.Backlog} sem entrar, tempo médio {sim.MeanTravelTime:0} s, {sim.Frames.Count} quadros.");
+            if (sim.Spawned > 20 && sim.Completed < 0.3 * sim.Spawned) s.Warn("Poucas viagens concluídas: possível travamento na rede simulada.");
+        });
+        if (_plan != null)
+            Step("Tráfego", "Mapa de níveis de serviço na planta", s =>
+            {
+                var msg = TrafficDrawer.Draw(_doc, _plan, res);
+                s.Note(msg);
+            });
+    }
 
     private void Step(string group, string name, Action<StepReport> body)
     {

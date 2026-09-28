@@ -300,6 +300,19 @@ public static class IconFactory
                 dc.DrawLine(P(Magenta, 2), new Point(11, 23), new Point(20, 9));
                 dc.DrawGeometry(B(Color.FromRgb(236, 120, 150)), P(Asphalt, 1), Close(Poly(new Point(19, 2), new Point(27, 2), new Point(23, 9), new Point(15, 9))));
                 break;
+            case "trafego":
+                // Cruzamento com veículos e o grupo focal do semáforo.
+                dc.DrawRectangle(B(Color.FromRgb(120, 180, 90)), null, new Rect(0, 0, 32, 32));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(0, 11, 32, 10));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(11, 0, 10, 32));
+                foreach (var x in new[] { 1.0, 6.0, 23.0, 28.0 }) dc.DrawRectangle(B(White), null, new Rect(x, 15.5, 3, 1));
+                dc.DrawRectangle(B(Blue), null, new Rect(2, 17, 7, 3.5));
+                dc.DrawRectangle(B(Red), null, new Rect(16.5, 22, 3.5, 7));
+                dc.DrawRoundedRectangle(B(Color.FromRgb(30, 30, 30)), null, new Rect(23, 1, 8, 17), 1.5, 1.5);
+                dc.DrawEllipse(B(Red), null, new Point(27, 4.5), 2, 2);
+                dc.DrawEllipse(B(Color.FromRgb(255, 190, 0)), null, new Point(27, 9.5), 2, 2);
+                dc.DrawEllipse(B(Color.FromRgb(0, 200, 83)), null, new Point(27, 14.5), 2, 2);
+                break;
             case "autoteste":
                 dc.DrawRectangle(B(White), P(Asphalt, 1.5), new Rect(6, 4, 20, 25));
                 dc.DrawRectangle(B(Asphalt), null, new Rect(11, 2, 10, 5));
