@@ -217,6 +217,22 @@ public sealed class IntersectionService
     }
 
     /// <summary>Perfil de borda (meio-fio, sarjeta, grama, calçada) lido dos elementos reais do grupo da via.</summary>
+    /// <summary>Perfis de calçada dos dois lados da via (cada esquina usa o lado de cada via que chega nela).</summary>
+    public RoadEdgeProfile SidesOf(RoadPavementDefinition pav)
+    {
+        if (pav.GroupId == null) return new RoadEdgeProfile { RoadId = pav.Id };
+        try
+        {
+            var members = MarkingStorage.Definitions(_doc).Where(d => d.GroupId == pav.GroupId && d.Id != pav.Id).ToList();
+            return EdgeProfile.FromRoadSides(pav, members, new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs });
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Perfis de borda da via", ex);
+            return new RoadEdgeProfile { RoadId = pav.Id };
+        }
+    }
+
     public List<EdgeBand> ProfileOf(RoadPavementDefinition pav)
     {
         if (pav.GroupId == null) return new();
@@ -277,6 +293,7 @@ public sealed class IntersectionService
         it.Node = node.Node;
         it.Z = roads.Average(r => RoadZ(r, node.Node));
         it.EdgeProfile = it.MatchRoadSection ? EdgeProfile.Best(roads.Select(r => ProfileOf(r.Def))) : new List<EdgeBand>();
+        it.RoadProfiles = it.MatchRoadSection ? roads.Select(r => SidesOf(r.Def)).ToList() : new List<RoadEdgeProfile>();
         var layout = IntersectionGenerator.Layout(it, roads);
         if (layout.Roads.Count > 0) it.Hierarchy = layout.Roads[layout.Main].Def.Hierarchy;
 

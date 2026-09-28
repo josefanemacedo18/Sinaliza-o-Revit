@@ -121,7 +121,7 @@
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <TextBlock x:Name="LblVaga" Text="Tipo de vaga" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="CbVaga" Grid.Column="1" SelectionChanged="DetailChanged"/>
@@ -139,8 +139,8 @@
                             <CheckBox x:Name="CkBidirecional" Grid.Row="7" Grid.ColumnSpan="2" Content="Ciclofaixa bidirecional (sem setas)" Checked="DetailChanged" Unchecked="DetailChanged"/>
                             <TextBlock x:Name="LblDisp" Grid.Row="8" Text="Segregação física (divisa interna)" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="CbDispositivo" Grid.Row="8" Grid.Column="1" SelectionChanged="DetailChanged"/>
-                            <TextBlock x:Name="LblSarjeta" Grid.Row="9" Text="Sarjeta junto ao meio-fio (m)" Style="{StaticResource FieldLabel}"/>
-                            <TextBox x:Name="TbSarjeta" Grid.Row="9" Grid.Column="1" TextChanged="DetailChanged" ToolTip="0 = sem sarjeta. Ocupa a borda da pista."/>
+                            <TextBlock x:Name="LblSarjeta" Grid.Row="9" Text="Sarjeta – largura (m)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbSarjeta" Grid.Row="9" Grid.Column="1" TextChanged="DetailChanged" ToolTip="0 = sem sarjeta. Usual 0,30 a 0,60 m. Com &quot;somar a sarjeta&quot; ela fica entre a última faixa e o meio-fio; senão ocupa a borda da faixa."/>
                             <TextBlock x:Name="LblCorCaminhada" Grid.Row="10" Text="Cor da faixa de caminhada" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="CbCorCaminhada" Grid.Row="10" Grid.Column="1" SelectionChanged="DetailChanged"/>
                             <TextBlock x:Name="LblCorOnibus" Grid.Row="10" Text="Cor do fundo da faixa de ônibus" Style="{StaticResource FieldLabel}"/>
@@ -166,6 +166,9 @@
                             <TextBlock x:Name="LblAltura" Grid.Row="17" Text="Nível do topo em relação à pista (m)" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="TbAltura" Grid.Row="17" Grid.Column="1" TextChanged="DetailChanged"
                                      ToolTip="0,15 = nível de calçada; 0 = nível da pista; negativo = rebaixado (só calçada e canteiro). Faixas acima de 0 viram plataforma elevada com meio-fio no degrau."/>
+                            <TextBlock x:Name="LblMeioFio" Grid.Row="19" Text="Meio-fio – largura no topo (m)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbMeioFio" Grid.Row="19" Grid.Column="1" TextChanged="DetailChanged"
+                                     ToolTip="Guia de concreto: 0,12 a 0,15 m usual (padrão 0,15). A altura do meio-fio (espelho) é o nível da calçada acima."/>
                             <TextBlock x:Name="LblVegetacao" Grid.Row="18" Text="Nível da vegetação (m, vazio = igual)" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="TbVegetacao" Grid.Row="18" Grid.Column="1" TextChanged="DetailChanged"
                                      ToolTip="Faixa gramada da calçada ou vegetação do canteiro: mais alta (floreira), no nível ou rebaixada (jardim de chuva)."/>
@@ -176,7 +179,7 @@
                 <GroupBox Header="Linhas e opções">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Text="Velocidade regulamentada (km/h)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Column="1" x:Name="TbSpeed" Text="60" TextChanged="AnyChanged"/>
                         <TextBlock Grid.Row="1" Text="Entre faixas de mesmo sentido" Style="{StaticResource FieldLabel}"/>
@@ -195,6 +198,8 @@
                         <ComboBox Grid.Row="5" Grid.Column="1" x:Name="CbStuds" SelectionChanged="AnyChanged"/>
                         <CheckBox Grid.Row="6" Grid.ColumnSpan="2" x:Name="CkInscriptions" Content="Legendas e símbolos repetidos (ÔNIBUS, bicicletas, setas)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
                         <CheckBox Grid.Row="7" Grid.ColumnSpan="2" x:Name="CkPhysical" Content="Gerar calçadas, meios-fios e canteiros físicos (3D)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="8" Grid.ColumnSpan="2" x:Name="CkGutterAdds" Content="Somar a sarjeta à largura da pista (as faixas mantêm a largura útil)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
+                                  ToolTip="Marcado: pista entre meios-fios = faixas + sarjetas (ex.: 3,50 + 0,30 = 3,80 m até a face da guia). Desmarcado: a sarjeta ocupa a borda da última faixa (vias criadas antes desta versão)."/>
                     </Grid>
                 </GroupBox>
 
@@ -261,6 +266,9 @@
         <DockPanel Grid.Column="1">
             <TextBlock DockPanel.Dock="Top" Text="Pré-visualização (trecho reto de 50 m – eixo em magenta)" Style="{StaticResource Title}"/>
             <TextBlock DockPanel.Dock="Bottom" x:Name="TxtSummary" TextWrapping="Wrap" Margin="0,6,0,0"/>
+            <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource Border}" BorderThickness="1" Background="#F4F7FB" Padding="8,6" Margin="0,6,0,0">
+                <TextBlock x:Name="TxtWidths" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
+            </Border>
             <Border BorderBrush="{StaticResource Border}" BorderThickness="1">
                 <ui:GeometryPreview x:Name="Preview"/>
             </Border>

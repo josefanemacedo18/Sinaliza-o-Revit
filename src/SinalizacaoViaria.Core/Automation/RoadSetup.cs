@@ -103,6 +103,13 @@ public sealed class ElementoSecao
     /// <summary>Largura da sarjeta junto ao meio-fio, dentro da pista (m). 0 = sem sarjeta.</summary>
     public double Sarjeta { get; set; } = 0.30;
 
+    /// <summary>Calçada: largura do meio-fio (guia) no topo (m).</summary>
+    public double LarguraMeioFio { get; set; } = RoadSetup.CurbWidth;
+
+    /// <summary>Largura efetiva do meio-fio (limitada a 5–60 cm).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public double MeioFioEfetivo => Math.Clamp(LarguraMeioFio, 0.05, 0.60);
+
     // ---- Faixa de caminhada
     /// <summary>Cor da faixa de caminhada (Azul ou Verde).</summary>
     public MarkingColor CorCaminhada { get; set; } = MarkingColor.Azul;
@@ -248,6 +255,20 @@ public sealed class RoadSetup
     public TipoPavimento Pavement { get; set; } = TipoPavimento.Asfalto;
     public double? PavementThickness { get; set; }
 
+    /// <summary>
+    /// Sarjeta SOMADA à largura: fica entre a última faixa e o meio-fio e a faixa mantém a largura útil (a pista entre
+    /// meios-fios = faixas + sarjetas). Nulo/falso = vias antigas (a sarjeta ocupa a borda da faixa).
+    /// </summary>
+    public bool? SarjetaSomada { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    private bool GutterAdds => SarjetaSomada == true;
+
+    /// <summary>Sarjeta acrescentada antes do elemento <paramref name="i"/> (calçada sem faixa elevada antes dela).</summary>
+    private double AddedGutter(List<ElementoSecao> side, int i) =>
+        GutterAdds && PhysicalElements && side[i].Tipo == TipoElementoSecao.Calcada && !(i > 0 && side[i - 1].Elevado)
+            ? Math.Max(0, side[i].Sarjeta) : 0;
+
     public List<string> Warnings { get; } = new();
 
     /// <summary>Largura da pista, calçada e faixas sem pavimento de um lado (do eixo para fora).</summary>
@@ -256,11 +277,13 @@ public sealed class RoadSetup
         var gaps = new List<PavementGap>();
         double a = MedianHalf;
         ElementoSecao? prev = null;
-        foreach (var e in side)
+        for (int i = 0; i < side.Count; i++)
         {
+            var e = side[i];
             var w = Math.Max(0.05, e.Largura);
             if (e.Tipo == TipoElementoSecao.Calcada)
             {
+                a += AddedGutter(side, i);
                 var gutter = PhysicalElements && prev is not { Elevado: true } ? Math.Max(0, e.Sarjeta) : 0;
                 if (gutter > 0.01) gaps.Add(new PavementGap(sigma * (a - gutter / 2), gutter, Median: false));
                 return (a, w, gaps);
@@ -285,7 +308,7 @@ public sealed class RoadSetup
             LeftWidth = lc,
             RightSidewalk = rs,
             LeftSidewalk = ls,
-            CurbWidth = CurbWidth,
+            CurbWidth = Right.Concat(Left).FirstOrDefault(x => x.Tipo == TipoElementoSecao.Calcada)?.MeioFioEfetivo ?? CurbWidth,
             TwoWay = TwoWay,
             StartSetback = StartSetback,
             EndSetback = EndSetback,
@@ -300,7 +323,50 @@ public sealed class RoadSetup
 
     private double MedianHalf => TwoWay && Center == CenterTreatment.Canteiro ? MedianWidth / 2 : 0;
 
-    public double SideWidth(IEnumerable<ElementoSecao> side) => side.Sum(e => e.Largura);
+    /// <summary>Largura de um lado, do eixo (sem o canteiro central) ao alinhamento: elementos + sarjetas somadas.</summary>
+    public double SideWidth(IEnumerable<ElementoSecao> side)
+    {
+        var l = side.ToList();
+        return l.Sum(e => e.Largura) + Enumerable.Range(0, l.Count).Sum(i => AddedGutter(l, i));
+    }
+
+    /// <summary>Larguras da seção para conferência (m).</summary>
+    public sealed record Larguras(double Total, double EntreMeiosFios, double ComMeiosFios, double Faixas, double Sarjetas, double MeiosFios,
+        double Calcadas, double Canteiros, double Central);
+
+    /// <summary>
+    /// Larguras da seção: total (alinhamento a alinhamento), pista entre as faces dos meios-fios, pista com os meios-fios,
+    /// faixas de tráfego, sarjetas, meios-fios, calçadas (sem o meio-fio) e canteiros.
+    /// </summary>
+    public Larguras Widths()
+    {
+        double faixas = 0, sarj = 0, guias = 0, calc = 0, cant = 0, entre = 2 * MedianHalf;
+        foreach (var side in new[] { Right, Left })
+        {
+            var edge = 0.0;
+            var reached = false;
+            for (int i = 0; i < side.Count; i++)
+            {
+                var e = side[i];
+                var w = Math.Max(0.05, e.Largura);
+                if (ElementoSecao.EhFaixaDeTrafego(e.Tipo)) faixas += w;
+                if (e.Tipo is TipoElementoSecao.CanteiroFisico or TipoElementoSecao.CanteiroPintado) cant += w;
+                if (e.Tipo == TipoElementoSecao.Calcada)
+                {
+                    sarj += PhysicalElements && !(i > 0 && side[i - 1].Elevado) ? Math.Max(0, e.Sarjeta) : 0;
+                    if (!reached) edge += AddedGutter(side, i);
+                    var cw = PhysicalElements && Math.Abs(e.AlturaEfetiva - (i > 0 ? side[i - 1].AlturaEfetiva : 0)) > 0.02 ? Math.Min(e.MeioFioEfetivo, w) : 0;
+                    guias += cw;
+                    calc += w - cw;
+                    reached = true;
+                    continue;
+                }
+                if (!reached) edge += w;
+            }
+            entre += edge;
+        }
+        return new Larguras(TotalWidth, entre, entre + guias, faixas, sarj, guias, calc, cant, TwoWay && Center == CenterTreatment.Canteiro ? MedianWidth : 0);
+    }
 
     /// <summary>Largura total entre os alinhamentos externos.</summary>
     public double TotalWidth => SideWidth(Right) + SideWidth(Left) + 2 * MedianHalf;
@@ -445,6 +511,8 @@ public sealed class RoadSetup
             for (int i = 0; i < side.Count; i++)
             {
                 var e = side[i];
+                // Sarjeta somada: a pista cresce até a face do meio-fio e a faixa mantém a largura útil.
+                a += AddedGutter(side, i);
                 var w = Math.Max(0.05, e.Largura);
                 var b = a + w;
                 var c = (a + b) / 2;
@@ -638,14 +706,15 @@ public sealed class RoadSetup
         void Sidewalk(ElementoSecao e, double a, double b, int sigma, double top, double inner)
         {
             var width = b - a;
+            var cw = Math.Min(e.MeioFioEfetivo, width - 0.05);
             // Meio-fio só onde há degrau para o elemento interno (calçada no nível de uma ciclovia elevada não tem guia entre elas).
-            var curb = Math.Abs(top - inner) > 0.02 ? CurbWidth : 0;
-            if (curb > 0) Physical("MEIO-FIO", sigma * (a + CurbWidth / 2), CurbWidth, Math.Max(top, inner));
-            var service = Math.Clamp(e.FaixaServico, CurbWidth, width) - CurbWidth;
-            var access = Math.Clamp(e.FaixaAcesso, 0, Math.Max(0, width - CurbWidth - service));
-            var free = width - CurbWidth - service - access;
-            var s0 = a + CurbWidth;
-            if (curb == 0) { service += CurbWidth; s0 = a; }
+            var curb = Math.Abs(top - inner) > 0.02 ? cw : 0;
+            if (curb > 0) Physical("MEIO-FIO", sigma * (a + cw / 2), cw, Math.Max(top, inner));
+            var service = Math.Clamp(e.FaixaServico, cw, width) - cw;
+            var access = Math.Clamp(e.FaixaAcesso, 0, Math.Max(0, width - cw - service));
+            var free = width - cw - service - access;
+            var s0 = a + cw;
+            if (curb == 0) { service += cw; s0 = a; }
             if (service > 0.02)
             {
                 if (e.ServicoGramado) Physical("GRAMADO", sigma * (s0 + service / 2), service, e.AlturaVegetacaoEfetiva);
@@ -716,7 +785,7 @@ public static class RoadTemplates
         catch { return null; }
     }
 
-    public static IReadOnlyList<Template> All { get; } = new List<Template>
+    private static readonly List<Template> Base = new()
     {
         new("Via local – 1 faixa por sentido, estacionamento e calçadas", () => new RoadSetup
         {
@@ -779,4 +848,12 @@ public static class RoadTemplates
             Left = { E(R, 3.50), E(R, 3.50), E(TipoElementoSecao.Calcada, 3.00) },
         }),
     };
+
+    /// <summary>Modelos prontos: a sarjeta é somada à largura da pista (as faixas mantêm a largura útil).</summary>
+    public static IReadOnlyList<Template> All { get; } = Base.Select(t => new Template(t.Name, () =>
+    {
+        var s = t.Create();
+        s.SarjetaSomada ??= true;
+        return s;
+    })).ToList();
 }

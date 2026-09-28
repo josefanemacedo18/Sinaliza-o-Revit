@@ -1271,6 +1271,9 @@ public sealed class RoadPavementDefinition : MarkingDefinition
 /// <summary>Interseção entre vias do "Sinalizar via": esquinas arredondadas, meio-fio, recortes e travessias.</summary>
 public sealed class IntersectionDefinition : MarkingDefinition
 {
+    /// <summary>Perfis de calçada de cada lado das vias do nó (aplicados esquina a esquina, com transição).</summary>
+    public List<Automation.RoadEdgeProfile> RoadProfiles { get; set; } = new();
+
     /// <summary>Perfil de borda (meio-fio, sarjeta, grama, calçada) copiado das vias ligadas – aplicado em volta da pista.</summary>
     public List<Automation.EdgeBand> EdgeProfile { get; set; } = new();
 

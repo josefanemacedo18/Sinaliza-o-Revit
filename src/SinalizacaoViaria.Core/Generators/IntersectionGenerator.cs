@@ -47,6 +47,9 @@ public sealed class LegFeature
 }
 
 /// <summary>Resultado geométrico de uma interseção.</summary>
+/// <summary>Esquina da interseção: via A (lado alto do ramo) → via B (lado baixo do ramo seguinte).</summary>
+public sealed record IntersectionCorner(Polygon2 Tri, int RoadA, bool LeftA, int RoadB, bool LeftB, Vec2 PA, Vec2 PB);
+
 public sealed class IntersectionLayout
 {
     public Vec2 Node { get; init; }
@@ -60,6 +63,13 @@ public sealed class IntersectionLayout
     public List<Polygon2> Pavement { get; } = new();
     public List<Polygon2> Curb { get; } = new();
     public List<Polygon2> Sidewalk { get; } = new();
+    /// <summary>
+    /// Esquinas entre ramos vizinhos: triângulo (nó e fins das curvas), via e lado de cada ramo – o perfil de calçada de
+    /// cada via é aplicado do lado dela e interpolado ao longo da curva.
+    /// </summary>
+    public List<IntersectionCorner> Corners { get; } = new();
+    /// <summary>Calçada das esquinas até a maior das duas larguras (a transição é feita pelo perfil interpolado).</summary>
+    public List<Polygon2> SidewalkMax { get; } = new();
     /// <summary>Faixa de serviço gramada das calçadas (composição repetida das vias) – subconjunto de Sidewalk.</summary>
     public List<Polygon2> SidewalkService { get; } = new();
     /// <summary>Sarjeta junto ao meio-fio (composição repetida das vias).</summary>
@@ -592,11 +602,35 @@ public static class IntersectionGenerator
         }
 
         // Canteiros centrais: terminam antes da pista das outras vias (nariz arredondado); bolsões recortados.
+        // Canteiros LATERAIS (entre a pista e a faixa de estacionamento/marginal) terminam atrás da travessia: senão entram
+        // no cruzamento e fecham a conversão de quem vem pela faixa externa.
+        var latCuts = L.Roads.Select(_ => new List<Polygon2>()).ToList();
         var medT = L.Roads.Select((_, i) =>
         {
             if (medBands[i].Count == 0) return new List<Polygon2>();
             var others = PolygonOps.Offset(own.Where((_, j) => j != i).SelectMany(x => x), 1.0);
-            return Open(PolygonOps.Difference(PolygonOps.Difference(medBands[i], others), pockets[i]), 0.3).Where(p => p.Area > 0.5).ToList();
+            var band = PolygonOps.Difference(PolygonOps.Difference(medBands[i], others), pockets[i]);
+            var r = L.Roads[i];
+            var lateral = r.Def.Gaps.Where(g => g.Median && Math.Abs(g.Offset) > g.Width / 2 + 0.1).ToList();
+            if (lateral.Count > 0)
+            {
+                var latBand = PolygonOps.Union(lateral.SelectMany(g => RoadGenerator.Band(r.Axis, g.Offset - g.Width / 2, g.Offset + g.Width / 2)));
+                var stopAt = new List<Polygon2>();
+                foreach (var leg in legs0.Where(l => l.Road == i))
+                {
+                    var tEnd = leg.Clear + (d.Crosswalks ? d.CrosswalkSetback + d.CrosswalkWidth + 0.8 : 1.0);
+                    var wide = Math.Max(r.Def.TotalLeft, r.Def.TotalRight) + 2;
+                    stopAt.AddRange(L.LegPoly(leg, -maxHalf, tEnd, _ => -wide, _ => wide));
+                }
+                if (stopAt.Count > 0)
+                {
+                    // O trecho retirado do canteiro lateral vira pista (refeita pela interseção) e sai da via.
+                    var cutLat = PolygonOps.Intersect(latBand, stopAt);
+                    latCuts[i].AddRange(cutLat);
+                    band = PolygonOps.Difference(band, cutLat);
+                }
+            }
+            return Open(band, 0.3).Where(p => p.Area > 0.5).ToList();
         }).ToList();
 
         // Ilhas gota.
@@ -690,7 +724,12 @@ public static class IntersectionGenerator
             if (tri.Area < 0.01) continue;
             var fixedTri = PolygonOps.Union(new[] { tri });
             zoneParts.AddRange(fixedTri);
-            foreach (var ft in fixedTri) cornerZones.Add((ft, la, lb));
+            foreach (var ft in fixedTri)
+            {
+                cornerZones.Add((ft, la, lb));
+                L.Corners.Add(new IntersectionCorner(ft, la.Road, la.Sign > 0, lb.Road, lb.Sign < 0,
+                    L.At(la, reachT[la], HiTot(la)), L.At(lb, reachT[lb], -LoTot(lb))));
+            }
         }
         if (zoneParts.Count == 0) zoneParts.Add(Circle(node, maxHalf + rc));
         var zoneU = PolygonOps.Union(zoneParts);
@@ -731,6 +770,7 @@ public static class IntersectionGenerator
         foreach (var f in L.Features)
             ext[f.Leg.Road].AddRange(L.LegPoly(f.Leg, 0, f.TEnd + 0.5, _ => f.ExtLo, _ => f.ExtHi, 1.0));
         for (int i = 0; i < L.Roads.Count; i++) ext[i].AddRange(refuges[i]);
+        for (int i = 0; i < L.Roads.Count; i++) ext[i].AddRange(latCuts[i].Select(p => PolygonOps.Offset(new[] { p }, 0.05)).SelectMany(x => x));
         for (int i = 0; i < L.Roads.Count; i++) L.PhysicalCuts[i] = PolygonOps.Union(core0.Concat(ext[i]));
         var rebuild = PolygonOps.Union(core0.Concat(ext.SelectMany(x => x)));
         L.Rebuild.AddRange(rebuild);
@@ -766,6 +806,8 @@ public static class IntersectionGenerator
             var rb = L.Roads[lb.Road].Def;
             var swA = la.Sign > 0 ? ra.LeftSidewalk : ra.RightSidewalk;
             var swB = lb.Sign > 0 ? rb.RightSidewalk : rb.LeftSidewalk;
+            if (swA > 0.01 || swB > 0.01)
+                L.SidewalkMax.AddRange(PolygonOps.Difference(PolygonOps.Intersect(PolygonOps.Offset(pav, Math.Max(swA, swB), true), new[] { tri }), pav));
             if (swA <= 0.01 || swB <= 0.01) continue;
             sideParts.AddRange(PolygonOps.Intersect(PolygonOps.Offset(pav, Math.Min(swA, swB), true), new[] { tri }));
         }
@@ -897,11 +939,15 @@ public static class IntersectionGenerator
             }
         }
         var profile = d.MatchRoadSection ? d.EdgeProfile : new List<Automation.EdgeBand>();
-        if (profile.Count > 0 && (L.Curb.Count > 0 || L.Sidewalk.Count > 0))
+        var perRoad = d.MatchRoadSection ? d.RoadProfiles.Where(p => p.Left.Count + p.Right.Count > 0).ToList() : new List<Automation.RoadEdgeProfile>();
+        if ((profile.Count > 0 || perRoad.Count > 0) && (L.Curb.Count > 0 || L.Sidewalk.Count > 0 || L.SidewalkMax.Count > 0))
         {
-            // Mesmos elementos das vias (meio-fio, sarjeta, faixa gramada, passeio) em volta da pista da interseção.
+            // Mesmos elementos das vias (meio-fio, sarjeta, faixa gramada, passeio) em volta da pista da interseção: o perfil
+            // de cada via do lado dela e, nas esquinas entre vias diferentes, interpolado ao longo da curva.
             var region = PolygonOps.Union(L.Curb.Concat(L.Sidewalk));
-            var (pieces, inside) = Automation.EdgeProfile.Apply(L.Pavement, region, profile, new[] { L.Zone });
+            var (pieces, inside) = perRoad.Count > 0
+                ? ApplyPerRoad(L, d.RoadProfiles, profile, region)
+                : Automation.EdgeProfile.Apply(L.Pavement, region, profile, new[] { L.Zone });
             // Sarjetas que as vias mantêm dentro da zona (junto ao meio-fio delas) também saem do pavimento da interseção.
             inside.AddRange(KeptGutters(L));
             if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
@@ -933,6 +979,182 @@ public static class IntersectionGenerator
         geo.UnitCount = 1;
         geo.PathLength = L.Legs.Count;
         return geo;
+    }
+
+    /// <summary>
+    /// Perfil de calçada por via: nas esquinas, setores ao longo da curva com o perfil interpolado entre o lado da via A e o
+    /// da via B (larguras de meio-fio, grama e passeio mudam aos poucos, sem degraus nem "calçada torta"); nos trechos
+    /// retos dentro da zona, o perfil do lado da própria via.
+    /// </summary>
+    private static (List<MarkingPiece> Pieces, List<Polygon2> Inside) ApplyPerRoad(IntersectionLayout L, List<Automation.RoadEdgeProfile> profiles,
+        List<Automation.EdgeBand> fallback, List<Polygon2> region)
+    {
+        List<Automation.EdgeBand> Side(int road, bool left)
+        {
+            var p = profiles.FirstOrDefault(x => x.RoadId == L.Roads[road].Def.Id);
+            if (p == null) return fallback;
+            return p.Side(left);
+        }
+        var pieces = new List<MarkingPiece>();
+        var inside = new List<Polygon2>();
+        var cache = new Dictionary<int, List<Polygon2>>();
+        var full = PolygonOps.Union(region.Concat(L.SidewalkMax)).Where(p => p.Area > 0.02).ToList();
+        // Bordos do pavimento sobre o limite da zona (corte transversal da pista) não são face de meio-fio.
+        var zoneInner = PolygonOps.Offset(L.Rebuild.Count > 0 ? L.Rebuild : new List<Polygon2> { L.Zone }, -0.12, true);
+        var done = new List<Polygon2>();
+        foreach (var c in L.Corners)
+        {
+            var a = Side(c.RoadA, c.LeftA);
+            var b = Side(c.RoadB, c.LeftB);
+            // A calçada da esquina inteira: do trecho reto da via A, pela curva, até o trecho reto da via B.
+            var comp = full.Where(p => !done.Contains(p))
+                .Select(p => (P: p, O: PolygonOps.TotalArea(PolygonOps.Intersect(new[] { p }, new[] { c.Tri }))))
+                .Where(x => x.O > 0.01).OrderByDescending(x => x.O).Select(x => x.P).FirstOrDefault();
+            if (comp == null) continue;
+            done.Add(comp);
+            if (a.Count == 0 && b.Count == 0) continue;
+            var chain = CurbChain(L.Pavement, comp, c.Tri, c.PA, zoneInner);
+            if (chain == null) continue;
+            var (pts, nrm, wts) = chain.Value;
+            var aligned = Automation.EdgeProfile.Aligned(a, b);
+            var clip = PolygonOps.Offset(new[] { comp }, 0.02);
+            var covered = new List<Polygon2>();
+            foreach (var (shape, attr, ins) in Automation.EdgeProfile.AlongChain(pts, nrm, wts, aligned))
+            {
+                if (ins)
+                {
+                    var g = PolygonOps.Intersect(PolygonOps.Intersect(new[] { shape }, PolygonOps.Offset(new[] { comp }, 2.0)), L.Pavement).Where(x => x.Area > 1e-3).ToList();
+                    inside.AddRange(g);
+                    foreach (var sh in g)
+                        pieces.Add(new MarkingPiece(sh, attr.Color) { Thickness = attr.Thickness, Elevation = attr.Elevation, Layer = attr.Code });
+                    continue;
+                }
+                foreach (var sh in PolygonOps.Difference(PolygonOps.Intersect(new[] { shape }, clip), L.Pavement).Where(x => x.Area > 1e-3))
+                {
+                    pieces.Add(new MarkingPiece(sh, attr.Color) { Thickness = attr.Thickness, Elevation = attr.Elevation, Layer = attr.Code });
+                    covered.Add(sh);
+                }
+            }
+            // Sobras nos trechos retos (fora da curva): continuam com a faixa externa da via daquele lado.
+            var outerA = a.Where(x => !x.Inside).OrderBy(x => x.D1).LastOrDefault();
+            var outerB = b.Where(x => !x.Inside).OrderBy(x => x.D1).LastOrDefault();
+            var left = PolygonOps.Difference(PolygonOps.Difference(new[] { comp }, PolygonOps.Offset(covered, 0.01)), PolygonOps.Offset(new[] { c.Tri }, 0.5));
+            foreach (var sh in left.Where(x => x.Area > 0.05))
+            {
+                var nearA = sh.Centroid.DistanceTo(c.PA) < sh.Centroid.DistanceTo(c.PB);
+                var ob = nearA ? outerA ?? outerB : outerB ?? outerA;
+                if (ob != null) pieces.Add(new MarkingPiece(sh, ob.Color) { Thickness = ob.Thickness, Elevation = ob.Elevation, Layer = ob.Code });
+            }
+        }
+        var rest = (done.Count > 0 ? PolygonOps.Difference(region, PolygonOps.Union(done)) : region).Where(p => p.Area > 0.02).ToList();
+        foreach (var part in rest)
+        {
+            var (road, left) = NearestSide(L, part.Centroid);
+            var bands = road < 0 ? fallback : Side(road, left);
+            if (bands.Count == 0) bands = fallback;
+            if (bands.Count == 0) continue;
+            var (pc, ins) = Automation.EdgeProfile.Apply(L.Pavement, new[] { part }, bands, null, true, cache);
+            foreach (var pi in pc)
+            {
+                var shapes = done.Count > 0 ? PolygonOps.Difference(new[] { pi.Shape }, done) : new List<Polygon2> { pi.Shape };
+                foreach (var sh in shapes.Where(x => x.Area > 1e-3))
+                    pieces.Add(new MarkingPiece(sh, pi.Color) { Thickness = pi.Thickness, Elevation = pi.Elevation, Layer = pi.Layer });
+            }
+            inside.AddRange((done.Count > 0 ? PolygonOps.Difference(ins, done) : ins).Where(x => x.Area > 1e-3));
+        }
+        return (pieces, PolygonOps.Union(inside));
+    }
+
+    /// <summary>
+    /// Linha do meio-fio da esquina: trecho do contorno do pavimento dentro do triângulo, de A para B, com pontos a cada
+    /// ~0,25 m, as normais para fora da pista e o peso (0 em A, 1 em B) pelo comprimento.
+    /// </summary>
+    private static (List<Vec2> Pts, List<Vec2> Normals, List<double> W)? CurbChain(IReadOnlyList<Polygon2> pavement, Polygon2 comp, Polygon2 tri, Vec2 pa,
+        IReadOnlyList<Polygon2> zoneInner)
+    {
+        // Bordo do pavimento junto a esta calçada (a face do meio-fio fica na borda interna dela), fora do limite da zona.
+        var near = PolygonOps.Offset(new[] { comp }, 0.25);
+        bool In(Vec2 p) => near.Any(z => z.Contains(p)) && zoneInner.Any(z => z.Contains(p));
+        List<Vec2>? best = null;
+        var bestLen = 0.0;
+        foreach (var pg in pavement)
+            foreach (var raw in new[] { pg.Outer }.Concat(pg.Holes))
+            {
+                var ring = new List<Vec2>();
+                for (int i = 0; i < raw.Count; i++)
+                {
+                    var p0 = raw[i];
+                    var p1 = raw[(i + 1) % raw.Count];
+                    var k = Math.Max(1, (int)Math.Ceiling(p0.DistanceTo(p1) / 0.25));
+                    for (int j = 0; j < k; j++) ring.Add(p0 + (p1 - p0) * (j / (double)k));
+                }
+                var n = ring.Count;
+                var inside = ring.Select(In).ToArray();
+                if (inside.All(x => x)) continue;
+                var s0 = Array.FindIndex(inside, x => !x);
+                var run = new List<Vec2>();
+                for (int q = 1; q <= n; q++)
+                {
+                    var i = (s0 + q) % n;
+                    if (inside[i]) { run.Add(ring[i]); continue; }
+                    if (run.Count > 1)
+                    {
+                        var len = Enumerable.Range(1, run.Count - 1).Sum(t => run[t].DistanceTo(run[t - 1]));
+                        if (len > bestLen) { bestLen = len; best = run; }
+                    }
+                    run = new List<Vec2>();
+                }
+            }
+        if (best == null || best.Count < 3) return null;
+        if (best[0].DistanceTo(pa) > best[^1].DistanceTo(pa)) best.Reverse();
+        // Prolonga as pontas 1 m na tangente (as faixas chegam inteiras até o limite da zona).
+        var e0 = (best[0] - best[1]).Normalized();
+        var e1 = (best[^1] - best[^2]).Normalized();
+        best.Insert(0, best[0] + e0 * 1.0);
+        best.Add(best[^1] + e1 * 1.0);
+        var normals = new List<Vec2>();
+        for (int i = 0; i < best.Count; i++)
+        {
+            var t = (best[Math.Min(best.Count - 1, i + 1)] - best[Math.Max(0, i - 1)]).Normalized();
+            normals.Add(new Vec2(t.Y, -t.X));
+        }
+        // Normais para fora do pavimento.
+        var mid = best.Count / 2;
+        var probe = best[mid] + normals[mid] * 0.1;
+        if (pavement.Any(p => p.Contains(probe))) normals = normals.Select(v => v * -1).ToList();
+        // Peso: 0 no trecho reto da via A, 1 no da via B; a passagem acontece só na curva (dentro do triângulo da esquina).
+        var acc = new List<double> { 0 };
+        for (int i = 1; i < best.Count; i++) acc.Add(acc[^1] + best[i].DistanceTo(best[i - 1]));
+        var inTri = best.Select(p => tri.Contains(p)).ToArray();
+        var f = Array.IndexOf(inTri, true);
+        var l = Array.LastIndexOf(inTri, true);
+        var w = new List<double>();
+        for (int i = 0; i < best.Count; i++)
+        {
+            if (f < 0 || l <= f) { w.Add(acc[i] / Math.Max(1e-6, acc[^1])); continue; }
+            var u = Math.Clamp((acc[i] - acc[f]) / Math.Max(1e-6, acc[l] - acc[f]), 0, 1);
+            w.Add(u * u * (3 - 2 * u));
+        }
+        return (best, normals, w);
+    }
+
+    /// <summary>Via e lado cuja calçada (entre a pista e o alinhamento) fica mais perto do ponto.</summary>
+    private static (int Road, bool Left) NearestSide(IntersectionLayout L, Vec2 p)
+    {
+        var best = (-1, false);
+        var score = double.MaxValue;
+        for (int i = 0; i < L.Roads.Count; i++)
+        {
+            var r = L.Roads[i];
+            var sd = r.Axis.SignedDistance(p);
+            var left = sd > 0;
+            var w = left ? r.Def.LeftWidth : r.Def.RightWidth;
+            var t = left ? r.Def.TotalLeft : r.Def.TotalRight;
+            var ad = Math.Abs(sd);
+            var sc = ad < w ? w - ad : ad > t + 0.3 ? ad - t : 0;
+            if (sc < score) { score = sc; best = (i, left); }
+        }
+        return best;
     }
 
     /// <summary>Faixas de sarjeta das vias (vãos do pavimento junto ao meio-fio) que não são recortadas pela interseção.</summary>

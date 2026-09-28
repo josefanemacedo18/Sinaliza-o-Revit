@@ -44,7 +44,7 @@ public static class IntersectionDemo
         var d = (IntersectionDefinition)template.CloneWithNewId();
         d.Node = Vec2.Zero;
         d.MainRoadId = null;
-        return Create(d, roads, groups, paths, defs);
+        return Create(d, roads, groups, paths, defs, cat);
     }
 
     /// <summary>
@@ -52,10 +52,18 @@ public static class IntersectionDemo
     /// <paramref name="paths"/> os eixos resolvidos por id de marca.
     /// </summary>
     public static Scene Create(IntersectionDefinition d, List<IntersectionRoad> roads, List<List<MarkingDefinition>> groups,
-        Dictionary<string, Polyline2> paths, List<MarkingDefinition>? defs = null)
+        Dictionary<string, Polyline2> paths, List<MarkingDefinition>? defs = null, Catalogo? cat = null)
     {
         defs ??= groups.SelectMany(g => g).ToList();
         d.RoadIds = roads.Select(r => r.Def.Id).ToList();
+        // Mesmo perfil de calçada que o plugin lê das vias no projeto (cada lado de cada via).
+        if (d.MatchRoadSection && cat != null)
+        {
+            var pctx = new BuildContext { Catalog = cat };
+            var profiles = roads.Select((r, k) => EdgeProfile.FromRoadSides(r.Def, groups[k].Where(m => m.Id != r.Def.Id), pctx)).ToList();
+            d.RoadProfiles = profiles;
+            d.EdgeProfile = EdgeProfile.Best(profiles.Select(p => p.Left.Sum(b => b.Width) >= p.Right.Sum(b => b.Width) ? p.Left : p.Right));
+        }
         var L = IntersectionGenerator.Layout(d, roads);
         for (int k = 0; k < roads.Count; k++)
             foreach (var m in groups[k])

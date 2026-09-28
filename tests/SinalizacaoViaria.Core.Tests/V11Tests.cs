@@ -40,7 +40,7 @@ public class V11Tests
         Assert.NotEmpty(L.Pavement);
         Assert.NotEmpty(L.Curb);
         // Ponto sobre a curva da esquina (bissetriz): pavimentado com o raio pedido, e não com outro.
-        var w = 6.8;
+        var w = L.Roads[0].Def.RightWidth;   // pista até a face do meio-fio (faixas + sarjeta)
         var c = new Vec2(w + r, w + r);
         var onCurve = c + (Vec2.Zero - c).Normalized() * (r * 0.9);    // um pouco para dentro do pavimento
         var outCurve = c + (Vec2.Zero - c).Normalized() * (r * 1.1 + 0.2);

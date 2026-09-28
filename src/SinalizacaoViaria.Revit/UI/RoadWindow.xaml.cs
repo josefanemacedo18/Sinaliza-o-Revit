@@ -71,6 +71,7 @@ public partial class RoadWindow : Window
     private SectionRow? _selected;
     private bool _loading = true;
     private bool _loadingDetails;
+    private bool _editing;
 
     public RoadSetup? Setup { get; private set; }
     public TipoConexao Connection { get; private set; } = TipoConexao.Intersecao;
@@ -195,6 +196,7 @@ public partial class RoadWindow : Window
     /// <summary>Abre a janela com a seção de uma via existente (Editar → via inteira).</summary>
     public void LoadForEdit(RoadSetup s)
     {
+        _editing = true;
         Title = "Editar via – seção transversal";
         LoadSetup(s);
         if (CbTemplate.Items.Count > 0) CbTemplate.SelectedIndex = -1;
@@ -221,6 +223,8 @@ public partial class RoadWindow : Window
         TbMedianVeg.Text = s.MedianVegetationHeight is { } mv ? UiHelpers.F(mv) : "";
         Select(CbMedianDevice, s.MedianDevice);
         CkInvertCenter.IsChecked = s.InvertCenter;
+        // Via existente: mantém o que ela tinha (vias antigas: sarjeta dentro da faixa); via nova: somada.
+        CkGutterAdds.IsChecked = s.SarjetaSomada ?? !_editing;
         TbSpeed.Text = UiHelpers.F(s.Speed, "0");
         CbDivider.SelectedItem = s.LaneDividerCode;
         CbEdge.SelectedItem = s.EdgeCode;
@@ -281,6 +285,7 @@ public partial class RoadWindow : Window
             EndSetback = UiHelpers.Parse(TbEnd, 0, "Recuo final", 0, 10000),
             Inscriptions = CkInscriptions.IsChecked == true,
             PhysicalElements = CkPhysical.IsChecked == true,
+            SarjetaSomada = CkGutterAdds.IsChecked == true,
             Pavement = (CbPavement.SelectedItem as PavementOption)?.Value ?? TipoPavimento.Asfalto,
             PavementThickness = UiHelpers.ParseNullable(TbPavThickness, "Espessura do pavimento", 0.01, 2),
         };
@@ -326,8 +331,15 @@ public partial class RoadWindow : Window
 
             var counts = defs.GroupBy(d => d.DisplayCode).Select(g => $"{g.Count()}× {g.Key}");
             var warnings = s.Warnings.Concat(geo.Warnings).Distinct().ToList();
-            TxtSummary.Text = $"Largura total: {UiHelpers.F(s.TotalWidth)} m  (pista: {UiHelpers.F(s.CarriagewayWidth)} m).  " +
-                              $"Elementos gerados: {string.Join(", ", counts)}." +
+            var wd = s.Widths();
+            TxtWidths.Text =
+                $"Largura total (alinhamento a alinhamento) ......... {UiHelpers.F(wd.Total),7} m\n" +
+                $"Pista entre as faces dos meios-fios ............... {UiHelpers.F(wd.EntreMeiosFios),7} m\n" +
+                $"Pista incluindo os meios-fios ..................... {UiHelpers.F(wd.ComMeiosFios),7} m\n" +
+                $"  faixas de tráfego {UiHelpers.F(wd.Faixas)} · sarjetas {UiHelpers.F(wd.Sarjetas)}{(s.SarjetaSomada == true ? " (somadas)" : " (dentro das faixas)")}" +
+                $" · meios-fios {UiHelpers.F(wd.MeiosFios)} · calçadas {UiHelpers.F(wd.Calcadas)}" +
+                (wd.Canteiros > 0 ? $" · canteiros laterais {UiHelpers.F(wd.Canteiros)}" : "") + (wd.Central > 0 ? $" · canteiro central {UiHelpers.F(wd.Central)}" : "");
+            TxtSummary.Text = $"Elementos gerados: {string.Join(", ", counts)}." +
                               (warnings.Count > 0 ? "\n⚠ " + string.Join("\n⚠ ", warnings) : "");
             TxtSummary.Foreground = warnings.Count > 0 ? System.Windows.Media.Brushes.SaddleBrown : System.Windows.Media.Brushes.Black;
         }
@@ -504,7 +516,8 @@ public partial class RoadWindow : Window
             Show(bike, CkFundo, CkBidirecional);
             Show(bus, CkFundoOnibus, LblCorOnibus, CbCorOnibus);
             Show(t is not (TipoElementoSecao.Calcada or TipoElementoSecao.FaixaSeguranca), LblDisp, CbDispositivo);
-            Show(walk, LblSarjeta, TbSarjeta);
+            Show(walk, LblSarjeta, TbSarjeta, LblMeioFio, TbMeioFio);
+            LblAltura.Text = walk ? "Altura do meio-fio / nível da calçada (m)" : "Nível do topo em relação à pista (m)";
             Show(walk || t == TipoElementoSecao.CanteiroFisico, LblVegetacao, TbVegetacao);
             Show(true, LblAltura, TbAltura);
             Show(t == TipoElementoSecao.FaixaCaminhada, LblCorCaminhada, CbCorCaminhada, LblEsp, TbEspacamento);
@@ -523,6 +536,7 @@ public partial class RoadWindow : Window
             Select(CbCorOnibus, e.CorOnibus);
             Select(CbDispositivo, e.Dispositivo);
             TbSarjeta.Text = UiHelpers.F(e.Sarjeta);
+            TbMeioFio.Text = UiHelpers.F(e.LarguraMeioFio);
             Select(CbCorCaminhada, e.CorCaminhada);
             TbLarguraLinha.Text = UiHelpers.F(e.LarguraLinha);
             CkSeccionada.IsChecked = e.LinhaSeccionada;
@@ -563,6 +577,7 @@ public partial class RoadWindow : Window
         el.Dispositivo = Selected<string?>(CbDispositivo);
         double Num(TextBox tb, double current, double min = 0) => UiHelpers.ParseOpt(tb.Text) is { } v && v >= min ? v : current;
         el.Sarjeta = Num(TbSarjeta, el.Sarjeta);
+        el.LarguraMeioFio = Num(TbMeioFio, el.LarguraMeioFio, 0.05);
         if (CbCorCaminhada.SelectedItem is Option<MarkingColor> cc) el.CorCaminhada = cc.Value;
         el.LarguraLinha = Num(TbLarguraLinha, el.LarguraLinha, 0.02);
         el.LinhaSeccionada = CkSeccionada.IsChecked == true;

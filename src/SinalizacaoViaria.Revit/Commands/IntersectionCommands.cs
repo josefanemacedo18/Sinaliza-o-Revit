@@ -38,7 +38,7 @@ internal static class IntersectionForms
                 }).ToList()).ToList();
                 var byId = groups.SelectMany(g => g).ToDictionary(m => m.Id);
                 var roadsCopy = real.Roads.Select(r => r with { Def = byId.GetValueOrDefault(r.Def.Id) as RoadPavementDefinition ?? r.Def }).ToList();
-                scene = IntersectionDemo.Create(c, roadsCopy, groups, real.Paths);
+                scene = IntersectionDemo.Create(c, roadsCopy, groups, real.Paths, null, PluginContext.Catalog);
                 info = "Pré-visualização com as vias do projeto.";
             }
             else
