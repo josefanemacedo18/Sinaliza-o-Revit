@@ -71,6 +71,39 @@ public sealed class IntersectionService
         return res;
     }
 
+    /// <summary>Rotatória num nó de vias (terminal de nó viário ou anel elevado), na cota indicada – só as vias nesse nível.</summary>
+    public List<RenderResult> AddRoundabout(Vec2 center, double z, RoundaboutDefinition template, out RoundaboutDefinition? created)
+    {
+        created = null;
+        var roads = Roads(createMissing: true).Where(r => Math.Abs(RoadZ(r, center) - z) < 3).ToList();
+        foreach (var it in MarkingStorage.Definitions(_doc).OfType<IntersectionDefinition>().Where(i => i.Node.DistanceTo(center) < template.OuterRadius + 5).ToList())
+            Remove(it);
+        var rb = (RoundaboutDefinition)template.CloneWithNewId();
+        rb.ChildIds.Clear();
+        rb.Center = center;
+        rb.Z = z;
+        var first = roads.OrderBy(r => IntersectionGenerator.Project(r.Axis, center).Distance).FirstOrDefault();
+        if (first != null) { rb.Output = first.Def.Output.Clone(); rb.Output.Grade = null; }
+        rb.Legs = RoundaboutGenerator.LegsFromRoads(center, roads, rb.OuterRadius + 25);
+        if (rb.Legs.Count < 2) return new List<RenderResult>();
+        created = rb;
+        return Refresh(rb);
+    }
+
+    /// <summary>Cota absoluta (m) da pista da via no ponto: base do eixo + greide na estação.</summary>
+    public double RoadZ(IntersectionRoad r, Vec2 p)
+    {
+        var baseZ = PathResolver.Resolve(_doc, r.Def.Path)?.Z ?? r.Def.Path?.Z ?? 0;
+        return baseZ + (r.Def.Output.Grade?.Z(r.Axis.Project(p).Station) ?? 0);
+    }
+
+    /// <summary>As vias se cruzam em níveis diferentes (&gt; 2,5 m) no nó – viaduto, trincheira ou túnel, sem interseção.</summary>
+    public bool Separated(IEnumerable<IntersectionRoad> roads, Vec2 node)
+    {
+        var zs = roads.Select(r => RoadZ(r, node)).ToList();
+        return zs.Count >= 2 && zs.Max() - zs.Min() > 2.5;
+    }
+
     /// <summary>Cria/atualiza todas as interseções do projeto (ou só a mais próxima de <paramref name="near"/>).</summary>
     public List<RenderResult> IntersectAll(IntersectionDefinition template, Vec2? near = null, double maxDistance = 60)
     {
@@ -88,6 +121,7 @@ public sealed class IntersectionService
         {
             if (roundabouts.Any(r => r.Center.DistanceTo(node) < r.OuterRadius + 5)) continue;
             if (!IntersectionGenerator.NeedsIntersection(ids.Select(i => roads[i]).ToList(), node)) continue;
+            if (Separated(ids.Select(i => roads[i]), node)) continue;   // vias em níveis diferentes: sem interseção
             var it = existing.FirstOrDefault(e => e.Node.DistanceTo(node) < IntersectionGenerator.NodeMergeDistance * 2);
             if (it == null)
             {
@@ -148,6 +182,7 @@ public sealed class IntersectionService
         {
             if (roundabouts.Any(r => r.Center.DistanceTo(node) < r.OuterRadius + 5)) continue;   // o nó já é uma rotatória
             if (!IntersectionGenerator.NeedsIntersection(ids.Select(i => roads[i]).ToList(), node)) continue;
+            if (Separated(ids.Select(i => roads[i]), node)) continue;   // vias em níveis diferentes: sem interseção
             var it = existing.FirstOrDefault(e => e.Node.DistanceTo(node) < IntersectionGenerator.NodeMergeDistance * 4);
             if (it == null)
             {
@@ -230,7 +265,14 @@ public sealed class IntersectionService
             Remove(it);
             return results;
         }
+        if (Separated(roads, node.Node))
+        {
+            // As vias passam a se cruzar em desnível (greide/viaduto): a interseção sai e as vias ficam contínuas.
+            Remove(it);
+            return results;
+        }
         it.Node = node.Node;
+        it.Z = roads.Average(r => RoadZ(r, node.Node));
         it.EdgeProfile = it.MatchRoadSection ? EdgeProfile.Best(roads.Select(r => ProfileOf(r.Def))) : new List<EdgeBand>();
         var layout = IntersectionGenerator.Layout(it, roads);
         if (layout.Roads.Count > 0) it.Hierarchy = layout.Roads[layout.Main].Def.Hierarchy;
@@ -278,7 +320,8 @@ public sealed class IntersectionService
         // Rotatória ligada às vias: acompanha o nó (eixos movidos) e ganha/perde ramos conforme as vias que chegam.
         if (rb.Legs.Any(l => l.GroupId != null || l.RoadId != null))
         {
-            var roads = Roads();
+            // Só as vias no nível da rotatória (a via que passa por baixo de uma rotatória elevada não é ramo dela).
+            var roads = Roads().Where(r => Math.Abs(RoadZ(r, rb.Center) - rb.Z) < 3).ToList();
             var near = roads.Where(r => IntersectionGenerator.Project(r.Axis, rb.Center).Distance <= Math.Max(r.Def.TotalLeft, r.Def.TotalRight) + rb.OuterRadius).ToList();
             var node = IntersectionGenerator.FindNodes(near).OrderBy(n => n.Node.DistanceTo(rb.Center)).FirstOrDefault();
             if (node.Roads != null && node.Node.DistanceTo(rb.Center) < 20) rb.Center = node.Node;
@@ -286,6 +329,13 @@ public sealed class IntersectionService
             if (legs.Count >= 2) rb.Legs = RoundaboutGenerator.MergeLegSettings(rb.Legs, legs);
             var hs = legs.Select(l => roads.FirstOrDefault(r => r.Def.Id == l.RoadId)?.Def.Hierarchy).OrderByDescending(Hierarquia.Rank).FirstOrDefault();
             if (hs != null) rb.Hierarchy = hs;
+        }
+        if (rb.Legs.Any(l => l.RoadId != null))
+        {
+            // Cota da rotatória pelo greide das vias que chegam nela.
+            var ids = rb.Legs.Select(l => l.RoadId).Where(i => i != null).ToHashSet();
+            var linked = Roads().Where(r => ids.Contains(r.Def.Id)).ToList();
+            if (linked.Count > 0) rb.Z = linked.Average(r => RoadZ(r, rb.Center));
         }
         rb.EdgeProfile = new List<EdgeBand>();
         if (rb.MatchRoadSection)
@@ -466,6 +516,7 @@ public sealed class IntersectionService
             {
                 if (existingRb.Any(r => r.Center.DistanceTo(node) < r.OuterRadius + 5)) continue;
                 if (!IntersectionGenerator.NeedsIntersection(ids.Select(i => roads[i]).ToList(), node)) continue;
+                if (Separated(ids.Select(i => roads[i]), node)) continue;   // vias em níveis diferentes: sem interseção
                 results.AddRange(ConvertToRoundabout(node, rbTemplate, roads));
                 roads = Roads();
             }

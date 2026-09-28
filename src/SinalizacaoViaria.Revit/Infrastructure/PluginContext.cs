@@ -46,8 +46,10 @@ public static class PluginContext
         Func<string, MarkingDefinition?>? lookup = null, Func<IReadOnlyList<MarkingDefinition>>? all = null,
         Func<MarkingDefinition, SinalizacaoViaria.Core.Model.MarkingGeometry?>? geometryOf = null,
         Func<MarkingDefinition, SinalizacaoViaria.Core.Geometry.Polyline2?>? pathOf = null,
-        Func<SinalizacaoViaria.Core.Geometry.Vec2, double?>? ground = null, bool nativeTerrain = false) => new()
+        Func<SinalizacaoViaria.Core.Geometry.Vec2, double?>? ground = null, bool nativeTerrain = false,
+        Func<MarkingDefinition, double>? baseZOf = null) => new()
     {
+        BaseZOf = baseZOf,
         Ground = ground,
         NativeTerrain = nativeTerrain,
         Catalog = Catalog,

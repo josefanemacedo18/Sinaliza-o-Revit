@@ -107,20 +107,23 @@ public static class RibbonBuilder
                 "Grelhas de sarjeta e de piso com caixa, e canaleta com grelha contínua ao longo de linhas (barras transversais seguras para ciclistas)."));
         Split(inf, "SvObrasArte", "Obras de Arte",
             Data(typeof(CmdViaduto), "Viaduto", "viaduto",
-                "Viaduto com rampas de acesso em aterro, encontros, pilares, vigas/caixão/laje, barreiras, passeios, juntas, iluminação e faixas – greide com curvas verticais."),
+                "Viaduto num trecho de uma via existente ou numa via nova: a via (pisos, faixas, calçadas) passa sobre a estrutura – rampas de acesso, encontros, pilares, vigas/caixão/laje, guarda-corpos, juntas e iluminação."),
             Data(typeof(CmdPonte), "Ponte", "ponte",
-                "Ponte em vigas, caixão, arco inferior, arco superior, estaiada ou treliça, com pilares até o terreno/rio e lâmina d'água opcional."),
+                "Ponte num trecho de via (existente ou nova): reta ou em curva, em nível, entre margens ou convexa; vigas, caixão, arcos, estaiada ou treliça; apoios esconsos e pilares onde você quiser."),
             Data(typeof(CmdPassarela), "Passarela", "passarela",
                 "Passarela de pedestres em treliça com cobertura, rampas ≤ 8,33 % (NBR 9050) e guarda-corpos."),
             Data(typeof(CmdTunel), "Túnel", "tunel",
-                "Túnel em ferradura (NATM), circular (TBM) ou retangular, com revestimento, passeios, iluminação, ventiladores e emboques (testa, bisel ou pala)."),
+                "Túnel num trecho de via (existente ou nova): ferradura (NATM), circular (TBM) ou retangular, com revestimento, iluminação, ventiladores e emboques – a pista e os passeios são da via."),
             Data(typeof(CmdTrincheira), "Trincheira", "trincheira",
-                "Via rebaixada entre muros (flexão, cortina atirantada ou terra armada), com rampas, guarda-corpos, canaletas e laje de travessia."));
+                "Trecho de via rebaixado entre muros (flexão, cortina atirantada ou terra armada), com rampas, guarda-corpos, canaletas e laje de travessia."));
         Split(inf, "SvContencoes", "Contenções",
             Data(typeof(CmdMuroArrimo), "Muro de Arrimo", "muro",
                 "Muros de flexão, gravidade, contrafortes, gabião, terra armada e cortina atirantada – base no terreno, barbacãs, coroamento e reaterro no Toposolid."),
             Data(typeof(CmdTalude), "Talude", "talude",
                 "Taludes de corte e aterro com bermas, canaletas de crista, pé e bermas, descidas d'água e revestimento – aplicados ao Toposolid."));
+        Large(inf, typeof(CmdPerfilVia), "Perfil da Via", "perfil",
+            "Greide (perfil longitudinal) de uma via sobre a topografia: acompanha o terreno com rampa máxima e curvas verticais, rampa constante, nivelado ou por PIVs. " +
+            "Onde o terreno pede, a via vira obra automaticamente – viaduto/ponte nos aterros altos, túnel nos cortes profundos, trincheira nos cortes médios – e o resto é aterro e corte no Toposolid.");
         Large(inf, typeof(CmdNoViario), "Nó Viário", "noviario",
             "Interseção em desnível: diamante, diamante com rotatórias, trevo completo, trevo parcial, trombeta e rotatória em dois níveis – viadutos, rampas e laços com greide.");
         Large(inf, typeof(CmdTerraplenagem), "Terraplenagem", "terraplenagem",

@@ -329,7 +329,7 @@ public static class EarthworksGenerator
         var gr = Math.Max(0.02, d.MaxGrade);
         var rin = Math.Abs(g0 - bottom) / gr;
         var rout = Math.Abs(g1 - bottom) / gr;
-        if (rin + rout > L * 0.9)
+        if (rin + rout > L * 0.9 && !hosted)
         {
             var k = L * 0.9 / (rin + rout);
             rin *= k; rout *= k;

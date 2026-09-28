@@ -109,6 +109,13 @@ public sealed class CmdEditar : CommandBase
             if (UiHelpers.ShowModal(form.Window) != true) return Result.Cancelled;
             var def = form.Working;
             def.Id = stored.MarkingId;
+            if (def is InterchangeDefinition { Integrated: true } node)
+            {
+                // Nó sobre vias do plugin: refaz ramos, viaduto, terminais e acabamentos com os novos parâmetros.
+                var rr = InterchangeBuilder.Build(uidoc, node, node.Position, node.Z);
+                if (rr != null) Report("Nó viário", rr.Where(x => x.Warnings.Count > 0).ToList(), alwaysShow: true);
+                return Result.Succeeded;
+            }
             EnsureDetailView(uidoc, def.Output, keepExistingView: true);
             var r = MarkingCreator.Commit(uidoc, new[] { def }, $"SV - Editar {def.DisplayCode}");
             FootprintCutter.ApplyFor(uidoc, def);
@@ -241,6 +248,8 @@ public sealed class CmdEditar : CommandBase
         if (newPav != null)
         {
             newPav.CornerRadius ??= pav.CornerRadius;
+            newPav.MergeStart = pav.MergeStart;
+            newPav.MergeEnd = pav.MergeEnd;
             newPav.Hierarchy ??= pav.Hierarchy;
             newPav.Exclusions.AddRange(pav.Exclusions);
         }

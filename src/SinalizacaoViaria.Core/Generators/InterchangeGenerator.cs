@@ -1,3 +1,4 @@
+using SinalizacaoViaria.Core.Automation;
 using System.Globalization;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Geometry;
@@ -411,6 +412,7 @@ public static class InterchangeGenerator
 
     public static MarkingGeometry Build(InterchangeDefinition d, BuildContext ctx)
     {
+        if (d.Integrated) return BuildIntegrated(d, ctx);
         var geo = new MarkingGeometry();
         Func<Vec2, double> ground = d.FollowTerrain ? ctx.GroundAt : _ => 0;
         var warnings = new List<string>();
@@ -464,6 +466,38 @@ public static class InterchangeGenerator
         geo.PathLength = list.Sum(a => a.Path.Length);
         geo.PaintedLength = geo.PathLength;
         BridgeGenerator.Measure(geo, MarkingColor.Asfalto, area);
+        return geo;
+    }
+
+    /// <summary>
+    /// Nó sobre vias do plugin: as pistas (principal, transversal, ramos) são vias – aqui só os acabamentos do nó (zebrados,
+    /// linhas de continuidade, pórticos, iluminação, torres, grama dos laços, tabuleiros do anel).
+    /// </summary>
+    private static MarkingGeometry BuildIntegrated(InterchangeDefinition d, BuildContext ctx)
+    {
+        var geo = new MarkingGeometry();
+        var all = ctx.AllDefinitions?.Invoke() ?? Array.Empty<MarkingDefinition>();
+        PlanRoad? Road(string? gid)
+        {
+            if (gid == null) return null;
+            var pav = all.OfType<RoadPavementDefinition>().FirstOrDefault(p => p.GroupId == gid);
+            if (pav == null || ctx.PathOf?.Invoke(pav) is not { } axis) return null;
+            return PlanRoad.Of(pav, axis, ctx.BaseZOf?.Invoke(pav) ?? pav.PathRef.Z);
+        }
+        var main = Road(d.MainRoad);
+        var cross = Road(d.CrossRoad);
+        if (main == null || cross == null)
+        {
+            geo.Warnings.Add("Nó viário: a via principal ou a transversal não existe mais – refaça o nó (Editar) ou apague-o.");
+            return geo;
+        }
+        var ramps = d.Ramps.Select(r => (r, Road(r.Group))).Where(x => x.Item2 != null).Select(x => new RampOnSite(x.r, x.Item2!)).ToList();
+        var rbs = d.RoundaboutCenters.Select((c, i) => (c, i * 2 + 1 < d.RoundaboutData.Count ? d.RoundaboutData[i * 2] : 20.0,
+            i * 2 + 1 < d.RoundaboutData.Count ? d.RoundaboutData[i * 2 + 1] : d.Z)).ToList();
+        Func<Vec2, double> ground = d.FollowTerrain ? ctx.GroundAt : _ => main.Z(d.Position) - d.Z;
+        geo.Merge(InterchangeExtras.Build(d, main, cross, ramps, rbs, d.RingDecks.Select(v => (v.X, v.Y)), ground, d.Z, ctx.NativeTerrain));
+        geo.PathLength = ramps.Sum(r => r.Road.Axis.Length);
+        BridgeGenerator.Measure(geo, MarkingColor.Metal, 0);
         return geo;
     }
 

@@ -147,6 +147,13 @@ public static class IconFactory
                 dc.DrawLine(P(White, 1), new Point(13.5, 12), new Point(13.5, 20));
                 dc.DrawLine(P(White, 1), new Point(18.5, 12), new Point(18.5, 20));
                 break;
+            case "perfil":
+                // Perfil longitudinal: terreno, greide e um viaduto no vale.
+                dc.DrawGeometry(B(Color.FromRgb(150, 118, 84)), null, Close(Poly(new Point(1, 31), new Point(1, 12), new Point(8, 16), new Point(14, 28), new Point(20, 27), new Point(26, 14), new Point(31, 9), new Point(31, 31))));
+                dc.DrawLine(P(Asphalt, 2.5), new Point(1, 11), new Point(31, 9));
+                foreach (var x in new[] { 13.0, 19.0 }) dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(x - 1, 11, 2, 16));
+                dc.DrawEllipse(B(White), P(Blue, 1), new Point(16, 10), 2, 2);
+                break;
             case "terraplenagem":
                 dc.DrawGeometry(B(Color.FromRgb(150, 118, 84)), null, Close(Poly(new Point(1, 30), new Point(1, 14), new Point(8, 10), new Point(12, 20), new Point(20, 20), new Point(24, 8), new Point(31, 12), new Point(31, 30))));
                 dc.DrawLine(P(Asphalt, 3), new Point(10, 20), new Point(22, 20));

@@ -223,7 +223,8 @@ public static class IntersectionGenerator
                 {
                     var ax = roads[x].Axis;
                     var tol = Math.Max(roads[y].Def.TotalLeft, roads[y].Def.TotalRight) + 2.0;
-                    foreach (var end in new[] { ax.Points[0], ax.Points[^1] })
+                    var def = roads[x].Def;
+                    foreach (var end in new[] { def.MergeStart ? (Vec2?)null : ax.Points[0], def.MergeEnd ? null : ax.Points[^1] }.Where(e => e != null).Select(e => e!.Value))
                     {
                         var (_, dist, q) = Project(roads[y].Axis, end);
                         if (dist <= tol && !raw.Any(r => r.Item1.DistanceTo(q) < NodeMergeDistance)) raw.Add((q, x, y));

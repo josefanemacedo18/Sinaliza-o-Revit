@@ -32,6 +32,9 @@ public sealed class BuildContext
     /// <summary>Eixo (primeiro trecho) de outra marca – interseções e rotatórias.</summary>
     public Func<MarkingDefinition, Polyline2?>? PathOf { get; init; }
 
+    /// <summary>Cota (m) da base do caminho de outra marca – vias ligadas a nós viários.</summary>
+    public Func<MarkingDefinition, double>? BaseZOf { get; init; }
+
     /// <summary>Geometria de outra marca do projeto (cotas de seção, quadros de quantitativos).</summary>
     public Func<MarkingDefinition, MarkingGeometry?>? GeometryOf { get; init; }
 

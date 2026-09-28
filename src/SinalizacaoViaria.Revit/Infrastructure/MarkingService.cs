@@ -145,7 +145,7 @@ public sealed class MarkingService
         var native = true;
         var ctx = PluginContext.BuildContext(def.Output.Drape && def.Output.Mode == OutputMode.Modelo3D,
             view?.Scale ?? 100, id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList(), OtherGeometry,
-            d => PathResolver.Resolve(_doc, d.Path)?.Main, ground, native);
+            d => PathResolver.Resolve(_doc, d.Path)?.Main, ground, native, d => PathResolver.Resolve(_doc, d.Path)?.Z ?? 0);
         if (def.Path == null)
         {
             baseZ = def.PointZ ?? 0;

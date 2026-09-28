@@ -14,10 +14,13 @@ public static class InfraDemo
 
     /// <summary>Geometria da via (seção <paramref name="setup"/>, greide) + obras hospedadas no mesmo eixo.</summary>
     public static MarkingGeometry RoadWith(RoadSetup setup, Polyline2 axis, RoadGrade grade, IEnumerable<MarkingDefinition> hosted, Catalog.Catalogo catalog,
-        Func<Vec2, double?>? ground = null, double chunk = 3)
+        Func<Vec2, double?>? ground = null, double chunk = 3, IReadOnlyList<Polygon2>? cuts = null, bool cutPavement = true)
     {
         var output = new OutputSettings { Grade = grade.Clone() };
         var defs = setup.Build(PathReference.FromPoints(axis.Points, 0), output, catalog, DemoGroup);
+        if (cuts != null)
+            foreach (var d in defs.Where(x => cutPavement || x is not (RoadPavementDefinition or DeviceMarkingDefinition)))
+                foreach (var c in cuts) d.Exclusions.Add(new ExclusionZone { SourceId = "demo", Points = c.Outer.ToList() });
         var works = hosted.ToList();
         foreach (var w in works)
         {
@@ -81,7 +84,12 @@ public static class InfraDemo
     /// taludes até o terreno natural – o que o Revit aplica ao Toposolid.
     /// </summary>
     public static GradingResult Grade(RoadSetup setup, Polyline2 axis, RoadGrade grade, IEnumerable<MarkingDefinition> works, MarkingGeometry worksGeo,
-        Func<Vec2, double?> ground, double subgrade = 0.4)
+        Func<Vec2, double?> ground, double subgrade = 0.4) =>
+        Grading.Design(Corridors(setup, axis, grade, works, worksGeo, subgrade), worksGeo.Pads, ground, 0, 80, 0.5, 4, 2);
+
+    /// <summary>Faixas de terraplenagem da via (fora dos trechos em obra) + as das obras.</summary>
+    public static List<GradeCorridor> Corridors(RoadSetup setup, Polyline2 axis, RoadGrade grade, IEnumerable<MarkingDefinition> works, MarkingGeometry worksGeo,
+        double subgrade = 0.4)
     {
         var pav = setup.PavementDefinition();
         var prof = grade.ToProfile(2);
@@ -98,7 +106,7 @@ public static class InfraDemo
             if (cursor >= L) break;
         }
         corridors.AddRange(worksGeo.Corridors);
-        return Grading.Design(corridors, worksGeo.Pads, ground, 0, 80, 0.5, 4, 2);
+        return corridors;
     }
 
     /// <summary>Peças planas (pisos, pinturas) cortadas em trechos ao longo do eixo e levantadas até o greide.</summary>

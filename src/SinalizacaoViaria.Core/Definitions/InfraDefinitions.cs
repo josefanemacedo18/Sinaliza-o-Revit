@@ -474,6 +474,8 @@ public sealed class TrenchDefinition : MarkingDefinition, ITerrainAware, IHosted
     public double HostEdgeRise { get; set; }
     public RoadGrade? GradeBefore { get; set; }
     public bool StraightAxis { get; set; }
+    /// <summary>Só os muros: o greide da via (já rebaixado pelo Perfil da via) é mantido.</summary>
+    public bool KeepRoadGrade { get; set; }
     public int Lanes { get; set; } = 2;
     public double LaneWidth { get; set; } = 3.50;
     public double ShoulderWidth { get; set; } = 0.60;
@@ -617,6 +619,21 @@ public enum TipoNoViario
     RotatoriaElevada,
 }
 
+/// <summary>Ramo de um nó viário (via do plugin) e suas ligações.</summary>
+public sealed class RampRecord
+{
+    public string Group { get; set; } = "";
+    public string Name { get; set; } = "";
+    public Generators.PapelRamo Role { get; set; }
+    public Automation.LigacaoRamo StartLink { get; set; }
+    public Automation.LigacaoRamo EndLink { get; set; }
+    public string? StartRoad { get; set; }
+    public string? EndRoad { get; set; }
+    public double LaneWidth { get; set; } = 4.0;
+    public double Shoulder { get; set; } = 2.0;
+    public double Taper { get; set; } = 60;
+}
+
 /// <summary>
 /// Interseção em desnível (nó viário): via principal, via transversal em viaduto, rampas e laços com greide, aterros
 /// com taludes, barreiras, iluminação e faixas pintadas – montados a partir do centro e das direções das vias.
@@ -672,6 +689,25 @@ public sealed class InterchangeDefinition : MarkingDefinition, ITerrainAware
     public bool FollowTerrain { get; set; } = true;
     public bool AdjustTerrain { get; set; } = true;
     public List<Vec2>? GroundLine { get; set; }
+
+    // ---- nó montado sobre vias do plugin
+    /// <summary>Grupo da via principal (a que passa por baixo ou por cima) – nulo = nó avulso (formato antigo).</summary>
+    public string? MainRoad { get; set; }
+    public string? CrossRoad { get; set; }
+    /// <summary>Ramos criados (cada um é uma via do plugin).</summary>
+    public List<RampRecord> Ramps { get; set; } = new();
+    /// <summary>Obras e conexões criadas pelo nó (viadutos hospedados, rotatórias) – removidas ao refazer o nó.</summary>
+    public List<string> WorkIds { get; set; } = new();
+    /// <summary>Greide da via de cima antes do nó (restaurado ao refazer/remover).</summary>
+    public RoadGrade? OverBaseGrade { get; set; }
+    /// <summary>Rotatórias dos terminais / anel (centro, raio, cota absoluta) e trechos do anel em tabuleiro.</summary>
+    public List<Vec2> RoundaboutCenters { get; set; } = new();
+    public List<double> RoundaboutData { get; set; } = new();
+    public List<Vec2> RingDecks { get; set; } = new();
+    /// <summary>Cota absoluta da base usada pelos acabamentos do nó (m).</summary>
+    public double BaseZ { get; set; }
+    /// <summary>Preservar as vias e só (re)fazer ramos, viaduto e acabamentos.</summary>
+    public bool Integrated => MainRoad != null && CrossRoad != null;
 
     public override string KindName => "Interseção em desnível";
     public override string DisplayCode => Type switch

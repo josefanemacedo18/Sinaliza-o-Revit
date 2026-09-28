@@ -403,16 +403,18 @@ internal static class InfraForms
 
     public static FormWindow Interchange(InterchangeDefinition d, bool edit)
     {
-        var w = new FormWindow(edit ? "Editar interseção em desnível" : "Interseção em desnível", "Interseção em desnível (nó viário)",
-            "Clique o CENTRO do nó (sobre o cruzamento de duas vias, a direção vem da via principal) ou um ponto livre e a direção da via principal. " +
-            "Viaduto, rampas e laços com greide, aterros, barreiras e iluminação são gerados; onde um ramo passa sobre outro vira ponte.",
+        var w = new FormWindow(edit ? "Editar nó viário" : "Nó viário", "Interseção em desnível (nó viário) sobre as vias",
+            "Clique o CRUZAMENTO de duas vias do plugin: a via de cima ganha greide e viaduto (esconso conforme o ângulo) e cada ramo ou laço " +
+            "vira uma VIA do plugin – pista, faixas, bordos, defensas, greide – ligada às duas por faixas de desaceleração/aceleração com taper, " +
+            "interseções ou rotatórias. Num ponto livre as duas vias são criadas antes. Tudo continua editável como via.",
             d, () =>
             {
                 var c = (InterchangeDefinition)MarkingDefinition.FromJson(d.ToJson())!;
-                c.Position = Vec2.Zero; c.FollowTerrain = false;
-                var g = Build(c, null);
-                return new FormPreview(g, null, null, Info(g, $"Pavimento aproximado: {g.AreaByColor.GetValueOrDefault(MarkingColor.Asfalto):0} m²."));
-            }, false, edit ? "Aplicar" : "Inserir", 1200, 780);
+                c.Position = Vec2.Zero; c.FollowTerrain = false; c.AngleDeg = 0;
+                c.MainRoad = null; c.CrossRoad = null; c.MainLength = 1100; c.CrossLength = 1000;
+                var g = InterchangeDemo.Build(c, PluginContext.Catalog);
+                return new FormPreview(g, null, null, Info(g, "Exemplo sobre uma rodovia de pista dupla e uma via transversal (as suas vias entram no lugar delas)."));
+            }, false, edit ? "Aplicar" : "Inserir", 1240, 800);
         w.Choice("Tipo", new[]
             {
                 ("Diamante", TipoNoViario.Diamante), ("Diamante com rotatórias", TipoNoViario.DiamanteRotatorias), ("Trevo completo", TipoNoViario.TrevoCompleto),
@@ -421,7 +423,7 @@ internal static class InfraForms
             }, () => d.Type, v => d.Type = v)
          .Number("Ângulo entre as vias (°)", () => d.CrossAngleDeg, v => d.CrossAngleDeg = v, 45, 135, "0")
          .Check("Via principal por baixo (transversal em viaduto)", () => d.MainBelow, v => d.MainBelow = v)
-         .Section("Via principal (pista dupla)")
+         .Section("Vias criadas num ponto livre", "Usadas só quando não há vias no ponto clicado; com vias existentes valem as seções delas.")
          .Integer("Faixas por sentido", () => d.MainLanes, v => d.MainLanes = v, 1, 5)
          .Number("Largura da faixa (m)", () => d.MainLaneWidth, v => d.MainLaneWidth = v, 3, 4)
          .Number("Canteiro central (m)", () => d.MainMedian, v => d.MainMedian = v, 0.6, 20)
@@ -827,63 +829,6 @@ public sealed class CmdGrelha : CommandBase
 }
 
 /// <summary>Interseção em desnível: centro (encaixa no cruzamento de vias) e direção da via principal.</summary>
-[Transaction(TransactionMode.Manual)]
-public sealed class CmdNoViario : CommandBase
-{
-    protected override Result Run(UIApplication app, UIDocument uidoc)
-    {
-        var template = UiHelpers.Remembered<InterchangeDefinition>("infra:no") ?? new InterchangeDefinition();
-        template.Output = InfraRunner.Output3D();
-        var w = InfraForms.Interchange(template, false);
-        if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
-        UiHelpers.Remember("infra:no", template);
-        PluginContext.SaveSettings();
-        var doc = uidoc.Document;
-        var c = Picking.PickPoint(uidoc, "Interseção em desnível: clique o CENTRO (sobre o cruzamento de duas vias, ou um ponto livre) – ESC cancela");
-        if (c == null) return Result.Cancelled;
-        var d = (InterchangeDefinition)template.CloneWithNewId();
-        var pt = UnitConv.ToVec2(c);
-        d.Position = pt;
-        d.Z = UnitConv.M(c.Z);
-        // Sobre vias existentes: a mais importante (mais larga) é a principal; o ângulo vem dos eixos.
-        var roads = MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>()
-            .Select(r => (Road: r, Path: PathResolver.Resolve(doc, r.Path)))
-            .Where(x => x.Path?.Main != null)
-            .Select(x => (x.Road, Axis: x.Path!.Main!, Z: x.Path.Z, Hit: IntersectionGenerator.Project(x.Path.Main!, pt)))
-            .Where(x => x.Hit.Distance < Math.Max(x.Road.TotalLeft, x.Road.TotalRight) + 10)
-            .OrderByDescending(x => x.Road.TotalLeft + x.Road.TotalRight).ToList();
-        if (roads.Count > 0)
-        {
-            var main = roads[0];
-            d.Position = main.Hit.Point;
-            d.Z = main.Z;
-            var t = main.Axis.TangentAt(Math.Clamp(main.Hit.Station, 0, main.Axis.Length));
-            d.AngleDeg = Math.Atan2(t.Y, t.X) * 180 / Math.PI;
-            if (roads.Count > 1)
-            {
-                var o = roads[1];
-                var t2 = o.Axis.TangentAt(Math.Clamp(o.Hit.Station, 0, o.Axis.Length));
-                var ang = Math.Acos(Math.Clamp(Math.Abs(t.Dot(t2)), 0, 1)) * 180 / Math.PI;
-                d.CrossAngleDeg = Math.Clamp(ang, 45, 90);
-                if (t.Cross(t2) < 0) d.CrossAngleDeg = 180 - d.CrossAngleDeg;
-            }
-        }
-        else
-        {
-            var q = Picking.PickPoint(uidoc, "Clique a direção da via principal – ESC = eixo X");
-            if (q != null && UnitConv.ToVec2(q).DistanceTo(pt) > 0.5)
-            {
-                var dir = UnitConv.ToVec2(q) - pt;
-                d.AngleDeg = Math.Atan2(dir.Y, dir.X) * 180 / Math.PI;
-            }
-        }
-        var results = MarkingCreator.Commit(uidoc, new[] { d }, "SV - Interseção em desnível");
-        TerrainActions.AfterCreate(uidoc, d);
-        Report("Interseção em desnível", results);
-        return Result.Succeeded;
-    }
-}
-
 /// <summary>Terraplenagem: ajusta o Toposolid às vias, conexões e obras (corte, aterro, taludes e escavação).</summary>
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdTerraplenagem : CommandBase

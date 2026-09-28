@@ -116,6 +116,7 @@ internal static class RoadWorks
             g = def switch
             {
                 BridgeDefinition br => InfraRoads.BridgeOnRoad(g, br, s0, s1, L, ground),
+                TrenchDefinition { KeepRoadGrade: true } => g,
                 TrenchDefinition tr => InfraRoads.TrenchOnRoad(g, s0, s1, tr.Depth, tr.MaxGrade, tr.VerticalCurve, ground),
                 TunnelDefinition tn => InfraRoads.TunnelOnRoad(g, s0, s1, tn.StraightAxis),
                 _ => g,

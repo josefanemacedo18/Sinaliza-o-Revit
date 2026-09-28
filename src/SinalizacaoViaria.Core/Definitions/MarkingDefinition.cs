@@ -1235,6 +1235,11 @@ public sealed class RoadPavementDefinition : MarkingDefinition
     public double? CornerRadius { get; set; }
     /// <summary>Seção transversal completa (RoadSetup em JSON) usada para gerar a via – permite editar a via inteira depois.</summary>
     public string? SetupJson { get; set; }
+    /// <summary>
+    /// Pontas que convergem em faixa paralela com outra via (ramos de nós viários): não geram interseção nem cul-de-sac.
+    /// </summary>
+    public bool MergeStart { get; set; }
+    public bool MergeEnd { get; set; }
 
     public double DefaultThickness => Material switch { TipoPavimento.Bloquete => 0.08, TipoPavimento.Concreto => 0.15, _ => 0.05 };
     public double ActualThickness => Thickness is > 0 ? Thickness.Value : DefaultThickness;
