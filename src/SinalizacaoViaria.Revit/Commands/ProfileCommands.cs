@@ -18,6 +18,14 @@ namespace SinalizacaoViaria.Revit.Commands;
 public sealed class CmdPerfilVia : CommandBase
 {
     private static PerfilOpcoes _opt = new();
+
+    /// <summary>PIVs atuais da via no formato "estaca; cota; curva" (uma linha por PIV).</summary>
+    private static string CurrentPvis(RoadGrade g)
+    {
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        return string.Join("\n", g.Points.OrderBy(p => p.S).Select(p =>
+            p.Curve is { } c ? string.Format(ci, "{0:0.##}; {1:0.###}; {2:0.#}", p.S, p.Z, c) : string.Format(ci, "{0:0.##}; {1:0.###}", p.S, p.Z)));
+    }
     private static bool _replace = true;
 
     protected override Result Run(UIApplication app, UIDocument uidoc)
@@ -56,14 +64,26 @@ public sealed class CmdPerfilVia : CommandBase
             .Choice("Greide", new[]
             {
                 ("Acompanhar o terreno suavizado (menor terraplenagem)", ModoGreide.AcompanharTerreno), ("Rampa constante entre as pontas", ModoGreide.RampaConstante),
-                ("Nivelado numa cota", ModoGreide.Nivelado), ("PIVs digitados", ModoGreide.Manual),
-            }, () => o.Mode, v => o.Mode = v)
+                ("Compensar corte e aterro (menos bota-fora e empréstimo)", ModoGreide.Compensado),
+                ("Nivelado numa cota", ModoGreide.Nivelado), ("PIVs digitados (edite os da via)", ModoGreide.Manual),
+            }, () => o.Mode, v =>
+            {
+                o.Mode = v;
+                // PIVs digitados partem do greide atual da via (para ajustar em vez de começar do zero).
+                if (v == ModoGreide.Manual && string.IsNullOrWhiteSpace(o.ManualPvis)) o.ManualPvis = CurrentPvis(road.Grade);
+            })
             .Number("Rampa máxima (%)", () => o.MaxGrade * 100, v => o.MaxGrade = v / 100, 0.5, 15, "0.0#", "DNIT: 3–6 % em rodovias; vias urbanas até 8–10 %.")
             .Number("Curva vertical nos PIVs (m)", () => o.VerticalCurve, v => o.VerticalCurve = v, 0, 1000, "0")
+            .Number("Parâmetro K das curvas (m/%; 0 = só o comprimento acima)", () => o.CurveK, v => o.CurveK = v, 0, 200, "0.#",
+                "L = K × variação de rampa (%). Urbano ~40 km/h: K 4–7; rodovia 80 km/h: K 24–30 (DNIT). O maior entre L e o comprimento acima vale.")
+            .If(() => o.Mode == ModoGreide.Compensado, x => x
+                .Number("Suavização do terreno (m)", () => o.Smoothing, v => o.Smoothing = v, 5, 2000, "0")
+                .Number("Fator de homogeneização (corte ÷ aterro)", () => o.Homogenization, v => o.Homogenization = v, 1, 2, "0.00",
+                    "O greide sobe ou desce até o corte cobrir o aterro compactado × este fator."))
             .If(() => o.Mode == ModoGreide.AcompanharTerreno, x => x
                 .Number("Suavização do terreno (m)", () => o.Smoothing, v => o.Smoothing = v, 5, 2000, "0", "Janela da média móvel: maior = greide mais reto.")
                 .Number("Alteamento do greide (m, + sobe / − desce)", () => o.Offset, v => o.Offset = v, -30, 30))
-            .If(() => o.Mode is ModoGreide.AcompanharTerreno or ModoGreide.RampaConstante, x => x
+            .If(() => o.Mode is ModoGreide.AcompanharTerreno or ModoGreide.RampaConstante or ModoGreide.Compensado, x => x
                 .Check("Início na cota do terreno", () => o.StartZ == null, v => o.StartZ = v ? null : o.StartZ ?? 0)
                 .Number("Cota no início (m, relativa à base)", () => o.StartZ ?? 0, v => { if (o.StartZ != null) o.StartZ = v; }, -500, 500)
                 .Check("Fim na cota do terreno", () => o.EndZ == null, v => o.EndZ = v ? null : o.EndZ ?? 0)

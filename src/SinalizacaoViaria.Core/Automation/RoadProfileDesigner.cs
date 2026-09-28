@@ -15,6 +15,8 @@ public enum ModoGreide
     Nivelado,
     /// <summary>PIVs digitados (estaca; cota; curva vertical).</summary>
     Manual,
+    /// <summary>Acompanha o terreno suavizado com o greide subido/descido até o corte compensar o aterro (menos bota-fora e empréstimo).</summary>
+    Compensado,
 }
 
 /// <summary>Relevo da via ao ser criada sobre o terreno nativo (Toposolid).</summary>
@@ -40,6 +42,13 @@ public sealed record TrechoVia(TipoTrecho Kind, double S0, double S1, double Max
 /// <summary>Opções da ferramenta Perfil da via.</summary>
 public sealed class PerfilOpcoes
 {
+    public PerfilOpcoes Clone()
+    {
+        var c = (PerfilOpcoes)MemberwiseClone();
+        c.Fixed = new List<Vec2>(Fixed);
+        return c;
+    }
+
     public ModoGreide Mode { get; set; } = ModoGreide.AcompanharTerreno;
     public double MaxGrade { get; set; } = 0.06;
     public double VerticalCurve { get; set; } = 80;
@@ -57,6 +66,13 @@ public sealed class PerfilOpcoes
     public double Crossfall { get; set; } = 0.02;
     public double CutSlope { get; set; } = 1.0;
     public double FillSlope { get; set; } = 1.5;
+    /// <summary>
+    /// Parâmetro K das curvas verticais (m por % de variação de rampa; 0 = usar <see cref="VerticalCurve"/>): L = K·|Δi|.
+    /// DNIT (urbano ~40 km/h): K ≥ 4–7 (convexa); rodovias 80 km/h: K ≥ 24–30.
+    /// </summary>
+    public double CurveK { get; set; }
+    /// <summary>Fator de homogeneização usado no modo compensado (corte ÷ aterro).</summary>
+    public double Homogenization { get; set; } = 1.25;
 
     /// <summary>
     /// Pontos obrigados (estaca, cota relativa): cruzamentos e entroncamentos com vias existentes – o greide passa exatamente
@@ -127,8 +143,8 @@ public static class RoadProfileDesigner
     public static PerfilOpcoes ForRelief(RelevoVia r, double maxGrade, double cut, double fill) => new()
     {
         Mode = ModoGreide.AcompanharTerreno,
-        Smoothing = r == RelevoVia.AcompanharTerreno ? 20 : 150,
-        VerticalCurve = r == RelevoVia.AcompanharTerreno ? 20 : 80,
+        Smoothing = r == RelevoVia.AcompanharTerreno ? 40 : 150,
+        VerticalCurve = r == RelevoVia.AcompanharTerreno ? 40 : 80,
         MaxGrade = r == RelevoVia.AcompanharTerreno ? 0.30 : maxGrade,
         CutSlope = cut,
         FillSlope = fill,
@@ -136,6 +152,31 @@ public static class RoadProfileDesigner
     };
 
     public static PerfilResultado Design(double length, Func<double, double?> groundAt, PerfilOpcoes o)
+    {
+        if (o.Mode == ModoGreide.Compensado)
+        {
+            // Busca do alteamento que equilibra corte e aterro (áreas no eixo, aterro × fator de homogeneização).
+            var baseOpt = o.Clone();
+            baseOpt.Mode = ModoGreide.AcompanharTerreno;
+            double Balance(double off) { baseOpt.Offset = off; var r0 = DesignCore(length, groundAt, baseOpt); return r0.CutM2 - r0.FillM2 * o.Homogenization; }
+            double lo = -15, hi = 15;
+            var blo = Balance(lo);
+            for (int i = 0; i < 40 && hi - lo > 0.01; i++)
+            {
+                var mid = (lo + hi) / 2;
+                var bm = Balance(mid);
+                // Subir o greide diminui o corte e aumenta o aterro (balanço decrescente).
+                if (Math.Sign(bm) == Math.Sign(blo)) { lo = mid; blo = bm; } else hi = mid;
+            }
+            baseOpt.Offset = (lo + hi) / 2;
+            var res = DesignCore(length, groundAt, baseOpt);
+            res.Warnings.Insert(0, $"Greide compensado: alteamento de {baseOpt.Offset.ToString("0.00", CultureInfo.GetCultureInfo("pt-BR"))} m sobre o terreno suavizado.");
+            return res;
+        }
+        return DesignCore(length, groundAt, o);
+    }
+
+    private static PerfilResultado DesignCore(double length, Func<double, double?> groundAt, PerfilOpcoes o)
     {
         var L = Math.Max(1, length);
         var n = Math.Max(2, (int)Math.Ceiling(L / Step));
@@ -225,6 +266,20 @@ public static class RoadProfileDesigner
                 grade.Normalize();
                 break;
             }
+        }
+        // Curvas verticais pelo parâmetro K: L = K·|Δi| (em %), no mínimo a curva padrão.
+        if (o.CurveK > 0 && o.Mode != ModoGreide.Manual)
+        {
+            var pts = grade.Points.OrderBy(q => q.S).ToList();
+            for (int i = 1; i + 1 < pts.Count; i++)
+            {
+                var g0 = (pts[i].Z - pts[i - 1].Z) / Math.Max(1e-6, pts[i].S - pts[i - 1].S);
+                var g1 = (pts[i + 1].Z - pts[i].Z) / Math.Max(1e-6, pts[i + 1].S - pts[i].S);
+                var lv = o.CurveK * Math.Abs(g1 - g0) * 100;
+                pts[i] = new GradePoint(pts[i].S, pts[i].Z, Math.Max(lv, pts[i].Curve ?? o.VerticalCurve));
+            }
+            grade.Points.Clear();
+            grade.Points.AddRange(pts);
         }
         // Áreas de corte e aterro no eixo (indicador rápido).
         for (int i = 0; i + 1 < ss.Count; i++)

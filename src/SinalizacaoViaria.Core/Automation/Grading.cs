@@ -92,6 +92,51 @@ public sealed class GradingResult
 /// </summary>
 public static class Grading
 {
+    /// <summary>
+    /// Mapa de corte e aterro: regiões (células de <paramref name="step"/> m unidas) onde o projeto fica mais de
+    /// <paramref name="min"/> m abaixo do terreno natural (corte) ou acima dele (aterro).
+    /// </summary>
+    public static (List<Polygon2> Cut, List<Polygon2> Fill) CutFillRegions(GradingResult design, Func<Vec2, double?> ground, double step = 2, double min = 0.10)
+    {
+        var cut = new List<Polygon2>();
+        var fill = new List<Polygon2>();
+        if (design.Footprint.Count == 0) return (cut, fill);
+        double x0 = double.MaxValue, y0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue;
+        foreach (var f in design.Footprint)
+        {
+            var (mn, mx) = f.Bounds;
+            x0 = Math.Min(x0, mn.X); y0 = Math.Min(y0, mn.Y); x1 = Math.Max(x1, mx.X); y1 = Math.Max(y1, mx.Y);
+        }
+        var nx = (int)Math.Ceiling((x1 - x0) / step);
+        var ny = (int)Math.Ceiling((y1 - y0) / step);
+        if ((long)nx * ny > 400_000) { step *= Math.Sqrt((double)nx * ny / 400_000); nx = (int)Math.Ceiling((x1 - x0) / step); ny = (int)Math.Ceiling((y1 - y0) / step); }
+        var cutCells = new List<Polygon2>();
+        var fillCells = new List<Polygon2>();
+        for (int i = 0; i < nx; i++)
+            for (int j = 0; j < ny; j++)
+            {
+                var c = new Vec2(x0 + (i + 0.5) * step, y0 + (j + 0.5) * step);
+                if (design.DesignZ(c) is not { } zd || ground(c) is not { } zg) continue;
+                var dz = zd - zg;
+                if (Math.Abs(dz) < min) continue;
+                var cell = Polygon2.Rectangle(new Vec2(x0 + i * step, y0 + j * step), new Vec2(x0 + (i + 1) * step, y0 + (j + 1) * step));
+                (dz < 0 ? cutCells : fillCells).Add(cell);
+            }
+        List<Polygon2> U(List<Polygon2> cells)
+        {
+            if (cells.Count == 0) return new List<Polygon2>();
+            try
+            {
+                // União das células e contorno suavizado (abre/fecha com arredondamento) – sem "escadinha" de células.
+                var u = PolygonOps.Union(cells);
+                var smooth = PolygonOps.Offset(PolygonOps.Offset(u, -step * 0.4, true), step * 0.4, true);
+                return smooth.Where(p => p.Area > step * step * 1.5).Select(p => p.Simplified() ?? p).ToList();
+            }
+            catch { return new List<Polygon2>(); }
+        }
+        return (U(cutCells), U(fillCells));
+    }
+
     /// <param name="ground">Cota do terreno natural (m, absoluta) – nulo fora do terreno.</param>
     /// <param name="baseZ">Cota da base das marcas (somada às cotas relativas das faixas/plataformas).</param>
     public static GradingResult Design(IEnumerable<GradeCorridor> corridors, IEnumerable<GradePad> pads, Func<Vec2, double?> ground, double baseZ = 0,

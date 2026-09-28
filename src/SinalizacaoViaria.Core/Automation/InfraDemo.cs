@@ -215,10 +215,10 @@ public static class InfraDemo
         foreach (var p in geo.Pieces)
         {
             if (p.Solid != null || p.Profile != null) { res.Add(p); continue; }
-            // Como no Revit: o piso é dividido em partes PLANAS (desvio ≤ 8 mm) e cada parte é um piso plano inclinado.
-            // Pintura 1 cm acima da superfície teórica (como no Revit): nunca some sob os pisos planos.
-            var q = MarkingColors.IsPaint(p.Color) ? p with { Elevation = p.Elevation + 0.01 } : p;
-            foreach (var (part, plane, warped) in FloorPlanes.Split(p.Shape, surf.Z, 0.008, surf))
+            // Como no Revit: o piso é dividido em partes PLANAS (desvio ≤ 12 mm) e cada parte é um piso plano inclinado.
+            // Pintura 1,5 cm acima da superfície teórica (como no Revit): nunca some sob os pisos planos.
+            var q = MarkingColors.IsPaint(p.Color) ? p with { Elevation = p.Elevation + 0.015 } : p;
+            foreach (var (part, plane, warped) in FloorPlanes.Split(p.Shape, surf.Z, 0.012, surf))
                 if (warped) res.Add(Draped(q, part, surf, grid));
                 else
                     foreach (var solid in part.Holes.Count > 0 ? PolygonOps.SplitHoles(part) : new List<Polygon2> { part })

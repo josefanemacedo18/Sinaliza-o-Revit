@@ -74,6 +74,8 @@ public static class FloorPlanes
         // transversais (juntas retas) até ficar plana – triângulos de edição de forma só onde não há eixo de referência.
         var along = axis != null;
         Go(shape, 0);
+        if (along && res.Count > 1) res = Merge(res, z, tol, axis!, ringStep);
+        if (along) res = res.Select(r => (r.Item1, Chord(r.Item1, r.Item2, z, tol, axis!, ringStep), r.Item3)).ToList();
         return res;
 
         void Go(Polygon2 p, int depth)
@@ -85,6 +87,88 @@ public static class FloorPlanes
             var halves = Halves(p, axis, along);
             if (halves.Count < 2) { res.Add((p, plane, !along && dev > 2 * tol)); return; }
             foreach (var h in halves) Go(h, depth + 1);
+        }
+    }
+
+    /// <summary>Ponto do plano a partir de estação/afastamento no eixo (prolongado em reta além das pontas).</summary>
+    public static Vec2 AxisPoint(GradeSurface surf, double s, double y)
+    {
+        var axis = surf.Axis;
+        var sc = Math.Clamp(s, 0, axis.Length);
+        var t = axis.TangentAt(sc);
+        return axis.PointAt(sc) + t * (s - sc) + t.PerpLeft * y;
+    }
+
+    /// <summary>
+    /// Junta de volta partes vizinhas (mesma faixa entre quebras, uma depois da outra ao longo do eixo) que juntas ainda
+    /// cabem num plano: a divisão ao meio corta também trechos que já eram planos – menos juntas, pisos maiores.
+    /// </summary>
+    private static List<(Polygon2, Plane3, bool)> Merge(List<(Polygon2, Plane3, bool)> parts, Func<Vec2, double> z, double tol, GradeSurface axis, double ringStep)
+    {
+        var breaks = new List<double> { 0 };
+        if (axis.Grade.CrossfallWidth > 0.5) { breaks.Add(axis.Grade.CrossfallWidth); breaks.Add(-axis.Grade.CrossfallWidth); }
+        int Band(Polygon2 p) { var y = axis.LocateExtended(p.Centroid).Y; return breaks.Count(b => y > b); }
+        var list = parts.Select(p => (Poly: p.Item1, Plane: p.Item2, W: p.Item3, B: Band(p.Item1), S: axis.LocateExtended(p.Item1.Centroid).S)).ToList();
+        var changed = true;
+        var guard = 0;
+        while (changed && guard++ < 400)
+        {
+            changed = false;
+            var order = list.Select((x, i) => (x, i)).OrderBy(t => t.x.B).ThenBy(t => t.x.S).Select(t => t.i).ToList();
+            for (int k = 0; k + 1 < order.Count; k++)
+            {
+                var a = list[order[k]];
+                var b = list[order[k + 1]];
+                if (a.B != b.B || a.W || b.W) continue;
+                List<Polygon2> u;
+                try { u = PolygonOps.Union(new[] { a.Poly, b.Poly }); } catch { continue; }
+                if (u.Count != 1 || u[0].Holes.Count > a.Poly.Holes.Count + b.Poly.Holes.Count) continue;
+                if (Math.Abs(u[0].Area - a.Poly.Area - b.Poly.Area) > 0.01 * (a.Poly.Area + b.Poly.Area) + 0.02) continue;
+                var (plane, dev) = Fit(Samples(u[0], z, ringStep));
+                if (dev > tol) continue;
+                var merged = (u[0], plane, false, a.B, axis.LocateExtended(u[0].Centroid).S);
+                var i0 = order[k];
+                var i1 = order[k + 1];
+                list[Math.Min(i0, i1)] = merged;
+                list.RemoveAt(Math.Max(i0, i1));
+                changed = true;
+                break;
+            }
+        }
+        return list.Select(x => (x.Poly, x.Plane, x.W)).ToList();
+    }
+
+    /// <summary>
+    /// Plano da parte passando EXATAMENTE pela superfície nas juntas transversais (no lado junto à crista) e no meio da
+    /// borda oposta – partes vizinhas se encontram sem degrau. Se ficar pior que a tolerância, mantém o de mínimos quadrados.
+    /// </summary>
+    private static Plane3 Chord(Polygon2 p, Plane3 lsq, Func<Vec2, double> z, double tol, GradeSurface axis, double ringStep)
+    {
+        try
+        {
+            var loc = p.Outer.Select(axis.LocateExtended).ToList();
+            double s0 = loc.Min(l => l.S), s1 = loc.Max(l => l.S);
+            if (s1 - s0 < 0.3) return lsq;
+            var inner = loc.OrderBy(l => Math.Abs(l.Y)).First().Y;
+            var outer = loc.OrderByDescending(l => Math.Abs(l.Y - inner)).First().Y;
+            if (Math.Abs(outer - inner) < 0.2) return lsq;
+            var a = AxisPoint(axis, s0, inner);
+            var b = AxisPoint(axis, s1, inner);
+            var c = AxisPoint(axis, (s0 + s1) / 2, outer);
+            var pts = new[] { Vec3.At(a, z(a)), Vec3.At(b, z(b)), Vec3.At(c, z(c)) };
+            var n = (pts[1] - pts[0]).Cross(pts[2] - pts[0]);
+            if (Math.Abs(n.Z) < 1e-9) return lsq;
+            // n·(X − P0) = 0  →  z = P0.z − (nx(x − x0) + ny(y − y0)) / nz
+            var bx = -n.X / n.Z;
+            var by = -n.Y / n.Z;
+            var chord = new Plane3(pts[0].Z - bx * pts[0].X - by * pts[0].Y, bx, by);
+            var samples = Samples(p, z, ringStep);
+            var dev = samples.Max(q => Math.Abs(q.Z - chord.Z(q.XY)));
+            return dev <= Math.Max(1.2 * tol, 1e-4) ? chord : lsq;
+        }
+        catch
+        {
+            return lsq;
         }
     }
 

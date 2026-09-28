@@ -9,6 +9,7 @@ namespace SinalizacaoViaria.Revit;
 public static class RibbonBuilder
 {
     public const string TabName = "SinalizaBIM";
+    public const string InfraTab = "SinalizaBIM Infra";
     private static readonly string AssemblyPath = Assembly.GetExecutingAssembly().Location;
 
     public static void Build(UIControlledApplication app)
@@ -97,38 +98,6 @@ public static class RibbonBuilder
                 "defensas metálicas (guard rail simples, dupla e de cabos), gradis, floreiras e canalização provisória de obras."),
             Data(typeof(CmdTachas), "Tachas e Tachões", "tacha", "Tachas e tachões refletivos ao longo de linhas (mono/bidirecionais, cadência pela velocidade) – atalho de Bloqueios Físicos."));
 
-        // ---------------------------------------------------------------- Detalhamento e quantitativos
-        // ---------------------------------------------------------------- Infraestrutura (drenagem, obras de arte, contenções, terreno)
-        var inf = app.CreateRibbonPanel(TabName, "Infraestrutura");
-        Split(inf, "SvDrenagem", "Drenagem",
-            Data(typeof(CmdBocaDeLobo), "Boca de Lobo / PV", "bocadelobo",
-                "Bocas de lobo simples, dupla, com grelha e combinada (guia chapéu, caixa, tampa, rebaixo da sarjeta) e poços de visita – alinhadas ao meio-fio com um clique."),
-            Data(typeof(CmdGrelha), "Grelha de Drenagem", "grelha",
-                "Grelhas de sarjeta e de piso com caixa, e canaleta com grelha contínua ao longo de linhas (barras transversais seguras para ciclistas)."));
-        Split(inf, "SvObrasArte", "Obras de Arte",
-            Data(typeof(CmdViaduto), "Viaduto", "viaduto",
-                "Viaduto num trecho de uma via existente ou numa via nova: a via (pisos, faixas, calçadas) passa sobre a estrutura – rampas de acesso, encontros, pilares, vigas/caixão/laje, guarda-corpos, juntas e iluminação."),
-            Data(typeof(CmdPonte), "Ponte", "ponte",
-                "Ponte num trecho de via (existente ou nova): reta ou em curva, em nível, entre margens ou convexa; vigas, caixão, arcos, estaiada ou treliça; apoios esconsos e pilares onde você quiser."),
-            Data(typeof(CmdPassarela), "Passarela", "passarela",
-                "Passarela de pedestres em treliça com cobertura, rampas ≤ 8,33 % (NBR 9050) e guarda-corpos."),
-            Data(typeof(CmdTunel), "Túnel", "tunel",
-                "Túnel num trecho de via (existente ou nova): ferradura (NATM), circular (TBM) ou retangular, com revestimento, iluminação, ventiladores e emboques – a pista e os passeios são da via."),
-            Data(typeof(CmdTrincheira), "Trincheira", "trincheira",
-                "Trecho de via rebaixado entre muros (flexão, cortina atirantada ou terra armada), com rampas, guarda-corpos, canaletas e laje de travessia."));
-        Split(inf, "SvContencoes", "Contenções",
-            Data(typeof(CmdMuroArrimo), "Muro de Arrimo", "muro",
-                "Muros de flexão, gravidade, contrafortes, gabião, terra armada e cortina atirantada – base no terreno, barbacãs, coroamento e reaterro no Toposolid."),
-            Data(typeof(CmdTalude), "Talude", "talude",
-                "Taludes de corte e aterro com bermas, canaletas de crista, pé e bermas, descidas d'água e revestimento – aplicados ao Toposolid."));
-        Large(inf, typeof(CmdPerfilVia), "Perfil da Via", "perfil",
-            "Greide (perfil longitudinal) de uma via sobre a topografia: acompanha o terreno com rampa máxima e curvas verticais, rampa constante, nivelado ou por PIVs. " +
-            "Onde o terreno pede, a via vira obra automaticamente – viaduto/ponte nos aterros altos, túnel nos cortes profundos, trincheira nos cortes médios – e o resto é aterro e corte no Toposolid.");
-        Large(inf, typeof(CmdNoViario), "Nó Viário", "noviario",
-            "Interseção em desnível: diamante, diamante com rotatórias, trevo completo, trevo parcial, trombeta e rotatória em dois níveis – viadutos, rampas e laços com greide.");
-        Large(inf, typeof(CmdTerraplenagem), "Terraplenagem", "terraplenagem",
-            "Ajusta o Toposolid (Massa e terreno) às vias, conexões e obras: plataformas, taludes de corte e aterro até o terreno natural, reaterro de muros e escavação – com volumes de corte e aterro.");
-
         var det = app.CreateRibbonPanel(TabName, "Detalhamento");
         Split(det, "SvDetalhar", "Detalhar",
             Data(typeof(CmdAnotar), "Anotar", "anotar", "Chamada com texto automático para qualquer sinalização."),
@@ -154,6 +123,45 @@ public static class RibbonBuilder
             Data(typeof(CmdConfiguracoes), "Configurações", "config", "Preferências do plugin (ímã de conexão, pisos do Revit, interseções automáticas...)."),
             Data(typeof(CmdCatalogo), "Catálogo", "catalogo", "Abre o catálogo normativo (JSON) para personalização."),
             Data(typeof(CmdSobre), "Normas / Sobre", "sobre", "Normas de referência e informações do plugin."));
+
+        // ================================================================ Guia "SinalizaBIM Infra"
+        // Infraestrutura numa guia própria: a guia principal fica com espaço para os nomes das ferramentas.
+        try { app.CreateRibbonTab(InfraTab); } catch { /* já existe */ }
+        var dren = app.CreateRibbonPanel(InfraTab, "Drenagem");
+        Split(dren, "SvDrenagem", "Drenagem",
+            Data(typeof(CmdBocaDeLobo), "Boca de Lobo / PV", "bocadelobo",
+                "Bocas de lobo simples, dupla, com grelha e combinada (guia chapéu, caixa, tampa, rebaixo da sarjeta) e poços de visita – alinhadas ao meio-fio com um clique."),
+            Data(typeof(CmdGrelha), "Grelha de Drenagem", "grelha",
+                "Grelhas de sarjeta e de piso com caixa, e canaleta com grelha contínua ao longo de linhas (barras transversais seguras para ciclistas)."));
+        var oa = app.CreateRibbonPanel(InfraTab, "Obras de Arte");
+        Split(oa, "SvObrasArte", "Pontes e Viadutos",
+            Data(typeof(CmdViaduto), "Viaduto", "viaduto",
+                "Viaduto num trecho de uma via existente ou numa via nova: a via (pisos, faixas, calçadas) passa sobre a estrutura – rampas de acesso, encontros, pilares, vigas/caixão/laje, guarda-corpos, juntas e iluminação."),
+            Data(typeof(CmdPonte), "Ponte", "ponte",
+                "Ponte num trecho de via (existente ou nova): reta ou em curva, em nível, entre margens ou convexa; vigas, caixão, arcos, estaiada ou treliça; apoios esconsos e pilares onde você quiser."),
+            Data(typeof(CmdPassarela), "Passarela", "passarela",
+                "Passarela de pedestres em treliça com cobertura, rampas ≤ 8,33 % (NBR 9050) e guarda-corpos."));
+        Split(oa, "SvTuneis", "Túneis e Trincheiras",
+            Data(typeof(CmdTunel), "Túnel", "tunel",
+                "Túnel num trecho de via (existente ou nova): ferradura (NATM), circular (TBM) ou retangular, com revestimento, iluminação, ventiladores e emboques – a pista e os passeios são da via."),
+            Data(typeof(CmdTrincheira), "Trincheira", "trincheira",
+                "Trecho de via rebaixado entre muros (flexão, cortina atirantada ou terra armada), com rampas, guarda-corpos, canaletas e laje de travessia."));
+        var cont = app.CreateRibbonPanel(InfraTab, "Contenções");
+        Split(cont, "SvContencoes", "Contenções",
+            Data(typeof(CmdMuroArrimo), "Muro de Arrimo", "muro",
+                "Muros de flexão, gravidade, contrafortes, gabião, terra armada e cortina atirantada – base no terreno, barbacãs, coroamento e reaterro no Toposolid."),
+            Data(typeof(CmdTalude), "Talude", "talude",
+                "Taludes de corte e aterro com bermas, canaletas de crista, pé e bermas, descidas d'água e revestimento – aplicados ao Toposolid."));
+        var rel = app.CreateRibbonPanel(InfraTab, "Relevo e Terreno");
+        Large(rel, typeof(CmdPerfilVia), "Perfil da Via", "perfil",
+            "Greide (perfil longitudinal) de uma via sobre a topografia: acompanha o terreno com rampa máxima e curvas verticais, rampa constante, nivelado ou por PIVs. " +
+            "Onde o terreno pede, a via vira obra automaticamente – viaduto/ponte nos aterros altos, túnel nos cortes profundos, trincheira nos cortes médios – e o resto é aterro e corte no Toposolid.");
+        var nos = app.CreateRibbonPanel(InfraTab, "Nós Viários");
+        Large(nos, typeof(CmdNoViario), "Nó Viário", "noviario",
+            "Interseção em desnível: diamante, diamante com rotatórias, trevo completo, trevo parcial, trombeta e rotatória em dois níveis – viadutos, rampas e laços com greide.");
+        Large(rel, typeof(CmdTerraplenagem), "Terraplenagem", "terraplenagem",
+            "Ajusta o Toposolid (Massa e terreno) às vias, conexões e obras: plataformas, taludes de corte e aterro até o terreno natural, reaterro de muros e escavação – com volumes de corte e aterro.");
+
     }
 
     private static void Split(RibbonPanel panel, string name, string text, params PushButtonData[] items)

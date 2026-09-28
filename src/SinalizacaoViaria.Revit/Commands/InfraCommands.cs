@@ -881,6 +881,11 @@ public sealed class CmdGrelha : CommandBase
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdTerraplenagem : CommandBase
 {
+    private static int SoilPreset(GradingOptions o) => (o.CutSlope, o.FillSlope) switch
+    {
+        (1.0, 1.5) => 0, (1.5, 2.0) => 1, (0.5, 1.5) => 2, (0.75, 1.5) => 3, _ => 4,
+    };
+
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
         var doc = uidoc.Document;
@@ -918,6 +923,14 @@ public sealed class CmdTerraplenagem : CommandBase
                 "O relatório traz corte, aterro, o balanço de massas (bota-fora ou empréstimo) e os volumes de cada elemento. " +
                 "Use \"Só calcular\" para ver os volumes sem mexer no terreno.", null, null, false, "Aplicar", 700, 620)
             .Check("Só calcular (simulação: volumes e balanço, sem alterar o Toposolid)", () => opt.DryRun, v => opt.DryRun = v)
+            .Choice("Tipo de terreno (taludes sugeridos)", new[]
+            {
+                ("Solo comum – corte 1 : 1, aterro 1,5 : 1", 0), ("Solo arenoso / pouco coesivo – corte 1,5 : 1, aterro 2 : 1", 1),
+                ("Rocha – corte 0,5 : 1, aterro 1,5 : 1", 2), ("Solo argiloso rijo – corte 0,75 : 1, aterro 1,5 : 1", 3), ("Personalizado (valores abaixo)", 4),
+            }, () => SoilPreset(opt), v =>
+            {
+                (opt.CutSlope, opt.FillSlope) = v switch { 0 => (1.0, 1.5), 1 => (1.5, 2.0), 2 => (0.5, 1.5), 3 => (0.75, 1.5), _ => (opt.CutSlope, opt.FillSlope) };
+            })
             .Number("Talude de corte (H : 1 V)", () => opt.CutSlope, v => opt.CutSlope = v, 0.3, 5, "0.0#", "Solo: 1 : 1; rocha: 0,5 : 1 (DNIT).")
             .Number("Talude de aterro (H : 1 V)", () => opt.FillSlope, v => opt.FillSlope = v, 1, 5, "0.0#", "Usual 1,5 : 1.")
             .Number("Profundidade do subleito sob o pavimento (m)", () => opt.Subgrade, v => opt.Subgrade = v, 0, 2)
@@ -926,6 +939,8 @@ public sealed class CmdTerraplenagem : CommandBase
                 "Volume de corte (in situ) necessário por m³ de aterro compactado: 1,20–1,40 em solos (DNIT). Entra no balanço de massas.")
             .Check("Escavar o terreno com túneis e caixas (quando o Revit permitir)", () => opt.Excavate, v => opt.Excavate = v)
             .Check("Grama dos taludes e ilhas como subdivisões do Toposolid", () => opt.Finishes, v => opt.Finishes = v)
+            .Check("Mapa de corte (vermelho) e aterro (verde) no Toposolid", () => opt.CutFillMap, v => opt.CutFillMap = v,
+                "Subdivisões coloridas onde o terreno é cortado ou aterrado mais de 10 cm – para conferir e apresentar. Rode de novo sem a opção para tirar.")
             .Check("Novo levantamento: o terreno atual passa a ser o terreno natural", () => resetOriginal, v => resetOriginal = v,
                 "Marque se você editou o Toposolid à mão (ou importou um levantamento novo) e quer que ele seja a nova referência.");
         if (noTerrain)

@@ -1,6 +1,8 @@
 # Manual de uso – SinalizaBIM
 
-Todos os comandos ficam na guia **SinalizaBIM** da faixa de opções. As janelas mostram uma
+Os comandos ficam em duas guias da faixa de opções: **SinalizaBIM** (vias, sinalização, detalhamento, edição) e
+**SinalizaBIM Infra** (drenagem, obras de arte, contenções, relevo e terreno, nós viários) – separadas para que todos os
+botões tenham espaço para o nome. As janelas mostram uma
 **pré-visualização ao vivo** (com área pintada e extensão) gerada pelo mesmo motor que cria os
 elementos no Revit, e avisos quando uma dimensão sai do intervalo de referência do MBST.
 
@@ -18,9 +20,18 @@ Convenções usadas em todo o plugin:
 | **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Orelha · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
 | **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (piso tátil · ciclovia · quebra-mola · cruzamento rodoferroviário) |
 | **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive **tachas e tachões** e guard rail) |
-| **Infraestrutura** | **Drenagem** (boca de lobo / PV · grelha) · **Obras de Arte** (viaduto · ponte · passarela · túnel · trincheira) · **Contenções** (muro de arrimo · talude) · **Nó Viário** · **Terraplenagem** |
 | **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
 | **Editar** | Editar · Apagar Trecho · Atualizar Todas · Selecionar Conjunto · Alternar 2D/3D · Configurações · Catálogo · Normas |
+
+Guia **SinalizaBIM Infra**:
+
+| Painel | Ferramentas |
+|---|---|
+| **Drenagem** | boca de lobo / PV · grelha |
+| **Obras de Arte** | **Pontes e Viadutos** (viaduto · ponte · passarela) · **Túneis e Trincheiras** (túnel · trincheira) |
+| **Contenções** | muro de arrimo · talude |
+| **Relevo e Terreno** | Perfil da Via · Terraplenagem |
+| **Nós Viários** | Nó Viário (interseção em desnível) |
 
 Os botões com seta (▾) agrupam ferramentas afins; o botão mostra a última usada do grupo.
 
@@ -404,6 +415,8 @@ desfazer a marca (pavimento, calçadas, placas e dispositivos não entram).
    * numa **linha contínua longa**, o clique apaga só o comprimento indicado (3 m por padrão) em volta do ponto;
    * arrastar move a planta, roda do mouse dá zoom, dois cliques enquadram;
    * **Desfazer último**, **Devolver tudo** e **Recortes ativos** (desmarque para mostrar a marca inteira sem perder os recortes).
+   * se a geometria da marca não puder ser recalculada (caminho de referência perdido, marca antiga), as peças são lidas
+     direto dos elementos do modelo – funciona com o eixo criado pela Via e com qualquer sinalização horizontal avulsa.
 3. **Aplicar** regera a marca. Os trechos ficam guardados nela: chamar a ferramenta de novo mostra o que está apagado (em
    vermelho) para devolver ou apagar mais. Os recortes acompanham Editar, Atualizar e a edição da seção da via, e os
    quantitativos consideram só o que ficou pintado.
@@ -1005,6 +1018,10 @@ estacas** que você indicar. Nem toda ponte é curva ou inclinada: a **Ponte** j
   via sem calçada → **New Jersey**. Juntas, buzinotes e iluminação sobre a mureta/barreira.
 * A prévia mostra a via inteira sobre um vale, com o terreno já terraplenado.
 
+**Juntas e encontros sem saliência**: as juntas de dilatação e a cortina dos encontros acompanham o abaulamento e a
+superelevação do tabuleiro ponto a ponto – antes eram caixas retas na cota do centro e ficavam alguns centímetros acima do
+asfalto nas bordas.
+
 ### 24.4 Túnel e trincheira
 * **Túnel** num trecho de via (existente ou nova): revestimento em **ferradura**, **circular** ou **retangular**, emboques em
   testa, bisel ou pala, LED contínuo, eletrocalhas, nichos SOS e ventiladores; a pista e os passeios são os da via. Numa via
@@ -1026,8 +1043,11 @@ via vira obra. É o "perfil longitudinal" do projeto rodoviário.
 **Como usar**:
 1. Clique a via.
 2. Escolha como o greide é traçado: **acompanhar o terreno suavizado** (menor terraplenagem; ajuste a suavização e o
-   alteamento), **rampa constante** entre as pontas, **nivelado** numa cota ou **PIVs digitados** (estaca; cota; curva).
-3. Limite a **rampa máxima** e o comprimento das **curvas verticais**.
+   alteamento), **rampa constante** entre as pontas, **compensar corte e aterro** (o greide sobe ou desce até o corte
+   cobrir o aterro × fator de homogeneização – menos bota-fora e empréstimo), **nivelado** numa cota ou **PIVs digitados**
+   (estaca; cota; curva) – que já abrem com os **PIVs atuais da via** para você só ajustar.
+3. Limite a **rampa máxima** e as **curvas verticais**: comprimento fixo e/ou **parâmetro K** (L = K × variação de rampa
+   em %; urbano ~40 km/h K 4–7, rodovia 80 km/h K 24–30 – DNIT); vale o maior.
 4. Diga a partir de que **altura de aterro** a via vira **viaduto/ponte**, de que **profundidade de corte** vira **túnel** e,
    se quiser, **trincheira** (muros) nos cortes médios. O gráfico se atualiza a cada mudança.
 5. **Aplicar**: o greide passa a valer para a via inteira (pista, calçadas, linhas, dispositivos), as obras são criadas nos
@@ -1098,14 +1118,16 @@ Revit triangula de novo. Por isso cada obra entrega os pontos certos:
 * **Plana** – sem alterar o terreno.
 Taludes de corte/aterro e a rampa máxima ficam na mesma janela. Depois, **Perfil da Via** ajusta o greide e cria as obras.
 **Pisos planos, sem vincos**: sobre o greide, o nó ou o terreno, cada piso é dividido em **partes planas** (o topo de cada
-parte fica a no máximo 8 mm da superfície teórica; 3 cm sobre o Toposolid) e cada parte é um **piso plano inclinado** –
+parte fica a no máximo 12 mm da superfície teórica; 3 cm sobre o Toposolid) e cada parte é um **piso plano inclinado** –
 uma única face, sem as linhas de triangulação da edição de forma. As divisões seguem a lógica da obra: primeiro na
 **crista do abaulamento** (cada caimento é um plano), depois **perpendiculares ao eixo** (juntas retas, como as juntas de
 pavimentação). Numa rampa constante a pista inteira são só **dois pisos** (um por caimento); nas curvas verticais e
 horizontais as partes ficam mais curtas. Ao longo das vias e nos nós a divisão continua sempre em faixas
 transversais até ficar plana (nunca triângulos); só em superfícies sem eixo de referência (terreno) uma parte torcida vira
-piso com edição de forma em malha regular. A pintura fica 1 cm acima da superfície teórica para nunca "afundar" nos pisos
-planos. As curvas verticais do greide nunca se sobrepõem e têm comprimento mínimo K = 10 m por % de
+piso com edição de forma em malha regular. Partes vizinhas que juntas ainda cabem num plano são **fundidas de volta** (pisos grandes, poucas juntas) e o plano de
+cada parte passa **exatamente pela superfície nas juntas** – sem degraus entre partes. A pintura fica 1,5 cm acima da
+superfície teórica para nunca "afundar" nos pisos planos. O relevo **acompanhar o terreno** usa suavização e curvas de
+40 m (tangentes mais longas, pisos maiores). As curvas verticais do greide nunca se sobrepõem e têm comprimento mínimo K = 10 m por % de
 variação de rampa.
 
 **Correção importante**: a localização de pontos em relação ao eixo (estaca e afastamento) errava para pontos a mais de
@@ -1144,6 +1166,10 @@ inteira, sem afinar).
 * **Terraplenagem** (botão): refaz tudo; vias escolhidas sem greide passam a moldar o terreno. Opção **novo levantamento**:
   o Toposolid atual vira o terreno natural (depois de editá-lo à mão ou importar outro levantamento).
 * **Só calcular (simulação)**: calcula volumes e balanço **sem alterar o Toposolid**.
+* **Tipo de terreno**: presets de taludes – solo comum (corte 1:1, aterro 1,5:1), arenoso (1,5:1 / 2:1), rocha (0,5:1 /
+  1,5:1), argiloso rijo (0,75:1 / 1,5:1) ou personalizado.
+* **Mapa de corte e aterro**: subdivisões coloridas no Toposolid – **vermelho** onde o terreno é cortado, **verde** onde é
+  aterrado (mais de 10 cm) – para conferir e apresentar; rode de novo sem a opção para tirar.
 * **Relatório**: área terraplenada, corte, aterro, **balanço de massas** com o **fator de homogeneização** (corte in situ por
   m³ de aterro compactado, 1,20–1,40 – DNIT): indica **bota-fora** (sobra de corte) ou **empréstimo** (falta), e os
   **volumes de cada elemento** (via, interseção, obra).

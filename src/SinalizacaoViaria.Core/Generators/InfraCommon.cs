@@ -300,11 +300,20 @@ public static class Infra
         var p = path.PointAt(s);
         var n = SolidSweep.Normal(path, s);
         var t = path.TangentAt(s);
-        var c = p + n * ((left + right) / 2);
-        var zl = surf.Z(s, (left + right) / 2);
-        foreach (var dx in new[] { -0.045, 0.045 })
-            SolidSweep.Add(geo, SolidSweep.Box(c + t * dx, t, 0.03, left - right, zl - 0.06, zl + 0.001), MarkingColor.Metal, "JUNTA");
-        SolidSweep.Add(geo, SolidSweep.Box(c, t, 0.06, left - right, zl - 0.05, zl - 0.012), MarkingColor.Preta, "JUNTA");
+        // Faixas embutidas no pavimento, rentes à superfície do tabuleiro em cada ponto (acompanham o abaulamento e a
+        // superelevação) – uma caixa reta na cota do centro ficava acima do asfalto nas bordas.
+        double Z(Vec2 q) => surf.Z(s, (q - p).Dot(n));
+        void Strip(double dx, double w, double below, double above, MarkingColor color)
+        {
+            var ring = new List<Vec2>();
+            var k = Math.Max(1, (int)Math.Ceiling((left - right) / 0.5));
+            for (int i = 0; i <= k; i++) ring.Add(p + n * (right + (left - right) * i / k) + t * (dx - w / 2));
+            for (int i = k; i >= 0; i--) ring.Add(p + n * (right + (left - right) * i / k) + t * (dx + w / 2));
+            var poly = Polyhedron.Prism(ring, q => Z(q) - below, q => Z(q) + above);
+            geo.Pieces.Add(new MarkingPiece(new Polygon2(ring), color) { Solid = GradeLift.Planarize(poly), Layer = "JUNTA" });
+        }
+        foreach (var dx in new[] { -0.045, 0.045 }) Strip(dx, 0.03, 0.06, 0.002, MarkingColor.Metal);
+        Strip(0, 0.06, 0.05, -0.008, MarkingColor.Preta);
     }
 
     /// <summary>Buzinotes (drenos Ø 100 mm) atravessando o tabuleiro junto às barreiras, a cada <paramref name="spacing"/> m.</summary>

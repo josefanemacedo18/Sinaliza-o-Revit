@@ -32,11 +32,25 @@ public sealed class CmdApagarTrecho : CommandBase
         var manual = def.Exclusions.Where(z => z.Manual).ToList();
         def.Exclusions.RemoveAll(z => z.Manual);
         MarkingGeometry geo;
-        try { geo = service.BuildGeometry(def, out _); }
+        var warnings = new List<string>();
+        try { geo = service.BuildGeometry(def, out _, warnings); }
+        catch (Exception ex)
+        {
+            Log.Error("Apagar trecho – geometria", ex);
+            warnings.Add(ex.Message);
+            geo = new MarkingGeometry();
+        }
         finally { def.Exclusions.AddRange(manual); }
+        // Sem peças calculadas (caminho não resolvido, marca antiga...): as peças são lidas dos elementos do modelo – cada
+        // traço/seta é um sólido próprio na forma direta (ou uma região preenchida no 2D).
         if (geo.Pieces.Count == 0)
         {
-            TaskDialog.Show(AppTitle, "Essa marca não tem peças para apagar.");
+            Log.Info($"Apagar trecho: geometria vazia para {def.DisplayCode} ({string.Join("; ", warnings)}) – lendo os elementos do modelo.");
+            geo = ModelPieces(doc, stored.MarkingId);
+        }
+        if (geo.Pieces.Count == 0)
+        {
+            TaskDialog.Show(AppTitle, "Não foi possível ler as peças dessa marca." + (warnings.Count > 0 ? "\n\n" + string.Join("\n", warnings.Distinct()) : ""));
             return Result.Cancelled;
         }
         var info = MarkingBuilder.Describe(def, PluginContext.Catalog);
@@ -49,6 +63,72 @@ public sealed class CmdApagarTrecho : CommandBase
         foreach (var z in w.Zones) def.Exclusions.Add(new ExclusionZone { Manual = true, Enabled = w.Active, Points = z.Outer.ToList() });
         ReportResults("Apagar trecho", MarkingCreator.Commit(uidoc, new[] { def }, "SV - Apagar trecho"));
         return Result.Succeeded;
+    }
+
+    /// <summary>Peças da marca lidas dos elementos do Revit: pegada de cada sólido (faces para cima) e regiões preenchidas.</summary>
+    internal static MarkingGeometry ModelPieces(Document doc, string markingId)
+    {
+        var geo = new MarkingGeometry();
+        foreach (var r in MarkingStorage.ById(doc, markingId))
+        {
+            try
+            {
+                if (r.Element is FilledRegion fr)
+                {
+                    foreach (var loop in fr.GetBoundaries())
+                        if (Ring(loop) is { Count: >= 3 } ring) geo.Add(new Polygon2(ring), r.Color);
+                    continue;
+                }
+                var ge = r.Element.get_Geometry(new Options { ComputeReferences = false, DetailLevel = ViewDetailLevel.Fine });
+                if (ge == null) continue;
+                foreach (var solid in Solids(ge))
+                    if (Footprint(solid) is { } f && f.Area > 1e-4) geo.Add(f, r.Color);
+            }
+            catch (Exception ex) { Log.Error("Apagar trecho – peças do modelo", ex); }
+        }
+        return geo;
+    }
+
+    private static List<Vec2>? Ring(CurveLoop loop)
+    {
+        var pts = new List<Vec2>();
+        foreach (var c in loop)
+        {
+            var t = c.Tessellate();
+            for (int i = 0; i + 1 < t.Count; i++) pts.Add(UnitConv.ToVec2(t[i]));
+        }
+        return pts;
+    }
+
+    private static IEnumerable<Solid> Solids(GeometryElement ge)
+    {
+        foreach (var o in ge)
+        {
+            if (o is Solid s && s.Faces.Size > 0 && s.Volume > 1e-9) yield return s;
+            else if (o is GeometryInstance gi)
+                foreach (var x in Solids(gi.GetInstanceGeometry())) yield return x;
+        }
+    }
+
+    /// <summary>Pegada em planta (m) de um sólido: união das faces voltadas para cima.</summary>
+    private static Polygon2? Footprint(Solid s)
+    {
+        var polys = new List<Polygon2>();
+        foreach (Face f in s.Faces)
+        {
+            try
+            {
+                var bb = f.GetBoundingBox();
+                if (f.ComputeNormal((bb.Min + bb.Max) / 2).Z < 0.3) continue;
+                var loop = f.GetEdgesAsCurveLoops().FirstOrDefault();
+                if (loop == null || Ring(loop) is not { Count: >= 3 } ring) continue;
+                polys.Add(new Polygon2(ring));
+            }
+            catch { /* face sem contorno */ }
+        }
+        if (polys.Count == 0) return null;
+        try { return PolygonOps.Union(polys).OrderByDescending(x => x.Area).FirstOrDefault(); }
+        catch { return polys.OrderByDescending(x => x.Area).First(); }
     }
 
     /// <summary>Sinalização horizontal (pinturas, legendas, zebrados, faixas) – o que a ferramenta aceita.</summary>

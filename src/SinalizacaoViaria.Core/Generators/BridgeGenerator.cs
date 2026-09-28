@@ -705,7 +705,18 @@ public static class BridgeGenerator
         half *= sk;
         // Travessa de apoio (viga do encontro) e cortina.
         SolidSweep.Add(geo, SolidSweep.Extrude(SolidSweep.Chamfered(-width / 2, width / 2, seat - 1.2, seat, 0.08), p + back * 1.6, t * inward, 1.6), MarkingColor.Concreto, "ENCONTRO");
-        SolidSweep.Add(geo, SolidSweep.Box(p + back * 1.45, t, 0.30, width, seat, deckTop - d.Wear), MarkingColor.Concreto, "ENCONTRO");
+        // Cortina: topo rente à face inferior do pavimento em cada ponto (acompanha o abaulamento) – nunca acima da pista.
+        {
+            var nn = SolidSweep.Normal(path, s);
+            var c0 = p + back * 1.45;
+            var ring = new List<Vec2>();
+            var k = Math.Max(1, (int)Math.Ceiling(width / 0.5));
+            for (int i = 0; i <= k; i++) ring.Add(c0 + n * (-width / 2 + width * i / k) - t * 0.15);
+            for (int i = k; i >= 0; i--) ring.Add(c0 + n * (-width / 2 + width * i / k) + t * 0.15);
+            double TopZ(Vec2 q) => surf.Z(s, Math.Clamp((q - p).Dot(nn), -d.RoadHalf, d.RoadHalf)) - d.Wear - 0.02;
+            var wall = Polyhedron.Prism(ring, _ => seat, TopZ);
+            geo.Pieces.Add(new MarkingPiece(new Polygon2(ring), MarkingColor.Concreto) { Solid = GradeLift.Planarize(wall), Layer = "ENCONTRO" });
+        }
         // Parede frontal/pilares enterrados até a fundação.
         SolidSweep.Add(geo, SolidSweep.Box(p + back * 0.9, t, 1.0, width - 0.4, g - 1.5, seat - 1.2), MarkingColor.Concreto, "ENCONTRO");
         // Laje de transição sob o pavimento (acompanha o greide e o caimento).

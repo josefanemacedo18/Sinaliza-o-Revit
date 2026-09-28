@@ -31,6 +31,8 @@ public sealed class GradingOptions
     /// Fator de homogeneização (volume de corte in situ necessário por m³ de aterro compactado; usual 1,2–1,4 – DNIT).
     /// </summary>
     public double Homogenization { get; set; } = 1.25;
+    /// <summary>Mapa de corte (vermelho) e aterro (verde) como subdivisões do Toposolid.</summary>
+    public bool CutFillMap { get; set; }
 }
 
 public sealed class TerrainReport
@@ -366,7 +368,20 @@ public static class TerrainService
                 report.Notes.Add("O Revit não permitiu escavar o Toposolid com o volume do túnel. Os emboques foram cortados; para abrir o furo " +
                                  "selecione o Toposolid → Escavar e clique a Massa \"SV … escavação do terreno\" (ative Mostrar massa).");
         }
-        if (opt.Finishes) ApplyFinishes(doc, finishes, report, list.Select(d => d.Id).ToHashSet());
+        if (opt.CutFillMap)
+        {
+            try
+            {
+                var (cutR, fillR) = Grading.CutFillRegions(design, Ground, 2.0, 0.10);
+                var taken = finishes.Select(f => f.Area).ToList();
+                foreach (var (regions, color, key) in new[] { (cutR, MarkingColor.Vermelha, "mapa-corte"), (fillR, MarkingColor.Verde, "mapa-aterro") })
+                    foreach (var r in taken.Count > 0 ? PolygonOps.Difference(regions, taken) : regions)
+                        if (r.Area > 4) finishes.Add((r, color, key));
+                report.Notes.Add($"Mapa de corte e aterro: {cutR.Count} região(ões) de corte (vermelho) e {fillR.Count} de aterro (verde) como subdivisões do Toposolid.");
+            }
+            catch (Exception ex) { Log.Error("Mapa de corte e aterro", ex); }
+        }
+        if (opt.Finishes || opt.CutFillMap) ApplyFinishes(doc, opt.Finishes ? finishes : finishes.Where(f => f.Id.StartsWith("mapa-")).ToList(), report, list.Select(d => d.Id).ToHashSet());
         return report;
     }
 

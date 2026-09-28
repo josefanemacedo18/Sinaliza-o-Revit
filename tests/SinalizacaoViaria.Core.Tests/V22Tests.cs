@@ -429,4 +429,73 @@ public class V22Tests
         var y = crest.Shape.Centroid.Y;
         Assert.InRange(top, T(new Vec2(30, y)) - 0.3, T(new Vec2(30, y)) + 1.8);
     }
+
+    [Fact]
+    public void Profile_CompensatedBalancesCutAndFill()
+    {
+        double T(double st) => 8 * Math.Sin(st / 60) + 0.02 * st;
+        var o = new PerfilOpcoes { Mode = ModoGreide.Compensado, Smoothing = 200, AutoStructures = false, Homogenization = 1.25 };
+        var r = RoadProfileDesigner.Design(600, s => T(s), o);
+        var bal = r.CutM2 - r.FillM2 * 1.25;
+        Assert.True(Math.Abs(bal) < 0.05 * (r.CutM2 + r.FillM2) + 5, $"corte {r.CutM2} aterro {r.FillM2}");
+    }
+
+    [Fact]
+    public void Profile_CurveKSetsCurveLengths()
+    {
+        var o = new PerfilOpcoes { Mode = ModoGreide.AcompanharTerreno, Smoothing = 40, VerticalCurve = 10, CurveK = 30, MaxGrade = 0.08, AutoStructures = false };
+        var r = RoadProfileDesigner.Design(500, s => 6 * Math.Sin(s / 50), o);
+        var pts = r.Grade.Points.OrderBy(q => q.S).ToList();
+        for (int i = 1; i + 1 < pts.Count; i++)
+        {
+            var g0 = (pts[i].Z - pts[i - 1].Z) / (pts[i].S - pts[i - 1].S);
+            var g1 = (pts[i + 1].Z - pts[i].Z) / (pts[i + 1].S - pts[i].S);
+            Assert.True((pts[i].Curve ?? 0) >= 30 * Math.Abs(g1 - g0) * 100 - 1e-6);
+        }
+    }
+
+    [Fact]
+    public void Grading_CutFillMapSeparatesCutAndFill()
+    {
+        // Plataforma plana em z = 0 sobre um terreno inclinado: corte de um lado, aterro do outro.
+        var pad = new GradePad(Polygon2.Rectangle(new Vec2(-20, -20), new Vec2(20, 20)), 0) { Daylight = false };
+        double? G(Vec2 p) => 0.05 * p.X;
+        var design = Grading.Design(Array.Empty<GradeCorridor>(), new[] { pad }, G);
+        var (cut, fill) = Grading.CutFillRegions(design, G, 2, 0.1);
+        Assert.NotEmpty(cut);
+        Assert.NotEmpty(fill);
+        Assert.True(cut.All(c => c.Centroid.X > 0) && fill.All(f => f.Centroid.X < 0));
+    }
+
+    [Fact]
+    public void FloorPlanes_MergeKeepsFewPartsOnATangent()
+    {
+        // Curva vertical só no fim: o trecho em tangente não pode ficar picado em ladrilhos.
+        var surf = new GradeSurface(Straight(300), new RoadGrade { Crossfall = 0.02, DefaultCurve = 40, Points = { new(0, 0), new(260, 5.2), new(300, 4.4) } });
+        var pav = Polygon2.Rectangle(new Vec2(0, 0.001), new Vec2(300, 7));
+        var parts = FloorPlanes.Split(pav, surf.Z, 0.012, surf);
+        var tangent = parts.Where(p => p.Part.Bounds.Max.X < 235).ToList();
+        Assert.True(tangent.Count <= 2, $"{tangent.Count} partes na tangente");
+        Assert.Equal(pav.Area, parts.Sum(p => p.Part.Area), 0);
+    }
+
+    [Fact]
+    public void BridgeJoint_FollowsDeckCrossfall()
+    {
+        var b = new BridgeDefinition(); b.ApplyKindDefaults();
+        var axis = Straight(200);
+        var grade = new RoadGrade { Crossfall = 0.03, Points = { new(0, 5), new(200, 5) } };
+        b.Output.Grade = grade;
+        b.HostStart = 50; b.HostEnd = 150;
+        var geo = MarkingBuilder.Build(b, axis, new BuildContext { Catalog = CatalogService.LoadDefault(), Ground = _ => 0 });
+        var joints = geo.Pieces.Where(p => p.Layer == "JUNTA" && p.Solid != null).ToList();
+        Assert.NotEmpty(joints);
+        // A junta acompanha o abaulamento do tabuleiro: nas bordas ela desce em relação ao eixo – não é uma caixa reta na cota do centro.
+        var j0 = joints.First();
+        var verts = j0.Solid!.Faces.SelectMany(f => f).ToList();
+        var yMax = verts.Max(v => Math.Abs(v.Y));
+        var center = verts.Where(v => Math.Abs(v.Y) < 0.6).Max(v => v.Z);
+        var edge = verts.Where(v => Math.Abs(v.Y) > yMax - 0.6).Max(v => v.Z);
+        Assert.True(center - edge > 0.05, $"{center - edge}");
+    }
 }

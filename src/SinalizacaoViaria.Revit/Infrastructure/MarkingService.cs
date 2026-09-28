@@ -469,7 +469,7 @@ public sealed class MarkingService
                 {
                     // Peças vizinhas do mesmo material viram um piso só (calçadas, trechos recortados).
                     var merged = PolygonOps.Union(grp.Select(p => p.Shape)).Where(p => p.Area > 0.01).ToList();
-                    // Sobre greide/nó/terreno: o piso é dividido em partes PLANAS (desvio ≤ 8 mm no greide/nó; 3 cm no Toposolid) – cada
+                    // Sobre greide/nó/terreno: o piso é dividido em partes PLANAS (desvio ≤ 12 mm no greide/nó; 3 cm no Toposolid) – cada
                     // parte é um piso plano inclinado, sem os vincos da triangulação da edição de forma: pista limpa, com
                     // juntas retas perpendiculares ao eixo e na crista do abaulamento.
                     var parts = new List<(Polygon2 Shape, Plane3? Plane)>();
@@ -479,7 +479,7 @@ public sealed class MarkingService
                         try
                         {
                             var zf = SurfaceZ(terrain, UnitConv.Ft(baseZ + def.Output.ElevationOffset));
-                            var tol = terrain is SurfaceSampler ? 0.03 : 0.008;
+                            var tol = terrain is SurfaceSampler ? 0.03 : 0.012;
                             var split = FloorPlanes.Split(m, zf, tol, (terrain as GradeSampler)?.Surface ?? (terrain as NodeSampler)?.Node.Major?.Surface, terrain is SurfaceSampler ? 60 : 25,
                                 ringStep: terrain is SurfaceSampler ? 3.0 : 1.0);
                             // Partes empenadas (superfície torcida) seguem com edição de forma em malha regular.
@@ -788,9 +788,9 @@ public sealed class MarkingService
         var zBaseFt = UnitConv.Ft(zMeters);
         var above = UnitConv.Ft(Math.Max(0.001, aboveSurfaceM));
         var draped = sampler is { IsAvailable: true };
-        // Sobre greide/nó a pista é feita de pisos planos (desvio ≤ 8 mm): a pintura fica 1 cm acima da superfície teórica
+        // Sobre greide/nó a pista é feita de pisos planos (desvio ≤ 12 mm): a pintura fica 1,5 cm acima da superfície teórica
         // para nunca "afundar" no piso.
-        if (sampler is GradeSampler or NodeSampler) above = Math.Max(above, UnitConv.Ft(0.01));
+        if (sampler is GradeSampler or NodeSampler) above = Math.Max(above, UnitConv.Ft(0.015));
 
         foreach (var piece in pieces)
         {
@@ -882,7 +882,7 @@ public sealed class MarkingService
         var dev = samples.Max(q => Math.Abs(mz + a * (q.X - mx) + b * (q.Y - my) - q.Z));
         var (mn, mxp) = shape.Bounds;
         var ext = Math.Max(mxp.X - mn.X, mxp.Y - mn.Y);
-        if (dev <= UnitConv.Ft(s is GradeSampler or NodeSampler ? 0.008 : 0.015) || depth >= 9 || ext < 0.8)
+        if (dev <= UnitConv.Ft(s is GradeSampler or NodeSampler ? 0.012 : 0.015) || depth >= 9 || ext < 0.8)
         {
             var zc = mz + a * (UnitConv.Ft(cen.X) - mx) + b * (UnitConv.Ft(cen.Y) - my);
             yield return (shape, zc, new XYZ(-a, -b, 1).Normalize());
