@@ -112,7 +112,13 @@ public sealed class CmdEditar : CommandBase
             EnsureDetailView(uidoc, def.Output, keepExistingView: true);
             var r = MarkingCreator.Commit(uidoc, new[] { def }, $"SV - Editar {def.DisplayCode}");
             FootprintCutter.ApplyFor(uidoc, def);
-            TerrainActions.AfterCreate(uidoc, def);
+            if (def is IHostedStructure { HostRoad: { } hostGid })
+            {
+                r.AddRange(RoadWorks.AfterHostedEdit(uidoc, def));
+                if (RoadWorks.RoadByGroup(uidoc.Document, hostGid) is { } hostRoad)
+                    TerrainActions.AfterCreate(uidoc, new[] { hostRoad.Pavement, def });
+            }
+            else TerrainActions.AfterCreate(uidoc, def);
             Report("Edição", r);
             return Result.Succeeded;
         }
@@ -228,6 +234,8 @@ public sealed class CmdEditar : CommandBase
         PluginContext.SaveSettings();
         EnsureDetailView(uidoc, w.OutputSettings, keepExistingView: true);
 
+        // O greide da via (perfil longitudinal) é mantido na edição da seção.
+        w.OutputSettings.Grade ??= pav.Output.Grade?.Clone();
         var defs = w.Setup.Build(pav.PathRef, w.OutputSettings, PluginContext.Catalog, pav.GroupId, pav.Id);   // Build clona o caminho por marca
         var newPav = defs.OfType<RoadPavementDefinition>().FirstOrDefault();
         if (newPav != null)
@@ -259,6 +267,9 @@ public sealed class CmdEditar : CommandBase
             results.Add(new RenderResult { Geometry = null });
             results[^1].Warnings.Add("As conexões da via não puderam ser refeitas: " + ex.Message);
         }
+        // Obras hospedadas (pontes, viadutos, túneis, trincheiras) acompanham a nova seção; o terreno é refeito.
+        results.AddRange(RoadWorks.RefreshHosted(uidoc, pav.GroupId));
+        TerrainActions.AfterCreate(uidoc, defs, quiet: true);
         Report("Via", results);
         return Result.Succeeded;
     }

@@ -21,6 +21,10 @@ public enum PathMode
     Bordas,
     /// <summary>Em série ao longo de um meio-fio (dois cliques: início e fim, espaçamento fixo).</summary>
     Serie,
+    /// <summary>Num trecho de uma via existente (obra hospedada: clique a via e as duas pontas).</summary>
+    ViaExistente,
+    /// <summary>Via nova: selecionar linhas existentes como eixo.</summary>
+    ViaNovaLinhas,
 }
 
 /// <summary>Janela genérica para marcas lineares (longitudinais, transversais, tachas, piso tátil, ciclovia).</summary>

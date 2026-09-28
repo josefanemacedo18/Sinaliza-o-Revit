@@ -39,10 +39,16 @@ public sealed class OutputSettings
     /// <summary>Material de demarcação (nome do catálogo) – usado em quantitativos e espessura.</summary>
     public string? Material { get; set; }
 
+    /// <summary>
+    /// Greide da via (perfil longitudinal) ao longo do caminho: pisos, pinturas e dispositivos acompanham as cotas. Todas as
+    /// marcas de uma via compartilham o mesmo greide.
+    /// </summary>
+    public RoadGrade? Grade { get; set; }
+
     public OutputSettings Clone() => new()
     {
         Mode = Mode, Thickness = Thickness, ElevationOffset = ElevationOffset, Drape = Drape,
-        SurfaceIds = new List<string>(SurfaceIds), ViewId = ViewId, Material = Material,
+        SurfaceIds = new List<string>(SurfaceIds), ViewId = ViewId, Material = Material, Grade = Grade?.Clone(),
     };
 }
 

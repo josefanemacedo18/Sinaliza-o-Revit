@@ -1,3 +1,4 @@
+using SinalizacaoViaria.Core.Automation;
 using System.Globalization;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Geometry;
@@ -45,7 +46,25 @@ public sealed record DeckSpec
     /// <summary>Superelevação (caimento único, m/m, + sobe para a esquerda); 0 = abaulamento de duas águas.</summary>
     public double Superelevation { get; init; }
 
-    public DeckSurface Surface(VerticalProfile prof) => Math.Abs(Superelevation) > 1e-6
+    /// <summary>
+    /// A via hospedeira fornece a pista, as calçadas e as faixas (pisos do Revit com o greide): a obra gera só a estrutura
+    /// (tabuleiro, vigas, apoios, encontros, guarda-corpos, juntas e drenos) sob e ao lado dela.
+    /// </summary>
+    public bool RoadProvided { get; init; }
+    /// <summary>Espessura do revestimento sobre a laje (m) – com via hospedeira, a do pavimento dela.</summary>
+    public double Wear { get; init; } = Infra.Wearing;
+    /// <summary>Altura do elemento mais externo da via sobre o greide (calçada), onde se apoia o guarda-corpo (m).</summary>
+    public double EdgeRise { get; init; }
+    /// <summary>Esconsidade dos apoios (graus): pilares e encontros paralelos ao obstáculo cruzado.</summary>
+    public double Skew { get; init; }
+    /// <summary>Estações dos pilares definidas pelo projetista (nulo = pelo vão).</summary>
+    public IReadOnlyList<double>? PierStations { get; init; }
+    /// <summary>Superfície da via hospedeira (substitui o greide + caimento próprios).</summary>
+    public Func<double, double, double>? HostSurface { get; init; }
+
+    public DeckSurface Surface(VerticalProfile prof) => HostSurface != null
+        ? new DeckSurface { Profile = prof, Custom = HostSurface }
+        : Math.Abs(Superelevation) > 1e-6
         ? new DeckSurface { Profile = prof, CrossSlope = Superelevation, Crown = false }
         : new DeckSurface { Profile = prof, CrossSlope = Pedestrian ? 0.01 : CrossSlope, Crown = true };
 }
@@ -132,6 +151,7 @@ public static class BridgeGenerator
         var geo = new MarkingGeometry();
         var L = path.Length;
         if (L < 10) { geo.Warnings.Add("Eixo da obra muito curto (mínimo 10 m)."); return geo; }
+        if (b.HostRoad != null) return BuildHosted(b, path, ctx, geo);
         var gp = Infra.GroundProfile(b, path, ctx);
         Func<Vec2, double> ground = p => gp.Z(IntersectionGenerator.Project(path, p).Station);
         var z0 = ground(path.PointAt(0));
@@ -156,6 +176,47 @@ public static class BridgeGenerator
             geo.Warnings.Add("Passarela: rampas acima de 8,33 % não atendem a NBR 9050.");
 
         geo.PathLength = L;
+        geo.PaintedLength = s1 - s0;
+        geo.UnitCount = info.Piers;
+        Measure(geo, MarkingColor.Concreto, (s1 - s0) * 2 * spec.DeckHalf);
+        return geo;
+    }
+
+    /// <summary>
+    /// Obra hospedada num trecho de via do plugin: a via (pisos com o greide) passa sobre a estrutura; aqui só o tabuleiro,
+    /// o sistema estrutural, pilares, encontros, guarda-corpos, juntas, drenos e iluminação – na largura e no greide da via.
+    /// </summary>
+    private static MarkingGeometry BuildHosted(BridgeDefinition b, Polyline2 path, BuildContext ctx, MarkingGeometry geo)
+    {
+        var L = path.Length;
+        var host = HostRoads.Find(b.HostRoad, ctx);
+        var grade = host?.Grade ?? b.Output.Grade ?? RoadGrade.Flat(L);
+        var half = host?.Half ?? b.HostHalf;
+        var s0 = Math.Clamp(Math.Min(b.HostStart, b.HostEnd), 0, L);
+        var s1 = Math.Clamp(Math.Max(b.HostStart, b.HostEnd), 0, L);
+        if (s1 - s0 < 5) { geo.Warnings.Add("Trecho da obra muito curto na via (mínimo 5 m)."); return geo; }
+        var gp = Infra.GroundProfile(b, path, ctx);
+        Func<Vec2, double> ground = p => gp.Z(IntersectionGenerator.Project(path, p).Station);
+        var prof = grade.ToProfile(2);
+        var pedestrian = b.Kind == TipoObraDeArte.Passarela;
+        var spec = Spec(b, ctx.NativeTerrain) with
+        {
+            RoadHalf = Math.Max(1, half), SidewalkWidth = 0, Markings = false, RoadProvided = true,
+            Wear = host?.Wear ?? b.HostWear, EdgeRise = host?.EdgeRise ?? b.HostEdgeRise, HostSurface = grade.Z,
+            Skew = b.Skew, PierStations = b.PierStations, Lanes = pedestrian ? 0 : host?.Lanes ?? b.Lanes,
+        };
+        var info = Structure(geo, path, prof, spec, s0, s1, ground, b.FillSlope, s0 > 0.5, s1 < L - 0.5);
+        if (b.Water)
+        {
+            var mid = (s0 + s1) / 2;
+            SolidSweep.Add(geo, SolidSweep.Box(path.PointAt(mid), path.TangentAt(mid), Math.Min(s1 - s0, b.WaterWidth), 2 * spec.DeckHalf + 60,
+                b.WaterLevel - 0.3, b.WaterLevel), MarkingColor.Agua, "AGUA");
+        }
+        var minClear = Enumerable.Range(0, 21).Select(i => s0 + (s1 - s0) * i / 20.0)
+            .Min(s => prof.Z(s) - info.GirderDepth - spec.DeckThickness - ground(path.PointAt(s)));
+        if (!pedestrian && !b.Water && minClear < 5.5 && minClear > 0)
+            geo.Warnings.Add($"Gabarito sob a obra: {minClear.ToString("0.00", Pt)} m no ponto mais baixo (DNIT: 5,50 m sob viadutos rodoviários).");
+        geo.PathLength = s1 - s0;
         geo.PaintedLength = s1 - s0;
         geo.UnitCount = info.Piers;
         Measure(geo, MarkingColor.Concreto, (s1 - s0) * 2 * spec.DeckHalf);
@@ -228,6 +289,23 @@ public static class BridgeGenerator
 
     private static void Guards(MarkingGeometry geo, Polyline2 path, DeckSurface surf, DeckSpec d, double s0, double s1)
     {
+        if (d.RoadProvided && d.EdgeRise > 0.05)
+        {
+            // Via com calçada sobre a obra: mureta de concreto com pingadeira na borda e guarda-corpo sobre ela.
+            foreach (var side in new[] { -1, 1 })
+            {
+                var y0 = side * d.RoadHalf;
+                var y1 = side * (d.RoadHalf + d.BarrierWidth);
+                SolidSweep.Along(geo, path, s =>
+                {
+                    var z = surf.Z(s, y0);
+                    return SolidSweep.Chamfered(Math.Min(y0, y1), Math.Max(y0, y1), z - d.Wear, z + d.EdgeRise + 0.25, 0.025);
+                }, MarkingColor.Concreto, s0, s1, 4, "MURETA");
+                Infra.Railing(geo, path, new DeckSurface { Profile = surf.Profile, Custom = (s, _) => surf.Z(s, y0) }, (y0 + y1) / 2, s0, s1,
+                    d.EdgeRise + 0.25, 1.10 - 0.25, 2.0, d.RailingStyle);
+            }
+            return;
+        }
         foreach (var side in new[] { -1, 1 })
         {
             if (d.Barrier != TipoGuarda.GuardaCorpoMetalico)
@@ -273,12 +351,13 @@ public static class BridgeGenerator
             var n = Math.Max(1, (int)Math.Round((b - a) / span));
             for (int i = 1; i < n; i++) piers.Add(a + (b - a) * i / n);
         }
-        if (arch) { Spans(s0, ma); Spans(mb, s1); if (ma - s0 > 2) piers.Add(ma); if (s1 - mb > 2) piers.Add(mb); }
+        if (d.PierStations is { Count: > 0 } fixedPiers) piers.AddRange(fixedPiers.Where(x => x > s0 + 3 && x < s1 - 3));
+        else if (arch) { Spans(s0, ma); Spans(mb, s1); if (ma - s0 > 2) piers.Add(ma); if (s1 - mb > 2) piers.Add(mb); }
         else Spans(s0, s1);
         piers = piers.Distinct().OrderBy(x => x).ToList();
         var supports = new List<double> { s0 }.Concat(piers).Append(s1).ToList();
 
-        double Top(double s, double y) => surf.Z(s, Math.Clamp(y, -d.RoadHalf, d.RoadHalf)) - Infra.Wearing;
+        double Top(double s, double y) => surf.Z(s, Math.Clamp(y, -d.RoadHalf, d.RoadHalf)) - d.Wear;
         // Balanço lateral e posição das vigas extremas.
         var cant = Math.Clamp(half * 0.22, 0.8, 2.0);
         var yRoot = half - cant;
@@ -298,14 +377,17 @@ public static class BridgeGenerator
 
         // ---- laje do tabuleiro com balanços, abas e pingadeiras (um perfil só)
         SolidSweep.Along(geo, path, s => DeckSlab(s, half, yRoot, slab, d.RoadHalf, Top), MarkingColor.Concreto, s0, s1, 3, "TABULEIRO");
-        Infra.Pavement(geo, path, surf, -d.RoadHalf, d.RoadHalf, s0, s1, d.Pedestrian ? MarkingColor.PavimentoConcreto : MarkingColor.Asfalto);
-        Sidewalks(geo, path, surf, d, s0, s1, (s, y) => Top(s, y));
+        if (!d.RoadProvided)
+        {
+            Infra.Pavement(geo, path, surf, -d.RoadHalf, d.RoadHalf, s0, s1, d.Pedestrian ? MarkingColor.PavimentoConcreto : MarkingColor.Asfalto);
+            Sidewalks(geo, path, surf, d, s0, s1, (s, y) => Top(s, y));
+        }
         Guards(geo, path, surf, d, s0, s1);
-        if (d.Markings) Infra.LaneMarkings(geo, path, surf, -d.RoadHalf, d.RoadHalf, d.Lanes, s0, s1, d.TwoWay);
+        if (d.Markings && !d.RoadProvided) Infra.LaneMarkings(geo, path, surf, -d.RoadHalf, d.RoadHalf, d.Lanes, s0, s1, d.TwoWay);
         Infra.Joint(geo, path, surf, s0 + 0.06, -d.RoadHalf, d.RoadHalf);
         Infra.Joint(geo, path, surf, s1 - 0.06, -d.RoadHalf, d.RoadHalf);
         if (!d.Continuous) foreach (var p in piers) Infra.Joint(geo, path, surf, p, -d.RoadHalf, d.RoadHalf);
-        if (d.Drains && !d.Pedestrian) Infra.Scuppers(geo, path, surf, d.RoadHalf - 0.25, s0, s1, 8, slab + Infra.Wearing);
+        if (d.Drains && !d.Pedestrian) Infra.Scuppers(geo, path, surf, d.RoadHalf - 0.25, s0, s1, 8, slab + d.Wear);
 
         // ---- superestrutura
         var bearingsAt = new List<double>();                 // laterais dos aparelhos de apoio
@@ -384,16 +466,18 @@ public static class BridgeGenerator
         {
             var seat = (d.System == SistemaEstrutural.LajeMacica ? SlabBottom(s, 0) : Soffit(s)) - bearingH;
             Pier(geo, path, d, s, seat, ground, half, yRoot);
-            Bearings(geo, path, s, seat, bearingsAt, !d.Continuous || d.System == SistemaEstrutural.VigasPreMoldadas);
+            Bearings(geo, path, s, seat, bearingsAt, !d.Continuous || d.System == SistemaEstrutural.VigasPreMoldadas, d.Skew);
         }
         foreach (var (s, inward) in new[] { (s0, 1), (s1, -1) })
         {
             var seat = (d.System == SistemaEstrutural.LajeMacica ? SlabBottom(s, 0) : Soffit(s)) - bearingH;
             Abutment(geo, path, surf, d, s, inward, seat, ground, half, fillSlope, inward > 0 ? fillStart : fillEnd);
-            Bearings(geo, path, s + inward * 0.45, seat, bearingsAt, false);
+            Bearings(geo, path, s + inward * 0.45, seat, bearingsAt, false, d.Skew);
         }
 
-        if (d.Lighting && !d.Pedestrian) Infra.Lights(geo, path, surf, d.RoadHalf + d.BarrierWidth - 0.15, s0, s1, d.LightSpacing, zBase: 0.81);
+        if (d.Lighting && !d.Pedestrian)
+            Infra.Lights(geo, path, surf, d.RoadHalf + d.BarrierWidth - 0.15, s0, s1, d.LightSpacing,
+                zBase: d.RoadProvided && d.EdgeRise > 0.05 ? d.EdgeRise + 0.25 : 0.81);
         if (d.Lighting && d.Pedestrian) Infra.Lights(geo, path, surf, half - 0.1, s0, s1, d.LightSpacing * 0.6, height: 4.5);
         return new StructureInfo(piers.Count, gd);
     }
@@ -446,14 +530,15 @@ public static class BridgeGenerator
     }
 
     /// <summary>Aparelhos de apoio: pedestal de concreto, neoprene fretado e chapa de aço, sob cada viga.</summary>
-    private static void Bearings(MarkingGeometry geo, Polyline2 path, double s, double seat, IEnumerable<double> ys, bool pair)
+    private static void Bearings(MarkingGeometry geo, Polyline2 path, double s, double seat, IEnumerable<double> ys, bool pair, double skew = 0)
     {
         var p = path.PointAt(s);
-        var t = path.TangentAt(s);
-        var n = SolidSweep.Normal(path, s);
-        foreach (var y in ys)
+        var (t, n, sk) = SkewFrame(path, s, skew);
+        t = path.TangentAt(s);
+        foreach (var y0 in ys)
             foreach (var dx in pair ? new[] { -0.45, 0.45 } : new[] { 0.0 })
             {
+                var y = y0 * sk;
                 var c = p + n * y + t * dx;
                 SolidSweep.Add(geo, SolidSweep.Box(c, t, 0.60, 0.70, seat, seat + 0.10), MarkingColor.Concreto, "APOIO");
                 SolidSweep.Add(geo, SolidSweep.Box(c, t, 0.40, 0.50, seat + 0.10, seat + 0.17), MarkingColor.Preta, "APOIO");
@@ -473,14 +558,14 @@ public static class BridgeGenerator
     private static void Pier(MarkingGeometry geo, Polyline2 path, DeckSpec d, double s, double top, Func<Vec2, double> ground, double half, double yRoot)
     {
         var p = path.PointAt(s);
-        var t = path.TangentAt(s);
-        var n = t.PerpLeft;
+        var (t, n, sk) = SkewFrame(path, s, d.Skew);
         var g = ground(p);
         if (top - g < 0.8) return;
         var size = Math.Max(0.4, d.PierSize);
         var capH = Math.Clamp(size * 1.1, 1.0, 2.2);
         var capW = Math.Max(1.4, size + 0.3);
-        var capLen = 2 * yRoot + 1.2;
+        var capLen = (2 * yRoot + 1.2) * sk;
+        yRoot *= sk;
         var bottom = g - 0.3;
         // Bloco de fundação (topo 0,3 m abaixo do terreno).
         SolidSweep.Add(geo, SolidSweep.Box(p, t, capW + 1.6, Math.Min(capLen, size * 3 + (d.PierType is TipoPilar.Portico or TipoPilar.DuplaCircular ? capLen * 0.7 : 0)),
@@ -550,6 +635,19 @@ public static class BridgeGenerator
         }
     }
 
+    /// <summary>
+    /// Referencial do apoio com esconsidade: t = direção "ao longo" da travessa (perpendicular à linha dos apoios), n = linha dos
+    /// apoios (girada de <paramref name="skewDeg"/> em relação à normal do eixo) e o fator 1/cos para alongar as travessas.
+    /// </summary>
+    private static (Vec2 T, Vec2 N, double K) SkewFrame(Polyline2 path, double s, double skewDeg)
+    {
+        var t = path.TangentAt(s);
+        var a = Math.Clamp(skewDeg, -60, 60) * Math.PI / 180;
+        if (Math.Abs(a) < 1e-4) return (t, t.PerpLeft, 1);
+        var n = t.PerpLeft.Rotate(a);
+        return (n.PerpRight, n, 1 / Math.Cos(a));
+    }
+
     /// <summary>Contorno em planta de um retângulo de cantos arredondados (espessura ao longo de t, largura na transversal).</summary>
     private static List<Vec2> RoundedPlan(Vec2 c, Vec2 t, double along, double across, double r)
     {
@@ -568,23 +666,23 @@ public static class BridgeGenerator
         Func<Vec2, double> ground, double half, double fillSlope, bool hasFill)
     {
         var p = path.PointAt(s);
-        var t = path.TangentAt(s);
-        var n = t.PerpLeft;
+        var (t, n, sk) = SkewFrame(path, s, d.Skew);
         var g = ground(p);
         var deckTop = surf.Z(s, 0);
         if (seat - g < 0.3) return;
-        var back = -t * inward;                               // para dentro do aterro
-        var width = 2 * half + 0.3;
+        var back = -path.TangentAt(s) * inward;               // para dentro do aterro
+        var width = (2 * half + 0.3) * sk;
+        half *= sk;
         // Travessa de apoio (viga do encontro) e cortina.
         SolidSweep.Add(geo, SolidSweep.Extrude(SolidSweep.Chamfered(-width / 2, width / 2, seat - 1.2, seat, 0.08), p + back * 1.6, t * inward, 1.6), MarkingColor.Concreto, "ENCONTRO");
-        SolidSweep.Add(geo, SolidSweep.Box(p + back * 1.45, t, 0.30, width, seat, deckTop - Infra.Wearing), MarkingColor.Concreto, "ENCONTRO");
+        SolidSweep.Add(geo, SolidSweep.Box(p + back * 1.45, t, 0.30, width, seat, deckTop - d.Wear), MarkingColor.Concreto, "ENCONTRO");
         // Parede frontal/pilares enterrados até a fundação.
         SolidSweep.Add(geo, SolidSweep.Box(p + back * 0.9, t, 1.0, width - 0.4, g - 1.5, seat - 1.2), MarkingColor.Concreto, "ENCONTRO");
         // Laje de transição sob o pavimento (acompanha o greide e o caimento).
         var sa = Math.Clamp(s - inward * 7.6, 0, path.Length);
         var sb = Math.Clamp(s - inward * 1.6, 0, path.Length);
         if (Math.Abs(sb - sa) > 0.5)
-            SolidSweep.Along(geo, path, x => Infra.Band(-d.RoadHalf, d.RoadHalf, y => surf.Z(x, y) - Infra.Wearing - 0.05, 0.30),
+            SolidSweep.Along(geo, path, x => Infra.Band(-d.RoadHalf, d.RoadHalf, y => surf.Z(x, y) - d.Wear - 0.05, 0.30),
                 MarkingColor.Concreto, Math.Min(sa, sb), Math.Max(sa, sb), 3, "ENCONTRO");
         // Alas.
         var h = deckTop - g;

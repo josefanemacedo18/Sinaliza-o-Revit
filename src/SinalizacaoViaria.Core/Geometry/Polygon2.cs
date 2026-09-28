@@ -54,6 +54,22 @@ public sealed class Polygon2
     public Polygon2 Transform(Func<Vec2, Vec2> f) =>
         new(Outer.Select(f), Holes.Select(h => h.Select(f)));
 
+    /// <summary>Distância do ponto ao contorno (externo e furos).</summary>
+    public double DistanceTo(Vec2 p)
+    {
+        var best = double.MaxValue;
+        foreach (var ring in Holes.Prepend(Outer))
+            for (int i = 0; i < ring.Count; i++)
+            {
+                var a = ring[i];
+                var ab = ring[(i + 1) % ring.Count] - a;
+                var l2 = ab.Dot(ab);
+                var t = l2 < 1e-12 ? 0 : Math.Clamp((p - a).Dot(ab) / l2, 0, 1);
+                best = Math.Min(best, p.DistanceTo(a + ab * t));
+            }
+        return best;
+    }
+
     public bool Contains(Vec2 p)
     {
         if (!PointInRing(Outer, p)) return false;

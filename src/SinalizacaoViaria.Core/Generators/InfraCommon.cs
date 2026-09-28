@@ -16,7 +16,10 @@ public sealed class DeckSurface
     /// <summary>Duas águas a partir do eixo; falso = caimento único descendo para a direita (afastamentos negativos).</summary>
     public bool Crown { get; init; } = true;
 
-    public double Z(double s, double y) => Profile.Z(s) - CrossSlope * (Crown ? Math.Abs(y) : -y);
+    /// <summary>Superfície dada por fora (greide da via hospedeira: estação, afastamento → cota).</summary>
+    public Func<double, double, double>? Custom { get; init; }
+
+    public double Z(double s, double y) => Custom != null ? Custom(s, y) : Profile.Z(s) - CrossSlope * (Crown ? Math.Abs(y) : -y);
 
     public static implicit operator DeckSurface(VerticalProfile p) => new() { Profile = p };
 }

@@ -1,3 +1,4 @@
+using SinalizacaoViaria.Core.Automation;
 using System.Globalization;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Geometry;
@@ -91,12 +92,45 @@ public static class EarthworksGenerator
         return (parts, crown, halfClear);
     }
 
+    /// <summary>
+    /// Trecho hospedado numa via: sub-eixo [início, fim], greide da via reamostrado a partir do início e a definição ajustada
+    /// à seção da via (a pista, as calçadas e as faixas são dela).
+    /// </summary>
+    private static (Polyline2 Path, VerticalProfile Profile, double Half, double EdgeRise)? Hosted(IHostedStructure h, MarkingDefinition def, Polyline2 path, BuildContext ctx)
+    {
+        if (h.HostRoad == null) return null;
+        var host = HostRoads.Find(h.HostRoad, ctx);
+        var grade = host?.Grade ?? def.Output.Grade ?? RoadGrade.Flat(path.Length);
+        var s0 = Math.Clamp(Math.Min(h.HostStart, h.HostEnd), 0, path.Length);
+        var s1 = Math.Clamp(Math.Max(h.HostStart, h.HostEnd), 0, path.Length);
+        if (s1 - s0 < 5) return null;
+        var sub = new Polyline2(path.SubPoints(s0, s1));
+        var prof = new VerticalProfile();
+        for (var s = s0; s < s1; s += 2) prof.Pvis.Add((s - s0, grade.Z(s)));
+        prof.Pvis.Add((s1 - s0, grade.Z(s1)));
+        return (sub, prof, host?.Half ?? h.HostHalf, host?.EdgeRise ?? h.HostEdgeRise);
+    }
+
     public static MarkingGeometry Tunnel(TunnelDefinition d, Polyline2 path, BuildContext ctx)
     {
         var geo = new MarkingGeometry();
+        var hostedInfo = Hosted(d, d, path, ctx);
+        var hosted = hostedInfo != null;
+        var edgeRise = 0.0;
+        VerticalProfile prof;
+        if (hostedInfo is { } hi)
+        {
+            path = hi.Path;
+            prof = hi.Profile;
+            edgeRise = hi.EdgeRise;
+            // Seção pela via: a largura livre cobre a seção inteira dela (as calçadas viram passeios de serviço).
+            var c = (TunnelDefinition)d.CloneWithNewId();
+            c.Lanes = 1; c.LaneWidth = 2 * Math.Max(1, hi.Half); c.ShoulderWidth = 0; c.WalkwayWidth = 0; c.GroundLine = null; c.WalkwayHeight = Math.Max(0.1, edgeRise);
+            d = c;
+        }
+        else prof = VerticalProfile.Linear(path.Length, d.StartZ, d.EndZ);
         var L = path.Length;
         if (L < 5) { geo.Warnings.Add("Eixo do túnel muito curto."); return geo; }
-        var prof = VerticalProfile.Linear(L, d.StartZ, d.EndZ);
         if (prof.MaxGrade > 0.06) geo.Warnings.Add($"Rampa de {(prof.MaxGrade * 100).ToString("0.0", Pt)} % no túnel – usual ≤ 5 % (ventilação e segurança).");
         var (parts, crown, halfClear) = TunnelSection(d);
         var t = Math.Max(0.2, d.LiningThickness);
@@ -104,7 +138,7 @@ public static class EarthworksGenerator
             SolidSweep.Along(geo, path, s => part.Select(q => new SectionPt(q.Y, q.Z + prof.Z(s))).ToList(), MarkingColor.Concreto, 0, L, 5, "REVESTIMENTO");
         // Pista, base e passeios de serviço.
         var half = d.RoadWidth / 2;
-        Infra.Pavement(geo, path, prof, -half, half, 0, L);
+        if (!hosted) Infra.Pavement(geo, path, prof, -half, half, 0, L);
         SolidSweep.Along(geo, path, s => SolidSweep.Rect(-halfClear, halfClear, prof.Z(s) - Infra.Wearing - 0.35, prof.Z(s) - Infra.Wearing), MarkingColor.Brita, 0, L, 8, "BASE");
         if (d.WalkwayWidth > 0.05)
             foreach (var side in new[] { -1, 1 })
@@ -114,7 +148,7 @@ public static class EarthworksGenerator
                 SolidSweep.Along(geo, path, s => SolidSweep.Rect(Math.Min(a, b), Math.Max(a, b), prof.Z(s) - Infra.Wearing, prof.Z(s) + Math.Max(0.1, d.WalkwayHeight)),
                     MarkingColor.Concreto, 0, L, 8, "PASSEIO");
             }
-        Infra.LaneMarkings(geo, path, prof, -half, half, Math.Max(1, d.Lanes), 0, L, true);
+        if (!hosted) Infra.LaneMarkings(geo, path, prof, -half, half, Math.Max(1, d.Lanes), 0, L, true);
         // Iluminação contínua (luminárias a cada 8 m nas duas laterais da abóbada).
         if (d.Lighting)
             for (var s = 4.0; s < L; s += 8)
@@ -147,7 +181,7 @@ public static class EarthworksGenerator
                 }
             }
         // Corrimão junto à parede nos passeios, faixa de LED contínua, eletrocalhas e nichos de emergência (SOS) a cada 150 m.
-        if (d.WalkwayWidth > 0.3)
+        if (d.WalkwayWidth > 0.3 || (hosted && edgeRise > 0.05))
             foreach (var side in new[] { -1, 1 })
                 Infra.Railing(geo, path, prof, side * (halfClear - 0.10), 0, L, Math.Max(0.1, d.WalkwayHeight), 1.0, 3.0);
         if (d.Lighting)
@@ -168,7 +202,7 @@ public static class EarthworksGenerator
         foreach (var (s, dir) in new[] { (0.0, -1), (L, 1) })
             Portal(geo, d, path, prof, s, dir, parts, crown, halfClear, t);
         // Terraplenagem: trincheiras de acesso diante dos emboques (a abertura interna fica a cargo da escavação do Revit).
-        if (d.ApproachCut > 1)
+        if (d.ApproachCut > 1 && !hosted)
             foreach (var (s, dir) in new[] { (0.0, -1), (L, 1) })
             {
                 var p = path.PointAt(s);
@@ -275,6 +309,15 @@ public static class EarthworksGenerator
     public static MarkingGeometry Trench(TrenchDefinition d, Polyline2 path, BuildContext ctx)
     {
         var geo = new MarkingGeometry();
+        var hostedInfo = Hosted(d, d, path, ctx);
+        var hosted = hostedInfo != null;
+        if (hostedInfo is { } hi)
+        {
+            path = hi.Path;
+            var c = (TrenchDefinition)d.CloneWithNewId();
+            c.Lanes = 1; c.LaneWidth = 2 * Math.Max(1, hi.Half); c.ShoulderWidth = 0; c.GroundLine = null;
+            d = c;
+        }
         var L = path.Length;
         if (L < 20) { geo.Warnings.Add("Eixo da trincheira muito curto."); return geo; }
         var half0 = d.RoadWidth / 2 + 0.3 + Math.Max(0.2, d.WallThickness) + 3;
@@ -292,12 +335,12 @@ public static class EarthworksGenerator
             rin *= k; rout *= k;
             geo.Warnings.Add($"Eixo curto para as rampas: rampa acima de {(gr * 100).ToString("0.0", Pt)} % – alongue o eixo ou reduza o rebaixo.");
         }
-        var prof = VerticalProfile.Hump(L, g0, bottom, g1, rin, rout, d.VerticalCurve);
+        var prof = hostedInfo?.Profile ?? VerticalProfile.Hump(L, g0, bottom, g1, rin, rout, d.VerticalCurve);
         var half = d.RoadWidth / 2;
         var t = Math.Max(0.2, d.WallThickness);
-        Infra.Pavement(geo, path, prof, -half, half, 0, L);
+        if (!hosted) Infra.Pavement(geo, path, prof, -half, half, 0, L);
         Infra.Base(geo, path, prof, -half, half, 0, L);
-        Infra.LaneMarkings(geo, path, prof, -half, half, Math.Max(1, d.Lanes), 0, L, true);
+        if (!hosted) Infra.LaneMarkings(geo, path, prof, -half, half, Math.Max(1, d.Lanes), 0, L, true);
         double Depth(double s) => topProf.Z(s) - prof.Z(s);
         var walled = SolidSweep.Stations(path, 0, L, 1).Where(s => Depth(s) > 0.5).ToList();
         var ws0 = walled.Count > 0 ? walled.First() : L / 2;

@@ -138,9 +138,11 @@ public sealed class MarkingService
         // Obras que acompanham a topografia leem o terreno natural (Toposolid) relativo à base da marca.
         var groundBase = def.Path == null ? def.PointZ ?? 0 : PathResolver.Resolve(_doc, def.Path)?.Z ?? 0;
         Func<Vec2, double?>? ground = null;
-        if (def is ITerrainAware { FollowTerrain: true } ta && (ta.GroundLine == null || ta.GroundLine.Count < 2 || def is InterchangeDefinition))
+        if (def is ITerrainAware { FollowTerrain: true } ta && (ta.GroundLine == null || ta.GroundLine.Count < 2 || def is InterchangeDefinition or IHostedStructure { HostRoad: not null }))
             ground = TerrainFunction(groundBase);
-        var native = def is ITerrainAware { AdjustTerrain: true } && HasToposolid;
+        // Terra é sempre do terreno nativo (Toposolid): aterros, cortes, saias e reaterros nunca viram sólidos – a terraplenagem os
+        // constrói no Toposolid (criado automaticamente quando o projeto não tem um).
+        var native = true;
         var ctx = PluginContext.BuildContext(def.Output.Drape && def.Output.Mode == OutputMode.Modelo3D,
             view?.Scale ?? 100, id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList(), OtherGeometry,
             d => PathResolver.Resolve(_doc, d.Path)?.Main, ground, native);
@@ -169,21 +171,55 @@ public sealed class MarkingService
         if (def is HatchMarkingDefinition { IsStrip: false } hatch)
             return MarkingBuilder.BuildHatch(hatch, path.Chains.Where(c => c.Points.Count >= 3).ToList(), ctx);
 
+        var graded = Graded(def) && path.Main != null;
         var geo = new MarkingGeometry();
         foreach (var chain in path.Chains)
-            geo.Merge(MarkingBuilder.Build(def, chain, ctx));
+        {
+            // Com greide, o eixo é refinado (2 m): barreiras, dispositivos e sólidos varridos acompanham as curvas verticais.
+            var c = graded ? new Polyline2(CurveTools.Densify(chain.Points, 2.0), chain.Closed) : chain;
+            geo.Merge(MarkingBuilder.Build(def, c, ctx));
+        }
+        if (graded) GradeLift.Apply(geo, new GradeSurface(path.Main!, def.Output.Grade!));
         return geo;
     }
 
-    /// <summary>Cota do terreno (Toposolid/topografia, m) relativa a <paramref name="baseZ"/>; nulo sem terreno ou sem vista 3D.</summary>
+    /// <summary>Marca da via que acompanha o greide (as obras hospedadas já aplicam o greide na própria geração).</summary>
+    public static bool Graded(MarkingDefinition def) =>
+        def.Output.Grade is { IsFlat: false } && def.Path != null && def is not ITerrainAware && def is not IAnnotationDefinition
+        && def.Output.Mode == OutputMode.Modelo3D;
+
+    /// <summary>Greide da via como superfície de apoio de pisos e pinturas (nulo = sem greide).</summary>
+    private ISurface? GradeFor(MarkingDefinition def, double baseZ)
+    {
+        if (!Graded(def)) return null;
+        var axis = PathResolver.Resolve(_doc, def.Path)?.Main;
+        return axis == null ? null : new GradeSampler(new GradeSurface(axis, def.Output.Grade!), baseZ);
+    }
+
+    private Func<Vec2, double?>? _ground;
+    private bool _groundRead;
+
+    /// <summary>
+    /// Cota do terreno NATURAL (m) relativa a <paramref name="baseZ"/>: o terreno original de cada Toposolid (guardado na primeira
+    /// terraplenagem), lido direto da geometria – sem vistas 3D. Topografias antigas caem no amostrador por raios.
+    /// </summary>
     private Func<Vec2, double?>? TerrainFunction(double baseZ)
     {
         try
         {
-            var sampler = new SurfaceSampler(_doc, Array.Empty<string>(), _interactive, terrainOnly: true);
-            if (!sampler.IsAvailable) return null;
-            var hint = UnitConv.Ft(baseZ);
-            return p => sampler.TrySample(UnitConv.Ft(p.X), UnitConv.Ft(p.Y), hint, out var z, out _) ? UnitConv.M(z) - baseZ : null;
+            if (!_groundRead)
+            {
+                _groundRead = true;
+                _ground = TerrainModel.Ground(_doc);
+                if (_ground == null)
+                {
+                    var sampler = new SurfaceSampler(_doc, Array.Empty<string>(), _interactive, terrainOnly: true);
+                    if (sampler.IsAvailable)
+                        _ground = p => sampler.TrySample(UnitConv.Ft(p.X), UnitConv.Ft(p.Y), 0, out var z, out _) ? UnitConv.M(z) : null;
+                }
+            }
+            var g = _ground;
+            return g == null ? null : p => g(p) - baseZ;
         }
         catch (Exception ex)
         {
@@ -191,6 +227,9 @@ public sealed class MarkingService
             return null;
         }
     }
+
+    /// <summary>Esquece o terreno lido (depois de criar ou moldar o Toposolid).</summary>
+    public void InvalidateTerrain() { _groundRead = false; _ground = null; _hasTopo = null; }
 
     // ------------------------------------------------------------------ criação / regeneração
 
@@ -286,8 +325,8 @@ public sealed class MarkingService
         if (def.Output.Mode == OutputMode.Modelo3D && settings.PhysicalAsFloors)
         {
             // Acompanhando a superfície: o piso é criado na cota do terreno e deformado (edição de forma nativa do piso).
-            SurfaceSampler? terrain = null;
-            if (def.Output.Drape)
+            ISurface? terrain = GradeFor(def, baseZ);
+            if (terrain == null && def.Output.Drape)
             {
                 terrain = new SurfaceSampler(_doc, def.Output.SurfaceIds, _interactive, terrainOnly: true);
                 if (!terrain.IsAvailable) terrain = null;
@@ -344,8 +383,8 @@ public sealed class MarkingService
 
         if (def.Output.Mode == OutputMode.Modelo3D)
         {
-            SurfaceSampler? sampler = null;
-            if (def.Output.Drape)
+            ISurface? sampler = GradeFor(def, baseZ);
+            if (sampler == null && def.Output.Drape)
             {
                 sampler = new SurfaceSampler(_doc, def.Output.SurfaceIds, _interactive);
                 if (!sampler.IsAvailable) result.Warnings.Add("Nenhuma vista 3D disponível para projetar sobre a superfície – marca gerada plana.");
@@ -573,7 +612,7 @@ public sealed class MarkingService
     // ------------------------------------------------------------------ 3D
 
     private List<GeometryObject> BuildSolids(IEnumerable<MarkingPiece> pieces, double zMeters, double thickness,
-        SurfaceSampler? sampler, ElementId materialId, List<string> warnings, double aboveSurfaceM = 0.001)
+        ISurface? sampler, ElementId materialId, List<string> warnings, double aboveSurfaceM = 0.001)
     {
         var res = new List<GeometryObject>();
         var options = new SolidOptions(materialId, ElementId.InvalidElementId);
@@ -592,7 +631,7 @@ public sealed class MarkingService
                 {
                     var z = zBaseFt;
                     var c = piece.Shape.Centroid;
-                    if (draped && sampler!.TrySample(UnitConv.Ft(c.X), UnitConv.Ft(c.Y), zBaseFt, out var sz, out _)) z = sz + above;
+                    if (draped && sampler!.LiftsSolids && sampler.TrySample(UnitConv.Ft(c.X), UnitConv.Ft(c.Y), zBaseFt, out var sz, out _)) z = sz + above;
                     if (piece.Round is { } round && RoundGeometry(round, z + lift, options) is { } exact) { res.Add(exact); continue; }
                     if (piece.Solid is { } poly) res.AddRange(PolyhedronGeometry(poly, z + lift, materialId));
                     else res.Add(ProfileSolidGeometry(piece.Profile!, z + lift, options));
@@ -637,7 +676,7 @@ public sealed class MarkingService
     /// Divide a peça até cada parte ficar num plano do terreno (desvio ≤ 1,5 cm): devolve a parte, a cota do plano no
     /// centroide (pés) e a normal do plano. Rampas constantes = peça única; só as mudanças de greide geram emendas.
     /// </summary>
-    private static IEnumerable<(Polygon2 Shape, double Z, XYZ? Normal)> DrapedParts(Polygon2 shape, SurfaceSampler s, double zHintFt, int depth)
+    private static IEnumerable<(Polygon2 Shape, double Z, XYZ? Normal)> DrapedParts(Polygon2 shape, ISurface s, double zHintFt, int depth)
     {
         var ring = CurveTools.Densify(shape.Outer.Append(shape.Outer[0]).ToList(), 5.0);
         var step = Math.Max(1, ring.Count / 32);
@@ -970,7 +1009,7 @@ public sealed class MarkingService
     /// Cria o(s) piso(s) da peça (topo na cota da peça). Tenta o contorno original, depois limpo de lascas e, por fim,
     /// dividido sem furos. Lista vazia se o Revit recusar todas as tentativas (<paramref name="reason"/> recebe o motivo).
     /// </summary>
-    private List<Floor> CreateFloors(MarkingPiece piece, double baseZm, ElementId? userType, ref string? reason, SurfaceSampler? terrain = null)
+    private List<Floor> CreateFloors(MarkingPiece piece, double baseZm, ElementId? userType, ref string? reason, ISurface? terrain = null)
     {
         var res = new List<Floor>();
         var topFt = UnitConv.Ft(baseZm + piece.Elevation + piece.Thickness);
@@ -1050,7 +1089,7 @@ public sealed class MarkingService
     /// Deforma o piso para acompanhar o terreno: edição de forma do Revit com os vértices do contorno e uma malha interna
     /// de pontos (4 m), cada um na cota da superfície. O piso continua editável com as ferramentas nativas.
     /// </summary>
-    private void DrapeFloor(Floor f, Polygon2 shape, SurfaceSampler terrain, double groundFt)
+    private void DrapeFloor(Floor f, Polygon2 shape, ISurface terrain, double groundFt)
     {
         try
         {

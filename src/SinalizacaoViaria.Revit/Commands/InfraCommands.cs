@@ -31,6 +31,44 @@ internal static class InfraForms
          .Check("Acompanhar o terreno natural (Toposolid)", follow, setFollow)
          .Check("Ajustar o Toposolid ao criar (corte, aterro, reaterro)", adjust, setAdjust);
 
+    /// <summary>Seção da via nova criada com a obra: −1 = pelas faixas do formulário; senão, índice do modelo de via.</summary>
+    public static int NewRoadTemplate { get; set; } = -1;
+    public static double NewRoadRadius { get; set; } = 150;
+
+    /// <summary>
+    /// Onde a obra entra: num trecho de uma via existente (a via vira a obra no trecho) ou numa via nova criada com a
+    /// ferramenta de vias (pisos, faixas, conexões) – nos dois casos a obra é hospedada na via.
+    /// </summary>
+    private static FormWindow HostModes(this FormWindow w, string what)
+    {
+        var templates = new List<(string, int)> { ("Pelas faixas, acostamentos e passeios acima", -1) };
+        templates.AddRange(RoadTemplates.All.Select((t, i) => (t.Name, i)));
+        return w.Section("Via da obra",
+                $"A {what} é um TRECHO de uma via do plugin: a pista, as calçadas e a sinalização são pisos da via (acompanham o greide) e se conectam " +
+                "às outras vias, rotatórias e interseções; a obra gera a estrutura. Numa via existente o greide dela é ajustado no trecho.")
+            .Choice("Seção da via nova", templates, () => NewRoadTemplate, v => NewRoadTemplate = v)
+            .Number("Raio das curvas ao desenhar o eixo (m)", () => NewRoadRadius, v => NewRoadRadius = v, 0, 5000, "0")
+            .Modes(($"Num trecho de uma VIA EXISTENTE (clique a via e as pontas do trecho)", PathMode.ViaExistente),
+                   ("Via nova: desenhar o eixo por pontos (encaixa nas vias existentes)", PathMode.Desenhar),
+                   ("Via nova: selecionar linhas existentes como eixo", PathMode.ViaNovaLinhas));
+    }
+
+    /// <summary>Seção da via da prévia: o modelo escolhido ou a das faixas do formulário.</summary>
+    private static RoadSetup PreviewSetup(Func<RoadSetup> own) =>
+        NewRoadTemplate >= 0 && NewRoadTemplate < RoadTemplates.All.Count ? RoadTemplates.All[NewRoadTemplate].Create() : own();
+
+    private static List<double>? ParseStations(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var list = text.Split(new[] { ';', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => double.TryParse(x.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : double.NaN)
+            .Where(v => !double.IsNaN(v) && v > 0).OrderBy(v => v).ToList();
+        return list.Count == 0 ? null : list;
+    }
+
+    private static string StationsText(List<double>? l) =>
+        l == null ? "" : string.Join("; ", l.Select(v => v.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))));
+
     // ------------------------------------------------------------------ drenagem
 
     public static FormWindow Drainage(DrainageDefinition d, bool edit, bool inlets)
@@ -116,16 +154,25 @@ internal static class InfraForms
     public static FormWindow Bridge(BridgeDefinition d, bool edit)
     {
         var w = new FormWindow(edit ? $"Editar {d.KindName.ToLowerInvariant()}" : d.KindName, "Viaduto, ponte ou passarela",
-            "Desenhe o EIXO da obra de ponta a ponta (incluindo as rampas de acesso). O greide sobe pela rampa máxima até a altura do tabuleiro; " +
-            "onde o aterro passaria de 6 m começa a estrutura (encontros, pilares e vãos). Tudo editável depois.",
+            "A obra é um trecho de uma VIA do plugin: escolha uma via existente (clique a via e as pontas do trecho) ou desenhe o eixo de uma via nova. " +
+            "A pista, as calçadas e a sinalização são pisos da via, no greide; a obra gera tabuleiro, vigas, pilares, encontros e guarda-corpos. " +
+            "Aterros e taludes são feitos no terreno nativo (Massa e terreno → Sólido topográfico).",
             d, () =>
             {
                 var c = (BridgeDefinition)MarkingDefinition.FromJson(d.ToJson())!;
-                c.FollowTerrain = false; c.GroundLine = null;
-                var len = Math.Max(120, 2 * Math.Abs(c.Height) / Math.Max(0.02, c.MaxGrade) + Math.Max(60, 3 * c.SpanLength));
-                var g = Build(c, new Polyline2(new[] { new Vec2(0, 0), new Vec2(len, 0) }));
-                return new FormPreview(g, null, null, Info(g, $"Exemplo com {len:0} m de eixo. Área de tabuleiro: {g.AreaByColor.GetValueOrDefault(MarkingColor.Concreto):0} m²."));
-            }, false, edit ? "Aplicar" : "Inserir", 1180, 760);
+                c.FollowTerrain = true; c.GroundLine = null;
+                var run = Math.Abs(c.Height) / Math.Max(0.02, c.MaxGrade);
+                var len = Math.Max(160, 2 * run + Math.Max(60, 3 * c.SpanLength));
+                var axis = new Polyline2(new[] { new Vec2(0, 0), new Vec2(len, 0) });
+                // Terreno de exemplo: um vale no meio do eixo (rio ou via mais baixa).
+                double Ground(Vec2 p) => -Math.Max(4, c.Height * 0.8) * Math.Exp(-Math.Pow((p.X - len / 2) / Math.Max(25, len * 0.18), 2));
+                var (grade, s0, s1, warn) = InfraRoads.BridgeGrade(c, axis, Ground);
+                c.HostStart = s0; c.HostEnd = s1;
+                if (c.Water) c.WaterLevel = Ground(new Vec2(len / 2, 0)) + 0.8;
+                var g = InfraDemo.Preview(PreviewSetup(() => InfraRoads.Setup(c)), axis, grade, new MarkingDefinition[] { c }, PluginContext.Catalog, Ground);
+                g.Warnings.AddRange(warn);
+                return new FormPreview(g, null, null, Info(g, $"Exemplo: via de {len:0} m sobre um vale; obra de {s1 - s0:0} m (estacas {s0:0} a {s1:0})."));
+            }, false, edit ? "Aplicar" : "Inserir", 1180, 780);
         w.Choice("Obra", new[] { ("Viaduto", TipoObraDeArte.Viaduto), ("Ponte", TipoObraDeArte.Ponte), ("Passarela de pedestres", TipoObraDeArte.Passarela) },
                 () => d.Kind, v => d.Kind = v, preset: v => { d.Kind = v; d.ApplyKindDefaults(); })
          .Choice("Sistema estrutural", new[]
@@ -153,9 +200,18 @@ internal static class InfraForms
          .Check("Iluminação", () => d.Lighting, v => d.Lighting = v)
          .Number("Espaçamento dos postes (m)", () => d.LightSpacing, v => d.LightSpacing = v, 10, 80)
          .Section("Greide e acessos")
-         .Number("Altura do tabuleiro sobre a base (m)", () => d.Height, v => d.Height = v, 2, 120, "0.00", "Gabarito vertical livre ≥ 5,50 m sobre rodovias (DNIT).")
-         .Check("Rampa de acesso no início", () => d.ApproachStart, v => d.ApproachStart = v)
-         .Check("Rampa de acesso no fim", () => d.ApproachEnd, v => d.ApproachEnd = v)
+         .Choice("Perfil da obra", new[]
+            {
+                ("Rampas de acesso até a altura, trecho em nível (viaduto)", PerfilObra.RampasDeAcesso), ("Horizontal na altura indicada (sem rampas)", PerfilObra.Horizontal),
+                ("Reta de uma margem à outra (ponte sobre vale/rio)", PerfilObra.EntreMargens), ("Convexo – curva vertical única com o alto no meio", PerfilObra.Convexo),
+                ("Manter o greide da via existente", PerfilObra.GreideDaVia),
+            }, () => d.ProfileKind, v => d.ProfileKind = v)
+         .Check("Traçado reto (só as pontas do eixo desenhado – obra em tangente)", () => d.StraightAxis, v => d.StraightAxis = v)
+         .If(() => d.ProfileKind is PerfilObra.RampasDeAcesso or PerfilObra.Horizontal or PerfilObra.Convexo,
+             x => x.Number("Altura do tabuleiro sobre a base (m)", () => d.Height, v => d.Height = v, 2, 120, "0.00", "Gabarito vertical livre ≥ 5,50 m sobre rodovias (DNIT)."))
+         .If(() => d.ProfileKind == PerfilObra.RampasDeAcesso, x => x
+             .Check("Rampa de acesso no início", () => d.ApproachStart, v => d.ApproachStart = v)
+             .Check("Rampa de acesso no fim", () => d.ApproachEnd, v => d.ApproachEnd = v))
          .Percent("Rampa máxima (%)", () => d.MaxGrade, v => d.MaxGrade = v, 0.01, 0.12, "Veículos: 5–6 %; passarelas: ≤ 8,33 % (NBR 9050).")
          .Number("Curva vertical (m)", () => d.VerticalCurve, v => d.VerticalCurve = v, 0, 300)
          .Check("Acessos em terra armada (muros) em vez de taludes", () => d.ApproachWalls, v => d.ApproachWalls = v)
@@ -167,6 +223,10 @@ internal static class InfraForms
                  ("Parede (pontas arredondadas)", TipoPilar.Parede), ("Martelo (capitel)", TipoPilar.Martelo), ("Em Y", TipoPilar.Y), ("Oblongo", TipoPilar.Oblongo) },
                  () => d.PierType, v => d.PierType = v)
          .Number("Dimensão dos pilares (m)", () => d.PierSize, v => d.PierSize = v, 0.4, 6)
+         .Number("Esconsidade dos apoios (°)", () => d.Skew, v => d.Skew = v, -60, 60, "0",
+            "Pilares e encontros paralelos ao rio ou à via cruzada (0 = perpendiculares ao eixo).")
+         .Text("Pilares nas estações (m a partir do início, separadas por ;)", () => StationsText(d.PierStations), v => d.PierStations = ParseStations(v),
+            tooltip: "Vazio = distribuídos pelo vão típico. Use para desviar de vias, rios e redes sob a obra.")
          .Check("Tabuleiro contínuo (juntas só nos encontros)", () => d.Continuous, v => d.Continuous = v)
          .If(() => d.System == SistemaEstrutural.CaixaoCelular, x => x.Check("Caixão com altura variável (mísulas)", () => d.VariableDepth, v => d.VariableDepth = v))
          .If(() => d.System == SistemaEstrutural.Estaiada, x => x
@@ -181,7 +241,7 @@ internal static class InfraForms
          .Number("Cota da água sobre a base (m)", () => d.WaterLevel, v => d.WaterLevel = v, -100, 100)
          .Number("Largura do rio (m)", () => d.WaterWidth, v => d.WaterWidth = v, 2, 2000, "0")
          .Terrain(() => d.FollowTerrain, v => d.FollowTerrain = v, () => d.AdjustTerrain, v => d.AdjustTerrain = v);
-        if (!edit) w.Modes(("Desenhar o eixo por pontos", PathMode.Desenhar), ("Selecionar linhas existentes", PathMode.Linhas), ("Dois cliques", PathMode.DoisPontos));
+        if (!edit) w.HostModes(d.KindName.ToLowerInvariant());
         return w;
     }
 
@@ -190,15 +250,22 @@ internal static class InfraForms
     public static FormWindow Tunnel(TunnelDefinition d, bool edit)
     {
         var w = new FormWindow(edit ? "Editar túnel" : "Túnel", "Túnel rodoviário",
-            "Desenhe o EIXO do túnel entre os emboques. Revestimento, pavimento, passeios de serviço, iluminação, ventiladores e emboques; " +
-            "com o terreno, as trincheiras de acesso diante dos emboques são terraplenadas e o Revit tenta escavar o Toposolid.",
+            "O túnel é um trecho de uma VIA do plugin (existente ou nova): a pista e os passeios são pisos da via; o túnel gera revestimento, " +
+            "emboques, iluminação, ventiladores, eletrocalhas e nichos SOS. Numa via nova o trecho em túnel sai onde o terreno cobre a abóbada.",
             d, () =>
             {
                 var c = (TunnelDefinition)MarkingDefinition.FromJson(d.ToJson())!;
-                var g = Build(c, new Polyline2(new[] { new Vec2(0, 0), new Vec2(40, 0) }));
+                c.GroundLine = null;
+                var len = 360.0;
+                var axis = new Polyline2(new[] { new Vec2(0, 0), new Vec2(len, 0) });
+                double Ground(Vec2 p) => 24 * Math.Exp(-Math.Pow((p.X - len / 2) / 85, 2));
+                var grade = new RoadGrade { Points = { new(0, 0), new(len, 0) } };
                 var (_, crown, half) = EarthworksGenerator.TunnelSection(c);
-                return new FormPreview(g, null, null, Info(g, $"Largura livre {2 * half:0.00} m; altura até a coroa {crown:0.00} m."));
-            }, false, edit ? "Aplicar" : "Inserir", 1080, 720);
+                var (s0, s1) = InfraRoads.TunnelRange(axis, grade, p => Ground(p), crown) ?? (100, 260);
+                c.HostStart = s0; c.HostEnd = s1;
+                var g = InfraDemo.Preview(PreviewSetup(() => InfraRoads.Setup(c)), axis, grade, new MarkingDefinition[] { c }, PluginContext.Catalog, Ground);
+                return new FormPreview(g, null, null, Info(g, $"Largura livre {2 * half:0.00} m; altura até a coroa {crown:0.00} m. Exemplo: túnel de {s1 - s0:0} m sob um morro."));
+            }, false, edit ? "Aplicar" : "Inserir", 1080, 740);
         w.Choice("Seção", new[] { ("Ferradura (NATM)", SecaoTunel.Ferradura), ("Circular (TBM)", SecaoTunel.Circular), ("Retangular (vala coberta)", SecaoTunel.Retangular) },
                 () => d.Section, v => d.Section = v)
          .Integer("Faixas", () => d.Lanes, v => d.Lanes = v, 1, 6)
@@ -207,8 +274,9 @@ internal static class InfraForms
          .Number("Passeio de serviço (m)", () => d.WalkwayWidth, v => d.WalkwayWidth = v, 0, 2)
          .Number("Gabarito vertical livre (m)", () => d.ClearHeight, v => d.ClearHeight = v, 3, 8, "0.00", "≥ 5,50 m em rodovias.")
          .Number("Espessura do revestimento (m)", () => d.LiningThickness, v => d.LiningThickness = v, 0.2, 1.5)
-         .Number("Cota da pista no início (m)", () => d.StartZ, v => d.StartZ = v, -200, 200)
-         .Number("Cota da pista no fim (m)", () => d.EndZ, v => d.EndZ = v, -200, 200)
+         .Check("Rampa constante entre os emboques (senão, segue o greide da via)", () => d.StraightAxis, v => d.StraightAxis = v)
+         .Number("Via nova: cota da pista no início (m)", () => d.StartZ, v => d.StartZ = v, -200, 200)
+         .Number("Via nova: cota da pista no fim (m)", () => d.EndZ, v => d.EndZ = v, -200, 200)
          .Choice("Emboques", new[] { ("Parede de testa", TipoEmboque.Testa), ("Bisel (acompanha o talude)", TipoEmboque.Bisel), ("Pala em balanço", TipoEmboque.Pala) },
             () => d.Portal, v => d.Portal = v)
          .Number("Comprimento da pala/bisel (m)", () => d.PortalLength, v => d.PortalLength = v, 1, 40)
@@ -217,7 +285,7 @@ internal static class InfraForms
          .Check("Ventiladores de jato", () => d.JetFans, v => d.JetFans = v)
          .Number("Espaçamento dos ventiladores (m)", () => d.FanSpacing, v => d.FanSpacing = v, 30, 500, "0")
          .Terrain(() => d.FollowTerrain, v => d.FollowTerrain = v, () => d.AdjustTerrain, v => d.AdjustTerrain = v);
-        if (!edit) w.Modes(("Desenhar o eixo por pontos", PathMode.Desenhar), ("Selecionar linhas existentes", PathMode.Linhas), ("Dois cliques", PathMode.DoisPontos));
+        if (!edit) w.HostModes("túnel");
         return w;
     }
 
@@ -226,16 +294,19 @@ internal static class InfraForms
     public static FormWindow Trench(TrenchDefinition d, bool edit)
     {
         var w = new FormWindow(edit ? "Editar trincheira" : "Trincheira", "Trincheira (via rebaixada)",
-            "Desenhe o EIXO da trincheira de ponta a ponta: a pista desce pela rampa máxima até o rebaixo, entre muros de contenção com " +
-            "guarda-corpo, e sobe no fim. Opcional: laje de travessia para a via transversal. O terreno entre os muros é escavado.",
+            "A trincheira é um trecho de uma VIA do plugin: no trecho escolhido a pista desce pela rampa máxima até o rebaixo, entre muros de contenção " +
+            "com guarda-corpo, e sobe no fim. Opcional: laje de travessia para a via transversal. O terreno entre os muros é escavado no Toposolid.",
             d, () =>
             {
                 var c = (TrenchDefinition)MarkingDefinition.FromJson(d.ToJson())!;
                 c.FollowTerrain = false; c.GroundLine = null;
                 var len = 2 * c.Depth / Math.Max(0.02, c.MaxGrade) + 80;
-                var g = Build(c, new Polyline2(new[] { new Vec2(0, 0), new Vec2(len, 0) }));
+                var axis = new Polyline2(new[] { new Vec2(0, 0), new Vec2(len, 0) });
+                var grade = InfraRoads.TrenchOnRoad(RoadGrade.Flat(len), 0, len, c.Depth, c.MaxGrade, c.VerticalCurve, _ => 0);
+                c.HostStart = 0; c.HostEnd = len;
+                var g = InfraDemo.Preview(PreviewSetup(() => InfraRoads.Setup(c)), axis, grade, new MarkingDefinition[] { c }, PluginContext.Catalog, _ => 0);
                 return new FormPreview(g, null, null, Info(g, $"Exemplo com {len:0} m de eixo."));
-            }, false, edit ? "Aplicar" : "Inserir", 1080, 720);
+            }, false, edit ? "Aplicar" : "Inserir", 1080, 740);
         w.Integer("Faixas", () => d.Lanes, v => d.Lanes = v, 1, 6)
          .Number("Largura da faixa (m)", () => d.LaneWidth, v => d.LaneWidth = v, 2.5, 4.5)
          .Number("Faixa de segurança (m)", () => d.ShoulderWidth, v => d.ShoulderWidth = v, 0, 3)
@@ -251,7 +322,7 @@ internal static class InfraForms
          .Check("Canaletas ao pé dos muros", () => d.Drainage, v => d.Drainage = v)
          .Check("Iluminação", () => d.Lighting, v => d.Lighting = v)
          .Terrain(() => d.FollowTerrain, v => d.FollowTerrain = v, () => d.AdjustTerrain, v => d.AdjustTerrain = v);
-        if (!edit) w.Modes(("Desenhar o eixo por pontos", PathMode.Desenhar), ("Selecionar linhas existentes", PathMode.Linhas), ("Dois cliques", PathMode.DoisPontos));
+        if (!edit) w.HostModes("trincheira");
         return w;
     }
 
@@ -412,37 +483,24 @@ internal static class InfraForms
 /// <summary>Terraplenagem logo após criar/editar uma obra que conversa com o terreno.</summary>
 internal static class TerrainActions
 {
-    private static bool _askedCreate;
+    /// <summary>
+    /// Depois de criar/editar uma obra ou uma via com greide: refaz o terreno nativo (Toposolid) com ela. Sem Toposolid no
+    /// projeto, cria um terreno plano sob as obras – aterros, cortes e taludes são sempre do terreno do Revit.
+    /// </summary>
+    public static void AfterCreate(UIDocument uidoc, MarkingDefinition def) => AfterCreate(uidoc, new[] { def });
 
-    public static void AfterCreate(UIDocument uidoc, MarkingDefinition def)
+    public static void AfterCreate(UIDocument uidoc, IReadOnlyCollection<MarkingDefinition> defs, bool quiet = false)
     {
-        if (def is not ITerrainAware { AdjustTerrain: true }) return;
-        var doc = uidoc.Document;
-        var opt = new GradingOptions();
-        if (!new FilteredElementCollector(doc).OfClass(typeof(Toposolid)).Any())
-        {
-            // Sem terreno nativo: oferece criar um Toposolid (Massa e terreno) sob a obra – aterros, cortes e taludes passam a
-            // ser do terreno do Revit, e não sólidos.
-            if (_askedCreate) return;
-            _askedCreate = true;
-            var td = new TaskDialog(CommandBase.AppTitle)
-            {
-                MainInstruction = "Criar o terreno nativo (Toposolid)?",
-                MainContent = "O projeto não tem Toposolid (Massa e terreno). Para aterros, cortes, taludes e reaterros serem do terreno nativo do Revit, " +
-                              "o plugin pode criar um Toposolid plano sob a obra (com margem) e moldá-lo a ela. Sem isso, a terra é representada por sólidos.",
-                CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
-            };
-            if (td.Show() != TaskDialogResult.Yes) return;
-            opt.CreateIfMissing = true;
-        }
-        var report = Apply(uidoc, new[] { def }, opt, "SV - Terraplenagem");
+        var shapes = defs.Where(d => d is ITerrainAware { AdjustTerrain: true } || d.Output.Grade is { AdjustTerrain: true }).ToList();
+        if (shapes.Count == 0) return;
+        var opt = new GradingOptions { CreateIfMissing = true };
+        var report = Apply(uidoc, shapes, opt, "SV - Terraplenagem");
         if (report?.Created == true)
-        {
-            // Agora há terreno nativo: a obra é regerada sem os sólidos de terra.
-            MarkingCreator.Commit(uidoc, new[] { def }, "SV - Obra sobre o terreno nativo");
-        }
-        if (report != null && (report.Toposolids > 0 || report.Notes.Count > 0))
-            TaskDialog.Show(CommandBase.AppTitle, $"Terreno ajustado a {def.KindName.ToLowerInvariant()}:\n\n" + report.Text());
+            MarkingCreator.Commit(uidoc, shapes.Where(d => d is ITerrainAware).ToList(), "SV - Obra sobre o terreno nativo");
+        if (report == null || quiet) return;
+        var important = report.Created || report.Notes.Any(n => n.StartsWith("Aviso") || n.Contains("Nenhum") || n.Contains("não"));
+        if (important)
+            TaskDialog.Show(CommandBase.AppTitle, "Terreno nativo (Massa e terreno → Sólido topográfico) ajustado:\n\n" + report.Text());
     }
 
     public static TerrainReport? Apply(UIDocument uidoc, IEnumerable<MarkingDefinition> defs, GradingOptions opt, string name)
@@ -496,18 +554,124 @@ internal static class InfraRunner
     }
 }
 
+/// <summary>
+/// Pontes, viadutos, passarelas, túneis e trincheiras como trechos de vias do plugin: num trecho de uma via existente (o
+/// greide dela é ajustado e a estrutura hospedada) ou numa via nova criada com a ferramenta de vias.
+/// </summary>
+internal static class HostedRunner
+{
+    public static Result Run<T>(UIDocument uidoc, string key, Func<T> create, Func<T, FormWindow> form, Action<T>? prepare = null)
+        where T : MarkingDefinition, IHostedStructure, ITerrainAware
+    {
+        var doc = uidoc.Document;
+        var template = UiHelpers.Remembered<T>(key) ?? create();
+        template.Output = InfraRunner.Output3D();
+        prepare?.Invoke(template);
+        template.GroundLine = null;
+        template.HostRoad = null;
+        var w = form(template);
+        if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
+        UiHelpers.Remember(key, template);
+        PluginContext.SaveSettings();
+        var def = (T)template.CloneWithNewId();
+        var results = new List<RenderResult>();
+
+        if (w.PathMode == PathMode.ViaExistente)
+        {
+            var road = RoadWorks.PickRoad(uidoc, $"{def.KindName}: clique a VIA (pista, calçada ou linha) onde fica a obra");
+            if (road == null) return Result.Cancelled;
+            var stretch = RoadWorks.PickStretch(uidoc, road, def.KindName);
+            if (stretch == null) return Result.Cancelled;
+            var (s0, s1) = stretch.Value;
+            if (s1 - s0 < 5) { TaskDialog.Show(CommandBase.AppTitle, "Trecho muito curto (mínimo 5 m)."); return Result.Cancelled; }
+            RoadWorks.Host(def, road.Pavement, s0, s1);
+            var grade = RoadWorks.GradeWith(doc, road, def);
+            road.Pavement.Output.Grade = grade.Clone();
+            def.Output.Grade = grade.Clone();
+            results.AddRange(RoadWorks.SetGrade(uidoc, road.GroupId, grade, new MarkingDefinition[] { def }));
+            TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { road.Pavement, def });
+            CommandBase.ReportResults(def.KindName, results.Where(r => r.Warnings.Count > 0).ToList());
+            return Result.Succeeded;
+        }
+
+        // Via nova com a obra: o eixo é desenhado (ou escolhido) como o de qualquer via do plugin.
+        var straight = def is BridgeDefinition { StraightAxis: true };
+        var snapped = new List<string>();
+        var path = RoadWorks.AxisFor(uidoc, w.PathMode != PathMode.ViaNovaLinhas, InfraForms.NewRoadRadius, straight, snapped);
+        if (path == null) return Result.Cancelled;
+        var resolved = PathResolver.Resolve(doc, path);
+        if (resolved?.Main is not { } axis || axis.Length < 10) { TaskDialog.Show(CommandBase.AppTitle, "Eixo muito curto para a obra (mínimo 10 m)."); return Result.Cancelled; }
+        var g0 = RoadWorks.Ground(doc, resolved.Z);
+        double G(Vec2 p) => def.FollowTerrain ? g0(p) ?? 0 : 0;
+        RoadGrade roadGrade;
+        double a, b2;
+        var warn = new List<string>();
+        switch (def)
+        {
+            case BridgeDefinition br:
+            {
+                (roadGrade, a, b2, warn) = InfraRoads.BridgeGrade(br, axis, G);
+                break;
+            }
+            case TunnelDefinition tn:
+            {
+                roadGrade = new RoadGrade { Points = { new(0, tn.StartZ), new(axis.Length, tn.EndZ) } };
+                var (_, crown, _) = EarthworksGenerator.TunnelSection(tn);
+                var range = InfraRoads.TunnelRange(axis, roadGrade, p => def.FollowTerrain ? g0(p) : null, crown);
+                (a, b2) = range ?? (Math.Min(axis.Length * 0.3, tn.ApproachCut), Math.Max(axis.Length * 0.7, axis.Length - tn.ApproachCut));
+                if (range == null && def.FollowTerrain) warn.Add("Sem cobertura de terreno suficiente sobre o eixo: o túnel foi posto no meio do eixo – confira o trecho.");
+                break;
+            }
+            case TrenchDefinition tr:
+            {
+                var flat = RoadGrade.Flat(axis.Length);
+                roadGrade = InfraRoads.TrenchOnRoad(flat, 0, axis.Length, tr.Depth, tr.MaxGrade, tr.VerticalCurve, s => G(axis.PointAt(s)));
+                (a, b2) = (0, axis.Length);
+                break;
+            }
+            default:
+                roadGrade = RoadGrade.Flat(axis.Length); (a, b2) = (0, axis.Length); break;
+        }
+        roadGrade.AdjustTerrain = def.AdjustTerrain;
+        // Greide "sem obras" da via nova: reta entre as cotas das pontas (a obra é reaplicada sobre ele ao ser editada).
+        roadGrade.WithoutWorks = def is TunnelDefinition
+            ? new RoadGrade { Points = { new(0, roadGrade.Z(0)), new(axis.Length, roadGrade.Z(axis.Length)) } }
+            : new RoadGrade { Points = { new(0, G(axis.PointAt(0))), new(axis.Length, G(axis.PointAt(axis.Length))) } };
+        var setup = InfraForms.NewRoadTemplate >= 0 && InfraForms.NewRoadTemplate < RoadTemplates.All.Count
+            ? RoadTemplates.All[InfraForms.NewRoadTemplate].Create()
+            : def switch
+            {
+                BridgeDefinition br => InfraRoads.Setup(br),
+                TunnelDefinition tn => InfraRoads.Setup(tn),
+                TrenchDefinition tr => InfraRoads.Setup(tr),
+                _ => InfraRoads.Setup(2, 3.5, 1, 0),
+            };
+        var (pav, created) = RoadWorks.CreateRoad(uidoc, setup, path, roadGrade, true, def.KindName);
+        results.AddRange(created);
+        if (pav == null) { CommandBase.ReportResults(def.KindName, results); return Result.Failed; }
+        RoadWorks.Host(def, pav, a, b2);
+        var r = MarkingCreator.Commit(uidoc, new MarkingDefinition[] { def }, $"SV - {def.KindName}");
+        if (warn.Count > 0 && r.Count > 0) r[0].Warnings.InsertRange(0, warn);
+        results.AddRange(r);
+        TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { pav, def });
+        if (snapped.Count > 0 && results.Count > 0) results[0].Warnings.Insert(0, "Conexões: " + string.Join("; ", snapped.Distinct()) + ".");
+        CommandBase.ReportResults(def.KindName, results.Where(x => x.Warnings.Count > 0).ToList());
+        return Result.Succeeded;
+    }
+}
+
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdViaduto : CommandBase
 {
     protected override Result Run(UIApplication app, UIDocument uidoc) =>
-        InfraRunner.Run(uidoc, "infra:viaduto", () => { var b = new BridgeDefinition(); b.ApplyKindDefaults(); return b; }, d => InfraForms.Bridge(d, false), d => d.Kind = TipoObraDeArte.Viaduto);
+        HostedRunner.Run(uidoc, "infra:viaduto", () => { var b = new BridgeDefinition(); b.ApplyKindDefaults(); return b; }, d => InfraForms.Bridge(d, false), d => d.Kind = TipoObraDeArte.Viaduto);
 }
 
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdPonte : CommandBase
 {
     protected override Result Run(UIApplication app, UIDocument uidoc) =>
-        InfraRunner.Run(uidoc, "infra:ponte", () => { var b = new BridgeDefinition { Kind = TipoObraDeArte.Ponte }; b.ApplyKindDefaults(); return b; }, d => InfraForms.Bridge(d, false),
+        HostedRunner.Run(uidoc, "infra:ponte", () => { var b = new BridgeDefinition { Kind = TipoObraDeArte.Ponte }; b.ApplyKindDefaults(); return b; }, d => InfraForms.Bridge(d, false),
             d => d.Kind = TipoObraDeArte.Ponte);
 }
 
@@ -515,7 +679,7 @@ public sealed class CmdPonte : CommandBase
 public sealed class CmdPassarela : CommandBase
 {
     protected override Result Run(UIApplication app, UIDocument uidoc) =>
-        InfraRunner.Run(uidoc, "infra:passarela", () => { var b = new BridgeDefinition { Kind = TipoObraDeArte.Passarela }; b.ApplyKindDefaults(); return b; }, d => InfraForms.Bridge(d, false),
+        HostedRunner.Run(uidoc, "infra:passarela", () => { var b = new BridgeDefinition { Kind = TipoObraDeArte.Passarela }; b.ApplyKindDefaults(); return b; }, d => InfraForms.Bridge(d, false),
             d => d.Kind = TipoObraDeArte.Passarela);
 }
 
@@ -523,14 +687,14 @@ public sealed class CmdPassarela : CommandBase
 public sealed class CmdTunel : CommandBase
 {
     protected override Result Run(UIApplication app, UIDocument uidoc) =>
-        InfraRunner.Run(uidoc, "infra:tunel", () => new TunnelDefinition(), d => InfraForms.Tunnel(d, false));
+        HostedRunner.Run(uidoc, "infra:tunel", () => new TunnelDefinition(), d => InfraForms.Tunnel(d, false));
 }
 
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdTrincheira : CommandBase
 {
     protected override Result Run(UIApplication app, UIDocument uidoc) =>
-        InfraRunner.Run(uidoc, "infra:trincheira", () => new TrenchDefinition(), d => InfraForms.Trench(d, false));
+        HostedRunner.Run(uidoc, "infra:trincheira", () => new TrenchDefinition(), d => InfraForms.Trench(d, false));
 }
 
 [Transaction(TransactionMode.Manual)]
@@ -754,14 +918,18 @@ public sealed class CmdTerraplenagem : CommandBase
             return Result.Cancelled;
         }
         var opt = new GradingOptions();
+        var resetOriginal = false;
         var form = new FormWindow("Terraplenagem", "Opções da terraplenagem",
-                $"{defs.Count} elemento(s). Taludes das vias e conexões (as obras usam os próprios taludes).", null, null, false, "Aplicar", 640, 460)
+                $"{defs.Count} elemento(s). O terreno é refeito a partir do terreno ORIGINAL com todas as vias e obras que o moldam – " +
+                "regerar não acumula aterros e apagar uma obra devolve o terreno natural.", null, null, false, "Aplicar", 680, 520)
             .Number("Talude de corte (H : 1 V)", () => opt.CutSlope, v => opt.CutSlope = v, 0.3, 5, "0.0#", "Solo: 1 : 1; rocha: 0,5 : 1 (DNIT).")
             .Number("Talude de aterro (H : 1 V)", () => opt.FillSlope, v => opt.FillSlope = v, 1, 5, "0.0#", "Usual 1,5 : 1.")
             .Number("Profundidade do subleito sob o pavimento (m)", () => opt.Subgrade, v => opt.Subgrade = v, 0, 2)
             .Number("Alcance máximo dos taludes (m)", () => opt.MaxDaylight, v => opt.MaxDaylight = v, 5, 500, "0")
             .Check("Escavar o terreno com túneis e caixas (quando o Revit permitir)", () => opt.Excavate, v => opt.Excavate = v)
-            .Check("Grama dos taludes e ilhas como subdivisões do Toposolid", () => opt.Finishes, v => opt.Finishes = v);
+            .Check("Grama dos taludes e ilhas como subdivisões do Toposolid", () => opt.Finishes, v => opt.Finishes = v)
+            .Check("Novo levantamento: o terreno atual passa a ser o terreno natural", () => resetOriginal, v => resetOriginal = v,
+                "Marque se você editou o Toposolid à mão (ou importou um levantamento novo) e quer que ele seja a nova referência.");
         if (noTerrain)
         {
             opt.CreateIfMissing = true;
@@ -769,9 +937,42 @@ public sealed class CmdTerraplenagem : CommandBase
                 .Number("Margem do terreno criado (m)", () => opt.NewTerrainMargin, v => opt.NewTerrainMargin = v, 10, 1000, "0");
         }
         if (UiHelpers.ShowModal(form) != true) return Result.Cancelled;
-        var report = TerrainActions.Apply(uidoc, defs, opt, "SV - Terraplenagem");
+        // Vias escolhidas passam a moldar o terreno (greide plano quando ainda não têm um) e as obras, a ajustá-lo.
+        var toCommit = new List<MarkingDefinition>();
+        var roadGroups = defs.OfType<RoadPavementDefinition>().Where(r => r.GroupId != null && r.Output.Grade is not { AdjustTerrain: true })
+            .Select(r => r.GroupId!).ToHashSet();
+        foreach (var d in MarkingStorage.Definitions(doc).Where(d => d.GroupId != null && roadGroups.Contains(d.GroupId!)))
+        {
+            d.Output.Grade ??= new RoadGrade();
+            d.Output.Grade.AdjustTerrain = true;
+            d.Output.Grade.CutSlope = opt.CutSlope;
+            d.Output.Grade.FillSlope = opt.FillSlope;
+            toCommit.Add(d);
+        }
+        foreach (var d in defs.OfType<ITerrainAware>().Where(t => !t.AdjustTerrain).Cast<MarkingDefinition>())
+        {
+            switch (d)
+            {
+                case BridgeDefinition b: b.AdjustTerrain = true; break;
+                case TunnelDefinition t: t.AdjustTerrain = true; break;
+                case TrenchDefinition t: t.AdjustTerrain = true; break;
+                case RetainingWallDefinition w: w.AdjustTerrain = true; break;
+                case SlopeDefinition sl: sl.AdjustTerrain = true; break;
+                case InterchangeDefinition i: i.AdjustTerrain = true; break;
+            }
+            toCommit.Add(d);
+        }
+        if (toCommit.Count > 0) MarkingCreator.Commit(uidoc, toCommit, "SV - Elementos que moldam o terreno");
+        if (resetOriginal)
+        {
+            using var t = new Transaction(doc, "SV - Novo terreno natural");
+            t.Start();
+            TerrainService.ResetOriginal(doc);
+            t.Commit();
+        }
+        var report = TerrainActions.Apply(uidoc, toCommit, opt, "SV - Terraplenagem");
         if (report?.Created == true)
-            MarkingCreator.Commit(uidoc, defs.Where(x => x is ITerrainAware).ToList(), "SV - Obras sobre o terreno nativo");
+            MarkingCreator.Commit(uidoc, MarkingStorage.Definitions(doc).Where(x => x is ITerrainAware).ToList(), "SV - Obras sobre o terreno nativo");
         if (report != null) TaskDialog.Show(AppTitle, report.Text());
         return report != null ? Result.Succeeded : Result.Failed;
     }

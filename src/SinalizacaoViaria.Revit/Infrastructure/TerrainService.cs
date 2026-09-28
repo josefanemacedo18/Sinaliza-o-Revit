@@ -62,7 +62,8 @@ public sealed class TerrainReport
 public static class TerrainService
 {
     /// <summary>Faixas e plataformas de projeto de uma marca (cotas absolutas, m).</summary>
-    public static (List<GradeCorridor> Corridors, List<GradePad> Pads) Features(Document doc, MarkingDefinition def, MarkingGeometry geo, double baseZ, GradingOptions opt)
+    public static (List<GradeCorridor> Corridors, List<GradePad> Pads) Features(Document doc, MarkingDefinition def, MarkingGeometry geo, double baseZ, GradingOptions opt,
+        IReadOnlyCollection<MarkingDefinition>? all = null)
     {
         var corridors = new List<GradeCorridor>();
         var pads = new List<GradePad>();
@@ -79,13 +80,29 @@ public static class TerrainService
         {
             case RoadPavementDefinition road when PathResolver.Resolve(doc, road.Path)?.Main is { } axis:
             {
-                // Via: plataforma do bordo externo de uma calçada ao da outra, sob a estrutura do pavimento.
-                var prof = VerticalProfile.Flat(z0 - opt.Subgrade);
+                // Via: plataforma do bordo externo de uma calçada ao da outra, no greide, sob a estrutura do pavimento – fora dos
+                // trechos em obra (sob pontes e viadutos o terreno fica natural; túneis e trincheiras cuidam do próprio trecho).
+                var g = road.Output.Grade;
+                var prof = g != null ? g.ToProfile(2) : VerticalProfile.Flat(0);
+                var cut = g?.CutSlope ?? opt.CutSlope;
+                var fill = g?.FillSlope ?? opt.FillSlope;
                 var right = -(road.TotalRight + 0.3);
                 var left = road.TotalLeft + 0.3;
                 var s0 = Math.Max(0, road.StartSetback);
                 var s1 = Math.Max(s0 + 0.5, axis.Length - Math.Max(0, road.EndSetback));
-                corridors.Add(Core.Generators.Infra.Corridor(axis, prof, right, left, s0, s1, 0, opt.CutSlope, opt.FillSlope, label: "Via"));
+                var gaps = (all ?? Array.Empty<MarkingDefinition>()).OfType<IHostedStructure>()
+                    .Where(h => road.GroupId != null && h.HostRoad == road.GroupId && h is ITerrainAware { AdjustTerrain: true } or BridgeDefinition)
+                    .Select(h => (A: Math.Min(h.HostStart, h.HostEnd), B: Math.Max(h.HostStart, h.HostEnd))).OrderBy(x => x.A).ToList();
+                var cursor = s0;
+                foreach (var (a, b) in gaps.Append((s1 + 1, s1 + 2)))
+                {
+                    var e = Math.Min(a, s1);
+                    if (e - cursor > 2)
+                        corridors.Add(Core.Generators.Infra.Corridor(axis, prof, right, left, cursor, e, opt.Subgrade, cut, fill, label: "Via")
+                            .WithOffset(z0));
+                    cursor = Math.Max(cursor, b);
+                    if (cursor >= s1) break;
+                }
                 break;
             }
             case IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition:
@@ -100,29 +117,69 @@ public static class TerrainService
         return (corridors, pads);
     }
 
-    /// <summary>Marcas que participam da terraplenagem.</summary>
+    /// <summary>Marcas que podem participar da terraplenagem.</summary>
     public static bool Grades(MarkingDefinition d) =>
         d is ITerrainAware or RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or DrainageDefinition;
 
-    /// <summary>Ajusta os Toposolids às marcas indicadas. Deve ser chamado dentro de uma transação.</summary>
-    public static TerrainReport Apply(Document doc, MarkingService service, IEnumerable<MarkingDefinition> defs, GradingOptions opt)
+    /// <summary>
+    /// Marcas que moldam o terreno de fato: obras com "ajustar o terreno", vias com greide (e as conexões nas pontas delas) e
+    /// caixas de drenagem (escavação).
+    /// </summary>
+    public static List<MarkingDefinition> Participants(Document doc, IReadOnlyCollection<MarkingDefinition> all)
+    {
+        var roads = all.OfType<RoadPavementDefinition>().Where(r => r.Output.Grade is { AdjustTerrain: true }).ToList();
+        var ends = new List<Vec2>();
+        foreach (var r in roads)
+            if (PathResolver.Resolve(doc, r.Path)?.Main is { } ax) { ends.Add(ax.Points[0]); ends.Add(ax.Points[^1]); }
+        bool NearGraded(Vec2 p) => ends.Any(e => e.DistanceTo(p) < 40);
+        return all.Where(d => d switch
+        {
+            ITerrainAware t => t.AdjustTerrain,
+            RoadPavementDefinition r => r.Output.Grade is { AdjustTerrain: true },
+            IntersectionDefinition it => NearGraded(it.Node),
+            RoundaboutDefinition rb => NearGraded(rb.Center),
+            CulDeSacDefinition => false,
+            DrainageDefinition => true,
+            _ => false,
+        }).ToList();
+    }
+
+    /// <summary>
+    /// Refaz o terreno nativo (Toposolid) com TODAS as obras que o moldam, a partir do terreno original: pontos dentro da área
+    /// terraplenada (atual e anterior) são substituídos pelos pontos originais fora do projeto + a superfície de projeto.
+    /// <paramref name="changed"/> traz as definições recém-editadas (ainda não gravadas). Deve ser chamado dentro de uma transação.
+    /// </summary>
+    public static TerrainReport Apply(Document doc, MarkingService service, IEnumerable<MarkingDefinition> changed, GradingOptions opt)
     {
         var report = new TerrainReport();
+        var byId = new Dictionary<string, MarkingDefinition>();
+        foreach (var d in MarkingStorage.Definitions(doc)) byId[d.Id] = d;
+        foreach (var d in changed) byId[d.Id] = d;
+        var all = byId.Values.ToList();
+        var list = Participants(doc, all);
+        if (TerrainModel.Hosts(doc).Count == 0)
+        {
+            if (!opt.CreateIfMissing || !CreateTerrain(doc, service, list, opt, report))
+            {
+                if (!report.Notes.Any())
+                    report.Notes.Add("Nenhum Toposolid no projeto (Massa e terreno → Sólido topográfico). Crie o terreno ou use Terraplenagem com \"criar terreno\".");
+                if (new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Topography).WhereElementIsNotElementType().Any())
+                    report.Notes.Add("Há uma superfície topográfica antiga: converta-a em Sólido topográfico (Massa e terreno → Sólido topográfico → Criar a partir da topografia).");
+                return report;
+            }
+            service.InvalidateTerrain();
+        }
+
         var corridors = new List<GradeCorridor>();
         var pads = new List<GradePad>();
         var excavators = new List<ElementId>();
         var finishes = new List<(Polygon2 Area, MarkingColor Color, string Id)>();
-        var list = defs.Where(Grades).ToList();
-        if (opt.CreateIfMissing && !new FilteredElementCollector(doc).OfClass(typeof(Toposolid)).Any())
-        {
-            if (CreateTerrain(doc, service, list, opt, report)) service.ResetTerrainCache();
-        }
         foreach (var def in list)
         {
             try
             {
                 var geo = service.BuildGeometry(def, out var baseZ);
-                var (c, p) = Features(doc, def, geo, baseZ, opt);
+                var (c, p) = Features(doc, def, geo, baseZ, opt, all);
                 corridors.AddRange(c);
                 pads.AddRange(p);
                 finishes.AddRange(geo.TerrainFinishes.Select(f => (f.Area, f.Color, def.Id)));
@@ -135,86 +192,53 @@ public static class TerrainService
                 report.Notes.Add($"{def.DisplayCode}: {ex.Message}");
             }
         }
-        var topos = new FilteredElementCollector(doc).OfClass(typeof(Toposolid)).Cast<Toposolid>().Where(t => t.HostTopoId == ElementId.InvalidElementId).ToList();
-        if (topos.Count == 0)
-        {
-            report.Notes.Add("Nenhum Toposolid no projeto (Massa e terreno → Toposolid). Crie o terreno e rode de novo.");
-            if (new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_Topography).WhereElementIsNotElementType().Any())
-                report.Notes.Add("Há uma superfície topográfica antiga: converta-a em Toposolid (Massa e terreno → Toposolid → Criar a partir da topografia).");
-            return report;
-        }
-        if (corridors.Count == 0 && pads.Count == 0 && excavators.Count == 0)
-        {
-            report.Notes.Add("Nada a terraplenar nas marcas selecionadas.");
-            return report;
-        }
 
-        // Terreno natural ANTES das alterações (rastreado no Toposolid).
-        var sampler = new SurfaceSampler(doc, Array.Empty<string>(), allowCreateView: true, terrainOnly: true);
-        if (!sampler.IsAvailable)
+        var topos = TerrainModel.Hosts(doc);
+        var originals = topos.ToDictionary(t => t.Id, TerrainModel.Original);
+        double? Ground(Vec2 p)
         {
-            report.Notes.Add("Nenhuma vista 3D disponível para ler o terreno.");
-            return report;
+            double? best = null;
+            foreach (var m in originals.Values) if (m.Z(p) is { } z && (best == null || z > best)) best = z;
+            return best;
         }
-        var hintZ = corridors.SelectMany(c => c.Left).Select(p => p.Z).Concat(pads.Select(p => p.Z)).DefaultIfEmpty(0).Average();
-        double? Ground(Vec2 p) => sampler.TrySample(UnitConv.Ft(p.X), UnitConv.Ft(p.Y), UnitConv.Ft(hintZ), out var z, out _) ? UnitConv.M(z) : null;
-
         var design = Grading.Design(corridors, pads, Ground, 0, Math.Max(5, opt.MaxDaylight), 0.5, 4.0, 1.0);
         report.Cut = design.CutM3;
         report.Fill = design.FillM3;
         report.Area = design.AreaM2;
         report.Notes.AddRange(design.Warnings);
-        var fp = design.Footprint;
-        var bounds = Bounds(fp);
+        var footprint = design.Footprint.Count == 0 ? new List<Polygon2>() : PolygonOps.Union(design.Footprint).Where(f => f.Area > 0.5).ToList();
 
         foreach (var topo in topos)
         {
-            if (!Overlaps(topo, bounds)) continue;
+            var orig = originals[topo.Id];
+            var last = TerrainModel.LastFootprint(topo);
+            var region = footprint.Concat(last).ToList();
+            if (region.Count == 0 || orig.Count == 0) continue;
+            if (!Overlaps(topo, Bounds(region))) continue;
             try
             {
                 var editor = topo.GetSlabShapeEditor();
                 if (editor == null) continue;
                 if (!editor.IsEnabled) editor.Enable();
-                // 1) Pontos do terreno dentro da área de projeto saem (serão substituídos pela superfície de projeto).
-                var removedXY = new List<Vec2>();
-                var keep = new List<Vec2>();
+                var inRegion = TerrainRebuild.Mask(region, 0.5);
+                // 1) Sai tudo o que está na área (atual ou anterior): pontos de terraplenagens passadas e do levantamento.
                 var vertices = new List<SlabShapeVertex>();
                 foreach (SlabShapeVertex v in editor.SlabShapeVertices) vertices.Add(v);
                 foreach (var v in vertices)
                 {
                     var xy = new Vec2(UnitConv.M(v.Position.X), UnitConv.M(v.Position.Y));
-                    if (design.DesignZ(xy) != null)
-                    {
-                        bool deleted;
-                        try { deleted = editor.DeletePoint(v); } catch { deleted = false; }
-                        if (deleted) { removedXY.Add(xy); report.Removed++; continue; }
-                    }
-                    keep.Add(xy);
+                    if (!inRegion(xy)) continue;
+                    try { if (editor.DeletePoint(v)) report.Removed++; } catch { /* vértice do contorno */ }
                 }
-                // 2) Superfície de projeto: bordas, pés/cristas de talude, pontos das plataformas e os pontos removidos já na cota nova.
-                var pts = design.Points.ToList();
-                foreach (var xy in removedXY) if (design.DesignZ(xy) is { } z) pts.Add(Vec3.At(xy, z));
-                var grid = new HashSet<(long, long)>(keep.Select(k => ((long)Math.Round(k.X * 20), (long)Math.Round(k.Y * 20))));
-                var add = new List<XYZ>();
-                foreach (var p0 in pts)
-                {
-                    // Cota da superfície combinada (plataformas têm prioridade; taludes sobrepostos se unem).
-                    var p = p0 with { Z = design.DesignZ(p0.XY) ?? p0.Z };
-                    if (double.IsNaN(p.Z) || Ground(p.XY) == null) continue;        // fora do Toposolid
-                    if (!grid.Add(((long)Math.Round(p.X * 20), (long)Math.Round(p.Y * 20)))) continue;   // distintos em planta (5 cm)
-                    add.Add(new XYZ(UnitConv.Ft(p.X), UnitConv.Ft(p.Y), UnitConv.Ft(p.Z)));
-                }
+                // 2) Entra o terreno original fora do projeto + a superfície de projeto combinada (plataformas e taludes).
+                var pts = TerrainRebuild.Points(orig, design, inRegion);
+                var add = pts.Select(p => new XYZ(UnitConv.Ft(p.X), UnitConv.Ft(p.Y), UnitConv.Ft(p.Z))).ToList();
                 var added = new List<SlabShapeVertex>();
                 if (add.Count > 0)
                 {
-                    try
-                    {
-                        added.AddRange(editor.AddPoints(add));
-                        report.Added += add.Count;
-                    }
+                    try { added.AddRange(editor.AddPoints(add)); report.Added += add.Count; }
                     catch (Exception ex)
                     {
-                        // Um ponto inválido derruba o lote: tenta um a um.
                         Log.Error("Toposolid.AddPoints", ex);
                         foreach (var q in add)
                             try { added.Add(editor.AddPoint(q)); report.Added++; } catch { /* ponto na borda ou repetido */ }
@@ -222,9 +246,8 @@ public static class TerrainService
                 }
                 doc.Regenerate();
                 report.Toposolids++;
-                // Conferência pelos próprios vértices: se o Revit leu as cotas com um deslocamento constante (relativas ao
-                // nível ou ao deslocamento do Toposolid), os pontos são refeitos com a correção.
                 FixOffset(doc, editor, add, added, report);
+                TerrainModel.Save(topo, orig, footprint);
             }
             catch (Exception ex)
             {
@@ -232,6 +255,7 @@ public static class TerrainService
                 report.Notes.Add($"Toposolid {topo.Id}: {ex.Message}");
             }
         }
+        service.InvalidateTerrain();
 
         // 3) Escavação pelo modelo (túneis, caixas de drenagem) – quando o Revit aceita o elemento.
         if (opt.Excavate && excavators.Count > 0)
@@ -251,12 +275,20 @@ public static class TerrainService
                         Log.Error("Toposolid.ExcavateBy", ex);
                     }
                 }
-            if (report.Excavated == 0 && refused > 0)
-                report.Notes.Add("O Revit não permitiu escavar o Toposolid com estes elementos (formas diretas). Os emboques e acessos foram terraplenados; " +
-                                 "para abrir o túnel no terreno use Massa e terreno → Escavar com um piso/volume ou uma vista em corte.");
+            if (report.Excavated == 0 && refused > 0 && list.Any(d => d is TunnelDefinition))
+                report.Notes.Add("O Revit não permitiu escavar o Toposolid com o túnel (forma direta). Os emboques foram terraplenados; " +
+                                 "para abrir o túnel no terreno use Massa e terreno → Escavar com um volume.");
         }
-        if (opt.Finishes && finishes.Count > 0) ApplyFinishes(doc, finishes, report);
+        if (opt.Finishes) ApplyFinishes(doc, finishes, report, list.Select(d => d.Id).ToHashSet());
         return report;
+    }
+
+    /// <summary>Esquece o terreno original dos Toposolids (o atual vira o terreno natural). Exige transação.</summary>
+    public static int ResetOriginal(Document doc)
+    {
+        var n = 0;
+        foreach (var t in TerrainModel.Hosts(doc)) if (TerrainModel.HasOriginal(t)) { TerrainModel.Reset(t); n++; }
+        return n;
     }
 
     /// <summary>
@@ -352,17 +384,19 @@ public static class TerrainService
     }
 
     /// <summary>Grama de taludes, ilhas e laços como subdivisões nativas do Toposolid, com o material da cor.</summary>
-    private static void ApplyFinishes(Document doc, List<(Polygon2 Area, MarkingColor Color, string Id)> finishes, TerrainReport report)
+    private static void ApplyFinishes(Document doc, List<(Polygon2 Area, MarkingColor Color, string Id)> finishes, TerrainReport report, HashSet<string> graded)
     {
         var styles = new StyleService(doc);
-        var topos = new FilteredElementCollector(doc).OfClass(typeof(Toposolid)).Cast<Toposolid>().Where(t => t.HostTopoId == ElementId.InvalidElementId).ToList();
+        var topos = TerrainModel.Hosts(doc);
+        // Subdivisões anteriores do plugin saem: das obras regeneradas e das que não moldam mais o terreno (apagadas).
+        foreach (var old in new FilteredElementCollector(doc).OfClass(typeof(Toposolid)).Cast<Toposolid>()
+                     .Where(t => t.HostTopoId != ElementId.InvalidElementId && t.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString() is { } c
+                                 && c.StartsWith("SV acabamento ", StringComparison.Ordinal)).ToList())
+            try { doc.Delete(old.Id); } catch { /* já removida */ }
+        _ = graded;
         foreach (var grp in finishes.GroupBy(f => f.Id))
         {
-            // Subdivisões anteriores desta obra saem (regeneração).
             var tag = $"SV acabamento {grp.Key}";
-            foreach (var old in new FilteredElementCollector(doc).OfClass(typeof(Toposolid)).Cast<Toposolid>()
-                         .Where(t => t.HostTopoId != ElementId.InvalidElementId && t.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.AsString() == tag).ToList())
-                try { doc.Delete(old.Id); } catch { /* já removida */ }
             foreach (var (area, color, _) in grp)
             {
                 var host = topos.FirstOrDefault(t => Contains(t, area.Centroid));

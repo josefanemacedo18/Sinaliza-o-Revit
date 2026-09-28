@@ -18,6 +18,40 @@ public interface ITerrainAware
     List<Vec2>? GroundLine { get; set; }
 }
 
+/// <summary>
+/// Obra hospedada num trecho de uma via do plugin (ponte, viaduto, túnel, trincheira): a pista, as calçadas e a
+/// sinalização são da via (pisos do Revit com o greide) e a obra gera só a estrutura no trecho [início, fim] do eixo.
+/// </summary>
+public interface IHostedStructure
+{
+    /// <summary>Grupo (GroupId) da via hospedeira; nulo = obra avulsa (formato antigo).</summary>
+    string? HostRoad { get; set; }
+    /// <summary>Estações (m) do início e do fim da obra no eixo da via.</summary>
+    double HostStart { get; set; }
+    double HostEnd { get; set; }
+    /// <summary>Cópia da seção da via no momento da criação (usada se a via não for encontrada).</summary>
+    double HostHalf { get; set; }
+    double HostWear { get; set; }
+    double HostEdgeRise { get; set; }
+    /// <summary>Greide da via antes desta obra (para refazer o trecho ao editar a obra).</summary>
+    RoadGrade? GradeBefore { get; set; }
+}
+
+/// <summary>Perfil (greide) da obra ao criá-la.</summary>
+public enum PerfilObra
+{
+    /// <summary>Rampas de acesso até a altura da obra, trecho em nível e curvas verticais (viadutos).</summary>
+    RampasDeAcesso,
+    /// <summary>Tabuleiro em nível na altura indicada, sem rampas (pontes retas e planas).</summary>
+    Horizontal,
+    /// <summary>Reta de uma margem à outra, na cota do terreno das cabeceiras (pontes sobre vales e rios).</summary>
+    EntreMargens,
+    /// <summary>Curva vertical convexa única com o ponto alto no meio (pontes em "lombo").</summary>
+    Convexo,
+    /// <summary>Mantém o greide que a via já tem.</summary>
+    GreideDaVia,
+}
+
 // ====================================================================== drenagem
 
 public enum TipoDrenagem
@@ -262,9 +296,24 @@ public enum TipoAla
 /// Viaduto, ponte ou passarela ao longo de um eixo: greide com rampas de acesso em aterro, encontros, pilares, vigas,
 /// tabuleiro, pavimento, passeios, barreiras/guarda-corpos, juntas, iluminação e faixas pintadas.
 /// </summary>
-public sealed class BridgeDefinition : MarkingDefinition, ITerrainAware
+public sealed class BridgeDefinition : MarkingDefinition, ITerrainAware, IHostedStructure
 {
     public PathReference PathRef { get; set; } = new();
+    public string? HostRoad { get; set; }
+    public double HostStart { get; set; }
+    public double HostEnd { get; set; }
+    public double HostHalf { get; set; } = 6;
+    public double HostWear { get; set; } = 0.05;
+    public double HostEdgeRise { get; set; }
+    public RoadGrade? GradeBefore { get; set; }
+    /// <summary>Greide da obra ao ser criada (rampas, horizontal, entre margens, convexo).</summary>
+    public PerfilObra ProfileKind { get; set; } = PerfilObra.RampasDeAcesso;
+    /// <summary>Traçado reto entre as pontas do eixo desenhado (ignora os vértices intermediários).</summary>
+    public bool StraightAxis { get; set; }
+    /// <summary>Esconsidade dos apoios (graus, ±60) – pilares e encontros paralelos ao rio/via cruzada.</summary>
+    public double Skew { get; set; }
+    /// <summary>Estações dos pilares (m, a partir do início da obra) – vazio = distribuídos pelo vão.</summary>
+    public List<double>? PierStations { get; set; }
     public TipoObraDeArte Kind { get; set; } = TipoObraDeArte.Viaduto;
     public SistemaEstrutural System { get; set; } = SistemaEstrutural.VigasPreMoldadas;
     public int Lanes { get; set; } = 2;
@@ -331,7 +380,8 @@ public sealed class BridgeDefinition : MarkingDefinition, ITerrainAware
         switch (Kind)
         {
             case TipoObraDeArte.Ponte:
-                SpanLength = 40; Height = 8.0; System = SistemaEstrutural.VigasPreMoldadas; Water = true; break;
+                SpanLength = 40; Height = 8.0; System = SistemaEstrutural.VigasPreMoldadas; Water = true; StraightAxis = true;
+                ProfileKind = PerfilObra.RampasDeAcesso; PierType = TipoPilar.Parede; break;
             case TipoObraDeArte.Passarela:
                 Lanes = 0; LaneWidth = 3.0; ShoulderWidth = 0; SidewalkWidth = 0; Height = 7.0; SpanLength = 35; System = SistemaEstrutural.Trelica;
                 Barrier = TipoGuarda.GuardaCorpoMetalico; MaxGrade = 0.0833; LaneMarkings = false; PierType = TipoPilar.Circular; PierSize = 0.8; break;
@@ -364,9 +414,18 @@ public enum TipoEmboque
 }
 
 /// <summary>Túnel rodoviário com revestimento, pavimento, passeios de serviço, iluminação, ventiladores e emboques.</summary>
-public sealed class TunnelDefinition : MarkingDefinition, ITerrainAware
+public sealed class TunnelDefinition : MarkingDefinition, ITerrainAware, IHostedStructure
 {
     public PathReference PathRef { get; set; } = new();
+    public string? HostRoad { get; set; }
+    public double HostStart { get; set; }
+    public double HostEnd { get; set; }
+    public double HostHalf { get; set; } = 6;
+    public double HostWear { get; set; } = 0.05;
+    public double HostEdgeRise { get; set; }
+    public RoadGrade? GradeBefore { get; set; }
+    /// <summary>Greide do túnel: em rampa constante entre os emboques (falso = segue o greide da via).</summary>
+    public bool StraightAxis { get; set; }
     public SecaoTunel Section { get; set; } = SecaoTunel.Ferradura;
     public int Lanes { get; set; } = 2;
     public double LaneWidth { get; set; } = 3.50;
@@ -404,9 +463,17 @@ public sealed class TunnelDefinition : MarkingDefinition, ITerrainAware
 public enum TipoContencaoTrincheira { Flexao, CortinaAtirantada, TerraArmada }
 
 /// <summary>Trincheira (via rebaixada): rampas de descida e subida, muros de contenção, guarda-corpos e laje de travessia.</summary>
-public sealed class TrenchDefinition : MarkingDefinition, ITerrainAware
+public sealed class TrenchDefinition : MarkingDefinition, ITerrainAware, IHostedStructure
 {
     public PathReference PathRef { get; set; } = new();
+    public string? HostRoad { get; set; }
+    public double HostStart { get; set; }
+    public double HostEnd { get; set; }
+    public double HostHalf { get; set; } = 6;
+    public double HostWear { get; set; } = 0.05;
+    public double HostEdgeRise { get; set; }
+    public RoadGrade? GradeBefore { get; set; }
+    public bool StraightAxis { get; set; }
     public int Lanes { get; set; } = 2;
     public double LaneWidth { get; set; } = 3.50;
     public double ShoulderWidth { get; set; } = 0.60;

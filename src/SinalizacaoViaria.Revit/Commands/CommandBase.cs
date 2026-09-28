@@ -60,6 +60,8 @@ public abstract class CommandBase : IExternalCommand
 
     protected abstract Result Run(UIApplication app, UIDocument uidoc);
 
+    internal static void ReportResults(string action, IReadOnlyCollection<RenderResult> results, bool alwaysShow = false) => Report(action, results, alwaysShow);
+
     /// <summary>Mostra um resumo quando há avisos (sem interromper o fluxo quando está tudo certo).</summary>
     protected static void Report(string action, IReadOnlyCollection<RenderResult> results, bool alwaysShow = false)
     {

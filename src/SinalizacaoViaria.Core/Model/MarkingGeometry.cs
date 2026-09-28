@@ -310,6 +310,14 @@ public sealed class GradeCorridor
     public bool DaylightLeft { get; set; } = true;
     public bool DaylightRight { get; set; } = true;
     public string Label { get; set; } = "";
+
+    /// <summary>Soma <paramref name="dz"/> a todas as cotas (relativas → absolutas).</summary>
+    public GradeCorridor WithOffset(double dz)
+    {
+        for (int i = 0; i < Left.Count; i++) Left[i] = Left[i] with { Z = Left[i].Z + dz };
+        for (int i = 0; i < Right.Count; i++) Right[i] = Right[i] with { Z = Right[i].Z + dz };
+        return this;
+    }
 }
 
 /// <summary>Plataforma plana (interseções, rotatórias, encontros) numa cota de projeto do terreno (m, relativa à base).</summary>

@@ -2,12 +2,43 @@ using Autodesk.Revit.DB;
 
 namespace SinalizacaoViaria.Revit.Infrastructure;
 
+/// <summary>Superfície de apoio das marcas: terreno/pisos (raios) ou o greide da via (analítico).</summary>
+public interface ISurface
+{
+    bool IsAvailable { get; }
+    /// <summary>Sólidos e perfis sobem pela cota do centro (falso = já vêm deformados pelo greide do núcleo).</summary>
+    bool LiftsSolids { get; }
+    bool TrySample(double xFt, double yFt, double zHintFt, out double zFt, out XYZ normal);
+}
+
+/// <summary>Greide da via como superfície: cota = base do eixo + greide (estação, afastamento).</summary>
+public sealed class GradeSampler : ISurface
+{
+    private readonly Core.Geometry.GradeSurface _surface;
+    private readonly double _baseM;
+    public GradeSampler(Core.Geometry.GradeSurface surface, double baseM) { _surface = surface; _baseM = baseM; }
+    public bool IsAvailable => true;
+    public bool LiftsSolids => false;
+    public bool TrySample(double xFt, double yFt, double zHintFt, out double zFt, out XYZ normal)
+    {
+        var p = new Core.Geometry.Vec2(UnitConv.M(xFt), UnitConv.M(yFt));
+        var z = _surface.Z(p);
+        zFt = UnitConv.Ft(_baseM + z);
+        // Normal pela diferença finita (0,5 m).
+        var zx = _surface.Z(p + new Core.Geometry.Vec2(0.5, 0)) - z;
+        var zy = _surface.Z(p + new Core.Geometry.Vec2(0, 0.5)) - z;
+        normal = new XYZ(-zx / 0.5, -zy / 0.5, 1).Normalize();
+        return true;
+    }
+}
+
 /// <summary>
 /// Projeta pontos verticalmente sobre superfícies (Toposolid, pisos, topografia) usando
 /// ReferenceIntersector, obtendo elevação e normal – permite que a sinalização acompanhe o greide.
 /// </summary>
-public sealed class SurfaceSampler
+public sealed class SurfaceSampler : ISurface
 {
+    public bool LiftsSolids => true;
     private readonly Document _doc;
     private readonly ReferenceIntersector? _intersector;
     public bool IsAvailable => _intersector != null;
