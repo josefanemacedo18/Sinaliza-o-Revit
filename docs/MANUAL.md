@@ -396,9 +396,11 @@ partir do pavimento – confira antes de aplicar.
 
 ### 9.2 Apagar Trecho (partes da sinalização)
 Apaga **só uma parte** de uma marca sem desfazê-la – por exemplo alguns traços da linha de eixo diante de uma entrada:
-* **Clicar nas peças**: clique o PONTO sobre o traço, seta, símbolo ou dispositivo (planta ou 3D) – o plugin acha a marca sob o
-  ponto, com preferência para a pintura sobre o pavimento e as calçadas (em linhas contínuas apaga 3 m em volta do clique).
-  ESC termina.
+* **Clicar nas peças**: clique sobre o traço, seta, símbolo, tacha ou dispositivo – só aquela peça some (um único traço de
+  uma linha tracejada, por exemplo). O plugin lê a **geometria real** dos elementos no Revit: cada traço é um sólido próprio
+  dentro da forma direta, e a pegada dele em planta vira o recorte (com 3 cm de folga). Pintura tem prioridade sobre o
+  pavimento e as calçadas que ficam por baixo; em linhas contínuas apaga 3 m em volta do clique. Funciona na **planta** (clique
+  de ponto) e na **vista 3D** (o ponto vem da face clicada). A peça some logo após o clique; ESC termina.
 * **Trecho entre dois pontos**: clique a marca e o início e o fim ao longo dela.
 * **Janela**: clique a marca e dois cantos – apaga tudo dela dentro do retângulo.
 * **Desativar / reativar / remover**: os trechos apagados ficam guardados na marca; **desativar** mostra a marca inteira de
@@ -1079,14 +1081,27 @@ Revit triangula de novo. Por isso cada obra entrega os pontos certos:
 * **Greide suavizado** – rampa máxima e curvas verticais, com cortes e aterros maiores em talude;
 * **Plana** – sem alterar o terreno.
 Taludes de corte/aterro e a rampa máxima ficam na mesma janela. Depois, **Perfil da Via** ajusta o greide e cria as obras.
-Os pisos da via acompanham o greide com a edição de forma nativa, em **malha limpa**: uma grade de estacas ao longo do eixo
-(a cada 4 m, mais curta nas curvas para a flecha ficar ≤ 1 cm) é comum a todos os pisos da via – os vértices das bordas
-ficam nessas estacas dos dois lados, as juntas entre pisos (até 40 m cada) também, e só há pontos internos no eixo do
-abaulamento. O Revit forma quadriláteros regulares, sem o emaranhado de triângulos. As curvas verticais do greide nunca se
-sobrepõem (antes, PIVs próximos geravam degraus) e têm comprimento mínimo K = 10 m por % de variação de rampa.
+**Pisos planos, sem vincos**: sobre o greide, o nó ou o terreno, cada piso é dividido em **partes planas** (o topo de cada
+parte fica a no máximo 4 mm da superfície teórica; 3 cm sobre o Toposolid) e cada parte é um **piso plano inclinado** –
+uma única face, sem as linhas de triangulação da edição de forma. As divisões seguem a lógica da obra: primeiro na
+**crista do abaulamento** (cada caimento é um plano), depois **perpendiculares ao eixo** (juntas retas, como as juntas de
+pavimentação). Numa rampa constante a pista inteira são só **dois pisos** (um por caimento); nas curvas verticais e
+horizontais as partes ficam mais curtas. Onde a superfície é realmente **torcida** (concordância de greides numa
+interseção, transição de superelevação) e nem partes pequenas ficam planas, a parte vira um piso com edição de forma em
+**malha regular de 1,5 m** – em vez de dezenas de lascas. A pintura fica 5 mm acima da superfície teórica para nunca
+"afundar" nos pisos planos. As curvas verticais do greide nunca se sobrepõem e têm comprimento mínimo K = 10 m por % de
+variação de rampa.
 
-**Interseções, rotatórias e cul-de-sacs no relevo**: o nó segue uma **superfície costurada às vias** que chegam nele – junto à
-pista de cada via a cota é a dela (greide, abaulamento, superelevação) e no miolo as vias se misturam suavemente. Pisos,
+**Correção importante**: a localização de pontos em relação ao eixo (estaca e afastamento) errava para pontos a mais de
+~10 m do eixo em trechos curvos – calçadas e canteiros largos recebiam a cota de outra estaca (degraus e calçadas
+"afundadas"). Corrigido: a busca agora amplia o raio até garantir o segmento mais próximo.
+
+**Interseções, rotatórias e cul-de-sacs no relevo** – como se projeta na prática: a **via principal** (maior hierarquia;
+empate = a mais larga) **atravessa o nó com o próprio greide e abaulamento**; as **secundárias se concordam** com ela, partindo
+da cota da borda da pista principal e chegando à própria superfície exatamente onde começa o piso delas (sem degrau na
+emenda), por uma transição suave. O miolo fica plano como a via principal – pisos planos grandes, sem os "leques" que
+apareciam nas esquinas. Além da ponta de um eixo o greide segue na rampa final e o abaulamento é medido na normal da ponta
+(antes formava um cone em volta da ponta). Pisos,
 pinturas, faixas de pedestres, retenções e rampas do nó ficam nessa superfície (sem degrau na emenda com o piso da via), e o
 nó entra na terraplenagem sempre que **qualquer via ligada** a ele molda o terreno: plataforma inclinada sob o pavimento e as
 calçadas, taludes das vias ligadas. Ao criar uma via com relevo que cruza (ou encosta em) vias existentes, o greide dela é

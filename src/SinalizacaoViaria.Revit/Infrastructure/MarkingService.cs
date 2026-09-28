@@ -215,17 +215,35 @@ public sealed class MarkingService
             _ => Array.Empty<string?>(),
         };
         var legs = new List<NodeSurface.Leg>();
+        var cuts = new List<List<Vec2>>();
         foreach (var id in ids.Where(x => x != null).Distinct())
         {
             if (!defs.TryGetValue(id!, out var d) || d is not RoadPavementDefinition pav) continue;
             var path = PathResolver.Resolve(_doc, pav.Path);
             if (path?.Main == null || path.Main.Points.Count < 2) continue;
             var grade = pav.Output.Grade ?? RoadGrade.Flat(path.Main.Length);
-            legs.Add(new NodeSurface.Leg(new GradeSurface(path.Main, grade), path.Z, Math.Max(1, Math.Max(pav.LeftWidth, pav.RightWidth))));
+            // Prioridade pela hierarquia (CTB art. 60): a via principal atravessa o nó com o próprio greide.
+            var rank = pav.Hierarchy is { } h && h != HierarquiaViaria.NaoDefinida ? (int)h : 10;
+            legs.Add(new NodeSurface.Leg(new GradeSurface(path.Main, grade), path.Z, Math.Max(1, Math.Max(pav.LeftWidth, pav.RightWidth)), rank));
+            // Recorte do nó sobre esta via: até onde o piso do nó avança nela.
+            cuts.Add(pav.Exclusions.Where(e => e.SourceId == owner.Id).SelectMany(e => e.Points).ToList());
         }
         if (legs.Count == 0) return null;
         var node = new NodeSurface(legs);
-        return node.IsFlat ? null : node;
+        if (node.IsFlat) return null;
+        // Alcance de cada via secundária: da borda da pista principal ao ponto mais distante do recorte do nó sobre ela – a
+        // concordância termina exatamente onde começa o piso da via (sem degrau na emenda).
+        if (legs.Count > 1 && node.Major is { } major)
+        {
+            for (int i = 0; i < legs.Count; i++)
+            {
+                if (ReferenceEquals(legs[i], major) || cuts[i].Count == 0) continue;
+                var reach = cuts[i].Max(v => { NodeSurface.LegZ(major, v, out var dm); return dm; });
+                legs[i] = legs[i] with { Reach = Math.Clamp(reach, 3, 60) };
+            }
+            node = new NodeSurface(legs);
+        }
+        return node;
     }
 
     private Func<Vec2, double?>? _ground;
@@ -390,12 +408,32 @@ public sealed class MarkingService
                 {
                     // Peças vizinhas do mesmo material viram um piso só (calçadas, trechos recortados).
                     var merged = PolygonOps.Union(grp.Select(p => p.Shape)).Where(p => p.Area > 0.01).ToList();
-                    // No greide: pisos em trechos de até 40 m ao longo do eixo (edição de forma leve e fiel ao perfil).
-                    if (terrain is GradeSampler gs) merged = merged.SelectMany(m => GradeFloors.Chunks(m, gs.Surface, 40, gs.Grid)).ToList();
-                    foreach (var shape in merged)
+                    // Sobre greide/nó/terreno: o piso é dividido em partes PLANAS (desvio ≤ 4 mm no greide/nó; 3 cm no Toposolid) – cada
+                    // parte é um piso plano inclinado, sem os vincos da triangulação da edição de forma: pista limpa, com
+                    // juntas retas perpendiculares ao eixo e na crista do abaulamento.
+                    var parts = new List<(Polygon2 Shape, Plane3? Plane)>();
+                    foreach (var m in merged)
+                    {
+                        if (terrain == null) { parts.Add((m, null)); continue; }
+                        try
+                        {
+                            var zf = SurfaceZ(terrain, UnitConv.Ft(baseZ + def.Output.ElevationOffset));
+                            var tol = terrain is SurfaceSampler ? 0.03 : 0.004;
+                            var split = FloorPlanes.Split(m, zf, tol, (terrain as GradeSampler)?.Surface, terrain is SurfaceSampler ? 60 : 25,
+                                ringStep: terrain is SurfaceSampler ? 3.0 : 1.0);
+                            // Partes empenadas (superfície torcida) seguem com edição de forma em malha regular.
+                            parts.AddRange(split.Select(x => (x.Part, x.Warped ? null : (Plane3?)x.Plane)));
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Error("FloorPlanes", ex);
+                            parts.Add((m, null));
+                        }
+                    }
+                    foreach (var (shape, plane) in parts)
                     {
                         var piece = new MarkingPiece(shape, grp.Key.Color) { Elevation = grp.Key.E, Thickness = grp.Key.T, Layer = grp.Key.Layer };
-                        var floors = CreateFloors(piece, baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(grp.Key.Color), ref reason, terrain);
+                        var floors = CreateFloors(piece, baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(grp.Key.Color), ref reason, terrain, plane);
                         if (floors.Count == 0) { failed.Add(piece); continue; }
                         foreach (var f in floors)
                         {
@@ -689,6 +727,9 @@ public sealed class MarkingService
         var zBaseFt = UnitConv.Ft(zMeters);
         var above = UnitConv.Ft(Math.Max(0.001, aboveSurfaceM));
         var draped = sampler is { IsAvailable: true };
+        // Sobre greide/nó a pista é feita de pisos planos (desvio ≤ 4 mm): a pintura fica 5 mm acima da superfície teórica
+        // para nunca "afundar" no piso.
+        if (sampler is GradeSampler or NodeSampler) above = Math.Max(above, UnitConv.Ft(0.005));
 
         foreach (var piece in pieces)
         {
@@ -780,7 +821,7 @@ public sealed class MarkingService
         var dev = samples.Max(q => Math.Abs(mz + a * (q.X - mx) + b * (q.Y - my) - q.Z));
         var (mn, mxp) = shape.Bounds;
         var ext = Math.Max(mxp.X - mn.X, mxp.Y - mn.Y);
-        if (dev <= UnitConv.Ft(0.015) || depth >= 7 || ext < 0.8)
+        if (dev <= UnitConv.Ft(s is GradeSampler or NodeSampler ? 0.004 : 0.015) || depth >= 9 || ext < 0.8)
         {
             var zc = mz + a * (UnitConv.Ft(cen.X) - mx) + b * (UnitConv.Ft(cen.Y) - my);
             yield return (shape, zc, new XYZ(-a, -b, 1).Normalize());
@@ -1091,13 +1132,19 @@ public sealed class MarkingService
     /// Cria o(s) piso(s) da peça (topo na cota da peça). Tenta o contorno original, depois limpo de lascas e, por fim,
     /// dividido sem furos. Lista vazia se o Revit recusar todas as tentativas (<paramref name="reason"/> recebe o motivo).
     /// </summary>
-    private List<Floor> CreateFloors(MarkingPiece piece, double baseZm, ElementId? userType, ref string? reason, ISurface? terrain = null)
+    private List<Floor> CreateFloors(MarkingPiece piece, double baseZm, ElementId? userType, ref string? reason, ISurface? terrain = null,
+        Plane3? plane = null)
     {
         var res = new List<Floor>();
         var topFt = UnitConv.Ft(baseZm + piece.Elevation + piece.Thickness);
         var c0 = piece.Shape.Centroid;
         double? groundFt = null;
-        if (terrain != null && terrain.TrySample(UnitConv.Ft(c0.X), UnitConv.Ft(c0.Y), topFt, out var gz, out _))
+        if (plane is { } pl)
+        {
+            groundFt = UnitConv.Ft(pl.Z(c0));
+            topFt = groundFt.Value + UnitConv.Ft(piece.Elevation + piece.Thickness);
+        }
+        else if (terrain != null && terrain.TrySample(UnitConv.Ft(c0.X), UnitConv.Ft(c0.Y), topFt, out var gz, out _))
         {
             groundFt = gz;
             topFt = gz + UnitConv.Ft(piece.Elevation + piece.Thickness);
@@ -1120,9 +1167,9 @@ public sealed class MarkingService
 
         // No terreno/greide, o contorno ganha vértices a cada 2–3 m (pontos de apoio da deformação do piso). O contorno já
         // preparado NÃO passa de novo pela limpeza (ela removeria os vértices colineares e as bordas longas ficariam retas).
-        var shaped = groundFt != null;
+        var shaped = groundFt != null && plane == null;
         // No greide: vértices nas estacas da grade da via (dos dois lados, emparelhados) – malha regular e limpa.
-        Polygon2 Prep(Polygon2 p) => !shaped ? p : terrain is GradeSampler gsp ? GradeFloors.Resample(p, gsp.Surface, gsp.Grid) : Densified(p, 3.0);
+        Polygon2 Prep(Polygon2 p) => !shaped ? p : terrain is GradeSampler gsp ? GradeFloors.Resample(p, gsp.Surface, gsp.Grid) : Densified(p, terrain is NodeSampler ? 1.5 : 3.0);
         var attempts = new List<Func<List<Polygon2>>>
         {
             () => new List<Polygon2> { Prep(Prepare(piece.Shape)) },
@@ -1147,7 +1194,8 @@ public sealed class MarkingService
                     var f = Floor.Create(_doc, loops, typeId, level.Id, false, null, 0.0);
                     f.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)?.Set(topFt - level.ProjectElevation);
                     FloorSignature.Write(f, loops);
-                    if (groundFt != null && terrain != null) DrapeFloor(f, shape, terrain, groundFt.Value);
+                    if (plane is { } pp) { if (!pp.IsLevel) TiltFloor(f, pp, groundFt!.Value); }
+                    else if (groundFt != null && terrain != null) DrapeFloor(f, shape, terrain, groundFt.Value);
                     created.Add(f);
                 }
                 catch (Exception ex)
@@ -1162,6 +1210,44 @@ public sealed class MarkingService
             foreach (var f in created) SafeDelete(f.Id);
         }
         return res;
+    }
+
+    /// <summary>Cota (m) da superfície num ponto (m), com memória – a divisão em planos amostra os mesmos pontos várias vezes.</summary>
+    private static Func<Vec2, double> SurfaceZ(ISurface terrain, double hintFt)
+    {
+        var memo = new Dictionary<(long, long), double>();
+        var last = UnitConv.M(hintFt);
+        return v =>
+        {
+            var k = ((long)Math.Round(v.X * 50), (long)Math.Round(v.Y * 50));
+            if (memo.TryGetValue(k, out var z)) return z;
+            if (terrain.TrySample(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), UnitConv.Ft(last), out var zf, out _)) last = UnitConv.M(zf);
+            return memo[k] = last;
+        };
+    }
+
+    /// <summary>
+    /// Inclina o piso para o plano dado: só os vértices do contorno, cada um exatamente no plano – o topo continua uma face
+    /// plana única (nenhum vinco), só que inclinada como o greide/abaulamento naquele trecho.
+    /// </summary>
+    private void TiltFloor(Floor f, Plane3 plane, double groundFt)
+    {
+        try
+        {
+            var ed = f.GetSlabShapeEditor();
+            ed.Enable();
+            _doc.Regenerate();
+            foreach (SlabShapeVertex v in ed.SlabShapeVertices)
+            {
+                var p = v.Position;
+                var off = UnitConv.Ft(plane.Z(new Vec2(UnitConv.M(p.X), UnitConv.M(p.Y)))) - groundFt;
+                if (Math.Abs(off) > 1e-5) ed.ModifySubElement(v, off);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("TiltFloor", ex);
+        }
     }
 
     private static Polygon2 Densified(Polygon2 p, double maxLen)
@@ -1189,7 +1275,8 @@ public sealed class MarkingService
             else
             {
                 var (mn, mx) = shape.Bounds;
-                var step = Math.Max(3.0, Math.Sqrt(Math.Max(1, shape.Area) / 1200));
+                // Nó (concordância torcida): malha fina e regular de 1,5 m; terreno: 3 m.
+                var step = Math.Max(terrain is NodeSampler ? 1.5 : 3.0, Math.Sqrt(Math.Max(1, shape.Area) / 1200));
                 var edge = PolygonOps.Offset(new[] { shape }, -0.4);
                 for (var x = mn.X + step / 2; x < mx.X; x += step)
                     for (var y = mn.Y + step / 2; y < mx.Y; y += step)

@@ -169,6 +169,43 @@ public static class InfraDemo
         return p with { Shape = part, Solid = poly, Elevation = 0, Thickness = poly.MaxZ };
     }
 
+    /// <summary>Piso empenado (edição de forma em malha regular de <paramref name="step"/> m), para superfícies torcidas.</summary>
+    public static MarkingPiece Warped(MarkingPiece p, Polygon2 part, Func<Vec2, double> z, double step = 1.5)
+    {
+        var ring = CurveTools.Densify(part.Outer.Append(part.Outer[0]).ToList(), step).SkipLast(1).ToList();
+        var inner = PolygonOps.Offset(new[] { part }, -0.3);
+        var (mn, mx) = part.Bounds;
+        for (var x = mn.X + step / 2; x < mx.X; x += step)
+            for (var y = mn.Y + step / 2; y < mx.Y; y += step)
+                if (inner.Any(e => e.Contains(new Vec2(x, y)))) ring.Add(new Vec2(x, y));
+        var up = p.Elevation + Math.Max(0.001, p.Thickness);
+        var top = ring.Select(v => Vec3.At(v, z(v) + up)).ToList();
+        var faces = new List<List<Vec3>>();
+        foreach (var (a, b, c) in Tin.Triangulate(top))
+        {
+            var tri = new List<Vec3> { top[a], top[b], top[c] };
+            var cen = new Vec2((tri[0].X + tri[1].X + tri[2].X) / 3, (tri[0].Y + tri[1].Y + tri[2].Y) / 3);
+            if (!part.Contains(cen)) continue;
+            if (Polyhedron.Normal(tri).Z < 0) tri.Reverse();
+            faces.Add(tri);
+        }
+        if (faces.Count == 0) return p with { Shape = part, Elevation = p.Elevation + z(part.Centroid) };
+        var poly = new Polyhedron(faces);
+        return p with { Shape = part, Solid = poly, Elevation = 0, Thickness = poly.MaxZ };
+    }
+
+    /// <summary>Piso plano inclinado (topo = plano da parte), com espessura constante na vertical.</summary>
+    public static MarkingPiece Tilted(MarkingPiece p, Polygon2 part, Plane3 plane)
+    {
+        var up = p.Elevation + Math.Max(0.001, p.Thickness);
+        if (part.Holes.Count > 0 || plane.IsLevel)
+            return p with { Shape = part, Elevation = p.Elevation + plane.Z(part.Centroid) };
+        var ring = part.Outer.ToList();
+        if (Polygon2.SignedArea(ring) < 0) ring.Reverse();
+        if (Polyhedron.Prism(ring, v => plane.Z(v) + p.Elevation, v => plane.Z(v) + up) is not { } poly) return p with { Shape = part, Elevation = p.Elevation + plane.Z(part.Centroid) };
+        return p with { Shape = part, Solid = poly, Elevation = 0, Thickness = poly.MaxZ };
+    }
+
     /// <summary>Peças planas (pisos, pinturas) cortadas em trechos ao longo do eixo e levantadas até o greide.</summary>
     public static void LiftFlat(MarkingGeometry geo, GradeSurface surf, Polyline2 axis, double step)
     {
@@ -178,9 +215,14 @@ public static class InfraDemo
         foreach (var p in geo.Pieces)
         {
             if (p.Solid != null || p.Profile != null) { res.Add(p); continue; }
-            // Como no Revit: pisos em trechos de até 40 m cortados nas estacas da grade.
-            foreach (var part in GradeFloors.Chunks(p.Shape, surf, 40, grid))
-                res.Add(Draped(p, part, surf, grid));
+            // Como no Revit: o piso é dividido em partes PLANAS (desvio ≤ 4 mm) e cada parte é um piso plano inclinado.
+            // Pintura 5 mm acima da superfície teórica (como no Revit): nunca some sob os pisos planos.
+            var q = MarkingColors.IsPaint(p.Color) ? p with { Elevation = p.Elevation + 0.005 } : p;
+            foreach (var (part, plane, warped) in FloorPlanes.Split(p.Shape, surf.Z, 0.004, surf))
+                if (warped) res.Add(Draped(q, part, surf, grid));
+                else
+                    foreach (var solid in part.Holes.Count > 0 ? PolygonOps.SplitHoles(part) : new List<Polygon2> { part })
+                        res.Add(Tilted(q, solid, plane));
         }
         geo.Pieces.Clear();
         geo.Pieces.AddRange(res);

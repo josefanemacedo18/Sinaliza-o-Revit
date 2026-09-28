@@ -237,35 +237,50 @@ public sealed class GradeSurface
     {
         var pts = _axis.Points;
         if (pts.Count < 2) return (0, 0);
-        IEnumerable<int> cand = Enumerable.Empty<int>();
-        for (var r = 0; r <= 12; r++)
+        int cx = K(p.X), cy = K(p.Y);
+        HashSet<int> Ring(int r)
         {
             var set = new HashSet<int>();
-            int cx = K(p.X), cy = K(p.Y);
             for (var x = cx - r; x <= cx + r; x++)
                 for (var y = cy - r; y <= cy + r; y++)
                     if (_grid.TryGetValue((x, y), out var l)) foreach (var i in l) set.Add(i);
-            if (set.Count > 0 && r >= 1) { cand = set; break; }
+            return set;
         }
-        var list = cand.ToList();
-        if (list.Count == 0) list = Enumerable.Range(0, pts.Count - 1).ToList();
-        double best = double.MaxValue, bs = 0, by = 0;
-        foreach (var i in list)
+        (double D, double S, double Y) Best(IEnumerable<int> list)
         {
-            var a = pts[i];
-            var ab = pts[i + 1] - a;
-            var len2 = ab.Dot(ab);
-            var t = len2 < 1e-12 ? 0 : Math.Clamp((p - a).Dot(ab) / len2, 0, 1);
-            var q = a + ab * t;
-            var d = q.DistanceTo(p);
-            if (d < best - 1e-9)
+            double best = double.MaxValue, bs = 0, by = 0;
+            foreach (var i in list)
             {
-                best = d;
-                bs = _stations[i] + t * Math.Sqrt(len2);
-                var side = ab.Cross(p - a);
-                by = side >= 0 ? d : -d;
+                var a = pts[i];
+                var ab = pts[i + 1] - a;
+                var len2 = ab.Dot(ab);
+                var t = len2 < 1e-12 ? 0 : Math.Clamp((p - a).Dot(ab) / len2, 0, 1);
+                var q = a + ab * t;
+                var d = q.DistanceTo(p);
+                if (d < best - 1e-9)
+                {
+                    best = d;
+                    bs = _stations[i] + t * Math.Sqrt(len2);
+                    var side = ab.Cross(p - a);
+                    by = side >= 0 ? d : -d;
+                }
             }
+            return (best, bs, by);
         }
+        // Primeiro anel com segmentos; depois amplia até cobrir a distância achada (o segmento mais próximo pode estar numa
+        // célula mais distante que a do primeiro candidato – sem isso, pontos a 15 m do eixo caíam na estação errada).
+        (double D, double S, double Y) res = (double.MaxValue, 0, 0);
+        for (var r = 1; r <= 12; r++)
+        {
+            var set = Ring(r);
+            if (set.Count == 0) continue;
+            res = Best(set);
+            var need = (int)Math.Ceiling(res.D / Cell) + 1;
+            if (need > r) res = Best(Ring(Math.Min(need, 40)));
+            break;
+        }
+        if (res.D == double.MaxValue) res = Best(Enumerable.Range(0, pts.Count - 1));
+        var (_, bs, by) = res;
         return (bs, by);
     }
 

@@ -53,6 +53,10 @@ public sealed class GeometryPreview : FrameworkElement
     }
 
     private Rect _togglePlan, _toggle3D;
+    // Órbita da vista 3D (graus): azimute e elevação, alterados arrastando com o botão direito.
+    private double _az = -35, _el = 30;
+    private Point? _orbitStart;
+    private (double Az, double El) _orbitFrom;
     private double _zoom = 1;
     private Vector _pan;
     private Point? _dragStart;
@@ -78,6 +82,29 @@ public sealed class GeometryPreview : FrameworkElement
             InvalidateVisual();
         };
         MouseLeftButtonUp += (_, _) => { _dragStart = null; ReleaseMouseCapture(); };
+        MouseRightButtonDown += (_, e) =>
+        {
+            if (!Iso) return;
+            _orbitStart = e.GetPosition(this);
+            _orbitFrom = (_az, _el);
+            CaptureMouse();
+            e.Handled = true;
+        };
+        MouseRightButtonUp += (_, e) =>
+        {
+            if (_orbitStart == null) return;
+            _orbitStart = null;
+            ReleaseMouseCapture();
+            e.Handled = true;
+        };
+        MouseMove += (_, e) =>
+        {
+            if (_orbitStart is not { } o0) return;
+            var d = e.GetPosition(this) - o0;
+            _az = _orbitFrom.Az - d.X * 0.4;
+            _el = Math.Clamp(_orbitFrom.El + d.Y * 0.3, 8, 89);
+            InvalidateVisual();
+        };
         MouseWheel += (_, e) =>
         {
             // Zoom com a roda do mouse em torno do cursor (duplo clique volta ao enquadramento).
@@ -251,7 +278,7 @@ public sealed class GeometryPreview : FrameworkElement
                 }
         }
         if (faces.Count == 0) return;
-        const double az = -35 * Math.PI / 180, el = 30 * Math.PI / 180;
+        double az = _az * Math.PI / 180, el = _el * Math.PI / 180;
         double ca = Math.Cos(az), sa = Math.Sin(az), ce = Math.Cos(el), se = Math.Sin(el);
         (double X, double Y, double D) Pr(Vec3 v)
         {
@@ -259,36 +286,60 @@ public sealed class GeometryPreview : FrameworkElement
             var y = v.X * sa + v.Y * ca;
             return (x, v.Z * ce + y * se, y * ce - v.Z * se);
         }
-        var light = new Vec3(-0.4, -0.6, 0.7);
-        var ll = Math.Sqrt(light.Dot(light));
-        light = light * (1 / ll);
-        var list = faces.Select(f => (P: f.Pts.Select(Pr).ToList(), f.C, N: Polyhedron.Normal(f.Pts))).ToList();
+        // Direção da câmera (para o observador) no modelo: descarta as faces de costas dos sólidos fechados.
+        var toEye = new Vec3(-sa * ce, -ca * ce, se);
+        // Luz do sol (noroeste, alta) + luz do céu + ambiente: faces horizontais claras, paredes com contraste.
+        var sun = new Vec3(-0.45, 0.35, 0.82);
+        sun = sun * (1 / Math.Sqrt(sun.Dot(sun)));
+        var list = new List<(List<(double X, double Y, double D)> P, MarkingColor C, double Shade, double Key)>();
+        foreach (var f in faces)
+        {
+            var n = Polyhedron.Normal(f.Pts);
+            var nl = Math.Sqrt(n.Dot(n));
+            if (nl < 1e-12) continue;
+            n = n * (1 / nl);
+            if (Math.Abs(n.Z) < 0.999 && n.Dot(toEye) < -0.02) continue;
+            var nn = n.Dot(toEye) < 0 ? n * -1 : n;
+            var shade = 0.42 + 0.48 * Math.Max(0, nn.Dot(sun)) + 0.14 * Math.Max(0, nn.Z);
+            var pr = f.Pts.Select(Pr).ToList();
+            // Pinturas finas ficam sempre por cima do piso em que estão (sem "brigar" na ordenação por profundidade).
+            var key = pr.Average(q => q.D) - (MarkingColors.IsPaint(f.C) ? 0.06 : 0);
+            list.Add((pr, f.C, Math.Min(1.08, shade), key));
+        }
+        if (list.Count == 0) return;
         var all = list.SelectMany(f => f.P).ToList();
         double minX = all.Min(q => q.X), maxX = all.Max(q => q.X), minY = all.Min(q => q.Y), maxY = all.Max(q => q.Y);
         var margin = 20.0;
         var s = Math.Min((w - 2 * margin) / Math.Max(0.01, maxX - minX), (h - 2 * margin) / Math.Max(0.01, maxY - minY));
         var ox = (w - (maxX - minX) * s) / 2;
         var oy = (h - (maxY - minY) * s) / 2;
+        // Céu em degradê atrás do modelo.
+        var sky = new LinearGradientBrush(Color.FromRgb(188, 208, 230), Color.FromRgb(238, 240, 236), 90);
+        sky.Freeze();
+        dc.DrawRectangle(sky, null, new Rect(0, 0, w, h));
         dc.PushTransform(ViewTransform());
-        foreach (var f in list.OrderByDescending(f => f.P.Average(q => q.D)))
+        foreach (var f in list.OrderByDescending(f => f.Key))
         {
             var rgb = MarkingColors.Display(f.C);
-            var nl = Math.Sqrt(f.N.Dot(f.N));
-            var shade = nl < 1e-12 ? 0.8 : 0.55 + 0.45 * Math.Abs(f.N.Dot(light) / nl);
-            var brush = new SolidColorBrush(Color.FromRgb((byte)(rgb.R * shade), (byte)(rgb.G * shade), (byte)(rgb.B * shade)));
+            var shade = f.Shade;
+            byte Ch(byte c) => (byte)Math.Clamp(c * shade, 0, 255);
+            var brush = new SolidColorBrush(Color.FromRgb(Ch(rgb.R), Ch(rgb.G), Ch(rgb.B)));
             brush.Freeze();
+            // Contorno fino da própria cor: fecha as frestas do antisserrilhamento entre faces vizinhas.
+            var seam = new Pen(brush, 0.7) { LineJoin = PenLineJoin.Round };
+            seam.Freeze();
             var sg = new StreamGeometry();
             using (var ctx = sg.Open())
             {
                 var pts = f.P.Select(q => new Point(ox + (q.X - minX) * s, h - (oy + (q.Y - minY) * s))).ToList();
                 ctx.BeginFigure(pts[0], true, true);
-                ctx.PolyLineTo(pts.Skip(1).ToList(), true, false);
+                ctx.PolyLineTo(pts.Skip(1).ToList(), true, true);
             }
             sg.Freeze();
-            dc.DrawGeometry(brush, null, sg);
+            dc.DrawGeometry(brush, seam, sg);
         }
         dc.Pop();
-        if (!Compact) DrawText(dc, "Vista 3D (isométrica)", new Point(8, h - 20), Brushes.White, 11);
+        if (!Compact) DrawText(dc, "Vista 3D · arrastar com o botão direito = girar", new Point(8, h - 20), Brushes.White, 11);
     }
 
     private double TextModelHeight(AnnotationText t) => t.PaperHeightMm * ViewScale / 1000.0;

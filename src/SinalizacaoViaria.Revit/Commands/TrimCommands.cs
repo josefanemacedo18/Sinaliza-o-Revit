@@ -73,10 +73,13 @@ public sealed class CmdApagarTrecho : CommandBase
         {
             // Clique de PONTO (na planta o clique de elemento nem sempre traz a coordenada): a marca é achada sob o ponto,
             // dando preferência à pintura/dispositivo sobre o pavimento e as calçadas.
-            var xyz = Picking.PickPoint(uidoc, "Apagar trecho: clique sobre o traço/peça a apagar – ESC termina");
+            // Na vista 3D não há plano de trabalho para o clique de ponto: o ponto vem da face clicada (exato em planta
+            // mesmo com a via inclinada).
+            var xyz = uidoc.ActiveView is View3D ? PickOnFace(uidoc) : Picking.PickPoint(uidoc, "Apagar trecho: clique sobre o traço/peça a apagar – ESC termina");
             if (xyz == null) break;
             var p = UnitConv.ToVec2(xyz);
-            var found = FindAt(uidoc, p, changed);
+            // 1º pela geometria real dos elementos no Revit (cada traço é um sólido próprio); 2º pela geometria da marca.
+            var found = FindInModel(uidoc, p, changed) ?? FindAt(uidoc, p, changed);
             if (found == null)
             {
                 TaskDialog.Show(AppTitle, "Nenhuma sinalização sob o ponto clicado – clique sobre a pintura (traço, seta, faixa) ou o dispositivo.");
@@ -90,6 +93,90 @@ public sealed class CmdApagarTrecho : CommandBase
             MarkingCreator.Commit(uidoc, new[] { def }, "SV - Apagar trecho");
         }
         return count > 0 ? Result.Succeeded : Result.Cancelled;
+    }
+
+    /// <summary>
+    /// Peça sob o ponto lida da geometria real dos elementos do plugin: cada traço/símbolo/dispositivo é um sólido separado
+    /// dentro da forma direta (ou um piso). A pegada do sólido (faces voltadas para cima, unidas) é o recorte – exatamente o
+    /// traço clicado. Pinturas têm prioridade sobre pisos (pavimento, calçada) que ficam por baixo.
+    /// </summary>
+    private static (MarkingDefinition Def, ExclusionZone Zone)? FindInModel(UIDocument uidoc, Vec2 p, Dictionary<string, MarkingDefinition> changed)
+    {
+        var doc = uidoc.Document;
+        (StoredMarking St, Polygon2 Foot, int Rank)? best = null;
+        foreach (var r in MarkingStorage.All(doc))
+        {
+            var e = r.Element;
+            var bb = e.get_BoundingBox(null) ?? e.get_BoundingBox(uidoc.ActiveView);
+            if (bb == null) continue;
+            if (p.X < UnitConv.M(bb.Min.X) - 0.3 || p.X > UnitConv.M(bb.Max.X) + 0.3 || p.Y < UnitConv.M(bb.Min.Y) - 0.3 || p.Y > UnitConv.M(bb.Max.Y) + 0.3) continue;
+            if (r.Definition is IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or IAnnotationDefinition) continue;
+            if (MarkingService.IsBore(e)) continue;
+            var rank = e is Floor ? 2 : r.Definition is RoadPavementDefinition ? 3 : 0;
+            GeometryElement? ge;
+            try { ge = e.get_Geometry(new Options { ComputeReferences = false, DetailLevel = ViewDetailLevel.Fine }); }
+            catch { continue; }
+            if (ge == null) continue;
+            foreach (var solid in Solids(ge))
+            {
+                var foot = Footprint(solid);
+                if (foot == null) continue;
+                var d = foot.Contains(p) ? 0 : foot.DistanceTo(p);
+                if (d > 0.25) continue;
+                if (best == null || rank < best.Value.Rank || rank == best.Value.Rank && foot.Area < best.Value.Foot.Area)
+                    best = (r, foot, rank);
+            }
+        }
+        if (best == null) return null;
+        var def = changed.TryGetValue(best.Value.St.MarkingId, out var d0) ? d0 : best.Value.St.Definition;
+        var zone = ZoneOf(new MarkingPiece(best.Value.Foot, MarkingColor.Branca), p);
+        return zone == null ? null : (def, zone);
+    }
+
+    private static XYZ? PickOnFace(UIDocument uidoc)
+    {
+        try
+        {
+            var r = uidoc.Selection.PickObject(ObjectType.PointOnElement, new MarkingSelectionFilter(), "Apagar trecho: clique sobre o traço/peça a apagar – ESC termina");
+            return r?.GlobalPoint;
+        }
+        catch (Autodesk.Revit.Exceptions.OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
+    private static IEnumerable<Solid> Solids(GeometryElement ge)
+    {
+        foreach (var o in ge)
+        {
+            if (o is Solid s && s.Faces.Size > 0 && s.Volume > 1e-9) yield return s;
+            else if (o is GeometryInstance gi)
+                foreach (var x in Solids(gi.GetInstanceGeometry())) yield return x;
+        }
+    }
+
+    /// <summary>Pegada em planta (m) de um sólido: união das faces voltadas para cima.</summary>
+    private static Polygon2? Footprint(Solid s)
+    {
+        var polys = new List<Polygon2>();
+        foreach (Face f in s.Faces)
+        {
+            try
+            {
+                var bb = f.GetBoundingBox();
+                if (f.ComputeNormal((bb.Min + bb.Max) / 2).Z < 0.3) continue;
+                var loop = f.GetEdgesAsCurveLoops().FirstOrDefault();
+                if (loop == null) continue;
+                var pts = new List<Vec2>();
+                foreach (var c in loop) foreach (var q in c.Tessellate().Take(Math.Max(1, c.Tessellate().Count - 1))) pts.Add(UnitConv.ToVec2(q));
+                if (pts.Count >= 3) polys.Add(new Polygon2(pts));
+            }
+            catch { /* face sem contorno */ }
+        }
+        if (polys.Count == 0) return null;
+        try { return PolygonOps.Union(polys).OrderByDescending(x => x.Area).FirstOrDefault(); }
+        catch { return polys.OrderByDescending(x => x.Area).First(); }
     }
 
     /// <summary>

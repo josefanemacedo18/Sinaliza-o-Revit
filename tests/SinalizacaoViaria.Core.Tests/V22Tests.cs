@@ -295,4 +295,75 @@ public class V22Tests
         var r2 = RoadProfileDesigner.Design(300, s => T(s), o2);
         for (var s = 0.0; s < 300; s += 5) Assert.True(Math.Abs(r2.Grade.GradeAt(s)) <= 0.031);
     }
+
+    [Fact]
+    public void FloorPlanes_StraightGradeGivesOnePlanePerCrownSide()
+    {
+        // Rampa constante de 5 % com abaulamento de 2 %: cada lado da crista é um plano – 2 pisos, nenhum empenado.
+        var surf = new GradeSurface(Straight(120), new RoadGrade { Crossfall = 0.02, Points = { new(0, 0), new(120, 6) } });
+        var pav = Polygon2.Rectangle(new Vec2(0, -7), new Vec2(120, 7));
+        var parts = FloorPlanes.Split(pav, surf.Z, 0.004, surf);
+        Assert.Equal(2, parts.Count);
+        Assert.All(parts, p => Assert.False(p.Warped));
+        Assert.Equal(pav.Area, parts.Sum(p => p.Part.Area), 1);
+        foreach (var (part, plane, _) in parts)
+            foreach (var v in part.Outer) Assert.Equal(surf.Z(v), plane.Z(v), 3);
+    }
+
+    [Fact]
+    public void FloorPlanes_VerticalCurveSplitsAcrossAxisWithinTolerance()
+    {
+        var surf = new GradeSurface(Straight(200), new RoadGrade { Crossfall = 0.02, DefaultCurve = 80, Points = { new(0, 0), new(100, 5), new(200, 0) } });
+        var pav = Polygon2.Rectangle(new Vec2(0, 0.001), new Vec2(200, 7));
+        var parts = FloorPlanes.Split(pav, surf.Z, 0.004, surf);
+        Assert.True(parts.Count > 3);
+        Assert.Equal(pav.Area, parts.Sum(p => p.Part.Area), 0);
+        foreach (var (part, plane, warped) in parts.Where(p => !p.Warped))
+            foreach (var v in part.Outer) Assert.True(Math.Abs(surf.Z(v) - plane.Z(v)) < 0.009);
+    }
+
+    [Fact]
+    public void GradeSurface_LocatesFarPointsOnTheRightStation()
+    {
+        // Eixo curvo em vértices a cada 4 m: pontos a 16 m do eixo caíam na estação de um vértice vizinho.
+        var axis = new Polyline2(Enumerable.Range(0, 81).Select(i => new Vec2(i * 4.0, 22 * Math.Sin(i * 4.0 / 95))).ToList());
+        var surf = new GradeSurface(axis, RoadGrade.Flat(axis.Length));
+        for (var s = 20.0; s < 300; s += 7.3)
+            foreach (var off in new[] { -16.0, -9.0, 9.0, 16.0 })
+            {
+                var p = axis.PointAt(s) + axis.TangentAt(s).PerpLeft * off;
+                var (ls, ly) = surf.Locate(p);
+                Assert.Equal(s, ls, 0);
+                Assert.Equal(off, ly, 0);
+            }
+    }
+
+    [Fact]
+    public void NodeSurface_MajorRoadKeepsItsGradeThroughTheNode()
+    {
+        // Principal (x) em rampa de 6 %; secundária (y) em nível. No miolo vale a principal; na secundária, além do alcance, a dela.
+        var a = new GradeSurface(new Polyline2(new[] { new Vec2(-80, 0), new Vec2(80, 0) }), new RoadGrade { Crossfall = 0.02, Points = { new(0, -4.8), new(160, 4.8) } });
+        var b = new GradeSurface(new Polyline2(new[] { new Vec2(0, -80), new Vec2(0, 80) }), new RoadGrade { Crossfall = 0.02, Points = { new(0, 0), new(160, 0) } });
+        var node = new NodeSurface(new[] { new NodeSurface.Leg(b, 0, 5, 3, 10), new NodeSurface.Leg(a, 0, 7, 2) });
+        Assert.Same(a, node.Major!.Surface);
+        foreach (var p in new[] { new Vec2(4, 3), new Vec2(-5, -6), new Vec2(0, 0) }) Assert.Equal(a.Z(p), node.Z(p), 6);
+        Assert.Equal(b.Z(new Vec2(2, 20)), node.Z(new Vec2(2, 20)), 6);
+        // Contínua.
+        for (var x = -10.0; x < 10; x += 0.5)
+            for (var y = -25.0; y < 25; y += 0.5)
+                Assert.True(Math.Abs(node.Z(new Vec2(x, y + 0.5)) - node.Z(new Vec2(x, y))) < 0.05);
+    }
+
+    [Fact]
+    public void NodeSurface_BeyondRoadEndHasNoCone()
+    {
+        // Além da ponta do eixo o afastamento é medido na normal da ponta: nada de "cone" do abaulamento em volta da ponta.
+        var a = new GradeSurface(Straight(50), new RoadGrade { Crossfall = 0.02, Points = { new(0, 0), new(50, 0) } });
+        var leg = new NodeSurface.Leg(a, 0, 7);
+        var z1 = NodeSurface.LegZ(leg, new Vec2(55, 0), out _);
+        var z2 = NodeSurface.LegZ(leg, new Vec2(60, 0), out _);
+        Assert.Equal(0, z1, 6);
+        Assert.Equal(0, z2, 6);
+        Assert.Equal(NodeSurface.LegZ(leg, new Vec2(45, 3), out _), NodeSurface.LegZ(leg, new Vec2(58, 3), out _), 6);
+    }
 }
