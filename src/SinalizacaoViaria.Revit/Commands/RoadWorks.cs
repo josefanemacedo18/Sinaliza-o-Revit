@@ -234,6 +234,26 @@ internal static class RoadWorks
         var covered = Enumerable.Range(0, 21).Count(i => ground(axis.PointAt(axis.Length * i / 20)) != null);
         if (covered < 5) return res;
         var opt = RoadProfileDesigner.ForRelief(relief, st.RoadReliefMaxGrade, st.RoadCutSlope, st.RoadFillSlope);
+        // Cruzamentos e entroncamentos com as vias existentes: a via nova passa na cota delas (interseção no mesmo nível).
+        try
+        {
+            var sv = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
+            var roads = sv.Roads();
+            var mine = roads.FindIndex(r => r.Def.Id == road.Pavement.Id);
+            if (mine >= 0)
+                foreach (var (node, ids) in Core.Generators.IntersectionGenerator.FindNodes(roads).Where(n => n.Roads.Contains(mine)))
+                {
+                    var others = ids.Where(i => i != mine).Select(i => roads[i]).ToList();
+                    if (others.Count == 0) continue;
+                    var zAbs = others.Average(o => sv.RoadZ(o, node));
+                    var s = axis.Project(node).Station;
+                    opt.Fixed.Add(new Vec2(Math.Clamp(s, 0, axis.Length), zAbs - road.BaseZ));
+                }
+            // Pontas coladas a outra via: a cota da ponta é a dela.
+            if (opt.Fixed.FirstOrDefault(f => f.X < 1) is { } f0 && f0 != default) opt.StartZ = f0.Y;
+            if (opt.Fixed.FirstOrDefault(f => f.X > axis.Length - 1) is { } f1 && f1 != default) opt.EndZ = f1.Y;
+        }
+        catch (Exception ex) { Log.Error("Relevo – cruzamentos", ex); }
         var perfil = RoadProfileDesigner.Design(axis.Length, s => ground(axis.PointAt(s)), opt);
         var grade = perfil.Grade;
         grade.AdjustTerrain = true;

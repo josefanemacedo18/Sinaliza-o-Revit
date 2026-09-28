@@ -349,4 +349,12 @@ public sealed class GradePad
     public double FillSlope { get; set; } = 1.5;
     public bool Daylight { get; set; } = true;
     public string Label { get; set; } = "";
+    /// <summary>
+    /// Cota variável da plataforma (m, na mesma referência de <see cref="Z"/>): interseções e rotatórias inclinadas pelo greide
+    /// das vias que chegam nelas. Nulo = plataforma plana na cota <see cref="Z"/>.
+    /// </summary>
+    public Func<Vec2, double>? ZAt { get; set; }
+
+    /// <summary>Cota da plataforma no ponto.</summary>
+    public double At(Vec2 p) => ZAt?.Invoke(p) ?? Z;
 }

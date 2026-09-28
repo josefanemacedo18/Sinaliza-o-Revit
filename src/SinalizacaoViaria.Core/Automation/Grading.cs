@@ -8,8 +8,8 @@ public sealed class GradingResult
 {
     /// <summary>Triângulos da superfície de projeto (faixas e taludes), cotas absolutas (m).</summary>
     public List<(Vec3 A, Vec3 B, Vec3 C)> Triangles { get; } = new();
-    /// <summary>Plataformas planas (polígono, cota absoluta).</summary>
-    public List<(Polygon2 Area, double Z)> Pads { get; } = new();
+    /// <summary>Plataformas (polígono, cota absoluta no ponto – plana ou inclinada pelo greide das vias).</summary>
+    public List<(Polygon2 Area, Func<Vec2, double> Z)> Pads { get; } = new();
     /// <summary>Pontos a inserir no terreno (bordas, pés/cristas de talude, pontos internos das plataformas).</summary>
     public List<Vec3> Points { get; } = new();
     /// <summary>Contorno de tudo o que é alterado (plataformas + taludes).</summary>
@@ -56,7 +56,7 @@ public sealed class GradingResult
     /// </summary>
     public double? DesignZ(Vec2 p)
     {
-        foreach (var (area, z) in Pads) if (area.Contains(p)) return z;
+        foreach (var (area, z) in Pads) if (area.Contains(p)) return z(p);
         Index();
         if (!_index!.TryGetValue(Key(p.X, p.Y), out var cand)) return null;
         double? platform = null;
@@ -129,19 +129,20 @@ public static class Grading
         {
             var outer = pad.Area.Outer.ToList();
             if (outer.Count < 3) continue;
-            var z = pad.Z + baseZ;
+            var pd = pad;
+            Func<Vec2, double> z = p => pd.At(p) + baseZ;
             res.Pads.Add((pad.Area, z));
             res.Footprint.Add(pad.Area);
             var ring = CurveTools.Densify(outer, 2.0);
             if (ring.Count > 1 && ring[0].AlmostEquals(ring[^1], 1e-6)) ring.RemoveAt(ring.Count - 1);
-            res.Points.AddRange(ring.Select(p => Vec3.At(p, z)));
-            // Pontos internos: a plataforma fica plana também no miolo.
+            res.Points.AddRange(ring.Select(p => Vec3.At(p, z(p))));
+            // Pontos internos: a plataforma segue a sua superfície também no miolo.
             var (mn, mx) = pad.Area.Bounds;
             for (var x = mn.X + padGrid / 2; x < mx.X; x += padGrid)
                 for (var y = mn.Y + padGrid / 2; y < mx.Y; y += padGrid)
                 {
                     var p = new Vec2(x, y);
-                    if (pad.Area.Contains(p) && Distance(ring, p) > 0.5) res.Points.Add(Vec3.At(p, z));
+                    if (pad.Area.Contains(p) && Distance(ring, p) > 0.5) res.Points.Add(Vec3.At(p, z(p)));
                 }
             if (pad.Daylight) PadSlopes(res, ring, z, pad.CutSlope, pad.FillSlope, ground, maxDaylight, step);
         }
@@ -341,7 +342,7 @@ public static class Grading
         return day;
     }
 
-    private static void PadSlopes(GradingResult res, List<Vec2> ring, double z, double cut, double fill, Func<Vec2, double?> ground, double maxDist, double step)
+    private static void PadSlopes(GradingResult res, List<Vec2> ring, Func<Vec2, double> zAt, double cut, double fill, Func<Vec2, double?> ground, double maxDist, double step)
     {
         var ccw = Polygon2.SignedArea(ring) > 0;
         var day = new List<Vec3>();
@@ -354,13 +355,13 @@ public static class Grading
             var n1 = ccw ? e1.PerpRight : e1.PerpLeft;
             var n2 = ccw ? e2.PerpRight : e2.PerpLeft;
             var n = (n1 + n2).Length < 1e-9 ? n1 : (n1 + n2).Normalized();
-            day.Add(Daylight(ring[i], z, n, cut, fill, ground, maxDist, step));
+            day.Add(Daylight(ring[i], zAt(ring[i]), n, cut, fill, ground, maxDist, step));
         }
         for (int i = 0; i < ring.Count; i++)
         {
             var j = (i + 1) % ring.Count;
-            var a = Vec3.At(ring[i], z);
-            var b = Vec3.At(ring[j], z);
+            var a = Vec3.At(ring[i], zAt(ring[i]));
+            var b = Vec3.At(ring[j], zAt(ring[j]));
             res.Triangles.Add((a, b, day[j]));
             res.Triangles.Add((a, day[j], day[i]));
             res.TriangleIsSlope.Add(true);

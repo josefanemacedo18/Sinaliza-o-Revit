@@ -421,15 +421,47 @@ public static class InterchangePlanner
     }
 
     /// <summary>Seção de via de um ramo: faixa única à direita do eixo (bordo esquerdo) e acostamento; mão única.</summary>
-    public static RoadSetup RampSetup(RampPlan r, bool guardrails, double speed = 50)
+    public static RoadSetup RampSetup(RampPlan r, bool guardrails, double speed = 50, bool urban = false, double sidewalk = 2.5)
     {
         var s = new RoadSetup
         {
             TwoWay = false, Center = CenterTreatment.Nenhum, Hierarchy = HierarquiaViaria.Arterial, Speed = speed, Inscriptions = true, EdgeLines = true,
         };
         s.Right.Add(new ElementoSecao { Tipo = TipoElementoSecao.FaixaRolamento, Largura = r.LaneWidth });
+        if (urban)
+        {
+            // Ramo urbano: faixa + acostamento curto, sarjeta, meio-fio e calçada do lado de fora; do lado de dentro sarjeta,
+            // meio-fio e passeio estreito (recortados onde o ramo encosta nas vias).
+            if (r.Shoulder > 0.05) s.Right.Add(new ElementoSecao { Tipo = TipoElementoSecao.Acostamento, Largura = Math.Min(r.Shoulder, 1.0) });
+            s.Right.Add(new ElementoSecao { Tipo = TipoElementoSecao.Calcada, Largura = Math.Max(1.2, sidewalk), Sarjeta = 0.30 });
+            s.Left.Add(new ElementoSecao { Tipo = TipoElementoSecao.Calcada, Largura = Math.Max(1.0, sidewalk * 0.5), Sarjeta = 0.30, FaixaServico = 0.5 });
+            return s;
+        }
         s.Right.Add(new ElementoSecao { Tipo = TipoElementoSecao.Acostamento, Largura = r.Shoulder, Dispositivo = guardrails ? "DEF" : null });
         return s;
+    }
+
+    /// <summary>
+    /// Área de pista (bordo a bordo, com as calçadas) de uma via do nó, numa faixa de ±<paramref name="reach"/> m em volta do
+    /// nó: onde os elementos laterais dos ramos (calçadas, meios-fios, sarjetas) não podem entrar.
+    /// </summary>
+    public static Polygon2? RoadStrip(PlanRoad road, Vec2 node, double reach = 600)
+    {
+        var s0 = road.Axis.Project(node).Station;
+        var a = Math.Max(0, s0 - reach);
+        var b = Math.Min(road.Axis.Length, s0 + reach);
+        if (b - a < 1) return null;
+        var left = new List<Vec2>();
+        var right = new List<Vec2>();
+        for (var s = a; s <= b + 1e-6; s += 2)
+        {
+            var p = road.Axis.PointAt(Math.Min(s, b));
+            var n = road.Axis.TangentAt(Math.Min(s, b)).PerpLeft;
+            left.Add(p + n * (road.TotalLeft + 0.05));
+            right.Add(p - n * (road.TotalRight + 0.05));
+        }
+        right.Reverse();
+        return new Polygon2(left.Concat(right));
     }
 
     /// <summary>

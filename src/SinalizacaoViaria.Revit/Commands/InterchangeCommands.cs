@@ -120,7 +120,7 @@ internal static class InterchangeBuilder
             try
             {
                 var path = CreateAxis(uidoc, r.Axis, r.BaseZ);
-                var setup = InterchangePlanner.RampSetup(r, d.Guardrails);
+                var setup = InterchangePlanner.RampSetup(r, d.Guardrails, 50, d.UrbanSection, d.SidewalkWidth);
                 var (pav, created) = RoadWorks.CreateRoad(uidoc, setup, path, r.Grade, connect: false, name: r.Name);
                 results.AddRange(created);
                 if (pav?.GroupId == null) { info.Warnings.Add($"{r.Name}: a via do ramo não pôde ser criada."); continue; }
@@ -136,10 +136,17 @@ internal static class InterchangeBuilder
                     mp.MergeEnd = r.EndLink == LigacaoRamo.Paralela;
                 }
                 var cuts = InterchangePlanner.TaperCuts(r);
-                if (cuts.Count > 0)
+                // Calçadas, meios-fios e sarjetas do ramo não entram na área das vias do nó (encostam no bordo delas).
+                var strips = d.UrbanSection ? new[] { InterchangePlanner.RoadStrip(pm, plan.Node), InterchangePlanner.RoadStrip(pc, plan.Node) }
+                    .Where(x => x != null).Cast<Polygon2>().ToList() : new List<Polygon2>();
+                if (cuts.Count > 0 || strips.Count > 0)
                 {
                     foreach (var m in members)
+                    {
                         foreach (var cut in cuts) m.Exclusions.Add(new ExclusionZone { SourceId = d.Id + ":taper", Points = cut.Outer.ToList() });
+                        if (Core.Generators.IntersectionGenerator.IsPhysical(m) || m is PlanterDefinition)
+                            foreach (var st in strips) m.Exclusions.Add(new ExclusionZone { SourceId = d.Id + ":vias", Points = st.Outer.ToList() });
+                    }
                     rampDefs.AddRange(members);
                 }
                 foreach (var (s0, s1) in r.Bridges)

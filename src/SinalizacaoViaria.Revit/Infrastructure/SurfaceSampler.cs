@@ -36,6 +36,26 @@ public sealed class GradeSampler : ISurface
     }
 }
 
+/// <summary>Superfície de um nó em nível (interseção, rotatória, cul-de-sac) costurada às vias ligadas – cota absoluta.</summary>
+public sealed class NodeSampler : ISurface
+{
+    private readonly Core.Geometry.NodeSurface _node;
+    public NodeSampler(Core.Geometry.NodeSurface node) => _node = node;
+    public Core.Geometry.NodeSurface Node => _node;
+    public bool IsAvailable => true;
+    public bool LiftsSolids => true;
+    public bool TrySample(double xFt, double yFt, double zHintFt, out double zFt, out XYZ normal)
+    {
+        var p = new Core.Geometry.Vec2(UnitConv.M(xFt), UnitConv.M(yFt));
+        var z = _node.Z(p);
+        zFt = UnitConv.Ft(z);
+        var zx = _node.Z(p + new Core.Geometry.Vec2(0.5, 0)) - z;
+        var zy = _node.Z(p + new Core.Geometry.Vec2(0, 0.5)) - z;
+        normal = new XYZ(-zx / 0.5, -zy / 0.5, 1).Normalize();
+        return true;
+    }
+}
+
 /// <summary>
 /// Projeta pontos verticalmente sobre superfícies (Toposolid, pisos, topografia) usando
 /// ReferenceIntersector, obtendo elevação e normal – permite que a sinalização acompanhe o greide.

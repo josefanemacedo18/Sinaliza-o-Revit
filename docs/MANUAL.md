@@ -396,8 +396,9 @@ partir do pavimento – confira antes de aplicar.
 
 ### 9.2 Apagar Trecho (partes da sinalização)
 Apaga **só uma parte** de uma marca sem desfazê-la – por exemplo alguns traços da linha de eixo diante de uma entrada:
-* **Clicar nas peças**: cada clique apaga o traço, seta, símbolo ou dispositivo sob o cursor (em linhas contínuas, 3 m em
-  volta do clique). ESC termina.
+* **Clicar nas peças**: clique o PONTO sobre o traço, seta, símbolo ou dispositivo (planta ou 3D) – o plugin acha a marca sob o
+  ponto, com preferência para a pintura sobre o pavimento e as calçadas (em linhas contínuas apaga 3 m em volta do clique).
+  ESC termina.
 * **Trecho entre dois pontos**: clique a marca e o início e o fim ao longo dela.
 * **Janela**: clique a marca e dois cantos – apaga tudo dela dentro do retângulo.
 * **Desativar / reativar / remover**: os trechos apagados ficam guardados na marca; **desativar** mostra a marca inteira de
@@ -1032,9 +1033,13 @@ Clique o **cruzamento de duas vias do plugin** (a de maior hierarquia/largura é
 as duas vias são criadas antes, com a ferramenta de vias.
 * **A via de cima** ganha greide (gabarito + altura estrutural, rampa máxima, platô nos terminais) e um **viaduto hospedado,
   esconso** conforme o ângulo, com pilar no canteiro quando o vão pede. A interseção em nível que existia sai.
-* **Cada ramo e laço é uma via do plugin**: eixo em spline (linha de modelo), faixa de 4 m e acostamento com **defensa**,
-  **greide que concorda com as duas vias** (desaceleração/aceleração no greide da via, rampa suavizada no meio) e
-  **superelevação** nos laços. Edite como qualquer via.
+* **Cada ramo e laço é uma via do plugin**: eixo em spline (linha de modelo), faixa de 4 m, **greide que concorda com as duas
+  vias** (desaceleração/aceleração no greide da via, rampa suavizada no meio) e **superelevação** nos laços. Edite como
+  qualquer via.
+* **Seção urbana completa** (padrão): ramos com **sarjeta, meio-fio e calçada** (externa na largura escolhida, interna
+  estreita) e as vias criadas pelo nó com calçadas dos dois lados – os elementos laterais dos ramos são recortados onde
+  encostam nas vias principal e transversal, e as calçadas destas são recortadas sob as faixas paralelas. Desmarcando, a seção
+  é rodoviária (acostamento com **defensa**).
 * **Ligações**: **faixas paralelas** de mudança de velocidade com **taper** (a pista do ramo afina até zero junto à via), com
   as calçadas, meios-fios, bordos e defensas da via **recortados** sob elas; **interseções** (PARE) nos terminais do diamante;
   **rotatórias** nos terminais do diamante com rotatórias e o **anel elevado** da rotatória em dois níveis (só com as vias no
@@ -1079,6 +1084,14 @@ Os pisos da via acompanham o greide com a edição de forma nativa, em **malha l
 ficam nessas estacas dos dois lados, as juntas entre pisos (até 40 m cada) também, e só há pontos internos no eixo do
 abaulamento. O Revit forma quadriláteros regulares, sem o emaranhado de triângulos. As curvas verticais do greide nunca se
 sobrepõem (antes, PIVs próximos geravam degraus) e têm comprimento mínimo K = 10 m por % de variação de rampa.
+
+**Interseções, rotatórias e cul-de-sacs no relevo**: o nó segue uma **superfície costurada às vias** que chegam nele – junto à
+pista de cada via a cota é a dela (greide, abaulamento, superelevação) e no miolo as vias se misturam suavemente. Pisos,
+pinturas, faixas de pedestres, retenções e rampas do nó ficam nessa superfície (sem degrau na emenda com o piso da via), e o
+nó entra na terraplenagem sempre que **qualquer via ligada** a ele molda o terreno: plataforma inclinada sob o pavimento e as
+calçadas, taludes das vias ligadas. Ao criar uma via com relevo que cruza (ou encosta em) vias existentes, o greide dela é
+**obrigado a passar na cota da outra via** no cruzamento, com uma plataforma de 12 m em nível – as duas chegam juntas à
+interseção.
 
 **Espessura do Toposolid**: o fundo do Toposolid precisa ficar abaixo do corte mais fundo – senão o Revit recusa ("o sólido
 topográfico é muito fino para seu tipo"). O plugin confere antes e, se preciso, cria um tipo "… SV +N m" com a camada mais

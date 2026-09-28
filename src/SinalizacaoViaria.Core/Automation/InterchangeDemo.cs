@@ -30,6 +30,10 @@ public static class InterchangeDemo
             for (int i = 0; i < Math.Max(1, d.CrossLanes); i++) side.Add(new ElementoSecao { Tipo = TipoElementoSecao.FaixaRolamento, Largura = d.CrossLaneWidth });
             if (d.CrossShoulder > 0.05) side.Add(new ElementoSecao { Tipo = TipoElementoSecao.Acostamento, Largura = d.CrossShoulder });
         }
+        if (d.UrbanSection)
+            // Seção urbana completa: sarjeta, meio-fio e calçada dos dois lados das duas vias.
+            foreach (var side in new[] { main.Right, main.Left, cross.Right, cross.Left })
+                side.Add(new ElementoSecao { Tipo = TipoElementoSecao.Calcada, Largura = Math.Max(1.2, d.SidewalkWidth), Sarjeta = 0.30 });
         return (main, cross);
     }
 
@@ -71,9 +75,10 @@ public static class InterchangeDemo
             GirderDepth = Math.Max(1.0, d.DeckDepth - 0.45), Barrier = TipoGuarda.NewJersey,
         };
         var corridors = new List<GradeCorridor>();
-        MarkingGeometry RoadGeo(RoadSetup s, Polyline2 axis, RoadGrade gr, List<MarkingDefinition> works, List<Polygon2>? cuts = null, bool cutPavement = true)
+        MarkingGeometry RoadGeo(RoadSetup s, Polyline2 axis, RoadGrade gr, List<MarkingDefinition> works, List<Polygon2>? cuts = null, bool cutPavement = true,
+            List<Polygon2>? sideCuts = null)
         {
-            var rg = InfraDemo.RoadWith(s, axis, gr, works, catalog, p => g(p), 6, cuts, cutPavement);
+            var rg = InfraDemo.RoadWith(s, axis, gr, works, catalog, p => g(p), 6, cuts, cutPavement, sideCuts);
             if (terrain) corridors.AddRange(InfraDemo.Corridors(s, axis, gr, works, rg));
             return rg;
         }
@@ -89,13 +94,15 @@ public static class InterchangeDemo
         if (d.Type != TipoNoViario.RotatoriaElevada) roadsForRb.Add(new IntersectionRoad(WithId(ms.PavementDefinition(), "principal"), ma));
         foreach (var r in plan.Ramps)
         {
-            var setup = InterchangePlanner.RampSetup(r, d.Guardrails);
+            var setup = InterchangePlanner.RampSetup(r, d.Guardrails, 50, d.UrbanSection, d.SidewalkWidth);
             var works = r.Bridges.Select(b => (MarkingDefinition)new BridgeDefinition
             {
                 Kind = TipoObraDeArte.Viaduto, ProfileKind = PerfilObra.GreideDaVia, HostStart = b.S0, HostEnd = b.S1, PierType = TipoPilar.Circular, PierSize = 1.1,
                 SpanLength = 25, Lighting = false, GirderDepth = 1.2,
             }).ToList();
-            geo.Merge(RoadGeo(setup, r.Axis, r.Grade, works, InterchangePlanner.TaperCuts(r)));
+            var strips = d.UrbanSection ? new[] { InterchangePlanner.RoadStrip(main, plan.Node), InterchangePlanner.RoadStrip(cross, plan.Node) }
+                .Where(x => x != null).Cast<Polygon2>().ToList() : null;
+            geo.Merge(RoadGeo(setup, r.Axis, r.Grade, works, InterchangePlanner.TaperCuts(r), true, strips));
             var rec = new RampRecord
             {
                 Group = r.Name, Name = r.Name, Role = r.Role, StartLink = r.StartLink, EndLink = r.EndLink, StartRoad = r.StartRoad, EndRoad = r.EndRoad,

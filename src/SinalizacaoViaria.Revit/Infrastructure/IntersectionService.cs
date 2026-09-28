@@ -248,6 +248,9 @@ public sealed class IntersectionService
     public List<RenderResult> Refresh(IntersectionDefinition it)
     {
         var results = new List<RenderResult>();
+        // O greide de uma via não vale para o nó (nem para os filhos: faixas, retenções, rampas): o nó segue a superfície
+        // costurada das vias que chegam nele (NodeSurface), calculada na geração.
+        it.Output.Grade = null;
         var all = MarkingStorage.Definitions(_doc);
         var roads = new List<IntersectionRoad>();
         foreach (var id in it.RoadIds)
@@ -317,6 +320,7 @@ public sealed class IntersectionService
     public List<RenderResult> Refresh(RoundaboutDefinition rb)
     {
         var results = new List<RenderResult>();
+        rb.Output.Grade = null;
         // Rotatória ligada às vias: acompanha o nó (eixos movidos) e ganha/perde ramos conforme as vias que chegam.
         if (rb.Legs.Any(l => l.GroupId != null || l.RoadId != null))
         {
@@ -445,6 +449,7 @@ public sealed class IntersectionService
     public List<RenderResult> Refresh(CulDeSacDefinition c)
     {
         var results = new List<RenderResult>();
+        c.Output.Grade = null;
         var roads = Roads();
         var road = roads.FirstOrDefault(r => r.Def.Id == c.RoadId);
         if (road == null) { Remove(c); return results; }

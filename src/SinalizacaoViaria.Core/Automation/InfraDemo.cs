@@ -14,13 +14,18 @@ public static class InfraDemo
 
     /// <summary>Geometria da via (seção <paramref name="setup"/>, greide) + obras hospedadas no mesmo eixo.</summary>
     public static MarkingGeometry RoadWith(RoadSetup setup, Polyline2 axis, RoadGrade grade, IEnumerable<MarkingDefinition> hosted, Catalog.Catalogo catalog,
-        Func<Vec2, double?>? ground = null, double chunk = 3, IReadOnlyList<Polygon2>? cuts = null, bool cutPavement = true)
+        Func<Vec2, double?>? ground = null, double chunk = 3, IReadOnlyList<Polygon2>? cuts = null, bool cutPavement = true,
+        IReadOnlyList<Polygon2>? sideCuts = null)
     {
         var output = new OutputSettings { Grade = grade.Clone() };
         var defs = setup.Build(PathReference.FromPoints(axis.Points, 0), output, catalog, DemoGroup);
         if (cuts != null)
             foreach (var d in defs.Where(x => cutPavement || x is not (RoadPavementDefinition or DeviceMarkingDefinition)))
                 foreach (var c in cuts) d.Exclusions.Add(new ExclusionZone { SourceId = "demo", Points = c.Outer.ToList() });
+        // Elementos laterais (calçada, meio-fio, sarjeta) fora da área de outras vias – como no Revit.
+        if (sideCuts != null)
+            foreach (var d in defs.Where(x => Generators.IntersectionGenerator.IsPhysical(x) || x is PlanterDefinition))
+                foreach (var c in sideCuts) d.Exclusions.Add(new ExclusionZone { SourceId = "demo-vias", Points = c.Outer.ToList() });
         var works = hosted.ToList();
         foreach (var w in works)
         {

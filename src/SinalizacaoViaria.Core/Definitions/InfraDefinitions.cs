@@ -698,6 +698,13 @@ public sealed class InterchangeDefinition : MarkingDefinition, ITerrainAware
     public bool HighMasts { get; set; } = true;
     /// <summary>Defensas metálicas nos aterros altos dos ramos.</summary>
     public bool Guardrails { get; set; } = true;
+    /// <summary>
+    /// Seção urbana completa nos ramos e nas vias criadas pelo nó: sarjeta, meio-fio e calçada (como qualquer via do plugin),
+    /// recortados onde encostam nas outras vias. Falso = seção rodoviária (acostamento e defensa).
+    /// </summary>
+    public bool UrbanSection { get; set; } = true;
+    /// <summary>Largura da calçada externa dos ramos e das vias criadas (m).</summary>
+    public double SidewalkWidth { get; set; } = 2.5;
     public bool FollowTerrain { get; set; } = true;
     public bool AdjustTerrain { get; set; } = true;
     public List<Vec2>? GroundLine { get; set; }

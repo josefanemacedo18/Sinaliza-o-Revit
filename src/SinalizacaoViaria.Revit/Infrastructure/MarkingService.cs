@@ -191,9 +191,41 @@ public sealed class MarkingService
     /// <summary>Greide da via como superfície de apoio de pisos e pinturas (nulo = sem greide).</summary>
     private ISurface? GradeFor(MarkingDefinition def, double baseZ)
     {
+        if (def.Output.Mode == OutputMode.Modelo3D && NodeFor(def) is { } node) return new NodeSampler(node);
         if (!Graded(def)) return null;
         var axis = PathResolver.Resolve(_doc, def.Path)?.Main;
         return axis == null ? null : new GradeSampler(new GradeSurface(axis, def.Output.Grade!), baseZ);
+    }
+
+    /// <summary>
+    /// Superfície do nó (interseção, rotatória, cul-de-sac – e as marcas filhas deles) costurada ao greide das vias ligadas;
+    /// nulo quando nenhuma via ligada tem greide (o nó fica plano, como antes).
+    /// </summary>
+    public NodeSurface? NodeFor(MarkingDefinition def)
+    {
+        var defs = Definitions;
+        var owner = def is IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition ? def
+            : defs.Values.FirstOrDefault(o => o is IntersectionDefinition i && i.ChildIds.Contains(def.Id) || o is RoundaboutDefinition r && r.ChildIds.Contains(def.Id));
+        if (owner == null) return null;
+        IEnumerable<string?> ids = owner switch
+        {
+            IntersectionDefinition it => it.RoadIds,
+            RoundaboutDefinition rb => rb.Legs.Select(l => l.RoadId),
+            CulDeSacDefinition c => new[] { c.RoadId },
+            _ => Array.Empty<string?>(),
+        };
+        var legs = new List<NodeSurface.Leg>();
+        foreach (var id in ids.Where(x => x != null).Distinct())
+        {
+            if (!defs.TryGetValue(id!, out var d) || d is not RoadPavementDefinition pav) continue;
+            var path = PathResolver.Resolve(_doc, pav.Path);
+            if (path?.Main == null || path.Main.Points.Count < 2) continue;
+            var grade = pav.Output.Grade ?? RoadGrade.Flat(path.Main.Length);
+            legs.Add(new NodeSurface.Leg(new GradeSurface(path.Main, grade), path.Z, Math.Max(1, Math.Max(pav.LeftWidth, pav.RightWidth))));
+        }
+        if (legs.Count == 0) return null;
+        var node = new NodeSurface(legs);
+        return node.IsFlat ? null : node;
     }
 
     private Func<Vec2, double?>? _ground;

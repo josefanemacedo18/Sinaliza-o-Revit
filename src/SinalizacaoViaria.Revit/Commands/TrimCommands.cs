@@ -71,16 +71,18 @@ public sealed class CmdApagarTrecho : CommandBase
         var count = 0;
         while (true)
         {
-            var hit = PickAt(uidoc, "Apagar trecho: clique no traço/peça a apagar – ESC termina");
-            if (hit == null) break;
-            var (stored, p) = hit.Value;
-            var def = changed.TryGetValue(stored.MarkingId, out var d0) ? d0 : stored.Definition;
-            var zone = PieceZone(uidoc, def, p);
-            if (zone == null)
+            // Clique de PONTO (na planta o clique de elemento nem sempre traz a coordenada): a marca é achada sob o ponto,
+            // dando preferência à pintura/dispositivo sobre o pavimento e as calçadas.
+            var xyz = Picking.PickPoint(uidoc, "Apagar trecho: clique sobre o traço/peça a apagar – ESC termina");
+            if (xyz == null) break;
+            var p = UnitConv.ToVec2(xyz);
+            var found = FindAt(uidoc, p, changed);
+            if (found == null)
             {
-                TaskDialog.Show(AppTitle, "Nenhuma peça da marca sob o ponto clicado (clique sobre a pintura/peça).");
+                TaskDialog.Show(AppTitle, "Nenhuma sinalização sob o ponto clicado – clique sobre a pintura (traço, seta, faixa) ou o dispositivo.");
                 continue;
             }
+            var (def, zone) = found.Value;
             def.Exclusions.Add(zone);
             changed[def.Id] = def;
             count++;
@@ -90,17 +92,49 @@ public sealed class CmdApagarTrecho : CommandBase
         return count > 0 ? Result.Succeeded : Result.Cancelled;
     }
 
-    /// <summary>Recorte da peça sob o ponto: o contorno dela com 3 cm de folga.</summary>
-    private static ExclusionZone? PieceZone(UIDocument uidoc, MarkingDefinition def, Vec2 p)
+    /// <summary>
+    /// Marca e recorte sob o ponto: procura entre as marcas cujos elementos cobrem o ponto; pinturas e dispositivos têm
+    /// prioridade sobre pavimento, calçadas e meios-fios (que ficam por baixo).
+    /// </summary>
+    private static (MarkingDefinition Def, ExclusionZone Zone)? FindAt(UIDocument uidoc, Vec2 p, Dictionary<string, MarkingDefinition> changed)
     {
-        var service = new MarkingService(uidoc.Document, uidoc.ActiveView);
-        MarkingGeometry geo;
-        try { geo = service.BuildGeometry(def, out _); }
-        catch (Exception ex) { Log.Error("Apagar trecho – geometria", ex); return null; }
-        // A peça que contém o ponto; senão a mais próxima até 0,5 m (peças finas como linhas de bordo).
-        var piece = geo.Pieces.Where(x => x.Shape.Contains(p)).OrderBy(x => x.Shape.Area).FirstOrDefault()
-                    ?? geo.Pieces.Select(x => (P: x, D: x.Shape.DistanceTo(p))).Where(t => t.D < 0.5).OrderBy(t => t.D).Select(t => t.P).FirstOrDefault();
-        if (piece == null) return null;
+        var doc = uidoc.Document;
+        var service = new MarkingService(doc, uidoc.ActiveView);
+        var cands = new List<MarkingDefinition>();
+        foreach (var g in MarkingStorage.All(doc).GroupBy(r => r.MarkingId))
+        {
+            var hit = g.Any(r =>
+            {
+                var bb = r.Element.get_BoundingBox(null) ?? r.Element.get_BoundingBox(uidoc.ActiveView);
+                if (bb == null) return false;
+                return UnitConv.M(bb.Min.X) - 0.5 <= p.X && p.X <= UnitConv.M(bb.Max.X) + 0.5 && UnitConv.M(bb.Min.Y) - 0.5 <= p.Y && p.Y <= UnitConv.M(bb.Max.Y) + 0.5;
+            });
+            if (hit) cands.Add(changed.TryGetValue(g.Key, out var d) ? d : g.First().Definition);
+        }
+        (MarkingDefinition Def, MarkingPiece Piece, int Rank, double Dist)? best = null;
+        foreach (var def in cands)
+        {
+            if (def is IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or IAnnotationDefinition) continue;
+            MarkingGeometry geo;
+            try { geo = service.BuildGeometry(def, out _); }
+            catch (Exception ex) { Log.Error("Apagar trecho – geometria", ex); continue; }
+            var rank = def is RoadPavementDefinition ? 3 : Core.Generators.IntersectionGenerator.IsPhysical(def) ? 2 : 0;
+            foreach (var pc in geo.Pieces)
+            {
+                var dist = pc.Shape.Contains(p) ? 0 : pc.Shape.DistanceTo(p);
+                if (dist > 0.4) continue;
+                var cand = (def, pc, rank, dist + pc.Shape.Area * 1e-4);
+                if (best == null || (cand.rank, cand.Item4) .CompareTo((best.Value.Rank, best.Value.Dist)) < 0) best = cand;
+            }
+        }
+        if (best == null) return null;
+        var zone = ZoneOf(best.Value.Piece, p);
+        return zone == null ? null : (best.Value.Def, zone);
+    }
+
+    /// <summary>Recorte da peça sob o ponto: o contorno dela com 3 cm de folga.</summary>
+    private static ExclusionZone? ZoneOf(MarkingPiece piece, Vec2 p)
+    {
         var shape = piece.Shape;
         // Peça muito longa (linha contínua): apaga só 3 m em volta do clique, ao longo da peça.
         var (mn, mx) = shape.Bounds;

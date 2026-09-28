@@ -68,19 +68,28 @@ public static class TerrainService
 {
     /// <summary>Faixas e plataformas de projeto de uma marca (cotas absolutas, m).</summary>
     public static (List<GradeCorridor> Corridors, List<GradePad> Pads) Features(Document doc, MarkingDefinition def, MarkingGeometry geo, double baseZ, GradingOptions opt,
-        IReadOnlyCollection<MarkingDefinition>? all = null)
+        IReadOnlyCollection<MarkingDefinition>? all = null, MarkingService? service = null)
     {
         var corridors = new List<GradeCorridor>();
         var pads = new List<GradePad>();
         var z0 = baseZ + def.Output.ElevationOffset;
         foreach (var c in geo.Corridors)
         {
-            var a = new GradeCorridor { CutSlope = c.CutSlope, FillSlope = c.FillSlope, DaylightLeft = c.DaylightLeft, DaylightRight = c.DaylightRight, Label = c.Label };
+            // Todas as marcações da faixa vão junto (degraus de muro, testa de emboque, saia) – não só os taludes.
+            var a = new GradeCorridor
+            {
+                CutSlope = c.CutSlope, FillSlope = c.FillSlope, DaylightLeft = c.DaylightLeft, DaylightRight = c.DaylightRight, Label = c.Label,
+                WallLeft = c.WallLeft, WallRight = c.WallRight, WallStart = c.WallStart, WallEnd = c.WallEnd, WallCap = c.WallCap, EndSpill = c.EndSpill,
+            };
             a.Left.AddRange(c.Left.Select(p => p with { Z = p.Z + baseZ }));
             a.Right.AddRange(c.Right.Select(p => p with { Z = p.Z + baseZ }));
             corridors.Add(a);
         }
-        pads.AddRange(geo.Pads.Select(p => new GradePad(p.Area, p.Z + baseZ) { CutSlope = p.CutSlope, FillSlope = p.FillSlope, Daylight = p.Daylight, Label = p.Label }));
+        pads.AddRange(geo.Pads.Select(p => new GradePad(p.Area, p.Z + baseZ)
+        {
+            CutSlope = p.CutSlope, FillSlope = p.FillSlope, Daylight = p.Daylight, Label = p.Label,
+            ZAt = p.ZAt == null ? null : q => p.ZAt(q) + baseZ,
+        }));
         switch (def)
         {
             case RoadPavementDefinition road when PathResolver.Resolve(doc, road.Path)?.Main is { } axis:
@@ -102,14 +111,39 @@ public static class TerrainService
             }
             case IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition:
             {
-                // Conexões: plataforma plana com o contorno de todas as peças.
+                // Conexões: plataforma com o contorno de todas as peças (calçadas incluídas), na superfície costurada ao greide das
+                // vias que chegam (plana quando nenhuma tem greide), sob a estrutura do pavimento.
+                var node = service?.NodeFor(def);
                 var union = Core.Geometry.PolygonOps.Union(geo.Pieces.Where(p => p.Elevation < 0.5).Select(p => p.Shape));
+                var (cutS, fillS) = RoadSlopes(def, all, opt);
                 foreach (var u in union.Where(u => u.Area > 1))
-                    pads.Add(new GradePad(u, z0 - opt.Subgrade) { CutSlope = opt.CutSlope, FillSlope = opt.FillSlope, Label = def.KindName });
+                    pads.Add(new GradePad(u, z0 - opt.Subgrade)
+                    {
+                        CutSlope = cutS, FillSlope = fillS, Label = def.KindName,
+                        ZAt = node == null ? null : q => node.Z(q) - opt.Subgrade,
+                    });
                 break;
             }
         }
         return (corridors, pads);
+    }
+
+    /// <summary>Vias ligadas a um nó (interseção, rotatória, cul-de-sac).</summary>
+    public static IEnumerable<string> NodeRoads(MarkingDefinition d) => (d switch
+    {
+        IntersectionDefinition it => it.RoadIds.Cast<string?>(),
+        RoundaboutDefinition rb => rb.Legs.Select(l => l.RoadId),
+        CulDeSacDefinition c => new[] { c.RoadId },
+        _ => Enumerable.Empty<string?>(),
+    }).Where(x => x != null).Cast<string>();
+
+    /// <summary>Taludes do nó: os das vias ligadas (o mais suave), senão os padrões.</summary>
+    private static (double Cut, double Fill) RoadSlopes(MarkingDefinition d, IReadOnlyCollection<MarkingDefinition>? all, GradingOptions opt)
+    {
+        var ids = NodeRoads(d).ToHashSet();
+        var grades = (all ?? Array.Empty<MarkingDefinition>()).OfType<RoadPavementDefinition>().Where(r => ids.Contains(r.Id) && r.Output.Grade != null)
+            .Select(r => r.Output.Grade!).ToList();
+        return grades.Count == 0 ? (opt.CutSlope, opt.FillSlope) : (grades.Max(g => g.CutSlope), grades.Max(g => g.FillSlope));
     }
 
     /// <summary>Marcas que podem participar da terraplenagem.</summary>
@@ -122,18 +156,15 @@ public static class TerrainService
     /// </summary>
     public static List<MarkingDefinition> Participants(Document doc, IReadOnlyCollection<MarkingDefinition> all)
     {
-        var roads = all.OfType<RoadPavementDefinition>().Where(r => r.Output.Grade is { AdjustTerrain: true }).ToList();
-        var ends = new List<Vec2>();
-        foreach (var r in roads)
-            if (PathResolver.Resolve(doc, r.Path)?.Main is { } ax) { ends.Add(ax.Points[0]); ends.Add(ax.Points[^1]); }
-        bool NearGraded(Vec2 p) => ends.Any(e => e.DistanceTo(p) < 40);
+        _ = doc;
+        // Nós (interseções, rotatórias, cul-de-sacs) moldam o terreno quando QUALQUER via ligada a eles molda – antes só os
+        // que ficavam perto das pontas das vias entravam, e os cruzamentos no meio das vias ficavam sem corte/aterro.
+        var graded = all.OfType<RoadPavementDefinition>().Where(r => r.Output.Grade is { AdjustTerrain: true }).Select(r => r.Id).ToHashSet();
         return all.Where(d => d switch
         {
             ITerrainAware t => t.AdjustTerrain,
-            RoadPavementDefinition r => r.Output.Grade is { AdjustTerrain: true },
-            IntersectionDefinition it => NearGraded(it.Node),
-            RoundaboutDefinition rb => NearGraded(rb.Center),
-            CulDeSacDefinition => false,
+            RoadPavementDefinition r => graded.Contains(r.Id),
+            IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition => NodeRoads(d).Any(graded.Contains),
             DrainageDefinition => true,
             _ => false,
         }).ToList();
@@ -185,7 +216,7 @@ public static class TerrainService
             try
             {
                 var geo = service.BuildGeometry(def, out var baseZ);
-                var (c, p) = Features(doc, def, geo, baseZ, opt, all);
+                var (c, p) = Features(doc, def, geo, baseZ, opt, all, service);
                 corridors.AddRange(c);
                 pads.AddRange(p);
                 finishes.AddRange(geo.TerrainFinishes.Select(f => (f.Area, f.Color, def.Id)));

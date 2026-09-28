@@ -214,6 +214,43 @@ public class V22Tests
     }
 
     [Fact]
+    public void NodeSurface_MatchesEachRoadAtItsPavement()
+    {
+        // Via A (x) em rampa de 4 %, via B (y) em nível 1 m acima da base de A; cruzam em (100, 0).
+        var a = new GradeSurface(Straight(200), new RoadGrade { Crossfall = 0.02, Points = { new(0, -3), new(200, 5) } });
+        var b = new GradeSurface(new Polyline2(new[] { new Vec2(100, -100), new Vec2(100, 100) }), new RoadGrade { Points = { new(0, 1), new(200, 1) } });
+        var node = new NodeSurface(new[] { new NodeSurface.Leg(a, 0, 7), new NodeSurface.Leg(b, 0, 7) });
+        // Na pista de A, longe de B: a cota é a de A (com o abaulamento).
+        Assert.Equal(a.Z(new Vec2(60, 3)), node.Z(new Vec2(60, 3)), 1);
+        // Na pista de B, longe de A: a cota é a de B.
+        Assert.Equal(1, node.Z(new Vec2(100, 40)), 1);
+        // No centro: entre as duas (as duas passam por 1 m ali).
+        Assert.Equal(1, node.Z(new Vec2(100, 0)), 1);
+        // Contínua (sem degraus) em toda a área do nó.
+        for (var x = 70.0; x < 130; x += 1)
+            for (var y = -30.0; y < 30; y += 1)
+                Assert.True(Math.Abs(node.Z(new Vec2(x + 0.5, y)) - node.Z(new Vec2(x, y))) < 0.12);
+    }
+
+    [Fact]
+    public void GradedPad_FollowsNodeSurface()
+    {
+        var pad = new GradePad(Polygon2.Rectangle(new Vec2(-10, -10), new Vec2(10, 10)), 0) { ZAt = p => 0.05 * p.X };
+        var design = Grading.Design(Array.Empty<GradeCorridor>(), new[] { pad }, _ => 0);
+        Assert.Equal(0.25, design.DesignZ(new Vec2(5, 0)) ?? double.NaN, 6);
+        Assert.Equal(-0.25, design.DesignZ(new Vec2(-5, 3)) ?? double.NaN, 6);
+    }
+
+    [Fact]
+    public void Profile_FixedPointsPinCrossings()
+    {
+        var o = RoadProfileDesigner.ForRelief(RelevoVia.GreideSuavizado, 0.06, 1, 1.5);
+        o.Fixed.Add(new Vec2(150, 7.5));
+        var r = RoadProfileDesigner.Design(300, s => 3 * Math.Sin(s / 50), o);
+        Assert.Equal(7.5, r.Grade.Z(150), 1);
+    }
+
+    [Fact]
     public void ManualExclusion_CanBeDisabled()
     {
         var cat = CatalogService.LoadDefault();

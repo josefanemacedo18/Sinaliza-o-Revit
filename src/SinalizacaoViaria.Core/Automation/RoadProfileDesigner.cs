@@ -58,6 +58,13 @@ public sealed class PerfilOpcoes
     public double CutSlope { get; set; } = 1.0;
     public double FillSlope { get; set; } = 1.5;
 
+    /// <summary>
+    /// Pontos obrigados (estaca, cota relativa): cruzamentos e entroncamentos com vias existentes – o greide passa exatamente
+    /// na cota da outra via ali, concordando suavemente numa janela de <see cref="FixedBlend"/> m.
+    /// </summary>
+    public List<Vec2> Fixed { get; set; } = new();
+    public double FixedBlend { get; set; } = 40;
+
     // ---- obras automáticas
     public bool AutoStructures { get; set; } = true;
     /// <summary>Aterro acima deste valor vira viaduto/ponte (m).</summary>
@@ -195,9 +202,26 @@ public static class RoadProfileDesigner
                 }
                 sm[0] = z0;
                 sm[^1] = z1;
+                // Cruzamentos com vias existentes: o greide é puxado para a cota delas (concordância em cosseno).
+                foreach (var f in o.Fixed)
+                    for (int i = 0; i < ss.Count; i++)
+                    {
+                        var d = Math.Abs(ss[i] - f.X);
+                        if (d >= o.FixedBlend) continue;
+                        var wf = 0.5 + 0.5 * Math.Cos(Math.PI * d / o.FixedBlend);
+                        sm[i] = sm[i] * (1 - wf) + f.Y * wf;
+                    }
                 var z = LimitGrade(ss, sm, g);
                 var pts = DouglasPeucker(ss.Select((s, i) => new Vec2(s, z[i])).ToList(), 0.25);
                 foreach (var p in pts) grade.Points.Add(new GradePoint(p.X, p.Y));
+                // Plataforma de 12 m em nível no cruzamento (a cota é exata ali e a interseção fica sem rampa no miolo).
+                foreach (var f in o.Fixed.Where(f => f.X > 0.5 && f.X < L - 0.5))
+                {
+                    grade.Points.RemoveAll(q => Math.Abs(q.S - f.X) < 8);
+                    if (f.X - 6 > 0.5) grade.Points.Add(new GradePoint(f.X - 6, f.Y));
+                    grade.Points.Add(new GradePoint(f.X, f.Y));
+                    if (f.X + 6 < L - 0.5) grade.Points.Add(new GradePoint(f.X + 6, f.Y));
+                }
                 grade.Normalize();
                 break;
             }
