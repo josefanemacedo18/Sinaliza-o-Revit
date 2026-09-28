@@ -72,9 +72,11 @@ public abstract class CommandBase : IExternalCommand
         var sb = new StringBuilder();
         foreach (var w in warnings.Take(25)) sb.AppendLine("• " + w);
         if (warnings.Count > 25) sb.AppendLine($"… e mais {warnings.Count - 25} aviso(s).");
+        var title = $"{action}: {results.Count} marca(s), {created} elemento(s), {UiHelpers.F(area)} m² pintados.";
+        if (Notify.Quiet) { if (warnings.Count > 0) Notify.Show(title + "\n" + sb); return; }
         var td = new TaskDialog(AppTitle)
         {
-            MainInstruction = $"{action}: {results.Count} marca(s), {created} elemento(s), {UiHelpers.F(area)} m² pintados.",
+            MainInstruction = title,
             MainContent = warnings.Count > 0 ? "Avisos:\n" + sb : "Concluído sem avisos.",
         };
         td.Show();

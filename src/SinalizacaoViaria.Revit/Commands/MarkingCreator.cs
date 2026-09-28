@@ -217,6 +217,6 @@ public static class MarkingCreator
     {
         var warnings = results.SelectMany(r => r.Warnings).Distinct().ToList();
         if (warnings.Count == 0) return;
-        TaskDialog.Show(CommandBase.AppTitle, $"{action} – avisos:\n\n" + string.Join("\n", warnings.Take(20).Select(w => "• " + w)));
+        Notify.Show($"{action} – avisos:\n\n" + string.Join("\n", warnings.Take(20).Select(w => "• " + w)));
     }
 }

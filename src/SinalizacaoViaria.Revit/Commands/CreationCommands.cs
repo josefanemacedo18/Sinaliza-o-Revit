@@ -37,18 +37,36 @@ public class CmdSinalizarVia : CommandBase
 
         var defs = w.BuildDefinitions(path);
         RoadSetup.ApplyAxisRadius(defs, w.CurveRadius);
+        var opt = new RoadCreation(w.AutoIntersect, w.Connection, w.FreeEnds, w.IntersectionCrosswalks, w.CornerRadius, w.IntersectionRamps && w.IntersectionCrosswalks,
+            w.Relief, w.OutputSettings);
+        var results = Create(uidoc, defs, opt, w.Setup.Warnings);
+        if (snapped.Count > 0 && results.Count > 0)
+            results[0].Warnings.Insert(0, "Conexões: " + string.Join("; ", snapped.Distinct()) + ".");
+        Report("Via", results);
+        return Result.Succeeded;
+    }
+
+    /// <summary>Opções da criação de uma via (as mesmas da janela Via).</summary>
+    internal sealed record RoadCreation(bool AutoIntersect, TipoConexao Connection, FimLivre FreeEnds, bool Crosswalks, double? CornerRadius, bool Ramps,
+        RelevoVia Relief, OutputSettings Output);
+
+    /// <summary>
+    /// Gera uma via já montada (definições da seção): pista, conexões às vias existentes, elementos junto ao bordo e o relevo.
+    /// </summary>
+    internal static List<RenderResult> Create(UIDocument uidoc, List<MarkingDefinition> defs, RoadCreation w, IReadOnlyList<string>? setupWarnings = null)
+    {
         // Mesma sequência da ferramenta Pista: primeiro a pista (pavimento, linhas, dispositivos), depois as conexões e, por fim,
         // calçadas, meios-fios, sarjetas e canteiros junto ao bordo – assim uma falha num elemento externo não impede a conexão.
         var outer = defs.Where(IsEdgeElement).ToList();
         var core = defs.Where(d => !outer.Contains(d)).ToList();
         var results = MarkingCreator.Commit(uidoc, core, "SV - Via");
-        if (w.Setup.Warnings.Count > 0 && results.Count > 0) results[0].Warnings.InsertRange(0, w.Setup.Warnings);
+        if (setupWarnings is { Count: > 0 } && results.Count > 0) results[0].Warnings.InsertRange(0, setupWarnings);
         if (defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav && (w.AutoIntersect || w.FreeEnds != Core.Automation.FimLivre.Nenhum))
         {
-            var template = IntersectionService.AutoTemplate(w.IntersectionCrosswalks);
+            var template = IntersectionService.AutoTemplate(w.Crosswalks);
             template.CornerRadius = w.CornerRadius ?? template.CornerRadius;
-            template.Ramps = w.IntersectionRamps && w.IntersectionCrosswalks;
-            template.Output = w.OutputSettings.Clone();
+            template.Ramps = w.Ramps;
+            template.Output = w.Output.Clone();
             var rb = UiHelpers.Remembered<RoundaboutDefinition>("Rotatoria") ?? new RoundaboutDefinition();
             var cds = UiHelpers.Remembered<CulDeSacDefinition>(nameof(CulDeSacDefinition)) ?? new CulDeSacDefinition();
             try
@@ -89,10 +107,7 @@ public class CmdSinalizarVia : CommandBase
                 results[^1].Warnings.Add("Não foi possível ajustar a via ao terreno: " + ex.Message);
             }
         }
-        if (snapped.Count > 0 && results.Count > 0)
-            results[0].Warnings.Insert(0, "Conexões: " + string.Join("; ", snapped.Distinct()) + ".");
-        Report("Via", results);
-        return Result.Succeeded;
+        return results;
     }
 
     /// <summary>Elementos da seção fora da pista dos veículos (o que a ferramenta Pista deixa para "junto ao bordo").</summary>

@@ -65,19 +65,24 @@ public partial class CrosswalkWindow : Window
     };
 
     /// <summary>Largura total ocupada pela faixa e largura da LRE (para posicionar a retenção).</summary>
-    public (double Crosswalk, double StopLine) Widths(CrosswalkSetup s)
+    public (double Crosswalk, double StopLine) Widths(CrosswalkSetup s) => Widths(_cat, s);
+
+    public static (double Crosswalk, double StopLine) Widths(Core.Catalog.Catalogo cat, CrosswalkSetup s)
     {
-        var t = _cat.Linear(s.CrosswalkCode);
+        var t = cat.Linear(s.CrosswalkCode);
         var v = t?.Variante(s.CrosswalkVariant);
         var cw = v == null ? 4.0 : LinearPatternGenerator.Footprint(v, s.CrosswalkWidth);
-        var lre = _cat.Linear("LRE")?.Variante(s.StopLineVariant);
+        var lre = cat.Linear("LRE")?.Variante(s.StopLineVariant);
         var sw = lre?.Faixas.FirstOrDefault()?.Largura ?? 0.4;
         return (cw, sw);
     }
 
-    public List<MarkingDefinition> BuildDefinitions(CrosswalkSetup s, OutputSettings o, Vec2 a, Vec2 b, double z)
+    public List<MarkingDefinition> BuildDefinitions(CrosswalkSetup s, OutputSettings o, Vec2 a, Vec2 b, double z) => Build(_cat, s, o, a, b, z);
+
+    /// <summary>Faixa de pedestres (e retenções) entre os bordos A e B – a mesma montagem da janela.</summary>
+    public static List<MarkingDefinition> Build(Core.Catalog.Catalogo cat, CrosswalkSetup s, OutputSettings o, Vec2 a, Vec2 b, double z)
     {
-        var (cw, sw) = Widths(s);
+        var (cw, sw) = Widths(cat, s);
         return s.Build(a, b, z, o, cw, sw);
     }
 

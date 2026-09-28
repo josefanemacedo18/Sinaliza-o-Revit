@@ -431,6 +431,30 @@ desfazer a marca (pavimento, calçadas, placas e dispositivos não entram).
 
 ---
 
+### 9.3 Autoteste (diagnóstico de todas as ferramentas)
+
+Guia **SinalizaBIM → Editar → Autoteste**. Roda sozinho, sem janelas, as ferramentas do plugin numa **área de teste**
+criada 400 m à direita de tudo o que existe no projeto:
+
+| Bloco | O que é testado |
+|---|---|
+| Vias | os 10 modelos de seção, via em curva/S, Pista ligada a outra via |
+| Conexões | interseção em cruz, T, esconsa, avenida × local; controles (PARE, preferência, semáforo), ilhas físicas/pintadas, ilhas de conversão, bolsões, raios pequeno/grande; conversão em rotatória; rotatórias de todos os tipos; cul-de-sac de todos os tipos e automático |
+| Horizontal | todas as linhas do catálogo com todas as variantes, zebrados (área, faixa, com furo), setas, legendas, vagas, inscrições, MAC, canalização, ciclovias, faixas de pedestres sobre a via, cruzamento rodoferroviário |
+| Vertical | dispositivos, placas (catálogo completo ou amostra), tipos de suporte, mobiliário (ponto e linha), famílias classificadas |
+| Calçadas | rampas (todos os tipos, com recorte), orelha, áreas de calçada, canteiros, moderação, piso tátil, via férrea, drenagem (todos os tipos e em série) |
+| Topografia | Toposolid de teste com encosta, dois morros e um vale; vias acompanhando o terreno e suavizadas; cruzamentos no relevo; Perfil da Via em todos os modos e aplicado com obras automáticas |
+| Obras | viaduto sobre outra via, ponte no vale, passarela, túnel, trincheira, muros (todos), taludes, nós viários, terraplenagem (simulação, aplicação, mapa) |
+| Edição | editar linha/interseção/rotatória, mover eixo (atualização automática), Apagar Trecho (na via, fora da via, zebrado, sem linha de referência, devolver peças), 2D/3D, excluir, Atualizar Todas |
+| Detalhamento | detalhe de placas, anotação, legenda, cota de seção + perfil, detalhe típico, quadros, notas, norte, eixos, quantitativos e tabelas |
+| Verificações | pintura escondida sob o piso ou flutuando, buracos e degraus entre pisos da pista, terreno acima da pista ou sem encostar na seção, estruturas invadindo outras vias, formas sem geometria |
+
+Cada erro do plugin (inclusive os que antes só iam para o log), cada erro/aviso do Revit e cada verificação que falha
+entram no relatório, salvo em `%AppData%\SinalizaBIM\autoteste-AAAAMMDD-HHMMSS.txt` (gravado a cada etapa – se o
+Revit fechar no meio, o arquivo mostra onde parou). Tudo acontece dentro de um único Desfazer: no fim escolha
+**Desfazer tudo** (recomendado) ou **Manter** para olhar as vistas "SV Autoteste" (planta e 3D). O teste completo leva de
+10 a 40 minutos; o progresso aparece na barra de status do Revit.
+
 ## 10. Quantitativos
 
 **Miniaturas.** Cada linha mostra a **imagem da própria sinalização**, não do trecho do projeto: a face da placa, um

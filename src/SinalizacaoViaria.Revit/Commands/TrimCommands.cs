@@ -26,8 +26,39 @@ public sealed class CmdApagarTrecho : CommandBase
         var stored = Preselected(uidoc) ?? Pick(uidoc);
         if (stored == null) return Result.Cancelled;
         var def = stored.Definition;
+        var (geo, fromModel, warnings) = Pieces(uidoc, stored);
+        if (geo.Pieces.Count == 0)
+        {
+            TaskDialog.Show(AppTitle, "Não foi possível ler as peças dessa marca." + (warnings.Count > 0 ? "\n\n" + string.Join("\n", warnings.Distinct()) : ""));
+            return Result.Cancelled;
+        }
+        var manual = def.Exclusions.Where(z => z.Manual).ToList();
+        var info = MarkingBuilder.Describe(def, PluginContext.Catalog);
+        var existing = manual.Where(z => z.Points.Count >= 3).Select(z => new Polygon2(z.Points)).ToList();
+        var active = manual.Count == 0 || manual.Any(z => z.Enabled);
+        var w = new TrimWindow($"{info.Code} – {info.Name}", geo, existing, active);
+        if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
+        var (results, direct) = Apply(uidoc, stored, fromModel, w.Zones, w.Active);
+        if (fromModel)
+        {
+            TaskDialog.Show(AppTitle, $"Apagar trecho: {direct} peça(s) recortada(s) direto no modelo.\n\n" +
+                "Esta marca perdeu a linha de referência, por isso o recorte foi aplicado aos elementos (não é possível devolver as peças " +
+                "depois – use Desfazer, Ctrl+Z, se precisar). Para voltar a editar pelos parâmetros, recrie a marca sobre uma linha.");
+            return Result.Succeeded;
+        }
+        ReportResults("Apagar trecho", results);
+        return Result.Succeeded;
+    }
 
-        // Geometria da marca SEM os recortes manuais (para poder devolver peças apagadas antes).
+    /// <summary>
+    /// Peças da marca SEM os recortes manuais (para poder devolver peças apagadas antes). Sem peças calculadas (caminho não
+    /// resolvido, marca antiga...), as peças são lidas dos elementos do modelo – cada traço/seta é um sólido próprio na
+    /// forma direta (ou uma região preenchida no 2D).
+    /// </summary>
+    internal static (MarkingGeometry Geo, bool FromModel, List<string> Warnings) Pieces(UIDocument uidoc, StoredMarking stored)
+    {
+        var doc = uidoc.Document;
+        var def = stored.Definition;
         var service = new MarkingService(doc, uidoc.ActiveView);
         var manual = def.Exclusions.Where(z => z.Manual).ToList();
         def.Exclusions.RemoveAll(z => z.Manual);
@@ -41,39 +72,22 @@ public sealed class CmdApagarTrecho : CommandBase
             geo = new MarkingGeometry();
         }
         finally { def.Exclusions.AddRange(manual); }
-        // Sem peças calculadas (caminho não resolvido, marca antiga...): as peças são lidas dos elementos do modelo – cada
-        // traço/seta é um sólido próprio na forma direta (ou uma região preenchida no 2D).
-        var fromModel = false;
-        if (geo.Pieces.Count == 0)
-        {
-            Log.Info($"Apagar trecho: geometria vazia para {def.DisplayCode} ({string.Join("; ", warnings)}) – lendo os elementos do modelo.");
-            geo = ModelPieces(doc, stored.MarkingId);
-            fromModel = true;
-        }
-        if (geo.Pieces.Count == 0)
-        {
-            TaskDialog.Show(AppTitle, "Não foi possível ler as peças dessa marca." + (warnings.Count > 0 ? "\n\n" + string.Join("\n", warnings.Distinct()) : ""));
-            return Result.Cancelled;
-        }
-        var info = MarkingBuilder.Describe(def, PluginContext.Catalog);
-        var existing = manual.Where(z => z.Points.Count >= 3).Select(z => new Polygon2(z.Points)).ToList();
-        var active = manual.Count == 0 || manual.Any(z => z.Enabled);
-        var w = new TrimWindow($"{info.Code} – {info.Name}", geo, existing, active);
-        if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
+        if (geo.Pieces.Count > 0) return (geo, false, warnings);
+        Log.Info($"Apagar trecho: geometria vazia para {def.DisplayCode} ({string.Join("; ", warnings)}) – lendo os elementos do modelo.");
+        return (ModelPieces(doc, stored.MarkingId), true, warnings);
+    }
 
+    /// <summary>
+    /// Grava as áreas apagadas na marca (recortes manuais) e a regenera; marca sem caminho (linha de referência apagada) não
+    /// pode ser regenerada – o recorte é feito direto nos elementos (Direct = peças alteradas).
+    /// </summary>
+    internal static (List<RenderResult> Results, int Direct) Apply(UIDocument uidoc, StoredMarking stored, bool fromModel, IReadOnlyList<Polygon2> zones, bool active)
+    {
+        var def = stored.Definition;
         def.Exclusions.RemoveAll(z => z.Manual);
-        foreach (var z in w.Zones) def.Exclusions.Add(new ExclusionZone { Manual = true, Enabled = w.Active, Points = z.Outer.ToList() });
-        if (fromModel)
-        {
-            // Marca sem caminho (linha de referência apagada): não dá para regenerar – o recorte é feito direto nos elementos.
-            var n = TrimElements(doc, stored.MarkingId, def, w.Active ? w.Zones : Array.Empty<Polygon2>());
-            TaskDialog.Show(AppTitle, $"Apagar trecho: {n} peça(s) recortada(s) direto no modelo.\n\n" +
-                "Esta marca perdeu a linha de referência, por isso o recorte foi aplicado aos elementos (não é possível devolver as peças " +
-                "depois – use Desfazer, Ctrl+Z, se precisar). Para voltar a editar pelos parâmetros, recrie a marca sobre uma linha.");
-            return Result.Succeeded;
-        }
-        ReportResults("Apagar trecho", MarkingCreator.Commit(uidoc, new[] { def }, "SV - Apagar trecho"));
-        return Result.Succeeded;
+        foreach (var z in zones) def.Exclusions.Add(new ExclusionZone { Manual = true, Enabled = active, Points = z.Outer.ToList() });
+        if (fromModel) return (new List<RenderResult>(), TrimElements(uidoc.Document, stored.MarkingId, def, active ? zones : Array.Empty<Polygon2>()));
+        return (MarkingCreator.Commit(uidoc, new[] { def }, "SV - Apagar trecho"), 0);
     }
 
     /// <summary>

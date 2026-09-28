@@ -403,14 +403,16 @@ public sealed class CmdRotatoria : CommandBase
         UiHelpers.Remember("Rotatoria", d);
         PluginContext.SaveSettings();
 
-        var results = IntersectionRunner.Run(uidoc, "SV - Rotatória", s =>
+        Report("Rotatória", Place(uidoc, d).Where(r => r.Warnings.Count > 0).ToList());
+        return Result.Succeeded;
+    }
+
+    /// <summary>Gera a rotatória: as interseções no mesmo nó deixam de existir (a rotatória as substitui), com os recortes que faziam nas vias.</summary>
+    internal static List<RenderResult> Place(UIDocument uidoc, RoundaboutDefinition d) =>
+        IntersectionRunner.Run(uidoc, "SV - Rotatória", s =>
         {
-            // Interseções no mesmo nó deixam de existir (a rotatória as substitui), com os recortes que faziam nas vias.
-            foreach (var it in MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().Where(i => i.Node.DistanceTo(center) < d.OuterRadius + 5).ToList())
+            foreach (var it in MarkingStorage.Definitions(uidoc.Document).OfType<IntersectionDefinition>().Where(i => i.Node.DistanceTo(d.Center) < d.OuterRadius + 5).ToList())
                 s.Remove(it);
             return s.Refresh(d);
         });
-        Report("Rotatória", results.Where(r => r.Warnings.Count > 0).ToList());
-        return Result.Succeeded;
-    }
 }

@@ -107,13 +107,27 @@ public sealed class CmdPerfilVia : CommandBase
                 .Check("Substituir as obras que esta via já tem", () => _replace, v => _replace = v,
                     "As obras usam os últimos parâmetros de Viaduto/Ponte, Túnel e Trincheira (sistema, pilares, emboques, muros)."));
         if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
+        Report("Perfil da via", Apply(uidoc, road, o, _replace).Where(r => r.Warnings.Count > 0).ToList(), alwaysShow: true);
+        return Result.Succeeded;
+    }
 
-        var res = Compute();
+    /// <summary>
+    /// Aplica o perfil: greide em toda a via, obras nos trechos que o terreno pede (substituindo as da via, se
+    /// <paramref name="replace"/>) e terraplenagem. O primeiro resultado traz o resumo.
+    /// </summary>
+    internal static List<RenderResult> Apply(UIDocument uidoc, PickedRoad road, PerfilOpcoes o, bool replace)
+    {
+        var doc = uidoc.Document;
+        var L = road.Axis.Length;
+        var groundFn = RoadWorks.Ground(doc, road.BaseZ);
+        var hasTerrain = TerrainModel.Hosts(doc).Count > 0;
+        var hosted = RoadWorks.Hosted(doc, road.GroupId);
+        var res = RoadProfileDesigner.Design(L, s => hasTerrain ? groundFn(road.Axis.PointAt(s)) : road.Grade.Z(s), o);
         var baseGrade = res.Grade;
         baseGrade.AdjustTerrain = true;
         var results = new List<RenderResult>();
         var keep = hosted;
-        if (o.AutoStructures && _replace && hosted.Count > 0)
+        if (o.AutoStructures && replace && hosted.Count > 0)
         {
             using (MarkingService.RenderScope())
             using (var t = new Transaction(doc, "SV - Remover obras da via"))
@@ -171,7 +185,6 @@ public sealed class CmdPerfilVia : CommandBase
         results.Insert(0, new RenderResult());
         results[0].Warnings.Add(summary);
         results[0].Warnings.AddRange(res.Warnings);
-        Report("Perfil da via", results.Where(r => r.Warnings.Count > 0).ToList(), alwaysShow: true);
-        return Result.Succeeded;
+        return results;
     }
 }

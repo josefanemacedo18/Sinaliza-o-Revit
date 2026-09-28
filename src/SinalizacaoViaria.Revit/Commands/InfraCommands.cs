@@ -538,7 +538,7 @@ internal static class TerrainActions
         if (report == null || quiet) return;
         var important = report.Created || report.Notes.Any(n => n.StartsWith("Aviso") || n.Contains("Nenhum") || n.Contains("não"));
         if (important)
-            TaskDialog.Show(CommandBase.AppTitle, "Terreno nativo (Massa e terreno → Sólido topográfico) ajustado:\n\n" + report.Text());
+            Notify.Show("Terreno nativo (Massa e terreno → Sólido topográfico) ajustado:\n\n" + report.Text());
     }
 
     public static TerrainReport? Apply(UIDocument uidoc, IEnumerable<MarkingDefinition> defs, GradingOptions opt, string name)
@@ -560,7 +560,7 @@ internal static class TerrainActions
             var status = t.Commit();
             if (status != TransactionStatus.Committed || failures.Errors.Count > 0)
             {
-                TaskDialog.Show(CommandBase.AppTitle, "O Revit recusou o ajuste do terreno e ele foi desfeito:\n\n" + string.Join("\n", failures.Errors.Distinct()) +
+                Notify.Show("O Revit recusou o ajuste do terreno e ele foi desfeito:\n\n" + string.Join("\n", failures.Errors.Distinct()) +
                     "\n\nSe a mensagem falar em sólido \"muito fino\", aumente a espessura do tipo do Toposolid (Editar tipo → Estrutura) e rode Terraplenagem.");
                 return null;
             }
@@ -570,7 +570,7 @@ internal static class TerrainActions
         {
             Log.Error("Terraplenagem", ex);
             if (t.HasStarted() && !t.HasEnded()) t.RollBack();
-            TaskDialog.Show(CommandBase.AppTitle, "Não foi possível ajustar o terreno: " + ex.Message);
+            Notify.Show("Não foi possível ajustar o terreno: " + ex.Message);
             return null;
         }
     }
@@ -624,7 +624,6 @@ internal static class HostedRunner
         UiHelpers.Remember(key, template);
         PluginContext.SaveSettings();
         var def = (T)template.CloneWithNewId();
-        var results = new List<RenderResult>();
 
         if (w.PathMode == PathMode.ViaExistente)
         {
@@ -634,13 +633,7 @@ internal static class HostedRunner
             if (stretch == null) return Result.Cancelled;
             var (s0, s1) = stretch.Value;
             if (s1 - s0 < 5) { TaskDialog.Show(CommandBase.AppTitle, "Trecho muito curto (mínimo 5 m)."); return Result.Cancelled; }
-            RoadWorks.Host(def, road.Pavement, s0, s1);
-            var grade = RoadWorks.GradeWith(doc, road, def);
-            road.Pavement.Output.Grade = grade.Clone();
-            def.Output.Grade = grade.Clone();
-            results.AddRange(RoadWorks.SetGrade(uidoc, road.GroupId, grade, new MarkingDefinition[] { def }));
-            TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { road.Pavement, def });
-            CommandBase.ReportResults(def.KindName, results.Where(r => r.Warnings.Count > 0).ToList());
+            CommandBase.ReportResults(def.KindName, OnExistingRoad(uidoc, def, road, s0, s1).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;
         }
 
@@ -650,7 +643,45 @@ internal static class HostedRunner
         var path = RoadWorks.AxisFor(uidoc, w.PathMode != PathMode.ViaNovaLinhas, InfraForms.NewRoadRadius, straight, snapped);
         if (path == null) return Result.Cancelled;
         var resolved = PathResolver.Resolve(doc, path);
-        if (resolved?.Main is not { } axis || axis.Length < 10) { TaskDialog.Show(CommandBase.AppTitle, "Eixo muito curto para a obra (mínimo 10 m)."); return Result.Cancelled; }
+        if (resolved?.Main is not { Length: >= 10 }) { TaskDialog.Show(CommandBase.AppTitle, "Eixo muito curto para a obra (mínimo 10 m)."); return Result.Cancelled; }
+        var results = OnNewRoad(uidoc, def, path, InfraForms.NewRoadTemplate);
+        if (results == null) return Result.Failed;
+        if (snapped.Count > 0 && results.Count > 0) results[0].Warnings.Insert(0, "Conexões: " + string.Join("; ", snapped.Distinct()) + ".");
+        CommandBase.ReportResults(def.KindName, results.Where(x => x.Warnings.Count > 0).ToList());
+        return Result.Succeeded;
+    }
+
+    /// <summary>Obra num trecho [s0, s1] de uma via existente: o greide da via é recomposto com a obra e o terreno ajustado.</summary>
+    public static List<RenderResult> OnExistingRoad<T>(UIDocument uidoc, T def, PickedRoad road, double s0, double s1)
+        where T : MarkingDefinition, IHostedStructure, ITerrainAware
+    {
+        var doc = uidoc.Document;
+        var results = new List<RenderResult>();
+        RoadWorks.Host(def, road.Pavement, s0, s1);
+        var grade = RoadWorks.GradeWith(doc, road, def);
+        road.Pavement.Output.Grade = grade.Clone();
+        def.Output.Grade = grade.Clone();
+        results.AddRange(RoadWorks.SetGrade(uidoc, road.GroupId, grade, new MarkingDefinition[] { def }));
+        TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { road.Pavement, def });
+        return results;
+    }
+
+    /// <summary>
+    /// Obra numa via nova no eixo <paramref name="path"/> (seção do modelo <paramref name="template"/>, −1 = pela obra).
+    /// Nulo se a via não pôde ser criada.
+    /// </summary>
+    public static List<RenderResult>? OnNewRoad<T>(UIDocument uidoc, T def, PathReference path, int template)
+        where T : MarkingDefinition, IHostedStructure, ITerrainAware
+    {
+        var doc = uidoc.Document;
+        var results = new List<RenderResult>();
+        var resolved = PathResolver.Resolve(doc, path);
+        if (resolved?.Main is not { } axis || axis.Length < 10)
+        {
+            results.Add(new RenderResult());
+            results[0].Warnings.Add("Eixo muito curto para a obra (mínimo 10 m).");
+            return results;
+        }
         var g0 = RoadWorks.Ground(doc, resolved.Z);
         double G(Vec2 p) => def.FollowTerrain ? g0(p) ?? 0 : 0;
         RoadGrade roadGrade;
@@ -687,8 +718,8 @@ internal static class HostedRunner
         roadGrade.WithoutWorks = def is TunnelDefinition
             ? new RoadGrade { Points = { new(0, roadGrade.Z(0)), new(axis.Length, roadGrade.Z(axis.Length)) } }
             : new RoadGrade { Points = { new(0, G(axis.PointAt(0))), new(axis.Length, G(axis.PointAt(axis.Length))) } };
-        var setup = InfraForms.NewRoadTemplate >= 0 && InfraForms.NewRoadTemplate < RoadTemplates.All.Count
-            ? RoadTemplates.All[InfraForms.NewRoadTemplate].Create()
+        var setup = template >= 0 && template < RoadTemplates.All.Count
+            ? RoadTemplates.All[template].Create()
             : def switch
             {
                 BridgeDefinition br => InfraRoads.Setup(br),
@@ -698,15 +729,13 @@ internal static class HostedRunner
             };
         var (pav, created) = RoadWorks.CreateRoad(uidoc, setup, path, roadGrade, true, def.KindName);
         results.AddRange(created);
-        if (pav == null) { CommandBase.ReportResults(def.KindName, results); return Result.Failed; }
+        if (pav == null) { CommandBase.ReportResults(def.KindName, results); return null; }
         RoadWorks.Host(def, pav, a, b2);
         var r = MarkingCreator.Commit(uidoc, new MarkingDefinition[] { def }, $"SV - {def.KindName}");
         if (warn.Count > 0 && r.Count > 0) r[0].Warnings.InsertRange(0, warn);
         results.AddRange(r);
         TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { pav, def });
-        if (snapped.Count > 0 && results.Count > 0) results[0].Warnings.Insert(0, "Conexões: " + string.Join("; ", snapped.Distinct()) + ".");
-        CommandBase.ReportResults(def.KindName, results.Where(x => x.Warnings.Count > 0).ToList());
-        return Result.Succeeded;
+        return results;
     }
 }
 
@@ -792,52 +821,74 @@ internal static class DrainageCommand
                 : $"{template.DisplayCode}: clique junto ao MEIO-FIO, do lado da pista – ESC encerra");
             if (p == null) break;
             var pt = UnitConv.ToVec2(p);
-            var batch = new List<DrainageDefinition>();
-            if (free)
+            Vec2? end = null;
+            if (series)
             {
-                var d = (DrainageDefinition)template.CloneWithNewId();
-                d.Position = pt;
-                d.Z = scanner.SurfaceZ(pt) ?? UnitConv.M(p.Z);
-                // Alinhada à via mais próxima (quando houver).
-                if (CurbFinder.Nearest(scanner.Faces(pt), pt, 30) is { } near) d.Along = near.Along;
-                batch.Add(d);
-            }
-            else
-            {
-                var faces = scanner.Faces(pt);
-                var hit = CurbFinder.Nearest(faces, pt);
-                if (hit == null)
+                if (Fitted(template, pt, UnitConv.M(p.Z), scanner, null) == null)
                 {
-                    TaskDialog.Show(CommandBase.AppTitle, "Nenhum meio-fio encontrado perto do clique. Clique junto à face de uma guia do plugin " +
-                        "(via com calçada, interseção, rotatória, orelha ou meio-fio avulso) – ou use o tipo livre (grelha de piso / PV).");
+                    TaskDialog.Show(CommandBase.AppTitle, NoCurb);
                     continue;
                 }
-                var hits = new List<CurbHit> { hit };
-                if (series)
-                {
-                    var q = Picking.PickPoint(uidoc, $"{template.DisplayCode}: clique o FIM da série no mesmo meio-fio – ESC cancela");
-                    if (q == null) break;
-                    hits = CurbFinder.Series(hit.Face, pt, UnitConv.ToVec2(q), template.SeriesSpacing);
-                }
-                foreach (var h in hits)
-                {
-                    var d = (DrainageDefinition)template.CloneWithNewId();
-                    Fit(d, h);
-                    batch.Add(d);
-                }
+                var q = Picking.PickPoint(uidoc, $"{template.DisplayCode}: clique o FIM da série no mesmo meio-fio – ESC cancela");
+                if (q == null) break;
+                end = UnitConv.ToVec2(q);
             }
-            var created = MarkingCreator.Commit(uidoc, batch, $"SV - {template.DisplayCode}");
-            results.AddRange(created);
-            foreach (var d in batch.Where(x => x.CutFloors))
+            var batch = Fitted(template, pt, UnitConv.M(p.Z), scanner, end);
+            if (batch == null)
             {
-                try { FootprintCutter.ApplyDrainage(uidoc, d); }
-                catch (Exception ex) { Log.Error("Recorte da drenagem", ex); }
+                TaskDialog.Show(CommandBase.AppTitle, NoCurb);
+                continue;
             }
+            results.AddRange(Place(uidoc, batch));
             scanner = new CurbScanner(doc, uidoc.ActiveView);           // pisos recortados: lê de novo
         }
         if (results.Count == 0) return Result.Cancelled;
         CommandBaseReport.Show(template.DisplayCode, results);
         return Result.Succeeded;
+    }
+
+    private const string NoCurb = "Nenhum meio-fio encontrado perto do clique. Clique junto à face de uma guia do plugin " +
+        "(via com calçada, interseção, rotatória, orelha ou meio-fio avulso) – ou use o tipo livre (grelha de piso / PV).";
+
+    /// <summary>
+    /// Dispositivos do clique: livres (PV, grelha de piso) no ponto, alinhados à via mais próxima; os demais encaixados no
+    /// meio-fio (um, ou uma série até <paramref name="seriesEnd"/>). Nulo = nenhum meio-fio perto.
+    /// </summary>
+    internal static List<DrainageDefinition>? Fitted(DrainageDefinition template, Vec2 pt, double clickZ, CurbScanner scanner, Vec2? seriesEnd)
+    {
+        var batch = new List<DrainageDefinition>();
+        if (template.Type is TipoDrenagem.PocoDeVisita or TipoDrenagem.GrelhaQuadrada)
+        {
+            var d = (DrainageDefinition)template.CloneWithNewId();
+            d.Position = pt;
+            d.Z = scanner.SurfaceZ(pt) ?? clickZ;
+            // Alinhada à via mais próxima (quando houver).
+            if (CurbFinder.Nearest(scanner.Faces(pt), pt, 30) is { } near) d.Along = near.Along;
+            batch.Add(d);
+            return batch;
+        }
+        var hit = CurbFinder.Nearest(scanner.Faces(pt), pt);
+        if (hit == null) return null;
+        var hits = seriesEnd is { } q ? CurbFinder.Series(hit.Face, pt, q, template.SeriesSpacing) : new List<CurbHit> { hit };
+        foreach (var h in hits)
+        {
+            var d = (DrainageDefinition)template.CloneWithNewId();
+            Fit(d, h);
+            batch.Add(d);
+        }
+        return batch;
+    }
+
+    /// <summary>Gera os dispositivos e recorta os pisos que eles substituem.</summary>
+    internal static List<RenderResult> Place(UIDocument uidoc, List<DrainageDefinition> batch)
+    {
+        var created = MarkingCreator.Commit(uidoc, batch, $"SV - {batch.FirstOrDefault()?.DisplayCode}");
+        foreach (var d in batch.Where(x => x.CutFloors))
+        {
+            try { FootprintCutter.ApplyDrainage(uidoc, d); }
+            catch (Exception ex) { Log.Error("Recorte da drenagem", ex); }
+        }
+        return created;
     }
 
     /// <summary>Encaixa o dispositivo na face do meio-fio (posição, direção, cota e medidas da guia).</summary>
@@ -860,7 +911,7 @@ internal static class CommandBaseReport
     public static void Show(string d0, List<RenderResult> results)
     {
         var warnings = results.SelectMany(r => r.Warnings).Distinct().ToList();
-        if (warnings.Count > 0) TaskDialog.Show(CommandBase.AppTitle, $"{d0}:\n" + string.Join("\n", warnings.Take(15)));
+        if (warnings.Count > 0) Notify.Show($"{d0}:\n" + string.Join("\n", warnings.Take(15)));
     }
 }
 
@@ -950,6 +1001,18 @@ public sealed class CmdTerraplenagem : CommandBase
                 .Number("Margem do terreno criado (m)", () => opt.NewTerrainMargin, v => opt.NewTerrainMargin = v, 10, 1000, "0");
         }
         if (UiHelpers.ShowModal(form) != true) return Result.Cancelled;
+        var report = Apply(uidoc, defs, opt, resetOriginal);
+        if (report != null) TaskDialog.Show(AppTitle, report.Text());
+        return report != null ? Result.Succeeded : Result.Failed;
+    }
+
+    /// <summary>
+    /// Terraplenagem dos elementos escolhidos: as vias passam a moldar o terreno e as obras a ajustá-lo; o Toposolid é refeito
+    /// (ou, na simulação, só os volumes são calculados). Nulo se o Revit recusou.
+    /// </summary>
+    internal static TerrainReport? Apply(UIDocument uidoc, List<MarkingDefinition> defs, GradingOptions opt, bool resetOriginal)
+    {
+        var doc = uidoc.Document;
         if (opt.DryRun) opt.CreateIfMissing = false;
         // Vias escolhidas passam a moldar o terreno (greide plano quando ainda não têm um) e as obras, a ajustá-lo.
         var toCommit = new List<MarkingDefinition>();
@@ -989,7 +1052,6 @@ public sealed class CmdTerraplenagem : CommandBase
             opt.DryRun ? "SV - Terraplenagem (simulação)" : "SV - Terraplenagem");
         if (report?.Created == true)
             MarkingCreator.Commit(uidoc, MarkingStorage.Definitions(doc).Where(x => x is ITerrainAware).ToList(), "SV - Obras sobre o terreno nativo");
-        if (report != null) TaskDialog.Show(AppTitle, report.Text());
-        return report != null ? Result.Succeeded : Result.Failed;
+        return report;
     }
 }

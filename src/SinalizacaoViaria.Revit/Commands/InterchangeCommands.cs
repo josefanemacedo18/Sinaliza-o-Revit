@@ -54,6 +54,11 @@ internal static class InterchangeBuilder
         if (main == null || cross == null)
         {
             var pair = FindCrossing(doc, click);
+            if (pair == null && Notify.Quiet)
+            {
+                info.Warnings.Add("Nó viário: nenhum cruzamento de vias no ponto indicado.");
+                return results;
+            }
             if (pair == null)
             {
                 var td = new TaskDialog(CommandBase.AppTitle)

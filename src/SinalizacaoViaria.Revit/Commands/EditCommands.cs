@@ -326,6 +326,16 @@ public sealed class CmdAtualizarTodas : CommandBase
             TaskDialog.Show(AppTitle, "Nenhuma marca de sinalização encontrada neste projeto.");
             return Result.Cancelled;
         }
+        Report("Atualização", RefreshAll(uidoc, null), alwaysShow: true);
+        return Result.Succeeded;
+    }
+
+    /// <summary>Regenera as marcas (todas, ou só as de <paramref name="only"/>), as conexões e os recortes de sobreposição.</summary>
+    internal static List<RenderResult> RefreshAll(UIDocument uidoc, ISet<string>? only)
+    {
+        var doc = uidoc.Document;
+        bool In(MarkingDefinition d) => only == null || only.Contains(d.Id);
+        var defs = MarkingStorage.Definitions(doc).Where(In).ToList();
         var results = new List<RenderResult>();
         using (MarkingService.RenderScope())
         using (var t = new Transaction(doc, "SV - Atualizar todas"))
@@ -334,17 +344,17 @@ public sealed class CmdAtualizarTodas : CommandBase
             var service = new MarkingService(doc, uidoc.ActiveView);
             foreach (var d in MarkingService.DependencyOrder(defs.Where(d => d is not (IntersectionDefinition or RoundaboutDefinition)))) results.Add(service.Render(d));
             var inter = new IntersectionService(doc, service);
-            foreach (var it in MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>())
+            foreach (var it in MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().Where(In))
             {
                 try { results.AddRange(inter.Refresh(it).Where(r => r.Warnings.Count > 0)); }
                 catch (Exception ex) { Log.Error("Refresh interseção", ex); }
             }
-            foreach (var rb in MarkingStorage.Definitions(doc).OfType<RoundaboutDefinition>())
+            foreach (var rb in MarkingStorage.Definitions(doc).OfType<RoundaboutDefinition>().Where(In))
             {
                 try { results.AddRange(inter.Refresh(rb).Where(r => r.Warnings.Count > 0)); }
                 catch (Exception ex) { Log.Error("Refresh rotatória", ex); }
             }
-            foreach (var cds in MarkingStorage.Definitions(doc).OfType<CulDeSacDefinition>().Where(c => c.RoadId != null).ToList())
+            foreach (var cds in MarkingStorage.Definitions(doc).OfType<CulDeSacDefinition>().Where(c => c.RoadId != null && In(c)).ToList())
             {
                 try { results.AddRange(inter.Refresh(cds).Where(r => r.Warnings.Count > 0)); }
                 catch (Exception ex) { Log.Error("Refresh cul-de-sac", ex); }
@@ -352,13 +362,12 @@ public sealed class CmdAtualizarTodas : CommandBase
             t.Commit();
         }
         // Marcas sobrepostas (faixas de pedestres, zebrados) e lombadas invertidas refazem os recortes.
-        foreach (var d in MarkingStorage.Definitions(doc).Where(d => d.Overlay || d is TrafficCalmingDefinition { Type: TipoModeracao.LombadaInvertida } or DrainageDefinition { CutFloors: true }))
+        foreach (var d in MarkingStorage.Definitions(doc).Where(d => In(d) && (d.Overlay || d is TrafficCalmingDefinition { Type: TipoModeracao.LombadaInvertida } or DrainageDefinition { CutFloors: true })))
         {
             try { FootprintCutter.ApplyFor(uidoc, d); }
             catch (Exception ex) { Log.Error("Recortes de sobreposição", ex); }
         }
-        Report("Atualização", results, alwaysShow: true);
-        return Result.Succeeded;
+        return results;
     }
 }
 

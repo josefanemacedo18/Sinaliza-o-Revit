@@ -300,6 +300,11 @@ public static class IconFactory
                 dc.DrawLine(P(Magenta, 2), new Point(11, 23), new Point(20, 9));
                 dc.DrawGeometry(B(Color.FromRgb(236, 120, 150)), P(Asphalt, 1), Close(Poly(new Point(19, 2), new Point(27, 2), new Point(23, 9), new Point(15, 9))));
                 break;
+            case "autoteste":
+                dc.DrawRectangle(B(White), P(Asphalt, 1.5), new Rect(6, 4, 20, 25));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(11, 2, 10, 5));
+                dc.DrawGeometry(null, P(Blue, 3), Poly(new Point(10, 17), new Point(15, 22), new Point(23, 11)));
+                break;
             case "atualizar":
                 dc.DrawGeometry(null, P(Blue, 3), Arc(new Point(16, 16), 10, 20, 290));
                 dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(22, 3), new Point(29, 9), new Point(20, 11))));

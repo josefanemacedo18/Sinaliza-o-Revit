@@ -7,7 +7,20 @@ public static class Log
 {
     private static readonly object Gate = new();
 
-    public static void Error(string context, Exception ex) => Write($"ERRO [{context}] {ex}");
+    /// <summary>Durante o Autoteste: erros tratados (que normalmente só iriam para o log) também são recolhidos aqui.</summary>
+    public static List<string>? Capture { get; set; }
+
+    public static void Error(string context, Exception ex)
+    {
+        Write($"ERRO [{context}] {ex}");
+        try { lock (Gate) Capture?.Add($"[{context}] {ex.GetType().Name}: {ex.Message}\n      {Where(ex)}"); }
+        catch { /* nunca interrompe */ }
+    }
+
+    /// <summary>Primeiras linhas da pilha que são do plugin (onde o erro aconteceu).</summary>
+    public static string Where(Exception ex) =>
+        string.Join("\n      ", (ex.StackTrace ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Contains("SinalizacaoViaria")).Take(4)
+            .Select(l => System.Text.RegularExpressions.Regex.Replace(l, @" in .*[\\/]", " em ")));
 
     public static void Info(string msg) => Write(msg);
 
