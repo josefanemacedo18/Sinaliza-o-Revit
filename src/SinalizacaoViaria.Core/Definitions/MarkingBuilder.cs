@@ -44,6 +44,12 @@ public sealed class BuildContext
     /// <summary>Cota do terreno no ponto, ou 0 (plano da base) sem terreno.</summary>
     public double GroundAt(Vec2 p) => Ground?.Invoke(p) ?? 0;
 
+    /// <summary>
+    /// O terreno é o Toposolid nativo do Revit (Massa e terreno) e será ajustado à obra: aterros, cortes, taludes e
+    /// reaterros NÃO viram sólidos – ficam por conta da terraplenagem do Toposolid. Falso = sem Toposolid (sólidos de terra).
+    /// </summary>
+    public bool NativeTerrain { get; init; }
+
     /// <summary>Converte mm de papel em metros de modelo.</summary>
     public double Mm(double paperMm) => paperMm * ViewScale / 1000.0;
 }

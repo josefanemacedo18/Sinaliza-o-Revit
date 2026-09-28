@@ -31,28 +31,25 @@ public static class EarthworksGenerator
         {
             case SecaoTunel.Circular:
             {
-                // Círculo que passa pelas bordas do piso e deixa o gabarito na coroa.
+                // Círculo que passa pelas bordas do piso e deixa o gabarito na coroa; anel em duas metades (sem furo).
                 var dd = (hc * hc - halfClear * halfClear) / (2 * hc);
                 var r = hc - dd;
                 var cz = dd;
                 crown = cz + r;
-                const int n = 24;
-                for (int i = 0; i < n; i++)
+                const int n = 48;
+                foreach (var (a0, a1) in new[] { (-Math.PI / 2, Math.PI / 2), (Math.PI / 2, 1.5 * Math.PI) })
                 {
-                    var a0 = 2 * Math.PI * i / n;
-                    var a1 = 2 * Math.PI * (i + 1) / n;
-                    parts.Add(new[]
-                    {
-                        new SectionPt(Math.Cos(a0) * r, cz + Math.Sin(a0) * r), new SectionPt(Math.Cos(a0) * (r + t), cz + Math.Sin(a0) * (r + t)),
-                        new SectionPt(Math.Cos(a1) * (r + t), cz + Math.Sin(a1) * (r + t)), new SectionPt(Math.Cos(a1) * r, cz + Math.Sin(a1) * r),
-                    });
+                    var pts = new List<SectionPt>();
+                    for (int i = 0; i <= n / 2; i++) { var a = a0 + (a1 - a0) * i / (n / 2); pts.Add(new SectionPt(Math.Cos(a) * (r + t), cz + Math.Sin(a) * (r + t))); }
+                    for (int i = n / 2; i >= 0; i--) { var a = a0 + (a1 - a0) * i / (n / 2); pts.Add(new SectionPt(Math.Cos(a) * r, cz + Math.Sin(a) * r)); }
+                    parts.Add(pts.ToArray());
                 }
                 // Enchimento sob o piso (segmento circular).
                 var fill = new List<SectionPt>();
                 var zRoadBase = -Infra.Wearing - 0.35;
-                for (int i = 0; i <= 16; i++)
+                for (int i = 0; i <= 32; i++)
                 {
-                    var a = Math.PI + Math.PI * i / 16;
+                    var a = Math.PI + Math.PI * i / 32;
                     var p = new SectionPt(Math.Cos(a) * r, cz + Math.Sin(a) * r);
                     if (p.Z <= zRoadBase) fill.Add(p);
                 }
@@ -75,23 +72,18 @@ public static class EarthworksGenerator
             }
             default:
             {
-                // Ferradura: paredes até a linha de arranque e abóbada semicircular; laje de fundo (arco invertido simplificado).
+                // Ferradura: paredes até a linha de arranque e abóbada semicircular num só perfil em "C"; laje de fundo.
                 var r = halfClear;
                 var spring = Math.Max(1.5, hc - r);
                 crown = spring + r;
-                parts.Add(SolidSweep.Rect(-halfClear - t, -halfClear, bottom, spring));
-                parts.Add(SolidSweep.Rect(halfClear, halfClear + t, bottom, spring));
-                const int n = 12;
-                for (int i = 0; i < n; i++)
-                {
-                    var a0 = Math.PI * i / n;
-                    var a1 = Math.PI * (i + 1) / n;
-                    parts.Add(new[]
-                    {
-                        new SectionPt(Math.Cos(a0) * r, spring + Math.Sin(a0) * r), new SectionPt(Math.Cos(a0) * (r + t), spring + Math.Sin(a0) * (r + t)),
-                        new SectionPt(Math.Cos(a1) * (r + t), spring + Math.Sin(a1) * (r + t)), new SectionPt(Math.Cos(a1) * r, spring + Math.Sin(a1) * r),
-                    });
-                }
+                const int n = 32;
+                var pts = new List<SectionPt> { new(-halfClear - t, bottom), new(-halfClear, bottom) };
+                for (int i = n; i >= 0; i--) { var a = Math.PI * i / n; pts.Add(new SectionPt(Math.Cos(a) * r, spring + Math.Sin(a) * r)); }
+                pts.Add(new SectionPt(halfClear, bottom));
+                pts.Add(new SectionPt(halfClear + t, bottom));
+                for (int i = 0; i <= n; i++) { var a = Math.PI * i / n; pts.Add(new SectionPt(Math.Cos(a) * (r + t), spring + Math.Sin(a) * (r + t))); }
+                // A sequência externa vai de +y para −y pelo topo: fecha o "C".
+                parts.Add(pts.ToArray());
                 parts.Add(SolidSweep.Rect(-halfClear - t, halfClear + t, bottom - t, bottom));
                 break;
             }
@@ -144,9 +136,33 @@ public static class EarthworksGenerator
                 {
                     var c = path.PointAt(s) + n * (side * 1.4);
                     var z = prof.Z(s) + crown - 1.2;
-                    SolidSweep.Add(geo, SolidSweep.Tube(Vec3.At(c - tng * 2.2, z), Vec3.At(c + tng * 2.2, z), 0.55, 14), MarkingColor.Metal, "VENTILACAO", isUnit: true);
+                    // Ventilador de jato: carcaça oca, silenciadores cônicos e suportes na abóbada.
+                    SolidSweep.AddRound(geo, Vec3.At(c - tng * 1.2, z), Vec3.At(c + tng * 1.2, z), 0.58, 0.58, MarkingColor.Metal, "VENTILACAO", true, 0.52, 0.52, 28);
+                    foreach (var sg in new[] { -1.0, 1.0 })
+                        SolidSweep.AddRound(geo, Vec3.At(c + tng * (sg * 1.2), z), Vec3.At(c + tng * (sg * 2.3), z), 0.58, 0.50, MarkingColor.Metal, "VENTILACAO", false, 0.52, 0.46, 28);
+                    SolidSweep.AddColumn(geo, c, 0.30, 0.30, z - 0.1, z + 0.05, MarkingColor.Metal, "VENTILACAO");
+                    foreach (var sg in new[] { -0.8, 0.8 })
+                        SolidSweep.Add(geo, SolidSweep.Box(c + tng * sg, tng, 0.12, 0.5, z + 0.5, z + 1.2), MarkingColor.Metal, "VENTILACAO");
                     fans++;
                 }
+            }
+        // Corrimão junto à parede nos passeios, faixa de LED contínua, eletrocalhas e nichos de emergência (SOS) a cada 150 m.
+        if (d.WalkwayWidth > 0.3)
+            foreach (var side in new[] { -1, 1 })
+                Infra.Railing(geo, path, prof, side * (halfClear - 0.10), 0, L, Math.Max(0.1, d.WalkwayHeight), 1.0, 3.0);
+        if (d.Lighting)
+            foreach (var side in new[] { -1, 1 })
+            {
+                var y = side * halfClear * 0.62;
+                SolidSweep.Along(geo, path, s => SolidSweep.Rect(y - 0.12, y + 0.12, prof.Z(s) + crown - 0.62, prof.Z(s) + crown - 0.55), MarkingColor.Vidro, 0, L, 8, "ILUMINACAO");
+                var yc = side * (halfClear - 0.25);
+                SolidSweep.Along(geo, path, s => SolidSweep.Rect(yc - 0.15, yc + 0.15, prof.Z(s) + 3.2, prof.Z(s) + 3.28), MarkingColor.Metal, 0, L, 8, "ELETROCALHA");
+            }
+        for (var s = 75.0; s < L - 30; s += 150)
+            foreach (var side in new[] { -1, 1 })
+            {
+                var q = path.PointAt(s) + SolidSweep.Normal(path, s) * (side * (halfClear + 0.02));
+                SolidSweep.Add(geo, SolidSweep.Box(q, path.TangentAt(s), 1.2, 0.06, prof.Z(s) + 0.5, prof.Z(s) + 2.4), MarkingColor.Vermelha, "SOS", true);
             }
         // Emboques.
         foreach (var (s, dir) in new[] { (0.0, -1), (L, 1) })
@@ -191,12 +207,17 @@ public static class EarthworksGenerator
             }
             case TipoEmboque.Bisel:
             {
-                // Bisel: cada gomo do anel avança em proporção à altura – a base avança mais que a coroa (corte inclinado).
+                // Bisel: o anel avança mais na base que na coroa (corte inclinado acompanhando o talude).
+                var n0 = tn.PerpLeft;
                 foreach (var part in ring)
                 {
-                    var zm = part.Average(q => q.Z);
-                    var e = Math.Max(0.3, d.PortalLength * (1 - Math.Clamp((zm - bottom) / Math.Max(1, crown + t - bottom), 0, 1)));
-                    SolidSweep.Add(geo, SolidSweep.Extrude(part.Select(q => new SectionPt(q.Y * dir, q.Z + z)).ToList(), p, tn, e), MarkingColor.Concreto, "EMBOQUE");
+                    var fa = part.Select(q => Vec3.At(p + n0 * (q.Y * dir), q.Z + z)).ToList();
+                    var fb = part.Select(q =>
+                    {
+                        var e = Math.Max(0.3, d.PortalLength * (1 - Math.Clamp((q.Z - bottom) / Math.Max(1, crown + t - bottom), 0, 1)));
+                        return Vec3.At(p + n0 * (q.Y * dir) + tn * e, q.Z + z);
+                    }).ToList();
+                    SolidSweep.Add(geo, SolidSweep.Prism(fa, fb), MarkingColor.Concreto, "EMBOQUE");
                 }
                 // Muros de ala laterais.
                 foreach (var side in new[] { -1, 1 })
@@ -410,7 +431,8 @@ public static class EarthworksGenerator
             {
                 var pz = Math.Clamp(d.PanelSize, 0.75, 2.5);
                 // Maciço de solo reforçado atrás das placas (largura ≈ 0,7 H).
-                SolidSweep.Along(geo, path, s => Sec((0.18, Zb(s) - emb), (0.7 * H(s) + 0.18, Zb(s) - emb), (0.7 * H(s) + 0.18, Zt(s)), (0.18, Zt(s))), MarkingColor.Terra, 0, L, 4, "MACICO");
+                if (!ctx.NativeTerrain)
+                    SolidSweep.Along(geo, path, s => Sec((0.18, Zb(s) - emb), (0.7 * H(s) + 0.18, Zb(s) - emb), (0.7 * H(s) + 0.18, Zt(s)), (0.18, Zt(s))), MarkingColor.Terra, 0, L, 4, "MACICO");
                 var rowsTa = (int)Math.Ceiling((hMax + emb) / pz);
                 for (int i = 0; i < rowsTa; i++)
                 {
@@ -546,16 +568,21 @@ public static class EarthworksGenerator
             var (y1, z1) = prof[i + 1];
             var isBerm = Math.Abs(z1 - z0) < 1e-6;
             // Corpo do aterro (só em aterros) sob cada trecho.
-            if (d.Type == TipoTalude.Aterro)
+            if (d.Type == TipoTalude.Aterro && !ctx.NativeTerrain)
                 SolidSweep.Along(geo, path, s => Sec((y0, baseProf.Z(s)), (y1, baseProf.Z(s)), (y1, baseProf.Z(s) + z1 - 0.1), (y0, baseProf.Z(s) + z0 - (i == 0 ? 0 : 0.1))),
                     MarkingColor.Terra, 0, L, 4, "ATERRO");
             // Revestimento (camada de 0,10 m sobre a face) – bermas em concreto quando há canaleta.
             var color = isBerm && d.BermChannels ? MarkingColor.PavimentoConcreto : lining;
-            SolidSweep.Along(geo, path, s => Sec((y0, baseProf.Z(s) + z0 - 0.10), (y1, baseProf.Z(s) + z1 - 0.10), (y1, baseProf.Z(s) + z1), (y0, baseProf.Z(s) + z0)),
+            // No terreno nativo a grama é uma subdivisão do Toposolid; revestimentos rígidos ficam 3 cm acima da face.
+            var lift = ctx.NativeTerrain ? 0.03 : 0;
+            if (ctx.NativeTerrain && !isBerm)
+                geo.TerrainFinishes.Add((new Polygon2(SlopeBand(path, u * y0, u * y1)), lining, "Talude"));
+            if (!(ctx.NativeTerrain && color == MarkingColor.Grama))
+            SolidSweep.Along(geo, path, s => Sec((y0, baseProf.Z(s) + z0 - 0.10 + lift), (y1, baseProf.Z(s) + z1 - 0.10 + lift), (y1, baseProf.Z(s) + z1 + lift), (y0, baseProf.Z(s) + z0 + lift)),
                 color, 0, L, 4, isBerm ? "BERMA" : "REVESTIMENTO");
             if (isBerm && d.BermChannels) Channel(geo, path, baseProf, u * (y0 + 0.4), z0, L);
         }
-        if (d.Type == TipoTalude.Aterro)
+        if (d.Type == TipoTalude.Aterro && !ctx.NativeTerrain)
             SolidSweep.Along(geo, path, s => Sec((crestY, baseProf.Z(s)), (crestY + 2, baseProf.Z(s)), (crestY + 2, baseProf.Z(s) + hTot - 0.1), (crestY, baseProf.Z(s) + hTot - 0.1)),
                 MarkingColor.Terra, 0, L, 4, "ATERRO");
         if (d.CrestChannel) Channel(geo, path, baseProf, u * (crestY + 1.5), hTot, L);
@@ -613,12 +640,29 @@ public static class EarthworksGenerator
         return geo;
     }
 
-    /// <summary>Canaleta de concreto meia-cana simplificada (fundo e bordas).</summary>
+    /// <summary>Faixa em planta entre os afastamentos a e b ao longo do eixo (contorno).</summary>
+    private static List<Vec2> SlopeBand(Polyline2 path, double a, double b)
+    {
+        var st = SolidSweep.Stations(path, 0, path.Length, 4);
+        var left = st.Select(s => path.PointAt(s) + SolidSweep.Normal(path, s) * a).ToList();
+        var right = st.Select(s => path.PointAt(s) + SolidSweep.Normal(path, s) * b).Reverse();
+        return left.Concat(right).ToList();
+    }
+
+    /// <summary>Canaleta de concreto meia-cana (Ø 0,60 m) com abas laterais.</summary>
     private static void Channel(MarkingGeometry geo, Polyline2 path, VerticalProfile baseProf, double y, double z, double L)
     {
-        SolidSweep.Along(geo, path, s => SolidSweep.Rect(y - 0.30, y + 0.30, baseProf.Z(s) + z - 0.30, baseProf.Z(s) + z - 0.22), MarkingColor.PavimentoConcreto, 0, L, 4, "CANALETA");
-        foreach (var side in new[] { -1, 1 })
-            SolidSweep.Along(geo, path, s => SolidSweep.Rect(y + side * 0.30 - 0.05, y + side * 0.30 + 0.05, baseProf.Z(s) + z - 0.30, baseProf.Z(s) + z + 0.02),
-                MarkingColor.PavimentoConcreto, 0, L, 4, "CANALETA");
+        SolidSweep.Along(geo, path, s =>
+        {
+            var zc = baseProf.Z(s) + z + 0.02;
+            var pts = new List<SectionPt> { new(y - 0.42, zc), new(y - 0.30, zc) };
+            for (int i = 1; i < 12; i++) { var a = Math.PI + Math.PI * i / 12; pts.Add(new SectionPt(y + Math.Cos(a) * 0.30, zc + Math.Sin(a) * 0.30)); }
+            pts.Add(new SectionPt(y + 0.30, zc));
+            pts.Add(new SectionPt(y + 0.42, zc));
+            pts.Add(new SectionPt(y + 0.42, zc - 0.06));
+            for (int i = 11; i >= 1; i--) { var a = Math.PI + Math.PI * i / 12; pts.Add(new SectionPt(y + Math.Cos(a) * 0.37, zc + Math.Sin(a) * 0.37)); }
+            pts.Add(new SectionPt(y - 0.42, zc - 0.06));
+            return pts;
+        }, MarkingColor.PavimentoConcreto, 0, L, 4, "CANALETA");
     }
 }

@@ -125,6 +125,14 @@ public sealed class MarkingService
     // ------------------------------------------------------------------ geometria
 
     /// <summary>Gera a geometria (sem tocar no modelo) – usado também em quantitativos e prévias.</summary>
+    private bool? _hasTopo;
+
+    /// <summary>Há Toposolid (terreno nativo) no projeto – as obras deixam aterros e cortes para a terraplenagem dele.</summary>
+    public bool HasToposolid => _hasTopo ??= new FilteredElementCollector(_doc).OfClass(typeof(Toposolid)).Any();
+
+    /// <summary>Esquece o cache de "há Toposolid" (depois de criar um terreno).</summary>
+    public void ResetTerrainCache() => _hasTopo = null;
+
     public MarkingGeometry BuildGeometry(MarkingDefinition def, out double baseZ, List<string>? warnings = null, View? view = null)
     {
         // Obras que acompanham a topografia leem o terreno natural (Toposolid) relativo à base da marca.
@@ -132,9 +140,10 @@ public sealed class MarkingService
         Func<Vec2, double?>? ground = null;
         if (def is ITerrainAware { FollowTerrain: true } ta && (ta.GroundLine == null || ta.GroundLine.Count < 2 || def is InterchangeDefinition))
             ground = TerrainFunction(groundBase);
+        var native = def is ITerrainAware { AdjustTerrain: true } && HasToposolid;
         var ctx = PluginContext.BuildContext(def.Output.Drape && def.Output.Mode == OutputMode.Modelo3D,
             view?.Scale ?? 100, id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList(), OtherGeometry,
-            d => PathResolver.Resolve(_doc, d.Path)?.Main, ground);
+            d => PathResolver.Resolve(_doc, d.Path)?.Main, ground, native);
         if (def.Path == null)
         {
             baseZ = def.PointZ ?? 0;

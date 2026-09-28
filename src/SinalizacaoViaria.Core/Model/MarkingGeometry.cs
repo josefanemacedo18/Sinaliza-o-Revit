@@ -257,12 +257,19 @@ public sealed class MarkingGeometry
     /// <summary>Plataformas planas (polígono numa cota) para ajustar o terreno.</summary>
     public List<GradePad> Pads { get; } = new();
 
+    /// <summary>
+    /// Acabamentos do terreno nativo (grama de taludes, ilhas, canteiros): viram subdivisões do Toposolid com o material da
+    /// cor indicada – em vez de sólidos sobre o terreno.
+    /// </summary>
+    public List<(Polygon2 Area, MarkingColor Color, string Label)> TerrainFinishes { get; } = new();
+
     public void Merge(MarkingGeometry other)
     {
         Pieces.AddRange(other.Pieces);
         Annotations.AddRange(other.Annotations);
         Corridors.AddRange(other.Corridors);
         Pads.AddRange(other.Pads);
+        TerrainFinishes.AddRange(other.TerrainFinishes);
         PaintedLength += other.PaintedLength;
         UnitCount += other.UnitCount;
         PathLength = Math.Max(PathLength, other.PathLength);

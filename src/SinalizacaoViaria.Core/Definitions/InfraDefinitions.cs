@@ -214,9 +214,49 @@ public enum SistemaEstrutural
     Trelica,
 }
 
-public enum TipoPilar { Circular, DuplaCircular, Parede, Portico, Martelo }
+public enum TipoPilar
+{
+    Circular,
+    DuplaCircular,
+    /// <summary>Pilar-parede com as pontas arredondadas.</summary>
+    Parede,
+    /// <summary>Pórtico: colunas e travessa.</summary>
+    Portico,
+    /// <summary>Martelo: coluna única e capitel em balanço.</summary>
+    Martelo,
+    /// <summary>Pilar em "Y" (fuste único que se abre em dois braços).</summary>
+    Y,
+    /// <summary>Coluna oblonga (seção de pista de atletismo), comum em viadutos urbanos.</summary>
+    Oblongo,
+}
 
 public enum TipoGuarda { NewJersey, GuardaCorpoMetalico, NewJerseyComGuardaCorpo }
+
+/// <summary>Preenchimento do guarda-corpo de pedestres.</summary>
+public enum TipoGuardaCorpo
+{
+    /// <summary>Três tubos horizontais e montantes.</summary>
+    Tubular,
+    /// <summary>Balaústres verticais (vão ≤ 11 cm – seguro para crianças).</summary>
+    Balaustres,
+    /// <summary>Painéis de vidro laminado entre os montantes.</summary>
+    Vidro,
+}
+
+/// <summary>Forma do mastro de pontes estaiadas.</summary>
+public enum FormaMastro { H, A, Central }
+
+/// <summary>Arranjo dos estais.</summary>
+public enum ArranjoEstais { Leque, Harpa }
+
+/// <summary>Alas do encontro.</summary>
+public enum TipoAla
+{
+    /// <summary>Alas paralelas ao eixo (aterro contido).</summary>
+    Paralelas,
+    /// <summary>Alas inclinadas acompanhando a saia do aterro.</summary>
+    Abertas,
+}
 
 /// <summary>
 /// Viaduto, ponte ou passarela ao longo de um eixo: greide com rampas de acesso em aterro, encontros, pilares, vigas,
@@ -257,6 +297,20 @@ public sealed class BridgeDefinition : MarkingDefinition, ITerrainAware
     public bool Lighting { get; set; } = true;
     public double LightSpacing { get; set; } = 30;
     public bool LaneMarkings { get; set; } = true;
+    /// <summary>Caimento transversal do tabuleiro (m/m) – 2 %, abaulado a partir do eixo.</summary>
+    public double CrossSlope { get; set; } = 0.02;
+    /// <summary>Tabuleiro contínuo (juntas só nos encontros); falso = vãos isostáticos com junta sobre cada pilar.</summary>
+    public bool Continuous { get; set; } = true;
+    /// <summary>Viga caixão com altura variável (mísulas parabólicas sobre os pilares).</summary>
+    public bool VariableDepth { get; set; } = true;
+    public TipoGuardaCorpo RailingStyle { get; set; } = TipoGuardaCorpo.Tubular;
+    public FormaMastro Pylon { get; set; } = FormaMastro.H;
+    public ArranjoEstais Stays { get; set; } = ArranjoEstais.Leque;
+    /// <summary>Flecha do arco / vão (1/6 usual).</summary>
+    public double ArchRise { get; set; } = 1.0 / 6;
+    public TipoAla WingWalls { get; set; } = TipoAla.Abertas;
+    /// <summary>Buzinotes (drenos do tabuleiro).</summary>
+    public bool Drains { get; set; } = true;
     /// <summary>Lâmina d'água sob a ponte (cota em relação à base, m) – só referência visual.</summary>
     public bool Water { get; set; }
     public double WaterLevel { get; set; } = 1.0;
