@@ -160,8 +160,8 @@ public static class BridgeGenerator
         geo.Warnings.AddRange(warnings);
         var spec = Spec(b, ctx.NativeTerrain);
 
-        if (s0 > 0.5) Approach(geo, path, prof, spec, 0, s0, ground, b.FillSlope, b.ApproachWalls);
-        if (s1 < L - 0.5) Approach(geo, path, prof, spec, s1, L, ground, b.FillSlope, b.ApproachWalls);
+        if (s0 > 0.5) Approach(geo, path, prof, spec, 0, s0, ground, b.FillSlope, b.ApproachWalls, wallEnd: true);
+        if (s1 < L - 0.5) Approach(geo, path, prof, spec, s1, L, ground, b.FillSlope, b.ApproachWalls, wallStart: true);
         var info = Structure(geo, path, prof, spec, s0, s1, ground, b.FillSlope, s0 > 0.5, s1 < L - 0.5);
         if (b.Water)
         {
@@ -234,7 +234,7 @@ public static class BridgeGenerator
 
     /// <summary>Rampa de acesso: pavimento, base, aterro com taludes (ou muros de terra armada), barreiras e terraplenagem.</summary>
     public static void Approach(MarkingGeometry geo, Polyline2 path, VerticalProfile prof, DeckSpec d, double s0, double s1, Func<Vec2, double> ground,
-        double fillSlope, bool walls)
+        double fillSlope, bool walls, bool wallStart = false, bool wallEnd = false)
     {
         var half = d.DeckHalf;
         var surf = d.Surface(prof);
@@ -267,8 +267,14 @@ public static class BridgeGenerator
         else Infra.Embankment(geo, path, prof, -half, half, s0, s1, fillSlope, ground, native: d.Native);
         Guards(geo, path, surf, d, s0, s1);
         if (d.Markings) Infra.LaneMarkings(geo, path, surf, -d.RoadHalf, d.RoadHalf, d.Lanes, s0, s1, d.TwoWay);
-        geo.Corridors.Add(Infra.Corridor(path, prof, -half - 0.3, half + 0.3, s0, s1, Infra.Wearing + 0.35, 1.0, fillSlope,
-            daylightRight: !walls, daylightLeft: !walls, label: "Rampa de acesso"));
+        var ramp = Infra.Corridor(path, prof, -half - 0.3, half + 0.3, s0, s1, Infra.Wearing + 0.35, 1.0, fillSlope,
+            daylightRight: !walls, daylightLeft: !walls, step: 2, label: "Rampa de acesso");
+        ramp.WallLeft = ramp.WallRight = walls;
+        // Junto ao encontro o aterro termina contido pela cortina (degrau até o terreno sob a ponte).
+        ramp.WallStart = wallStart;
+        ramp.WallEnd = wallEnd;
+        ramp.EndSpill = d.WingWalls == TipoAla.Abertas && !walls;     // alas abertas: saia de aterro sob o primeiro vão
+        geo.Corridors.Add(ramp);
     }
 
     /// <summary>Passeios elevados (0,20 m) entre a barreira e a borda, com meio-fio.</summary>

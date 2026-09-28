@@ -224,6 +224,23 @@
                     </Grid>
                 </GroupBox>
 
+                <GroupBox Header="Relevo sobre o terreno nativo (Massa e terreno → Toposolid)">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Greide da via" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Column="1" x:Name="CbRelief" ToolTip="Acompanhar o terreno: a via sobe e desce com a topografia e o Toposolid é cortado/aterrado só na largura da plataforma. Greide suavizado: rampa máxima e curvas verticais, com cortes e aterros maiores (taludes). Plana: sem alterar o terreno."/>
+                        <TextBlock Grid.Row="1" Text="Rampa máxima (%) – greide suavizado" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbReliefGrade" Text="8" ToolTip="Vias urbanas: até 8–10 %; rodovias (DNIT): 3–6 %."/>
+                        <TextBlock Grid.Row="2" Text="Talude de corte (H : 1 V)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbCutSlope" Text="1"/>
+                        <TextBlock Grid.Row="3" Text="Talude de aterro (H : 1 V)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbFillSlope" Text="1,5"/>
+                        <TextBlock Grid.Row="4" Grid.ColumnSpan="2" TextWrapping="Wrap" Foreground="#666" Margin="0,4,0,0"
+                                   Text="Com Toposolid sob a via, o terreno é cortado e aterrado automaticamente (taludes, degraus nos muros). Sem Toposolid a via fica plana. Depois, Perfil da Via ajusta o greide e cria viadutos/túneis onde o relevo pede."/>
+                    </Grid>
+                </GroupBox>
+
                 <GroupBox Header="Caminho (eixo)">
                     <StackPanel>
                         <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar a via por pontos (conecta-se às vias existentes)" IsChecked="True"/>

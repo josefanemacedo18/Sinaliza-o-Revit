@@ -210,13 +210,54 @@ public static class EarthworksGenerator
                 var ext = new Polyline2(new[] { p, p + tn * d.ApproachCut });
                 var z = prof.Z(s);
                 var extProf = VerticalProfile.Flat(z);
-                geo.Corridors.Add(Infra.Corridor(ext, extProf, -halfClear - t - 1, halfClear + t + 1, 0, ext.Length, Infra.Wearing + 0.35, 1.0, 1.5, label: "Emboque"));
+                var cut = Infra.Corridor(ext, extProf, -halfClear - t - 1, halfClear + t + 1, 0, ext.Length, Infra.Wearing + 0.35, 1.0, 1.5, step: 2, label: "Emboque");
+                cut.WallStart = true;           // testa do emboque: face vertical até o topo da testa, talude acima
+                cut.WallCap = PortalCap(d) + Infra.Wearing + 0.35;
+                geo.Corridors.Add(cut);
             }
         geo.PathLength = L;
         geo.PaintedLength = L;
         geo.UnitCount = fans;
         BridgeGenerator.Measure(geo, MarkingColor.Concreto, 0);
+        // Volume de escavação (envoltória externa do revestimento): no Revit vira uma Massa que escava o Toposolid – o terreno
+        // natural fica por cima e o furo do túnel aparece no terreno nativo.
+        if (ctx.NativeTerrain)
+        {
+            var env = Envelope(parts);
+            if (env.Count >= 3)
+                SolidSweep.Along(geo, path, s => env.Select(q => new SectionPt(q.Y, q.Z + prof.Z(s))).ToList(), MarkingColor.Terra, 0, L, 3, BoreLayer);
+        }
         return geo;
+    }
+
+    /// <summary>Altura da testa do emboque sobre a pista (m): acima dela a encosta é recortada em talude.</summary>
+    public static double PortalCap(TunnelDefinition d)
+    {
+        var (_, crown, _) = TunnelSection(d);
+        return crown + Math.Max(0.2, d.LiningThickness) + 1.8;
+    }
+
+    /// <summary>Camada das peças que só escavam o terreno nativo (não são desenhadas nem quantificadas como obra).</summary>
+    public const string BoreLayer = "ESCAVACAO";
+
+    /// <summary>Envoltória convexa (seção) de todas as partes do revestimento, no sentido anti-horário.</summary>
+    public static List<SectionPt> Envelope(IEnumerable<SectionPt[]> parts)
+    {
+        var pts = parts.SelectMany(p => p).Distinct().OrderBy(p => p.Y).ThenBy(p => p.Z).ToList();
+        if (pts.Count < 3) return pts;
+        double Cross(SectionPt o, SectionPt a, SectionPt b) => (a.Y - o.Y) * (b.Z - o.Z) - (a.Z - o.Z) * (b.Y - o.Y);
+        var hull = new List<SectionPt>();
+        foreach (var pass in new[] { pts, Enumerable.Reverse(pts).ToList() })
+        {
+            var start = hull.Count;
+            foreach (var p in pass)
+            {
+                while (hull.Count >= start + 2 && Cross(hull[^2], hull[^1], p) <= 1e-9) hull.RemoveAt(hull.Count - 1);
+                hull.Add(p);
+            }
+            hull.RemoveAt(hull.Count - 1);
+        }
+        return hull;
     }
 
     private static void Portal(MarkingGeometry geo, TunnelDefinition d, Polyline2 path, VerticalProfile prof, double s, int dir, List<SectionPt[]> ring,
@@ -273,10 +314,11 @@ public static class EarthworksGenerator
         double top, double bottom, double wing)
     {
         const double th = 0.8;
+        // Testa com as alas descendo em 1:1 nas pontas (acompanham o talude do emboque).
         var parts = new List<SectionPt[]>
         {
-            SolidSweep.Rect(-outer - wing, -halfClear, bottom, top),
-            SolidSweep.Rect(halfClear, outer + wing, bottom, top),
+            new[] { new SectionPt(-outer - wing, bottom), new SectionPt(-halfClear, bottom), new SectionPt(-halfClear, top), new SectionPt(-outer, top), new SectionPt(-outer - wing, top - wing) },
+            new[] { new SectionPt(halfClear, bottom), new SectionPt(outer + wing, bottom), new SectionPt(outer + wing, top - wing), new SectionPt(outer, top), new SectionPt(halfClear, top) },
         };
         if (d.Section == SecaoTunel.Retangular)
             parts.Add(SolidSweep.Rect(-halfClear, halfClear, crown, top));
@@ -300,8 +342,25 @@ public static class EarthworksGenerator
         }
         foreach (var part in parts)
             SolidSweep.Add(geo, SolidSweep.Extrude(part.Select(q => new SectionPt(q.Y, q.Z + z)).ToList(), p - tn * (th / 2), tn, th), MarkingColor.Concreto, "EMBOQUE");
-        // Coroamento.
-        SolidSweep.Add(geo, SolidSweep.Box(p, tn, th + 0.3, 2 * (outer + wing) + 0.3, z + top, z + top + 0.25), MarkingColor.Concreto, "EMBOQUE");
+        // Coroamento (sobre o trecho reto da testa) e moldura saliente em volta da boca.
+        SolidSweep.Add(geo, SolidSweep.Box(p, tn, th + 0.3, 2 * outer + 0.3, z + top, z + top + 0.25), MarkingColor.Concreto, "EMBOQUE");
+        if (d.Section != SecaoTunel.Retangular)
+        {
+            var r0 = halfClear;
+            var c0 = crown - r0;
+            const int m = 16;
+            for (int i = 0; i < m; i++)
+            {
+                double A(int k) => Math.PI * k / m;
+                var q = new[]
+                {
+                    new SectionPt(Math.Cos(A(i)) * r0, c0 + Math.Sin(A(i)) * r0), new SectionPt(Math.Cos(A(i)) * (r0 + 0.6), c0 + Math.Sin(A(i)) * (r0 + 0.6)),
+                    new SectionPt(Math.Cos(A(i + 1)) * (r0 + 0.6), c0 + Math.Sin(A(i + 1)) * (r0 + 0.6)), new SectionPt(Math.Cos(A(i + 1)) * r0, c0 + Math.Sin(A(i + 1)) * r0),
+                };
+                if (Polygon2.SignedArea(q.Select(v => new Vec2(v.Y, v.Z)).ToList()) < 0) Array.Reverse(q);
+                SolidSweep.Add(geo, SolidSweep.Extrude(q.Select(v => new SectionPt(v.Y, v.Z + z)).ToList(), p + tn * (th / 2), tn, 0.15), MarkingColor.PavimentoConcreto, "EMBOQUE");
+            }
+        }
     }
 
     // ================================================================== trincheira
@@ -385,7 +444,10 @@ public static class EarthworksGenerator
         }
         if (d.Lighting) Infra.Lights(geo, path, prof, half + 0.1, 0, L, 25, false, 9);
         // Terraplenagem: escavação entre os muros (sem taludes – os muros contêm o terreno) e rampas em corte nas pontas.
-        geo.Corridors.Add(Infra.Corridor(path, prof, -half - 0.3 - t, half + 0.3 + t, ws0, ws1, Infra.Wearing + 0.35, 1.0, 1.5, false, false, 3, "Trincheira"));
+        // Muros: o terreno natural volta logo atrás da face externa (degrau vertical), sem rampa de terra até a borda.
+        var trench = Infra.Corridor(path, prof, -half - 0.3 - t, half + 0.3 + t, ws0, ws1, Infra.Wearing + 0.35, 1.0, 1.5, false, false, 2, "Trincheira");
+        trench.WallLeft = trench.WallRight = true;
+        geo.Corridors.Add(trench);
         if (ws0 > 1) geo.Corridors.Add(Infra.Corridor(path, prof, -half - 0.3, half + 0.3, 0, ws0, Infra.Wearing + 0.35, 1.0, 1.5, label: "Rampa"));
         if (ws1 < L - 1) geo.Corridors.Add(Infra.Corridor(path, prof, -half - 0.3, half + 0.3, ws1, L, Infra.Wearing + 0.35, 1.0, 1.5, label: "Rampa"));
         geo.PathLength = L;
@@ -588,8 +650,18 @@ public static class EarthworksGenerator
         var L = path.Length;
         if (L < 1) { geo.Warnings.Add("Linha do talude muito curta."); return geo; }
         var u = d.UphillLeft ? 1.0 : -1.0;
-        var baseProf = Infra.GroundProfile(d, path, ctx, null, Math.Max(1, L / 80));
         var prof = SlopeProfile(d);
+        // Aterro: o pé fica no terreno natural (linha desenhada) e a crista H acima. Corte: a CRISTA fica no terreno natural
+        // (a H·razão do pé, lado de cima) e o pé H abaixo dela – o talude entra no maciço e o terreno à frente é rebaixado.
+        var cut = d.Type == TipoTalude.Corte;
+        var crestOff = prof[^1].Y;
+        var groundProf = Infra.GroundProfile(d, path, ctx, cut ? s => path.PointAt(s) + SolidSweep.Normal(path, s) * (u * crestOff) : null, Math.Max(1, L / 80));
+        var baseProf = groundProf;
+        if (cut)
+        {
+            baseProf = new VerticalProfile();
+            foreach (var (s, z) in groundProf.Pvis) baseProf.Pvis.Add((s, z - prof[^1].Z));
+        }
         var lining = d.Lining switch
         {
             RevestimentoTalude.ConcretoProjetado => MarkingColor.Concreto,
@@ -669,9 +741,24 @@ public static class EarthworksGenerator
                 var b = Vec3.At(p + n * y0, zb + z0);
                 if (u > 0) { c.Left.Add(a); c.Right.Add(b); } else { c.Left.Add(b); c.Right.Add(a); }
             }
-            if (i == 0) { if (u > 0) c.DaylightRight = true; else c.DaylightLeft = true; }
+            if (i == 0 && !cut) { if (u > 0) c.DaylightRight = true; else c.DaylightLeft = true; }
             if (i + 2 == prof.Count) { if (u > 0) c.DaylightLeft = true; else c.DaylightRight = true; }
             geo.Corridors.Add(c);
+        }
+        if (cut)
+        {
+            // Plataforma rebaixada à frente do pé do corte (com a canaleta), concordando com o terreno do lado de baixo.
+            var front = new GradeCorridor { DaylightLeft = u < 0, DaylightRight = u > 0, CutSlope = Math.Max(0.5, d.Ratio), FillSlope = 1.5, Label = "Pé do corte" };
+            foreach (var s in SolidSweep.Stations(path, 0, L, 2))
+            {
+                var p = path.PointAt(s);
+                var n = SolidSweep.Normal(path, s) * u;
+                var z = baseProf.Z(s);
+                var a = Vec3.At(p, z);
+                var b = Vec3.At(p - n * Math.Max(1.5, d.ToePlatform), z);
+                if (u > 0) { front.Left.Add(a); front.Right.Add(b); } else { front.Left.Add(b); front.Right.Add(a); }
+            }
+            geo.Corridors.Add(front);
         }
         geo.PathLength = L;
         geo.PaintedLength = L;

@@ -165,6 +165,7 @@ public sealed class GeometryPreview : FrameworkElement
         {
             foreach (var piece in _geometry.Pieces)
             {
+                if (piece.Layer == Core.Generators.EarthworksGenerator.BoreLayer) continue;
                 var rgb = MarkingColors.Display(piece.Color);
                 var brush = new SolidColorBrush(Color.FromRgb(rgb.R, rgb.G, rgb.B));
                 brush.Freeze();
@@ -220,6 +221,7 @@ public sealed class GeometryPreview : FrameworkElement
         foreach (var pav in _pavement) faces.Add((pav.Outer.Select(v => Vec3.At(v, -0.02)).ToList(), MarkingColor.Asfalto));
         foreach (var p in _geometry!.Pieces)
         {
+            if (p.Layer == Core.Generators.EarthworksGenerator.BoreLayer) continue;
             if (p.Solid != null) { foreach (var f in p.Solid.Faces) faces.Add((f.Select(v => v with { Z = v.Z + p.Elevation }).ToList(), p.Color)); continue; }
             if (p.Profile != null)
             {

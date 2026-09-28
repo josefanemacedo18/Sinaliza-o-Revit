@@ -137,12 +137,13 @@ public sealed class RoadGrade
     /// Eleva o greide num trecho: cota <paramref name="height"/> (relativa) entre <paramref name="s0"/> e <paramref name="s1"/>,
     /// com rampas de <paramref name="maxGrade"/> fora do trecho até reencontrar o greide atual. Mantém o que já existe fora.
     /// </summary>
-    public void RaiseBetween(double s0, double s1, double height, double maxGrade, double length, double? curve = null)
+    public void RaiseBetween(double s0, double s1, double height, double maxGrade, double length, double? curve = null, double? heightEnd = null)
     {
         maxGrade = Math.Max(0.005, maxGrade);
         var old = Clone();
+        var h1 = heightEnd ?? height;
         var run0 = Math.Abs(height - old.Z(s0)) / maxGrade;
-        var run1 = Math.Abs(height - old.Z(s1)) / maxGrade;
+        var run1 = Math.Abs(h1 - old.Z(s1)) / maxGrade;
         var a = Math.Max(0, s0 - run0);
         var b = Math.Min(length, s1 + run1);
         var keep = Points.Where(q => q.S < a - 1 || q.S > b + 1).ToList();
@@ -151,10 +152,27 @@ public sealed class RoadGrade
         if (!Points.Any(q => q.S < a - 1)) Points.Add(new GradePoint(0, a > 1 ? old.Z(0) : height));
         if (a > 1) Points.Add(new GradePoint(a, old.Z(a), curve));
         Points.Add(new GradePoint(Math.Max(0, s0), height, curve));
-        Points.Add(new GradePoint(Math.Min(length, s1), height, curve));
+        Points.Add(new GradePoint(Math.Min(length, s1), h1, curve));
         if (b < length - 1) Points.Add(new GradePoint(b, old.Z(b), curve));
-        if (!Points.Any(q => q.S > b + 1)) Points.Add(new GradePoint(length, b < length - 1 ? old.Z(length) : height));
+        if (!Points.Any(q => q.S > b + 1)) Points.Add(new GradePoint(length, b < length - 1 ? old.Z(length) : h1));
         Normalize();
+    }
+
+    /// <summary>PIVs digitados, um por linha: "estaca; cota; curva (opcional)" – vírgula ou ponto decimal.</summary>
+    public static List<GradePoint> ParsePvis(string? text, double stationOffset = 0)
+    {
+        var res = new List<GradePoint>();
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        foreach (var line in (text ?? "").Replace("\\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = line.Split(new[] { ';', '\t' }, StringSplitOptions.RemoveEmptyEntries).Select(p => p.Trim().Replace(',', '.')).ToList();
+            if (parts.Count < 2) continue;
+            if (!double.TryParse(parts[0], System.Globalization.NumberStyles.Float, inv, out var s)) continue;
+            if (!double.TryParse(parts[1], System.Globalization.NumberStyles.Float, inv, out var z)) continue;
+            double? c = parts.Count > 2 && double.TryParse(parts[2], System.Globalization.NumberStyles.Float, inv, out var cv) ? cv : null;
+            res.Add(new GradePoint(s + stationOffset, z, c));
+        }
+        return res.OrderBy(q => q.S).ToList();
     }
 
     /// <summary>Ordena, remove PIVs coincidentes e intermediários colineares.</summary>
@@ -313,5 +331,77 @@ public static class GradeLift
         n = n * (1 / len);
         var d = n.Dot(f[0]);
         return f.All(v => Math.Abs(n.Dot(v) - d) < 1e-4);
+    }
+}
+
+/// <summary>
+/// Pisos que acompanham o greide: divididos em trechos ao longo do eixo (cada piso com poucas dezenas de metros) e com os
+/// pontos de apoio da edição de forma alinhados ao eixo – bordas, eixo (crista do abaulamento) e linhas intermediárias.
+/// </summary>
+public static class GradeFloors
+{
+    /// <summary>Corta o contorno em trechos de até <paramref name="length"/> m ao longo do eixo (cortes perpendiculares).</summary>
+    public static List<Polygon2> Chunks(Polygon2 shape, GradeSurface surf, double length = 40)
+    {
+        var axis = surf.Axis;
+        var loc = shape.Outer.Select(surf.Locate).ToList();
+        if (loc.Count == 0) return new List<Polygon2> { shape };
+        var s0 = loc.Min(l => l.S);
+        var s1 = loc.Max(l => l.S);
+        var w = loc.Max(l => Math.Abs(l.Y)) + 2;
+        if (s1 - s0 <= length * 1.25) return new List<Polygon2> { shape };
+        var n = (int)Math.Ceiling((s1 - s0) / length);
+        var res = new List<Polygon2>();
+        for (int k = 0; k < n; k++)
+        {
+            var a = s0 + (s1 - s0) * k / n;
+            var b = s0 + (s1 - s0) * (k + 1) / n;
+            // Faixa [a, b] ao longo do eixo (as pontas passam um pouco das extremidades do contorno).
+            var a2 = k == 0 ? a - 5 : a;
+            var b2 = k == n - 1 ? b + 5 : b;
+            var st = new List<double>();
+            for (var s = a2; s < b2; s += 2) st.Add(s);
+            st.Add(b2);
+            Vec2 P(double s, double y)
+            {
+                var sc = Math.Clamp(s, 0, axis.Length);
+                var p = axis.PointAt(sc) + axis.TangentAt(sc) * (s - sc);
+                return p + axis.TangentAt(sc).PerpLeft * y;
+            }
+            var band = st.Select(s => P(s, w)).Concat(st.AsEnumerable().Reverse().Select(s => P(s, -w))).ToList();
+            try { res.AddRange(PolygonOps.Intersect(new[] { shape }, new[] { new Polygon2(band) }).Where(p => p.Area > 0.05)); }
+            catch { return new List<Polygon2> { shape }; }
+        }
+        return res.Count > 0 ? res : new List<Polygon2> { shape };
+    }
+
+    /// <summary>
+    /// Pontos internos de apoio (planta): linhas paralelas ao eixo (inclui o eixo, onde fica a crista do abaulamento) a cada
+    /// <paramref name="ds"/> m, afastadas <paramref name="margin"/> m do contorno.
+    /// </summary>
+    public static List<Vec2> Supports(Polygon2 shape, GradeSurface surf, double ds = 3, double dy = 2.5, double margin = 0.3, int max = 1500)
+    {
+        var axis = surf.Axis;
+        var loc = shape.Outer.Select(surf.Locate).ToList();
+        if (loc.Count == 0) return new();
+        double s0 = Math.Max(0, loc.Min(l => l.S)), s1 = Math.Min(axis.Length, loc.Max(l => l.S));
+        double y0 = loc.Min(l => l.Y), y1 = loc.Max(l => l.Y);
+        var ys = new List<double>();
+        for (var y = Math.Ceiling(y0 / dy) * dy; y <= y1; y += dy) ys.Add(y);
+        if (y0 < 0 && y1 > 0 && !ys.Any(y => Math.Abs(y) < 1e-6)) ys.Add(0);
+        var inner = PolygonOps.Offset(new[] { shape }, -margin);
+        var res = new List<Vec2>();
+        for (var s = s0 + ds / 2; s < s1; s += ds)
+        {
+            var p = axis.PointAt(s);
+            var nrm = axis.TangentAt(s).PerpLeft;
+            foreach (var y in ys)
+            {
+                var q = p + nrm * y;
+                if (inner.Any(e => e.Contains(q))) res.Add(q);
+                if (res.Count >= max) return res;
+            }
+        }
+        return res;
     }
 }

@@ -17,6 +17,18 @@ public enum ModoGreide
     Manual,
 }
 
+/// <summary>Relevo da via ao ser criada sobre o terreno nativo (Toposolid).</summary>
+public enum RelevoVia
+{
+    /// <summary>Via plana na cota do eixo – o terreno não é alterado.</summary>
+    Plana,
+    /// <summary>Greide colado no terreno (suavização curta): a via sobe e desce com a topografia; a plataforma fica em nível
+    /// transversal com pequenos cortes/aterros laterais.</summary>
+    AcompanharTerreno,
+    /// <summary>Greide suavizado com rampa máxima e curvas verticais: cortes e aterros com taludes no Toposolid.</summary>
+    GreideSuavizado,
+}
+
 /// <summary>O que o trecho da via vira conforme a topografia.</summary>
 public enum TipoTrecho { Plataforma, Aterro, Corte, Viaduto, Tunel, Trincheira }
 
@@ -103,6 +115,18 @@ public sealed class PerfilResultado
 public static class RoadProfileDesigner
 {
     public const double Step = 5;
+
+    /// <summary>Opções do perfil para o relevo escolhido na criação da via (sem obras automáticas).</summary>
+    public static PerfilOpcoes ForRelief(RelevoVia r, double maxGrade, double cut, double fill) => new()
+    {
+        Mode = ModoGreide.AcompanharTerreno,
+        Smoothing = r == RelevoVia.AcompanharTerreno ? 20 : 150,
+        VerticalCurve = r == RelevoVia.AcompanharTerreno ? 20 : 80,
+        MaxGrade = r == RelevoVia.AcompanharTerreno ? 0.30 : maxGrade,
+        CutSlope = cut,
+        FillSlope = fill,
+        AutoStructures = false,
+    };
 
     public static PerfilResultado Design(double length, Func<double, double?> groundAt, PerfilOpcoes o)
     {

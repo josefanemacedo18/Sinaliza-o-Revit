@@ -1,6 +1,7 @@
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
+using SinalizacaoViaria.Core.Model;
 
 namespace SinalizacaoViaria.Core.Automation;
 
@@ -59,6 +60,68 @@ public static class InfraRoads
         return s;
     }
 
+    /// <summary>
+    /// Trechos da via que as obras tiram da terraplenagem da via (a obra trata o terreno do próprio trecho) e como a via
+    /// termina junto a elas: face vertical nos encontros de pontes e nos emboques de túneis (com a testa limitada à altura do
+    /// emboque e talude acima). Pala: a via termina na testa, à frente do túnel.
+    /// </summary>
+    public static List<(double A, double B, bool Face, double? Cap, bool Spill)> TerrainGaps(IEnumerable<MarkingDefinition> works, double subgrade)
+    {
+        var res = new List<(double, double, bool, double?, bool)>();
+        foreach (var w in works)
+        {
+            if (w is not IHostedStructure h) continue;
+            if (w is ITerrainAware { AdjustTerrain: false } && w is not BridgeDefinition) continue;
+            var a = Math.Min(h.HostStart, h.HostEnd);
+            var b = Math.Max(h.HostStart, h.HostEnd);
+            switch (w)
+            {
+                case TunnelDefinition tn:
+                {
+                    var ext = tn.Portal == TipoEmboque.Pala ? Math.Max(0, tn.PortalLength) : 0;
+                    res.Add((a - ext, b + ext, true, EarthworksGenerator.PortalCap(tn) + subgrade, false));
+                    break;
+                }
+                case BridgeDefinition br:
+                    // Alas abertas: saia de aterro à frente do encontro; alas paralelas/terra armada: face vertical (contida).
+                    res.Add((a, b, true, null, br.WingWalls == TipoAla.Abertas && !br.ApproachWalls));
+                    break;
+                default:
+                    res.Add((a, b, false, null, false));
+                    break;
+            }
+        }
+        return res.OrderBy(x => x.Item1).ToList();
+    }
+
+    /// <summary>Faixas de terraplenagem da via fora dos trechos em obra (plataforma no greide, taludes, faces junto às obras).</summary>
+    public static List<GradeCorridor> RoadCorridors(Polyline2 axis, VerticalProfile prof, double right, double left, double s0, double s1, double subgrade,
+        double cut, double fill, IEnumerable<MarkingDefinition> works)
+    {
+        var res = new List<GradeCorridor>();
+        var cursor = s0;
+        (bool Face, double? Cap, bool Spill) before = (false, null, false);
+        foreach (var (a, b, face, cap, spill) in TerrainGaps(works, subgrade).Append((s1 + 1, s1 + 2, false, null, false)))
+        {
+            var e = Math.Min(a, s1);
+            if (e - cursor > 2)
+            {
+                var c = Infra.Corridor(axis, prof, right, left, cursor, e, subgrade, cut, fill, step: 3, label: "Via");
+                c.WallStart = before.Face;
+                c.WallEnd = face && a <= s1;
+                // Uma faixa só tem um limite de testa: vale o do emboque (o encontro de ponte não tem limite).
+                c.WallCap = c.WallEnd ? cap : before.Cap;
+                if (c.WallStart && c.WallEnd && before.Cap == null) c.WallCap = cap;
+                c.EndSpill = c.WallEnd ? spill : before.Spill;
+                res.Add(c);
+            }
+            before = (face, cap, spill);
+            cursor = Math.Max(cursor, b);
+            if (cursor >= s1) break;
+        }
+        return res;
+    }
+
     /// <summary>Greide a partir de um perfil do gerador (mesmos PIVs e curva).</summary>
     public static RoadGrade FromProfile(VerticalProfile p, double curve)
     {
@@ -95,6 +158,43 @@ public static class InfraRoads
             case PerfilObra.Convexo:
             {
                 var g = new RoadGrade { DefaultCurve = Math.Max(20, L * 0.9), Points = { new(0, z0), new(L / 2, Math.Max(b.Height, Math.Max(z0, z1) + 1)), new(L, z1) } };
+                var (s0, s1) = StructureRange(path, g, ground, BridgeGenerator.MaxFillHeight, Math.Max(10, b.SpanLength));
+                return (g, s0, s1, warnings);
+            }
+            case PerfilObra.Concavo:
+            {
+                // Ponto baixo no meio (cota "Altura"), subindo às cabeceiras: vale entre duas cristas.
+                var mid = Math.Min(b.Height, Math.Min(z0, z1) - 0.5);
+                var g = new RoadGrade { DefaultCurve = Math.Max(20, L * 0.9), Points = { new(0, z0), new(L / 2, mid), new(L, z1) } };
+                if (b.Height > Math.Min(z0, z1)) warnings.Add("Perfil côncavo: a cota do meio deve ficar abaixo das cabeceiras – usada 0,5 m abaixo da mais baixa.");
+                var (s0, s1) = StructureRange(path, g, ground, BridgeGenerator.MaxFillHeight, Math.Max(10, b.SpanLength));
+                return (g, s0, s1, warnings);
+            }
+            case PerfilObra.Inclinado:
+            {
+                // Rampa de acesso até a altura do início, tabuleiro inclinado até a altura do fim, rampa até o terreno.
+                var gmax = Math.Max(0.005, b.MaxGrade);
+                var ra = b.ApproachStart ? Math.Abs(b.Height - z0) / gmax : 0;
+                var rb = b.ApproachEnd ? Math.Abs(b.EndHeight - z1) / gmax : 0;
+                if (ra + rb > L * 0.8) { var k = L * 0.8 / (ra + rb); ra *= k; rb *= k; warnings.Add("Eixo curto para as rampas de acesso: rampas acima da máxima."); }
+                var g = new RoadGrade { DefaultCurve = b.VerticalCurve };
+                if (ra > 0.5) g.Points.Add(new GradePoint(0, z0));
+                g.Points.Add(new GradePoint(ra, b.Height));
+                g.Points.Add(new GradePoint(L - rb, b.EndHeight));
+                if (rb > 0.5) g.Points.Add(new GradePoint(L, z1));
+                g.Normalize();
+                var slope = Math.Abs(b.EndHeight - b.Height) / Math.Max(1, L - ra - rb);
+                if (slope > gmax + 1e-6) warnings.Add($"Tabuleiro com {(slope * 100):0.0} % de inclinação – acima da rampa máxima.");
+                var (s0, s1) = StructureRange(path, g, ground, BridgeGenerator.MaxFillHeight, Math.Max(10, b.SpanLength));
+                return (g, Math.Min(s0, Math.Max(0, ra)), Math.Max(s1, Math.Min(L, L - rb)), warnings);
+            }
+            case PerfilObra.Personalizado:
+            {
+                var pv = RoadGrade.ParsePvis(b.ProfilePvis);
+                if (pv.Count < 2) { warnings.Add("PIVs do perfil personalizado inválidos (uma linha por PIV: estaca; cota; curva) – usado o perfil com rampas."); goto default; }
+                var g = new RoadGrade { DefaultCurve = b.VerticalCurve };
+                g.Points.AddRange(pv);
+                g.Normalize();
                 var (s0, s1) = StructureRange(path, g, ground, BridgeGenerator.MaxFillHeight, Math.Max(10, b.SpanLength));
                 return (g, s0, s1, warnings);
             }
@@ -141,6 +241,29 @@ public static class InfraRoads
                 var za = g.Z(s0);
                 var zb = g.Z(s1);
                 Replace(g, s0, s1, new[] { new GradePoint(s0, za), new GradePoint((s0 + s1) / 2, Math.Max(b.Height, Math.Max(za, zb) + 1), (s1 - s0) * 0.9), new GradePoint(s1, zb) });
+                return g;
+            }
+            case PerfilObra.Concavo:
+            {
+                var za = g.Z(s0);
+                var zb = g.Z(s1);
+                Replace(g, s0, s1, new[] { new GradePoint(s0, za), new GradePoint((s0 + s1) / 2, Math.Min(b.Height, Math.Min(za, zb) - 0.5), (s1 - s0) * 0.9), new GradePoint(s1, zb) });
+                return g;
+            }
+            case PerfilObra.Inclinado:
+                g.RaiseBetween(s0, s1, b.Height, b.MaxGrade, length, b.VerticalCurve, b.EndHeight);
+                return g;
+            case PerfilObra.Personalizado:
+            {
+                var all = RoadGrade.ParsePvis(b.ProfilePvis, s0);
+                if (all.Count < 2) { g.RaiseBetween(s0, s1, b.Height, b.MaxGrade, length, b.VerticalCurve); return g; }
+                // PIVs relativos ao início da obra, recortados ao trecho (as pontas do trecho seguem a linha dos PIVs).
+                var pg = new RoadGrade { DefaultCurve = 0 };
+                pg.Points.AddRange(all);
+                var inner = all.Where(q => q.S > s0 + 0.5 && q.S < s1 - 0.5).ToList();
+                inner.Insert(0, new GradePoint(s0, pg.Z(s0)));
+                inner.Add(new GradePoint(s1, pg.Z(s1)));
+                Replace(g, s0, s1, inner);
                 return g;
             }
             default:

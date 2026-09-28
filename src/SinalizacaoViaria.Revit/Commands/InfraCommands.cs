@@ -204,12 +204,26 @@ internal static class InfraForms
             {
                 ("Rampas de acesso até a altura, trecho em nível (viaduto)", PerfilObra.RampasDeAcesso), ("Horizontal na altura indicada (sem rampas)", PerfilObra.Horizontal),
                 ("Reta de uma margem à outra (ponte sobre vale/rio)", PerfilObra.EntreMargens), ("Convexo – curva vertical única com o alto no meio", PerfilObra.Convexo),
+                ("Inclinado – rampa constante da altura do início à do fim", PerfilObra.Inclinado),
+                ("Côncavo – ponto baixo no meio (vale entre cristas)", PerfilObra.Concavo),
+                ("Personalizado – PIVs digitados", PerfilObra.Personalizado),
                 ("Manter o greide da via existente", PerfilObra.GreideDaVia),
             }, () => d.ProfileKind, v => d.ProfileKind = v)
          .Check("Traçado reto (só as pontas do eixo desenhado – obra em tangente)", () => d.StraightAxis, v => d.StraightAxis = v)
-         .If(() => d.ProfileKind is PerfilObra.RampasDeAcesso or PerfilObra.Horizontal or PerfilObra.Convexo,
+         .If(() => d.ProfileKind is PerfilObra.RampasDeAcesso or PerfilObra.Horizontal,
              x => x.Number("Altura do tabuleiro sobre a base (m)", () => d.Height, v => d.Height = v, 2, 120, "0.00", "Gabarito vertical livre ≥ 5,50 m sobre rodovias (DNIT)."))
-         .If(() => d.ProfileKind == PerfilObra.RampasDeAcesso, x => x
+         .If(() => d.ProfileKind == PerfilObra.Inclinado,
+             x => x.Number("Altura do tabuleiro no INÍCIO (m sobre a base)", () => d.Height, v => d.Height = v, -50, 120, "0.00"))
+         .If(() => d.ProfileKind == PerfilObra.Convexo,
+             x => x.Number("Cota do ponto ALTO no meio (m sobre a base)", () => d.Height, v => d.Height = v, -50, 120, "0.00"))
+         .If(() => d.ProfileKind == PerfilObra.Concavo,
+             x => x.Number("Cota do ponto BAIXO no meio (m sobre a base)", () => d.Height, v => d.Height = v, -50, 120, "0.00", "Abaixo das cabeceiras – ponte em \"barriga\" sobre o vale."))
+         .If(() => d.ProfileKind == PerfilObra.Inclinado,
+             x => x.Number("Altura do tabuleiro no FIM (m sobre a base)", () => d.EndHeight, v => d.EndHeight = v, -50, 120, "0.00"))
+         .If(() => d.ProfileKind == PerfilObra.Personalizado,
+             x => x.Text("PIVs – uma linha por PIV: estaca (a partir do início da obra); cota; curva", () => d.ProfilePvis, v => d.ProfilePvis = v ?? "", true,
+                 "Ex.: 0; 6\n40; 9; 60\n120; 7"))
+         .If(() => d.ProfileKind is PerfilObra.RampasDeAcesso or PerfilObra.Inclinado, x => x
              .Check("Rampa de acesso no início", () => d.ApproachStart, v => d.ApproachStart = v)
              .Check("Rampa de acesso no fim", () => d.ApproachEnd, v => d.ApproachEnd = v))
          .Percent("Rampa máxima (%)", () => d.MaxGrade, v => d.MaxGrade = v, 0.01, 0.12, "Veículos: 5–6 %; passarelas: ≤ 8,33 % (NBR 9050).")
@@ -394,6 +408,8 @@ internal static class InfraForms
          .Check("Canaletas nas bermas", () => d.BermChannels, v => d.BermChannels = v)
          .Number("Descidas d'água a cada (m, 0 = sem)", () => d.DowndrainSpacing, v => d.DowndrainSpacing = v, 0, 200)
          .Check("O talude sobe para a ESQUERDA da linha (senão, para a direita)", () => d.UphillLeft, v => d.UphillLeft = v)
+         .If(() => d.Type == TipoTalude.Corte, x => x.Number("Corte: plataforma rebaixada à frente do pé (m)", () => d.ToePlatform, v => d.ToePlatform = v, 0, 50, "0.0",
+             "No corte a linha desenhada é o PÉ do talude; a crista fica no terreno natural e o terreno à frente do pé é rebaixado até a cota do pé."))
          .Terrain(() => d.FollowTerrain, v => d.FollowTerrain = v, () => d.AdjustTerrain, v => d.AdjustTerrain = v);
         if (!edit) w.Modes(("Desenhar a linha por pontos", PathMode.Desenhar), ("Selecionar linhas existentes", PathMode.Linhas), ("Dois cliques", PathMode.DoisPontos));
         return w;

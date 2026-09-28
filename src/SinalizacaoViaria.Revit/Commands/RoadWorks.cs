@@ -219,6 +219,36 @@ internal static class RoadWorks
     }
 
     /// <summary>
+    /// Relevo da via recém-criada sobre o Toposolid: greide pelo terreno (colado ou suavizado) em todas as marcas da via e
+    /// terraplenagem no terreno nativo (corte, aterro e taludes). Sem Toposolid (ou relevo plano) nada muda.
+    /// </summary>
+    public static List<RenderResult> ApplyRelief(UIDocument uidoc, RoadPavementDefinition pav, RelevoVia relief)
+    {
+        var res = new List<RenderResult>();
+        var doc = uidoc.Document;
+        if (relief == RelevoVia.Plana || TerrainModel.Hosts(doc).Count == 0 || Road(doc, pav) is not { } road) return res;
+        var st = PluginContext.Settings;
+        var ground = Ground(doc, road.BaseZ);
+        var axis = road.Axis;
+        // Sem terreno sob a maior parte do eixo: fica plana.
+        var covered = Enumerable.Range(0, 21).Count(i => ground(axis.PointAt(axis.Length * i / 20)) != null);
+        if (covered < 5) return res;
+        var opt = RoadProfileDesigner.ForRelief(relief, st.RoadReliefMaxGrade, st.RoadCutSlope, st.RoadFillSlope);
+        var perfil = RoadProfileDesigner.Design(axis.Length, s => ground(axis.PointAt(s)), opt);
+        var grade = perfil.Grade;
+        grade.AdjustTerrain = true;
+        grade.CutSlope = st.RoadCutSlope;
+        grade.FillSlope = st.RoadFillSlope;
+        res.AddRange(SetGrade(uidoc, road.GroupId, grade));
+        TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { road.Pavement }, quiet: true);
+        var r = new RenderResult();
+        r.Warnings.Add((relief == RelevoVia.AcompanharTerreno ? "Relevo: a via acompanha o terreno" : "Relevo: greide suavizado") +
+                       $" – corte {perfil.CutM2:0} m² / aterro {perfil.FillM2:0} m² no eixo; Toposolid ajustado (corte, aterro e taludes).");
+        res.Insert(0, r);
+        return res;
+    }
+
+    /// <summary>
     /// Eixo de uma via nova: desenhado por pontos (encaixa nas vias existentes, curvas concordadas) ou linhas selecionadas;
     /// com <paramref name="straight"/> só as pontas valem (obra em tangente).
     /// </summary>

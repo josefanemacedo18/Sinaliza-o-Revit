@@ -17,6 +17,7 @@ public sealed class GradeSampler : ISurface
     private readonly Core.Geometry.GradeSurface _surface;
     private readonly double _baseM;
     public GradeSampler(Core.Geometry.GradeSurface surface, double baseM) { _surface = surface; _baseM = baseM; }
+    public Core.Geometry.GradeSurface Surface => _surface;
     public bool IsAvailable => true;
     public bool LiftsSolids => false;
     public bool TrySample(double xFt, double yFt, double zHintFt, out double zFt, out XYZ normal)

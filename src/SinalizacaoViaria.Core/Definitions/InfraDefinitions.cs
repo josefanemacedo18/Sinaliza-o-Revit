@@ -50,6 +50,12 @@ public enum PerfilObra
     Convexo,
     /// <summary>Mantém o greide que a via já tem.</summary>
     GreideDaVia,
+    /// <summary>Tabuleiro inclinado: rampa constante da altura no início à altura no fim (encosta, cais, acesso em desnível).</summary>
+    Inclinado,
+    /// <summary>Curva vertical côncava ("barriga") com o ponto baixo no meio – ponte sobre vale entre duas cristas.</summary>
+    Concavo,
+    /// <summary>Perfil personalizado: PIVs digitados (estaca a partir do início da obra; cota; curva).</summary>
+    Personalizado,
 }
 
 // ====================================================================== drenagem
@@ -310,6 +316,10 @@ public sealed class BridgeDefinition : MarkingDefinition, ITerrainAware, IHosted
     public PerfilObra ProfileKind { get; set; } = PerfilObra.RampasDeAcesso;
     /// <summary>Traçado reto entre as pontas do eixo desenhado (ignora os vértices intermediários).</summary>
     public bool StraightAxis { get; set; }
+    /// <summary>Perfil inclinado: cota do tabuleiro no fim da obra (m sobre a base; o início usa <see cref="Height"/>).</summary>
+    public double EndHeight { get; set; } = 4.0;
+    /// <summary>Perfil personalizado: PIVs "estaca; cota; curva" (estaca a partir do início da obra, cota sobre a base).</summary>
+    public string ProfilePvis { get; set; } = "";
     /// <summary>Esconsidade dos apoios (graus, ±60) – pilares e encontros paralelos ao rio/via cruzada.</summary>
     public double Skew { get; set; }
     /// <summary>Estações dos pilares (m, a partir do início da obra) – vazio = distribuídos pelo vão.</summary>
@@ -590,6 +600,8 @@ public sealed class SlopeDefinition : MarkingDefinition, ITerrainAware
     /// <summary>Descidas d'água em degraus a cada tantos metros (0 = sem).</summary>
     public double DowndrainSpacing { get; set; } = 40;
     /// <summary>A linha desenhada é o pé do talude; o talude sobe para a esquerda do sentido da linha.</summary>
+    /// <summary>Corte: largura da plataforma rebaixada à frente do pé (m), antes de concordar com o terreno.</summary>
+    public double ToePlatform { get; set; } = 3.0;
     public bool UphillLeft { get; set; } = true;
     public bool FollowTerrain { get; set; } = true;
     public bool AdjustTerrain { get; set; } = true;

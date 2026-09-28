@@ -34,6 +34,11 @@ public sealed class PluginSettings
     public Automation.FimLivre LastFreeEnds { get; set; } = Automation.FimLivre.Nenhum;
     public double LastCurveRadius { get; set; } = 30;
     public bool LastDrawRoad { get; set; } = true;
+    /// <summary>Relevo da via nova sobre o Toposolid: plana, acompanhando o terreno ou em greide suavizado (corte e aterro).</summary>
+    public Automation.RelevoVia RoadRelief { get; set; } = Automation.RelevoVia.AcompanharTerreno;
+    public double RoadReliefMaxGrade { get; set; } = 0.08;
+    public double RoadCutSlope { get; set; } = 1.0;
+    public double RoadFillSlope { get; set; } = 1.5;
     /// <summary>Modelos de via salvos pelo usuário (seção completa em JSON).</summary>
     public List<CustomRoadTemplate> CustomRoadTemplates { get; set; } = new();
     /// <summary>Última seção usada no "Sinalizar via" (reaberta na próxima vez).</summary>

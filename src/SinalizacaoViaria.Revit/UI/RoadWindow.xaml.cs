@@ -88,6 +88,8 @@ public partial class RoadWindow : Window
         public override string ToString() => Label;
     }
     public OutputSettings? OutputSettings { get; private set; }
+    /// <summary>Relevo escolhido para a via sobre o Toposolid.</summary>
+    public RelevoVia Relief { get; private set; } = RelevoVia.Plana;
     public bool DrawPath { get; private set; }
     public bool PickSurfaces => Output.PickSurfaces;
 
@@ -115,6 +117,13 @@ public partial class RoadWindow : Window
         Select(CbConnection, st.LastConnection);
         Select(CbFreeEnds, st.LastFreeEnds);
         TbCurveRadius.Text = UiHelpers.F(st.LastCurveRadius, "0.#");
+        CbRelief.Items.Add(new Option<RelevoVia>("Acompanhar o terreno (corte e aterro só na plataforma)", RelevoVia.AcompanharTerreno));
+        CbRelief.Items.Add(new Option<RelevoVia>("Greide suavizado com corte e aterro (rampa máxima)", RelevoVia.GreideSuavizado));
+        CbRelief.Items.Add(new Option<RelevoVia>("Plana, sem alterar o terreno", RelevoVia.Plana));
+        Select(CbRelief, st.RoadRelief);
+        TbReliefGrade.Text = UiHelpers.F(st.RoadReliefMaxGrade * 100, "0.#");
+        TbCutSlope.Text = UiHelpers.F(st.RoadCutSlope, "0.0#");
+        TbFillSlope.Text = UiHelpers.F(st.RoadFillSlope, "0.0#");
         CkIntCrosswalks.IsChecked = st.AutoCrosswalks;
         CkIntRamps.IsChecked = st.AutoCrosswalks;
 
@@ -594,6 +603,11 @@ public partial class RoadWindow : Window
             st.LastConnection = Connection;
             st.LastFreeEnds = FreeEnds;
             st.LastCurveRadius = CurveRadius;
+            Relief = Selected<RelevoVia>(CbRelief);
+            st.RoadRelief = Relief;
+            st.RoadReliefMaxGrade = UiHelpers.Parse(TbReliefGrade, 8, "Rampa máxima", 0.5, 30) / 100;
+            st.RoadCutSlope = UiHelpers.Parse(TbCutSlope, 1, "Talude de corte", 0.2, 5);
+            st.RoadFillSlope = UiHelpers.Parse(TbFillSlope, 1.5, "Talude de aterro", 0.5, 5);
             PluginContext.Settings.DefaultSpeed = Setup.Speed;
             DialogResult = true;
         }

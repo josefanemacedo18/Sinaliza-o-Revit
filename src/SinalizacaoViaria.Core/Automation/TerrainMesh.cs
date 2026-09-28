@@ -180,6 +180,19 @@ public static class TerrainRebuild
         return res;
     }
 
+    /// <summary>
+    /// Simula o Toposolid depois da terraplenagem: os pontos originais fora da região ficam, os de dentro são trocados pelos
+    /// pontos de <see cref="Points"/>, e tudo é triangulado (Delaunay) como o Revit faz. Usado em prévias e testes.
+    /// </summary>
+    public static TerrainMesh Simulate(TerrainMesh original, GradingResult design, double margin = 0.5)
+    {
+        var region = design.Footprint.Count == 0 ? new List<Polygon2>() : PolygonOps.Union(design.Footprint).Where(f => f.Area > 0.5).ToList();
+        var inRegion = Mask(region, margin);
+        var pts = original.DistinctPoints().Where(v => !inRegion(v.XY)).ToList();
+        pts.AddRange(Points(original, design, inRegion));
+        return Tin.Mesh(pts);
+    }
+
     /// <summary>Máscara rápida (grade de 1 m) de um conjunto de polígonos.</summary>
     public static Func<Vec2, bool> Mask(IEnumerable<Polygon2> polys, double margin = 1.0)
     {

@@ -78,6 +78,17 @@ public class CmdSinalizarVia : CommandBase
                 results[^1].Warnings.Add("Calçadas/meios-fios da via não puderam ser criados: " + ex.Message);
             }
         }
+        // Relevo: com Toposolid sob a via, o greide segue o terreno e o terreno é cortado/aterrado (plataforma e taludes).
+        if (w.Relief != Core.Automation.RelevoVia.Plana && defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } rp)
+        {
+            try { results.AddRange(RoadWorks.ApplyRelief(uidoc, rp, w.Relief).Where(r => r.Warnings.Count > 0)); }
+            catch (Exception ex)
+            {
+                Log.Error("Relevo da via", ex);
+                results.Add(new RenderResult());
+                results[^1].Warnings.Add("Não foi possível ajustar a via ao terreno: " + ex.Message);
+            }
+        }
         if (snapped.Count > 0 && results.Count > 0)
             results[0].Warnings.Insert(0, "Conexões: " + string.Join("; ", snapped.Distinct()) + ".");
         Report("Via", results);

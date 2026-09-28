@@ -116,9 +116,14 @@ public static class Grading
             res.Points.AddRange(left);
             res.Points.AddRange(right);
             for (int i = 0; i < n; i++) res.Points.Add(new Vec3((left[i].X + right[i].X) / 2, (left[i].Y + right[i].Y) / 2, (left[i].Z + right[i].Z) / 2));
-            // Taludes: do lado de fora de cada borda.
-            if (c.DaylightLeft) SlopeBand(res, left, right, c.CutSlope, c.FillSlope, ground, maxDaylight, step);
-            if (c.DaylightRight) SlopeBand(res, right, left, c.CutSlope, c.FillSlope, ground, maxDaylight, step, reverse: true);
+            // Taludes: do lado de fora de cada borda; muros: degrau até o terreno natural logo atrás da borda.
+            var dayL = c.DaylightLeft ? SlopeBand(res, left, right, c.CutSlope, c.FillSlope, ground, maxDaylight, step)
+                : c.WallLeft ? WallBand(res, left, right, ground) : left;
+            var dayR = c.DaylightRight ? SlopeBand(res, right, left, c.CutSlope, c.FillSlope, ground, maxDaylight, step, reverse: true)
+                : c.WallRight ? WallBand(res, right, left, ground) : right;
+            if (c.WallStart) EndWall(res, dayL[0], left[0], right[0], dayR[0], (left[0].XY + right[0].XY) * 0.5 - (left[1].XY + right[1].XY) * 0.5, ground, c.WallCap, c.CutSlope, maxDaylight, step, c.EndSpill ? c.FillSlope : null);
+            if (c.WallEnd) EndWall(res, dayL[n - 1], left[n - 1], right[n - 1], dayR[n - 1], (left[n - 1].XY + right[n - 1].XY) * 0.5 - (left[n - 2].XY + right[n - 2].XY) * 0.5, ground,
+                c.WallCap, c.CutSlope, maxDaylight, step, c.EndSpill ? c.FillSlope : null);
         }
         foreach (var pad in pads)
         {
@@ -193,7 +198,118 @@ public static class Grading
         return Vec3.At(far, ground(far) ?? z + (isCut ? 1 : -1) * maxDist / ratio);
     }
 
-    private static void SlopeBand(GradingResult res, List<Vec3> edge, List<Vec3> other, double cut, double fill, Func<Vec2, double?> ground,
+    /// <summary>Afastamento do degrau de muro/emboque (m): face quase vertical do terreno, escondida pela estrutura.</summary>
+    public const double WallGap = 0.10;
+
+    /// <summary>
+    /// Degrau de muro: linha de pontos a <see cref="WallGap"/> para fora da borda, no terreno natural. A faixa estreita entre a
+    /// borda (no projeto) e essa linha vira a face do corte/aterro contido pelo muro.
+    /// </summary>
+    private static List<Vec3> WallBand(GradingResult res, List<Vec3> edge, List<Vec3> other, Func<Vec2, double?> ground)
+    {
+        var outer = new List<Vec3>();
+        for (int i = 0; i < edge.Count; i++)
+        {
+            var e = edge[i].XY;
+            var n = (e - other[i].XY).Length < 1e-9 ? Vec2.UnitY : (e - other[i].XY).Normalized();
+            var q = e + n * WallGap;
+            outer.Add(Vec3.At(q, ground(q) ?? edge[i].Z));
+        }
+        Strip(res, edge, outer);
+        res.Points.AddRange(outer);
+        return outer;
+    }
+
+    /// <summary>Face vertical transversal no início/fim de uma faixa (emboque, encontro): de uma crista de talude à outra.</summary>
+    private static void EndWall(GradingResult res, Vec3 dayL, Vec3 left, Vec3 right, Vec3 dayR, Vec2 outward, Func<Vec2, double?> ground,
+        double? cap = null, double cut = 1.0, double maxDist = 60, double step = 0.5, double? spillFill = null)
+    {
+        if (outward.Length < 1e-9) return;
+        var dir = outward.Normalized();
+        if (spillFill is { } fs)
+        {
+            // Saia: da ponta, talude à frente (aterro na razão do aterro, corte na do corte) até encontrar o terreno.
+            var edgeLine = new List<Vec3>();
+            foreach (var (a, b) in new[] { (dayL, left), (left, right), (right, dayR) })
+            {
+                var len = a.XY.DistanceTo(b.XY);
+                var k = Math.Max(1, (int)Math.Ceiling(len / 1.5));
+                for (int i = 0; i < k; i++) edgeLine.Add(a + (b - a) * ((double)i / k));
+            }
+            edgeLine.Add(dayR);
+            var toe = edgeLine.Select(p => Daylight(p.XY, p.Z, dir, cut, fs, ground, maxDist, step)).ToList();
+            for (int i = 0; i + 1 < edgeLine.Count; i++)
+            {
+                res.Triangles.Add((edgeLine[i], edgeLine[i + 1], toe[i + 1]));
+                res.Triangles.Add((edgeLine[i], toe[i + 1], toe[i]));
+                res.TriangleIsSlope.Add(true);
+                res.TriangleIsSlope.Add(true);
+                var quad = new Polygon2(new[] { edgeLine[i].XY, edgeLine[i + 1].XY, toe[i + 1].XY, toe[i].XY });
+                if (Math.Abs(quad.Area) > 1e-4) res.Footprint.Add(quad);
+            }
+            res.Points.AddRange(edgeLine);
+            for (int i = 0; i < toe.Count; i++)
+            {
+                var w = toe[i].XY.DistanceTo(edgeLine[i].XY);
+                if (w < 0.05) continue;
+                res.Points.Add(toe[i]);
+                var k = (int)Math.Floor(w / 3.0);
+                for (int j = 1; j <= k; j++) res.Points.Add(edgeLine[i] + (toe[i] - edgeLine[i]) * ((double)j / (k + 1)));
+            }
+            return;
+        }
+        var o = dir * WallGap;
+        var capZ = cap is { } h ? Math.Max(left.Z, right.Z) + h : double.MaxValue;
+        var line = new List<Vec3>();
+        foreach (var (a, b) in new[] { (dayL, left), (left, right), (right, dayR) })
+        {
+            var len = a.XY.DistanceTo(b.XY);
+            var k = Math.Max(1, (int)Math.Ceiling(len / 1.0));
+            for (int i = 0; i < k; i++) line.Add(a + (b - a) * ((double)i / k));
+        }
+        line.Add(dayR);
+        var outer = line.Select(p => { var q = p.XY + o; return Vec3.At(q, Math.Min(capZ, ground(q) ?? p.Z)); }).ToList();
+        // Pontos da borda de projeto também (a crista/base do corte fica marcada).
+        res.Points.AddRange(line);
+        Strip(res, line, outer);
+        res.Points.AddRange(outer);
+        if (cap == null) return;
+        // Acima da face (testa do emboque): talude de corte para dentro do maciço até reencontrar o terreno.
+        var day = outer.Select(p => (ground(p.XY) ?? p.Z) > p.Z + 0.01 ? Daylight(p.XY, p.Z, dir, cut, cut, ground, maxDist, step) : p).ToList();
+        for (int i = 0; i + 1 < outer.Count; i++)
+        {
+            res.Triangles.Add((outer[i], outer[i + 1], day[i + 1]));
+            res.Triangles.Add((outer[i], day[i + 1], day[i]));
+            res.TriangleIsSlope.Add(true);
+            res.TriangleIsSlope.Add(true);
+            var quad = new Polygon2(new[] { outer[i].XY, outer[i + 1].XY, day[i + 1].XY, day[i].XY });
+            if (Math.Abs(quad.Area) > 1e-4) res.Footprint.Add(quad);
+        }
+        for (int i = 0; i < outer.Count; i++)
+        {
+            var w = day[i].XY.DistanceTo(outer[i].XY);
+            if (w < 0.05) continue;
+            res.Points.Add(day[i]);
+            var k = (int)Math.Floor(w / 3.0);
+            for (int j = 1; j <= k; j++) res.Points.Add(outer[i] + (day[i] - outer[i]) * ((double)j / (k + 1)));
+        }
+    }
+
+    /// <summary>Faixa estreita (degrau) entre duas linhas paralelas: triângulos de talude e contorno.</summary>
+    private static void Strip(GradingResult res, List<Vec3> a, List<Vec3> b)
+    {
+        for (int i = 0; i + 1 < a.Count; i++)
+        {
+            res.Triangles.Add((a[i], a[i + 1], b[i + 1]));
+            res.Triangles.Add((a[i], b[i + 1], b[i]));
+            res.TriangleIsSlope.Add(true);
+            res.TriangleIsSlope.Add(true);
+            var quad = new Polygon2(new[] { a[i].XY, a[i + 1].XY, b[i + 1].XY, b[i].XY });
+            if (Math.Abs(quad.Area) > 1e-5) res.Footprint.Add(quad);
+        }
+    }
+
+    private static List<Vec3> SlopeBand(GradingResult res, List<Vec3> edge, List<Vec3> other, double cut, double fill, Func<Vec2, double?> ground,
         double maxDist, double step, bool reverse = false)
     {
         var day = new List<Vec3>();
@@ -216,8 +332,13 @@ public static class Grading
         res.Points.AddRange(day.Where((d, i) => d.XY.DistanceTo(edge[i].XY) > 0.05));
         // Pontos no meio da face do talude: a triangulação do Toposolid acompanha o plano do talude.
         for (int i = 0; i < edge.Count; i++)
-            if (day[i].XY.DistanceTo(edge[i].XY) > 3)
-                res.Points.Add((edge[i] + day[i]) * 0.5);
+        {
+            var w = day[i].XY.DistanceTo(edge[i].XY);
+            // Taludes altos: pontos a cada ~3 m na face (a triangulação do Toposolid fica no plano do talude).
+            var k = (int)Math.Floor(w / 3.0);
+            for (int j = 1; j <= k; j++) res.Points.Add(edge[i] + (day[i] - edge[i]) * ((double)j / (k + 1)));
+        }
+        return day;
     }
 
     private static void PadSlopes(GradingResult res, List<Vec2> ring, double z, double cut, double fill, Func<Vec2, double?> ground, double maxDist, double step)

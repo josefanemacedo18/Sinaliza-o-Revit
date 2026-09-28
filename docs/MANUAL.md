@@ -978,7 +978,9 @@ Três formas de inserir:
 3. **Via nova: selecionar linhas**.
 
 **Perfil da obra**: *rampas de acesso* (o trecho em estrutura começa onde o aterro passaria de 6 m), *horizontal*, *entre
-margens* (reta de cabeceira a cabeceira – pontes sobre vales e rios), *convexo* ou *manter o greide da via*. **Traçado reto**
+margens* (reta de cabeceira a cabeceira – pontes sobre vales e rios), *convexo* (ponto alto no meio), *côncavo* (ponto baixo
+no meio – "barriga" sobre o vale), *inclinado* (rampa constante da altura do início à do fim), *personalizado* (PIVs
+digitados a partir do início da obra: estaca; cota; curva) ou *manter o greide da via*. **Traçado reto**
 (só as pontas do eixo), **esconsidade dos apoios** (pilares e encontros paralelos ao rio ou à via cruzada) e **pilares nas
 estacas** que você indicar. Nem toda ponte é curva ou inclinada: a **Ponte** já vem reta, em nível e com pilares-parede.
 * **Estrutura**: laje com balanços, abas, pingadeiras e **cornija** clara; **vigas "I"** por vão com transversinas e aparelhos
@@ -1035,6 +1037,35 @@ as duas vias são criadas antes, com a ferramenta de vias.
   ficam).
 
 ### 24.8 Terraplenagem e topografia (Massa e terreno – terreno nativo)
+**Como o corte e o aterro acontecem no Toposolid.** O Toposolid é uma superfície triangulada pelos seus pontos: o plugin
+troca os pontos da área de projeto pelos pontos da plataforma, das cristas e pés de talude e dos degraus dos muros – e o
+Revit triangula de novo. Por isso cada obra entrega os pontos certos:
+* **Via em corte/aterro**: plataforma (bordas e eixo a cada 3 m) e **taludes** até o terreno natural, com pontos no meio da
+  face dos taludes altos.
+* **Muros** (trincheira, rampas em terra armada): **degrau** de 10 cm atrás da face do muro, no terreno natural – o terreno
+  fica natural atrás do muro, sem a "rampa de terra" até a borda.
+* **Emboque de túnel**: a via em corte termina numa **testa vertical** até a altura do emboque e, acima dela, a encosta é
+  **recortada em talude**; o furo é aberto pela **Massa de escavação** do túnel (Massa fica oculta nas vistas por padrão).
+  Se o Revit recusar a Massa, uma cópia como Modelo genérico (oculta) é tentada; se ainda assim recusar, o relatório explica
+  como usar *Escavar* à mão.
+* **Encontros de pontes**: com alas abertas, **saia de aterro** à frente do encontro até o terreno; com alas paralelas ou
+  terra armada, face vertical contida.
+* **Talude de corte**: a linha desenhada é o **pé**; a **crista fica no terreno natural** e o terreno à frente do pé é
+  rebaixado (plataforma configurável). Talude de aterro: pé no terreno, crista acima.
+* **Conferência**: depois de inserir os pontos o plugin **lê a geometria real do Toposolid** e compara com o projeto. Se o
+  Revit tiver lido as cotas com um deslocamento constante (nível/deslocamento do Toposolid), os pontos são refeitos com a
+  correção; o relatório mostra o **desvio máximo conferido**. A "superfície suavizada" dos Toposolids é desligada (ela
+  arredonda taludes e degraus).
+
+**Relevo ao criar a via (Via/Nova via)**: com Toposolid sob o eixo, escolha
+* **Acompanhar o terreno** – a via sobe e desce com a topografia (greide colado ao terreno, suavização curta) e o terreno é
+  cortado/aterrado só na largura da plataforma, deixando a seção em nível transversal;
+* **Greide suavizado** – rampa máxima e curvas verticais, com cortes e aterros maiores em talude;
+* **Plana** – sem alterar o terreno.
+Taludes de corte/aterro e a rampa máxima ficam na mesma janela. Depois, **Perfil da Via** ajusta o greide e cria as obras.
+Os pisos da via acompanham o greide com a edição de forma nativa: cada piso tem até 40 m, vértices a cada 2 m no contorno e
+linhas de apoio paralelas ao eixo (inclui a crista do abaulamento).
+
 * O terreno é **sempre o Toposolid nativo** (Massa e terreno → Sólido topográfico): aterros, cortes, taludes, saias e
   reaterros nunca viram sólidos. **Sem Toposolid, o plugin cria um** plano sob as obras automaticamente.
 * O terreno é **lido direto da geometria do Toposolid** (sem depender de vista 3D) e, na primeira terraplenagem, o

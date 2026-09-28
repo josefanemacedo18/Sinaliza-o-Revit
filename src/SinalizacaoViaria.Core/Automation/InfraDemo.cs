@@ -55,10 +55,50 @@ public static class InfraDemo
         geo.Corridors.Clear();
         if (geo.Bounds is { } b)
         {
-            var step = Math.Max(4, Math.Max(b.Max.X - b.Min.X, b.Max.Y - b.Min.Y) / 70);
-            geo.Pieces.InsertRange(0, TerrainPieces(p => (design.DesignZ(p) ?? ground(p)) - 0.03, b.Min - new Vec2(margin, margin), b.Max + new Vec2(margin, margin), step));
+            var step = Math.Max(3, Math.Max(b.Max.X - b.Min.X, b.Max.Y - b.Min.Y) / 90);
+            var bores = geo.Pieces.Where(p => p.Layer == Generators.EarthworksGenerator.BoreLayer).ToList();
+            geo.Pieces.InsertRange(0, Excavate(Toposolid(ground, design, b.Min - new Vec2(margin, margin), b.Max + new Vec2(margin, margin), step), bores));
         }
         return geo;
+    }
+
+    /// <summary>
+    /// Terreno como o Revit vai montar o Toposolid: levantamento regular (<paramref name="step"/>) + pontos da terraplenagem,
+    /// triangulados por Delaunay (mesma regra do Toposolid) – não a superfície de projeto idealizada.
+    /// </summary>
+    public static IEnumerable<MarkingPiece> Toposolid(Func<Vec2, double> ground, GradingResult design, Vec2 min, Vec2 max, double step)
+    {
+        var survey = TerrainMesh.FromFunction(min, max, step, ground);
+        var topo = TerrainRebuild.Simulate(survey, design);
+        return MeshPieces(topo, -0.03);
+    }
+
+    /// <summary>Tira do terreno (prévia) os triângulos dentro do volume de escavação dos túneis – como o Revit escava o Toposolid.</summary>
+    public static IEnumerable<MarkingPiece> Excavate(IEnumerable<MarkingPiece> terrain, IReadOnlyList<MarkingPiece> bores)
+    {
+        if (bores.Count == 0) { foreach (var t in terrain) yield return t; yield break; }
+        var boxes = bores.Where(b => b.Solid != null).Select(b => (Shape: b.Shape, Top: b.Solid!.MaxZ + b.Elevation)).ToList();
+        foreach (var t in terrain)
+        {
+            var c = t.Shape.Centroid;
+            var z = t.Solid?.Faces[0].Average(v => v.Z) ?? 0;
+            if (boxes.Any(b => z < b.Top - 0.05 && b.Shape.Contains(c))) continue;
+            yield return t;
+        }
+    }
+
+    /// <summary>Triângulos de uma malha de terreno como peças (prévias).</summary>
+    public static IEnumerable<MarkingPiece> MeshPieces(TerrainMesh m, double dz = 0)
+    {
+        foreach (var (ia, ib, ic) in m.Triangles)
+        {
+            var top = new List<Vec3> { m.Vertices[ia], m.Vertices[ib], m.Vertices[ic] }.Select(v => v with { Z = v.Z + dz }).ToList();
+            if (Polyhedron.Normal(top).Z < 0) top.Reverse();
+            var tri = new Polygon2(top.Select(v => v.XY));
+            if (Math.Abs(tri.Area) < 1e-6) continue;
+            var poly = new Polyhedron(new List<List<Vec3>> { top });
+            yield return new MarkingPiece(tri, MarkingColor.Grama) { Solid = poly, Thickness = poly.MaxZ, Layer = "TERRENO" };
+        }
     }
 
     /// <summary>Superfície do terreno como triângulos finos (prévias).</summary>
@@ -93,20 +133,34 @@ public static class InfraDemo
     {
         var pav = setup.PavementDefinition();
         var prof = grade.ToProfile(2);
-        var gaps = works.OfType<IHostedStructure>().Select(h => (A: Math.Min(h.HostStart, h.HostEnd), B: Math.Max(h.HostStart, h.HostEnd))).OrderBy(x => x.A).ToList();
-        var corridors = new List<GradeCorridor>();
-        var cursor = 0.0;
-        var L = axis.Length;
-        foreach (var (a, b) in gaps.Append((L + 1, L + 2)))
-        {
-            var e = Math.Min(a, L);
-            if (e - cursor > 2)
-                corridors.Add(Generators.Infra.Corridor(axis, prof, -(pav.TotalRight + 0.3), pav.TotalLeft + 0.3, cursor, e, subgrade, grade.CutSlope, grade.FillSlope));
-            cursor = Math.Max(cursor, b);
-            if (cursor >= L) break;
-        }
+        var corridors = InfraRoads.RoadCorridors(axis, prof, -(pav.TotalRight + 0.3), pav.TotalLeft + 0.3, 0, axis.Length, subgrade, grade.CutSlope, grade.FillSlope, works);
         corridors.AddRange(worksGeo.Corridors);
         return corridors;
+    }
+
+    /// <summary>
+    /// Peça plana deformada pelo greide vértice a vértice (como o piso do Revit com edição de forma): face superior contínua,
+    /// sem degraus entre os trechos.
+    /// </summary>
+    private static MarkingPiece Draped(MarkingPiece p, Polygon2 part, GradeSurface surf)
+    {
+        if (part.Holes.Count > 0) return p with { Shape = part, Elevation = p.Elevation + surf.Z(part.Centroid) };
+        var ring = CurveTools.Densify(part.Outer.Append(part.Outer[0]).ToList(), 2.0);
+        ring.RemoveAt(ring.Count - 1);
+        var top = ring.Select(v => Vec3.At(v, surf.Z(v) + p.Elevation + Math.Max(0.001, p.Thickness))).ToList();
+        // Triângulos (Delaunay dos vértices do contorno, só os de dentro): contornos côncavos nas curvas ficam certos.
+        var faces = new List<List<Vec3>>();
+        foreach (var (a, b, c) in Tin.Triangulate(top))
+        {
+            var tri = new List<Vec3> { top[a], top[b], top[c] };
+            var cen = new Vec2((tri[0].X + tri[1].X + tri[2].X) / 3, (tri[0].Y + tri[1].Y + tri[2].Y) / 3);
+            if (!part.Contains(cen)) continue;
+            if (Polyhedron.Normal(tri).Z < 0) tri.Reverse();
+            faces.Add(tri);
+        }
+        if (faces.Count == 0) return p with { Shape = part, Elevation = p.Elevation + surf.Z(part.Centroid) };
+        var poly = new Polyhedron(faces);
+        return p with { Shape = part, Solid = poly, Elevation = 0, Thickness = poly.MaxZ };
     }
 
     /// <summary>Peças planas (pisos, pinturas) cortadas em trechos ao longo do eixo e levantadas até o greide.</summary>
@@ -130,12 +184,12 @@ public static class InfraDemo
             var (mn, mx) = p.Shape.Bounds;
             if (Math.Max(mx.X - mn.X, mx.Y - mn.Y) <= step * 1.2)
             {
-                res.Add(p with { Elevation = p.Elevation + surf.Z(p.Shape.Centroid) });
+                res.Add(Draped(p, p.Shape, surf));
                 continue;
             }
             foreach (var (strip, _) in strips)
                 foreach (var part in PolygonOps.Intersect(new[] { p.Shape }, new[] { strip }).Where(x => x.Area > 1e-4))
-                    res.Add(p with { Shape = part, Elevation = p.Elevation + surf.Z(part.Centroid) });
+                    res.Add(Draped(p, part, surf));
         }
         geo.Pieces.Clear();
         geo.Pieces.AddRange(res);

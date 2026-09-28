@@ -358,6 +358,8 @@ public sealed class MarkingService
                 {
                     // Peças vizinhas do mesmo material viram um piso só (calçadas, trechos recortados).
                     var merged = PolygonOps.Union(grp.Select(p => p.Shape)).Where(p => p.Area > 0.01).ToList();
+                    // No greide: pisos em trechos de até 40 m ao longo do eixo (edição de forma leve e fiel ao perfil).
+                    if (terrain is GradeSampler gs) merged = merged.SelectMany(m => GradeFloors.Chunks(m, gs.Surface, 40)).ToList();
                     foreach (var shape in merged)
                     {
                         var piece = new MarkingPiece(shape, grp.Key.Color) { Elevation = grp.Key.E, Thickness = grp.Key.T, Layer = grp.Key.Layer };
@@ -378,6 +380,9 @@ public sealed class MarkingService
                 solidPieces = geo.Pieces.Where(p => !floorPieces.Contains(p)).Concat(failed).ToList();
             }
         }
+        // Volume de escavação (túneis): Massa que escava o Toposolid – separada das peças da obra.
+        var bore = solidPieces.Where(p => p.Layer == Core.Generators.EarthworksGenerator.BoreLayer).ToList();
+        if (bore.Count > 0) solidPieces = solidPieces.Where(p => p.Layer != Core.Generators.EarthworksGenerator.BoreLayer).ToList();
         var groups = solidPieces.GroupBy(p => p.Color)
             .OrderByDescending(g => g.Sum(p => p.Shape.Area)).ToList();
 
@@ -398,7 +403,7 @@ public sealed class MarkingService
                 var solids = BuildSolids(g, baseZ + def.Output.ElevationOffset + lift, thickness, sampler, Styles.Material(g.Key), result.Warnings,
                     def.Output.ElevationOffset + lift);
                 if (solids.Count == 0) continue;
-                var ds = existing.FirstOrDefault(r => r.Color == g.Key && r.Element is DirectShape && !keep.Contains(r.Element.Id))?.Element as DirectShape;
+                var ds = existing.FirstOrDefault(r => r.Color == g.Key && r.Element is DirectShape && !IsBore(r.Element) && !keep.Contains(r.Element.Id))?.Element as DirectShape;
                 if (ds == null)
                 {
                     ds = DirectShape.CreateElement(_doc, new ElementId(BuiltInCategory.OST_GenericModel));
@@ -461,6 +466,35 @@ public sealed class MarkingService
             }
         }
 
+        if (bore.Count > 0 && def.Output.Mode == OutputMode.Modelo3D)
+        {
+            try
+            {
+                var solids = BuildSolids(bore, baseZ + def.Output.ElevationOffset, thickness, null, Styles.Material(MarkingColor.Terra), new List<string>(), def.Output.ElevationOffset);
+                if (solids.Count > 0)
+                {
+                    var ds = existing.FirstOrDefault(r => IsBore(r.Element) && !keep.Contains(r.Element.Id))?.Element as DirectShape;
+                    if (ds == null)
+                    {
+                        // Massa: oculta nas vistas por padrão (Mostrar massa) – só escava o terreno.
+                        ds = DirectShape.CreateElement(_doc, new ElementId(BuiltInCategory.OST_Mass));
+                        ds.ApplicationId = "SinalizacaoViaria";
+                        ds.ApplicationDataId = def.Id;
+                    }
+                    ds.SetShape(solids);
+                    try { ds.SetName($"SV {info.Code} escavação do terreno"); } catch { /* opcional */ }
+                    MarkingStorage.Write(ds, def, MarkingColor.Terra);
+                    try { ds.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set($"SV escavação {info.Code}"); } catch { /* opcional */ }
+                    keep.Add(ds.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Escavação {info.Code}", ex);
+                result.Warnings.Add($"{info.Code}: volume de escavação do terreno não criado ({ex.Message}).");
+            }
+        }
+
         if (keep.Count == 0 && def.Output.Mode == OutputMode.Modelo3D && geo.Pieces.Count > 0)
         {
             // Último recurso: nenhuma peça pôde ser modelada. Um marcador mínimo guarda a definição para a via/marca não
@@ -496,6 +530,9 @@ public sealed class MarkingService
         result.Elements.AddRange(keep);
         return result;
     }
+
+    /// <summary>Volume de escavação do terreno (Massa gerada pelo plugin para túneis).</summary>
+    public static bool IsBore(Element e) => e is DirectShape && e.Category?.BuiltInCategory == BuiltInCategory.OST_Mass;
 
     /// <summary>Canto inferior esquerdo das linhas de detalhe da geometria (m).</summary>
     private static Vec2? LinesAnchor(MarkingGeometry geo)
@@ -895,9 +932,9 @@ public sealed class MarkingService
         }
     }
 
-    private IList<CurveLoop> ToCurveLoops(Polygon2 poly, double zFt)
+    private IList<CurveLoop> ToCurveLoops(Polygon2 poly, double zFt, bool raw = false)
     {
-        poly = Prepare(poly);
+        if (!raw) poly = Prepare(poly);
         var loops = new List<CurveLoop>();
         var outer = ToCurveLoop(poly.Outer, zFt);
         if (outer == null) return loops;
@@ -1036,8 +1073,10 @@ public sealed class MarkingService
         }
         if (typeId == ElementId.InvalidElementId) { reason = "o projeto não tem nenhum tipo de piso"; return res; }
 
-        // No terreno, o contorno ganha vértices a cada 4 m (pontos de apoio da deformação do piso).
-        Polygon2 Prep(Polygon2 p) => groundFt == null ? p : Densified(p, 4.0);
+        // No terreno/greide, o contorno ganha vértices a cada 2–3 m (pontos de apoio da deformação do piso). O contorno já
+        // preparado NÃO passa de novo pela limpeza (ela removeria os vértices colineares e as bordas longas ficariam retas).
+        var shaped = groundFt != null;
+        Polygon2 Prep(Polygon2 p) => !shaped ? p : Densified(p, terrain is GradeSampler ? 2.0 : 3.0);
         var attempts = new List<Func<List<Polygon2>>>
         {
             () => new List<Polygon2> { Prep(Prepare(piece.Shape)) },
@@ -1054,7 +1093,7 @@ public sealed class MarkingService
             var ok = true;
             foreach (var shape in shapes)
             {
-                var loops = ToCurveLoops(shape, level.ProjectElevation);
+                var loops = ToCurveLoops(shape, level.ProjectElevation, raw: shaped);
                 if (loops.Count == 0) continue;
                 try
                 {
@@ -1097,20 +1136,30 @@ public sealed class MarkingService
             ed.Enable();
             _doc.Regenerate();
             var top = f.get_BoundingBox(null)?.Max.Z ?? groundFt;
-            // Pontos internos (malha de 4 m, afastados do contorno).
-            var (mn, mx) = shape.Bounds;
+            // Pontos internos: no greide, linhas paralelas ao eixo (inclui a crista do abaulamento); no terreno, malha regular.
             var inner = new List<XYZ>();
-            const double step = 4.0;
-            var edge = PolygonOps.Offset(new[] { shape }, -0.5);
-            for (var x = mn.X + step / 2; x < mx.X; x += step)
-                for (var y = mn.Y + step / 2; y < mx.Y; y += step)
-                {
-                    var v = new Vec2(x, y);
-                    if (inner.Count < 400 && edge.Any(e => e.Contains(v))) inner.Add(new XYZ(UnitConv.Ft(x), UnitConv.Ft(y), top));
-                }
+            if (terrain is GradeSampler gs)
+                inner.AddRange(GradeFloors.Supports(shape, gs.Surface).Select(v => new XYZ(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), top)));
+            else
+            {
+                var (mn, mx) = shape.Bounds;
+                var step = Math.Max(3.0, Math.Sqrt(Math.Max(1, shape.Area) / 1200));
+                var edge = PolygonOps.Offset(new[] { shape }, -0.4);
+                for (var x = mn.X + step / 2; x < mx.X; x += step)
+                    for (var y = mn.Y + step / 2; y < mx.Y; y += step)
+                    {
+                        var v = new Vec2(x, y);
+                        if (inner.Count < 1500 && edge.Any(e => e.Contains(v))) inner.Add(new XYZ(UnitConv.Ft(x), UnitConv.Ft(y), top));
+                    }
+            }
             if (inner.Count > 0)
             {
-                try { ed.AddPoints(inner); } catch (Exception ex) { Log.Error("SlabShape.AddPoints", ex); }
+                try { ed.AddPoints(inner); }
+                catch (Exception ex)
+                {
+                    Log.Error("SlabShape.AddPoints", ex);
+                    foreach (var q in inner) try { ed.AddPoint(q); } catch { /* ponto repetido ou na borda */ }
+                }
                 _doc.Regenerate();
             }
             foreach (SlabShapeVertex v in ed.SlabShapeVertices)

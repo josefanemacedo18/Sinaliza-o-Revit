@@ -122,7 +122,8 @@ public static class InterchangeDemo
         {
             var design = Grading.Design(corridors, Array.Empty<GradePad>(), p => g(p), 0, 60, 0.5, 4, 3);
             var step = Math.Max(5, Math.Max(b.Max.X - b.Min.X, b.Max.Y - b.Min.Y) / 90);
-            geo.Pieces.InsertRange(0, InfraDemo.TerrainPieces(p => (design.DesignZ(p) ?? g(p)) - 0.05, b.Min - new Vec2(30, 30), b.Max + new Vec2(30, 30), step));
+            geo.Pieces.InsertRange(0, InfraDemo.Toposolid(g, design, b.Min - new Vec2(30, 30), b.Max + new Vec2(30, 30), step)
+                .Select(pc => pc with { Elevation = pc.Elevation - 0.02 }));
         }
         return geo;
     }

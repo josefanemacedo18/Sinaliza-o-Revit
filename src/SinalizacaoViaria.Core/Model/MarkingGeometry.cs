@@ -309,6 +309,25 @@ public sealed class GradeCorridor
     /// <summary>Concordar o lado esquerdo/direito com taludes (falso = muro/estrutura: o terreno fica como está além da borda).</summary>
     public bool DaylightLeft { get; set; } = true;
     public bool DaylightRight { get; set; } = true;
+    /// <summary>
+    /// Muro/estrutura na borda esquerda/direita (sem talude): o terreno natural volta logo atrás da borda, num degrau quase
+    /// vertical (face do muro) – sem isso a triangulação do Toposolid faria uma rampa de terra até o ponto natural mais próximo.
+    /// </summary>
+    public bool WallLeft { get; set; }
+    public bool WallRight { get; set; }
+    /// <summary>Face vertical no início/fim da faixa (emboque de túnel, encontro de ponte): degrau até o terreno natural.</summary>
+    public bool WallStart { get; set; }
+    public bool WallEnd { get; set; }
+    /// <summary>
+    /// Altura máxima da face vertical do início/fim sobre a plataforma (m; nulo = até o terreno). Acima dela o corte continua
+    /// em talude para dentro do maciço – testa de emboque com a encosta recortada acima da boca.
+    /// </summary>
+    public double? WallCap { get; set; }
+    /// <summary>
+    /// Início/fim em "saia" (encontro de ponte com alas abertas): em vez da face vertical, o aterro/corte continua em talude
+    /// à frente da ponta até o terreno (cone de aterro sob o primeiro vão).
+    /// </summary>
+    public bool EndSpill { get; set; }
     public string Label { get; set; } = "";
 
     /// <summary>Soma <paramref name="dz"/> a todas as cotas (relativas → absolutas).</summary>
