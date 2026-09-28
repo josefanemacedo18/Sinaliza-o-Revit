@@ -19,21 +19,69 @@ public sealed class GradingResult
     public double AreaM2 { get; set; }
     public List<string> Warnings { get; } = new();
 
-    /// <summary>Cota de projeto no ponto (nulo = fora da área terraplenada).</summary>
+    /// <summary>Triângulo de talude (falso = plataforma/faixa de projeto, que tem prioridade).</summary>
+    public List<bool> TriangleIsSlope { get; } = new();
+
+    /// <summary>Terreno natural usado no projeto (para combinar taludes sobrepostos).</summary>
+    public Func<Vec2, double?>? Ground { get; set; }
+
+    private const double Cell = 6.0;
+    private Dictionary<(int, int), List<int>>? _index;
+    private int _indexed;
+
+    private static (int, int) Key(double x, double y) => ((int)Math.Floor(x / Cell), (int)Math.Floor(y / Cell));
+
+    private void Index()
+    {
+        if (_index != null && _indexed == Triangles.Count) return;
+        _index = new();
+        for (int i = 0; i < Triangles.Count; i++)
+        {
+            var (a, b, c) = Triangles[i];
+            var (x0, y0) = Key(Math.Min(a.X, Math.Min(b.X, c.X)), Math.Min(a.Y, Math.Min(b.Y, c.Y)));
+            var (x1, y1) = Key(Math.Max(a.X, Math.Max(b.X, c.X)), Math.Max(a.Y, Math.Max(b.Y, c.Y)));
+            for (var x = x0; x <= x1; x++)
+                for (var y = y0; y <= y1; y++)
+                {
+                    if (!_index.TryGetValue((x, y), out var l)) _index[(x, y)] = l = new List<int>();
+                    l.Add(i);
+                }
+        }
+        _indexed = Triangles.Count;
+    }
+
+    /// <summary>
+    /// Cota de projeto no ponto (nulo = fora da área terraplenada). Plataformas têm prioridade; onde taludes de obras
+    /// vizinhas se sobrepõem vale o mais alto nos aterros e o mais baixo nos cortes (superfície única, sem "degraus").
+    /// </summary>
     public double? DesignZ(Vec2 p)
     {
         foreach (var (area, z) in Pads) if (area.Contains(p)) return z;
-        foreach (var (a, b, c) in Triangles)
+        Index();
+        if (!_index!.TryGetValue(Key(p.X, p.Y), out var cand)) return null;
+        double? platform = null;
+        List<double>? slopes = null;
+        foreach (var i in cand)
         {
+            var (a, b, c) = Triangles[i];
             var d = (b.Y - c.Y) * (a.X - c.X) + (c.X - b.X) * (a.Y - c.Y);
             if (Math.Abs(d) < 1e-12) continue;
             var l1 = ((b.Y - c.Y) * (p.X - c.X) + (c.X - b.X) * (p.Y - c.Y)) / d;
             var l2 = ((c.Y - a.Y) * (p.X - c.X) + (a.X - c.X) * (p.Y - c.Y)) / d;
             var l3 = 1 - l1 - l2;
             if (l1 < -1e-9 || l2 < -1e-9 || l3 < -1e-9) continue;
-            return l1 * a.Z + l2 * b.Z + l3 * c.Z;
+            var z = l1 * a.Z + l2 * b.Z + l3 * c.Z;
+            var slope = i < TriangleIsSlope.Count && TriangleIsSlope[i];
+            if (!slope) platform = platform == null ? z : Math.Max(platform.Value, z);
+            else (slopes ??= new()).Add(z);
         }
-        return null;
+        if (platform != null) return platform;
+        if (slopes == null) return null;
+        if (slopes.Count == 1) return slopes[0];
+        var g = Ground?.Invoke(p);
+        if (g == null) return slopes.Max();
+        var fills = slopes.Where(z => z > g.Value).ToList();
+        return fills.Count > 0 ? fills.Max() : slopes.Min();
     }
 }
 
@@ -49,7 +97,7 @@ public static class Grading
     public static GradingResult Design(IEnumerable<GradeCorridor> corridors, IEnumerable<GradePad> pads, Func<Vec2, double?> ground, double baseZ = 0,
         double maxDaylight = 60, double step = 0.5, double padGrid = 4.0, double sampling = 1.0)
     {
-        var res = new GradingResult();
+        var res = new GradingResult { Ground = ground };
         foreach (var c in corridors)
         {
             var n = Math.Min(c.Left.Count, c.Right.Count);
@@ -61,6 +109,8 @@ public static class Grading
             {
                 res.Triangles.Add((left[i], left[i + 1], right[i + 1]));
                 res.Triangles.Add((left[i], right[i + 1], right[i]));
+                res.TriangleIsSlope.Add(false);
+                res.TriangleIsSlope.Add(false);
                 res.Footprint.Add(new Polygon2(new[] { left[i].XY, left[i + 1].XY, right[i + 1].XY, right[i].XY }));
             }
             res.Points.AddRange(left);
@@ -158,10 +208,16 @@ public static class Grading
         {
             res.Triangles.Add((edge[i], edge[i + 1], day[i + 1]));
             res.Triangles.Add((edge[i], day[i + 1], day[i]));
+            res.TriangleIsSlope.Add(true);
+            res.TriangleIsSlope.Add(true);
             var quad = new Polygon2(new[] { edge[i].XY, edge[i + 1].XY, day[i + 1].XY, day[i].XY });
             if (quad.Area > 1e-4) res.Footprint.Add(quad);
         }
         res.Points.AddRange(day.Where((d, i) => d.XY.DistanceTo(edge[i].XY) > 0.05));
+        // Pontos no meio da face do talude: a triangulação do Toposolid acompanha o plano do talude.
+        for (int i = 0; i < edge.Count; i++)
+            if (day[i].XY.DistanceTo(edge[i].XY) > 3)
+                res.Points.Add((edge[i] + day[i]) * 0.5);
     }
 
     private static void PadSlopes(GradingResult res, List<Vec2> ring, double z, double cut, double fill, Func<Vec2, double?> ground, double maxDist, double step)
@@ -186,6 +242,8 @@ public static class Grading
             var b = Vec3.At(ring[j], z);
             res.Triangles.Add((a, b, day[j]));
             res.Triangles.Add((a, day[j], day[i]));
+            res.TriangleIsSlope.Add(true);
+            res.TriangleIsSlope.Add(true);
             var quad = new Polygon2(new[] { ring[i], ring[j], day[j].XY, day[i].XY });
             if (quad.Area > 1e-4) res.Footprint.Add(quad);
         }

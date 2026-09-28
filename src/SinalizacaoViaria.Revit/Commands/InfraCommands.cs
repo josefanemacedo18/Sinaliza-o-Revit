@@ -145,6 +145,10 @@ internal static class InfraForms
          .Number("Espessura da laje (m)", () => d.DeckThickness, v => d.DeckThickness = v, 0.15, 0.6)
          .Number("Altura das vigas (m, 0 = vão/16)", () => d.GirderDepth, v => d.GirderDepth = v, 0, 6)
          .Number("Espaçamento das vigas (m)", () => d.GirderSpacing, v => d.GirderSpacing = v, 1.5, 5)
+         .Percent("Caimento transversal (%)", () => d.CrossSlope, v => d.CrossSlope = v, 0, 0.08, "Abaulamento de duas águas a partir do eixo (2 % usual).")
+         .Choice("Guarda-corpo (passeios e passarela)", new[] { ("Tubular", TipoGuardaCorpo.Tubular), ("Balaústres (vão ≤ 11 cm)", TipoGuardaCorpo.Balaustres), ("Vidro laminado", TipoGuardaCorpo.Vidro) },
+            () => d.RailingStyle, v => d.RailingStyle = v)
+         .Check("Buzinotes (drenos do tabuleiro)", () => d.Drains, v => d.Drains = v)
          .Check("Faixas pintadas", () => d.LaneMarkings, v => d.LaneMarkings = v)
          .Check("Iluminação", () => d.Lighting, v => d.Lighting = v)
          .Number("Espaçamento dos postes (m)", () => d.LightSpacing, v => d.LightSpacing = v, 10, 80)
@@ -160,8 +164,18 @@ internal static class InfraForms
          .Number("Vão típico (m)", () => d.SpanLength, v => d.SpanLength = v, 8, 200, "0")
          .Number("Vão principal – arcos e estaiadas (m, 0 = toda a obra)", () => d.MainSpan, v => d.MainSpan = v, 0, 1000, "0")
          .Choice("Pilares", new[] { ("Pórtico (dois pilares + travessa)", TipoPilar.Portico), ("Circular único", TipoPilar.Circular), ("Dois circulares + travessa", TipoPilar.DuplaCircular),
-                 ("Parede", TipoPilar.Parede), ("Martelo (capitel)", TipoPilar.Martelo) }, () => d.PierType, v => d.PierType = v)
+                 ("Parede (pontas arredondadas)", TipoPilar.Parede), ("Martelo (capitel)", TipoPilar.Martelo), ("Em Y", TipoPilar.Y), ("Oblongo", TipoPilar.Oblongo) },
+                 () => d.PierType, v => d.PierType = v)
          .Number("Dimensão dos pilares (m)", () => d.PierSize, v => d.PierSize = v, 0.4, 6)
+         .Check("Tabuleiro contínuo (juntas só nos encontros)", () => d.Continuous, v => d.Continuous = v)
+         .If(() => d.System == SistemaEstrutural.CaixaoCelular, x => x.Check("Caixão com altura variável (mísulas)", () => d.VariableDepth, v => d.VariableDepth = v))
+         .If(() => d.System == SistemaEstrutural.Estaiada, x => x
+             .Choice("Mastro", new[] { ("Em H (dois fustes e travessas)", FormaMastro.H), ("Em A (fustes unidos no topo)", FormaMastro.A), ("Central (canteiro)", FormaMastro.Central) },
+                () => d.Pylon, v => d.Pylon = v)
+             .Choice("Estais", new[] { ("Em leque", ArranjoEstais.Leque), ("Em harpa (paralelos)", ArranjoEstais.Harpa) }, () => d.Stays, v => d.Stays = v))
+         .If(() => d.System is SistemaEstrutural.ArcoInferior or SistemaEstrutural.ArcoSuperior,
+             x => x.Percent("Flecha do arco / vão (%)", () => d.ArchRise, v => d.ArchRise = v, 0.08, 0.40))
+         .Choice("Alas dos encontros", new[] { ("Abertas (acompanham o talude)", TipoAla.Abertas), ("Paralelas ao eixo", TipoAla.Paralelas) }, () => d.WingWalls, v => d.WingWalls = v)
          .Section("Rio (pontes)")
          .Check("Lâmina d'água sob a obra", () => d.Water, v => d.Water = v)
          .Number("Cota da água sobre a base (m)", () => d.WaterLevel, v => d.WaterLevel = v, -100, 100)
@@ -398,12 +412,35 @@ internal static class InfraForms
 /// <summary>Terraplenagem logo após criar/editar uma obra que conversa com o terreno.</summary>
 internal static class TerrainActions
 {
+    private static bool _askedCreate;
+
     public static void AfterCreate(UIDocument uidoc, MarkingDefinition def)
     {
         if (def is not ITerrainAware { AdjustTerrain: true }) return;
         var doc = uidoc.Document;
-        if (!new FilteredElementCollector(doc).OfClass(typeof(Toposolid)).Any()) return;
-        var report = Apply(uidoc, new[] { def }, new GradingOptions(), "SV - Terraplenagem");
+        var opt = new GradingOptions();
+        if (!new FilteredElementCollector(doc).OfClass(typeof(Toposolid)).Any())
+        {
+            // Sem terreno nativo: oferece criar um Toposolid (Massa e terreno) sob a obra – aterros, cortes e taludes passam a
+            // ser do terreno do Revit, e não sólidos.
+            if (_askedCreate) return;
+            _askedCreate = true;
+            var td = new TaskDialog(CommandBase.AppTitle)
+            {
+                MainInstruction = "Criar o terreno nativo (Toposolid)?",
+                MainContent = "O projeto não tem Toposolid (Massa e terreno). Para aterros, cortes, taludes e reaterros serem do terreno nativo do Revit, " +
+                              "o plugin pode criar um Toposolid plano sob a obra (com margem) e moldá-lo a ela. Sem isso, a terra é representada por sólidos.",
+                CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
+            };
+            if (td.Show() != TaskDialogResult.Yes) return;
+            opt.CreateIfMissing = true;
+        }
+        var report = Apply(uidoc, new[] { def }, opt, "SV - Terraplenagem");
+        if (report?.Created == true)
+        {
+            // Agora há terreno nativo: a obra é regerada sem os sólidos de terra.
+            MarkingCreator.Commit(uidoc, new[] { def }, "SV - Obra sobre o terreno nativo");
+        }
         if (report != null && (report.Toposolids > 0 || report.Notes.Count > 0))
             TaskDialog.Show(CommandBase.AppTitle, $"Terreno ajustado a {def.KindName.ToLowerInvariant()}:\n\n" + report.Text());
     }
@@ -690,11 +727,7 @@ public sealed class CmdTerraplenagem : CommandBase
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
         var doc = uidoc.Document;
-        if (!new FilteredElementCollector(doc).OfClass(typeof(Toposolid)).Any())
-        {
-            TaskDialog.Show(AppTitle, "Nenhum Toposolid no projeto. Crie o terreno em Massa e terreno → Toposolid (ou converta a topografia antiga) e rode de novo.");
-            return Result.Cancelled;
-        }
+        var noTerrain = !new FilteredElementCollector(doc).OfClass(typeof(Toposolid)).Any();
         var td = new TaskDialog(AppTitle)
         {
             MainInstruction = "Terraplenagem no Toposolid",
@@ -727,9 +760,18 @@ public sealed class CmdTerraplenagem : CommandBase
             .Number("Talude de aterro (H : 1 V)", () => opt.FillSlope, v => opt.FillSlope = v, 1, 5, "0.0#", "Usual 1,5 : 1.")
             .Number("Profundidade do subleito sob o pavimento (m)", () => opt.Subgrade, v => opt.Subgrade = v, 0, 2)
             .Number("Alcance máximo dos taludes (m)", () => opt.MaxDaylight, v => opt.MaxDaylight = v, 5, 500, "0")
-            .Check("Escavar o terreno com túneis e caixas (quando o Revit permitir)", () => opt.Excavate, v => opt.Excavate = v);
+            .Check("Escavar o terreno com túneis e caixas (quando o Revit permitir)", () => opt.Excavate, v => opt.Excavate = v)
+            .Check("Grama dos taludes e ilhas como subdivisões do Toposolid", () => opt.Finishes, v => opt.Finishes = v);
+        if (noTerrain)
+        {
+            opt.CreateIfMissing = true;
+            form.Section("Terreno nativo", "O projeto não tem Toposolid: um terreno plano será criado sob os elementos (Massa e terreno) e moldado a eles.")
+                .Number("Margem do terreno criado (m)", () => opt.NewTerrainMargin, v => opt.NewTerrainMargin = v, 10, 1000, "0");
+        }
         if (UiHelpers.ShowModal(form) != true) return Result.Cancelled;
         var report = TerrainActions.Apply(uidoc, defs, opt, "SV - Terraplenagem");
+        if (report?.Created == true)
+            MarkingCreator.Commit(uidoc, defs.Where(x => x is ITerrainAware).ToList(), "SV - Obras sobre o terreno nativo");
         if (report != null) TaskDialog.Show(AppTitle, report.Text());
         return report != null ? Result.Succeeded : Result.Failed;
     }
