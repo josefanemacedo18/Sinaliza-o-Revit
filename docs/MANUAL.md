@@ -186,6 +186,11 @@ setas, placa e abrigo) mantendo eixo, greide, trechos apagados e conexões. Para
 depois, use **Editar** sobre a marca do recuo (MVE, LCO ou setas): a janela do recuo abre direto, com a opção
 *REMOVER este recuo da via*. Também continua valendo **Editar → A via inteira → Recuos do meio-fio**.
 
+**Sinalização limpa no recuo.** A marcação da via acompanha o meio-fio recuado sem se misturar: as vagas de
+estacionamento são interrompidas na extensão da baia/faixa auxiliar (só vagas inteiras antes e depois, nunca dentro da
+baia), a linha de bordo e as demais linhas seguem o novo bordo com o seu próprio afastamento, e as interrupções ficam
+amarradas ao eixo – ao prolongar, aparar ou editar a via elas continuam no lugar certo.
+
 ### 2.0.3 Calçadas com níveis variáveis (topografia e edificações antigas)
 
 Selecione a calçada e informe:
@@ -231,6 +236,27 @@ Em **Sinalizar Via** / **Pista** com *Selecionar linhas existentes*, selecione t
 Cada via recebe a seção escolhida e as **interseções** são criadas em todos os encontros (T, cruz, esconsos), como se
 as vias fossem criadas uma a uma. A largura variável e os recuos, que valem para um eixo só, ficam para a edição de
 cada via (a janela avisa).
+
+### 2.0.7 Pistas feitas com Piso comum (projetos antigos e formas complexas)
+
+Quando a pista foi modelada à mão com **Piso** (projeto antigo, forma difícil de montar pelo plugin), use em
+**Sinalizar Via** / **Via** a opção de caminho **Reconhecer em pisos existentes (eixo e largura do contorno do piso)**:
+
+1. Escolha o modelo de seção (a sinalização que a via deve receber) e, em **Pavimento**, *Nenhum (pista já modelada)*
+   – a opção é sugerida sozinha, para o piso existente não ser duplicado.
+2. Clique em Criar e selecione os **pisos** da pista (um ou vários; podem estar encostados ou sobrepostos) → Concluir.
+3. O plugin mostra o que reconheceu (**vias, comprimentos, larguras e encontros**) e, ao confirmar, cria as **linhas de
+   eixo** (editáveis como qualquer eixo) e as vias, cada uma com a seção **ajustada à largura medida** – as faixas são
+   escaladas para caber de bordo a bordo; onde a pista alarga ou estreita entram **estacas de largura variável**.
+4. As **interseções** nascem nos encontros (T, cruz), como numa malha desenhada.
+
+Como funciona: o contorno dos pisos é unido, triangulado e o **eixo cordal** liga os meios das cordas de bordo a bordo;
+ramos curtos das quinas são podados, a via que atravessa um encontro segue reta, o eixo é recentrado entre os bordos e as
+pontas vão até o bordo do piso. Canteiros (furos no piso) viram pistas separadas. A partir daí a via vale para tudo:
+sinalização, interseções, rotatórias, recuos, cotas, quantitativos e o **Simulador de Tráfego**.
+
+> Confira o **sentido** do eixo (vias de mão única) e a hierarquia; pistas muito irregulares podem pedir um ajuste manual
+> das linhas de eixo criadas – depois use Editar na via.
 
 ## 2.1 Hierarquia viária (CTB art. 60)
 
@@ -578,12 +604,12 @@ criada 400 m à direita de tudo o que existe no projeto:
 | Horizontal | todas as linhas do catálogo com todas as variantes, zebrados (área, faixa, com furo), setas, legendas, vagas, inscrições, MAC, canalização, ciclovias, faixas de pedestres sobre a via, cruzamento rodoferroviário |
 | Vertical | dispositivos, placas (catálogo completo ou amostra), tipos de suporte, mobiliário (ponto e linha), famílias classificadas |
 | Calçadas | rampas (todos os tipos, com recorte), orelha, áreas de calçada, canteiros, moderação, piso tátil, via férrea, drenagem (todos os tipos e em série) |
-| Largura e recuos / Segurança | via com largura variável e estreitamento do lote, baia de ônibus + faixas de desaceleração e aceleração, calçada com inclinação e níveis do alinhamento, arterial × coletora com LCO, sonorizadores (todos os tipos) e área de escape; via nova emendada na ponta de outra em ângulo (emenda concordada); várias linhas selecionadas virando uma malha de vias com T e cruz; recuo (baia) acrescentado numa via já criada |
+| Largura e recuos / Segurança | via com largura variável e estreitamento do lote, baia de ônibus + faixas de desaceleração e aceleração, calçada com inclinação e níveis do alinhamento, arterial × coletora com LCO, sonorizadores (todos os tipos) e área de escape; via nova emendada na ponta de outra em ângulo (emenda concordada); várias linhas selecionadas virando uma malha de vias com T e cruz; recuo (baia) acrescentado numa via já criada; **via reconhecida em pisos comuns** (T feito com dois pisos, pista já modelada) |
 | Topografia | Toposolid de teste com encosta, dois morros e um vale; vias acompanhando o terreno e suavizadas; cruzamentos no relevo; Perfil da Via em todos os modos e aplicado com obras automáticas |
 | Obras | viaduto sobre outra via, ponte no vale, passarela, túnel, trincheira, muros (todos), taludes, nós viários, terraplenagem (simulação, aplicação, mapa) |
 | Edição | editar linha/interseção/rotatória, mover eixo (atualização automática), Apagar Trecho (na via, fora da via, zebrado, sem linha de referência, devolver peças), 2D/3D, excluir, Atualizar Todas |
 | Detalhamento | detalhe de placas, anotação, legenda, cota de seção + perfil, detalhe típico, quadros, notas, norte, eixos, quantitativos e tabelas |
-| Tráfego | Simulador de Tráfego sobre a área de teste: leitura da rede, análise HCM e diagnóstico, microssimulação de 5 min, cenários (rotatória × semáforo coordenado × contagem) com comparação, cenários gravados e lidos do projeto, plano semafórico gravado na interseção, sinalização interpretada (placas, marcas, dispositivos e semáforos associados a trechos e cruzamentos), resultados nos parâmetros SV_NivelServico/SV_Trafego e mapa de níveis de serviço na planta |
+| Tráfego | Simulador de Tráfego sobre a área de teste: leitura da rede, análise HCM e diagnóstico, microssimulação de 5 min, cenários (rotatória × semáforo coordenado × contagem) com comparação, cenários gravados e lidos do projeto, plano semafórico gravado na interseção, sinalização interpretada (placas, marcas, dispositivos e semáforos associados a trechos e cruzamentos), resultados nos parâmetros SV_NivelServico/SV_Trafego e mapa de níveis de serviço na planta; **contatos entre veículos (deve ser zero) e setas**, **planta real no mapa**, **recomendação de tempos e onda verde**, **semáforo de travessia do cenário** e **soluções testadas** para o pior cruzamento |
 | Verificações | pintura escondida sob o piso ou flutuando, buracos e degraus entre pisos da pista, terreno acima da pista ou sem encostar na seção, estruturas invadindo outras vias, formas sem geometria |
 
 Cada erro do plugin (inclusive os que antes só iam para o log), cada erro/aviso do Revit e cada verificação que falha
@@ -950,6 +976,21 @@ Em **Linha de continuidade**: *Pela hierarquia* (padrão), *Sempre* ou *Nunca*.
 **Plano semafórico gravado.** O Simulador de Tráfego pode gravar na interseção o plano (ciclo, fases, verdes,
 amarelo, vermelho geral, defasagem e verde de pedestres) – ele passa a valer na análise e fica com o modelo (§ 26).
 
+### 19.1.1 Linhas no cruzamento e regras de conversão (MBST Vol. IV / CTB art. 207)
+
+Na janela da interseção, bloco **Linhas no cruzamento e regras de conversão**:
+
+* **Conversões à esquerda permitidas** (padrão): o eixo da via principal vira **linha de continuidade (LCO)** tracejada
+  na boca das transversais – quem vem da principal pode converter; desmarcado, o eixo segue **contínuo** pela boca (linha
+  contínua amarela proíbe a conversão, CTB art. 207) e cada aproximação recebe **R-4a** – só conversões à direita. O
+  Simulador de Tráfego passa a proibir essas conversões.
+* **LCO no miolo da via principal**: eixo amarelo (duplo quando a linha é dupla) e divisórias brancas tracejadas
+  **1 × 1 m** (**2 × 2 m** acima de 60 km/h) atravessando o cruzamento; desmarcado, interrompidas.
+* **Linhas contínuas nas aproximações**: o eixo seccionado vira **LFO-3** (LFO-1 em pista estreita) nos **15 m** antes do
+  cruzamento (**30 m** acima de 60 km/h) e, no semáforo, as divisórias ficam **LMS-1** nos 20 m antes da retenção –
+  sempre limitadas à metade da quadra quando há outro cruzamento perto.
+* As linhas da via são **cortadas e substituídas** por essas marcas (nada fica sobreposto).
+
 ### 19.2 Tipos de interseção (MBST / DNIT)
 
 Os tipos podem ser combinados na mesma interseção:
@@ -1018,6 +1059,11 @@ editável**):
 Parâmetros adicionais: tipo da ilha (**ajardinada**, **pavimentada**, **galgável** ou **pintada**), altura da faixa
 galgável, **raios de entrada e de saída** separados, largura dos divisores, largura/raio do by-pass,
 distância e largura das **travessias**, número de **árvores**. A janela mostra o **diâmetro inscrito**.
+
+**Elementos no lugar certo.** A **linha de bordo** acompanha o meio-fio real (inclusive nas curvas de entrada e saída),
+a **faixa de pedestres** vai de calçada a calçada atravessando também as faixas de desvio (by-pass), com as rampas nas
+duas pontas, os **refúgios** são recortados no nível da pista dentro das ilhas separadoras, o zebrado do "nariz" da ilha
+foi retirado (a ilha já é física) e a LFO-3 da aproximação começa junto à ilha.
 
 ### 20.1 Integração com as vias – só a rotatória, sem refazer o cruzamento
 
@@ -1597,3 +1643,66 @@ serviço; na animação o nível vira uma fita junto ao bordo, para os veículos
   de progresso.
 * **Veículos**, **Rótulos** e **Sinalização** ligam/desligam cada camada; roda do mouse = zoom no cursor, arrastar =
   mover, clique = selecionar cruzamento/trecho.
+
+**Planta real.** Com **Planta real** marcado (padrão), o mapa desenha o projeto como ele é: as mesmas peças que o
+plugin gera no Revit – pavimento das vias, interseções e rotatórias, calçadas, meios-fios, canteiros, ilhas e **toda a
+sinalização horizontal** (eixos, divisórias, bordos, faixas de pedestres, retenções, setas, zebrados, legendas). O
+desenho fica em cache (a animação continua leve). Desmarcado, volta ao esquema das faixas pelo eixo.
+
+**Setas dos veículos.** Cada veículo **pisca a seta** do lado certo ao trocar de faixa, nos 45 m antes de uma conversão
+e durante ela, e à direita para sair da rotatória (CTB art. 196).
+
+### 26.10 Microssimulação coesa – fila e lentidão, nunca choque
+
+Com muito tráfego os veículos **formam fila e andam devagar**, sem se atravessar:
+
+* dentro do cruzamento cada veículo segue a trajetória da sua faixa de origem para a faixa de destino; trechos
+  compartilhados (fusões, anel da rotatória) são percorridos em fila, e as **zonas de conflito** são ocupadas por um de
+  cada vez – quem já passou da linha termina a travessia, quem chega **não entra no cruzamento para ficar parado dentro
+  dele** (CTB art. 45) e espera na linha;
+* a linha de retenção fica antes do cruzamento (não no centro do nó) e o veículo só cruza a linha com espaço na saída;
+* troca de faixa só com espaço (inclusive ao lado de quem ainda está entrando no cruzamento ou trocando de faixa), com
+  cooperação de quem vem atrás quando a troca é obrigatória; quem ficou na faixa errada espera, refaz a rota ou converte
+  com cuidado;
+* rotatória: ocupação máxima do anel (sem travamento circular), as duas faixas de uma entrada larga entram
+  **alternadas** num anel de uma faixa e só com espaço para o veículo inteiro;
+* calibração urbana: carros 2,0 m/s² e 1,0 s de intervalo; caminhões e ônibus 1,0 m/s² e 1,4 s.
+
+O Autoteste confere que não há sobreposição de veículos na animação.
+
+### 26.11 Semáforos no simulador: escolher, temporizar e recomendar
+
+* **🚦 Semáforo no mapa** (barra do mapa): clique num **cruzamento** para torná-lo semaforizado no cenário (e editar os
+  tempos) ou num **trecho / faixa de pedestres** para criar um **semáforo de travessia no meio da quadra** – com ciclo,
+  verde de pedestres, entreverdes, defasagem, *Ativo* (desmarque para testar sem o semáforo) e **Sugerir tempos**
+  (verde de pedestres pela largura a 1,2 m/s + 4 s, ciclo e defasagem do semáforo vizinho da via).
+* **Escolher objeto no projeto…** (aba Cruzamentos): a janela fecha, você clica no elemento do Revit que será o
+  semáforo (grupo focal, placa, faixa de pedestres, interseção) e ela reabre no mesmo cenário com o semáforo criado.
+* **Tempos de cada semáforo** (aba Cruzamentos): ciclo, verdes de cada fase, **entreverdes** (amarelo + vermelho geral)
+  e **defasagem**; o diagrama de tempos mostra o resultado. **Gravar plano semafórico no projeto** leva tudo para a
+  interseção.
+* **Recomendação de tempos**: escolha **Este semáforo**, **Todos os semáforos do cenário** ou **Todos os cruzamentos de
+  uma via** (com **onda verde** – ciclo comum e defasagens pela progressão no sentido de maior volume) e clique em
+  **Recomendar tempos**: ciclo e verdes pelo método de Webster/HCM (verdes mínimos de veículos e de pedestres), com o
+  **antes × depois** de cada cruzamento. **Aplicar no cenário** fixa os tempos; **Aplicar e gravar no projeto** grava o
+  plano em cada interseção. Os demais semáforos da rede não mudam.
+
+### 26.12 O que fazer para resolver – soluções testadas
+
+No **Diagnóstico** (ou na aba Cruzamentos, *Testar soluções para este cruzamento*) o botão **Testar soluções** roda a
+análise da rede inteira com cada alternativa cabível e mostra o **efeito medido**, da melhor para a pior:
+
+| Alternativa | Quando aparece |
+|---|---|
+| Semaforizar o cruzamento | cruzamento sem semáforo |
+| PARE / Dê a preferência na secundária | cruzamento sem controle com via principal definida |
+| Rotatória | cruzamento comum |
+| Retemporizar o semáforo (Webster) | semáforo |
+| Onda verde na via principal | semáforo com outros semáforos na mesma via |
+| Proibir as conversões à esquerda | aproximações com conversões à esquerda |
+| Travessia: ciclo curto / sem semáforo | trecho com semáforo de travessia |
+
+Cada item traz o atraso e o nível do local antes → depois, o atraso total e a velocidade média da rede, os itens
+críticos, **o que fazer no projeto** para implantar e o botão **Aplicar no cenário e simular**. Só é marcada como
+solução (✔) a alternativa que melhora o local em pelo menos 10 % sem piorar a rede; quando nenhuma resolve sozinha, a
+recomendação do diagnóstico indica as medidas de projeto (faixa adicional, bolsão, binário etc.).

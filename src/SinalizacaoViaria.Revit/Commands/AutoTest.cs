@@ -228,6 +228,48 @@ internal sealed partial class AutoTestRunner
             var sim = Core.Traffic.TrafficSimulation.Run(r2);
             s.Note($"{sim.Spawned} veículos gerados, {sim.Completed} viagens concluídas, {sim.InNetwork} na rede, {sim.Backlog} sem entrar, tempo médio {sim.MeanTravelTime:0} s, {sim.Frames.Count} quadros.");
             if (sim.Spawned > 20 && sim.Completed < 0.3 * sim.Spawned) s.Warn("Poucas viagens concluídas: possível travamento na rede simulada.");
+            var overlaps = Core.Traffic.TrafficSimulation.CountOverlaps(sim);
+            if (overlaps > 2) s.Error($"{overlaps} contato(s) entre veículos na animação (deveria haver só fila e lentidão).");
+            var blink = sim.Frames.Sum(f => Enumerable.Range(0, f.Count).Count(k => f.Data[k * Core.Traffic.SimFrame.Stride + 6] != 0));
+            s.Note($"Contatos entre veículos: {overlaps}; setas acesas em {blink} posições de veículo.");
+        });
+        Step("Tráfego", "Mapa com a planta real do projeto", s =>
+        {
+            if (net.Backdrop.Count == 0) s.Error("O mapa não recebeu as peças do projeto (pavimento, calçadas, pintura).");
+            s.Note(string.Join(", ", net.Backdrop.GroupBy(b => b.Layer).Select(g => $"{g.Key}: {g.Count()}")));
+        });
+        Step("Tráfego", "Semáforos: recomendação de tempos, onda verde e travessia no meio da quadra", s =>
+        {
+            var o = new Core.Traffic.TrafficOptions { Demand = Core.Traffic.NivelDemanda.Pico };
+            var nodes = net.Nodes.Where(n => n.Kind == Core.Traffic.TipoNo.Intersecao && n.In.Count >= 3).Take(3).ToList();
+            foreach (var n in nodes) o.Nodes.Add(new Core.Traffic.NodeOverride { Node = n.Key, Control = Core.Traffic.ControleNo.Semaforo });
+            var adv = Core.Traffic.TrafficSignalAdvisor.Recommend(net, o, nodes.Select(n => n.Key).ToList());
+            if (nodes.Count > 0 && adv.Count == 0) s.Error("Nenhuma recomendação de tempos gerada.");
+            foreach (var a in adv) s.Note($"{a.Label}: ciclo {a.CycleBefore:0} → {a.Cycle:0} s, atraso {a.DelayBefore:0.0} → {a.DelayAfter:0.0} s.");
+            var road = net.Roads.OrderByDescending(r => r.Axis.Length).First();
+            var r0 = Core.Traffic.TrafficAnalysis.Run(net, o);
+            var chain = Core.Traffic.TrafficSignalAdvisor.SignalsOnRoad(r0, road.Id);
+            if (chain.Count >= 2)
+            {
+                var wave = Core.Traffic.TrafficSignalAdvisor.Recommend(net, o, chain.Select(n => n.Key).ToList(), road.Id);
+                s.Note($"Onda verde na {road.Name}: {string.Join(", ", wave.Select(a => $"{a.Label} {a.Offset:0} s"))}.");
+            }
+            var lk = net.Links.OrderByDescending(l => l.Length).First();
+            var mid = lk.Path.PointAt(lk.Length / 2);
+            o.Crossings.Add(new Core.Traffic.CrossingSignal { X = mid.X, Y = mid.Y, Cycle = 60, PedGreen = 14 });
+            var r1 = Core.Traffic.TrafficAnalysis.Run(net, o);
+            if (!r1.CrossingPlans.ContainsKey(lk.Index)) s.Error("O semáforo de travessia do cenário não foi associado ao trecho.");
+            else s.Note($"Travessia semaforizada em {lk.Name}: capacidade {lk.BaseCapacity:0} → {lk.Capacity:0} veh/h.");
+            Core.Traffic.TrafficAnalysis.Run(net, new Core.Traffic.TrafficOptions { Demand = Core.Traffic.NivelDemanda.Pico });
+        });
+        Step("Tráfego", "Soluções testadas para o pior cruzamento", s =>
+        {
+            var worst = res.Nodes.Values.Where(n => !n.Node.IsZone && n.Node.Kind == Core.Traffic.TipoNo.Intersecao).OrderByDescending(n => n.Delay).FirstOrDefault();
+            if (worst == null) { s.Note("Sem cruzamento no projeto de teste."); return; }
+            var trials = Core.Traffic.TrafficSolutions.For(net, res.Options, res, worst.Node.Index, null);
+            if (trials.Count == 0) s.Warn($"{worst.Node.Label}: nenhuma alternativa gerada.");
+            foreach (var t in trials.Take(5)) s.Note(t.Summary());
+            if (trials.Any(t => t.Failed)) s.Error("Alguma alternativa falhou ao ser testada: " + trials.First(t => t.Failed).Error);
         });
         Step("Tráfego", "Cenários: PARE × rotatória × semáforo coordenado, contagem e comparação", s =>
         {

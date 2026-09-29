@@ -127,6 +127,58 @@ public static class TrafficSimulation
     private const double Dt = 0.5;
     public static bool Debug { get; set; }
 
+    /// <summary>
+    /// Pares de veículos sobrepostos nos quadros (segmentos frente–traseira a menos de <paramref name="tol"/> m) – deve ser
+    /// zero: com muito tráfego há fila e lentidão, nunca choque.
+    /// </summary>
+    public static int CountOverlaps(SimResult r, double tol = 1.0)
+    {
+        static double Seg(Vec2 a, Vec2 b, Vec2 c, Vec2 d)
+        {
+            static double O(Vec2 p, Vec2 q, Vec2 x) => (q - p).Cross(x - p);
+            if (O(a, b, c) * O(a, b, d) < 0 && O(c, d, a) * O(c, d, b) < 0) return 0;
+            static double Pt(Vec2 p, Vec2 a, Vec2 b)
+            {
+                var ab = b - a;
+                var t = ab.Length < 1e-9 ? 0 : Math.Clamp((p - a).Dot(ab) / ab.Dot(ab), 0, 1);
+                return p.DistanceTo(a + ab * t);
+            }
+            return Math.Min(Math.Min(Pt(a, c, d), Pt(b, c, d)), Math.Min(Pt(c, a, b), Pt(d, a, b)));
+        }
+        var total = 0;
+        foreach (var f in r.Frames)
+        {
+            var seg = new (Vec2 A, Vec2 B)[f.Count];
+            for (int i = 0; i < f.Count; i++)
+            {
+                var o = i * SimFrame.Stride;
+                var p = new Vec2(f.Data[o], f.Data[o + 1]);
+                var d = new Vec2(Math.Cos(f.Data[o + 2]), Math.Sin(f.Data[o + 2]));
+                var half = ((int)f.Data[o + 3] == 0 ? 4.5 : 12) / 2 - 0.3;
+                seg[i] = (p + d * half, p - d * half);
+            }
+            var grid = new Dictionary<(int, int), List<int>>();
+            for (int i = 0; i < seg.Length; i++)
+            {
+                var c = (seg[i].A + seg[i].B) / 2;
+                var key = ((int)Math.Floor(c.X / 10), (int)Math.Floor(c.Y / 10));
+                if (!grid.TryGetValue(key, out var l)) grid[key] = l = new List<int>();
+                l.Add(i);
+            }
+            for (int i = 0; i < seg.Length; i++)
+            {
+                var c = (seg[i].A + seg[i].B) / 2;
+                var (gx, gy) = ((int)Math.Floor(c.X / 10), (int)Math.Floor(c.Y / 10));
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                        if (grid.TryGetValue((gx + dx, gy + dy), out var l))
+                            foreach (var j in l)
+                                if (j > i && Seg(seg[i].A, seg[i].B, seg[j].A, seg[j].B) < tol) total++;
+            }
+        }
+        return total;
+    }
+
     public static SimResult Run(TrafficResult macro, CancellationToken cancel = default, IProgress<double>? progress = null)
     {
         var net = macro.Network;

@@ -189,11 +189,17 @@ internal static class FloorRoadInput
         IList<Reference> refs;
         try { refs = uidoc.Selection.PickObjects(Autodesk.Revit.UI.Selection.ObjectType.Element, new FloorFilter(), "Selecione os PISOS da pista (um ou vários) e clique em Concluir"); }
         catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return null; }
+        return FromElements(uidoc, refs.Select(r => doc.GetElement(r)).ToList(), true, warnings);
+    }
+
+    /// <summary>Reconhece as vias nos pisos dados e cria os eixos (<paramref name="confirm"/> = perguntar antes).</summary>
+    public static List<(PathReference Path, Core.Automation.FloorRoad Road)>? FromElements(UIDocument uidoc, List<Element> elements, bool confirm, List<string> warnings)
+    {
+        var doc = uidoc.Document;
         var shapes = new List<Polygon2>();
         var zs = new List<double>();
-        foreach (var r in refs)
+        foreach (var e in elements)
         {
-            var e = doc.GetElement(r);
             var loops = Outline(doc, e);
             if (loops.Count == 0) { warnings.Add($"Piso {e.Id}: contorno não lido."); continue; }
             shapes.AddRange(Classify(loops));
@@ -210,7 +216,7 @@ internal static class FloorRoadInput
             MainContent = summary + "\n\nAs linhas de eixo serão criadas (dá para ajustá-las depois como qualquer eixo) e cada via recebe a seção do modelo escolhido com a largura medida.",
             CommonButtons = TaskDialogCommonButtons.Ok | TaskDialogCommonButtons.Cancel,
         };
-        if (td.Show() != TaskDialogResult.Ok) return null;
+        if (confirm && td.Show() != TaskDialogResult.Ok) return null;
         var z = zs.Count > 0 ? zs.Max() : 0;
         var res = new List<(PathReference, Core.Automation.FloorRoad)>();
         using var t = new Transaction(doc, "SV - Eixos dos pisos existentes");

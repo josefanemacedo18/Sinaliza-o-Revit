@@ -109,6 +109,44 @@ internal sealed partial class AutoTestRunner
             if (!MarkingStorage.Definitions(_doc).OfType<RecessMarkingDefinition>().Any(x => x.GroupId == pav.GroupId))
                 s.Error("A baia não foi criada na via existente.");
         });
+        Step("Largura e recuos", "Via reconhecida em pisos comuns do Revit (T feito com dois pisos, pista já modelada)", s =>
+        {
+            var level = _level;
+            if (level == null) { s.Error("Sem nível."); return; }
+            var floors = new List<Element>();
+            using (var t = new Transaction(_doc, "SV Autoteste - pisos comuns"))
+            {
+                t.Start();
+                var type = Floor.GetDefaultFloorType(_doc, false);
+                CurveLoop Rect(double x0, double y0, double x1, double y1)
+                {
+                    XYZ Q(double x, double y) => UnitConv.ToXyz(P(x, y), _z0);
+                    var l = new CurveLoop();
+                    l.Append(Line.CreateBound(Q(x0, y0), Q(x1, y0)));
+                    l.Append(Line.CreateBound(Q(x1, y0), Q(x1, y1)));
+                    l.Append(Line.CreateBound(Q(x1, y1), Q(x0, y1)));
+                    l.Append(Line.CreateBound(Q(x0, y1), Q(x0, y0)));
+                    return l;
+                }
+                floors.Add(Floor.Create(_doc, new List<CurveLoop> { Rect(1200, Y - 3.5, 1400, Y + 3.5) }, type, level.Id));
+                floors.Add(Floor.Create(_doc, new List<CurveLoop> { Rect(1297, Y + 3, 1303, Y + 90) }, type, level.Id));
+                t.Commit();
+            }
+            var warnings = new List<string>();
+            var found = FloorRoadInput.FromElements(_uidoc, floors, false, warnings);
+            foreach (var w in warnings) s.Note(w);
+            if (found == null || found.Count != 2) { s.Error($"Esperadas 2 vias reconhecidas; foram {found?.Count ?? 0}."); return; }
+            var opt = new CmdSinalizarVia.RoadCreation(true, TipoConexao.Intersecao, FimLivre.Nenhum, true, null, true, RelevoVia.Plana, Out());
+            foreach (var (path, road) in found)
+            {
+                var setup = FloorRoads.Fit(T(0), road);
+                setup.Pavement = TipoPavimento.Nenhum;
+                var defs = setup.Build(path, Out(), PluginContext.Catalog);
+                Take(s, CmdSinalizarVia.Create(_uidoc, defs, opt, setup.Warnings), defs);
+                s.Note($"Via de {road.Axis.Length:0} m com pista de {road.Width:0.00} m (seção ajustada: {setup.CarriagewayWidth:0.00} m).");
+            }
+            if (ItNear(P(1300, Y), 8) == null) s.Warn("Os dois eixos reconhecidos não formaram a interseção em T.");
+        });
         foreach (var v in Enum.GetValues<TipoSonorizador>())
             Step("Segurança viária", $"Sonorizador longitudinal – {v}", s =>
             {
