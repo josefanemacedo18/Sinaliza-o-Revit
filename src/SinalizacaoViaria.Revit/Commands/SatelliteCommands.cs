@@ -2,7 +2,6 @@ using System.Text;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
-using SinalizacaoViaria.Core.Geo;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Revit.Infrastructure;
 using SinalizacaoViaria.Revit.UI;
@@ -10,8 +9,9 @@ using SinalizacaoViaria.Revit.UI;
 namespace SinalizacaoViaria.Revit.Commands;
 
 /// <summary>
-/// Imagem de Satélite: imagem aérea (Google Satélite ou OpenStreetMap) reprojetada para a escala métrica real e colocada
-/// na vista de planta, em blocos fixados atrás de tudo, com escala gráfica e créditos – referência para desenhar o eixo.
+/// Imagem Aérea: Google Earth Pro com calibração automática pelos marcadores, ou mapa no plugin (OpenStreetMap, fonte
+/// própria XYZ, WMS). A imagem entra reprojetada na escala métrica real, medida no modelo (&lt; 1 mm), atrás de tudo na
+/// planta, com escala gráfica e créditos.
 /// </summary>
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdImagemSatelite : CommandBase
@@ -21,7 +21,7 @@ public sealed class CmdImagemSatelite : CommandBase
         var doc = uidoc.Document;
         var view = uidoc.ActiveView;
         if (view is not ViewPlan || view.IsTemplate)
-            throw new UserMessageException("Abra uma vista de planta (piso, forro ou implantação) para colocar a imagem de satélite.");
+            throw new UserMessageException("Abra uma vista de planta (piso, forro ou implantação) para colocar a imagem aérea.");
 
         var stored = GeoReferenceStore.Load(doc);
         double siteLat = 0, siteLon = 0, siteAlt = 0, north = 0;
@@ -36,56 +36,38 @@ public sealed class CmdImagemSatelite : CommandBase
         try { north = doc.ActiveProjectLocation.GetProjectPosition(XYZ.Zero).Angle; }
         catch { /* Norte verdadeiro = Norte do projeto */ }
 
-        var ctx = new SatelliteContext
+        var w = new AerialImageWindow(new SatelliteContext
         {
             Stored = stored, SiteLatitude = siteLat, SiteLongitude = siteLon, SiteAltitude = siteAlt, NorthAngle = north,
-            ViewCenter = ViewCenter(uidoc, view),
-        };
-        var w = new SatelliteWindow(ctx);
+            ViewCenter = CmdImportarImagem.ViewCenter(uidoc, view),
+        });
         if (UiHelpers.ShowModal(w) != true || w.Result == null) return Result.Cancelled;
-        var img = w.Result;
-        var count = Place(doc, view, img, w.ReplacePrevious);
+        var res = w.Result;
+        var (ids, report) = Place(doc, view, res, w.ReplacePrevious);
 
-        var p = img.Plan;
         var sb = new StringBuilder();
-        sb.AppendLine($"{p.Source.Nome}: {img.Files.Count} bloco(s), {p.PixelWidth} × {p.PixelHeight} px, {UiHelpers.F(p.Width, "0")} × {UiHelpers.F(p.Height, "0")} m.");
-        sb.AppendLine($"Zoom {p.Zoom} · {UiHelpers.F(p.OutputMpp, "0.000")} m/px efetivos · erro máximo da reprojeção {UiHelpers.F(img.ReprojectionError * 1000, "0.000")} mm.");
-        sb.AppendLine($"Altitude {UiHelpers.F(p.Geo.Altitude, "0")} m (fator 1 − {UiHelpers.F((1 - p.Geo.ElevationFactor) * 1e5, "0.0")}×10⁻⁵) · origem {p.Geo.Latitude:0.000000}, {p.Geo.Longitude:0.000000}.");
-        foreach (var n in p.Notes) sb.AppendLine("• " + n);
-        foreach (var l in LastReport) sb.AppendLine(l);
+        sb.AppendLine($"{res.SourceName}: {res.Blocks.Count} bloco(s), {UiHelpers.F(res.Max.X - res.Min.X, "0")} × {UiHelpers.F(res.Max.Y - res.Min.Y, "0")} m, {UiHelpers.F(res.OutputMpp, "0.000")} m/px.");
+        if (res.ReprojectionError > 0) sb.AppendLine($"Erro máximo da reprojeção: {UiHelpers.F(res.ReprojectionError * 1000, "0.000")} mm.");
+        sb.AppendLine($"Origem {res.Geo.Latitude:0.000000}, {res.Geo.Longitude:0.000000} · altitude {UiHelpers.F(res.Geo.Altitude, "0")} m.");
+        foreach (var n in res.Notes) sb.AppendLine("• " + n);
+        foreach (var l in report) sb.AppendLine(l);
         sb.AppendLine();
-        sb.AppendLine("Confira a escala: meça a escala gráfica (Anotar → Alinhada) e uma distância conhecida da imagem.");
-        sb.AppendLine("A posição absoluta de imagens de satélite tem erro típico de alguns metros; ortofoto oficial ou levantamento topográfico prevalecem.");
-        new TaskDialog(AppTitle) { MainInstruction = $"Imagem de satélite colocada ({count} elementos).", MainContent = sb.ToString() }.Show();
+        sb.AppendLine("Confira: meça a escala gráfica e uma distância conhecida (Anotar → Alinhada).");
+        new TaskDialog(AppTitle) { MainInstruction = $"Imagem aérea colocada ({ids.Count} elementos).", MainContent = sb.ToString() }.Show();
+
+        // Sem os marcadores do Google Earth: confirma a escala por 2 pontos.
+        if (w.NeedsCalibration && ids.FirstOrDefault() is { } first && doc.GetElement(first) is ImageInstance img && res.Blocks.Count == 1)
+            return CmdCalibrarImagem.Calibrate(uidoc, img, null);
         return Result.Succeeded;
     }
 
-    private static Vec2 ViewCenter(UIDocument uidoc, View view)
+    /// <summary>Cria as imagens (medidas e corrigidas), a escala gráfica e os créditos e grava a georreferência.</summary>
+    private static (List<ElementId> Ids, List<string> Report) Place(Document doc, View view, AerialResult res, bool replace)
     {
-        try
-        {
-            var uv = uidoc.GetOpenUIViews().FirstOrDefault(v => v.ViewId == view.Id);
-            if (uv != null)
-            {
-                var c = uv.GetZoomCorners();
-                return UnitConv.ToVec2((c[0] + c[1]) / 2);
-            }
-        }
-        catch { /* segue na origem */ }
-        return Vec2.Zero;
-    }
-
-    /// <summary>Esperado × obtido de cada bloco na última colocação.</summary>
-    private static List<string> LastReport = new();
-
-    /// <summary>Cria as imagens, a escala gráfica e os créditos numa transação e grava a georreferência.</summary>
-    private static int Place(Document doc, View view, SatelliteImage img, bool replace)
-    {
-        var plan = img.Plan;
-        var geo = plan.Geo;
+        var geo = res.Geo;
         var z = view is ViewPlan vp && vp.GenLevel != null ? vp.GenLevel.ProjectElevation : 0;
         var ids = new List<ElementId>();
-        using var t = new Transaction(doc, "Imagem de Satélite");
+        using var t = new Transaction(doc, "Imagem Aérea");
         t.Start();
         if (replace)
             foreach (var old in geo.LastImageElements)
@@ -94,49 +76,46 @@ public sealed class CmdImagemSatelite : CommandBase
                 try { if (doc.GetElement(id) != null) doc.Delete(id); }
                 catch { /* já apagado */ }
             }
-
-        // Tamanho medido no modelo e corrigido até < 1 mm (ImagePlacer) – esperado × obtido de cada bloco vai para o relatório.
-        var (imgIds, placeReport) = ImagePlacer.Place(doc, view, img.Files.Select(f => new ImageBlock(f.File, f.Block.Min, f.Block.Max, f.Block.Width, f.Block.Height)), z);
+        var (imgIds, report) = ImagePlacer.Place(doc, view, res.Blocks, z);
         ids.AddRange(imgIds);
-        LastReport = placeReport;
-
-        ids.AddRange(ScaleBar(doc, view, plan, img.Attribution, z));
-
+        ids.AddRange(ScaleBar(doc, view, res, z));
         geo.LastImageElements = ids.Select(i => i.Value).ToList();
-        geo.LastImageInfo = $"{plan.Source.Nome}, zoom {plan.Zoom}, {plan.OutputMpp:0.000} m/px, {DateTime.Now:dd/MM/yyyy}";
+        geo.LastImageInfo = $"{res.SourceName}, {res.OutputMpp:0.000} m/px, {DateTime.Now:dd/MM/yyyy}";
         GeoReferenceStore.Save(doc, geo);
         t.Commit();
-        return ids.Count;
+        return (ids, report);
     }
 
     /// <summary>Escala gráfica (0–10–50–100 m ou menor) e créditos no canto inferior esquerdo da imagem.</summary>
-    private static List<ElementId> ScaleBar(Document doc, View view, SatellitePlan plan, string attribution, double z)
+    private static List<ElementId> ScaleBar(Document doc, View view, AerialResult res, double z)
     {
-        var res = new List<ElementId>();
+        var list = new List<ElementId>();
         try
         {
-            var (len, ticks) = plan.Width >= 250 ? (100.0, new[] { 0.0, 10, 50, 100 })
-                : plan.Width >= 80 ? (50.0, new[] { 0.0, 10, 50 }) : (10.0, new[] { 0.0, 5, 10 });
-            var o = plan.Min + new Vec2(plan.Width * 0.04, plan.Height * 0.08);
+            var min = res.Min;
+            var width = res.Max.X - min.X;
+            var height = res.Max.Y - min.Y;
+            var (len, ticks) = width >= 250 ? (100.0, new[] { 0.0, 10, 50, 100 })
+                : width >= 80 ? (50.0, new[] { 0.0, 10, 50 }) : (10.0, new[] { 0.0, 5, 10 });
+            var o = min + new Vec2(width * 0.04, height * 0.08);
             XYZ P(Vec2 v) => new(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), z);
-            res.Add(doc.Create.NewDetailCurve(view, Line.CreateBound(P(o), P(o + new Vec2(len, 0)))).Id);
+            list.Add(doc.Create.NewDetailCurve(view, Line.CreateBound(P(o), P(o + new Vec2(len, 0)))).Id);
             var tick = len * 0.04;
-            var styles = new StyleService(doc);
-            var textType = styles.TextType(2.5);
+            var textType = new StyleService(doc).TextType(2.5);
             foreach (var k in ticks)
             {
-                res.Add(doc.Create.NewDetailCurve(view, Line.CreateBound(P(o + new Vec2(k, 0)), P(o + new Vec2(k, tick)))).Id);
+                list.Add(doc.Create.NewDetailCurve(view, Line.CreateBound(P(o + new Vec2(k, 0)), P(o + new Vec2(k, tick)))).Id);
                 var opt = new TextNoteOptions(textType) { HorizontalAlignment = HorizontalTextAlignment.Center, VerticalAlignment = VerticalTextAlignment.Bottom };
-                res.Add(TextNote.Create(doc, view.Id, P(o + new Vec2(k, tick * 1.5)), k == 0 ? "0" : $"{k:0} m", opt).Id);
+                list.Add(TextNote.Create(doc, view.Id, P(o + new Vec2(k, tick * 1.5)), k == 0 ? "0" : $"{k:0} m", opt).Id);
             }
-            var credit = $"{attribution} · {plan.Source.Nome}, zoom {plan.Zoom}, {UiHelpers.F(plan.OutputMpp, "0.00")} m/px, {DateTime.Now:dd/MM/yyyy} · escala métrica real (TM local SIRGAS 2000)";
+            var credit = $"{res.Attribution} · {res.SourceName}, {UiHelpers.F(res.OutputMpp, "0.00")} m/px, {DateTime.Now:dd/MM/yyyy} · escala métrica real (TM local SIRGAS 2000)";
             var copt = new TextNoteOptions(textType) { HorizontalAlignment = HorizontalTextAlignment.Left, VerticalAlignment = VerticalTextAlignment.Top };
-            res.Add(TextNote.Create(doc, view.Id, P(o - new Vec2(0, tick)), credit, copt).Id);
+            list.Add(TextNote.Create(doc, view.Id, P(o - new Vec2(0, tick)), credit, copt).Id);
         }
         catch (Exception ex)
         {
-            Log.Error("Imagem de satélite – escala gráfica", ex);
+            Log.Error("Imagem aérea – escala gráfica", ex);
         }
-        return res;
+        return list;
     }
 }

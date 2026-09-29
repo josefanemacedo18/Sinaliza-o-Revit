@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.DB.ExtensibleStorage;
 using SinalizacaoViaria.Core.Geo;
@@ -45,28 +43,5 @@ public static class GeoReferenceStore
         var e = new Entity(Schema());
         e.Set(FJson, geo.ToJson());
         doc.ProjectInformation.SetEntity(e);
-    }
-}
-
-/// <summary>Chave da Google Maps Platform cifrada com a DPAPI do Windows (usuário atual).</summary>
-public static class GoogleKeyStore
-{
-    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("SinalizaBIM/MapTiles");
-
-    public static string? Key
-    {
-        get
-        {
-            var p = PluginContext.Settings.GoogleMapsKeyProtected;
-            if (string.IsNullOrEmpty(p)) return null;
-            try { return Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(p), Entropy, DataProtectionScope.CurrentUser)); }
-            catch { return null; }                 // outro usuário/computador: pede a chave de novo
-        }
-        set
-        {
-            PluginContext.Settings.GoogleMapsKeyProtected = string.IsNullOrWhiteSpace(value)
-                ? null
-                : Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(value.Trim()), Entropy, DataProtectionScope.CurrentUser));
-        }
     }
 }

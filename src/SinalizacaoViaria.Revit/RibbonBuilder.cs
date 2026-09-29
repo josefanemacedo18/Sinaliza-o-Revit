@@ -31,8 +31,8 @@ public static class RibbonBuilder
             Data(typeof(CmdDesenharEixo), "Desenhar Eixo", "eixo",
                 "Eixo com a ferramenta nativa Linha de modelo (reta, arco, spline, cadeia, snaps) ou por pontos com encaixe nas vias."));
         Split(via, "SvImagem", "Imagem Aérea",
-            Data(typeof(CmdImagemSatelite), "Imagem de Satélite", "satelite",
-                "Imagem aérea (OpenStreetMap, Google com chave ou fonte própria XYZ) na escala métrica real e na posição geográfica do projeto, " +
+            Data(typeof(CmdImagemSatelite), "Imagem Aérea (Google Earth / Mapa)", "satelite",
+                "Imagem aérea sem chave: Google Earth Pro com calibração automática ou mapa no plugin (OpenStreetMap, fonte própria, WMS), na escala métrica real, " +
                 "atrás de tudo na planta – desenhe o eixo por cima. Tamanho medido no modelo e corrigido até < 1 mm."),
             Data(typeof(CmdImportarImagem), "Importar Imagem Aérea", "importarimagem",
                 "Qualquer imagem aérea (Google Earth Pro, ortofoto, drone): com world file ou GeoTIFF entra na escala e posição certas; " +

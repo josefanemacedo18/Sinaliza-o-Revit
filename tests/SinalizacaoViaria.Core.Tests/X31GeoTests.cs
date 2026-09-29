@@ -11,6 +11,8 @@ public class X31GeoTests
     public X31GeoTests(ITestOutputHelper output) => _out = output;
 
     private static readonly Ellipsoid El = Ellipsoid.Grs80;
+    /// <summary>Fonte de foto aérea (XYZ própria) com zoom até 20.</summary>
+    private static readonly SatelliteSource Aerial = SatelliteSource.Custom("Teste", null, 20);
 
     /// <summary>Diferença entre dois pontos geográficos em metros (pelos raios de curvatura locais).</summary>
     private static double MetersBetween(double lat1, double lon1, double lat2, double lon2)
@@ -143,7 +145,7 @@ public class X31GeoTests
         // Praça da Sé (marco zero de São Paulo): −23,550520, −46,633308. Pixel global calculado à parte (fórmula do EPSG:3857):
         // zoom 19 → x = 49 722 706,642, y = 76 147 354,611 → tile (194229, 297450), pixel (82,64; 154,61) dentro dele.
         var geo = new GeoReference { Latitude = -23.550520, Longitude = -46.633308, Altitude = 760 };
-        var plan = SatellitePlan.Create(geo, SatelliteSource.Google, Vec2.Zero, 200, 200, 0.3);
+        var plan = SatellitePlan.Create(geo, Aerial, Vec2.Zero, 200, 200, 0.3);
         Assert.Equal(19, plan.Zoom);
         var (sx, sy) = SatelliteReprojection.SourcePixel(plan, Vec2.Zero);
         Assert.Equal(49722706.642, sx, 2);
@@ -183,12 +185,12 @@ public class X31GeoTests
     {
         var geo = new GeoReference { Latitude = -15.7939, Longitude = -47.8828, Altitude = 1170, NorthAngle = 0.3 };
         // 3 km × 3 km a 0,3 m/px passaria de 100 milhões de pixels: resolução ajustada e blocos de até 4000 px.
-        var big = SatellitePlan.Create(geo, SatelliteSource.Google, new Vec2(100, 100), 3000, 3000, 0.3);
+        var big = SatellitePlan.Create(geo, Aerial, new Vec2(100, 100), 3000, 3000, 0.3);
         Assert.True((long)big.PixelWidth * big.PixelHeight <= SatellitePlan.MaxPixels);
         Assert.All(big.Blocks, b => Assert.True(b.Width <= SatellitePlan.BlockSize && b.Height <= SatellitePlan.BlockSize));
         Assert.Equal(big.PixelWidth, big.Blocks.Where(b => b.Row == 0).Sum(b => b.Width));
         Assert.Equal(big.Width, big.PixelWidth * big.OutputMpp, 6);
-        Assert.True(big.TileCount <= SatelliteSource.Google.MaxTiles);
+        Assert.True(big.TileCount <= Aerial.MaxTiles);
         Assert.NotEmpty(big.Notes);
         // Blocos contíguos: a borda de um é a do vizinho.
         foreach (var b in big.Blocks.Where(b => b.Col > 0))
@@ -197,7 +199,7 @@ public class X31GeoTests
         var osm = SatellitePlan.Create(geo, SatelliteSource.Osm, Vec2.Zero, 3000, 3000, 0.3);
         Assert.True(osm.TileCount <= SatelliteSource.Osm.MaxTiles);
         // Erro geométrico da grade de interpolação.
-        var small = SatellitePlan.Create(geo, SatelliteSource.Google, Vec2.Zero, 800, 600, 0.3);
+        var small = SatellitePlan.Create(geo, Aerial, Vec2.Zero, 800, 600, 0.3);
         var err = SatelliteReprojection.MaxInterpolationError(small);
         _out.WriteLine($"800×600 m: zoom {small.Zoom}, {small.OutputMpp:0.000} m/px, {small.TileCount} tiles, erro da grade {err * 1000:0.0000} mm");
         Assert.True(err < 0.001, $"{err * 1000:0.000} mm");
@@ -208,7 +210,7 @@ public class X31GeoTests
     {
         // Mosaico sintético: cada tile pinta de vermelho o pixel global da Praça da Sé e o resto de azul.
         var geo = new GeoReference { Latitude = -23.550520, Longitude = -46.633308 };
-        var plan = SatellitePlan.Create(geo, SatelliteSource.Google, Vec2.Zero, 60, 60, 0.3);
+        var plan = SatellitePlan.Create(geo, Aerial, Vec2.Zero, 60, 60, 0.3);
         var (sx, sy) = SatelliteReprojection.SourcePixel(plan, Vec2.Zero);
         long gx = (long)Math.Floor(sx), gy = (long)Math.Floor(sy);
         byte[] Tile(long tx, long ty)

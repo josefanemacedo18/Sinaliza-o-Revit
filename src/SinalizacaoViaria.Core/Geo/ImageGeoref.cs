@@ -171,6 +171,9 @@ public sealed record Similarity(Vec2 Pivot, double Scale, double Rotation, Vec2 
     /// <summary>Leva um ponto da imagem atual à posição calibrada.</summary>
     public Vec2 Apply(Vec2 p) => Target + (p - Pivot).Rotate(Rotation) * Scale;
 
+    /// <summary>Inversa: posição calibrada → ponto da imagem original.</summary>
+    public Vec2 Inverse(Vec2 q) => Pivot + ((q - Target) / Scale).Rotate(-Rotation);
+
     /// <summary>Só escala, em torno do 1º ponto: distância digitada / medida.</summary>
     public static Similarity FromDistance(Vec2 p1, Vec2 p2, double realDistance)
     {

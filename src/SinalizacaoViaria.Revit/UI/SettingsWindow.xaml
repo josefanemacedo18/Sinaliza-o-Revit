@@ -75,14 +75,6 @@
                         </Grid>
                     </StackPanel>
                 </GroupBox>
-                <GroupBox Header="Imagem de satélite (Google Maps Platform)">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
-                                   Text="Chave da sua conta no Google Cloud com a Map Tiles API ativada (cobrança por tile na sua conta). Fica cifrada neste computador (só o seu usuário do Windows consegue ler) e nunca vai para o projeto. Sem chave, use o OpenStreetMap."/>
-                        <PasswordBox x:Name="PbGoogleKey"/>
-                        <CheckBox x:Name="CkClearKey" Content="Apagar a chave gravada"/>
-                    </StackPanel>
-                </GroupBox>
                 <GroupBox Header="Catálogo normativo">
                     <StackPanel>
                         <TextBlock Style="{StaticResource Hint}" Text="Arquivo JSON com os tipos de marca, dimensões, cores, símbolos, vagas e materiais. Itens com o mesmo código substituem os padrões do plugin."/>

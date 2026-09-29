@@ -13,9 +13,6 @@ using SinalizacaoViaria.Revit.UI;
 
 namespace SinalizacaoViaria.Revit.Commands;
 
-/// <summary>Um bloco de imagem já na grade métrica do projeto: arquivo, extensão no modelo (m) e pixels.</summary>
-internal sealed record ImageBlock(string File, Vec2 Min, Vec2 Max, int PixelWidth, int PixelHeight);
-
 /// <summary>
 /// Coloca imagens na escala exata. O tamanho que o Revit dá a uma imagem depende da resolução (DPI) do arquivo e o
 /// parâmetro "Largura" é o da imagem "na vista, depois de escalar" (RASTER_SHEETWIDTH) – não dá para confiar que um

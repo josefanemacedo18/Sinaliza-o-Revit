@@ -3,13 +3,11 @@ using SinalizacaoViaria.Core.Geometry;
 namespace SinalizacaoViaria.Core.Geo;
 
 /// <summary>Fonte da imagem aérea.</summary>
-public enum FonteImagem { GoogleSatelite, OpenStreetMap, Personalizada }
+public enum FonteImagem { OpenStreetMap, Personalizada }
 
 /// <summary>Limites e créditos de cada fonte (uso responsável: nada de download em massa).</summary>
 public sealed record SatelliteSource(FonteImagem Fonte, string Nome, int MaxZoom, int MaxTiles, double KbPerTile, string Attribution, bool IsPhoto)
 {
-    /// <summary>Google Maps Platform – Map Tiles API (2D Tiles, satélite). Cobrança por tile na conta do usuário.</summary>
-    public static readonly SatelliteSource Google = new(FonteImagem.GoogleSatelite, "Google Satélite", 20, 2500, 22, "© Google", true);
     /// <summary>OpenStreetMap (tile.openstreetmap.org) – mapa, não foto; limite baixo pela política de uso dos tiles.</summary>
     public static readonly SatelliteSource Osm = new(FonteImagem.OpenStreetMap, "OpenStreetMap (mapa)", 19, 300, 14, "© OpenStreetMap contributors", false);
 
@@ -21,7 +19,6 @@ public sealed record SatelliteSource(FonteImagem Fonte, string Nome, int MaxZoom
         new(FonteImagem.Personalizada, string.IsNullOrWhiteSpace(name) ? "Fonte própria (XYZ)" : name!.Trim(), Math.Clamp(maxZoom, 1, 22), 1500, 20,
             string.IsNullOrWhiteSpace(attribution) ? "Imagem: fonte configurada pelo usuário" : attribution!.Trim(), true);
 
-    public static SatelliteSource Of(FonteImagem f) => f == FonteImagem.GoogleSatelite ? Google : Osm;
 
     /// <summary>Endereço de tile de um modelo XYZ ({z}, {x}, {y}; {-y} para TMS). Nulo se o modelo for inválido.</summary>
     public static string? TileUrl(string? template, int z, long x, long y)

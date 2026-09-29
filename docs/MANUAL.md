@@ -381,113 +381,83 @@ de 16 mm; acostamento sem interrupções para bicicletas.
   veículo) com **âncoras** de reboque, **berma** de material no fim, **zebrado de entrada** e **delineadores**.
 * O volume de material aparece na prévia. O Simulador de Tráfego acusa **descida longa sem área de escape** (§ 26).
 
-## 2.7 Imagem de Satélite – referência na escala métrica real
+## 2.7 Imagem Aérea – referência na escala métrica real (sem chave de API)
 
-Guia **SinalizaBIM → Vias → Imagem de Satélite** (com uma vista de **planta** aberta). Traz a imagem aérea do local para a
-vista, atrás de tudo, na **escala métrica real** e na **posição geográfica do projeto** – desenhe o eixo por cima
-(*Desenhar Eixo*, *Via*, *Pista*) com a certeza de que 1 m na imagem é 1 m no Revit.
+Guia **SinalizaBIM → Vias → Imagem Aérea** (com uma vista de **planta** aberta). A imagem aérea entra atrás de tudo, na
+**escala métrica real** e na **posição geográfica do projeto** – desenhe o eixo por cima (*Desenhar Eixo*, *Via*, *Pista*).
+Nenhuma opção precisa de chave de API.
 
-**Passo a passo**
+### Opção 1 – Google Earth Pro com calibração automática
 
-1. Abra a vista de planta onde a via será desenhada.
-2. *Imagem de Satélite* → escolha a **fonte**: *Google Satélite* (foto aérea, precisa da sua chave) ou *OpenStreetMap*
-   (mapa das ruas – **não é foto de satélite**, não precisa de chave).
-3. **Centro (lat, lon)**: no Google Maps, clique com o botão direito no local e clique nas coordenadas para copiá-las;
-   cole no campo (aceita `-23.550520, -46.633308`, vírgula decimal ou `23.5505° S 46.6333° W`).
-4. **Largura × altura** (até 3 km × 3 km), **resolução** (0,30 m/px por padrão – o zoom da fonte é escolhido por ela)
-   e **altitude média** do local.
-5. Na **primeira imagem** escolha o ponto do projeto que recebe o centro: *centro da vista atual* ou *origem interna
-   (0, 0)*. Essa passa a ser a **origem geográfica do projeto**, gravada no arquivo: as próximas imagens encaixam
-   exatamente nela e nos eixos já desenhados (*Redefinir a origem* só se quiser recomeçar).
-6. **Prévia** (opcional) e **Baixar e colocar na vista**. O download e a reprojeção rodam em segundo plano, com
-   progresso e botão *Parar*; o Revit só recebe a imagem no fim, num único *Desfazer*.
+Precisa do **Google Earth Pro para computador** (gratuito: google.com/earth/versions → *Google Earth Pro para computador*).
 
-O painel mostra, antes de baixar: zoom, **metros por pixel efetivos**, pixels e blocos, número de tiles e MB estimados
-(os já baixados vêm do cache `%AppData%\SinalizaBIM\tiles`) e o **erro máximo estimado da reprojeção**.
+1. *Imagem Aérea* → aba **1 · Google Earth Pro** → **Abrir no Google Earth Pro**. O plugin grava um KML com um
+   *NetworkLink* (`viewRefreshMode = onStop`, `viewFormat` com a caixa da vista, rumo, inclinação, distância e campo de
+   visão) apontando para um servidor **só no próprio computador** (127.0.0.1). A cada parada da vista o Google Earth manda a
+   área visível e recebe **2 miras magenta** (perto dos cantos noroeste e sudeste), em posições geográficas conhecidas.
+2. No Google Earth, aproxime com a **roda do mouse** e arraste até a área. Aperte **N** (Norte para cima) e **U** (vista de
+   cima) – a janela do plugin mostra ao vivo a área visível em metros, o rumo e a inclinação, e avisa enquanto não estiverem
+   em 0°.
+3. Com as 2 miras visíveis, **Arquivo → Salvar → Salvar imagem** na pasta indicada na janela (o plugin percebe a imagem
+   nova sozinho) – ou use **Usar a imagem salva…**.
+4. O plugin **encontra as 2 miras na imagem** (precisão de fração de pixel) e calibra **escala, posição e Norte
+   verdadeiro**; mostra os metros por pixel e a coerência com a área visível do Google Earth.
+5. **Gerar e colocar na vista**. Sem as miras (fora da tela ou cobertas), a escala é estimada pela área visível e a
+   calibração por 2 pontos abre em seguida para confirmar.
 
-**O que é colocado:** a imagem em blocos de até 4000 px (imagens do Revit incorporadas ao projeto, lado a lado, camada
-*Fundo*, **fixadas**), uma **escala gráfica** de 0–10–50–100 m (ou menor) e o texto de **créditos** (© Google /
-© OpenStreetMap contributors, fonte, zoom, m/px e data) – obrigatório pelos termos das fontes. *Substituir a imagem
-anterior* apaga de uma vez a imagem, a escala e os créditos da vez anterior.
+O plugin usa só recursos do próprio Google Earth Pro (arquivo KML e *Salvar imagem*) – não baixa imagens do Google. O uso
+das imagens segue os **termos do Google Earth**; os créditos (© Google) acompanham a imagem colocada.
 
-**Como a escala fica certa.** Os tiles vêm na projeção Web Mercator, cuja escala muda com 1/cos(latitude) (em Brasília,
-mais de 8 %) e nem é igual nos sentidos norte–sul e leste–oeste do elipsoide (≈ 0,5 % de diferença no Brasil). Por isso a
-imagem **nunca é esticada** por um fator único: cada pixel do Revit é recalculado (interpolação bilinear) a partir do
-ponto exato do mosaico, pela cadeia
+### Opção 2 – Mapa no plugin (OpenStreetMap, fonte própria ou WMS)
 
-modelo → rotação do **Norte verdadeiro** do projeto (*Gerenciar → Local → Posição*) → plano local no terreno →
-**fator de altitude** R/(R+h) → **Transversa de Mercator local** no elipsoide GRS80/SIRGAS 2000, com meridiano central e
-origem no centro do projeto e **k0 = 1** → latitude/longitude → pixel do tile.
+Aba **2 · Mapa no plugin**: busque o endereço (Nominatim/OpenStreetMap, 1 consulta por segundo) ou cole "lat, lon"; no
+mapa, **arraste** para mover, **roda do mouse** para aproximar, **clique duplo** centraliza; ajuste o **recorte** pelos
+cantos (ou arraste-o pelo meio) – a largura × altura aparece em **metros reais**. Escolha a fonte:
 
-Na TM local a distorção é menor que 1 ppm a alguns km do centro (no UTM a escala varia de 0,9996 a 1,0010 – até
-40 cm/km); o fator de altitude faz as medidas valerem no terreno (a 800 m de altitude são ~12,5 cm/km). Testes do
-núcleo: ida e volta lat/lon → plano < 0,001 mm; plano × geodésica (Vincenty) < 0,2 ppm em pares de 1 e 3 km;
-erro da grade de interpolação < 0,001 mm.
+* **OpenStreetMap** – mapa das ruas (não é foto), política de uso respeitada (identificação do plugin, no máximo 2
+  conexões, cache, sem download em massa);
+* **Fonte própria (XYZ)** – serviço de tiles que você tem direito de usar (Configurações → Imagem aérea);
+* **WMS** – ortofoto oficial (prefeitura, estado, IBGE…): cole o endereço do serviço, **Carregar camadas**, escolha a
+  camada. O plugin pede a imagem em UTM SIRGAS 2000 ou EPSG:4674 com a caixa exata do recorte (em pedaços de até 2000 px),
+  então a escala vem do próprio pedido.
 
-**Chave do Google (Map Tiles API).** No [Google Cloud Console](https://console.cloud.google.com/): crie (ou escolha) um
-projeto → *APIs e serviços* → ative a **Map Tiles API** → configure a **cobrança** → *Credenciais* → *Criar chave de API*
-(recomendado: restringir a chave à Map Tiles API). Cole em **SinalizaBIM → Configurações → Imagem de satélite** (ou no
-botão *Chave do Google…* da janela). A chave fica **cifrada** no seu usuário do Windows (DPAPI) e **nunca** vai para o
-projeto, para o log ou para o código. O plugin usa só a API oficial (sessão de tiles 2D, tipo *satellite*); o uso é
-cobrado por tile na sua conta conforme a tabela do Google – o número de tiles aparece antes de baixar.
+**Prévia do recorte** mostra a imagem já reprojetada; **Gerar e colocar na vista** baixa, reprojeta e coloca.
 
-**Limites de uso.** Google: até 2500 tiles por imagem e zoom máximo que o Google tem na área (consultado antes de baixar).
-OpenStreetMap: até 300 tiles por imagem, zoom até 19, no máximo 2 downloads simultâneos, cache respeitando a validade
-informada pelo servidor e identificação do plugin – conforme a *Tile Usage Policy* da OSM Foundation (sem download em
-massa). Acima dos limites a resolução é reduzida automaticamente (com aviso) ou reduza a área. Sem internet, sem chave ou
-com erro do servidor aparece a mensagem e **nada é criado** no projeto.
+### Como a escala fica certa
 
-**Precisão.** As medidas **dentro** da imagem ficam na escala correta; a **posição absoluta** de imagens de satélite tem
-erro típico de alguns metros (e pode haver deslocamento entre Google e OSM). Para projeto executivo, **ortofoto oficial
-ou levantamento topográfico prevalecem**.
+Toda imagem é **reamostrada** para a grade métrica do projeto pela cadeia modelo → Norte verdadeiro → plano local no
+terreno → fator de altitude → **Transversa de Mercator local** (GRS80/SIRGAS 2000, k0 = 1 no centro do projeto) →
+latitude/longitude → pixel da origem – nunca esticada por um fator único (a Web Mercator erra ~0,5 % no norte–sul e o UTM
+até 0,1 % de escala e alguns décimos de grau de rotação).
 
-**Escala conferida no próprio Revit.** O tamanho que o Revit dá a uma imagem depende da resolução (DPI) do arquivo, e o
-parâmetro *Largura* da imagem é "na vista, depois de escalar" – não é garantido que um valor gravado nele vire a mesma
-medida no modelo. Por isso cada bloco é **medido no modelo** pelos cantos da imagem depois de colocado e corrigido até a
-diferença ficar **abaixo de 1 mm**; o relatório final mostra *esperado × obtido* de cada bloco e o passo a passo completo
-fica em `%AppData%\SinalizaBIM\imagem-aerea-diagnostico.txt` (tamanho após criar, após definir a largura, após posicionar
-e caixa envolvente).
+**Tamanho conferido no Revit.** O tamanho que o Revit dá a uma imagem depende do DPI do arquivo e o parâmetro *Largura* é
+"na vista, depois de escalar"; por isso cada bloco é **medido no modelo** pelos cantos e corrigido até **< 1 mm**. O
+relatório mostra *esperado × obtido* e o diagnóstico completo fica em `%AppData%\SinalizaBIM\imagem-aerea-diagnostico.txt`.
 
-### 2.7.1 Imagem nítida de qualquer origem – Importar Imagem Aérea
+**O que é colocado:** blocos de até 4000 px (camada *Fundo*, fixados), **escala gráfica** 0–10–50–100 m e o texto de
+**créditos**. *Substituir a imagem anterior* apaga imagem, escala e créditos da vez anterior. A origem geográfica fica
+gravada no projeto: as imagens seguintes encaixam na primeira.
 
-Guia **Vias → Imagem Aérea → Importar Imagem Aérea**. Aceita JPG, PNG, TIF ou BMP de qualquer origem – exportação do
-Google Earth Pro, ortofoto da prefeitura, voo de drone. **A licença da imagem é de quem a obteve.**
+### Importar Imagem Aérea e Calibrar Escala
 
-* **Com world file** (`.jgw`, `.pgw`, `.tfw`, `.wld` ao lado do arquivo) ou **GeoTIFF**: a imagem é reprojetada para o
-  plano do projeto e entra **na escala e na posição corretas**. O sistema vem do GeoTIFF (EPSG 4674/4326, SIRGAS 2000 UTM
-  31978–31985) ou do `.prj`; se não houver, a janela pergunta (geográficas, UTM SIRGAS 2000 fuso/hemisfério ou metros do
-  projeto). Uma ortofoto em UTM é corrigida do fator de escala do fuso (até 0,1 %) e da convergência meridiana (a grade UTM
-  fica girada em relação ao Norte verdadeiro – ~0,27° a 265 km do meridiano central).
-* **Sem georreferência** (ex.: imagem salva do Google Earth Pro): informe o tamanho aproximado do pixel, a imagem é colocada
-  no centro da vista e a **calibração por 2 pontos** abre em seguida.
+* **Importar Imagem Aérea** – qualquer JPG/PNG/TIF/BMP (ortofoto, drone, imagem salva de outro programa): com **world file**
+  (`.jgw`, `.pgw`, `.tfw`, `.wld`) ou **GeoTIFF** entra na escala e posição corretas (geográficas, UTM SIRGAS 2000 ou metros
+  do projeto); sem georreferência é colocada e calibrada por 2 pontos. A licença da imagem é de quem a obteve.
+* **Calibrar Escala da Imagem** – clique 2 pontos sobre a imagem e informe a **distância real** (ex.: medido 93,70 m, real
+  100,00 m → fator 1,06724, o 1º ponto fica) ou a **lat/lon** dos dois (escala, posição e Norte verdadeiro).
 
-**Receita com o Google Earth Pro:** posicione a vista de cima (tecla *U*, Norte para cima – tecla *N*), marque dois
-**marcadores** em esquinas bem visíveis e afastadas (anote a latitude/longitude de cada um em *Propriedades*), salve a
-imagem (*Arquivo → Salvar → Salvar imagem*), importe no plugin e calibre com as coordenadas dos dois marcadores – escala,
-posição e Norte verdadeiro ficam certos.
+### Fonte própria (XYZ)
 
-### 2.7.2 Calibrar Escala da Imagem
+Em **Configurações → Imagem aérea – fonte própria**: endereço `https://…/{z}/{x}/{y}` (ou `{-y}`), nome, créditos e zoom
+máximo. O plugin não traz endereços pré-preenchidos; a licença e os créditos são de quem configura.
 
-Guia **Vias → Imagem Aérea → Calibrar Escala da Imagem** (ou logo após importar). Selecione a imagem, clique **2 pontos
-sobre ela** (quanto mais afastados, melhor) e informe:
+### Precisão e conferência
 
-* a **distância real** entre eles (medida no Google Earth com a régua, na planta do loteamento ou em campo) – a imagem é
-  redimensionada em torno do 1º ponto (ex.: medido 93,70 m, real 100,00 m → fator 1,06724); ou
-* a **latitude/longitude** dos dois pontos – além da escala, a imagem vai para a posição geográfica do projeto e é girada
-  para o Norte verdadeiro (se o Revit não permitir girar a imagem, o relatório avisa).
-
-O tamanho final é medido no modelo e mostrado (esperado × obtido).
-
-### 2.7.3 Fonte própria (XYZ)
-
-Em **Configurações → Imagem aérea – fonte própria**, informe o endereço de um serviço de tiles no formato
-`https://…/{z}/{x}/{y}` (ou `{-y}` para TMS) que **você tem direito de usar** (conta própria em um provedor de imagens,
-servidor de ortofotos da prefeitura ou da empresa), o nome, os créditos e o zoom máximo. Ela aparece como fonte na janela
-*Imagem de Satélite*, com as mesmas regras de cache, limite de tiles, reprojeção e conferência de escala. O plugin não traz
-endereços pré-preenchidos: a licença e os créditos são de quem configura. O endereço fica só neste computador.
-
-**Conferir a escala no Revit.** Com *Anotar → Alinhada*, meça a escala gráfica (deve dar exatamente 10/50/100 m) e uma
-distância conhecida na imagem (ex.: a mesma distância medida no Google Earth) (largura de uma quadra, uma faixa de pedestres, um campo de futebol oficial de 105 m).
+As medidas **dentro** da imagem ficam na escala correta. A **posição absoluta** de imagens aéreas tem erro de alguns metros;
+no Google Earth o relevo e a perspectiva (se a vista não estiver exatamente de cima) deslocam a imagem – as miras corrigem
+escala, posição e rotação, mas não o relevo. Para projeto executivo, **ortofoto oficial ou levantamento topográfico
+prevalecem**. **Conferir:** com *Anotar → Alinhada*, meça a escala gráfica (exatamente 10/50/100 m) e uma distância
+conhecida (a mesma medida no Google Earth com a régua).
 
 ## 2.4 Bloqueios físicos
 

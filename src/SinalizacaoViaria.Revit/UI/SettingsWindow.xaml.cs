@@ -47,9 +47,6 @@ public partial class SettingsWindow : Window
         TbXyzName.Text = s.CustomTilesName ?? "";
         TbXyzAttribution.Text = s.CustomTilesAttribution ?? "";
         TbXyzZoom.Text = s.CustomTilesMaxZoom.ToString();
-        // A chave não é exibida: só se informa se já há uma gravada.
-        CkClearKey.Visibility = string.IsNullOrEmpty(s.GoogleMapsKeyProtected) ? Visibility.Collapsed : Visibility.Visible;
-        PbGoogleKey.ToolTip = string.IsNullOrEmpty(s.GoogleMapsKeyProtected) ? "Cole aqui a chave (AIza…)." : "Há uma chave gravada. Cole outra para substituir.";
         UpdateStatus();
     }
 
@@ -122,8 +119,6 @@ public partial class SettingsWindow : Window
             s.CustomTilesName = string.IsNullOrWhiteSpace(TbXyzName.Text) ? null : TbXyzName.Text.Trim();
             s.CustomTilesAttribution = string.IsNullOrWhiteSpace(TbXyzAttribution.Text) ? null : TbXyzAttribution.Text.Trim();
             s.CustomTilesMaxZoom = (int)UiHelpers.Parse(TbXyzZoom, 19, "Zoom máximo", 1, 22);
-            if (CkClearKey.IsChecked == true) GoogleKeyStore.Key = null;
-            else if (!string.IsNullOrWhiteSpace(PbGoogleKey.Password)) GoogleKeyStore.Key = PbGoogleKey.Password;
             s.UserCatalogPath = string.Equals(TbCatalog.Text, PluginPaths.DefaultUserCatalog, StringComparison.OrdinalIgnoreCase) ? null : TbCatalog.Text;
             PluginContext.SaveSettings();
             PluginContext.ReloadCatalog();
