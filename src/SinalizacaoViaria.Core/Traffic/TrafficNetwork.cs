@@ -41,6 +41,10 @@ public sealed class TrafficRoad
     public double LeftWidth { get; init; }
     /// <summary>Largura da pista entre meios-fios (m).</summary>
     public double CarriageWidth => RightWidth + LeftWidth;
+    /// <summary>Do eixo ao alinhamento (pista + calçada) de cada lado (m) e largura do canteiro central.</summary>
+    public double TotalRight { get; init; }
+    public double TotalLeft { get; init; }
+    public double MedianWidth { get; init; }
     /// <summary>Menor largura de faixa ao longo da via (largura variável: estreitamentos), m.</summary>
     public double MinLaneWidth { get; init; } = 3.5;
     /// <summary>Menor largura entre meios-fios ao longo da via (m) – igual à nominal sem largura variável.</summary>
@@ -468,6 +472,8 @@ public static class TrafficNetworkBuilder
         return new TrafficRoad
         {
             MinCarriageWidth = minCarriage, MinLaneWidth = minLane, NarrowestAt = narrowAt,
+            TotalRight = pav.TotalRight, TotalLeft = pav.TotalLeft,
+            MedianWidth = pav.Gaps.Where(g => g.Median && Math.Abs(g.Offset) < 0.3).Select(g => g.Width).DefaultIfEmpty(0).Max(),
             Id = pav.Id, GroupId = pav.GroupId, Hierarchy = h, Axis = axis, BaseZ = z, Grade = pav.Output.Grade, TwoWay = twoWay,
             LanesForward = fwd, LanesBackward = bwd, BusLanesForward = busF, BusLanesBackward = busB, LaneWidth = laneW,
             SpeedKmh = speed > 0 ? speed : 50, SpeedFromSection = fromSection, ParkingForward = parkF, ParkingBackward = parkB, BikeLane = bike,
