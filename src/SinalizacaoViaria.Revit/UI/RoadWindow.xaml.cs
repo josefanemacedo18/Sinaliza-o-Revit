@@ -128,6 +128,8 @@ public partial class RoadWindow : Window
     /// <summary>Relevo escolhido para a via sobre o Toposolid.</summary>
     public RelevoVia Relief { get; private set; } = RelevoVia.Plana;
     public bool DrawPath { get; private set; }
+    /// <summary>Eixos reconhecidos em pisos existentes (a seção é ajustada à largura medida em cada via).</summary>
+    public bool FromFloors { get; private set; }
     public bool PickSurfaces => Output.PickSurfaces;
 
     private sealed record Option<T>(string Label, T Value)
@@ -142,6 +144,11 @@ public partial class RoadWindow : Window
         InitializeComponent();
         RbDraw.IsChecked = draw;
         RbCurves.IsChecked = !draw;
+        RbFloors.Checked += (_, _) =>
+        {
+            foreach (var it in CbPavement.Items)
+                if (it is PavementOption { Value: TipoPavimento.Nenhum }) CbPavement.SelectedItem = it;
+        };
         CbHierarchy.Items.Add(new Option<HierarquiaViaria>("— selecione a hierarquia —", HierarquiaViaria.NaoDefinida));
         foreach (var h in Hierarquia.Definidas)
             CbHierarchy.Items.Add(new Option<HierarquiaViaria>($"{Hierarquia.Label(h)} (até {Hierarquia.DefaultSpeed(h):0} km/h)", h));
@@ -250,6 +257,7 @@ public partial class RoadWindow : Window
         RbCurves.IsChecked = true;
         RbDraw.IsEnabled = false;
         RbCurves.IsEnabled = false;
+        RbFloors.IsEnabled = false;
         CkSnap.IsEnabled = false;
         BtnOk.Content = "Aplicar à via";
         SchedulePreview();
@@ -358,6 +366,7 @@ public partial class RoadWindow : Window
 
     /// <summary>Gera as definições para o caminho escolhido (os avisos ficam em <see cref="RoadSetup.Warnings"/>).</summary>
     public List<MarkingDefinition> BuildDefinitions(PathReference path, Polyline2? axis = null) => Setup!.Build(path, OutputSettings!, _cat, axis: axis);
+    public List<MarkingDefinition> BuildDefinitions(RoadSetup setup, PathReference path, Polyline2? axis) => setup.Build(path, OutputSettings!, _cat, axis: axis);
 
     // ------------------------------------------------------------------ largura variável e recuos
 
@@ -742,6 +751,7 @@ public partial class RoadWindow : Window
             }
             OutputSettings = Output.Save();
             DrawPath = RbDraw.IsChecked == true;
+            FromFloors = RbFloors.IsChecked == true;
             Connection = Selected<TipoConexao>(CbConnection);
             FreeEnds = Selected<FimLivre>(CbFreeEnds);
             Snap = CkSnap.IsChecked == true;

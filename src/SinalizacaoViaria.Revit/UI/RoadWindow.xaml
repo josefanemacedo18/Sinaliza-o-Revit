@@ -323,6 +323,8 @@
                     <StackPanel>
                         <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar a via por pontos (conecta-se às vias existentes)" IsChecked="True"/>
                         <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas existentes"/>
+                        <RadioButton x:Name="RbFloors" GroupName="path" Content="Reconhecer em pisos existentes (eixo e largura do contorno do piso)"
+                                     ToolTip="Para pistas modeladas com Piso comum (projetos antigos, formas complexas): selecione os pisos e o plugin acha os eixos, as larguras e os encontros. Use o pavimento &quot;Nenhum (pista já modelada)&quot; para não duplicar o piso."/>
                         <CheckBox x:Name="CkSnap" Content="Encaixar nas pontas e nos eixos das vias existentes" IsChecked="True" Margin="18,3,0,3"
                                   ToolTip="Clique sobre uma via para ligar a nova via ao eixo dela (entroncamento/cruzamento) ou perto da ponta para continuá-la."/>
                         <Grid Margin="18,0,0,0">

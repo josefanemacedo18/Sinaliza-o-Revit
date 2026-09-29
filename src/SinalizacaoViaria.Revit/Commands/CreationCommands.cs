@@ -32,11 +32,28 @@ public class CmdSinalizarVia : CommandBase
         var snapped = new List<string>();
         // Curvas desenhadas com raio menor que a meia largura deixariam a borda interna "dobrada": o raio é limitado.
         var axisRadius = Math.Max(w.CurveRadius, RoadSetup.MinAxisRadius(w.Setup.MaxHalfWidth));
-        var paths = RoadAxisInput.GetMany(uidoc, w.DrawPath, w.Snap, axisRadius, snapped);
+        var results0 = new List<RenderResult>();
+        // Pisos existentes: eixos e larguras reconhecidos no contorno; cada via recebe a seção ajustada à sua largura.
+        Dictionary<PathReference, Core.Automation.FloorRoad>? floorRoads = null;
+        List<PathReference>? paths;
+        if (w.FromFloors)
+        {
+            var found = FloorRoadInput.Pick(uidoc, out var floorWarnings);
+            if (found == null) return Result.Cancelled;
+            if (found.Count == 0)
+            {
+                UiHelpers.Error("Nenhuma pista reconhecida nos pisos escolhidos." + (floorWarnings.Count > 0 ? "\n\n" + string.Join("\n", floorWarnings) : ""));
+                return Result.Cancelled;
+            }
+            floorRoads = found.ToDictionary(x => x.Path, x => x.Road);
+            paths = found.Select(x => x.Path).ToList();
+            if (floorWarnings.Count > 0) { var rr = new RenderResult(); rr.Warnings.AddRange(floorWarnings); results0.Add(rr); }
+        }
+        else paths = RoadAxisInput.GetMany(uidoc, w.DrawPath, w.Snap, axisRadius, snapped);
         if (paths == null || paths.Count == 0) return Result.Cancelled;
         var opt = new RoadCreation(w.AutoIntersect, w.Connection, w.FreeEnds, w.IntersectionCrosswalks, w.CornerRadius, w.IntersectionRamps && w.IntersectionCrosswalks,
             w.Relief, w.OutputSettings);
-        var results = new List<RenderResult>();
+        var results = new List<RenderResult>(results0);
         var many = paths.Count > 1;
         if (many && (w.Setup.LargurasVariaveis.Count > 0 || w.Setup.Recuos.Count > 0))
         {
@@ -60,7 +77,13 @@ public class CmdSinalizarVia : CommandBase
                 var survey = WidthSurvey.Read(uidoc, axis);
                 if (survey.Count > 0) w.Setup.LargurasVariaveis = survey;
             }
-            var defs = w.BuildDefinitions(path, axis);
+            List<MarkingDefinition> defs;
+            if (floorRoads != null && floorRoads.TryGetValue(path, out var fr))
+            {
+                var fitted = Core.Automation.FloorRoads.Fit(w.Setup, fr);
+                defs = w.BuildDefinitions(fitted, path, axis);
+            }
+            else defs = w.BuildDefinitions(path, axis);
             RoadSetup.ApplyAxisRadius(defs, w.CurveRadius);
             try { results.AddRange(Create(uidoc, defs, opt, w.Setup.Warnings)); }
             catch (Exception ex)
@@ -146,6 +169,120 @@ public class CmdSinalizarVia : CommandBase
 }
 
 /// <summary>Obtém o eixo de uma via: desenhado por pontos (com encaixe e curvas) ou linhas selecionadas.</summary>
+/// <summary>
+/// Pistas modeladas com Piso comum: lê o contorno dos pisos escolhidos (esboço ou face superior), reconhece eixos,
+/// larguras e encontros (núcleo: <see cref="Core.Automation.FloorRoads"/>) e cria as linhas de eixo de cada via.
+/// </summary>
+internal static class FloorRoadInput
+{
+    private sealed class FloorFilter : Autodesk.Revit.UI.Selection.ISelectionFilter
+    {
+        public bool AllowElement(Element e) => e is Floor || e.Category?.Id.Value == (long)BuiltInCategory.OST_Floors ||
+                                                e.GetType().Name == "Toposolid";
+        public bool AllowReference(Reference reference, XYZ position) => false;
+    }
+
+    public static List<(PathReference Path, Core.Automation.FloorRoad Road)>? Pick(UIDocument uidoc, out List<string> warnings)
+    {
+        warnings = new List<string>();
+        var doc = uidoc.Document;
+        IList<Reference> refs;
+        try { refs = uidoc.Selection.PickObjects(Autodesk.Revit.UI.Selection.ObjectType.Element, new FloorFilter(), "Selecione os PISOS da pista (um ou vários) e clique em Concluir"); }
+        catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return null; }
+        var shapes = new List<Polygon2>();
+        var zs = new List<double>();
+        foreach (var r in refs)
+        {
+            var e = doc.GetElement(r);
+            var loops = Outline(doc, e);
+            if (loops.Count == 0) { warnings.Add($"Piso {e.Id}: contorno não lido."); continue; }
+            shapes.AddRange(Classify(loops));
+            if (e.get_BoundingBox(null) is { } bb) zs.Add(bb.Max.Z);
+        }
+        if (shapes.Count == 0) return new List<(PathReference, Core.Automation.FloorRoad)>();
+        var net = Core.Automation.FloorRoads.Read(shapes);
+        warnings.AddRange(net.Warnings);
+        if (net.Roads.Count == 0) return new List<(PathReference, Core.Automation.FloorRoad)>();
+        var summary = string.Join("\n", net.Roads.Select((x, i) => $"Via {i + 1}: {x.Axis.Length:0} m, pista de {x.Width:0.00} m" + (x.VariableWidth ? " (largura variável)" : "")));
+        var td = new TaskDialog("SinalizaBIM – pisos existentes")
+        {
+            MainInstruction = $"{net.Roads.Count} via(s) e {net.Junctions.Count} encontro(s) reconhecidos",
+            MainContent = summary + "\n\nAs linhas de eixo serão criadas (dá para ajustá-las depois como qualquer eixo) e cada via recebe a seção do modelo escolhido com a largura medida.",
+            CommonButtons = TaskDialogCommonButtons.Ok | TaskDialogCommonButtons.Cancel,
+        };
+        if (td.Show() != TaskDialogResult.Ok) return null;
+        var z = zs.Count > 0 ? zs.Max() : 0;
+        var res = new List<(PathReference, Core.Automation.FloorRoad)>();
+        using var t = new Transaction(doc, "SV - Eixos dos pisos existentes");
+        t.Start();
+        foreach (var road in net.Roads)
+        {
+            var pts = road.Axis.Points;
+            var pieces = new List<Core.Automation.RoadConnection.Piece>();
+            for (int k = 1; k < pts.Count; k++) if (pts[k - 1].DistanceTo(pts[k]) > 0.01) pieces.Add(new Core.Automation.RoadConnection.Piece(pts[k - 1], pts[k], null));
+            if (pieces.Count == 0) continue;
+            var ids = Picking.CreateAxis(doc, uidoc.ActiveView, pieces, z);
+            res.Add((PathReference.FromElements(ids.Select(id => doc.GetElement(id).UniqueId)), road));
+        }
+        t.Commit();
+        return res;
+    }
+
+    /// <summary>Anéis do contorno do piso (m): do esboço (exato) ou das faces superiores.</summary>
+    private static List<List<Vec2>> Outline(Document doc, Element e)
+    {
+        var loops = new List<List<Vec2>>();
+        try
+        {
+            if (e is Floor f && doc.GetElement(f.SketchId) is Sketch sk)
+                foreach (CurveArray arr in sk.Profile)
+                {
+                    var loop = new List<Vec2>();
+                    foreach (Curve c in arr)
+                    {
+                        var tp = c.Tessellate();
+                        for (int i = 0; i < tp.Count - 1; i++) loop.Add(UnitConv.ToVec2(tp[i]));
+                    }
+                    if (loop.Count >= 3) loops.Add(loop);
+                }
+        }
+        catch { /* sem esboço: pela face */ }
+        if (loops.Count > 0) return loops;
+        try
+        {
+            var faces = e is HostObject ho ? HostObjectUtils.GetTopFaces(ho) : new List<Reference>();
+            foreach (var fr in faces)
+                if (e.GetGeometryObjectFromReference(fr) is Face face)
+                    foreach (EdgeArray ea in face.EdgeLoops)
+                    {
+                        var loop = new List<Vec2>();
+                        foreach (Edge edge in ea)
+                        {
+                            var tp = edge.Tessellate();
+                            for (int i = 0; i < tp.Count - 1; i++) loop.Add(UnitConv.ToVec2(tp[i]));
+                        }
+                        if (loop.Count >= 3) loops.Add(loop);
+                    }
+        }
+        catch { /* sem geometria legível */ }
+        return loops;
+    }
+
+    /// <summary>Anéis → polígonos: o anel contido em outro é furo dele (canteiros, ilhas).</summary>
+    private static List<Polygon2> Classify(List<List<Vec2>> loops)
+    {
+        var ordered = loops.OrderByDescending(l => Math.Abs(Polygon2.SignedArea(l))).ToList();
+        var outers = new List<(List<Vec2> Outer, List<List<Vec2>> Holes)>();
+        foreach (var l in ordered)
+        {
+            var host = outers.FirstOrDefault(o => Polygon2.PointInRing(o.Outer, l[0]) && !o.Holes.Any(h => Polygon2.PointInRing(h, l[0])));
+            if (host.Outer != null) host.Holes.Add(l);
+            else outers.Add((l, new List<List<Vec2>>()));
+        }
+        return outers.Select(o => new Polygon2(o.Outer, o.Holes)).Where(p => p.IsValid).ToList();
+    }
+}
+
 internal static class RoadAxisInput
 {
     /// <summary>
