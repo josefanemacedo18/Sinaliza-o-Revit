@@ -398,18 +398,21 @@ public sealed class IntersectionService
         var roadIds = rb.Legs.Select(l => l.RoadId).Where(i => i != null).ToHashSet();
         var groups = all.OfType<RoadPavementDefinition>().Where(p => roadIds.Contains(p.Id)).Select(p => p.GroupId).Where(g => g != null).ToHashSet();
         foreach (var g in rb.Legs.Select(l => l.GroupId)) if (g != null) groups.Add(g);
+        var liveIds = all.Select(x => x.Id).ToHashSet();
         foreach (var m in all.Where(d => d.GroupId != null && groups.Contains(d.GroupId) || d.Exclusions.Any(e => e.SourceId == rb.Id)))
         {
             if (m.Id == rb.Id || children.Any(c => c.Id == m.Id)) continue;
             m.Exclusions.RemoveAll(e => e.SourceId == rb.Id);
+            // Recortes deixados por interseções/rotatórias que já não existem (a via voltava "lisa" em volta).
+            m.Exclusions.RemoveAll(e => !e.Manual && !string.IsNullOrEmpty(e.SourceId) && !liveIds.Contains(e.SourceId));
             if (rb.CutRoads && m.GroupId != null && groups.Contains(m.GroupId))
             {
                 // Elementos físicos (pavimento, calçadas, meios-fios) recortados na zona; pintura e dispositivos só no anel
                 // (nos modos "anel" e "somente ilha" as vias ficam como estão fora da pista giratória).
-                var physical = m is RoadPavementDefinition || IntersectionGenerator.IsPhysical(m);
-                var zone = physical ? layout.Zone : layout.PaintZone;
-                if (rb.Integration == IntegracaoRotatoria.Completa) zone = layout.Zone;
-                m.Exclusions.Add(new ExclusionZone { SourceId = rb.Id, Points = zone.Outer.ToList() });
+                // Físicos pela zona (e passagem de pedestres no canteiro), pintura até depois da travessia, estacionamento
+                // 5 m antes dela (CTB art. 181) – a mesma regra dos testes do núcleo.
+                foreach (var zone in RoundaboutGenerator.RoadCuts(rb, layout, m))
+                    m.Exclusions.Add(new ExclusionZone { SourceId = rb.Id, Points = zone.Outer.ToList() });
             }
             try { results.Add(_service.Render(m)); }
             catch (Exception ex) { Log.Error($"Rotatória – via {m.DisplayCode}", ex); }

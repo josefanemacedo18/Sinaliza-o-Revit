@@ -49,6 +49,12 @@ public sealed class RoundaboutLayout
     /// <summary>Borda externa do anel (pista giratória).</summary>
     public Polygon2 Outer { get; set; } = Polygon2.Rectangle(Vec2.Zero, Vec2.Zero);
     public double LegLength { get; set; }
+    /// <summary>Área onde a pintura das vias (linhas, setas, legendas) é interrompida: até depois da travessia e da ilha separadora.</summary>
+    public Polygon2 RoadPaintZone { get; set; } = Polygon2.Rectangle(Vec2.Zero, Vec2.Zero);
+    /// <summary>Área sem estacionamento (CTB art. 181: 5 m antes da travessia/alinhamento transversal).</summary>
+    public Polygon2 ParkingZone { get; set; } = Polygon2.Rectangle(Vec2.Zero, Vec2.Zero);
+    /// <summary>Passagens de pedestres no nível da pista através do canteiro central das vias (refúgio – NBR 9050).</summary>
+    public List<Polygon2> MedianPassages { get; } = new();
     public List<string> Warnings { get; } = new();
 
     /// <summary>Distância, a partir de <paramref name="origin"/> na direção <paramref name="dir"/>, até a borda externa do anel.</summary>
@@ -110,6 +116,36 @@ public static class RoundaboutGenerator
         return new Polygon2(pts);
     }
 
+    /// <summary>
+    /// Recortes de uma marca de via ligada à rotatória: físicos pela zona (e pelas passagens no canteiro), pintura até depois
+    /// da travessia, estacionamento 5 m antes dela. Usado pelo Revit e pelos testes (uma regra só).
+    /// </summary>
+    public static List<Polygon2> RoadCuts(RoundaboutDefinition d, RoundaboutLayout L, MarkingDefinition m)
+    {
+        var res = new List<Polygon2>();
+        if (m is RoadPavementDefinition) { res.Add(L.Zone); return res; }
+        if (IntersectionGenerator.IsPhysical(m))
+        {
+            res.Add(L.Zone);
+            res.AddRange(L.MedianPassages);
+            return res;
+        }
+        res.Add(m is ParkingMarkingDefinition ? L.ParkingZone : L.RoadPaintZone);
+        return res;
+    }
+
+    /// <summary>A peça é só o prolongamento reto de um ramo (sem by-pass).</summary>
+    private static bool LegStripOnly(Polygon2 p, RoundaboutDefinition d, Vec2 c)
+    {
+        foreach (var leg in d.Legs)
+        {
+            var u = Dir(leg.AngleDeg);
+            var n = u.PerpLeft;
+            if (p.Outer.All(q => Math.Abs((q - c).Dot(n)) <= leg.Width / 2 + 0.6)) return true;
+        }
+        return false;
+    }
+
     private static Polygon2 Grow(Polygon2 poly, double r) =>
         Math.Abs(r) < 1e-6 ? poly : PolygonOps.Offset(new[] { poly }, r, true).OrderByDescending(p => p.Area).FirstOrDefault() ?? poly;
 
@@ -133,8 +169,11 @@ public static class RoundaboutGenerator
         var outer = Grow(island, ring);
         L.Outer = outer;
         var complete = d.Integration == IntegracaoRotatoria.Completa;
+        // Zona remodelada: ilha separadora + transição (o by-pass acrescenta só a área dele, não um círculo inteiro – senão
+        // canteiro, estacionamento e linhas das vias sumiam por ~100 m em volta).
+        var baseLeg = complete ? (d.SplitterIslands ? d.SplitterLength : 0) + 12 : 0;
         L.LegLength = complete
-            ? (d.SplitterIslands ? d.SplitterLength : 0) + 12 + (d.Bypass ? Math.Max(d.BypassRadius, Math.Max(d.EntryRadius, d.ExitRadius ?? d.EntryRadius) + 16) * 1.6 : 0)
+            ? baseLeg + (d.Bypass ? Math.Max(d.BypassRadius, Math.Max(d.EntryRadius, d.ExitRadius ?? d.EntryRadius) + 16) * 1.6 : 0)
             : 0;
         // Recortes nas vias: completa = toda a zona remodelada; anel = só a pista giratória; ilha = só a ilha (pintura no anel).
         L.PaintZone = Grow(outer, 0.05);
@@ -150,6 +189,8 @@ public static class RoundaboutGenerator
         if (d.Lanes * d.LaneWidth < 4.0) L.Warnings.Add("Pista giratória com menos de 4 m – confira a largura para os veículos de projeto.");
         var inscribed = 2 * (ri + ring);
         if (d.Type == TipoRotatoria.Mini && inscribed > 28) L.Warnings.Add($"Minirrotatória com diâmetro inscrito de {inscribed:0.0} m (referência: 13 a 25 m).");
+        if (d.Legs.Count > 0 && inscribed < d.Legs.Max(l => l.Width) + 4)
+            L.Warnings.Add($"Diâmetro inscrito de {inscribed:0.0} m menor que a pista mais larga que chega ({d.Legs.Max(l => l.Width):0.0} m) + 4 m: as entradas ficam maiores que o anel – use rotatória compacta/1 faixa com raio maior ou reduza a entrada (MBST Vol. IV).");
         if (d.Type != TipoRotatoria.Mini && d.IslandType is not (TipoIlhaCentral.Galgavel or TipoIlhaCentral.Pintada or TipoIlhaCentral.Calota) && ri < 4 && d.Legs.Count > 0)
             L.Warnings.Add("Ilha central pequena (< 4 m): em rotatórias compactas prefira ilha galgável ou pintada (minirrotatória).");
         if (d.Lanes >= 2 && d.Type is TipoRotatoria.Compacta or TipoRotatoria.Mini) L.Warnings.Add("Rotatórias compactas/mini devem ter uma faixa no anel.");
@@ -200,6 +241,21 @@ public static class RoundaboutGenerator
                     bypassIslands.AddRange(isl);
                 }
             }
+            if (d.Bypass)
+            {
+                // Zona efetiva: o miolo (anel + ilhas separadoras + transição) e a área dos by-pass com a calçada em volta.
+                // Fora dela as vias continuam com a sua seção (canteiro, estacionamento, faixas).
+                var sideW = Math.Max(0, d.SidewalkWidth) + cw + 0.5;
+                var coreZone = Grow(outer, baseLeg);
+                var byArea = PolygonOps.Offset(PolygonOps.Difference(full, new[] { coreZone }).Where(p => !LegStripOnly(p, d, c)).ToList(), sideW, true);
+                var tight = PolygonOps.Union(new[] { coreZone }.Concat(byArea)).OrderByDescending(p => p.Area).ToList();
+                if (tight.Count > 0)
+                {
+                    L.Zone = tight[0];
+                    zone = new[] { L.Zone };
+                    full = PolygonOps.Intersect(full, zone);
+                }
+            }
         }
         else full = d.Integration == IntegracaoRotatoria.Anel ? new List<Polygon2> { outer } : new List<Polygon2>();
 
@@ -213,14 +269,21 @@ public static class RoundaboutGenerator
             var mode = leg.Splitter == IlhaSeparadora.Padrao ? d.SplitterStyle : leg.Splitter;
             if (!d.SplitterIslands || mode == IlhaSeparadora.Padrao) mode = d.SplitterIslands ? IlhaSeparadora.Fisica : IlhaSeparadora.Nenhuma;
             Polygon2? sp = null;
+            var med = leg.MedianWidth >= 0.8 ? leg.MedianWidth : 0;
+            // Via com canteiro central: nos modos que não remodelam as entradas o próprio canteiro é a ilha separadora (a
+            // pintada/física por cima ficaria sobreposta a ele).
+            if (med > 0 && !complete) mode = IlhaSeparadora.Nenhuma;
             if (mode != IlhaSeparadora.Nenhuma && leg.Width >= 6)
             {
-                var w0 = Math.Min(d.SplitterWidth, leg.Width - 6.0);
+                var w0 = Math.Min(Math.Max(d.SplitterWidth, med), leg.Width - 6.0);
                 if (w0 >= 0.8)
                 {
                     var t0 = rou + 1.0;
                     var t1 = rou + Math.Max(3, leg.SplitterLength ?? d.SplitterLength);
-                    var tri = new Polygon2(new[] { c + u * t0 - n * (w0 / 2), c + u * t1 - n * 0.3, c + u * t1 + n * 0.3, c + u * t0 + n * (w0 / 2) });
+                    // Canteiro: a ilha vai até o fim da zona remodelada e termina na largura do canteiro (continuidade).
+                    var tipW = 0.6;
+                    if (med > 0) { t1 = Math.Max(t1, Ray(L.Zone, c, u) + 0.3); tipW = Math.Min(med, w0); }
+                    var tri = new Polygon2(new[] { c + u * t0 - n * (w0 / 2), c + u * t1 - n * (tipW / 2), c + u * t1 + n * (tipW / 2), c + u * t0 + n * (w0 / 2) });
                     sp = PolygonOps.Offset(PolygonOps.Offset(new[] { tri }, -0.25, true), 0.25, true).OrderByDescending(p => p.Area).FirstOrDefault();
                 }
                 else L.Warnings.Add($"Ramo a {leg.AngleDeg:0}°: pista estreita para ilha separadora (mínimo ~7 m).");
@@ -231,6 +294,25 @@ public static class RoundaboutGenerator
             if (physical) splitters.Add(sp!);
             L.Legs.Add(new RoundaboutLegGeometry(leg, u, n, physical ? sp : null) { PaintedSplitter = sp != null && mode == IlhaSeparadora.Pintada ? sp : null });
         }
+
+        // Zonas de recorte da pintura das vias: completa = a zona inteira; anel/ilha = até depois da travessia e da ilha
+        // separadora (linhas não cruzam a faixa de pedestres nem a ilha), estacionamento 5 m antes da travessia.
+        var reach = 0.0;
+        foreach (var g in L.Legs)
+        {
+            var rou = L.ToOuter(c, g.Dir);
+            g.CrosswalkT = rou + Math.Max(2, d.CrosswalkDistance);
+            var cwOn = g.Leg.Crosswalk ?? d.Crosswalks;
+            var r1 = (cwOn ? Math.Max(2, d.CrosswalkDistance) + Math.Clamp(d.CrosswalkWidth, 2, 10) : 0) + 0.5;
+            if (g.Splitter != null || g.PaintedSplitter != null) r1 = Math.Max(r1, Math.Max(3, g.Leg.SplitterLength ?? d.SplitterLength) + 0.5);
+            reach = Math.Max(reach, r1);
+            // Canteiro central atravessado pela faixa de pedestres: passagem no nível da pista (refúgio).
+            if (cwOn && g.Leg.MedianWidth >= 0.8)
+                L.MedianPassages.AddRange(PolygonOps.Strip(new[] { g.At(c, g.CrosswalkT, -g.Leg.MedianWidth / 2 - 0.5), g.At(c, g.CrosswalkT, g.Leg.MedianWidth / 2 + 0.5) },
+                    Math.Clamp(d.CrosswalkWidth, 2, 10)));
+        }
+        L.RoadPaintZone = complete ? L.Zone : d.Integration == IntegracaoRotatoria.Anel ? Grow(outer, reach) : L.PaintZone;
+        L.ParkingZone = complete ? Grow(L.Zone, 5) : Grow(outer, reach + (d.Integration == IntegracaoRotatoria.Anel ? 5 : 3));
 
         var solids = splitters.Concat(bypassIslands).ToList();
         L.Refuges.AddRange(solids);
@@ -680,7 +762,7 @@ public static class RoundaboutGenerator
             var leg = g.Leg;
             var hw = leg.Width / 2;
             var splitterW = g.Splitter != null || g.PaintedSplitter != null ? Math.Min(d.SplitterWidth, leg.Width - 6) : 0;
-            var inner = splitterW > 0 ? splitterW / 2 + 0.2 : 0.1;
+            var inner = Math.Max(splitterW > 0 ? splitterW / 2 + 0.2 : 0.1, leg.MedianWidth > 0 ? leg.MedianWidth / 2 + 0.2 : 0);
             // Entrada = lado esquerdo do ramo (quem chega pela direita da pista circula no sentido anti-horário).
             var rou = L.ToOuter(c, g.Dir);
             var splitLen = Math.Max(3, leg.SplitterLength ?? d.SplitterLength);
@@ -691,7 +773,9 @@ public static class RoundaboutGenerator
             if (d.Markings)
             {
                 var o0 = inner;
-                var o1 = hw - 0.3;
+                // No anel pequeno (mini/compacta sobre via larga) a linha não pode atravessar o anel até o outro ramo.
+                var o1 = Math.Min(hw - 0.3, 0.8 * rou);
+                if (o1 < o0 + 1) o1 = o0 + 1;
                 double T(double o) => L.ToOuter(c + g.Left * o, g.Dir) + 0.4;
                 if (control == ControleRamo.Pare)
                 {
@@ -718,7 +802,7 @@ public static class RoundaboutGenerator
                         Boundary = PathReference.FromPoints(ps.Outer, z, true),
                     });
                 }
-                if (d.ApproachDoubleLine && leg.TwoWay && d.Integration == IntegracaoRotatoria.Completa)
+                if (d.ApproachDoubleLine && leg.TwoWay && d.Integration == IntegracaoRotatoria.Completa && leg.MedianWidth < 0.8)
                 {
                     // LFO-3 entre a ponta da ilha separadora e o fim da zona remodelada (aproximação sem ultrapassagem).
                     var t0 = (g.Splitter != null || g.PaintedSplitter != null ? rou + splitLen : rou + 2.0) + 0.3;
@@ -803,6 +887,7 @@ public static class RoundaboutGenerator
                     RoadId = r.Def.Id,
                     GroupId = r.Def.GroupId,
                     TwoWay = r.Def.TwoWay,
+                    MedianWidth = r.Def.Gaps.Where(g => g.Median && Math.Abs(g.Offset) < 0.5).Select(g => g.Width).DefaultIfEmpty(0).Max(),
                 });
             }
         }

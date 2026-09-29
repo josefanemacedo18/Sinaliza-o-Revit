@@ -1611,6 +1611,8 @@ public sealed class RoundaboutLeg
     public string? GroupId { get; set; }
     /// <summary>Via de mão dupla (ilha separadora pintada amarela, entre fluxos opostos; mão única = branca).</summary>
     public bool TwoWay { get; set; } = true;
+    /// <summary>Canteiro central da via neste ramo (m, 0 = sem canteiro): vira a ilha separadora da entrada.</summary>
+    public double MedianWidth { get; set; }
 
     // ---- personalização por ramo (nulo/Padrao = valor geral da rotatória)
     public IlhaSeparadora Splitter { get; set; } = IlhaSeparadora.Padrao;
