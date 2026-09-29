@@ -32,21 +32,44 @@ public class CmdSinalizarVia : CommandBase
         var snapped = new List<string>();
         // Curvas desenhadas com raio menor que a meia largura deixariam a borda interna "dobrada": o raio é limitado.
         var axisRadius = Math.Max(w.CurveRadius, RoadSetup.MinAxisRadius(w.Setup.MaxHalfWidth));
-        var path = RoadAxisInput.Get(uidoc, w.DrawPath, w.Snap, axisRadius, snapped);
-        if (path == null) return Result.Cancelled;
-
-        // Eixo resolvido: as estacas da largura variável ficam amarradas a pontos do eixo (sobrevivem a prolongamentos).
-        var axis = PathResolver.Resolve(doc, path)?.Main;
-        if (w.ReadSurvey && axis != null)
-        {
-            var survey = WidthSurvey.Read(uidoc, axis);
-            if (survey.Count > 0) w.Setup.LargurasVariaveis = survey;
-        }
-        var defs = w.BuildDefinitions(path, axis);
-        RoadSetup.ApplyAxisRadius(defs, w.CurveRadius);
+        var paths = RoadAxisInput.GetMany(uidoc, w.DrawPath, w.Snap, axisRadius, snapped);
+        if (paths == null || paths.Count == 0) return Result.Cancelled;
         var opt = new RoadCreation(w.AutoIntersect, w.Connection, w.FreeEnds, w.IntersectionCrosswalks, w.CornerRadius, w.IntersectionRamps && w.IntersectionCrosswalks,
             w.Relief, w.OutputSettings);
-        var results = Create(uidoc, defs, opt, w.Setup.Warnings);
+        var results = new List<RenderResult>();
+        var many = paths.Count > 1;
+        if (many && (w.Setup.LargurasVariaveis.Count > 0 || w.Setup.Recuos.Count > 0))
+        {
+            // Estacas de largura variável e recuos valem para UM eixo: com várias vias, ficam para a edição de cada uma.
+            w.Setup.LargurasVariaveis.Clear();
+            w.Setup.Recuos.Clear();
+            results.Add(new RenderResult());
+            results[^1].Warnings.Add($"{paths.Count} vias criadas das linhas selecionadas: a largura variável e os recuos não foram aplicados (valem para um eixo só) – use Editar em cada via.");
+        }
+        else if (many)
+        {
+            results.Add(new RenderResult());
+            results[^1].Warnings.Add($"As linhas selecionadas formam {paths.Count} vias (encontros em T/cruz e ruas que seguem retas nos nós) – as interseções foram criadas entre elas.");
+        }
+        foreach (var path in paths)
+        {
+            // Eixo resolvido: as estacas da largura variável ficam amarradas a pontos do eixo (sobrevivem a prolongamentos).
+            var axis = PathResolver.Resolve(doc, path)?.Main;
+            if (!many && w.ReadSurvey && axis != null)
+            {
+                var survey = WidthSurvey.Read(uidoc, axis);
+                if (survey.Count > 0) w.Setup.LargurasVariaveis = survey;
+            }
+            var defs = w.BuildDefinitions(path, axis);
+            RoadSetup.ApplyAxisRadius(defs, w.CurveRadius);
+            try { results.AddRange(Create(uidoc, defs, opt, w.Setup.Warnings)); }
+            catch (Exception ex)
+            {
+                Log.Error("Via (várias linhas)", ex);
+                results.Add(new RenderResult());
+                results[^1].Warnings.Add("Uma das vias não pôde ser criada: " + ex.Message);
+            }
+        }
         if (snapped.Count > 0 && results.Count > 0)
             results[0].Warnings.Insert(0, "Conexões: " + string.Join("; ", snapped.Distinct()) + ".");
         Report("Via", results);
@@ -125,6 +148,36 @@ public class CmdSinalizarVia : CommandBase
 /// <summary>Obtém o eixo de uma via: desenhado por pontos (com encaixe e curvas) ou linhas selecionadas.</summary>
 internal static class RoadAxisInput
 {
+    /// <summary>
+    /// Eixos de uma ou várias vias: as linhas selecionadas são separadas em vias (encontros em T/cruz, ruas que seguem
+    /// retas nos nós, curvas entre duas linhas) – cada grupo vira uma via e as interseções nascem nos encontros.
+    /// </summary>
+    public static List<PathReference>? GetMany(UIDocument uidoc, bool draw, bool snap, double curveRadius, List<string> snapped)
+    {
+        if (draw)
+        {
+            var one = Get(uidoc, true, snap, curveRadius, snapped);
+            return one == null ? null : new List<PathReference> { one };
+        }
+        var doc = uidoc.Document;
+        var curves = Picking.PickCurves(uidoc, "Selecione as linhas do(s) EIXO(S) – uma via ou uma malha inteira – e clique em Concluir");
+        if (curves == null || curves.Count == 0) return null;
+        using (var t = new Transaction(doc, "SV - Estilo de eixo"))
+        {
+            t.Start();
+            var styles = new StyleService(doc);
+            foreach (var c in curves) try { c.LineStyle = styles.AxisLineStyle(); } catch { /* opcional */ }
+            t.Commit();
+        }
+        var pts = curves.Select(c =>
+        {
+            try { return (IReadOnlyList<Vec2>)c.GeometryCurve.Tessellate().Select(UnitConv.ToVec2).ToList(); }
+            catch { return (IReadOnlyList<Vec2>)new List<Vec2>(); }
+        }).ToList();
+        var groups = RoadChains.Split(pts, 0.05);
+        return groups.Where(g => g.Count > 0).Select(g => PathReference.FromElements(g.Select(i => curves[i].UniqueId))).ToList();
+    }
+
     public static PathReference? Get(UIDocument uidoc, bool draw, bool snap, double curveRadius, List<string> snapped)
     {
         var doc = uidoc.Document;
@@ -231,22 +284,26 @@ public sealed class CmdPista : CommandBase
         EnsureDetailView(uidoc, output);
 
         var snapped = new List<string>();
-        var path = RoadAxisInput.Get(uidoc, draw, snap, Math.Max(radius, RoadSetup.MinAxisRadius(Math.Max(d.LeftWidth, d.RightWidth))), snapped);
-        if (path == null) return Result.Cancelled;
-        var defs = RoadConnection.BuildCarriageway(d, path, output, center == "-" ? null : center, edges, Hierarquia.DefaultSpeed(h));
-        if (survey && PathResolver.Resolve(uidoc.Document, path)?.Main is { } axis)
+        var paths = RoadAxisInput.GetMany(uidoc, draw, snap, Math.Max(radius, RoadSetup.MinAxisRadius(Math.Max(d.LeftWidth, d.RightWidth))), snapped);
+        if (paths == null || paths.Count == 0) return Result.Cancelled;
+        var results = new List<RenderResult>();
+        foreach (var path in paths)
         {
-            var pts = WidthSurvey.Read(uidoc, axis);
-            if (pts.Count > 0) RoadConnection.ApplySurvey(defs, pts, axis, smooth: false);
-        }
-        RoadSetup.ApplyAxisRadius(defs, radius);
-        var results = MarkingCreator.Commit(uidoc, defs, "SV - Pista");
-        if (connect && defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav)
-        {
-            var template = IntersectionService.AutoTemplate(crosswalks);
-            results.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões da pista", sv =>
-                sv.Connect(pav, TipoConexao.Intersecao, FimLivre.Nenhum, template, new RoundaboutDefinition(), new CulDeSacDefinition(), radiusByHierarchy: true))
-                .Where(r => r.Warnings.Count > 0));
+            var defs = RoadConnection.BuildCarriageway(d, path, output, center == "-" ? null : center, edges, Hierarquia.DefaultSpeed(h));
+            if (survey && paths.Count == 1 && PathResolver.Resolve(uidoc.Document, path)?.Main is { } axis)
+            {
+                var pts = WidthSurvey.Read(uidoc, axis);
+                if (pts.Count > 0) RoadConnection.ApplySurvey(defs, pts, axis, smooth: false);
+            }
+            RoadSetup.ApplyAxisRadius(defs, radius);
+            results.AddRange(MarkingCreator.Commit(uidoc, defs, "SV - Pista"));
+            if (connect && defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav)
+            {
+                var template = IntersectionService.AutoTemplate(crosswalks);
+                results.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões da pista", sv =>
+                    sv.Connect(pav, TipoConexao.Intersecao, FimLivre.Nenhum, template, new RoundaboutDefinition(), new CulDeSacDefinition(), radiusByHierarchy: true))
+                    .Where(r => r.Warnings.Count > 0));
+            }
         }
         Report("Pista", results.Where(r => r.Warnings.Count > 0).ToList());
         return Result.Succeeded;

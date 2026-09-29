@@ -70,4 +70,24 @@ public class V28Tests
         var diff = new List<IntersectionRoad> { same[0], same[1] with { Def = RoadTemplates.All[1].Create().Build(PathReference.FromPoints(new[] { Vec2.Zero, new Vec2(50, 0) }, 0), new OutputSettings(), Cat).OfType<RoadPavementDefinition>().First() } };
         Assert.True(IntersectionGenerator.NeedsIntersection(diff, Vec2.Zero));
     }
+
+    [Fact]
+    public void RoadChains_GridOfLinesBecomesSeparateRoads()
+    {
+        IReadOnlyList<Vec2> L(params (double X, double Y)[] p) => p.Select(q => new Vec2(q.X, q.Y)).ToList();
+        var curves = new List<IReadOnlyList<Vec2>>
+        {
+            L((0, 0), (100, 0)), L((100, 0), (200, 0)),          // avenida desenhada em dois trechos (cruzamento no meio)
+            L((100, -80), (100, 0)), L((100, 0), (100, 80)),     // transversal em dois trechos
+            L((200, 0), (260, 60)),                              // continuação em ângulo da avenida (deflexão de 45°)
+            L((0, 0), (0, 90)),                                  // rua que sai em L da ponta da avenida... com a avenida já seguindo: nó de grau 2 → mesma via
+            L((50, 0), (50, 60)),                                // T no meio de um trecho (a ponta não é nó de linhas)
+        };
+        var groups = RoadChains.Split(curves);
+        // Avenida: 0 + 1 (alinhadas no nó de grau 4) + 4 (encontro só das duas) + 5 (L na outra ponta).
+        Assert.Contains(groups, g => g.OrderBy(x => x).SequenceEqual(new[] { 0, 1, 4, 5 }));
+        Assert.Contains(groups, g => g.OrderBy(x => x).SequenceEqual(new[] { 2, 3 }));
+        Assert.Contains(groups, g => g.SequenceEqual(new[] { 6 }));
+        Assert.Equal(3, groups.Count);
+    }
 }
