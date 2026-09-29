@@ -88,6 +88,8 @@ public sealed class TrafficNode
     // ---------------------------------------------------------------- regulamentação lida do projeto
     /// <summary>Conversões proibidas (R-4, R-5, R-25/R-26) por aproximação.</summary>
     public HashSet<(int In, Giro Turn)> ProhibitedTurns { get; } = new();
+    /// <summary>Interseção com conversões à esquerda proibidas (eixo contínuo pela boca, R-4a – CTB art. 207).</summary>
+    public bool NoLeftTurns { get; set; }
     /// <summary>Aproximações com PARE (R-1, legenda PARE, LRE) e com "Dê a preferência" (R-2, LDP, SDP).</summary>
     public HashSet<int> StopApproaches { get; } = new();
     public HashSet<int> YieldApproaches { get; } = new();
@@ -204,6 +206,8 @@ public sealed class TrafficNetwork
     /// <summary>Tudo o que a sinalização do projeto significa para o tráfego (lido e aplicado, ou não associado).</summary>
     public List<TrafficRegulation> Regulations { get; } = new();
     public List<string> Notes { get; } = new();
+    /// <summary>Planta real do projeto (pavimento, calçadas, canteiros e pintura) para o mapa; vazia sem geometria.</summary>
+    public List<MapShape> Backdrop { get; } = new();
 
     public TrafficRoad? Road(string id) => Roads.FirstOrDefault(r => r.Id == id);
     public IEnumerable<TrafficLink> LinksOf(TrafficRoad r) => Links.Where(l => ReferenceEquals(l.Road, r));
@@ -224,6 +228,13 @@ public static class TrafficNetworkBuilder
         Func<MarkingDefinition, Model.MarkingGeometry?>? geometryOf = null)
     {
         var net = new TrafficNetwork();
+        // Geometria calculada uma vez por marca (a leitura da sinalização e a planta do mapa usam as mesmas peças).
+        if (geometryOf != null)
+        {
+            var inner = geometryOf;
+            var memo = new Dictionary<string, Model.MarkingGeometry?>();
+            geometryOf = d => memo.TryGetValue(d.Id, out var g) ? g : memo[d.Id] = inner(d);
+        }
         // ------------------------------------------------------------ vias
         var n = 0;
         var pavs = defs.OfType<RoadPavementDefinition>().GroupBy(p => p.Id).Select(g => g.First()).ToList();
@@ -281,6 +292,7 @@ public static class TrafficNetworkBuilder
             };
             var nd = NewNode(TipoNo.Intersecao, control, it.Node, it.Z, it.Id, it.MainRoadId, crosswalks: it.Crosswalks, signs: it.Signs,
                 pockets: it.LeftTurnPockets, islands: it.RightTurnIslands != TipoIlha.Nenhuma, plan: it.SignalPlan);
+            nd.NoLeftTurns = !it.LeftTurns;
             foreach (var r in roads) Attach(r, r.Axis.Project(it.Node).Station, nd);
         }
         foreach (var rb in defs.OfType<RoundaboutDefinition>().GroupBy(d => d.Id).Select(g => g.First()))
@@ -389,7 +401,14 @@ public static class TrafficNetworkBuilder
             if (axisOf(rs) is { } a) net.RumbleStrips.Add((rs.Id, a.Axis));
         ReadRecesses(net, defs, axisOf);
         ReadBusStops(net, defs);
+        foreach (var nd in net.Nodes.Where(x => x.NoLeftTurns))
+            foreach (var li in nd.In)
+            {
+                nd.ProhibitedTurns.Add((li, Giro.Esquerda));
+                nd.ProhibitedTurns.Add((li, Giro.Retorno));
+            }
         TrafficRegulations.Read(net, defs, axisOf, geometryOf);
+        if (geometryOf != null) TrafficBackdrop.Read(net, defs, geometryOf);
 
         foreach (var lk in net.Links) Characterize(net, lk);
         Label(net);

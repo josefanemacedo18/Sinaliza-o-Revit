@@ -26,12 +26,16 @@ public class V29SimTests
             return g.OfType<RoadPavementDefinition>().First();
         }
 
-        public TrafficNetwork Network() =>
-            TrafficNetworkBuilder.Build(Defs, d => Paths.TryGetValue(d.Id, out var p) ? (p, 0.0) : d.Path is { Points.Count: >= 2 } pr ? (new Polyline2(pr.Points, pr.Closed), 0.0) : null);
+        public TrafficNetwork Network(bool geometry = false)
+        {
+            (Polyline2, double)? Ax(MarkingDefinition d) => Paths.TryGetValue(d.Id, out var p) ? (p, 0.0) : d.Path is { Points.Count: >= 2 } pr ? (new Polyline2(pr.Points, pr.Closed), 0.0) : null;
+            var ctx = new BuildContext { Catalog = Cat };
+            return TrafficNetworkBuilder.Build(Defs, Ax, geometry ? d => MarkingBuilder.Build(d, Ax(d)?.Item1, ctx) : null);
+        }
     }
 
     /// <summary>Cruzamento de duas coletoras de duas faixas por sentido: 0 PARE, 1 semáforo, 2 sem controle, 3 rotatória de uma faixa.</summary>
-    private static TrafficNetwork Crossing(int kind)
+    private static TrafficNetwork Crossing(int kind, bool geometry = false, bool leftTurns = true)
     {
         var s = new Scene();
         var a = s.Road(1, new Vec2(-400, 0), new Vec2(400, 0));
@@ -47,8 +51,9 @@ public class V29SimTests
         {
             Node = Vec2.Zero, RoadIds = { a.Id, b.Id }, MainRoadId = a.Id,
             Control = kind switch { 0 => ControleIntersecao.Pare, 1 => ControleIntersecao.Semaforo, _ => ControleIntersecao.Nenhum },
+            LeftTurns = leftTurns,
         });
-        return s.Network();
+        return s.Network(geometry);
     }
 
     /// <summary>Quadros com dois corpos (segmento frente–traseira, centro do quadro) a menos de <paramref name="tol"/> m.</summary>
@@ -109,5 +114,52 @@ public class V29SimTests
         // Antes o anel enchia por inteiro (todos parados à distância mínima) e a rotatória travava (≈70 concluídos).
         Assert.True(sim.Completed > 250, $"{sim.Completed} de {sim.Spawned}");
         Assert.Equal(0, Overlaps(sim));
+    }
+
+    [Fact]
+    public void Map_DrawsTheRealPlanOfTheProject()
+    {
+        var net = Crossing(1, geometry: true);
+        Assert.NotEmpty(net.Backdrop);
+        Assert.Contains(net.Backdrop, b => b.Layer == CamadaMapa.Pavimento);
+        Assert.Contains(net.Backdrop, b => b.Layer == CamadaMapa.Calcada);
+        Assert.Contains(net.Backdrop, b => b.Layer == CamadaMapa.Pintura);
+        // Ordem de pintura: pavimento antes da pintura.
+        var firstPaint = net.Backdrop.FindIndex(b => b.Layer == CamadaMapa.Pintura);
+        var lastPave = net.Backdrop.FindLastIndex(b => b.Layer == CamadaMapa.Pavimento);
+        Assert.True(lastPave < firstPaint);
+        // Sem geometria (chamada antiga) o mapa usa o esquema.
+        Assert.Empty(Crossing(1).Backdrop);
+    }
+
+    [Fact]
+    public void Frames_CarryTheTurnSignal()
+    {
+        var sim = TrafficSimulation.Run(TrafficAnalysis.Run(Crossing(1), new TrafficOptions { Demand = NivelDemanda.Media, SimSeconds = 300, WarmupSeconds = 60 }));
+        Assert.Equal(7, SimFrame.Stride);
+        var left = 0;
+        var right = 0;
+        foreach (var f in sim.Frames)
+            for (int k = 0; k < f.Count; k++)
+            {
+                var b = f.Data[k * SimFrame.Stride + 6];
+                if (b < 0) left++;
+                else if (b > 0) right++;
+            }
+        Assert.True(left > 0 && right > 0, $"esq {left} dir {right}");
+    }
+
+    [Fact]
+    public void Intersection_WithoutLeftTurns_ForbidsThemInTheNetwork()
+    {
+        var net = Crossing(0, leftTurns: false);
+        var nd = net.Nodes.Single(n => n.Kind == TipoNo.Intersecao);
+        Assert.True(nd.NoLeftTurns);
+        foreach (var li in nd.In)
+            foreach (var lo in nd.Out)
+                if (TrafficAnalysis.TurnOf(net, li, lo) == Giro.Esquerda)
+                    Assert.False(TrafficAnalysis.Allowed(net, nd, li, lo));
+        var sim = TrafficSimulation.Run(TrafficAnalysis.Run(net, new TrafficOptions { Demand = NivelDemanda.Baixa, SimSeconds = 300, WarmupSeconds = 60 }));
+        Assert.True(sim.Completed > 0);
     }
 }

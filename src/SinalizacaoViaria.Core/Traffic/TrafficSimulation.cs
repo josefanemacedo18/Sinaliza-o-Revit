@@ -68,10 +68,13 @@ internal sealed class SimPath
 /// </summary>
 internal readonly record struct SimRun(double AIn, double AOut, double BIn, double BOut, bool Parallel);
 
-/// <summary>Quadro da animação: posições do CENTRO de cada veículo (x, y), rumo, tipo, velocidade e número, e as fases dos semáforos.</summary>
+/// <summary>
+/// Quadro da animação: posições do CENTRO de cada veículo (x, y), rumo, tipo, velocidade, número e seta (−1 esquerda,
+/// +1 direita, 0 desligada), e as fases dos semáforos.
+/// </summary>
 public sealed class SimFrame
 {
-    public const int Stride = 6;
+    public const int Stride = 7;
     public double Time { get; init; }
     public float[] Data { get; init; } = Array.Empty<float>();   // Stride valores por veículo
     /// <summary>Nó → fase em verde (k ≥ 0) ou entreverdes depois da fase k (−(k + 2)).</summary>
@@ -474,6 +477,25 @@ public static class TrafficSimulation
                 if (d < best) { best = d; st = p.St[i]; }
             }
             return st;
+        }
+        // Seta (CTB art. 196): na troca de faixa, ao se aproximar da conversão (últimos 45 m) e durante ela; na rotatória,
+        // à direita para sair.
+        float Blinker(SimVehicle v)
+        {
+            if (!v.InNode && v.LaneFrom >= 0 && Math.Abs(v.LaneShift) > 0.3) return v.Lane < v.LaneFrom ? 1 : -1;
+            int from, to;
+            if (v.InNode && v.Mov is { } m)
+            {
+                if (net.Nodes[m.Node].Kind == TipoNo.Rotatoria) return v.NodeLen - v.NodeS < 18 ? 1 : 0;
+                (from, to) = (m.From, m.To);
+            }
+            else
+            {
+                if (v.Step + 1 >= v.Route.Count || EndOf(net.Links[v.Link]) - v.S > 45) return 0;
+                if (net.Nodes[net.Links[v.Link].To].Kind == TipoNo.Rotatoria) return 0;
+                (from, to) = (v.Link, v.Route[v.Step + 1]);
+            }
+            return TrafficAnalysis.TurnOf(net, from, to) switch { Giro.Esquerda or Giro.Retorno => -1, Giro.Direita => 1, _ => 0 };
         }
         SimMove Planned(SimVehicle v)
         {
@@ -1020,6 +1042,7 @@ public static class TrafficSimulation
                     data[k++] = v.Type;
                     data[k++] = (float)v.V;
                     data[k++] = v.Id;
+                    data[k++] = Blinker(v);
                 }
                 var sig = plans.Keys.ToDictionary(nd => nd, nd => SignalState(nd, time));
                 Dictionary<int, string>? info = null;

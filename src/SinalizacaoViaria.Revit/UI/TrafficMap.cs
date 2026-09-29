@@ -40,6 +40,11 @@ public sealed class TrafficMap : FrameworkElement
 
     public event Action<int?, int?>? SelectionChanged;
 
+    /// <summary>Desenha a planta real do projeto (pisos e pintura gerados pelo plugin); senão, o esquema pelo eixo.</summary>
+    public bool RealPlan { get; set; } = true;
+    private TrafficNetwork? _planFor;
+    private DrawingGroup? _planBase, _planPaint;
+
     public TrafficMap()
     {
         ClipToBounds = true;
@@ -173,6 +178,70 @@ public sealed class TrafficMap : FrameworkElement
         return res;
     }
 
+    // ------------------------------------------------------------------------------------------------ planta real
+    /// <summary>
+    /// Monta (uma vez por rede) os desenhos da planta em coordenadas do projeto: base (pisos, calçadas, canteiros e elementos
+    /// físicos) e pintura. Peças seguidas da mesma cor viram uma só geometria (ordem de pintura preservada).
+    /// </summary>
+    private void EnsurePlan(TrafficNetwork net)
+    {
+        if (ReferenceEquals(_planFor, net)) return;
+        _planFor = net;
+        _planBase = _planPaint = null;
+        if (net.Backdrop.Count == 0) return;
+        var baseG = new DrawingGroup();
+        var paintG = new DrawingGroup();
+        using (var bc = baseG.Open())
+        using (var pc = paintG.Open())
+        {
+            var i = 0;
+            var list = net.Backdrop;
+            while (i < list.Count)
+            {
+                var first = list[i];
+                var g = new StreamGeometry { FillRule = FillRule.Nonzero };
+                var j = i;
+                using (var ctx = g.Open())
+                {
+                    for (; j < list.Count && list[j].Layer == first.Layer && list[j].Color == first.Color && j - i < 4000; j++)
+                    {
+                        var sh = list[j].Shape;
+                        Ring(ctx, sh.Outer, true);
+                        foreach (var h in sh.Holes) Ring(ctx, h, false);
+                    }
+                }
+                g.Freeze();
+                var brush = B(Color.FromRgb(first.Color.R, first.Color.G, first.Color.B));
+                // Meio-fio e bordas de calçada/canteiro com um contorno fino (leitura do desnível, como numa foto aérea).
+                Pen? pen = first.Layer is CamadaMapa.Calcada or CamadaMapa.Canteiro or CamadaMapa.Fisico ? P(Color.FromRgb(0x9A, 0x95, 0x8A), 0.08) : null;
+                (first.Layer == CamadaMapa.Pintura ? pc : bc).DrawGeometry(brush, pen, g);
+                i = j;
+            }
+        }
+        baseG.Freeze();
+        paintG.Freeze();
+        _planBase = baseG;
+        _planPaint = paintG;
+
+        static void Ring(StreamGeometryContext ctx, IReadOnlyList<Vec2> r, bool outer)
+        {
+            if (r.Count < 3) return;
+            double a = 0;
+            for (int k = 0; k < r.Count; k++) { var p = r[k]; var q = r[(k + 1) % r.Count]; a += p.X * q.Y - q.X * p.Y; }
+            // Contorno anti-horário e furos horários: com a regra "nonzero" os furos ficam vazios e peças vizinhas da mesma
+            // cor não se anulam.
+            var ccw = a > 0;
+            IEnumerable<Vec2> pts = ccw == outer ? r : r.Reverse();
+            var l = pts.ToList();
+            ctx.BeginFigure(new Point(l[0].X, l[0].Y), true, true);
+            ctx.PolyLineTo(l.Skip(1).Select(v => new Point(v.X, v.Y)).ToList(), false, true);
+        }
+    }
+
+    /// <summary>Transformação projeto → tela (y para cima no projeto).</summary>
+    private MatrixTransform WorldTransform() =>
+        new(new Matrix(_scale, 0, 0, -_scale, ActualWidth / 2 - _cx * _scale, ActualHeight / 2 + _cy * _scale));
+
     // ------------------------------------------------------------------------------------------------ desenho
     protected override void OnRender(DrawingContext dc)
     {
@@ -206,7 +275,19 @@ public sealed class TrafficMap : FrameworkElement
             dc.DrawGeometry(B(c), pen, g);
         }
 
-        // Calçadas (com o meio-fio desenhado como contorno), pista e canteiro central de cada via.
+        EnsurePlan(net);
+        var real = RealPlan && _planBase != null;
+        if (real)
+        {
+            dc.PushTransform(WorldTransform());
+            dc.DrawDrawing(_planBase);
+            if (_scale > 0.35) dc.DrawDrawing(_planPaint);
+            dc.Pop();
+        }
+
+        // Esquema (projetos sem a geometria das peças): calçadas (com o meio-fio como contorno), pista e canteiro de cada via.
+        if (!real)
+        {
         var walk = Color.FromRgb(0xD8, 0xD5, 0xCD);
         var curb = P(Color.FromRgb(0xA9, 0xA4, 0x98), Math.Max(0.6, 0.15 * _scale));
         var asphalt = Color.FromRgb(0x3E, 0x42, 0x48);
@@ -247,6 +328,7 @@ public sealed class TrafficMap : FrameworkElement
                 Fill(Poly(lk.Path, -r.MedianWidth / 2, r.MedianWidth / 2, clear[lk.From], clear[lk.To]), Color.FromRgb(0x86, 0xB0, 0x6A), curb);
             _ = first;
         }
+        }
 
         // Nível de serviço: faixa colorida sobre as faixas de cada sentido (na animação, só uma fita junto ao bordo).
         foreach (var lr in _res.Links.Values)
@@ -266,7 +348,7 @@ public sealed class TrafficMap : FrameworkElement
             }
             else
             {
-                var c = Color.FromArgb(sel ? (byte)235 : (byte)190, color.R, color.G, color.B);
+                var c = Color.FromArgb(sel ? (byte)235 : real ? (byte)120 : (byte)190, color.R, color.G, color.B);
                 Fill(Poly(l.Path, inner + 0.2, outer - 0.2, t0, t1), c, sel ? P(Color.FromRgb(0x1F, 0x5F, 0xA8), 2.5) : null);
             }
             if (l.Closed)
@@ -286,7 +368,7 @@ public sealed class TrafficMap : FrameworkElement
 
         // Marcas no pavimento: eixo (amarelo, contínuo onde a ultrapassagem é proibida), divisórias entre faixas, bordos,
         // faixas fechadas (zebrado), retenções e faixas de pedestres.
-        if (detail)
+        if (detail && !real)
         {
             var mw = Math.Max(0.8, 0.13 * _scale);
             Pen Dashed(Color c, double dash, double gap) => new(B(c, 230), mw) { DashStyle = new DashStyle(new[] { dash * _scale / mw, gap * _scale / mw }, 0), DashCap = PenLineCap.Flat };
@@ -362,7 +444,7 @@ public sealed class TrafficMap : FrameworkElement
                 }
             }
         }
-        else
+        else if (!real)
             foreach (var (_, _, path) in net.Crosswalks)
                 if (path.Points.Count >= 2) dc.DrawGeometry(null, P(Colors.White, Math.Max(1.5, 3 * _scale), 200), Line(path.Points));
 
@@ -540,6 +622,9 @@ public sealed class TrafficMap : FrameworkElement
         var br = brake.Open();
         var tail = new StreamGeometry();
         var tl = tail.Open();
+        var blinkG = new StreamGeometry();
+        var bk = blinkG.Open();
+        var blinkOn = SimTime - Math.Floor(SimTime) < 0.55;   // pisca-pisca ~1 Hz
         var detailed = _scale * 4.4 >= 9;
         var stopped = 0;
         var sumV = 0.0;
@@ -552,6 +637,7 @@ public sealed class TrafficMap : FrameworkElement
             var type = (int)a.Data[k * st + 3];
             var v = a.Data[k * st + 4];
             var id = (int)a.Data[k * st + 5];
+            var blink = a.Data[k * st + 6];
             var braking = v < 0.5;
             if (next.TryGetValue(id, out var j))
             {
@@ -635,7 +721,15 @@ public sealed class TrafficMap : FrameworkElement
             var lg = braking ? br : tl;
             Quad(lg, (-hl + 0.18, hw - 0.1), (-hl + 0.18, hw - 0.45), (-hl - 0.02, hw - 0.45), (-hl - 0.02, hw - 0.1));
             Quad(lg, (-hl + 0.18, -hw + 0.1), (-hl + 0.18, -hw + 0.45), (-hl - 0.02, -hw + 0.45), (-hl - 0.02, -hw + 0.1));
+            // Seta (pisca) no lado da conversão ou da troca de faixa: cantos dianteiro e traseiro.
+            if (blink != 0 && blinkOn)
+            {
+                var sy = blink < 0 ? 1.0 : -1.0;
+                Quad(bk, (hl + 0.05, sy * (hw - 0.05)), (hl + 0.05, sy * (hw - 0.4)), (hl - 0.3, sy * (hw - 0.4)), (hl - 0.3, sy * (hw + 0.05)));
+                Quad(bk, (-hl + 0.3, sy * (hw + 0.05)), (-hl + 0.3, sy * (hw - 0.4)), (-hl - 0.05, sy * (hw - 0.4)), (-hl - 0.05, sy * (hw - 0.05)));
+            }
         }
+        bk.Close(); blinkG.Freeze();
         sh.Close(); shadow.Freeze();
         if (detailed) dc.DrawGeometry(B(Colors.Black, 55), null, shadow);
         var outline = P(Color.FromRgb(0x1B, 0x1F, 0x24), Math.Clamp(_scale * 0.06, 0.4, 1.0), 200);
@@ -653,6 +747,7 @@ public sealed class TrafficMap : FrameworkElement
             dc.DrawGeometry(B(Color.FromRgb(0x2A, 0x3A, 0x4A), 230), null, glass);
             dc.DrawGeometry(B(Color.FromRgb(0x8B, 0x1A, 0x1A)), null, tail);
             dc.DrawGeometry(B(Color.FromRgb(0xFF, 0x2D, 0x2D)), P(Color.FromRgb(0xFF, 0x6B, 0x6B), Math.Max(0.5, _scale * 0.1), 120), brake);
+            dc.DrawGeometry(B(Color.FromRgb(0xFF, 0xA0, 0x00)), P(Color.FromRgb(0xFF, 0xD0, 0x60), Math.Max(0.5, _scale * 0.12), 140), blinkG);
         }
         return (a.Count, stopped, a.Count > 0 ? sumV / a.Count * 3.6 : 0);
     }

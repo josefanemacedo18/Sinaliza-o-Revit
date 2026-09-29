@@ -76,6 +76,7 @@ public sealed class TrafficWindow : Window
     private readonly CheckBox _showVeh = new() { Content = "Veículos", IsChecked = true, Margin = new Thickness(12, 0, 0, 0) };
     private readonly CheckBox _showLbl = new() { Content = "Rótulos", IsChecked = true, Margin = new Thickness(12, 0, 0, 0) };
     private readonly CheckBox _showSigns = new() { Content = "Sinalização", IsChecked = true, Margin = new Thickness(12, 0, 0, 0), ToolTip = "Ícones da sinalização lida do projeto: PARE, dê a preferência, velocidade máxima, semáforos e bloqueios." };
+    private readonly CheckBox _realPlan = new() { Content = "Planta real", IsChecked = true, Margin = new Thickness(12, 0, 0, 0), ToolTip = "Desenha o projeto como ele é (pavimento, calçadas, canteiros, ilhas e toda a pintura gerada pelo plugin). Desmarcado: esquema das faixas pelo eixo." };
     private readonly CheckBox _speedColors = new() { Content = "Veículos pela velocidade", IsChecked = false, Margin = new Thickness(12, 0, 0, 0), ToolTip = "Cor de cada veículo pela velocidade (vermelho parado → verde livre) em vez das cores reais." };
     private readonly Button _play = new() { Content = "▶", MinWidth = 44, IsEnabled = false };
     private readonly ComboBox _speed = new() { Width = 70, Margin = new Thickness(6, 0, 0, 0) };
@@ -350,6 +351,9 @@ public sealed class TrafficWindow : Window
         _showLbl.Unchecked += (_, _) => { _map.ShowLabels = false; _map.InvalidateVisual(); };
         bar.Children.Add(_showSigns);
         bar.Children.Add(_speedColors);
+        bar.Children.Add(_realPlan);
+        _realPlan.Checked += (_, _) => { _map.RealPlan = true; _map.InvalidateVisual(); };
+        _realPlan.Unchecked += (_, _) => { _map.RealPlan = false; _map.InvalidateVisual(); };
         _showSigns.Checked += (_, _) => { _map.ShowSigns = true; _map.InvalidateVisual(); };
         _showSigns.Unchecked += (_, _) => { _map.ShowSigns = false; _map.InvalidateVisual(); };
         _speedColors.Checked += (_, _) => { _map.ColorBySpeed = true; _map.InvalidateVisual(); };
