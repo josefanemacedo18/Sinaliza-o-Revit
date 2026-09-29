@@ -44,6 +44,7 @@ public static class IntersectionDemo
         var d = (IntersectionDefinition)template.CloneWithNewId();
         d.Node = Vec2.Zero;
         d.MainRoadId = null;
+        d.NeighborNodes = template.NeighborNodes.ToList();
         return Create(d, roads, groups, paths, defs, cat);
     }
 

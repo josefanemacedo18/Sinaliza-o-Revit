@@ -84,8 +84,16 @@ internal static class IntersectionForms
          .Check("Esquinas com a mesma composição das calçadas das vias (meio-fio + faixa gramada + passeio)", () => d.MatchRoadSection, v => d.MatchRoadSection = v,
              "Repete nas esquinas a faixa de serviço gramada definida na seção das vias que se cruzam, alinhando o desenho com as vias.");
 
-        w.Section("Linha de continuidade (LCO) na boca das secundárias", "O bordo da via principal continua tracejado atravessando a boca da secundária: quem entra ou sai cruza a linha (MBST Vol. IV).")
-         .Choice("Linha de continuidade", new[] { ("Pela hierarquia (arterial/rodovia × via menor)", LinhaContinuidade.Automatica), ("Sempre", LinhaContinuidade.Sempre), ("Nunca", LinhaContinuidade.Nunca) },
+        w.Section("Linhas no cruzamento e regras de conversão (MBST Vol. IV / CTB art. 207)",
+                "Linha contínua amarela proíbe a conversão (CTB art. 207). Na via principal que atravessa o cruzamento, o eixo vira linha de " +
+                "continuidade (LCO) tracejada na boca das transversais, liberando as conversões à esquerda; nas aproximações o eixo fica contínuo.")
+         .Check("Conversões à esquerda permitidas (eixo tracejado – LCO – no cruzamento)", () => d.LeftTurns, v => d.LeftTurns = v,
+             "Desmarcado: o eixo da principal segue contínuo pela boca das transversais e as aproximações recebem R-4a (proibido virar à esquerda) – só conversões à direita.")
+         .Check("Linhas de continuidade (LCO) no miolo da via principal (eixo e faixas)", () => d.BoxContinuity, v => d.BoxContinuity = v,
+             "Eixo amarelo (duplo quando a linha é dupla) e divisórias de faixa brancas tracejadas 1 × 1 m (2 × 2 m acima de 60 km/h). Desmarcado: interrompidas no cruzamento.")
+         .Check("Linhas contínuas nas aproximações (LFO-3 no eixo; LMS-1 no semáforo)", () => d.ApproachLines, v => d.ApproachLines = v,
+             "Eixo seccionado vira LFO-3 (LFO-1 em pista estreita) nos 15 m antes do cruzamento (30 m acima de 60 km/h); no semáforo as divisórias ficam LMS-1 nos 20 m antes da retenção. Limitado à metade da quadra.")
+         .Choice("LCO no bordo da principal (boca das secundárias)", new[] { ("Pela hierarquia (arterial/rodovia × via menor)", LinhaContinuidade.Automatica), ("Sempre", LinhaContinuidade.Sempre), ("Nunca", LinhaContinuidade.Nunca) },
              () => d.ContinuityLine, v => d.ContinuityLine = v);
         var ilhas = new[] { ("Nenhuma", TipoIlha.Nenhuma), ("Física (meio-fio)", TipoIlha.Fisica), ("Pintada (zebrado)", TipoIlha.Pintada) };
         w.Section("Tipo II – ilha separadora (gota) na via secundária", "A pista é alargada em volta da ilha; a travessia passa por um refúgio no nível da pista.")

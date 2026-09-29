@@ -152,6 +152,9 @@ public sealed class IntersectionService
                 it.RightTurnLaneWidth = template.RightTurnLaneWidth;
                 it.LeftTurnPockets = template.LeftTurnPockets;
                 it.ContinuityLine = template.ContinuityLine;
+                it.LeftTurns = template.LeftTurns;
+                it.BoxContinuity = template.BoxContinuity;
+                it.ApproachLines = template.ApproachLines;
                 it.PocketLength = template.PocketLength;
                 it.PocketTaper = template.PocketTaper;
                 it.PocketWidth = template.PocketWidth;
@@ -295,6 +298,10 @@ public sealed class IntersectionService
         it.Z = roads.Average(r => RoadZ(r, node.Node));
         it.EdgeProfile = it.MatchRoadSection ? EdgeProfile.Best(roads.Select(r => ProfileOf(r.Def))) : new List<EdgeBand>();
         it.RoadProfiles = it.MatchRoadSection ? roads.Select(r => SidesOf(r.Def)).ToList() : new List<RoadEdgeProfile>();
+        // Nós vizinhos (outras interseções e rotatórias): as linhas de aproximação vão no máximo até a metade da quadra.
+        it.NeighborNodes = all.OfType<IntersectionDefinition>().Where(o => o.Id != it.Id).Select(o => o.Node)
+            .Concat(all.OfType<RoundaboutDefinition>().Select(o => o.Center))
+            .Where(p => p.DistanceTo(node.Node) > 3 && p.DistanceTo(node.Node) < 400).ToList();
         var layout = IntersectionGenerator.Layout(it, roads);
         if (layout.Roads.Count > 0) it.Hierarchy = layout.Roads[layout.Main].Def.Hierarchy;
 

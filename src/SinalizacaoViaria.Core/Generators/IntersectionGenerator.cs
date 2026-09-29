@@ -57,6 +57,8 @@ public sealed record IntersectionCorner(Polygon2 Tri, int RoadA, bool LeftA, int
 public sealed class IntersectionLayout
 {
     public Vec2 Node { get; init; }
+    /// <summary>Definição que gerou o arranjo (opções de sinalização usadas pelos recortes).</summary>
+    public IntersectionDefinition? Definition { get; init; }
     public double Radius { get; set; }
     /// <summary>Emenda de duas vias pela ponta (continuação em ângulo ou com mudança de seção): curva concordada.</summary>
     public bool IsBend { get; set; }
@@ -100,6 +102,11 @@ public sealed class IntersectionLayout
     public List<Polygon2> Carriageway { get; } = new();
     public List<IntersectionLeg> Legs { get; } = new();
     public List<LegFeature> Features { get; } = new();
+    /// <summary>
+    /// A via principal atravessa o nó sem semáforo: as linhas dela seguem pela boca das secundárias (LCO no miolo, eixo
+    /// contínuo só quando as conversões à esquerda são proibidas).
+    /// </summary>
+    public bool ThroughMain { get; set; }
     /// <summary>Por via: áreas onde a sinalização pintada é removida (miolo + aproximações até a retenção).</summary>
     public Dictionary<int, List<Polygon2>> PaintCuts { get; } = new();
     /// <summary>Por via: áreas onde as vagas são removidas (pintura + 5 m antes da esquina, CTB art. 181).</summary>
@@ -376,7 +383,7 @@ public static class IntersectionGenerator
         var samples = Enumerable.Range(1, 39).Select(i => len * i / 40.0).ToList();
         List<Polygon2> Band(Func<double, double> lo, Func<double, double> hi) => RoadGenerator.VariableBand(bend, 0, len, lo, hi, samples);
 
-        var L = new IntersectionLayout { Node = node, IsBend = true, BendAxis = bend, BendReversed = new[] { flipA, flipB } };
+        var L = new IntersectionLayout { Node = node, IsBend = true, BendAxis = bend, BendReversed = new[] { flipA, flipB }, Definition = d };
         L.Roads.AddRange(input);
         L.PavementColor = A.Def.Color;
         L.PavementThickness = A.Def.ActualThickness;
@@ -697,7 +704,7 @@ public static class IntersectionGenerator
 
     public static IntersectionLayout Layout(IntersectionDefinition d, IReadOnlyList<IntersectionRoad> input)
     {
-        var L = new IntersectionLayout { Node = d.Node };
+        var L = new IntersectionLayout { Node = d.Node, Definition = d };
         if (input.Count < 2)
         {
             L.Warnings.Add("A interseção precisa de pelo menos duas vias com pavimento (Sinalizar via).");
@@ -1070,6 +1077,7 @@ public static class IntersectionGenerator
                           && d.Control != ControleIntersecao.Semaforo && !L.Features.Any(f => f.Leg.Road == i);
             if (through)
             {
+                L.ThroughMain = true;
                 var mouth = PolygonOps.Difference(PolygonOps.Intersect(pav, core0), own[i]);
                 // Entra na pista o bastante para cortar o bordo (inclusive com acostamento), sem chegar ao eixo.
                 var reachIn = Math.Max(0.8, 0.45 * Math.Min(r.Def.RightWidth, r.Def.LeftWidth));
@@ -1123,7 +1131,183 @@ public static class IntersectionGenerator
         if (member is RoadPavementDefinition || IsPhysical(member)) return phys;
         if (member is ParkingMarkingDefinition) return L.ParkingCuts.GetValueOrDefault(road) ?? new();
         if (member is DeviceMarkingDefinition) return PolygonOps.Union(phys.Concat(L.PaintCuts.GetValueOrDefault(road) ?? new()));
-        return L.PaintCuts.GetValueOrDefault(road) ?? new();
+        var paint = L.PaintCuts.GetValueOrDefault(road) ?? new();
+        // Eixo e divisórias de faixa: miolo da principal (LCO) e aproximações (linha contínua) – MBST Vol. IV.
+        if (member is LinearMarkingDefinition lin && road < L.Roads.Count && LineRuleFor(L, road, lin) is { Cut.Count: > 0 } rule)
+        {
+            var r = L.Roads[road];
+            var bands = rule.Cut.SelectMany(c => RoadGenerator.Band(new Polyline2(r.Axis.SubPoints(c.S0, c.S1)), lin.Offset - 0.6, lin.Offset + 0.6));
+            return PolygonOps.Union(paint.Concat(bands));
+        }
+        return paint;
+    }
+
+    // ------------------------------------------------------------------ linhas da via no cruzamento (MBST Vol. IV)
+
+    /// <summary>Papel de uma linha longitudinal da via no cruzamento.</summary>
+    private enum PapelLinha { Nenhum, Eixo, Faixa }
+
+    /// <summary>Linha que substitui um trecho de uma linha da via (estacas no eixo da via).</summary>
+    public sealed record LineReplacement(double S0, double S1, string Code, MarkingColor? Color, bool Double, string Why);
+
+    /// <summary>Regra de uma linha da via no cruzamento: trechos recortados e as linhas que os substituem.</summary>
+    public sealed record LineRule(List<(double S0, double S1)> Cut, List<LineReplacement> Add);
+
+    private static PapelLinha RoleOf(LinearMarkingDefinition m, IntersectionRoad r)
+    {
+        var code = m.Code ?? "";
+        if (m.PathRef == null || RoadSectionInference.IsPhysical(code) || NotShifted.Any(c => code.StartsWith(c)) || code.StartsWith("LCO")) return PapelLinha.Nenhum;
+        if (RoadSectionInference.PathKey(m.PathRef) != RoadSectionInference.PathKey(r.Def.Path)) return PapelLinha.Nenhum;
+        // Só as linhas internas da pista (o bordo tem a LCO própria na boca das secundárias).
+        var edge = m.Offset >= 0 ? r.Def.LeftWidth : r.Def.RightWidth;
+        if (Math.Abs(m.Offset) > edge - 0.6) return PapelLinha.Nenhum;
+        if (code.StartsWith("LFO")) return r.Def.TwoWay ? PapelLinha.Eixo : PapelLinha.Faixa;
+        if (code.StartsWith("LMS") || code.StartsWith("MFE") || code.StartsWith("MFP")) return PapelLinha.Faixa;
+        return PapelLinha.Nenhum;
+    }
+
+    /// <summary>Velocidade da via (km/h) para as cadências (LCO 1 × 1 m até 60 km/h, 2 × 2 m acima).</summary>
+    private static double SpeedOf(IntersectionRoad r) => Hierarquia.DefaultSpeed(r.Def.Hierarchy ?? HierarquiaViaria.Local);
+
+    /// <summary>Estaca do fim do trecho livre de um ramo, limitada à metade da distância ao nó vizinho mais próximo.</summary>
+    private static double LegLimit(IntersectionLayout L, IntersectionLeg leg, IReadOnlyList<Vec2> neighbors)
+    {
+        var axis = L.Roads[leg.Road].Axis;
+        var lim = MaxT(L, leg) - 2;
+        foreach (var n in neighbors)
+        {
+            var (st, dist, _) = Project(axis, n);
+            if (dist > 6) continue;
+            var t = (st - leg.NodeStation) * leg.Sign;
+            if (t > 1) lim = Math.Min(lim, t / 2 - 1);
+        }
+        return lim;
+    }
+
+    /// <summary>
+    /// Regra MBST Vol. IV / CTB art. 207 de uma linha da via <paramref name="road"/> no cruzamento:
+    /// <list type="bullet">
+    /// <item>via principal que atravessa o nó: o eixo amarelo vira LCO (dupla se a linha é dupla) na boca das secundárias,
+    /// permitindo as conversões à esquerda; com conversões proibidas o eixo segue contínuo; divisórias de faixa viram LCO
+    /// branca;</item>
+    /// <item>aproximações: eixo seccionado passa a contínuo (LFO-3; LFO-1 em pista estreita) por 15 m (30 m acima de
+    /// 60 km/h) antes do cruzamento; no semáforo as divisórias são LMS-1 nos 20 m antes da retenção.</item>
+    /// </list>
+    /// </summary>
+    public static LineRule? LineRuleFor(IntersectionLayout L, int road, LinearMarkingDefinition m, IntersectionDefinition? d = null)
+    {
+        d ??= L.Definition;
+        if (d == null || L.IsBend || L.Legs.Count <= 2 || road >= L.Roads.Count) return null;
+        var r = L.Roads[road];
+        var role = RoleOf(m, r);
+        if (role == PapelLinha.Nenhum) return null;
+        var code = m.Code ?? "";
+        var cut = new List<(double, double)>();
+        var add = new List<LineReplacement>();
+        var legs = L.Legs.Where(l => l.Road == road).ToList();
+        var dashed = code is "LFO-2" or "LFO-4";
+        var dbl = code is "LFO-3" or "LFO-4";
+        var wide = r.Def.LeftWidth + r.Def.RightWidth >= 7.0;
+        var through = L.ThroughMain && road == L.Main && legs.Count >= 2;
+
+        // 1. Miolo da principal que atravessa o nó.
+        if (through)
+        {
+            var box = legs.Select(l => l.StationAt(l.Clear + (d.Crosswalks ? Math.Max(0, d.CrosswalkSetback - 0.4) : 0))).ToList();
+            var (s0, s1) = (box.Min(), box.Max());
+            if (s1 - s0 > 1)
+            {
+                if (role == PapelLinha.Eixo)
+                {
+                    if (d.LeftTurns)
+                    {
+                        cut.Add((s0, s1));
+                        if (d.BoxContinuity) add.Add(new LineReplacement(s0, s1, "LCO", MarkingColor.Amarela, dbl || d.ApproachLines && dashed,
+                            "conversões à esquerda permitidas: eixo tracejado (LCO) na boca das transversais"));
+                    }
+                    else if (dashed || code == "LFO-2")
+                    {
+                        cut.Add((s0, s1));
+                        add.Add(new LineReplacement(s0, s1, wide ? "LFO-3" : "LFO-1", null, false, "conversões à esquerda proibidas: eixo contínuo"));
+                    }
+                }
+                else
+                {
+                    cut.Add((s0, s1));
+                    if (d.BoxContinuity) add.Add(new LineReplacement(s0, s1, "LCO", null, false, "continuidade das faixas no cruzamento"));
+                }
+            }
+        }
+
+        // 2. Aproximações.
+        if (d.ApproachLines)
+            foreach (var leg in legs)
+            {
+                if (L.FeatureOf(leg) != null) continue;                       // gota/bolsão têm linhas próprias
+                var t0 = through && !d.Crosswalks ? leg.Clear : leg.Clear + StopFar(d);
+                var lim = LegLimit(L, leg, d.NeighborNodes);
+                if (role == PapelLinha.Eixo && dashed)
+                {
+                    var t1 = Math.Min(t0 + (SpeedOf(r) > 60 ? 30 : 15), lim);
+                    if (t1 - t0 < 5) continue;
+                    var (a, b) = (leg.StationAt(t0), leg.StationAt(t1));
+                    cut.Add((Math.Min(a, b), Math.Max(a, b)));
+                    add.Add(new LineReplacement(Math.Min(a, b), Math.Max(a, b), wide ? "LFO-3" : "LFO-1", null, false, "aproximação do cruzamento: ultrapassagem proibida"));
+                }
+                else if (role == PapelLinha.Faixa && d.Control == ControleIntersecao.Semaforo && code.StartsWith("LMS-2"))
+                {
+                    // Só as divisórias do lado de chegada (+o do ramo; mão única: o ramo por onde o tráfego chega).
+                    var inbound = r.Def.TwoWay ? m.Offset * leg.Sign > 0.3 : leg.Sign < 0;
+                    if (!inbound) continue;
+                    var t1 = Math.Min(t0 + 20, lim);
+                    if (t1 - t0 < 5) continue;
+                    var (a, b) = (leg.StationAt(t0), leg.StationAt(t1));
+                    cut.Add((Math.Min(a, b), Math.Max(a, b)));
+                    add.Add(new LineReplacement(Math.Min(a, b), Math.Max(a, b), "LMS-1", null, false, "aproximação do semáforo: troca de faixa proibida"));
+                }
+            }
+        return cut.Count == 0 && add.Count == 0 ? null : new LineRule(cut, add);
+    }
+
+    /// <summary>Linhas que substituem os trechos recortados das linhas das vias (LCO no miolo, contínuas nas aproximações).</summary>
+    private static IEnumerable<LinearMarkingDefinition> RuleLines(IntersectionDefinition d, IntersectionLayout L, double z,
+        IReadOnlyList<IReadOnlyCollection<MarkingDefinition>> roadMembers)
+    {
+        for (int k = 0; k < L.Roads.Count && k < roadMembers.Count; k++)
+        {
+            var r = L.Roads[k];
+            var speed = SpeedOf(r);
+            var seen = new HashSet<string>();
+            foreach (var m in roadMembers[k].OfType<LinearMarkingDefinition>())
+            {
+                if (LineRuleFor(L, k, m, d) is not { } rule) continue;
+                foreach (var a in rule.Add)
+                {
+                    // A mesma linha (mesmo código e deslocamento) só uma vez.
+                    if (!seen.Add($"{a.Code}|{a.Color}|{Math.Round(m.Offset, 2)}|{Math.Round(a.S0, 1)}")) continue;
+                    var line = new Polyline2(r.Axis.SubPoints(a.S0, a.S1));
+                    if (line.Length < 1) continue;
+                    var pts = (Math.Abs(m.Offset) > 1e-6 ? line.Offset(m.Offset) : line).Points.ToList();
+                    if (a.Double)
+                    {
+                        var (w, g) = speed > 80 ? (0.15, 0.15) : (0.10, 0.10);
+                        foreach (var sg in new[] { 1.0, -1.0 })
+                            yield return new LinearMarkingDefinition
+                            {
+                                Code = a.Code, Speed = speed, ColorOverride = a.Color, WidthOverride = w, Offset = sg * g,
+                                PathRef = PathReference.FromPoints(pts, z),
+                            };
+                    }
+                    else
+                        yield return new LinearMarkingDefinition
+                        {
+                            Code = a.Code, Speed = speed, ColorOverride = a.Color,
+                            WidthOverride = a.Code == "LCO" ? (speed > 80 ? 0.15 : 0.10) : null,
+                            PathRef = PathReference.FromPoints(pts, z),
+                        };
+                }
+            }
+        }
     }
 
     // ------------------------------------------------------------------ geometria da interseção
@@ -1620,6 +1804,23 @@ public static class IntersectionGenerator
             Add(new HatchMarkingDefinition { Code = "ZPA", Boundary = PathReference.FromPoints(p.Outer, z, true) });
         foreach (var p in L.PaintedMedians)
             Add(new HatchMarkingDefinition { Code = "ZPA-A", Boundary = PathReference.FromPoints(p.Outer, z, true) });
+
+        // Eixo e faixas no miolo (LCO) e nas aproximações (contínuas) – MBST Vol. IV / CTB art. 207.
+        if (roadMembers != null)
+            foreach (var line in RuleLines(d, L, z, roadMembers)) Add(line);
+        // Conversões à esquerda proibidas: R-4a em cada aproximação (o eixo segue contínuo pela boca das transversais).
+        if (!d.LeftTurns && d.Signs)
+            foreach (var leg in L.Legs)
+            {
+                var r = L.Roads[leg.Road];
+                if (!(r.Def.TwoWay || leg.Sign < 0)) continue;
+                var t = leg.Clear + StopFar(d) + 6;
+                if (t > MaxT(L, leg) - 1) continue;
+                var walkHi = (leg.Sign > 0 ? r.Def.LeftSidewalk : r.Def.RightSidewalk) > 0.5;
+                hierarchy = r.Def.Hierarchy;
+                Add(new SignDefinition { Code = "R-4a", Position = L.At(leg, t, L.HiEdge(leg, t) + (walkHi ? L.CurbWidth + 0.45 : 1.0)), Direction = L.Inbound(leg, t), Z = z });
+            }
+        hierarchy = L.Roads[L.Main].Def.Hierarchy;
 
         // Linha de continuidade (LCO): o bordo da via principal continua tracejado na boca da secundária – quem está na
         // principal e entra na secundária (ou vice-versa) cruza a linha (MBST Vol. IV).

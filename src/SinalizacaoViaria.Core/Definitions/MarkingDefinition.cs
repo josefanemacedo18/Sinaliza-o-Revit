@@ -1496,6 +1496,30 @@ public sealed class IntersectionDefinition : MarkingDefinition
     /// </summary>
     public LinhaContinuidade ContinuityLine { get; set; } = LinhaContinuidade.Automatica;
 
+    /// <summary>
+    /// Conversões à esquerda permitidas (MBST Vol. IV / CTB art. 207): na via principal que atravessa o cruzamento, o eixo
+    /// amarelo vira linha de continuidade (LCO) tracejada na boca das secundárias. Falso = eixo contínuo e placas R-4a
+    /// nas aproximações (só conversões à direita).
+    /// </summary>
+    public bool LeftTurns { get; set; } = true;
+
+    /// <summary>
+    /// Linhas de continuidade (LCO) no miolo da via principal que atravessa o nó: o eixo (amarela, dupla quando a linha é
+    /// dupla) e as divisórias de faixas (branca) seguem tracejados 1 × 1 m (2 × 2 m acima de 60 km/h). Falso = interrompidas.
+    /// </summary>
+    public bool BoxContinuity { get; set; } = true;
+
+    /// <summary>
+    /// Linhas das aproximações (MBST Vol. IV): eixo seccionado passa a contínuo (LFO-3, ou LFO-1 em pista &lt; 7 m) por 15 m
+    /// (30 m acima de 60 km/h) antes do cruzamento, e divisórias de faixa contínuas (LMS-1) nos 20 m antes da retenção do
+    /// semáforo.
+    /// </summary>
+    public bool ApproachLines { get; set; } = true;
+
+    /// <summary>Nós vizinhos (outras interseções/rotatórias) – limitam as linhas de aproximação à metade da quadra. Não gravado.</summary>
+    [JsonIgnore]
+    public List<Vec2> NeighborNodes { get; set; } = new();
+
     /// <summary>Tipo II – ilha separadora (gota) nas aproximações das vias secundárias, com alargamento da pista.</summary>
     public TipoIlha SplitterIslands { get; set; } = TipoIlha.Nenhuma;
     public double SplitterLength { get; set; } = 15.0;

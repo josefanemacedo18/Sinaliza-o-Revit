@@ -161,7 +161,7 @@ public class V25IntersectionTests
     public void ArterialWithCollector_GetsDashedContinuityLineAcrossTheMouth()
     {
         var s = Scene(2, 1);                                   // avenida (arterial) × coletora
-        var lco = s.Definitions.OfType<LinearMarkingDefinition>().Where(l => l.Code == "LCO").ToList();
+        var lco = EdgeLco(s);
         Assert.NotEmpty(lco);
         var main = s.Layout.Roads[s.Layout.Main];
         foreach (var l in lco)
@@ -181,8 +181,17 @@ public class V25IntersectionTests
     [Fact]
     public void LocalStreets_DoNotGetContinuityLineUnlessAsked()
     {
-        Assert.DoesNotContain(Scene(0, 0).Definitions.OfType<LinearMarkingDefinition>(), l => l.Code == "LCO");
-        Assert.Contains(Scene(0, 0, LinhaContinuidade.Sempre).Definitions.OfType<LinearMarkingDefinition>(), l => l.Code == "LCO");
-        Assert.DoesNotContain(Scene(2, 1, LinhaContinuidade.Nunca).Definitions.OfType<LinearMarkingDefinition>(), l => l.Code == "LCO");
+        Assert.Empty(EdgeLco(Scene(0, 0)));
+        Assert.NotEmpty(EdgeLco(Scene(0, 0, LinhaContinuidade.Sempre)));
+        Assert.Empty(EdgeLco(Scene(2, 1, LinhaContinuidade.Nunca)));
+    }
+
+    /// <summary>LCO do bordo da principal (a do miolo – eixo e faixas – fica longe do bordo).</summary>
+    private static List<LinearMarkingDefinition> EdgeLco(IntersectionDemo.Scene s)
+    {
+        var main = s.Layout.Roads[s.Layout.Main];
+        var edge = Math.Min(main.Def.LeftWidth, main.Def.RightWidth) - 1.0;
+        return s.Definitions.OfType<LinearMarkingDefinition>().Where(l => l.Code == "LCO")
+            .Where(l => Math.Abs(main.Axis.Project(l.PathRef.Points[l.PathRef.Points.Count / 2]).Signed + l.Offset) > edge).ToList();
     }
 }
