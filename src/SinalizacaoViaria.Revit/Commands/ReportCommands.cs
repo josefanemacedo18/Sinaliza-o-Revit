@@ -127,8 +127,17 @@ public sealed class CmdConfiguracoes : CommandBase
 {
     protected override bool RequiresDocument => false;
 
-    protected override Result Run(UIApplication app, UIDocument uidoc) =>
-        UiHelpers.ShowModal(new SettingsWindow()) == true ? Result.Succeeded : Result.Cancelled;
+    protected override Result Run(UIApplication app, UIDocument uidoc)
+    {
+        var w = new SettingsWindow();
+        var ok = UiHelpers.ShowModal(w) == true;
+        if (w.RunAutoTest)
+        {
+            if (uidoc?.Document == null) { UiHelpers.Error("Abra um projeto (de preferência uma cópia ou um arquivo vazio) para rodar o Autoteste."); return Result.Cancelled; }
+            return CmdAutoteste.Start(app, uidoc);
+        }
+        return ok ? Result.Succeeded : Result.Cancelled;
+    }
 }
 
 /// <summary>Abre, recarrega ou restaura o catálogo normativo.</summary>

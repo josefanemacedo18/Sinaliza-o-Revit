@@ -136,9 +136,7 @@ public static class RibbonBuilder
             Data(typeof(CmdConfiguracoes), "Configurações", "config", "Preferências do plugin (ímã de conexão, pisos do Revit, interseções automáticas...)."),
             Data(typeof(CmdCatalogo), "Catálogo", "catalogo", "Abre o catálogo normativo (JSON) para personalização."),
             Data(typeof(CmdSobre), "Normas / Sobre", "sobre", "Normas de referência e informações do plugin."));
-        Large(edit, typeof(CmdAutoteste), "Autoteste", "autoteste",
-            "Roda sozinho todas as ferramentas do plugin numa área de teste afastada do projeto, confere o modelo (pintura sobre os pisos, " +
-            "continuidade dos pisos, terreno × via, obras × vias) e gera um relatório de erros. No fim tudo é desfeito.");
+        // O Autoteste (diagnóstico) fica em Configurações: é ferramenta de suporte, não de projeto.
 
         // ================================================================ Guia "SinalizaBIM Infra"
         // Infraestrutura numa guia própria: a guia principal fica com espaço para os nomes das ferramentas.

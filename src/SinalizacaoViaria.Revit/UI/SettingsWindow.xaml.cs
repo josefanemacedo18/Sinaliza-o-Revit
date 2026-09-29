@@ -10,6 +10,15 @@ namespace SinalizacaoViaria.Revit.UI;
 
 public partial class SettingsWindow : Window
 {
+    /// <summary>O usuário pediu o Autoteste (roda depois que a janela fecha).</summary>
+    public bool RunAutoTest { get; private set; }
+
+    private void AutoTestClick(object sender, RoutedEventArgs e)
+    {
+        RunAutoTest = true;
+        DialogResult = false;
+    }
+
     public SettingsWindow()
     {
         InitializeComponent();

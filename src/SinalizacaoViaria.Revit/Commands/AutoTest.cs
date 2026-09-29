@@ -22,32 +22,30 @@ namespace SinalizacaoViaria.Revit.Commands;
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdAutoteste : CommandBase
 {
-    protected override Result Run(UIApplication app, UIDocument uidoc)
+    protected override Result Run(UIApplication app, UIDocument uidoc) => Start(app, uidoc);
+
+    internal static Result Start(UIApplication app, UIDocument uidoc)
     {
         var o = new AutoTestOptions();
-        var w = new FormWindow("Autoteste", "Autoteste do SinalizaBIM",
-                "Roda as ferramentas do plugin, sozinho, numa ÁREA DE TESTE afastada do seu projeto (à direita de tudo o que existe) e " +
-                "anota cada erro, aviso e medida num relatório. Depois confere o modelo: pintura escondida sob os pisos, degraus e " +
-                "buracos entre pisos, terreno cobrindo a via, obras invadindo outras vias e elementos sem geometria.\n\n" +
-                "Tudo acontece dentro de um único \"Desfazer\": no fim você escolhe desfazer tudo (recomendado) ou manter os elementos " +
-                "para olhar no 3D. O Revit fica ocupado durante o teste (pode levar de 10 a 40 minutos, conforme o computador) – o " +
-                "progresso aparece na barra de status e no arquivo do relatório.\n\n" +
-                "Ao terminar, envie o relatório (botão Copiar, ou o arquivo em %AppData%\\SinalizaBIM) para que os erros sejam corrigidos.",
+        var w = new FormWindow("Autoteste", "Autoteste do SinalizaBIM (diagnóstico)",
+                "Roda as ferramentas do plugin, sozinho, numa pequena ÁREA DE TESTE afastada do seu projeto e anota cada erro e aviso " +
+                "num relatório. No fim tudo é desfeito (um único Desfazer).\n\n" +
+                "RÁPIDO (padrão): uma amostra de cada ferramenta, com limite de 3 minutos – o arquivo não fica pesado. " +
+                "Use o COMPLETO só quando for enviar um relatório de erros: ele cria milhares de elementos e pode levar 10 a 40 minutos.\n\n" +
+                "Dica: rode num arquivo separado (cópia do projeto ou arquivo vazio) para não pesar o seu projeto.",
                 null, null, false, "Iniciar o teste", 780, 760)
+            .Section("Modo")
+            .Check("Completo (todas as variantes e o catálogo inteiro – DEMORADO)", () => o.Full, v => o.Full = v)
             .Section("O que testar")
-            .Check("Vias: os 10 modelos de seção, via em curva, Pista", () => o.Roads, v => o.Roads = v)
-            .Check("Conexões: interseções (controles, ilhas, bolsões), T, esconsa, rotatórias (todos os tipos), cul-de-sac (todos)", () => o.Connections, v => o.Connections = v)
-            .Check("Sinalização horizontal: catálogo inteiro (linhas e variantes, zebrados, setas, legendas, vagas), travessias, canalização, ciclovia", () => o.Horizontal, v => o.Horizontal = v)
+            .Check("Vias e conexões (interseções, rotatórias, cul-de-sac)", () => o.Roads, v => { o.Roads = v; o.Connections = v; })
+            .Check("Sinalização horizontal", () => o.Horizontal, v => o.Horizontal = v)
             .Check("Sinalização vertical, dispositivos e mobiliário urbano", () => o.Vertical, v => o.Vertical = v)
             .Check("Calçadas: rampas, orelha, áreas, canteiros, moderação, piso tátil, ferrovia, drenagem", () => o.Sidewalks, v => o.Sidewalks = v)
-            .Check("Topografia: Toposolid de teste, vias no relevo, cruzamentos no relevo, Perfil da Via", () => o.Terrain, v => o.Terrain = v)
-            .Check("Obras: viaduto sobre via, ponte, passarela, túnel, trincheira, muros, taludes, nó viário, terraplenagem", () => o.Works, v => o.Works = v)
-            .Check("Edição: editar, mover eixo, Apagar Trecho (na via, fora da via, sem linha), 2D/3D, excluir, Atualizar Todas", () => o.Editing, v => o.Editing = v)
-            .Check("Detalhamento e quantitativos (numa planta de teste)", () => o.Detailing, v => o.Detailing = v)
-            .Check("Simulador de Tráfego: rede do projeto, análise HCM, diagnóstico, microssimulação, mapa na planta", () => o.Traffic, v => o.Traffic = v)
-            .Check("Verificações do modelo (pintura × pisos, continuidade, terreno × via, obras × vias)", () => o.Checks, v => o.Checks = v)
-            .Section("Profundidade")
-            .Check("Completo: todas as placas do catálogo e todos os tipos de nó viário (mais demorado)", () => o.Full, v => o.Full = v);
+            .Check("Topografia e Perfil da Via (pesado)", () => o.Terrain, v => o.Terrain = v)
+            .Check("Obras: viaduto, ponte, túnel, trincheira, muros, taludes, nó viário (pesado)", () => o.Works, v => o.Works = v)
+            .Check("Edição e detalhamento", () => o.Editing, v => { o.Editing = v; o.Detailing = v; })
+            .Check("Simulador de Tráfego", () => o.Traffic, v => o.Traffic = v)
+            .Check("Verificações do modelo (pintura × pisos, continuidade)", () => o.Checks, v => o.Checks = v);
         if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
         var runner = new AutoTestRunner(app, uidoc, o);
         var (summary, text) = runner.Run();
@@ -58,18 +56,22 @@ public sealed class CmdAutoteste : CommandBase
 
 internal sealed class AutoTestOptions
 {
+    // Padrão leve: vias/conexões, horizontal, calçadas e simulador numa amostra; o resto só por escolha.
     public bool Roads { get; set; } = true;
     public bool Traffic { get; set; } = true;
     public bool Connections { get; set; } = true;
     public bool Horizontal { get; set; } = true;
     public bool Vertical { get; set; } = true;
     public bool Sidewalks { get; set; } = true;
-    public bool Terrain { get; set; } = true;
-    public bool Works { get; set; } = true;
-    public bool Editing { get; set; } = true;
-    public bool Detailing { get; set; } = true;
-    public bool Checks { get; set; } = true;
-    public bool Full { get; set; } = true;
+    public bool Terrain { get; set; }
+    public bool Works { get; set; }
+    public bool Editing { get; set; }
+    public bool Detailing { get; set; }
+    public bool Checks { get; set; }
+    /// <summary>Completo: todas as variantes; senão, no máximo 3 etapas por bloco e 3 minutos no total.</summary>
+    public bool Full { get; set; }
+    public int StepsPerGroup => Full ? int.MaxValue : 3;
+    public double BudgetSeconds => Full ? double.MaxValue : 180;
 }
 
 /// <summary>Resultado de uma etapa do Autoteste.</summary>
@@ -111,6 +113,7 @@ internal sealed partial class AutoTestRunner
     private readonly List<string> _dialogs = new();
     private readonly HashSet<string> _before;
     private readonly Stopwatch _clock = new();
+    private int _skipped;
     private StepReport? _cur;
     private Vec2 _origin;
     private double _z0;
@@ -316,6 +319,9 @@ internal sealed partial class AutoTestRunner
 
     private void Step(string group, string name, Action<StepReport> body)
     {
+        // Modo rápido: amostra de cada bloco e limite de tempo (o arquivo não fica pesado nem trava).
+        if (_steps.Count(x => x.Group == group) >= _opt.StepsPerGroup) { _skipped++; return; }
+        if (_clock.Elapsed.TotalSeconds > _opt.BudgetSeconds) { _skipped++; return; }
         var s = new StepReport(group, name);
         _steps.Add(s);
         _cur = s;
@@ -451,6 +457,7 @@ internal sealed partial class AutoTestRunner
         try { built = File.GetLastWriteTime(asm.Location); } catch { built = DateTime.MinValue; }
         sb.AppendLine("SINALIZABIM – RELATÓRIO DO AUTOTESTE");
         sb.AppendLine($"Data: {DateTime.Now:dd/MM/yyyy HH:mm}   Duração: {_clock.Elapsed:hh\\:mm\\:ss}");
+        sb.AppendLine(_opt.Full ? "Modo: COMPLETO" : $"Modo: RÁPIDO (amostra de até {_opt.StepsPerGroup} etapas por bloco, limite de {_opt.BudgetSeconds / 60:0} min; {_skipped} etapa(s) não executadas)");
         sb.AppendLine($"Revit: {_app.Application.VersionName} {_app.Application.SubVersionNumber} (build {_app.Application.VersionBuild})");
         sb.AppendLine($"Plugin: {asm.GetName().Version} – DLL de {built:dd/MM/yyyy HH:mm}");
         sb.AppendLine($"Projeto: {_doc.Title}   Marcas existentes antes do teste: {_before.Count}");
