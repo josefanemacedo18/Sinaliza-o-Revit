@@ -58,6 +58,12 @@ public sealed class IntersectionLayout
 {
     public Vec2 Node { get; init; }
     public double Radius { get; set; }
+    /// <summary>Emenda de duas vias pela ponta (continuação em ângulo ou com mudança de seção): curva concordada.</summary>
+    public bool IsBend { get; set; }
+    /// <summary>Eixo da emenda (da via 0 para a via 1, com a curva) e trecho de transição.</summary>
+    public Polyline2? BendAxis { get; set; }
+    /// <summary>O eixo da via i corre no sentido contrário ao da emenda.</summary>
+    public bool[] BendReversed { get; set; } = new bool[2];
     public Polygon2 Zone { get; set; } = Polygon2.Rectangle(Vec2.Zero, Vec2.Zero);
     /// <summary>Área refeita pela interseção (zona do nó sem os ramos já fora das esquinas + trechos tratados).</summary>
     public List<Polygon2> Rebuild { get; } = new();
@@ -275,7 +281,12 @@ public static class IntersectionGenerator
             if (s > 3) dirs.Add(-axis.TangentAt(Math.Max(0, s - 1)));
         }
         if (dirs.Count >= 3) return true;
-        return dirs.Count == 2 && dirs[0].Dot(dirs[1]) > -0.96;
+        // Duas vias pela ponta: qualquer deflexão (> 3°) ou mudança de seção vira emenda concordada (sem cunhas nem degraus).
+        if (dirs.Count != 2) return false;
+        if (dirs[0].Dot(dirs[1]) > -0.9986) return true;
+        var near = roads.Where(r => Project(r.Axis, node).Distance < Math.Max(r.Def.TotalLeft, r.Def.TotalRight) + 3).ToList();
+        return near.Count == 2 && (Math.Abs(near[0].Def.RightWidth + near[0].Def.LeftWidth - near[1].Def.RightWidth - near[1].Def.LeftWidth) > 0.05
+                                   || Math.Abs(near[0].Def.TotalLeft + near[0].Def.TotalRight - near[1].Def.TotalLeft - near[1].Def.TotalRight) > 0.05);
     }
 
     private static IEnumerable<Vec2> AxisCrossings(Polyline2 a, Polyline2 b)
@@ -293,6 +304,207 @@ public static class IntersectionGenerator
                 var u = (q - p).Cross(r) / den;
                 if (t >= -1e-9 && t <= 1 + 1e-9 && u >= -1e-9 && u <= 1 + 1e-9) yield return p + r * t;
             }
+    }
+
+
+    // ------------------------------------------------------------------ emenda pela ponta (continuação)
+
+    /// <summary>
+    /// Emenda de duas vias que se encontram pela ponta (continuação): em vez de um cruzamento, a pista, o meio-fio, a
+    /// sarjeta, a faixa gramada, a calçada e o canteiro central seguem por uma CURVA concordada entre os dois eixos, com
+    /// transição suave de largura quando as seções diferem. As pontas retas das duas vias (que deixavam uma cunha vazia
+    /// do lado de fora e se sobrepunham do lado de dentro) são recortadas pela zona da emenda; as linhas pintadas
+    /// continuam pela curva (<see cref="BendLines"/>).
+    /// </summary>
+    private static IntersectionLayout? Bend(IntersectionDefinition d, IReadOnlyList<IntersectionRoad> input)
+    {
+        if (input.Count != 2) return null;
+        var node = d.Node;
+        var ends = new List<bool>();
+        foreach (var r in input)
+        {
+            if (r.Axis.Points.Count < 2 || r.Axis.Length < 4) return null;
+            var (st, dist, _) = Project(r.Axis, node);
+            if (dist > 1.5) return null;
+            var tol = Math.Min(1.5, r.Axis.Length * 0.2);
+            if (st > tol && st < r.Axis.Length - tol) return null;          // a via atravessa o nó: é um cruzamento
+            ends.Add(st >= r.Axis.Length - tol);
+        }
+        var A = input[0];
+        var B = input[1];
+        var axA = ends[0] ? A.Axis : A.Axis.Reversed();                     // termina no nó
+        var axB = ends[1] ? B.Axis.Reversed() : B.Axis;                     // começa no nó
+        var flipA = !ends[0];
+        var flipB = ends[1];
+        (double R, double L, double TR, double TL, double SR, double SL, double Med) Side(RoadPavementDefinition p, bool flip)
+        {
+            var med = p.Gaps.Where(g => g.Median && Math.Abs(g.Offset) < 0.3).Select(g => g.Width).DefaultIfEmpty(0).Max();
+            return flip ? (p.LeftWidth, p.RightWidth, p.TotalLeft, p.TotalRight, p.LeftSidewalk, p.RightSidewalk, med)
+                        : (p.RightWidth, p.LeftWidth, p.TotalRight, p.TotalLeft, p.RightSidewalk, p.LeftSidewalk, med);
+        }
+        var sa = Side(A.Def, flipA);
+        var sb = Side(B.Def, flipB);
+        var tA = axA.TangentAt(axA.Length);
+        var tB = axB.TangentAt(0);
+        var defl = Math.Acos(Math.Clamp(tA.Dot(tB), -1, 1));
+        var maxHalf = new[] { sa.TR, sa.TL, sb.TR, sb.TL }.Max();
+        var dw = new[] { Math.Abs(sa.R - sb.R), Math.Abs(sa.L - sb.L), Math.Abs(sa.TR - sb.TR), Math.Abs(sa.TL - sb.TL), Math.Abs(sa.Med - sb.Med) }.Max();
+        // Raio do eixo na emenda: a borda interna da calçada ainda faz curva (nunca menor que a meia largura + 1,5 m).
+        var R = Math.Max(RoadSetup.MinAxisRadius(maxHalf), Math.Max(d.CornerRadius, 2.0 * maxHalf));
+        var half = Math.Tan(defl / 2);
+        var T = R * half;
+        // Transição de largura (1 : 8 por lado, entre 6 e 40 m no total) somada às tangentes da curva.
+        var m = Math.Max(2.0, dw > 0.05 ? Math.Clamp(8 * dw, 6, 40) / 2 : 0);
+        var limit = 0.45 * Math.Min(axA.Length, axB.Length);
+        if (T + m > limit)
+        {
+            T = Math.Max(0.5, limit - m);
+            if (T + m > limit) m = Math.Max(0.5, limit - T);
+            if (half > 1e-6) R = T / half;
+        }
+        var reach = T + m;
+        var pA = axA.PointAt(Math.Max(0, axA.Length - reach));
+        var pB = axB.PointAt(Math.Min(axB.Length, reach));
+        var raw = defl < 0.5 * Math.PI / 180 ? new List<Vec2> { pA, pB } : new List<Vec2> { pA, node, pB };
+        var bend = new Polyline2(raw.Count == 3 ? CurveTools.FilletCorners(raw, R, false, 0.3) : raw);
+        var len = bend.Length;
+        if (len < 1) return null;
+        double U(double s) { var u = Math.Clamp(s / len, 0, 1); return u * u * (3 - 2 * u); }
+        double Lp(double a, double b, double s) => a + (b - a) * U(s);
+        Func<double, double> Right = s => Lp(sa.R, sb.R, s), Left = s => Lp(sa.L, sb.L, s);
+        Func<double, double> TotR = s => Lp(sa.TR, sb.TR, s), TotL = s => Lp(sa.TL, sb.TL, s);
+        var samples = Enumerable.Range(1, 39).Select(i => len * i / 40.0).ToList();
+        List<Polygon2> Band(Func<double, double> lo, Func<double, double> hi) => RoadGenerator.VariableBand(bend, 0, len, lo, hi, samples);
+
+        var L = new IntersectionLayout { Node = node, IsBend = true, BendAxis = bend, BendReversed = new[] { flipA, flipB } };
+        L.Roads.AddRange(input);
+        L.PavementColor = A.Def.Color;
+        L.PavementThickness = A.Def.ActualThickness;
+        L.CurbHeight = A.Def.CurbHeight;
+        var cw = Math.Max(A.Def.CurbWidth, B.Def.CurbWidth);
+        L.CurbWidth = cw;
+        L.Main = 0;
+        L.Legs.Add(new IntersectionLeg(0, ends[0] ? -1 : 1, ends[0] ? A.Axis.Length : 0, reach, -tA));
+        L.Legs.Add(new IntersectionLeg(1, ends[1] ? -1 : 1, ends[1] ? B.Axis.Length : 0, reach, tB));
+
+        var pav = PolygonOps.Union(Band(s => -Right(s), Left));
+        // Canteiro central (quando as duas vias têm): acompanha a curva.
+        if (sa.Med > 0.1 || sb.Med > 0.1)
+        {
+            var med = PolygonOps.Union(Band(s => -Lp(sa.Med, sb.Med, s) / 2, s => Lp(sa.Med, sb.Med, s) / 2)).Where(p => p.Area > 0.2).ToList();
+            if (med.Count > 0)
+            {
+                var core = PolygonOps.Offset(med, -cw);
+                L.MedianCurb.AddRange(PolygonOps.Difference(med, core));
+                L.MedianCore.AddRange(core);
+                L.Obstacles.AddRange(med);
+                pav = PolygonOps.Difference(pav, med);
+            }
+        }
+        L.Carriageway.AddRange(pav);
+        L.Pavement.AddRange(pav);
+        var sideParts = new List<Polygon2>();
+        if (sa.SR > 0.01 || sb.SR > 0.01) sideParts.AddRange(Band(s => -TotR(s), s => -Right(s) + 0.01));
+        if (sa.SL > 0.01 || sb.SL > 0.01) sideParts.AddRange(Band(s => Left(s) - 0.01, TotL));
+        var sides = PolygonOps.Difference(PolygonOps.Union(sideParts), pav);
+        var curbRing = PolygonOps.Difference(PolygonOps.Offset(PolygonOps.Union(Band(s => -Right(s), Left)), cw, true), PolygonOps.Union(Band(s => -Right(s), Left)));
+        L.Curb.AddRange(PolygonOps.Intersect(curbRing, sides));
+        L.Sidewalk.AddRange(PolygonOps.Difference(sides, L.Curb).Where(p => p.Area > 0.05));
+        L.SidewalkMax.AddRange(L.Sidewalk);
+        if (d.MatchRoadSection && SectionMatch.From(L.Roads.Select(r => r.Def), cw) is { } sec)
+        {
+            var full = PolygonOps.Union(Band(s => -Right(s), Left));
+            if (sec.HasService && sec.Grass) L.SidewalkService.AddRange(SectionMatch.ServiceBand(full, L.Sidewalk, cw, sec.Service));
+            if (sec.HasGutter) L.Gutter.AddRange(SectionMatch.GutterBand(full, L.Curb, sec.Gutter));
+        }
+
+        // Zona refeita: a faixa da emenda + as pontas retas das duas vias (o canto externo delas sobrava fora da curva).
+        var zoneParts = new List<Polygon2>();
+        zoneParts.AddRange(Band(s => -TotR(s) - 0.05, s => TotL(s) + 0.05));
+        foreach (var (ax, fromEnd, sd) in new[] { (axA, true, sa), (axB, false, sb) })
+        {
+            var s0 = fromEnd ? Math.Max(0, ax.Length - reach) : 0;
+            var s1 = fromEnd ? ax.Length : Math.Min(ax.Length, reach);
+            var sub = new Polyline2(ax.SubPoints(s0, s1));
+            if (sub.Points.Count >= 2 && sub.Length > 0.05) zoneParts.AddRange(RoadGenerator.Band(sub, -sd.TR - 0.3, sd.TL + 0.3));
+        }
+        var zone = PolygonOps.Union(zoneParts);
+        if (zone.Count == 0) return null;
+        L.Zone = zone.OrderByDescending(p => p.Area).First();
+        L.Radius = zone.SelectMany(p => p.Outer).Max(v => v.DistanceTo(node));
+        L.Rebuild.AddRange(zone);
+        for (int i = 0; i < 2; i++)
+        {
+            L.PhysicalCuts[i] = zone.ToList();
+            L.PaintCuts[i] = zone.ToList();
+            L.ParkingCuts[i] = PolygonOps.Offset(zone, 2.0, true);
+        }
+        if (defl > 60 * Math.PI / 180)
+            L.Warnings.Add($"Emenda com deflexão de {defl * 180 / Math.PI:0}°: considere uma interseção em T/rotatória ou uma curva de raio maior no eixo.");
+        return L;
+    }
+
+    /// <summary>
+    /// Linhas pintadas da emenda: cada linha longitudinal de uma via continua pela curva até a linha correspondente da
+    /// outra (mesmo código e afastamento parecido, com o afastamento interpolado); as sem par vão até o meio da emenda.
+    /// </summary>
+    private static List<MarkingDefinition> BendLines(IntersectionDefinition d, IntersectionLayout L, double z,
+        IReadOnlyList<IReadOnlyCollection<MarkingDefinition>> members)
+    {
+        var res = new List<MarkingDefinition>();
+        var bend = L.BendAxis!;
+        var len = bend.Length;
+        string[] notLongitudinal = { "FTP-1", "FTP-2", "LRE", "LDP", "MCC", "LRV", "LCO" };
+        List<(LinearMarkingDefinition Line, double Off)> Lines(int i)
+        {
+            if (i >= members.Count) return new();
+            var r = L.Roads[i];
+            var sNode = Project(r.Axis, L.Node).Station;
+            return members[i].OfType<LinearMarkingDefinition>()
+                .Where(l => !IsPhysical(l) && !notLongitudinal.Contains(l.Code) && Math.Abs(l.Offset) <= Math.Max(r.Def.TotalLeft, r.Def.TotalRight))
+                .Select(l =>
+                {
+                    var off = l.Offset + (l.PathRef.Lateral is { IsEmpty: false } lat ? lat.ShiftAt(sNode, r.Axis) : 0);
+                    return (l, L.BendReversed[i] ? -off : off);
+                }).ToList();
+        }
+        var a = Lines(0);
+        var b = Lines(1);
+        var usedB = new HashSet<LinearMarkingDefinition>();
+        double U(double s) { var u = Math.Clamp(s / len, 0, 1); return u * u * (3 - 2 * u); }
+        void Emit(LinearMarkingDefinition src, Func<double, double> off, double s0, double s1)
+        {
+            if (s1 - s0 < 0.5) return;
+            var pts = new List<Vec2>();
+            var n = Math.Max(2, (int)Math.Ceiling((s1 - s0) / 0.75));
+            for (int k = 0; k <= n; k++)
+            {
+                var s = s0 + (s1 - s0) * k / n;
+                pts.Add(bend.PointAt(s) + bend.TangentAt(s).PerpLeft * off(s));
+            }
+            var c = (LinearMarkingDefinition)src.CloneWithNewId();
+            c.PathRef = PathReference.FromPoints(pts, z);
+            c.Offset = 0;
+            c.Exclusions.Clear();
+            c.Breaks.Clear();
+            c.LevelProfile.Clear();
+            c.GroupId = d.Id;
+            res.Add(c);
+        }
+        foreach (var (la, oa) in a)
+        {
+            var pair = b.Where(x => !usedB.Contains(x.Line) && x.Line.Code == la.Code && Math.Sign(x.Off) == Math.Sign(oa) && Math.Abs(x.Off - oa) < 2.5)
+                .OrderBy(x => Math.Abs(x.Off - oa)).FirstOrDefault();
+            if (pair.Line != null)
+            {
+                usedB.Add(pair.Line);
+                var ob = pair.Off;
+                Emit(la, s => oa + (ob - oa) * U(s), 0, len);
+            }
+            else Emit(la, _ => oa, 0, len / 2);
+        }
+        foreach (var (lb, ob) in b.Where(x => !usedB.Contains(x.Line))) Emit(lb, _ => ob, len / 2, len);
+        return res;
     }
 
     // ------------------------------------------------------------------ layout
@@ -494,6 +706,8 @@ public static class IntersectionGenerator
         var node = d.Node;
         // Vias de largura variável: a interseção usa a seção de cada via no ponto do cruzamento.
         input = input.Select(r => r.LocalAt(node)).ToList();
+        // Duas vias que se encontram pela ponta: emenda concordada, não cruzamento.
+        if (Bend(d, input) is { } bend) return bend;
         var rc = Math.Max(0, d.CornerRadius);
         var channels = d.RightTurnIslands != TipoIlha.Nenhuma;
         var rs = channels ? Math.Max(d.RightTurnRadius, rc + 3) : rc;
@@ -1248,6 +1462,12 @@ public static class IntersectionGenerator
             return def;
         }
         var stopFar = StopFar(d);
+        // Emenda pela ponta: as linhas das vias continuam pela curva, sem travessias nem controle.
+        if (L.IsBend)
+        {
+            if (roadMembers != null) foreach (var c in BendLines(d, L, z, roadMembers)) Add(c);
+            return res;
+        }
         // Continuação de uma via na outra (dois ramos): só a geometria, sem travessias nem controle.
         if (L.Legs.Count <= 2) return res;
         foreach (var leg in L.Legs)
