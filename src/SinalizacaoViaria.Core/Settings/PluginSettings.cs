@@ -62,6 +62,12 @@ public sealed class PluginSettings
     /// </summary>
     public string? GoogleMapsKeyProtected { get; set; }
 
+    /// <summary>Fonte de imagem aérea própria (modelo XYZ https://…/{z}/{x}/{y}), nome, créditos e zoom máximo.</summary>
+    public string? CustomTilesUrl { get; set; }
+    public string? CustomTilesName { get; set; }
+    public string? CustomTilesAttribution { get; set; }
+    public int CustomTilesMaxZoom { get; set; } = 19;
+
     /// <summary>Últimas escolhas por janela (lembradas entre sessões).</summary>
     public Dictionary<string, string> LastUsed { get; set; } = new();
 

@@ -30,9 +30,15 @@ public static class RibbonBuilder
                 "TR-45/57/68, UIC-60 ou Ri-60 – ou via em laje e via embutida no pavimento (VLT) –, bitola larga, métrica, padrão ou mista, várias linhas e valetas."),
             Data(typeof(CmdDesenharEixo), "Desenhar Eixo", "eixo",
                 "Eixo com a ferramenta nativa Linha de modelo (reta, arco, spline, cadeia, snaps) ou por pontos com encaixe nas vias."));
-        Large(via, typeof(CmdImagemSatelite), "Imagem de Satélite", "satelite",
-            "Imagem aérea (Google Satélite ou OpenStreetMap) na escala métrica real e na posição geográfica do projeto, atrás de tudo na vista de planta – " +
-            "desenhe o eixo por cima com as medidas certas. Reprojetada para o plano local (TM SIRGAS 2000, k0 = 1, com fator de altitude e Norte verdadeiro), com escala gráfica e créditos.");
+        Split(via, "SvImagem", "Imagem Aérea",
+            Data(typeof(CmdImagemSatelite), "Imagem de Satélite", "satelite",
+                "Imagem aérea (OpenStreetMap, Google com chave ou fonte própria XYZ) na escala métrica real e na posição geográfica do projeto, " +
+                "atrás de tudo na planta – desenhe o eixo por cima. Tamanho medido no modelo e corrigido até < 1 mm."),
+            Data(typeof(CmdImportarImagem), "Importar Imagem Aérea", "importarimagem",
+                "Qualquer imagem aérea (Google Earth Pro, ortofoto, drone): com world file ou GeoTIFF entra na escala e posição certas; " +
+                "sem georreferência, é colocada e calibrada por 2 pontos."),
+            Data(typeof(CmdCalibrarImagem), "Calibrar Escala da Imagem", "calibrarimagem",
+                "Clique 2 pontos na imagem e informe a distância real (ou a lat/lon deles): a imagem é redimensionada (e posicionada/girada) na escala exata."));
         Split(via, "SvConexoes", "Conexões",
             Data(typeof(CmdRotatoria), "Rotatória", "rotatoria",
                 "Clique o centro (encaixa no cruzamento mais próximo; os ramos vêm das vias) ou um ponto livre para uma rotatória isolada. " +

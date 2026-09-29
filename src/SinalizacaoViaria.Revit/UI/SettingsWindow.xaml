@@ -57,6 +57,24 @@
                         <CheckBox x:Name="CkBoundary" Content="Contorno visível nas regiões 2D (recomendado para marcas brancas)"/>
                     </StackPanel>
                 </GroupBox>
+                <GroupBox Header="Imagem aérea – fonte própria (XYZ)">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
+                                   Text="Endereço de tiles no formato https://…/{z}/{x}/{y} (ou {-y}) de um serviço que você tem direito de usar (conta própria, ortofoto da prefeitura, servidor da empresa). A licença e os créditos são de sua responsabilidade. Fica só neste computador, nunca no projeto."/>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <TextBlock Text="Endereço (XYZ)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" x:Name="TbXyzUrl"/>
+                            <TextBlock Grid.Row="1" Text="Nome" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbXyzName"/>
+                            <TextBlock Grid.Row="2" Text="Créditos (atribuição)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbXyzAttribution"/>
+                            <TextBlock Grid.Row="3" Text="Zoom máximo" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbXyzZoom"/>
+                        </Grid>
+                    </StackPanel>
+                </GroupBox>
                 <GroupBox Header="Imagem de satélite (Google Maps Platform)">
                     <StackPanel>
                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"

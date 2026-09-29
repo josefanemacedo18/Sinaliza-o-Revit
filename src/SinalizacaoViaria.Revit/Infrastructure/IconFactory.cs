@@ -347,6 +347,20 @@ public static class IconFactory
                 dc.DrawRectangle(B(Color.FromRgb(160, 200, 240)), null, new Rect(17, 2, 4, 2));
                 dc.DrawRectangle(B(Color.FromRgb(160, 200, 240)), null, new Rect(27, 2, 4, 2));
                 break;
+            case "importarimagem":
+                dc.DrawRoundedRectangle(B(Color.FromRgb(96, 128, 80)), null, new Rect(1, 9, 22, 22), 3, 3);
+                dc.DrawLine(P(Color.FromRgb(90, 90, 96), 3), new Point(1, 24), new Point(23, 15));
+                dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(24, 2), new Point(31, 9), new Point(27, 9), new Point(27, 17), new Point(21, 17), new Point(21, 9), new Point(17, 9))));
+                break;
+            case "calibrarimagem":
+                dc.DrawRoundedRectangle(B(Color.FromRgb(96, 128, 80)), null, new Rect(1, 1, 30, 30), 3, 3);
+                dc.DrawLine(P(Color.FromRgb(90, 90, 96), 4), new Point(1, 20), new Point(31, 9));
+                dc.DrawLine(P(White, 2), new Point(6, 26), new Point(26, 26));
+                dc.DrawLine(P(White, 2), new Point(6, 22), new Point(6, 29));
+                dc.DrawLine(P(White, 2), new Point(26, 22), new Point(26, 29));
+                dc.DrawEllipse(B(Red), P(White, 1), new Point(8, 8), 3, 3);
+                dc.DrawEllipse(B(Red), P(White, 1), new Point(24, 16), 3, 3);
+                break;
             case "semaforos":
                 // Grupo focal grande com as três luzes.
                 dc.DrawRoundedRectangle(B(Color.FromRgb(30, 30, 30)), null, new Rect(9, 1, 14, 30), 3, 3);

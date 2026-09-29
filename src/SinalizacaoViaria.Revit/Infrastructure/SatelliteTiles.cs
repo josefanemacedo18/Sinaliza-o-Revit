@@ -39,7 +39,13 @@ public static class SatelliteTiles
         return h;
     }
 
-    private static string Folder(FonteImagem f) => f == FonteImagem.GoogleSatelite ? "google" : "osm";
+    private static string Folder(FonteImagem f) => f switch
+    {
+        FonteImagem.GoogleSatelite => "google",
+        FonteImagem.OpenStreetMap => "osm",
+        // Fonte própria: uma pasta por endereço (trocar o endereço não mistura tiles de fontes diferentes).
+        _ => "xyz-" + Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(Encoding.UTF8.GetBytes(PluginContext.Settings.CustomTilesUrl ?? "")))[..10].ToLowerInvariant(),
+    };
     private static string TileFile(FonteImagem f, int z, long x, long y) => Path.Combine(CacheRoot, Folder(f), z.ToString(), x.ToString(), y + ".img");
 
     /// <summary>Tile no cache e ainda válido.</summary>
@@ -134,7 +140,9 @@ public static class SatelliteTiles
         progress?.Report((done, tiles.Count));
         if (missing.Count == 0) return;
         string? session = src == FonteImagem.GoogleSatelite ? await GoogleSessionAsync(googleKey!, ct).ConfigureAwait(false) : null;
-        using var gate = new SemaphoreSlim(src == FonteImagem.OpenStreetMap ? 2 : 6);
+        if (src == FonteImagem.Personalizada && !SatelliteSource.IsValidTemplate(PluginContext.Settings.CustomTilesUrl))
+            throw new SatelliteException("Configure o endereço da fonte própria (https://…/{z}/{x}/{y}) em SinalizaBIM → Configurações → Imagem aérea.");
+        using var gate = new SemaphoreSlim(src == FonteImagem.GoogleSatelite ? 6 : 2);
         var tasks = missing.Select(async t =>
         {
             await gate.WaitAsync(ct).ConfigureAwait(false);
@@ -153,6 +161,7 @@ public static class SatelliteTiles
         var file = TileFile(src, z, x, y);
         var url = src == FonteImagem.GoogleSatelite
             ? $"https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session={Uri.EscapeDataString(session!)}&key={Uri.EscapeDataString(key!)}"
+            : src == FonteImagem.Personalizada ? SatelliteSource.TileUrl(PluginContext.Settings.CustomTilesUrl, z, x, y)!
             : $"https://tile.openstreetmap.org/{z}/{x}/{y}.png";
         for (int attempt = 0; ; attempt++)
         {
@@ -180,6 +189,8 @@ public static class SatelliteTiles
                 {
                     if (File.Exists(file)) return;                     // cópia antiga no cache ainda serve
                     throw new SatelliteException(src == FonteImagem.GoogleSatelite ? GoogleError(code)
+                        : src == FonteImagem.Personalizada ? $"A fonte própria recusou o tile ({(int)code}). Confira o endereço, o acesso da sua conta e o zoom máximo em Configurações."
+
                         : code is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests or (HttpStatusCode)418
                             ? $"O servidor de tiles do OpenStreetMap recusou o pedido ({(int)code}) pela política de uso. Aguarde e tente uma área menor."
                             : $"Erro do servidor do OpenStreetMap ({(int)code}). Tente novamente mais tarde.");
@@ -192,7 +203,7 @@ public static class SatelliteTiles
                 if (attempt >= 2)
                 {
                     if (File.Exists(file)) return;
-                    throw new SatelliteException($"Sem conexão com {(src == FonteImagem.GoogleSatelite ? "o Google (tile.googleapis.com)" : "o OpenStreetMap (tile.openstreetmap.org)")}. Verifique a internet, o proxy ou o firewall.");
+                    throw new SatelliteException($"Sem conexão com {(src == FonteImagem.GoogleSatelite ? "o Google (tile.googleapis.com)" : src == FonteImagem.Personalizada ? "a fonte própria" : "o OpenStreetMap (tile.openstreetmap.org)")}. Verifique a internet, o proxy ou o firewall.");
                 }
             }
             finally { res?.Dispose(); }

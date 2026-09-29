@@ -43,6 +43,10 @@ public partial class SettingsWindow : Window
         CkPaintFloors.IsChecked = s.PaintAsFloors;
         CkBoundary.IsChecked = s.VisibleBoundary2D;
         TbCatalog.Text = PluginContext.UserCatalogPath;
+        TbXyzUrl.Text = s.CustomTilesUrl ?? "";
+        TbXyzName.Text = s.CustomTilesName ?? "";
+        TbXyzAttribution.Text = s.CustomTilesAttribution ?? "";
+        TbXyzZoom.Text = s.CustomTilesMaxZoom.ToString();
         // A chave não é exibida: só se informa se já há uma gravada.
         CkClearKey.Visibility = string.IsNullOrEmpty(s.GoogleMapsKeyProtected) ? Visibility.Collapsed : Visibility.Visible;
         PbGoogleKey.ToolTip = string.IsNullOrEmpty(s.GoogleMapsKeyProtected) ? "Cole aqui a chave (AIza…)." : "Há uma chave gravada. Cole outra para substituir.";
@@ -111,6 +115,13 @@ public partial class SettingsWindow : Window
             s.PhysicalAsFloors = CkFloors.IsChecked == true;
             s.PaintAsFloors = CkPaintFloors.IsChecked == true;
             s.VisibleBoundary2D = CkBoundary.IsChecked == true;
+            var xyz = TbXyzUrl.Text.Trim();
+            if (xyz.Length > 0 && !Core.Geo.SatelliteSource.IsValidTemplate(xyz))
+                throw new FormatException("Endereço da fonte própria inválido: use https://…/{z}/{x}/{y} (ou {-y}).");
+            s.CustomTilesUrl = xyz.Length > 0 ? xyz : null;
+            s.CustomTilesName = string.IsNullOrWhiteSpace(TbXyzName.Text) ? null : TbXyzName.Text.Trim();
+            s.CustomTilesAttribution = string.IsNullOrWhiteSpace(TbXyzAttribution.Text) ? null : TbXyzAttribution.Text.Trim();
+            s.CustomTilesMaxZoom = (int)UiHelpers.Parse(TbXyzZoom, 19, "Zoom máximo", 1, 22);
             if (CkClearKey.IsChecked == true) GoogleKeyStore.Key = null;
             else if (!string.IsNullOrWhiteSpace(PbGoogleKey.Password)) GoogleKeyStore.Key = PbGoogleKey.Password;
             s.UserCatalogPath = string.Equals(TbCatalog.Text, PluginPaths.DefaultUserCatalog, StringComparison.OrdinalIgnoreCase) ? null : TbCatalog.Text;

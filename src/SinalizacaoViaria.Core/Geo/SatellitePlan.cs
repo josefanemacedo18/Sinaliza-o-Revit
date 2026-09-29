@@ -3,7 +3,7 @@ using SinalizacaoViaria.Core.Geometry;
 namespace SinalizacaoViaria.Core.Geo;
 
 /// <summary>Fonte da imagem aérea.</summary>
-public enum FonteImagem { GoogleSatelite, OpenStreetMap }
+public enum FonteImagem { GoogleSatelite, OpenStreetMap, Personalizada }
 
 /// <summary>Limites e créditos de cada fonte (uso responsável: nada de download em massa).</summary>
 public sealed record SatelliteSource(FonteImagem Fonte, string Nome, int MaxZoom, int MaxTiles, double KbPerTile, string Attribution, bool IsPhoto)
@@ -13,7 +13,27 @@ public sealed record SatelliteSource(FonteImagem Fonte, string Nome, int MaxZoom
     /// <summary>OpenStreetMap (tile.openstreetmap.org) – mapa, não foto; limite baixo pela política de uso dos tiles.</summary>
     public static readonly SatelliteSource Osm = new(FonteImagem.OpenStreetMap, "OpenStreetMap (mapa)", 19, 300, 14, "© OpenStreetMap contributors", false);
 
+    /// <summary>
+    /// Fonte XYZ configurada pelo próprio usuário ({z}/{x}/{y}, de uma conta ou serviço que ele tem direito de usar). O
+    /// plugin não traz endereços pré-preenchidos; a licença e os créditos são responsabilidade de quem configura.
+    /// </summary>
+    public static SatelliteSource Custom(string? name, string? attribution, int maxZoom) =>
+        new(FonteImagem.Personalizada, string.IsNullOrWhiteSpace(name) ? "Fonte própria (XYZ)" : name!.Trim(), Math.Clamp(maxZoom, 1, 22), 1500, 20,
+            string.IsNullOrWhiteSpace(attribution) ? "Imagem: fonte configurada pelo usuário" : attribution!.Trim(), true);
+
     public static SatelliteSource Of(FonteImagem f) => f == FonteImagem.GoogleSatelite ? Google : Osm;
+
+    /// <summary>Endereço de tile de um modelo XYZ ({z}, {x}, {y}; {-y} para TMS). Nulo se o modelo for inválido.</summary>
+    public static string? TileUrl(string? template, int z, long x, long y)
+    {
+        if (!IsValidTemplate(template)) return null;
+        var tmsY = (1L << z) - 1 - y;
+        return template!.Trim().Replace("{z}", z.ToString()).Replace("{x}", x.ToString()).Replace("{-y}", tmsY.ToString()).Replace("{y}", y.ToString());
+    }
+
+    public static bool IsValidTemplate(string? template) =>
+        !string.IsNullOrWhiteSpace(template) && template.Trim().StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+        && template.Contains("{z}") && template.Contains("{x}") && (template.Contains("{y}") || template.Contains("{-y}"));
 }
 
 /// <summary>Um bloco da imagem (vira uma imagem do Revit): pixels na imagem inteira e extensão no modelo (m).</summary>

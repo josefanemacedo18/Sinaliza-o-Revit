@@ -52,6 +52,7 @@ public sealed class CmdImagemSatelite : CommandBase
         sb.AppendLine($"Zoom {p.Zoom} · {UiHelpers.F(p.OutputMpp, "0.000")} m/px efetivos · erro máximo da reprojeção {UiHelpers.F(img.ReprojectionError * 1000, "0.000")} mm.");
         sb.AppendLine($"Altitude {UiHelpers.F(p.Geo.Altitude, "0")} m (fator 1 − {UiHelpers.F((1 - p.Geo.ElevationFactor) * 1e5, "0.0")}×10⁻⁵) · origem {p.Geo.Latitude:0.000000}, {p.Geo.Longitude:0.000000}.");
         foreach (var n in p.Notes) sb.AppendLine("• " + n);
+        foreach (var l in LastReport) sb.AppendLine(l);
         sb.AppendLine();
         sb.AppendLine("Confira a escala: meça a escala gráfica (Anotar → Alinhada) e uma distância conhecida da imagem.");
         sb.AppendLine("A posição absoluta de imagens de satélite tem erro típico de alguns metros; ortofoto oficial ou levantamento topográfico prevalecem.");
@@ -74,6 +75,9 @@ public sealed class CmdImagemSatelite : CommandBase
         return Vec2.Zero;
     }
 
+    /// <summary>Esperado × obtido de cada bloco na última colocação.</summary>
+    private static List<string> LastReport = new();
+
     /// <summary>Cria as imagens, a escala gráfica e os créditos numa transação e grava a georreferência.</summary>
     private static int Place(Document doc, View view, SatelliteImage img, bool replace)
     {
@@ -91,21 +95,10 @@ public sealed class CmdImagemSatelite : CommandBase
                 catch { /* já apagado */ }
             }
 
-        foreach (var (b, file) in img.Files)
-        {
-            var type = ImageType.Create(doc, new ImageTypeOptions(file, false, ImageTypeSource.Import));
-            var topLeft = new XYZ(UnitConv.Ft(b.Min.X), UnitConv.Ft(b.Max.Y), z);
-            var inst = ImageInstance.Create(doc, view, type.Id, new ImagePlacementOptions(topLeft, BoxPlacement.TopLeft));
-            // Tamanho exato no modelo (pés) a partir dos metros – e o canto de volta ao lugar depois de redimensionar.
-            inst.Width = UnitConv.Ft(b.Max.X - b.Min.X);
-            var h = UnitConv.Ft(b.Max.Y - b.Min.Y);
-            if (Math.Abs(inst.Height - h) > 1e-6)
-                try { inst.Height = h; } catch { /* proporção travada: já correta pelos pixels quadrados */ }
-            inst.SetLocation(topLeft, BoxPlacement.TopLeft);
-            inst.DrawLayer = DrawLayer.Background;
-            inst.Pinned = true;
-            ids.Add(inst.Id);
-        }
+        // Tamanho medido no modelo e corrigido até < 1 mm (ImagePlacer) – esperado × obtido de cada bloco vai para o relatório.
+        var (imgIds, placeReport) = ImagePlacer.Place(doc, view, img.Files.Select(f => new ImageBlock(f.File, f.Block.Min, f.Block.Max, f.Block.Width, f.Block.Height)), z);
+        ids.AddRange(imgIds);
+        LastReport = placeReport;
 
         ids.AddRange(ScaleBar(doc, view, plan, img.Attribution, z));
 

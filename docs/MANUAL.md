@@ -441,8 +441,53 @@ com erro do servidor aparece a mensagem e **nada é criado** no projeto.
 erro típico de alguns metros (e pode haver deslocamento entre Google e OSM). Para projeto executivo, **ortofoto oficial
 ou levantamento topográfico prevalecem**.
 
+**Escala conferida no próprio Revit.** O tamanho que o Revit dá a uma imagem depende da resolução (DPI) do arquivo, e o
+parâmetro *Largura* da imagem é "na vista, depois de escalar" – não é garantido que um valor gravado nele vire a mesma
+medida no modelo. Por isso cada bloco é **medido no modelo** pelos cantos da imagem depois de colocado e corrigido até a
+diferença ficar **abaixo de 1 mm**; o relatório final mostra *esperado × obtido* de cada bloco e o passo a passo completo
+fica em `%AppData%\SinalizaBIM\imagem-aerea-diagnostico.txt` (tamanho após criar, após definir a largura, após posicionar
+e caixa envolvente).
+
+### 2.7.1 Imagem nítida de qualquer origem – Importar Imagem Aérea
+
+Guia **Vias → Imagem Aérea → Importar Imagem Aérea**. Aceita JPG, PNG, TIF ou BMP de qualquer origem – exportação do
+Google Earth Pro, ortofoto da prefeitura, voo de drone. **A licença da imagem é de quem a obteve.**
+
+* **Com world file** (`.jgw`, `.pgw`, `.tfw`, `.wld` ao lado do arquivo) ou **GeoTIFF**: a imagem é reprojetada para o
+  plano do projeto e entra **na escala e na posição corretas**. O sistema vem do GeoTIFF (EPSG 4674/4326, SIRGAS 2000 UTM
+  31978–31985) ou do `.prj`; se não houver, a janela pergunta (geográficas, UTM SIRGAS 2000 fuso/hemisfério ou metros do
+  projeto). Uma ortofoto em UTM é corrigida do fator de escala do fuso (até 0,1 %) e da convergência meridiana (a grade UTM
+  fica girada em relação ao Norte verdadeiro – ~0,27° a 265 km do meridiano central).
+* **Sem georreferência** (ex.: imagem salva do Google Earth Pro): informe o tamanho aproximado do pixel, a imagem é colocada
+  no centro da vista e a **calibração por 2 pontos** abre em seguida.
+
+**Receita com o Google Earth Pro:** posicione a vista de cima (tecla *U*, Norte para cima – tecla *N*), marque dois
+**marcadores** em esquinas bem visíveis e afastadas (anote a latitude/longitude de cada um em *Propriedades*), salve a
+imagem (*Arquivo → Salvar → Salvar imagem*), importe no plugin e calibre com as coordenadas dos dois marcadores – escala,
+posição e Norte verdadeiro ficam certos.
+
+### 2.7.2 Calibrar Escala da Imagem
+
+Guia **Vias → Imagem Aérea → Calibrar Escala da Imagem** (ou logo após importar). Selecione a imagem, clique **2 pontos
+sobre ela** (quanto mais afastados, melhor) e informe:
+
+* a **distância real** entre eles (medida no Google Earth com a régua, na planta do loteamento ou em campo) – a imagem é
+  redimensionada em torno do 1º ponto (ex.: medido 93,70 m, real 100,00 m → fator 1,06724); ou
+* a **latitude/longitude** dos dois pontos – além da escala, a imagem vai para a posição geográfica do projeto e é girada
+  para o Norte verdadeiro (se o Revit não permitir girar a imagem, o relatório avisa).
+
+O tamanho final é medido no modelo e mostrado (esperado × obtido).
+
+### 2.7.3 Fonte própria (XYZ)
+
+Em **Configurações → Imagem aérea – fonte própria**, informe o endereço de um serviço de tiles no formato
+`https://…/{z}/{x}/{y}` (ou `{-y}` para TMS) que **você tem direito de usar** (conta própria em um provedor de imagens,
+servidor de ortofotos da prefeitura ou da empresa), o nome, os créditos e o zoom máximo. Ela aparece como fonte na janela
+*Imagem de Satélite*, com as mesmas regras de cache, limite de tiles, reprojeção e conferência de escala. O plugin não traz
+endereços pré-preenchidos: a licença e os créditos são de quem configura. O endereço fica só neste computador.
+
 **Conferir a escala no Revit.** Com *Anotar → Alinhada*, meça a escala gráfica (deve dar exatamente 10/50/100 m) e uma
-distância conhecida na imagem (largura de uma quadra, uma faixa de pedestres, um campo de futebol oficial de 105 m).
+distância conhecida na imagem (ex.: a mesma distância medida no Google Earth) (largura de uma quadra, uma faixa de pedestres, um campo de futebol oficial de 105 m).
 
 ## 2.4 Bloqueios físicos
 

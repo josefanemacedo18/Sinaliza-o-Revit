@@ -75,8 +75,14 @@ public sealed class SatelliteWindow : Window
 
         _source.Items.Add(SatelliteSource.Google.Nome + " (foto aérea – chave própria)");
         _source.Items.Add(SatelliteSource.Osm.Nome + " – é mapa, não foto de satélite");
+        var st0 = PluginContext.Settings;
+        _source.Items.Add(SatelliteSource.IsValidTemplate(st0.CustomTilesUrl)
+            ? CustomSource.Nome + " (foto aérea – configurada por você)"
+            : "Fonte própria (XYZ) – configure em Configurações → Imagem aérea");
         // Sem chave do Google gravada, abre no OpenStreetMap (não exige chave).
-        _source.SelectedIndex = string.IsNullOrWhiteSpace(GoogleKeyStore.Key) || PluginContext.Settings.LastUsed.TryGetValue("satelite:fonte", out var f) && f == "osm" ? 1 : 0;
+        _source.SelectedIndex = PluginContext.Settings.LastUsed.TryGetValue("satelite:fonte", out var f) && f == "xyz" && SatelliteSource.IsValidTemplate(st0.CustomTilesUrl) ? 2
+            : SatelliteSource.IsValidTemplate(st0.CustomTilesUrl) && string.IsNullOrWhiteSpace(GoogleKeyStore.Key) ? 2
+            : string.IsNullOrWhiteSpace(GoogleKeyStore.Key) || f == "osm" ? 1 : 0;
         var stored = ctx.Stored;
         var lat = stored?.Latitude ?? ctx.SiteLatitude;
         var lon = stored?.Longitude ?? ctx.SiteLongitude;
@@ -147,8 +153,15 @@ public sealed class SatelliteWindow : Window
         form.Children.Add(_useProjectNorth);
         form.Children.Add(_northWarn);
         var keyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
-        var cfg = new Button { Content = "Chave do Google…", Margin = new Thickness(0) };
-        cfg.Click += (_, _) => { UiHelpers.ShowModal(new SettingsWindow()); Refresh(); };
+        var cfg = new Button { Content = "Configurar fontes (fonte própria / chave do Google)…", Margin = new Thickness(0) };
+        cfg.Click += (_, _) =>
+        {
+            UiHelpers.ShowModal(new SettingsWindow());
+            _source.Items[2] = SatelliteSource.IsValidTemplate(PluginContext.Settings.CustomTilesUrl)
+                ? CustomSource.Nome + " (foto aérea – configurada por você)"
+                : "Fonte própria (XYZ) – configure em Configurações → Imagem aérea";
+            Refresh();
+        };
         keyRow.Children.Add(cfg);
         form.Children.Add(keyRow);
         form.Children.Add(_info);
@@ -209,7 +222,16 @@ public sealed class SatelliteWindow : Window
         return g;
     }
 
-    private SatelliteSource Source => _source.SelectedIndex == 1 ? SatelliteSource.Osm : SatelliteSource.Google;
+    private static SatelliteSource CustomSource
+    {
+        get
+        {
+            var st = PluginContext.Settings;
+            return SatelliteSource.Custom(st.CustomTilesName, st.CustomTilesAttribution, st.CustomTilesMaxZoom);
+        }
+    }
+
+    private SatelliteSource Source => _source.SelectedIndex switch { 1 => SatelliteSource.Osm, 2 => CustomSource, _ => SatelliteSource.Google };
 
     /// <summary>Georreferência e centro (modelo) com os valores da janela.</summary>
     private (GeoReference Geo, Vec2 Center) Inputs()
@@ -266,7 +288,7 @@ public sealed class SatelliteWindow : Window
             var p = MakePlan(Source);
             var err = SatelliteReprojection.MaxInterpolationError(p);
             var key = Source.Fonte == FonteImagem.GoogleSatelite && string.IsNullOrWhiteSpace(GoogleKeyStore.Key)
-                ? "\n⚠ Falta a chave da Google Maps Platform (botão \"Chave do Google…\")." : "";
+                ? "\n⚠ Falta a chave da Google Maps Platform (botão \"Configurar fontes…\")." : "";
             _info.Text =
                 $"Zoom {p.Zoom} ({p.Source.Nome}) · pixel da fonte ≈ {UiHelpers.F(p.SourceMpp, "0.000")} m · imagem com {UiHelpers.F(p.OutputMpp, "0.000")} m/px efetivos\n" +
                 $"{p.PixelWidth} × {p.PixelHeight} px em {p.Blocks.Count} bloco(s) · área {UiHelpers.F(p.Width, "0")} × {UiHelpers.F(p.Height, "0")} m\n" +
@@ -291,7 +313,7 @@ public sealed class SatelliteWindow : Window
         var key = GoogleKeyStore.Key;
         if (plan.Source.Fonte == FonteImagem.GoogleSatelite && string.IsNullOrWhiteSpace(key))
         {
-            UiHelpers.Error("Para o Google Satélite informe sua chave da Google Maps Platform (botão \"Chave do Google…\" ou SinalizaBIM → Configurações).\n\nSem chave, use o OpenStreetMap (mapa).");
+            UiHelpers.Error("Para o Google Satélite informe sua chave da Google Maps Platform (botão \"Configurar fontes…\" ou SinalizaBIM → Configurações).\n\nSem chave, use o OpenStreetMap (mapa).");
             return;
         }
         _cts = new CancellationTokenSource();
@@ -312,7 +334,7 @@ public sealed class SatelliteWindow : Window
             }
             else
             {
-                PluginContext.Settings.LastUsed["satelite:fonte"] = plan.Source.Fonte == FonteImagem.OpenStreetMap ? "osm" : "google";
+                PluginContext.Settings.LastUsed["satelite:fonte"] = plan.Source.Fonte switch { FonteImagem.OpenStreetMap => "osm", FonteImagem.Personalizada => "xyz", _ => "google" };
                 PluginContext.Settings.LastUsed["satelite:area"] = $"{_width.Text}x{_height.Text}x{_res.Text}";
                 PluginContext.SaveSettings();
                 var geo = plan.Geo;
