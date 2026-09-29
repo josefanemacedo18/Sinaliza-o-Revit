@@ -69,6 +69,9 @@ public static class MarkingBuilder
         // alargada). O pavimento usa as bordas variáveis próprias (RoadPavementDefinition.EdgeVariation).
         if (path != null && path.Points.Count >= 2 && def is not RoadPavementDefinition && def.Path?.Lateral is { IsEmpty: false } lat)
         {
+            // Interrupções sem âncora: estacas do EIXO – resolvidas nele antes da deformação (o caminho deslocado é mais
+            // longo nas transições e as estacas não coincidem).
+            def = WithAnchoredBreaks(def, path);
             var band = def switch
             {
                 LinearMarkingDefinition l => VariableLinear(l, path, lat, ctx),
@@ -76,13 +79,75 @@ public static class MarkingBuilder
                 _ => null,
             };
             if (band != null) return def.Exclusions.All(z => !z.Enabled) ? band : ApplyExclusions(band, def.Exclusions);
-            path = lat.Apply(path);
+            // O afastamento próprio da marca soma-se ao perfil na normal do EIXO – e não da linha já inclinada: nas
+            // transições (baias, alargamentos) a marca fica exatamente sobre o bordo deslocado (sem frestas).
+            var own = OwnOffset(def);
+            if (Math.Abs(own) > 1e-6 && WithoutOwnOffset(def) is { } flat)
+            {
+                path = lat.Apply(path, own);
+                def = flat;
+            }
+            else path = lat.Apply(path);
         }
         if (path != null && def.Justify is Justificacao.Esquerda or Justificacao.Direita && SupportsJustify(def) && path.Points.Count >= 2)
             path = JustifiedPath(def, path, ctx);
         var geo = BuildRaw(def, path, ctx);
         if (def is LinearMarkingDefinition { Breaks.Count: > 0 } lb && path != null) geo = ApplyBreaks(geo, lb.Breaks, path);
         return def.Exclusions.All(z => !z.Enabled) ? geo : ApplyExclusions(geo, def.Exclusions);
+    }
+
+    private static MarkingDefinition WithAnchoredBreaks(MarkingDefinition def, Polyline2 axis)
+    {
+        List<StationRange>? Fix(List<StationRange> br) => br.Count == 0 || br.All(b => b.AnchorStart != null && b.AnchorEnd != null) ? null
+            : br.Select(b => new StationRange
+            {
+                Start = b.Start, End = b.End,
+                AnchorStart = b.AnchorStart ?? axis.PointAt(Math.Clamp(b.Start, 0, axis.Length)),
+                AnchorEnd = b.AnchorEnd ?? axis.PointAt(Math.Clamp(b.End, 0, axis.Length)),
+            }).ToList();
+        switch (def)
+        {
+            case LinearMarkingDefinition l when Fix(l.Breaks) is { } f:
+            {
+                var c = (LinearMarkingDefinition)l.ShallowCopy();
+                c.Breaks = f;
+                return c;
+            }
+            case ParkingMarkingDefinition p when Fix(p.Breaks) is { } f:
+            {
+                var c = (ParkingMarkingDefinition)p.ShallowCopy();
+                c.Breaks = f;
+                return c;
+            }
+            default: return def;
+        }
+    }
+
+    /// <summary>Afastamento lateral próprio da marca em relação ao caminho (+ à esquerda do sentido do caminho).</summary>
+    private static double OwnOffset(MarkingDefinition d) => d switch
+    {
+        LinearMarkingDefinition l => l.Reverse ? -l.Offset : l.Offset,
+        DeviceMarkingDefinition dv => dv.Offset,
+        RepeatedMarkingDefinition r => r.Offset,
+        PlanterDefinition p => p.Offset,
+        ParkingMarkingDefinition pk => (pk.RightSide ? -1.0 : 1.0) * pk.CurbOffset,
+        _ => 0,
+    };
+
+    /// <summary>Cópia rasa da marca com o afastamento próprio zerado (já aplicado ao caminho).</summary>
+    private static MarkingDefinition? WithoutOwnOffset(MarkingDefinition d)
+    {
+        if (d.Justify is Justificacao.Esquerda or Justificacao.Direita) return null;
+        var c = d.ShallowCopy();
+        switch (c)
+        {
+            case LinearMarkingDefinition l: l.Offset = 0; return l;
+            case DeviceMarkingDefinition dv: dv.Offset = 0; return dv;
+            case RepeatedMarkingDefinition r: r.Offset = 0; return r;
+            case PlanterDefinition p: p.Offset = 0; return p;
+            case ParkingMarkingDefinition pk: pk.CurbOffset = 0; return pk;
+            default: return null;
+        }
     }
 
     /// <summary>Marcas ao longo de caminho que aceitam borda sobre a linha (em vez de centralizadas).</summary>
@@ -648,7 +713,7 @@ public static class MarkingBuilder
         var preset = ctx.Catalog.Vaga(d.Code);
         if (preset == null) { geo.Warnings.Add($"Vaga {d.Code} não existe no catálogo."); return geo; }
         if (path == null) { geo.Warnings.Add("Meio-fio (caminho) não encontrado."); return geo; }
-        return ParkingGenerator.Generate(path, preset, new ParkingOptions
+        var opt = new ParkingOptions
         {
             Angle = d.Angle,
             StallWidth = d.StallWidth,
@@ -666,7 +731,69 @@ public static class MarkingBuilder
             FillColor = d.FillColor,
             SymbolSize = d.SymbolSize,
             LegendHeight = d.LegendHeight,
-        }, ctx.Catalog, ctx.Glyphs);
+        };
+        // Trechos sem vagas: interrupções (baias, recuos, acessos) e zonas de exclusão (esquinas, 5 m da transversal –
+        // CTB art. 181). As vagas saem inteiras: nunca uma vaga cortada ao meio.
+        var blocked = new List<(double A, double B)>();
+        foreach (var b in d.Breaks)
+        {
+            var (a, e) = b.On(path);
+            // Folga de 0,5 m: a primeira vaga depois de uma transição começa no trecho reto, e não na ponta inclinada.
+            if (e - a > 0.05) blocked.Add((Math.Max(0, a - 0.5), Math.Min(path.Length, e + 0.5)));
+        }
+        if (d.Count == 0)
+        {
+            var zones = d.Exclusions.Where(z => z.Enabled && z.Points.Count >= 3).Select(z => new Polygon2(z.Points)).ToList();
+            if (zones.Count > 0)
+            {
+                var sideSign = d.RightSide ? -1.0 : 1.0;
+                var inside = path.Offset(sideSign * (d.CurbOffset + 1.0));
+                double? start = null;
+                var step = 0.5;
+                for (var s = 0.0; s <= path.Length + 1e-6; s += step)
+                {
+                    var p = inside.PointAtParam(path.ParamAt(Math.Min(s, path.Length)));
+                    var hit = zones.Any(z => z.Contains(p));
+                    if (hit && start == null) start = Math.Max(0, s - step / 2);
+                    if ((!hit || s + step > path.Length + 1e-6) && start is { } a0) { blocked.Add((a0, Math.Min(path.Length, s + step / 2))); start = null; }
+                }
+            }
+        }
+        if (blocked.Count == 0) return ParkingGenerator.Generate(path, preset, opt, ctx.Catalog, ctx.Glyphs);
+        blocked = blocked.OrderBy(x => x.A).ToList();
+        var merged = new List<(double A, double B)>();
+        foreach (var x in blocked)
+            if (merged.Count > 0 && x.A <= merged[^1].B + 0.01) merged[^1] = (merged[^1].A, Math.Max(merged[^1].B, x.B));
+            else merged.Add(x);
+        var free = new List<(double A, double B)>();
+        var cur = 0.0;
+        foreach (var x in merged)
+        {
+            if (x.A > cur) free.Add((cur, x.A));
+            cur = Math.Max(cur, x.B);
+        }
+        if (cur < path.Length) free.Add((cur, path.Length));
+        var units = 0;
+        foreach (var (a, b) in free)
+        {
+            var first = a < 1e-6;
+            var lead = first ? d.StartOffset : 0;
+            if (b - a - lead < 1.0) continue;
+            var sub = new Polyline2(path.SubPoints(a, b));
+            if (sub.Length < 1.0) continue;
+            var part = ParkingGenerator.Generate(sub, preset, new ParkingOptions
+            {
+                Angle = opt.Angle, StallWidth = opt.StallWidth, StallLength = opt.StallLength, LineWidth = opt.LineWidth, Color = opt.Color,
+                Count = 0, RightSide = opt.RightSide, StartOffset = lead, CurbOffset = opt.CurbOffset, FlipAngle = opt.FlipAngle,
+                BackLine = opt.BackLine, FullOutline = opt.FullOutline, IncludeSymbols = opt.IncludeSymbols, FillColor = opt.FillColor,
+                SymbolSize = opt.SymbolSize, LegendHeight = opt.LegendHeight,
+            }, ctx.Catalog, ctx.Glyphs);
+            part.Warnings.RemoveAll(w => w.StartsWith("Nenhuma vaga") || w.StartsWith("Meio-fio (caminho) muito curto"));
+            units += part.UnitCount;
+            geo.Merge(part);
+        }
+        geo.UnitCount = units;
+        return geo;
     }
 
     /// <summary>Informações descritivas (nome, grupo, referência normativa, unidade de medição).</summary>

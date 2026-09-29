@@ -260,10 +260,12 @@ public sealed partial class RoadSetup
     private static double RecessDepth(RecuoVia r, double s)
     {
         double U(double u) => r.CurvaReversa ? u * u * (3 - 2 * u) : u;
-        if (s <= r.Estaca || s >= r.S3) return 0;
-        if (s < r.S1) return r.Profundidade * U((s - r.Estaca) / Math.Max(1e-6, r.TaperEntrada));
+        // Transições nulas (faixa de aceleração começa, a de desaceleração termina em degrau): profundidade plena até a
+        // própria estaca do degrau – o recuo volta a zero só 5 cm depois (estacas extras em VariationStations).
+        if (s < r.Estaca - 1e-9 || s > r.S3 + 1e-9) return 0;
+        if (s < r.S1) return r.TaperEntrada < 1e-6 ? r.Profundidade : r.Profundidade * U((s - r.Estaca) / r.TaperEntrada);
         if (s <= r.S2) return r.Profundidade;
-        return r.Profundidade * U(1 - (s - r.S2) / Math.Max(1e-6, r.TaperSaida));
+        return r.TaperSaida < 1e-6 ? r.Profundidade : r.Profundidade * U(1 - (s - r.S2) / r.TaperSaida);
     }
 
     /// <summary>Estacas onde a variação é avaliada (quebras + a cada 1 m nas transições suaves).</summary>
@@ -409,6 +411,10 @@ public sealed partial class RoadSetup
             if (bay)
                 foreach (var lbo in res.OfType<LinearMarkingDefinition>().Where(l => l.Code == EdgeCode && Math.Sign(l.Offset) == sigma && Math.Abs(Math.Abs(l.Offset) - (z.LaneEdge - EdgeInset)) < 0.6))
                     lbo.Breaks.Add(new StationRange { Start = r.Estaca, End = r.S3, AnchorStart = Anchor(r.Estaca), AnchorEnd = Anchor(r.S3) });
+            // Sem vagas ao longo do recuo (ponto de ônibus, faixa auxiliar – CTB art. 181): a faixa de estacionamento é
+            // interrompida inteira, do início da transição de entrada ao fim da de saída.
+            foreach (var pk in res.OfType<ParkingMarkingDefinition>().Where(p => ParkingSide(p) == sigma))
+                pk.Breaks.Add(new StationRange { Start = r.Estaca, End = r.S3, AnchorStart = Anchor(r.Estaca), AnchorEnd = Anchor(r.S3) });
             if (r.Sinalizacao)
                 add(new RecessMarkingDefinition
                 {
@@ -429,6 +435,13 @@ public sealed partial class RoadSetup
                 var shelterAt = axis.PointAt(Sd(mid)) + axis.TangentAt(Sd(mid)).PerpLeft * sigma * (dCurb + 1.6);
                 add(new UrbanElementDefinition { Code = "ABRIGO", Position = shelterAt, Direction = -nrm });
             }
+        }
+
+        // Lado das vagas em relação ao eixo (+1 esquerda): as vagas ficam a sideSign·CurbOffset do caminho.
+        static int ParkingSide(ParkingMarkingDefinition p)
+        {
+            var sideSign = p.RightSide ? -1.0 : 1.0;
+            return Math.Abs(p.CurbOffset) < 1e-9 ? (int)sideSign : Math.Sign(sideSign * p.CurbOffset);
         }
 
         (int, double, double)? Band(double offset, double width)

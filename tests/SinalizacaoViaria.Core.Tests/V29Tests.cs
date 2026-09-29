@@ -201,4 +201,76 @@ public class V29Tests
         }
         Assert.DoesNotContain(kids.OfType<HatchMarkingDefinition>(), h => h.Code == "ZPA" && h.BarColor != MarkingColor.Amarela);
     }
+
+    // ------------------------------------------------------------------ baias e recuos
+
+    private static (List<MarkingDefinition> Defs, RecuoVia R) Bay(int tpl, TipoRecuo tipo, bool left)
+    {
+        var setup = RoadTemplates.All[tpl].Create();
+        var r = RecuoVia.Padrao(tipo, 50);
+        r.Estaca = 30;
+        r.LadoEsquerdo = left;
+        setup.Recuos.Add(r);
+        var pr = PathReference.FromPoints(new[] { new Vec2(0, 0), new Vec2(140, 0) }, 0);
+        return (setup.Build(pr, new OutputSettings(), Cat), r);
+    }
+
+    private static MarkingGeometry Geo(MarkingDefinition m) => MarkingBuilder.Build(m, m.Path == null ? null : new Polyline2(m.Path.Points, m.Path.Closed), new BuildContext { Catalog = Cat });
+
+    [Theory]
+    [InlineData(2, TipoRecuo.BaiaOnibus, true)]
+    [InlineData(2, TipoRecuo.BaiaOnibus, false)]
+    [InlineData(0, TipoRecuo.FaixaDesaceleracao, false)]
+    [InlineData(0, TipoRecuo.RecuoEmbarque, true)]
+    public void Recuo_interrompe_as_vagas_inteiras(int tpl, TipoRecuo tipo, bool left)
+    {
+        var (defs, r) = Bay(tpl, tipo, left);
+        var side = defs.OfType<ParkingMarkingDefinition>().Where(p => p.Breaks.Count > 0).ToList();
+        Assert.Single(side);
+        var geo = Geo(side[0]);
+        Assert.NotEmpty(geo.Pieces);
+        // Nenhuma peça de vaga entre o início da transição de entrada e o fim da de saída.
+        foreach (var p in geo.Pieces)
+        {
+            var (mn, mx) = p.Shape.Bounds;
+            Assert.False(mx.X > r.Estaca + 0.3 && mn.X < r.S3 - 0.3, $"vaga em {mn.X:0.0}..{mx.X:0.0} dentro do recuo {r.Estaca}..{r.S3}");
+        }
+        // As vagas do outro lado continuam inteiras.
+        var other = defs.OfType<ParkingMarkingDefinition>().Where(p => p.Breaks.Count == 0).ToList();
+        foreach (var o in other) Assert.Contains(Geo(o).Pieces, p => p.Shape.Bounds.Max.X > r.Estaca + 1 && p.Shape.Bounds.Min.X < r.S3 - 1);
+    }
+
+    [Theory]
+    [InlineData(2, TipoRecuo.BaiaOnibus, true)]
+    [InlineData(1, TipoRecuo.FaixaDesaceleracao, false)]
+    public void Recuo_sem_fresta_entre_pista_e_sarjeta_nas_transicoes(int tpl, TipoRecuo tipo, bool left)
+    {
+        var (defs, r) = Bay(tpl, tipo, left);
+        var pav = Geo(defs.OfType<RoadPavementDefinition>().First());
+        var sg = left ? 1 : -1;
+        var gutter = defs.OfType<LinearMarkingDefinition>().FirstOrDefault(m => m.Code == "SARJETA" && Math.Sign(m.Offset) == sg);
+        var curb = defs.OfType<LinearMarkingDefinition>().First(m => m.Code == "MEIO-FIO" && Math.Sign(m.Offset) == sg && Math.Abs(m.Offset) > 3);
+        var edgeGeo = Geo(gutter ?? curb);
+        double Cut(MarkingGeometry g, double x, bool outer)
+        {
+            var ys = new List<double>();
+            foreach (var p in g.Pieces)
+            {
+                var ring = p.Shape.Outer;
+                for (int i = 0; i < ring.Count; i++)
+                {
+                    var a = ring[i];
+                    var b = ring[(i + 1) % ring.Count];
+                    if ((a.X - x) * (b.X - x) <= 0 && Math.Abs(a.X - b.X) > 1e-9) ys.Add(a.Y + (b.Y - a.Y) * (x - a.X) / (b.X - a.X));
+                }
+            }
+            return outer ? (sg > 0 ? ys.Max() : ys.Min()) : (sg > 0 ? ys.Min() : ys.Max());
+        }
+        foreach (var x in new[] { r.Estaca + (r.S1 - r.Estaca) * 0.5, r.S2 + Math.Max(0.1, (r.S3 - r.S2) * 0.5) })
+        {
+            var pe = Cut(pav, x, true);
+            var ge = Cut(edgeGeo, x, false);
+            Assert.True(Math.Abs(pe - ge) < 0.02, $"estaca {x:0.0}: pista {pe:0.000} × sarjeta/meio-fio {ge:0.000}");
+        }
+    }
 }

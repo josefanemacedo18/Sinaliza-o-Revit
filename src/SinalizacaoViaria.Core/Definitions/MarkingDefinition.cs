@@ -238,6 +238,9 @@ public abstract class MarkingDefinition
     public static MarkingDefinition? FromJson(string json) =>
         JsonSerializer.Deserialize<MarkingDefinition>(json, JsonConfig.Compact);
 
+    /// <summary>Cópia rasa (mesmo Id e listas compartilhadas) – para ajustes temporários na geração.</summary>
+    public MarkingDefinition ShallowCopy() => (MarkingDefinition)MemberwiseClone();
+
     public MarkingDefinition CloneWithNewId()
     {
         var c = FromJson(ToJson())!;
@@ -471,6 +474,8 @@ public sealed class ParkingMarkingDefinition : MarkingDefinition
     public MarkingColor? FillColor { get; set; }
     public double SymbolSize { get; set; } = 1.20;
     public double LegendHeight { get; set; } = 0.50;
+    /// <summary>Trechos (estacas) sem vagas – baias de ônibus, recuos, acessos (as vagas saem inteiras, nunca cortadas).</summary>
+    public List<StationRange> Breaks { get; set; } = new();
 
     public override string KindName => "Estacionamento";
     public override string DisplayCode => Code;
