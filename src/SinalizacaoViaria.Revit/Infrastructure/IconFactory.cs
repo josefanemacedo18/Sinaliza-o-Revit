@@ -133,6 +133,13 @@ public static class IconFactory
                 dc.DrawGeometry(B(Color.FromRgb(188, 186, 180)), null, Close(Poly(new Point(8, 4), new Point(13, 4), new Point(13, 26), new Point(20, 26), new Point(20, 30), new Point(4, 30), new Point(4, 26), new Point(8, 26))));
                 dc.DrawLine(P(Color.FromRgb(98, 158, 74), 2), new Point(1, 29), new Point(6, 29));
                 break;
+            case "recuo":
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(1, 1, 30, 30));
+                dc.DrawGeometry(B(Asphalt), null, Close(Poly(new Point(1, 1), new Point(16, 1), new Point(16, 7), new Point(23, 11), new Point(23, 21), new Point(16, 25), new Point(16, 31), new Point(1, 31))));
+                dc.DrawRectangle(null, P(Yellow, 1.5), new Rect(17, 12, 5, 8));
+                dc.DrawLine(new Pen(B(White), 1.2) { DashStyle = DashStyles.Dash }, new Point(16, 7), new Point(16, 25));
+                dc.DrawLine(P(White, 1.5), new Point(8, 1), new Point(8, 31));
+                break;
             case "sonorizador":
                 dc.DrawRectangle(B(Asphalt), null, new Rect(1, 1, 30, 30));
                 dc.DrawLine(P(White, 2), new Point(12, 1), new Point(12, 31));

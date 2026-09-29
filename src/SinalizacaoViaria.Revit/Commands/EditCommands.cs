@@ -71,6 +71,8 @@ public sealed class CmdEditar : CommandBase
             Report("Interseção", IntersectionRunner.Run(uidoc, "SV - Editar interseção", s => s.Refresh(inter)).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;
         }
+        // Recuo da via (baia, faixa auxiliar): edita só este recuo e regenera a via.
+        if (stored.Definition is RecessMarkingDefinition rec) return RecessCommand.EditExisting(uidoc, rec);
         // Elemento de uma via: escolher o que editar (só ele, a via inteira ou o pavimento/raios).
         if (stored.Definition.GroupId is { } gid && stored.Definition is not (IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition))
         {
@@ -249,51 +251,7 @@ public sealed class CmdEditar : CommandBase
             var survey = WidthSurvey.Read(uidoc, axis);
             if (survey.Count > 0) w.Setup.LargurasVariaveis = survey;
         }
-        var defs = w.Setup.Build(pav.PathRef, w.OutputSettings, PluginContext.Catalog, pav.GroupId, pav.Id, axis);   // Build clona o caminho por marca
-        var newPav = defs.OfType<RoadPavementDefinition>().FirstOrDefault();
-        if (newPav != null)
-        {
-            newPav.CornerRadius ??= pav.CornerRadius;
-            newPav.MergeStart = pav.MergeStart;
-            newPav.MergeEnd = pav.MergeEnd;
-            newPav.Hierarchy ??= pav.Hierarchy;
-            newPav.Exclusions.AddRange(pav.Exclusions);
-        }
-        // Trechos apagados à mão (Apagar Trecho) passam para a marca equivalente da seção nova (mesmo tipo e código).
-        var used = new HashSet<string>();
-        foreach (var d in defs.Where(d => d is not RoadPavementDefinition))
-        {
-            var old = members.FirstOrDefault(m => !used.Contains(m.Id) && m.GetType() == d.GetType() && m.DisplayCode == d.DisplayCode && m.Exclusions.Any(z => z.Manual));
-            if (old == null) continue;
-            used.Add(old.Id);
-            d.Exclusions.AddRange(old.Exclusions.Where(z => z.Manual));
-        }
-        // Recortes das conexões (interseções, rotatórias, rampas) são reaplicados pelo RefreshDependents.
-        var results = new List<RenderResult>();
-        using (MarkingService.RenderScope())
-        using (var t = new Transaction(doc, "SV - Editar via (remover elementos antigos)"))
-        {
-            t.Start();
-            var service = new MarkingService(doc, uidoc.ActiveView);
-            foreach (var m in members.Where(m => m.Id != pav.Id)) service.Delete(m.Id);
-            if (newPav == null) service.Delete(pav.Id);
-            t.Commit();
-        }
-        results.AddRange(MarkingCreator.Commit(uidoc, defs, "SV - Editar via"));
-        if (w.Setup.Warnings.Count > 0 && results.Count > 0) results[0].Warnings.InsertRange(0, w.Setup.Warnings);
-        try
-        {
-            results.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões da via", sv => sv.RefreshDependents(defs)).Where(r => r.Warnings.Count > 0));
-        }
-        catch (Exception ex)
-        {
-            Log.Error("Editar via – conexões", ex);
-            results.Add(new RenderResult { Geometry = null });
-            results[^1].Warnings.Add("As conexões da via não puderam ser refeitas: " + ex.Message);
-        }
-        // Obras hospedadas (pontes, viadutos, túneis, trincheiras) acompanham a nova seção; o terreno é refeito.
-        results.AddRange(RoadWorks.RefreshHosted(uidoc, pav.GroupId));
-        TerrainActions.AfterCreate(uidoc, defs, quiet: true);
+        var results = RoadRegen.Regenerate(uidoc, pav, members, w.Setup, w.OutputSettings, axis);
         Report("Via", results);
         return Result.Succeeded;
     }

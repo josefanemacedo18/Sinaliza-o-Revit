@@ -37,7 +37,9 @@ public static class RibbonBuilder
             Data(typeof(CmdIntersecao), "Interseção", "intersecao",
                 "Cria/atualiza a interseção do cruzamento clicado ou todas as do projeto (tipos I a IV, PARE / dê a preferência / semáforo)."),
             Data(typeof(CmdConexao), "Trocar Conexão", "conexao",
-                "Clique num encontro de vias, rotatória ou ponta livre e troque o tratamento: interseção, rotatória, cul-de-sac ou nenhum."));
+                "Clique num encontro de vias, rotatória ou ponta livre e troque o tratamento: interseção, rotatória, cul-de-sac ou nenhum."),
+            Data(typeof(CmdRecuoVia), "Recuo na Via (baia / faixa auxiliar)", "recuo",
+                "Numa via já criada: clique junto ao bordo e crie baia de ônibus, faixa de desaceleração/aceleração ou recuo de embarque – a via é refeita com meio-fio, calçada e sinalização do recuo. Editar no recuo altera ou remove."));
         Split(via, "SvCalcadas", "Calçadas",
             Data(typeof(CmdCalcadas), "Meio-fio, Calçada e Sarjeta", "calcada",
                 "Meios-fios, sarjetas, sarjetões, calçadas, grama e faixas de caminhada ao longo de linhas – ou 'Junto ao bordo de uma via', empilhando a partir do bordo (fazem parte da via e das conexões)."),
