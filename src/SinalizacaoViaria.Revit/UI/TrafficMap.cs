@@ -499,8 +499,8 @@ public sealed class TrafficMap : FrameworkElement
             foreach (var li in nr.Node.In)
             {
                 var l = net.Links[li];
-                var d = l.Path.TangentAt(l.Length);
-                var p = l.Path.PointAt(l.Length) + new Vec2(d.Y, -d.X) * (l.LaneOffset(0) + l.Road.LaneWidth * 0.5 + 0.8);
+                // Na linha de retenção da própria aproximação (antes ficava no centro do nó e parecia de outra via).
+                var p = TrafficSimulation.SignalHeadPosition(net, l);
                 Color c;
                 if (state == int.MinValue) c = Color.FromRgb(0x44, 0x44, 0x44);
                 else if (state >= 0)

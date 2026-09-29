@@ -97,10 +97,13 @@ public sealed class CmdSimuladorTrafego : CommandBase
             cache[d.Id] = r;
             return r;
         }
-        var ctx = new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs };
+        // A mesma geometria gerada no Revit (contexto completo: vias ligadas, caminhos, recortes e só o que ainda existe).
+        // Antes o contexto não tinha as vias: interseções e rotatórias não achavam os ramos, saíam sem pavimento e o
+        // cruzamento "sumia" do mapa, com as vias recortadas em volta de um buraco.
+        var service = new MarkingService(doc, null, interactive: false);
         Core.Model.MarkingGeometry? GeomOf(MarkingDefinition d)
         {
-            try { return MarkingBuilder.Build(d, AxisOf(d)?.Axis, ctx); }
+            try { return service.BuildGeometryOrNull(d); }
             catch (Exception ex) { Log.Error("Simulador de Tráfego – geometria", ex); return null; }
         }
         return TrafficNetworkBuilder.Build(defs, AxisOf, GeomOf);

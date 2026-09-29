@@ -26,16 +26,20 @@ public class V29SimTests
             return g.OfType<RoadPavementDefinition>().First();
         }
 
-        public TrafficNetwork Network(bool geometry = false)
+        /// <param name="fullContext">Contexto como o do Revit (vias ligadas e caminhos). Falso reproduz o contexto antigo do
+        /// simulador, só com o catálogo – interseções sem os ramos.</param>
+        public TrafficNetwork Network(bool geometry = false, bool fullContext = true)
         {
             (Polyline2, double)? Ax(MarkingDefinition d) => Paths.TryGetValue(d.Id, out var p) ? (p, 0.0) : d.Path is { Points.Count: >= 2 } pr ? (new Polyline2(pr.Points, pr.Closed), 0.0) : null;
-            var ctx = new BuildContext { Catalog = Cat };
+            var ctx = fullContext
+                ? new BuildContext { Catalog = Cat, Lookup = id => Defs.FirstOrDefault(x => x.Id == id), AllDefinitions = () => Defs, PathOf = d => Ax(d)?.Item1 }
+                : new BuildContext { Catalog = Cat };
             return TrafficNetworkBuilder.Build(Defs, Ax, geometry ? d => MarkingBuilder.Build(d, Ax(d)?.Item1, ctx) : null);
         }
     }
 
     /// <summary>Cruzamento de duas coletoras de duas faixas por sentido: 0 PARE, 1 semáforo, 2 sem controle, 3 rotatória de uma faixa.</summary>
-    private static TrafficNetwork Crossing(int kind, bool geometry = false, bool leftTurns = true)
+    private static TrafficNetwork Crossing(int kind, bool geometry = false, bool leftTurns = true, bool fullContext = true)
     {
         var s = new Scene();
         var a = s.Road(1, new Vec2(-400, 0), new Vec2(400, 0));
@@ -53,7 +57,7 @@ public class V29SimTests
             Control = kind switch { 0 => ControleIntersecao.Pare, 1 => ControleIntersecao.Semaforo, _ => ControleIntersecao.Nenhum },
             LeftTurns = leftTurns,
         });
-        return s.Network(geometry);
+        return s.Network(geometry, fullContext);
     }
 
     /// <summary>Quadros com dois corpos (segmento frente–traseira, centro do quadro) a menos de <paramref name="tol"/> m.</summary>
@@ -319,5 +323,94 @@ public class V29SimTests
         Assert.False(left.LeftTurns);
         Assert.Contains(left.Items, i => i.Item.Contains("R-4a"));
         Assert.Contains(trials, t => t.Kind == "bolsao");
+    }
+
+    // ------------------------------------------------------------------ rodada X: semáforo e cruzamentos no mapa
+
+    [Fact]
+    public void Signal_VehiclesOnlyEnterOnTheirOwnGreen()
+    {
+        var macro = TrafficAnalysis.Run(Crossing(1), new TrafficOptions { Demand = NivelDemanda.Media, SimSeconds = 600, WarmupSeconds = 120 });
+        var nr = macro.Nodes.Values.Single(n => n.Control == ControleNo.Semaforo);
+        TrafficSimulation.Debug = true;
+        SimResult sim;
+        try { sim = TrafficSimulation.Run(macro); }
+        finally { TrafficSimulation.Debug = false; }
+        // Verde (ou amarelo logo depois do verde) da fase que contém a aproximação de onde o veículo veio.
+        bool Allowed(int state, int from) =>
+            state >= 0 ? nr.Phases[state].Links.Contains(from)
+                       : -state - 2 is var k && k >= 0 && k < nr.Phases.Count && nr.Phases[k].Links.Contains(from);
+        var last = new Dictionary<int, string>();
+        SimFrame? prev = null;
+        int entries = 0, wrong = 0;
+        var perApproach = new Dictionary<int, int>();
+        foreach (var f in sim.Frames)
+        {
+            foreach (var (id, info) in f.Info!)
+            {
+                if (info.StartsWith("NÓ" + nr.Node.Index + " ") && last.TryGetValue(id, out var before) && before.StartsWith("L"))
+                {
+                    var from = int.Parse(info.Split(' ')[1].Split('/')[0]);
+                    entries++;
+                    perApproach[from] = perApproach.GetValueOrDefault(from) + 1;
+                    var now = f.SignalPhase[nr.Node.Index];
+                    var then = prev?.SignalPhase[nr.Node.Index] ?? now;
+                    if (!Allowed(now, from) && !Allowed(then, from)) wrong++;
+                }
+                last[id] = info;
+            }
+            prev = f;
+        }
+        Assert.True(entries > 200, $"entradas: {entries}");
+        // Ninguém entra no vermelho; todas as aproximações descarregam no próprio verde.
+        Assert.Equal(0, wrong);
+        Assert.All(nr.Node.In, li => Assert.True(perApproach.GetValueOrDefault(li) > 20, $"aproximação {li}: {perApproach.GetValueOrDefault(li)}"));
+    }
+
+    [Fact]
+    public void Signal_MapIconSitsOnItsOwnApproach()
+    {
+        var net = Crossing(1);
+        var nd = net.Nodes.Single(n => n.Kind == TipoNo.Intersecao);
+        foreach (var li in nd.In)
+        {
+            var l = net.Links[li];
+            var head = TrafficSimulation.SignalHeadPosition(net, l);
+            var back = (l.Path.PointAt(0) - nd.Pos).Normalized();       // de onde a aproximação vem
+            var rel = head - nd.Pos;
+            // Do lado de onde o veículo chega, antes da faixa de pedestres – e não do lado de uma via transversal.
+            Assert.True(rel.Dot(back) > 5, $"link {li}: {rel.Dot(back):0.0} m ao longo da aproximação");
+            Assert.True(Math.Abs(rel.Cross(back)) < rel.Dot(back), $"link {li}: ícone mais para o lado do que para trás");
+        }
+    }
+
+    [Fact]
+    public void Map_IntersectionPavementIsDrawnWithTheLinkedRoads()
+    {
+        var s = Crossing(1, geometry: true);
+        var id = s.Nodes.Single(n => n.Kind == TipoNo.Intersecao).SourceId;
+        // O miolo do cruzamento tem pavimento da própria interseção (antes: contexto sem as vias → buraco no mapa).
+        Assert.Contains(s.Backdrop, b => b.SourceId == id && b.Layer == CamadaMapa.Pavimento && b.Shape.Contains(Vec2.Zero));
+        var old = Crossing(1, geometry: true, fullContext: false);
+        Assert.DoesNotContain(old.Backdrop, b => b.SourceId == id && b.Layer == CamadaMapa.Pavimento);
+        // Rotatória também.
+        var rb = Crossing(3, geometry: true);
+        Assert.Contains(rb.Backdrop, b => b.Layer == CamadaMapa.Pavimento && rb.Nodes.Any(n => n.Kind == TipoNo.Rotatoria && n.SourceId == b.SourceId));
+    }
+
+    [Fact]
+    public void Map_KeepsGroundPiecesOfGradedNodes()
+    {
+        var net = Crossing(1);
+        var def = new IntersectionDefinition { Node = Vec2.Zero };
+        var sq = new Polygon2(new[] { new Vec2(-5, -5), new Vec2(5, -5), new Vec2(5, 5), new Vec2(-5, 5) });
+        var geo = new Model.MarkingGeometry();
+        geo.Pieces.Add(new Model.MarkingPiece(sq, Model.MarkingColor.Asfalto) { Elevation = 2.4, Thickness = 0.1 });   // nó em rampa
+        geo.Pieces.Add(new Model.MarkingPiece(sq, Model.MarkingColor.Concreto) { Elevation = 2.5, Thickness = 0.15 }); // calçada
+        geo.Pieces.Add(new Model.MarkingPiece(sq, Model.MarkingColor.Folhagem) { Elevation = 3.0, Thickness = 2 });    // copa
+        TrafficBackdrop.Read(net, new MarkingDefinition[] { def }, _ => geo);
+        Assert.Contains(net.Backdrop, b => b.Layer == CamadaMapa.Pavimento);
+        Assert.Contains(net.Backdrop, b => b.Layer == CamadaMapa.Calcada);
+        Assert.Equal(2, net.Backdrop.Count);
     }
 }

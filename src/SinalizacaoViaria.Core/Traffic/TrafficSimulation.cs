@@ -181,6 +181,30 @@ public static class TrafficSimulation
         return total;
     }
 
+    /// <summary>
+    /// Recuo da linha de retenção em relação ao centro do nó (m): meia largura da via transversal + 1,2 m
+    /// e, com faixa de pedestres, mais 4,5 m. É onde os veículos param no vermelho.
+    /// </summary>
+    public static double StopLineClear(TrafficNetwork net, TrafficLink l, int node)
+    {
+        var nd = net.Nodes[node];
+        if (nd.IsZone || nd.Kind is not (TipoNo.Intersecao or TipoNo.CruzamentoSemControle)) return 0;
+        var w = nd.In.Concat(nd.Out).Select(i => net.Links[i].Road).Where(r => r.Id != l.Road.Id).Select(r => r.CarriageWidth / 2)
+            .DefaultIfEmpty(3.5).Max();
+        return Math.Min(w + 1.2 + (nd.Crosswalks ? 4.5 : 0), l.Length * 0.35);
+    }
+
+    /// <summary>
+    /// Posição do grupo focal de uma aproximação (link que chega ao nó): na linha de retenção, à direita de quem
+    /// chega – do lado da própria aproximação, e não no centro do cruzamento, onde o ícone parecia de outra via.
+    /// </summary>
+    public static Vec2 SignalHeadPosition(TrafficNetwork net, TrafficLink l)
+    {
+        var at = Math.Max(0, l.Length - StopLineClear(net, l, l.To));
+        var d = l.Path.TangentAt(at);
+        return l.Path.PointAt(at) + new Vec2(d.Y, -d.X) * (l.LaneOffset(0) + l.Road.LaneWidth * 0.5 + 0.8);
+    }
+
     public static SimResult Run(TrafficResult macro, CancellationToken cancel = default, IProgress<double>? progress = null)
     {
         var net = macro.Network;
@@ -225,14 +249,7 @@ public static class TrafficSimulation
         // Linha de parada e início de cada trecho recuados para a borda do cruzamento: os trechos da rede vão de centro a
         // centro dos nós, mas o veículo para antes da via transversal (e da faixa de pedestres) e atravessa o miolo pelo
         // trajeto do movimento – as filas de aproximações diferentes não se encontram no meio do cruzamento.
-        double EdgeClear(TrafficLink l, int node)
-        {
-            var nd = net.Nodes[node];
-            if (nd.IsZone || nd.Kind is not (TipoNo.Intersecao or TipoNo.CruzamentoSemControle)) return 0;
-            var w = nd.In.Concat(nd.Out).Select(i => net.Links[i].Road).Where(r => r.Id != l.Road.Id).Select(r => r.CarriageWidth / 2)
-                .DefaultIfEmpty(3.5).Max();
-            return Math.Min(w + 1.2 + (nd.Crosswalks ? 4.5 : 0), l.Length * 0.35);
-        }
+        double EdgeClear(TrafficLink l, int node) => StopLineClear(net, l, node);
         var endClear = net.Links.Select(l => EdgeClear(l, l.To)).ToArray();
         var startClear = net.Links.Select(l => EdgeClear(l, l.From)).ToArray();
         double EndOf(TrafficLink l) => l.Length - endClear[l.Index];

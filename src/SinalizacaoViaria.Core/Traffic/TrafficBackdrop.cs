@@ -34,8 +34,10 @@ public static class TrafficBackdrop
             foreach (var pc in g.Pieces)
             {
                 if (pc.Shape.Outer.Count < 3 || pc.Shape.Area < 1e-4) continue;
-                if (pc.Elevation > 1.2) continue;                      // placas, copas altas, cabos: fora da planta
                 var layer = LayerOf(pc);
+                // Placas, copas altas, cabos: fora da planta. Pisos, calçadas, grama e pintura ficam sempre – num nó em
+                // rampa a cota relativa do pavimento passa de 1,2 m e o cruzamento sumia do mapa.
+                if (pc.Elevation > 1.2 && !IsGround(pc, layer)) continue;
                 net.Backdrop.Add(new MapShape(pc.Shape, layer, ColorOf(pc), pc.Elevation + pc.Thickness, d.Id));
             }
         }
@@ -50,10 +52,14 @@ public static class TrafficBackdrop
         });
     }
 
+    /// <summary>Peça de chão (pavimento, calçada, grama, pintura) – desenhada em qualquer cota.</summary>
+    public static bool IsGround(MarkingPiece pc, CamadaMapa layer) =>
+        layer is CamadaMapa.Pavimento or CamadaMapa.Calcada or CamadaMapa.Pintura || pc.Color == MarkingColor.Grama;
+
     public static CamadaMapa LayerOf(MarkingPiece pc) => pc.Color switch
     {
         MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto => CamadaMapa.Pavimento,
-        MarkingColor.Concreto when pc.Elevation + pc.Thickness > 0.35 => CamadaMapa.Fisico,   // barreiras, muretas
+        MarkingColor.Concreto when pc.Thickness > 0.35 => CamadaMapa.Fisico,   // barreiras, muretas (pela altura da peça, não pela cota)
         MarkingColor.Concreto => CamadaMapa.Calcada,
         MarkingColor.Grama or MarkingColor.Folhagem => CamadaMapa.Canteiro,
         MarkingColor.Metal or MarkingColor.Madeira or MarkingColor.Vidro => CamadaMapa.Fisico,
