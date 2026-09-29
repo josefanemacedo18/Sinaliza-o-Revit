@@ -31,6 +31,7 @@ public partial class SettingsWindow : Window
         CkAutoConnect.IsChecked = s.AutoConnect;
         CkAutoCrosswalks.IsChecked = s.AutoCrosswalks;
         CkFloors.IsChecked = s.PhysicalAsFloors;
+        CkPaintFloors.IsChecked = s.PaintAsFloors;
         CkBoundary.IsChecked = s.VisibleBoundary2D;
         TbCatalog.Text = PluginContext.UserCatalogPath;
         UpdateStatus();
@@ -96,6 +97,7 @@ public partial class SettingsWindow : Window
             s.AutoConnect = CkAutoConnect.IsChecked == true;
             s.AutoCrosswalks = CkAutoCrosswalks.IsChecked == true;
             s.PhysicalAsFloors = CkFloors.IsChecked == true;
+            s.PaintAsFloors = CkPaintFloors.IsChecked == true;
             s.VisibleBoundary2D = CkBoundary.IsChecked == true;
             s.UserCatalogPath = string.Equals(TbCatalog.Text, PluginPaths.DefaultUserCatalog, StringComparison.OrdinalIgnoreCase) ? null : TbCatalog.Text;
             PluginContext.SaveSettings();

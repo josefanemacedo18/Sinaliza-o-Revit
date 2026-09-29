@@ -36,6 +36,33 @@ public sealed class GradeSampler : ISurface
     }
 }
 
+/// <summary>
+/// Calçada com níveis variáveis (inclinação transversal, nível no alinhamento): a superfície de apoio (greide da via ou
+/// plano da base) mais o perfil de níveis da faixa.
+/// </summary>
+public sealed class LevelSampler : ISurface
+{
+    private readonly ISurface? _inner;
+    private readonly double _baseM;
+    private readonly Func<Core.Geometry.Vec2, double> _offset;
+    public LevelSampler(ISurface? inner, double baseM, Func<Core.Geometry.Vec2, double> offset) { _inner = inner; _baseM = baseM; _offset = offset; }
+    public bool IsAvailable => true;
+    public bool LiftsSolids => _inner?.LiftsSolids ?? false;
+    public bool TrySample(double xFt, double yFt, double zHintFt, out double zFt, out XYZ normal)
+    {
+        var p = new Core.Geometry.Vec2(UnitConv.M(xFt), UnitConv.M(yFt));
+        double Base(Core.Geometry.Vec2 q) =>
+            _inner != null && _inner.TrySample(UnitConv.Ft(q.X), UnitConv.Ft(q.Y), zHintFt, out var z0, out _) ? UnitConv.M(z0) : _baseM;
+        double Z(Core.Geometry.Vec2 q) => Base(q) + _offset(q);
+        var z = Z(p);
+        zFt = UnitConv.Ft(z);
+        var zx = Z(p + new Core.Geometry.Vec2(0.5, 0)) - z;
+        var zy = Z(p + new Core.Geometry.Vec2(0, 0.5)) - z;
+        normal = new XYZ(-zx / 0.5, -zy / 0.5, 1).Normalize();
+        return true;
+    }
+}
+
 /// <summary>Superfície de um nó em nível (interseção, rotatória, cul-de-sac) costurada às vias ligadas – cota absoluta.</summary>
 public sealed class NodeSampler : ISurface
 {

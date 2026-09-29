@@ -62,6 +62,37 @@ public sealed class SectionRow : INotifyPropertyChanged
     private void OnChanged([CallerMemberName] string? n = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 }
 
+/// <summary>Linha da tabela de larguras medidas (texto em pt-BR; vazio = medida da seção).</summary>
+public sealed class WidthRow
+{
+    public PontoLargura P { get; }
+    public WidthRow(PontoLargura p) => P = p;
+    private static string T(double? v) => v is { } x ? UiHelpers.F(x) : "";
+    private static double? V(string? t) => UiHelpers.ParseOpt(t) is { } x and > 0 and < 200 ? x : null;
+    public string Estaca { get => UiHelpers.F(P.Estaca, "0.##"); set { if (PontoLargura.ParseEstaca(value) is { } e && e >= 0) P.Estaca = e; } }
+    public string BordoEsq { get => T(P.BordoEsquerdo); set => P.BordoEsquerdo = V(value); }
+    public string BordoDir { get => T(P.BordoDireito); set => P.BordoDireito = V(value); }
+    public string AlinhEsq { get => T(P.AlinhamentoEsquerdo); set => P.AlinhamentoEsquerdo = V(value); }
+    public string AlinhDir { get => T(P.AlinhamentoDireito); set => P.AlinhamentoDireito = V(value); }
+}
+
+/// <summary>Linha da tabela de recuos (baias, faixas auxiliares).</summary>
+public sealed class RecessRow
+{
+    public RecuoVia R { get; }
+    public RecessRow(RecuoVia r) => R = r;
+    private static double N(string? t, double cur, double min = 0) => UiHelpers.ParseOpt(t) is { } x && x >= min ? x : cur;
+    public string TipoTexto => RecuoVia.Rotulo(R.Tipo);
+    public bool Esquerdo { get => R.LadoEsquerdo; set => R.LadoEsquerdo = value; }
+    public string Estaca { get => UiHelpers.F(R.Estaca, "0.##"); set { if (PontoLargura.ParseEstaca(value) is { } e && e >= 0) R.Estaca = e; } }
+    public string Comprimento { get => UiHelpers.F(R.Comprimento, "0.##"); set => R.Comprimento = N(value, R.Comprimento); }
+    public string Profundidade { get => UiHelpers.F(R.Profundidade); set => R.Profundidade = N(value, R.Profundidade, 0.1); }
+    public string TaperIn { get => UiHelpers.F(R.TaperEntrada, "0.##"); set => R.TaperEntrada = N(value, R.TaperEntrada); }
+    public string TaperOut { get => UiHelpers.F(R.TaperSaida, "0.##"); set => R.TaperSaida = N(value, R.TaperSaida); }
+    public bool CalcadaRecua { get => R.CalcadaRecua; set => R.CalcadaRecua = value; }
+    public bool Curva { get => R.CurvaReversa; set => R.CurvaReversa = value; }
+}
+
 /// <summary>Monta a seção transversal completa e gera toda a via (sinalização + calçadas, canteiros e dispositivos).</summary>
 public partial class RoadWindow : Window
 {
@@ -69,6 +100,11 @@ public partial class RoadWindow : Window
     private readonly ObservableCollection<SectionRow> _right = new();
     private readonly ObservableCollection<SectionRow> _left = new();
     private SectionRow? _selected;
+    private readonly ObservableCollection<WidthRow> _widths = new();
+    private readonly ObservableCollection<RecessRow> _recesses = new();
+
+    /// <summary>Ler meios-fios e muros existentes do desenho depois de indicar o eixo.</summary>
+    public bool ReadSurvey => CkReadSurvey.IsChecked == true;
     private bool _loading = true;
     private bool _loadingDetails;
     private bool _editing;
@@ -135,6 +171,17 @@ public partial class RoadWindow : Window
         GridLeft.ItemsSource = _left;
 
         FillTemplates(null);
+        GridWidths.ItemsSource = _widths;
+        GridRecess.ItemsSource = _recesses;
+        foreach (var (l, v) in new[] { ("Elemento junto ao meio-fio", AbsorcaoLargura.ElementoJuntoAoBordo), ("Última faixa de tráfego", AbsorcaoLargura.UltimaFaixaDeTrafego),
+                     ("Todas as faixas (proporcional)", AbsorcaoLargura.TodasAsFaixas), ("Faixa de estacionamento", AbsorcaoLargura.Estacionamento) })
+            CbAbsorb.Items.Add(new Option<AbsorcaoLargura>(l, v));
+        CbAbsorb.SelectedIndex = 0;
+        foreach (var (l, v) in new[] { ("dividida igualmente", 0), ("toda no lado direito", 1), ("toda no lado esquerdo", 2) })
+            CbQuickSplit.Items.Add(new Option<int>(l, v));
+        CbQuickSplit.SelectedIndex = 0;
+        foreach (var t in Enum.GetValues<TipoRecuo>()) CbRecessType.Items.Add(new Option<TipoRecuo>(RecuoVia.Rotulo(t), t));
+        CbRecessType.SelectedIndex = 0;
 
         CbCenter.Items.Add(new Option<CenterTreatment>("LFO-2 – seccionada (ultrapassagem permitida)", CenterTreatment.LFO2));
         CbCenter.Items.Add(new Option<CenterTreatment>("LFO-1 – contínua simples", CenterTreatment.LFO1));
@@ -237,6 +284,12 @@ public partial class RoadWindow : Window
         foreach (var e in s.Right) Attach(_right, e.Clone());
         _left.Clear();
         foreach (var e in s.Left) Attach(_left, e.Clone());
+        _widths.Clear();
+        foreach (var p in s.LargurasVariaveis.OrderBy(p => p.Estaca)) _widths.Add(new WidthRow(p.Clone()));
+        _recesses.Clear();
+        foreach (var r in s.Recuos) _recesses.Add(new RecessRow(r.Clone()));
+        Select(CbAbsorb, s.Absorcao);
+        CkSmoothWidth.IsChecked = s.TransicaoSuave;
         _loading = was;
         UpdateCenterEnabled();
     }
@@ -290,6 +343,10 @@ public partial class RoadWindow : Window
             PavementThickness = UiHelpers.ParseNullable(TbPavThickness, "Espessura do pavimento", 0.01, 2),
         };
         if (s.Right.Count == 0 && s.Left.Count == 0) throw new FormatException("Adicione ao menos um elemento à seção.");
+        s.LargurasVariaveis = _widths.Select(w => w.P.Clone()).OrderBy(p => p.Estaca).ToList();
+        s.Recuos = _recesses.Select(r => r.R.Clone()).ToList();
+        s.Absorcao = Selected<AbsorcaoLargura>(CbAbsorb);
+        s.TransicaoSuave = CkSmoothWidth.IsChecked == true;
         if (CkStuds.IsChecked == true && CbStuds.SelectedItem is string st)
         {
             var parts = st.Split(" | ");
@@ -300,7 +357,70 @@ public partial class RoadWindow : Window
     }
 
     /// <summary>Gera as definições para o caminho escolhido (os avisos ficam em <see cref="RoadSetup.Warnings"/>).</summary>
-    public List<MarkingDefinition> BuildDefinitions(PathReference path) => Setup!.Build(path, OutputSettings!, _cat);
+    public List<MarkingDefinition> BuildDefinitions(PathReference path, Polyline2? axis = null) => Setup!.Build(path, OutputSettings!, _cat, axis: axis);
+
+    // ------------------------------------------------------------------ largura variável e recuos
+
+    private void AddWidthClick(object sender, RoutedEventArgs e)
+    {
+        var next = _widths.Count == 0 ? 0 : _widths.Max(w => w.P.Estaca) + 20;
+        _widths.Add(new WidthRow(new PontoLargura { Estaca = next }));
+        SchedulePreview();
+    }
+
+    private void RemoveWidthClick(object sender, RoutedEventArgs e)
+    {
+        if (GridWidths.SelectedItem is WidthRow w) _widths.Remove(w);
+        SchedulePreview();
+    }
+
+    private void ClearWidthsClick(object sender, RoutedEventArgs e)
+    {
+        _widths.Clear();
+        SchedulePreview();
+    }
+
+    /// <summary>Medida "de meio-fio a meio-fio" numa estaca, repartida entre os lados.</summary>
+    private void AddQuickClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var s = BuildSetup();
+            var total = UiHelpers.Parse(TbQuickTotal, 0, "Largura entre meios-fios", 1, 200);
+            var st = PontoLargura.ParseEstaca(TbQuickStation.Text) ?? throw new FormatException("Informe a estaca da medida.");
+            var (bl, _, _) = s.Nominal(true);
+            var (br, _, _) = s.Nominal(false);
+            var diff = total - (bl + br);
+            var split = Selected<int>(CbQuickSplit);
+            var row = _widths.FirstOrDefault(w => Math.Abs(w.P.Estaca - st) < 0.01);
+            if (row == null) { row = new WidthRow(new PontoLargura { Estaca = st }); _widths.Add(row); }
+            row.P.BordoEsquerdo = split == 1 ? bl : split == 2 ? bl + diff : bl + diff / 2;
+            row.P.BordoDireito = split == 2 ? br : split == 1 ? br + diff : br + diff / 2;
+            var sorted = _widths.OrderBy(w => w.P.Estaca).ToList();
+            _widths.Clear();
+            foreach (var w in sorted) _widths.Add(w);
+            GridWidths.Items.Refresh();
+            SchedulePreview();
+        }
+        catch (FormatException ex) { UiHelpers.Error(ex.Message); }
+    }
+
+    private void AddRecessClick(object sender, RoutedEventArgs e)
+    {
+        var t = Selected<TipoRecuo>(CbRecessType);
+        var speed = UiHelpers.ParseOpt(TbSpeed.Text) ?? 50;
+        var lane = _right.Where(r => ElementoSecao.EhFaixaDeTrafego(r.Tipo)).Select(r => r.Element.Largura).DefaultIfEmpty(3.5).Last();
+        var r = RecuoVia.Padrao(t, speed, lane);
+        r.Estaca = _recesses.Count == 0 ? 20 : _recesses.Max(x => x.R.S3) + 20;
+        _recesses.Add(new RecessRow(r));
+        SchedulePreview();
+    }
+
+    private void RemoveRecessClick(object sender, RoutedEventArgs e)
+    {
+        if (GridRecess.SelectedItem is RecessRow r) _recesses.Remove(r);
+        SchedulePreview();
+    }
 
     // ------------------------------------------------------------------ prévia
 
@@ -320,13 +440,14 @@ public partial class RoadWindow : Window
         {
             var s = BuildSetup();
             var o = Output.Save();
-            var sample = new Polyline2(new[] { new Vec2(0, 0), new Vec2(50, 0) });
+            var len = Math.Max(50, Math.Max(s.LargurasVariaveis.Select(p => p.Estaca).DefaultIfEmpty(0).Max(), s.Recuos.Select(r => r.S3).DefaultIfEmpty(0).Max()) + 10);
+            var sample = new Polyline2(new[] { new Vec2(0, 0), new Vec2(len, 0) });
             var ctx = new BuildContext { Catalog = _cat, Glyphs = PluginContext.Glyphs };
             var geo = new MarkingGeometry();
-            var defs = s.Build(new PathReference(), o, _cat);
+            var defs = s.Build(new PathReference(), o, _cat, axis: sample);
             foreach (var d in defs) geo.Merge(MarkingBuilder.Build(d, sample, ctx));
             var half = s.TwoWay && s.Center == CenterTreatment.Canteiro ? s.MedianWidth / 2 : 0;
-            var pav = Polygon2.Rectangle(new Vec2(0, -(s.SideWidth(s.Right) + half)), new Vec2(50, s.SideWidth(s.Left) + half));
+            var pav = Polygon2.Rectangle(new Vec2(0, -(s.SideWidth(s.Right) + half)), new Vec2(len, s.SideWidth(s.Left) + half));
             Preview.Show(geo, new[] { sample.Points }, new[] { pav });
 
             var counts = defs.GroupBy(d => d.DisplayCode).Select(g => $"{g.Count()}× {g.Key}");
@@ -339,6 +460,15 @@ public partial class RoadWindow : Window
                 $"  faixas de tráfego {UiHelpers.F(wd.Faixas)} · sarjetas {UiHelpers.F(wd.Sarjetas)}{(s.SarjetaSomada == true ? " (somadas)" : " (dentro das faixas)")}" +
                 $" · meios-fios {UiHelpers.F(wd.MeiosFios)} · calçadas {UiHelpers.F(wd.Calcadas)}" +
                 (wd.Canteiros > 0 ? $" · canteiros laterais {UiHelpers.F(wd.Canteiros)}" : "") + (wd.Central > 0 ? $" · canteiro central {UiHelpers.F(wd.Central)}" : "");
+            if (s.HasVariableWidth)
+            {
+                var rg = s.WidthRange();
+                TxtWidths.Text += $"\nLargura variável: entre meios-fios de {UiHelpers.F(rg.MinEntre)} a {UiHelpers.F(rg.MaxEntre)} m; total de {UiHelpers.F(rg.MinTotal)} a {UiHelpers.F(rg.MaxTotal)} m" +
+                                  (s.Recuos.Count > 0 ? $" · {s.Recuos.Count} recuo(s)" : "");
+            }
+            var (nbl, nal, _) = s.Nominal(true);
+            var (nbr, nar, _) = s.Nominal(false);
+            TxtNominal.Text = $"Seção atual (do eixo): bordo esq. {UiHelpers.F(nbl)} m · dir. {UiHelpers.F(nbr)} m; alinhamento esq. {UiHelpers.F(nal)} m · dir. {UiHelpers.F(nar)} m.";
             TxtSummary.Text = $"Elementos gerados: {string.Join(", ", counts)}." +
                               (warnings.Count > 0 ? "\n⚠ " + string.Join("\n⚠ ", warnings) : "");
             TxtSummary.Foreground = warnings.Count > 0 ? System.Windows.Media.Brushes.SaddleBrown : System.Windows.Media.Brushes.Black;
@@ -516,7 +646,7 @@ public partial class RoadWindow : Window
             Show(bike, CkFundo, CkBidirecional);
             Show(bus, CkFundoOnibus, LblCorOnibus, CbCorOnibus);
             Show(t is not (TipoElementoSecao.Calcada or TipoElementoSecao.FaixaSeguranca), LblDisp, CbDispositivo);
-            Show(walk, LblSarjeta, TbSarjeta, LblMeioFio, TbMeioFio);
+            Show(walk, LblSarjeta, TbSarjeta, LblMeioFio, TbMeioFio, LblInclinacao, TbInclinacao, LblNiveis, TbNiveis, LblNiveisHint);
             LblAltura.Text = walk ? "Altura do meio-fio / nível da calçada (m)" : "Nível do topo em relação à pista (m)";
             Show(walk || t == TipoElementoSecao.CanteiroFisico, LblVegetacao, TbVegetacao);
             Show(true, LblAltura, TbAltura);
@@ -537,6 +667,8 @@ public partial class RoadWindow : Window
             Select(CbDispositivo, e.Dispositivo);
             TbSarjeta.Text = UiHelpers.F(e.Sarjeta);
             TbMeioFio.Text = UiHelpers.F(e.LarguraMeioFio);
+            TbInclinacao.Text = UiHelpers.F(e.InclinacaoTransversal, "0.##");
+            TbNiveis.Text = NivelAlinhamento.Format(e.NiveisAlinhamento);
             Select(CbCorCaminhada, e.CorCaminhada);
             TbLarguraLinha.Text = UiHelpers.F(e.LarguraLinha);
             CkSeccionada.IsChecked = e.LinhaSeccionada;
@@ -578,6 +710,8 @@ public partial class RoadWindow : Window
         double Num(TextBox tb, double current, double min = 0) => UiHelpers.ParseOpt(tb.Text) is { } v && v >= min ? v : current;
         el.Sarjeta = Num(TbSarjeta, el.Sarjeta);
         el.LarguraMeioFio = Num(TbMeioFio, el.LarguraMeioFio, 0.05);
+        el.InclinacaoTransversal = UiHelpers.ParseOpt(TbInclinacao.Text) is { } inc and >= -8 and <= 8 ? inc : el.InclinacaoTransversal;
+        if (sender == TbNiveis) el.NiveisAlinhamento = NivelAlinhamento.Parse(TbNiveis.Text);
         if (CbCorCaminhada.SelectedItem is Option<MarkingColor> cc) el.CorCaminhada = cc.Value;
         el.LarguraLinha = Num(TbLarguraLinha, el.LarguraLinha, 0.02);
         el.LinhaSeccionada = CkSeccionada.IsChecked == true;
@@ -613,7 +747,11 @@ public partial class RoadWindow : Window
             Snap = CkSnap.IsChecked == true;
             CurveRadius = UiHelpers.Parse(TbCurveRadius, 0, "Raio das curvas", 0, 5000);
             var st = PluginContext.Settings;
-            st.LastRoadSetup = RoadTemplates.ToJson(Setup);
+            // A próxima via reabre com a mesma seção, mas sem as medidas e recuos (que são desta via).
+            var last = Setup.Clone();
+            last.LargurasVariaveis = new();
+            last.Recuos = new();
+            st.LastRoadSetup = RoadTemplates.ToJson(last);
             st.AutoCrosswalks = CkIntCrosswalks.IsChecked == true;
             st.LastConnection = Connection;
             st.LastFreeEnds = FreeEnds;

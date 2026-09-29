@@ -131,6 +131,12 @@ public sealed class ElementoSecao
     /// <summary>Calçada (faixa de serviço gramada) e canteiro físico: nível do topo da vegetação (m). Nulo = igual ao elemento.</summary>
     public double? AlturaVegetacao { get; set; }
 
+    /// <summary>Calçada: inclinação transversal (%), subindo em direção ao lote (NBR 9050: até 3 %). 0 = plana.</summary>
+    public double InclinacaoTransversal { get; set; }
+
+    /// <summary>Calçada: nível no alinhamento predial ao longo da via (edificações mais altas, topografia). Vazio = pela inclinação.</summary>
+    public List<NivelAlinhamento> NiveisAlinhamento { get; set; } = new();
+
     public static double AlturaPadrao(TipoElementoSecao t) =>
         t is TipoElementoSecao.Calcada or TipoElementoSecao.CanteiroFisico ? RoadSetup.CurbHeight : 0;
 
@@ -146,7 +152,12 @@ public sealed class ElementoSecao
     [System.Text.Json.Serialization.JsonIgnore]
     public bool Elevado => Tipo is not (TipoElementoSecao.Calcada or TipoElementoSecao.CanteiroFisico) && AlturaEfetiva >= 0.01;
 
-    public ElementoSecao Clone() => (ElementoSecao)MemberwiseClone();
+    public ElementoSecao Clone()
+    {
+        var c = (ElementoSecao)MemberwiseClone();
+        c.NiveisAlinhamento = NiveisAlinhamento.Select(n => n.Clone()).ToList();
+        return c;
+    }
 
     public static string Rotulo(TipoElementoSecao t) => t switch
     {
@@ -190,7 +201,7 @@ public sealed class ElementoSecao
 /// elementos físicos: faixas de rolamento, exclusivas e preferenciais, ciclofaixas, estacionamento,
 /// acostamentos, faixas de segurança, canteiros centrais e laterais e calçadas.
 /// </summary>
-public sealed class RoadSetup
+public sealed partial class RoadSetup
 {
     public const double CurbWidth = 0.15;
     /// <summary>Altura usual do meio-fio / nível da calçada acima da pista (m).</summary>
@@ -399,7 +410,8 @@ public sealed class RoadSetup
     public double CarriagewayWidth => Right.Concat(Left).Where(e => e.Tipo is not (TipoElementoSecao.Calcada or TipoElementoSecao.CanteiroFisico)).Sum(e => e.Largura);
 
     /// <summary>Gera todas as definições (todas associadas ao mesmo caminho).</summary>
-    public List<MarkingDefinition> Build(PathReference path, OutputSettings output, Catalogo? catalog = null, string? existingGroupId = null, string? existingPavementId = null)
+    public List<MarkingDefinition> Build(PathReference path, OutputSettings output, Catalogo? catalog = null, string? existingGroupId = null, string? existingPavementId = null,
+        Polyline2? axis = null)
     {
         Warnings.Clear();
         var groupId = existingGroupId ?? Guid.NewGuid().ToString("N");
@@ -493,6 +505,22 @@ public sealed class RoadSetup
 
         BuildSide(Right, -1, reverseTraffic: false);
         BuildSide(Left, +1, reverseTraffic: TwoWay);
+        // Largura variável (levantamento) e recuos (baias, faixas de aceleração/desaceleração).
+        ApplyVariation(res, axis, new Dictionary<MarkingDefinition, (int, double, double)>(), d =>
+        {
+            d.Output = output.Clone();
+            d.GroupId = groupId;
+            d.Hierarchy = Hierarchy == HierarquiaViaria.NaoDefinida ? null : Hierarchy;
+            switch (d)
+            {
+                case SignDefinition sg: sg.Z = path.Z; break;
+                case UrbanElementDefinition ue: ue.Z = path.Z; break;
+                case RecessMarkingDefinition rc: rc.Reverse = rc.Left && TwoWay; d.SetPath(Clone(path)); break;
+                default: d.SetPath(Clone(path)); break;
+            }
+            res.Add(d);
+            return d;
+        });
         return res;
 
         // ------------------------------------------------ lados
@@ -715,13 +743,15 @@ public sealed class RoadSetup
             var free = width - cw - service - access;
             var s0 = a + cw;
             if (curb == 0) { service += cw; s0 = a; }
+            LinearMarkingDefinition? sd = null, fd = null, ad = null;
             if (service > 0.02)
             {
-                if (e.ServicoGramado) Physical("GRAMADO", sigma * (s0 + service / 2), service, e.AlturaVegetacaoEfetiva);
-                else Physical("CALCADA", sigma * (s0 + service / 2), service, top);
+                if (e.ServicoGramado) sd = Physical("GRAMADO", sigma * (s0 + service / 2), service, e.AlturaVegetacaoEfetiva);
+                else sd = Physical("CALCADA", sigma * (s0 + service / 2), service, top);
             }
-            if (free > 0.02) Physical("CALCADA", sigma * (s0 + service + free / 2), free, top);
-            if (access > 0.02) Physical("CALCADA", sigma * (b - access / 2), access, top);
+            if (free > 0.02) fd = Physical("CALCADA", sigma * (s0 + service + free / 2), free, top);
+            if (access > 0.02) ad = Physical("CALCADA", sigma * (b - access / 2), access, top);
+            SidewalkLevelProfiles(e, a, b, top, curb, service, access, sd, fd, ad, sigma > 0);
             if (free < 1.20 - 1e-6)
                 Warnings.Add($"Calçada com faixa livre de {free:0.00} m – a NBR 9050 exige no mínimo 1,20 m.");
         }
@@ -754,6 +784,8 @@ public sealed class RoadSetup
         var c = (RoadSetup)MemberwiseClone();
         c.Right = Right.Select(e => e.Clone()).ToList();
         c.Left = Left.Select(e => e.Clone()).ToList();
+        c.LargurasVariaveis = LargurasVariaveis.Select(p => p.Clone()).ToList();
+        c.Recuos = Recuos.Select(r => r.Clone()).ToList();
         return c;
     }
 }

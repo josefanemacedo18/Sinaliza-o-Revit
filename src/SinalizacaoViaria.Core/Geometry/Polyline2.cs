@@ -133,6 +133,70 @@ public sealed class Polyline2
         return new Polyline2(res, Closed);
     }
 
+    /// <summary>
+    /// Polilinha com vértices extras nas estacas dadas (dentro dos segmentos). Devolve também a estaca de cada vértice.
+    /// </summary>
+    public (List<Vec2> Points, List<double> Stations) WithStations(IEnumerable<double> extra)
+    {
+        var ex = extra.Where(s => s > 1e-6 && s < Length - 1e-6).Distinct().OrderBy(s => s).ToList();
+        var pts = new List<Vec2>();
+        var sts = new List<double>();
+        var k = 0;
+        for (int i = 0; i < Points.Count; i++)
+        {
+            if (i > 0)
+            {
+                var s0 = _stations[i - 1];
+                var s1 = _stations[i];
+                while (k < ex.Count && ex[k] <= s0 + 1e-6) k++;
+                while (k < ex.Count && ex[k] < s1 - 1e-6)
+                {
+                    var t = s1 - s0 < 1e-12 ? 0 : (ex[k] - s0) / (s1 - s0);
+                    pts.Add(Points[i - 1] + (Points[i] - Points[i - 1]) * t);
+                    sts.Add(ex[k]);
+                    k++;
+                }
+            }
+            pts.Add(Points[i]);
+            sts.Add(_stations[i]);
+        }
+        return (pts, sts);
+    }
+
+    /// <summary>
+    /// Deslocamento lateral VARIÁVEL ao longo do caminho (positivo = à esquerda): o afastamento de cada vértice é
+    /// <paramref name="d"/>(estaca). Vértices extras são inseridos em <paramref name="extraStations"/> (quebras do perfil),
+    /// com junções em esquadria limitada como em <see cref="Offset"/>.
+    /// </summary>
+    public Polyline2 OffsetVariable(Func<double, double> d, IEnumerable<double>? extraStations = null, double miterLimit = 4.0)
+    {
+        if (Points.Count < 2) return this;
+        var (pts, sts) = WithStations(extraStations ?? Array.Empty<double>());
+        var n = pts.Count;
+        var res = new Vec2[n];
+        for (int i = 0; i < n; i++)
+        {
+            var di = d(sts[i]);
+            Vec2? tPrev = null, tNext = null;
+            if (i > 0) tPrev = (pts[i] - pts[i - 1]).Normalized();
+            else if (Closed) tPrev = (pts[n - 1] - pts[n - 2]).Normalized();
+            if (i < n - 1) tNext = (pts[i + 1] - pts[i]).Normalized();
+            else if (Closed) tNext = (pts[1] - pts[0]).Normalized();
+            if (tPrev == null) { res[i] = pts[i] + tNext!.Value.PerpLeft * di; continue; }
+            if (tNext == null) { res[i] = pts[i] + tPrev.Value.PerpLeft * di; continue; }
+            var n1 = tPrev.Value.PerpLeft;
+            var n2 = tNext.Value.PerpLeft;
+            var bis = n1 + n2;
+            var bl = bis.Length;
+            if (bl < 1e-9) { res[i] = pts[i] + n1 * di; continue; }
+            bis /= bl;
+            var cosHalf = bis.Dot(n1);
+            var k = cosHalf < 1.0 / miterLimit ? miterLimit : 1.0 / cosHalf;
+            res[i] = pts[i] + bis * (di * k);
+        }
+        return new Polyline2(res, Closed);
+    }
+
     /// <summary>Projeção do ponto na polilinha: estaca e distância com sinal (+ à esquerda do sentido).</summary>
     public (double Station, double Signed) Project(Vec2 p)
     {

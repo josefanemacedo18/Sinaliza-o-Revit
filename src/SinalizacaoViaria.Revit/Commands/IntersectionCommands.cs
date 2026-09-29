@@ -84,6 +84,9 @@ internal static class IntersectionForms
          .Check("Esquinas com a mesma composição das calçadas das vias (meio-fio + faixa gramada + passeio)", () => d.MatchRoadSection, v => d.MatchRoadSection = v,
              "Repete nas esquinas a faixa de serviço gramada definida na seção das vias que se cruzam, alinhando o desenho com as vias.");
 
+        w.Section("Linha de continuidade (LCO) na boca das secundárias", "O bordo da via principal continua tracejado atravessando a boca da secundária: quem entra ou sai cruza a linha (MBST Vol. IV).")
+         .Choice("Linha de continuidade", new[] { ("Pela hierarquia (arterial/rodovia × via menor)", LinhaContinuidade.Automatica), ("Sempre", LinhaContinuidade.Sempre), ("Nunca", LinhaContinuidade.Nunca) },
+             () => d.ContinuityLine, v => d.ContinuityLine = v);
         var ilhas = new[] { ("Nenhuma", TipoIlha.Nenhuma), ("Física (meio-fio)", TipoIlha.Fisica), ("Pintada (zebrado)", TipoIlha.Pintada) };
         w.Section("Tipo II – ilha separadora (gota) na via secundária", "A pista é alargada em volta da ilha; a travessia passa por um refúgio no nível da pista.")
          .Choice("Ilha gota", ilhas, () => d.SplitterIslands, v => d.SplitterIslands = v)

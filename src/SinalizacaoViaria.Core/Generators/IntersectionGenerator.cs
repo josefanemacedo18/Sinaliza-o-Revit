@@ -6,7 +6,11 @@ using SinalizacaoViaria.Core.Model;
 namespace SinalizacaoViaria.Core.Generators;
 
 /// <summary>Via participante de uma interseção (pavimento/seção + eixo resolvido).</summary>
-public sealed record IntersectionRoad(RoadPavementDefinition Def, Polyline2 Axis);
+public sealed record IntersectionRoad(RoadPavementDefinition Def, Polyline2 Axis)
+{
+    /// <summary>A via com a seção que tem no ponto <paramref name="p"/> (vias de largura variável).</summary>
+    public IntersectionRoad LocalAt(Vec2 p) => Def.HasEdgeVariation ? this with { Def = Def.Local(Axis.Project(p).Station, Axis) } : this;
+}
 
 /// <summary>Ramo de uma via a partir do nó da interseção.</summary>
 public sealed record IntersectionLeg(int Road, int Sign, double NodeStation, double Clear, Vec2 Dir)
@@ -488,6 +492,8 @@ public static class IntersectionGenerator
             return L;
         }
         var node = d.Node;
+        // Vias de largura variável: a interseção usa a seção de cada via no ponto do cruzamento.
+        input = input.Select(r => r.LocalAt(node)).ToList();
         var rc = Math.Max(0, d.CornerRadius);
         var channels = d.RightTurnIslands != TipoIlha.Nenhuma;
         var rs = channels ? Math.Max(d.RightTurnRadius, rc + 3) : rc;
@@ -1394,6 +1400,68 @@ public static class IntersectionGenerator
             Add(new HatchMarkingDefinition { Code = "ZPA", Boundary = PathReference.FromPoints(p.Outer, z, true) });
         foreach (var p in L.PaintedMedians)
             Add(new HatchMarkingDefinition { Code = "ZPA-A", Boundary = PathReference.FromPoints(p.Outer, z, true) });
+
+        // Linha de continuidade (LCO): o bordo da via principal continua tracejado na boca da secundária – quem está na
+        // principal e entra na secundária (ou vice-versa) cruza a linha (MBST Vol. IV).
+        if (UseContinuityLine(d, L))
+            foreach (var lco in ContinuityLines(d, L, z, roadMembers != null && L.Main < roadMembers.Count ? roadMembers[L.Main] : null)) Add(lco);
+        return res;
+    }
+
+    /// <summary>A interseção recebe LCO no bordo da principal? Automático: principal arterial/rodovia/trânsito rápido com secundária de hierarquia menor.</summary>
+    public static bool UseContinuityLine(IntersectionDefinition d, IntersectionLayout L)
+    {
+        if (d.ContinuityLine == LinhaContinuidade.Nunca || L.Roads.Count < 2) return false;
+        if (d.ContinuityLine == LinhaContinuidade.Sempre) return true;
+        var main = Hierarquia.Rank(L.Roads[L.Main].Def.Hierarchy);
+        var minor = L.Roads.Where((_, i) => i != L.Main).Select(r => Hierarquia.Rank(r.Def.Hierarchy)).DefaultIfEmpty(0).Max();
+        return main >= Hierarquia.Rank(HierarquiaViaria.Arterial) && minor < main && minor > 0;
+    }
+
+    /// <summary>LCO ao longo do bordo da via principal em cada boca das vias secundárias (do fim de uma curva ao início da outra).</summary>
+    public static List<LinearMarkingDefinition> ContinuityLines(IntersectionDefinition d, IntersectionLayout L, double z,
+        IReadOnlyCollection<MarkingDefinition>? mainMembers = null)
+    {
+        var res = new List<LinearMarkingDefinition>();
+        var main = L.Roads[L.Main];
+        var axis = main.Axis;
+        var sN = axis.Project(L.Node).Station;
+        var speed = Hierarquia.DefaultSpeed(main.Def.Hierarchy ?? HierarquiaViaria.Arterial);
+        var reach = L.Roads.Where((_, i) => i != L.Main).Select(r => Math.Max(r.Def.TotalLeft, r.Def.TotalRight)).DefaultIfEmpty(10).Max() + d.CornerRadius + 8;
+        var mouths = new List<Polygon2>();
+        foreach (var (r, i) in L.Roads.Select((r, i) => (r, i)).Where(x => x.i != L.Main))
+            mouths.AddRange(RoadGenerator.Band(r.Axis, -(r.Def.RightWidth + d.CornerRadius * 0.95), r.Def.LeftWidth + d.CornerRadius * 0.95));
+        if (mouths.Count == 0) return res;
+        foreach (var side in new[] { 1, -1 })
+        {
+            var edge = side > 0 ? main.Def.LeftWidth : main.Def.RightWidth;
+            var gutter = main.Def.Gaps.Where(g => !g.Median && Math.Sign(g.Offset) == side).Select(g => g.Width).DefaultIfEmpty(0).Sum();
+            var off = side * (edge - gutter - 0.15);
+            // Continua a linha de bordo que a via já tem desse lado (a mais externa), quando existe.
+            var lbo = mainMembers?.OfType<LinearMarkingDefinition>().Where(l => l.Code == "LBO" && Math.Sign(l.Offset) == side && Math.Abs(l.Offset) > edge * 0.5)
+                .OrderByDescending(l => Math.Abs(l.Offset)).FirstOrDefault();
+            if (lbo != null) off = lbo.Offset;
+            var s0 = Math.Max(0, sN - reach);
+            var s1 = Math.Min(axis.Length, sN + reach);
+            // Trechos do bordo dentro das bocas (amostrado a cada 0,25 m).
+            double? start = null;
+            var runs = new List<(double A, double B)>();
+            for (var s = s0; s <= s1 + 1e-6; s += 0.25)
+            {
+                var p = axis.PointAt(s) + axis.TangentAt(s).PerpLeft * off;
+                var inside = mouths.Any(m => m.Contains(p));
+                if (inside && start == null) start = s;
+                if ((!inside || s + 0.25 > s1) && start is { } a) { runs.Add((a, s)); start = null; }
+            }
+            foreach (var (a, b) in runs.Where(x => x.B - x.A > 2))
+            {
+                var pts = new List<Vec2>();
+                for (var s = a; s <= b + 1e-6; s += 1.0) pts.Add(axis.PointAt(s) + axis.TangentAt(s).PerpLeft * off);
+                if (pts.Count < 2 || pts[^1].DistanceTo(axis.PointAt(b) + axis.TangentAt(b).PerpLeft * off) > 0.05)
+                    pts.Add(axis.PointAt(b) + axis.TangentAt(b).PerpLeft * off);
+                res.Add(new LinearMarkingDefinition { Code = "LCO", Speed = speed, PathRef = PathReference.FromPoints(pts, z) });
+            }
+        }
         return res;
     }
 }

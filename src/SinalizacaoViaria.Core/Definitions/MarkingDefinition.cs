@@ -81,6 +81,12 @@ public sealed class PathReference
     /// </summary>
     public double? SmoothRadius { get; set; }
 
+    /// <summary>
+    /// Variação lateral ao longo do caminho (vias de largura variável): a marca é deslocada/alargada estaca a estaca em
+    /// relação ao eixo. Nulo = paralela ao caminho.
+    /// </summary>
+    public LateralProfile? Lateral { get; set; }
+
     /// <summary>Pontos do caminho já com os cantos arredondados (<see cref="SmoothRadius"/>).</summary>
     public static IReadOnlyList<Vec2> Smooth(IReadOnlyList<Vec2> pts, double? radius, bool closed) =>
         radius is > 0.01 ? CurveTools.FilletCorners(pts, radius.Value, closed) : pts;
@@ -110,6 +116,7 @@ public sealed class PathReference
         Closed = Closed,
         Cache = Cache?.Select(c => new List<Vec2>(c)).ToList(),
         SmoothRadius = SmoothRadius,
+        Lateral = Lateral?.Clone(),
     };
 
     public static PathReference FromPoints(IEnumerable<Vec2> pts, double z, bool closed = false) =>
@@ -170,6 +177,7 @@ public enum Justificacao
 [JsonDerivedType(typeof(RetainingWallDefinition), "muro-arrimo")]
 [JsonDerivedType(typeof(SlopeDefinition), "talude")]
 [JsonDerivedType(typeof(InterchangeDefinition), "no-viario")]
+[JsonDerivedType(typeof(RecessMarkingDefinition), "recuo")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;
@@ -265,9 +273,85 @@ public sealed class LinearMarkingDefinition : MarkingDefinition
     /// negativo = rebaixado (jardim de chuva, canteiro rebaixado). Nulo = espessura do catálogo apoiada na pista.
     /// </summary>
     public double? Height { get; set; }
+    /// <summary>
+    /// Níveis variáveis do topo (calçadas): em cada estaca, quanto o topo sobe (+) ou desce em relação a
+    /// <see cref="Height"/> na borda interna (junto à pista) e na externa (junto ao lote). Interpolado ao longo e através.
+    /// </summary>
+    public List<SidewalkLevelPoint> LevelProfile { get; set; } = new();
+    /// <summary>Trechos (estacas) em que a linha é interrompida – ex.: boca de uma baia de ônibus.</summary>
+    public List<StationRange> Breaks { get; set; } = new();
 
     public override string KindName => "Linear";
     public override string DisplayCode => Code;
+    public override PathReference? Path => PathRef;
+    public override void SetPath(PathReference path) => PathRef = path;
+}
+
+/// <summary>Nível do topo de uma faixa (calçada) numa estaca: variação na borda interna e na externa (m).</summary>
+public sealed class SidewalkLevelPoint
+{
+    public double Station { get; set; }
+    public Vec2? Anchor { get; set; }
+    public double Inner { get; set; }
+    public double Outer { get; set; }
+    public SidewalkLevelPoint Clone() => (SidewalkLevelPoint)MemberwiseClone();
+}
+
+/// <summary>Trecho do caminho entre duas estacas (com os pontos do eixo, para acompanhar prolongamentos do eixo).</summary>
+public sealed class StationRange
+{
+    public double Start { get; set; }
+    public double End { get; set; }
+    public Vec2? AnchorStart { get; set; }
+    public Vec2? AnchorEnd { get; set; }
+
+    public (double A, double B) On(Polyline2 path)
+    {
+        var a = AnchorStart is { } p ? path.Project(p).Station : Start;
+        var b = AnchorEnd is { } q ? path.Project(q).Station : End;
+        return (Math.Min(a, b), Math.Max(a, b));
+    }
+}
+
+/// <summary>
+/// Marcas de um recuo do meio-fio (baia de ônibus, faixa de aceleração/desaceleração, embarque), geradas ao longo do eixo
+/// da via: MVE e legenda na baia, LCO separando a faixa auxiliar, setas.
+/// </summary>
+public sealed class RecessMarkingDefinition : MarkingDefinition
+{
+    public PathReference PathRef { get; set; } = new();
+    public Automation.TipoRecuo Type { get; set; }
+    public bool Left { get; set; }
+    public double S0 { get; set; }
+    public double S1 { get; set; }
+    public double S2 { get; set; }
+    public double S3 { get; set; }
+    public Vec2? A0 { get; set; }
+    public Vec2? A1 { get; set; }
+    public Vec2? A2 { get; set; }
+    public Vec2? A3 { get; set; }
+    /// <summary>Distância do eixo ao bordo externo da última faixa de tráfego (m).</summary>
+    public double LaneEdge { get; set; }
+    /// <summary>Distância do eixo à linha de bordo (m).</summary>
+    public double EdgeLine { get; set; }
+    /// <summary>Distância do eixo à face do meio-fio sem o recuo (m).</summary>
+    public double Curb { get; set; }
+    public double Gutter { get; set; }
+    public double Depth { get; set; }
+    public double Speed { get; set; } = 50;
+    public string Legend { get; set; } = "ÔNIBUS";
+    public bool Smooth { get; set; }
+    /// <summary>O tráfego do lado do recuo circula contra o sentido do eixo (lado esquerdo de via de mão dupla).</summary>
+    public bool Reverse { get; set; }
+
+    public override string KindName => "Recuo da via";
+    public override string DisplayCode => Type switch
+    {
+        Automation.TipoRecuo.BaiaOnibus => "MVE",
+        Automation.TipoRecuo.FaixaAceleracao => "FX-ACEL",
+        Automation.TipoRecuo.FaixaDesaceleracao => "FX-DESAC",
+        _ => "RECUO",
+    };
     public override PathReference? Path => PathRef;
     public override void SetPath(PathReference path) => PathRef = path;
 }
@@ -1209,7 +1293,30 @@ public enum TipoPavimento
 }
 
 /// <summary>Faixa (offset do eixo e largura) sem pavimento – canteiros elevados e sarjetas.</summary>
-public sealed record PavementGap(double Offset, double Width, bool Median = true);
+public sealed record PavementGap(double Offset, double Width, bool Median = true)
+{
+    /// <summary>Deslocamento da faixa sem pavimento ao longo do eixo (vias de largura variável).</summary>
+    public LateralProfile? Lateral { get; init; }
+}
+
+/// <summary>
+/// Variação das bordas da via numa estaca: quanto o bordo da pista (face do meio-fio) e o alinhamento (muro/lote) se
+/// afastam do eixo em relação à seção, de cada lado (m, + = mais largo). <see cref="Anchor"/>: ponto do eixo na estaca
+/// (a estaca é recalculada se o eixo for prolongado/aparado).
+/// </summary>
+public sealed class EdgeVariationPoint
+{
+    public double Station { get; set; }
+    public Vec2? Anchor { get; set; }
+    public double CurbLeft { get; set; }
+    public double CurbRight { get; set; }
+    public double LotLeft { get; set; }
+    public double LotRight { get; set; }
+    public EdgeVariationPoint Clone() => (EdgeVariationPoint)MemberwiseClone();
+
+    [JsonIgnore]
+    public bool IsZero => Math.Abs(CurbLeft) < 1e-6 && Math.Abs(CurbRight) < 1e-6 && Math.Abs(LotLeft) < 1e-6 && Math.Abs(LotRight) < 1e-6;
+}
 
 /// <summary>
 /// Pavimento da pista gerado pelo "Sinalizar via". Também registra a seção transversal (larguras da pista e das
@@ -1244,6 +1351,81 @@ public sealed class RoadPavementDefinition : MarkingDefinition
     /// </summary>
     public bool MergeStart { get; set; }
     public bool MergeEnd { get; set; }
+
+    /// <summary>Largura variável ao longo do eixo: variação dos bordos e alinhamentos em cada estaca (interpolada).</summary>
+    public List<EdgeVariationPoint> EdgeVariation { get; set; } = new();
+
+    [JsonIgnore]
+    public bool HasEdgeVariation => EdgeVariation.Any(p => !p.IsZero);
+
+    /// <summary>Variação dos bordos em função da estaca no eixo dado (e as estacas de amostragem).</summary>
+    public (Func<double, (double CurbL, double CurbR, double LotL, double LotR)> At, List<double> Samples) EdgeFunctions(Polyline2? axis)
+    {
+        var pts = EdgeVariation.Select(p =>
+        {
+            var c = p.Clone();
+            if (axis != null && p.Anchor is { } a && axis.Points.Count >= 2) c.Station = axis.Project(a).Station;
+            return c;
+        }).OrderBy(p => p.Station).ToList();
+        (double, double, double, double) At(double s)
+        {
+            if (pts.Count == 0) return (0, 0, 0, 0);
+            EdgeVariationPoint a = pts[0], b = pts[0];
+            double u = 0;
+            if (s <= pts[0].Station) { a = b = pts[0]; }
+            else if (s >= pts[^1].Station) { a = b = pts[^1]; }
+            else
+                for (int i = 0; i + 1 < pts.Count; i++)
+                {
+                    if (s > pts[i + 1].Station) continue;
+                    a = pts[i];
+                    b = pts[i + 1];
+                    var len = b.Station - a.Station;
+                    u = len < 1e-9 ? 1 : (s - a.Station) / len;
+                    break;
+                }
+            double L(double x, double y) => x + (y - x) * u;
+            return (L(a.CurbLeft, b.CurbLeft), L(a.CurbRight, b.CurbRight), L(a.LotLeft, b.LotLeft), L(a.LotRight, b.LotRight));
+        }
+        var samples = pts.Select(p => p.Station).Where(s => axis == null || (s > 1e-6 && s < axis.Length - 1e-6)).ToList();
+        return (At, samples);
+    }
+
+    /// <summary>
+    /// Cópia da via com a seção da estaca <paramref name="station"/> (larguras constantes) – interseções, rotatórias e
+    /// balões usam a largura que a via tem naquele ponto.
+    /// </summary>
+    public RoadPavementDefinition Local(double station, Polyline2? axis = null)
+    {
+        var c = (RoadPavementDefinition)FromJson(ToJson())!;
+        if (!HasEdgeVariation) return c;
+        var (fn, _) = EdgeFunctions(axis);
+        var v = fn(station);
+        c.RightWidth = Math.Max(0.5, RightWidth + v.CurbR);
+        c.LeftWidth = Math.Max(0, LeftWidth + v.CurbL);
+        if (RightSidewalk > 0.01) c.RightSidewalk = Math.Max(0.2, RightSidewalk + v.LotR - v.CurbR);
+        if (LeftSidewalk > 0.01) c.LeftSidewalk = Math.Max(0.2, LeftSidewalk + v.LotL - v.CurbL);
+        c.Gaps = Gaps.Select(g => g with { Offset = g.Offset + (g.Lateral is { IsEmpty: false } gl ? gl.ShiftAt(station, axis) : 0), Lateral = null }).ToList();
+        c.EdgeVariation = new List<EdgeVariationPoint>();
+        return c;
+    }
+
+    /// <summary>
+    /// Perfil lateral de um elemento acrescentado junto ao bordo (<paramref name="lot"/> = além da calçada, no
+    /// alinhamento): acompanha a variação da via desse lado.
+    /// </summary>
+    public LateralProfile? EdgeLateral(bool left, bool lot)
+    {
+        if (!HasEdgeVariation) return null;
+        var sg = left ? 1.0 : -1.0;
+        var p = new LateralProfile();
+        foreach (var e in EdgeVariation)
+        {
+            var d = lot ? (left ? e.LotLeft : e.LotRight) : (left ? e.CurbLeft : e.CurbRight);
+            p.Points.Add(new LateralPoint(e.Station, sg * d, 0, e.Anchor));
+        }
+        return p.IsEmpty ? null : p;
+    }
 
     public double DefaultThickness => Material switch { TipoPavimento.Bloquete => 0.08, TipoPavimento.Concreto => 0.15, _ => 0.05 };
     public double ActualThickness => Thickness is > 0 ? Thickness.Value : DefaultThickness;
@@ -1300,6 +1482,12 @@ public sealed class IntersectionDefinition : MarkingDefinition
     /// <summary>Placas R-1/R-2 e legenda "PARE"/símbolo "Dê a preferência" nas aproximações secundárias.</summary>
     public bool Signs { get; set; } = true;
 
+    /// <summary>
+    /// Linha de continuidade (LCO) tracejada no bordo da via principal, atravessando a boca das secundárias. Automática:
+    /// quando a principal é arterial, rodovia ou de trânsito rápido e a secundária tem hierarquia menor.
+    /// </summary>
+    public LinhaContinuidade ContinuityLine { get; set; } = LinhaContinuidade.Automatica;
+
     /// <summary>Tipo II – ilha separadora (gota) nas aproximações das vias secundárias, com alargamento da pista.</summary>
     public TipoIlha SplitterIslands { get; set; } = TipoIlha.Nenhuma;
     public double SplitterLength { get; set; } = 15.0;
@@ -1325,6 +1513,15 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public override void Translate(Vec2 delta, double dz) { Node += delta; Z += dz; }
     public override string KindName => "Interseção";
     public override string DisplayCode => "INTERSECAO";
+}
+
+/// <summary>Uso da linha de continuidade (LCO) na boca das vias secundárias.</summary>
+public enum LinhaContinuidade
+{
+    /// <summary>Pela hierarquia: principal arterial/rodovia/trânsito rápido com secundária de hierarquia menor.</summary>
+    Automatica,
+    Sempre,
+    Nunca,
 }
 
 /// <summary>Controle do direito de passagem na interseção.</summary>

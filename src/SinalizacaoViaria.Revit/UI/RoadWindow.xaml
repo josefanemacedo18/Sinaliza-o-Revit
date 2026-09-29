@@ -122,6 +122,7 @@
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <TextBlock x:Name="LblVaga" Text="Tipo de vaga" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="CbVaga" Grid.Column="1" SelectionChanged="DetailChanged"/>
@@ -169,6 +170,14 @@
                             <TextBlock x:Name="LblMeioFio" Grid.Row="19" Text="Meio-fio – largura no topo (m)" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="TbMeioFio" Grid.Row="19" Grid.Column="1" TextChanged="DetailChanged"
                                      ToolTip="Guia de concreto: 0,12 a 0,15 m usual (padrão 0,15). A altura do meio-fio (espelho) é o nível da calçada acima."/>
+                            <TextBlock x:Name="LblInclinacao" Grid.Row="20" Text="Inclinação transversal (%, sobe p/ o lote)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbInclinacao" Grid.Row="20" Grid.Column="1" TextChanged="DetailChanged"
+                                     ToolTip="NBR 9050: até 3 %. 0 = calçada plana. A calçada sobe do meio-fio em direção ao alinhamento."/>
+                            <TextBlock x:Name="LblNiveis" Grid.Row="21" Text="Nível no alinhamento (estaca:nível; …)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbNiveis" Grid.Row="21" Grid.Column="1" TextChanged="DetailChanged"
+                                     ToolTip="Ex.: 0:0,15; 40:0,45; 70:0,45; 90:0,15 – nível (m acima da pista) junto ao lote em cada estaca, para edificações mais altas ou topografia. A faixa de acesso vence o desnível (rampa ≤ 8,33 %; acima disso, avisa para prever degraus)."/>
+                            <TextBlock x:Name="LblNiveisHint" Grid.Row="22" Grid.ColumnSpan="2" Style="{StaticResource Hint}"
+                                       Text="Use a faixa de acesso (junto ao lote) para absorver desníveis: a faixa livre mantém a inclinação de até 3 % e a de acesso vira rampa."/>
                             <TextBlock x:Name="LblVegetacao" Grid.Row="18" Text="Nível da vegetação (m, vazio = igual)" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="TbVegetacao" Grid.Row="18" Grid.Column="1" TextChanged="DetailChanged"
                                      ToolTip="Faixa gramada da calçada ou vegetação do canteiro: mais alta (floreira), no nível ou rebaixada (jardim de chuva)."/>
@@ -201,6 +210,70 @@
                         <CheckBox Grid.Row="8" Grid.ColumnSpan="2" x:Name="CkGutterAdds" Content="Somar a sarjeta à largura da pista (as faixas mantêm a largura útil)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
                                   ToolTip="Marcado: pista entre meios-fios = faixas + sarjetas (ex.: 3,50 + 0,30 = 3,80 m até a face da guia). Desmarcado: a sarjeta ocupa a borda da última faixa (vias criadas antes desta versão)."/>
                     </Grid>
+                </GroupBox>
+
+                <GroupBox Header="Largura variável ao longo do eixo (levantamento)">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" Text="Medidas do levantamento em cada estaca: distância do EIXO ao bordo da pista (face do meio-fio/sarjeta) e ao alinhamento (muro, divisa do lote). Vazio = medida da seção. Entre as estacas a largura varia gradualmente; antes do primeiro e depois do último ponto fica constante. Estaca em metros (110) ou em estacas de 20 m (5+10)."/>
+                        <DataGrid x:Name="GridWidths" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
+                                  HeadersVisibility="Column" Height="130" SelectionMode="Single" CellEditEnding="CellEdited">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Estaca" Width="70" Binding="{Binding Estaca}"/>
+                                <DataGridTextColumn Header="Bordo esq." Width="*" Binding="{Binding BordoEsq}"/>
+                                <DataGridTextColumn Header="Bordo dir." Width="*" Binding="{Binding BordoDir}"/>
+                                <DataGridTextColumn Header="Alinh. esq." Width="*" Binding="{Binding AlinhEsq}"/>
+                                <DataGridTextColumn Header="Alinh. dir." Width="*" Binding="{Binding AlinhDir}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <Button Content="+ Ponto" Click="AddWidthClick" Margin="0"/>
+                            <Button Content="Remover" Click="RemoveWidthClick"/>
+                            <Button Content="Limpar" Click="ClearWidthsClick"/>
+                        </StackPanel>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="70"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Entre meios-fios (m)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" x:Name="TbQuickTotal" ToolTip="Largura medida de meio-fio a meio-fio nesta estaca"/>
+                            <TextBlock Grid.Column="2" Text=" na estaca" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="3" x:Name="TbQuickStation"/>
+                            <ComboBox Grid.Column="4" x:Name="CbQuickSplit" Width="150" Margin="6,3,0,3"/>
+                        </Grid>
+                        <Button Content="Adicionar medida entre meios-fios" HorizontalAlignment="Left" Margin="0,2,0,0" Click="AddQuickClick"/>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Quem absorve a variação na pista" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox Grid.Column="1" x:Name="CbAbsorb" SelectionChanged="AnyChanged"/>
+                        </Grid>
+                        <CheckBox x:Name="CkSmoothWidth" Content="Transição em curva S (suave) entre os pontos" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox x:Name="CkReadSurvey" Content="Depois de indicar o eixo, ler do desenho os meios-fios e muros existentes (linhas do levantamento)"
+                                  ToolTip="Após o eixo, selecione as linhas do bordo direito, bordo esquerdo, alinhamento direito e esquerdo (ESC pula). O plugin mede a distância ao eixo a cada 5 m e preenche esta tabela."/>
+                        <TextBlock x:Name="TxtNominal" Style="{StaticResource Hint}"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Header="Recuos do meio-fio: baias de ônibus, faixas de aceleração/desaceleração">
+                    <StackPanel>
+                        <DataGrid x:Name="GridRecess" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
+                                  HeadersVisibility="Column" Height="110" SelectionMode="Single" CellEditEnding="CellEdited">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Tipo" Width="*" Binding="{Binding TipoTexto}" IsReadOnly="True"/>
+                                <DataGridCheckBoxColumn Header="Esq." Width="36" Binding="{Binding Esquerdo, UpdateSourceTrigger=PropertyChanged}"/>
+                                <DataGridTextColumn Header="Estaca" Width="55" Binding="{Binding Estaca}"/>
+                                <DataGridTextColumn Header="Compr." Width="50" Binding="{Binding Comprimento}"/>
+                                <DataGridTextColumn Header="Prof." Width="45" Binding="{Binding Profundidade}"/>
+                                <DataGridTextColumn Header="Taper in" Width="55" Binding="{Binding TaperIn}"/>
+                                <DataGridTextColumn Header="Taper out" Width="60" Binding="{Binding TaperOut}"/>
+                                <DataGridCheckBoxColumn Header="Calçada recua" Width="55" Binding="{Binding CalcadaRecua, UpdateSourceTrigger=PropertyChanged}"/>
+                                <DataGridCheckBoxColumn Header="Curva S" Width="45" Binding="{Binding Curva, UpdateSourceTrigger=PropertyChanged}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <ComboBox x:Name="CbRecessType" Width="210" Margin="0,0,0,0"/>
+                            <Button Content="+ Adicionar" Click="AddRecessClick"/>
+                            <Button Content="Remover" Click="RemoveRecessClick"/>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" Text="Estaca = início da transição de entrada; comprimento = trecho com a profundidade total. Os valores iniciais seguem a velocidade da via (DNIT/AASHTO, indicativos). Baia: MVE amarela, ÔNIBUS, LCO na boca, placa e abrigo. Faixas auxiliares: LCO e setas. Calçada recua = o alinhamento fica e a calçada estreita."/>
+                    </StackPanel>
                 </GroupBox>
 
                 <GroupBox Header="Pavimento">

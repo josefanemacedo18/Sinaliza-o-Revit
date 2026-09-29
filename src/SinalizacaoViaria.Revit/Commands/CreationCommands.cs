@@ -35,7 +35,14 @@ public class CmdSinalizarVia : CommandBase
         var path = RoadAxisInput.Get(uidoc, w.DrawPath, w.Snap, axisRadius, snapped);
         if (path == null) return Result.Cancelled;
 
-        var defs = w.BuildDefinitions(path);
+        // Eixo resolvido: as estacas da largura variável ficam amarradas a pontos do eixo (sobrevivem a prolongamentos).
+        var axis = PathResolver.Resolve(doc, path)?.Main;
+        if (w.ReadSurvey && axis != null)
+        {
+            var survey = WidthSurvey.Read(uidoc, axis);
+            if (survey.Count > 0) w.Setup.LargurasVariaveis = survey;
+        }
+        var defs = w.BuildDefinitions(path, axis);
         RoadSetup.ApplyAxisRadius(defs, w.CurveRadius);
         var opt = new RoadCreation(w.AutoIntersect, w.Connection, w.FreeEnds, w.IntersectionCrosswalks, w.CornerRadius, w.IntersectionRamps && w.IntersectionCrosswalks,
             w.Relief, w.OutputSettings);
@@ -179,6 +186,7 @@ public sealed class CmdPista : CommandBase
         var radius = st.LastCurveRadius;
         var connect = st.Get("pista:conectar") != "0";
         var crosswalks = st.AutoCrosswalks;
+        var survey = false;
         var w = new FormWindow("Pista", "Pista (parte dos veículos)",
                 "Cria só o pavimento da pista, já ligado às vias existentes. Depois monte a via elemento por elemento com " +
                 "Meio-fio e Sarjeta / Calçadas no modo \"Junto ao bordo de uma via\" – eles passam a fazer parte da via e das conexões.",
@@ -208,7 +216,8 @@ public sealed class CmdPista : CommandBase
             .Choice("Eixo", new[] { ("Desenhar por pontos (encaixa nas vias existentes)", true), ("Selecionar linhas existentes", false) }, () => draw, v => draw = v)
             .Number("Raio das curvas ao desenhar (m)", () => radius, v => radius = v, 0, 5000)
             .Check("Conectar às vias existentes (interseção simples)", () => connect, v => connect = v)
-            .Check("Faixas de pedestres nas interseções", () => crosswalks, v => crosswalks = v);
+            .Check("Faixas de pedestres nas interseções", () => crosswalks, v => crosswalks = v)
+            .Check("Largura variável: ler os bordos existentes do desenho depois do eixo (linhas do levantamento)", () => survey, v => survey = v);
         if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
         d.Hierarchy = h;
         UiHelpers.Remember("Pista", d);
@@ -225,6 +234,11 @@ public sealed class CmdPista : CommandBase
         var path = RoadAxisInput.Get(uidoc, draw, snap, Math.Max(radius, RoadSetup.MinAxisRadius(Math.Max(d.LeftWidth, d.RightWidth))), snapped);
         if (path == null) return Result.Cancelled;
         var defs = RoadConnection.BuildCarriageway(d, path, output, center == "-" ? null : center, edges, Hierarquia.DefaultSpeed(h));
+        if (survey && PathResolver.Resolve(uidoc.Document, path)?.Main is { } axis)
+        {
+            var pts = WidthSurvey.Read(uidoc, axis);
+            if (pts.Count > 0) RoadConnection.ApplySurvey(defs, pts, axis, smooth: false);
+        }
         RoadSetup.ApplyAxisRadius(defs, radius);
         var results = MarkingCreator.Commit(uidoc, defs, "SV - Pista");
         if (connect && defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav)

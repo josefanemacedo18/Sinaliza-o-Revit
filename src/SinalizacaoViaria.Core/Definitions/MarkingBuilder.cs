@@ -65,9 +65,23 @@ public static class MarkingBuilder
 {
     public static MarkingGeometry Build(MarkingDefinition def, Polyline2? path, BuildContext ctx)
     {
+        // Via de largura variável: a marca acompanha o bordo/alinhamento estaca a estaca (deslocada e, nas faixas contínuas,
+        // alargada). O pavimento usa as bordas variáveis próprias (RoadPavementDefinition.EdgeVariation).
+        if (path != null && path.Points.Count >= 2 && def is not RoadPavementDefinition && def.Path?.Lateral is { IsEmpty: false } lat)
+        {
+            var band = def switch
+            {
+                LinearMarkingDefinition l => VariableLinear(l, path, lat, ctx),
+                HatchMarkingDefinition h => VariableHatchStrip(h, path, lat, ctx),
+                _ => null,
+            };
+            if (band != null) return def.Exclusions.All(z => !z.Enabled) ? band : ApplyExclusions(band, def.Exclusions);
+            path = lat.Apply(path);
+        }
         if (path != null && def.Justify is Justificacao.Esquerda or Justificacao.Direita && SupportsJustify(def) && path.Points.Count >= 2)
             path = JustifiedPath(def, path, ctx);
         var geo = BuildRaw(def, path, ctx);
+        if (def is LinearMarkingDefinition { Breaks.Count: > 0 } lb && path != null) geo = ApplyBreaks(geo, lb.Breaks, path);
         return def.Exclusions.All(z => !z.Enabled) ? geo : ApplyExclusions(geo, def.Exclusions);
     }
 
@@ -117,6 +131,34 @@ public static class MarkingBuilder
             hi = Math.Max(hi, d);
         }
         return (lo, hi);
+    }
+
+    /// <summary>Interrompe a marca nos trechos (estacas) indicados – boca de baias, acessos.</summary>
+    public static MarkingGeometry ApplyBreaks(MarkingGeometry geo, IEnumerable<StationRange> breaks, Polyline2 path)
+    {
+        var cuts = new List<Polygon2>();
+        foreach (var b in breaks)
+        {
+            var (a, e) = b.On(path);
+            if (e - a > 0.05) cuts.AddRange(Generators.RoadGenerator.VariableBand(path, a, e, _ => -40, _ => 40));
+        }
+        if (cuts.Count == 0) return geo;
+        var res = new MarkingGeometry { PaintedLength = geo.PaintedLength, PathLength = geo.PathLength, UnitCount = geo.UnitCount };
+        res.Warnings.AddRange(geo.Warnings);
+        foreach (var p in geo.Pieces)
+        {
+            if (p.Profile != null || p.Solid != null)
+            {
+                if (!cuts.Any(h => h.Contains(p.Shape.Centroid))) res.Pieces.Add(p);
+                continue;
+            }
+            foreach (var part in PolygonOps.Difference(new[] { p.Shape }, cuts))
+            {
+                var s = part.Simplified();
+                if (s != null && s.Area > 1e-4) res.Pieces.Add(p with { Shape = s });
+            }
+        }
+        return res;
     }
 
     /// <summary>Recorta as peças pelas zonas de exclusão (ex.: calçada sob um rebaixamento).</summary>
@@ -180,6 +222,7 @@ public static class MarkingBuilder
         InterchangeDefinition ic => InterchangeGenerator.Build(ic, ctx),
         BridgeDefinition br => path == null || path.Points.Count < 2 ? Missing("Eixo da obra de arte não encontrado.") : BridgeGenerator.Build(br, path, ctx),
         RailwayDefinition rw => path == null || path.Points.Count < 2 ? Missing("Eixo da via férrea não encontrado.") : RailwayGenerator.Build(rw, path),
+        RecessMarkingDefinition rc => path == null || path.Points.Count < 2 ? Missing("Eixo da via do recuo não encontrado.") : RecessGenerator.Build(rc, path, ctx),
         ChannelizationDefinition cz => path == null || path.Points.Count < 2 ? Missing("Linha de referência da canalização não encontrada.") : ChannelizationGenerator.Generate(cz, path, ctx),
         _ => throw new NotSupportedException(def.GetType().Name),
     };
@@ -238,7 +281,93 @@ public static class MarkingBuilder
             MaxPieceLength = ctx.MaxPieceLength,
         });
         if (d.Height is { } top) ApplyTopLevel(lin, top);
+        DeepenForLevels(lin, d);
         return lin;
+    }
+
+    /// <summary>
+    /// Faixa contínua de largura variável (calçada, grama, plataforma, fundo pintado): bordas que acompanham o perfil
+    /// lateral da via. Nulo = a marca não é uma faixa contínua simples (só é deslocada).
+    /// </summary>
+    private static MarkingGeometry? VariableLinear(LinearMarkingDefinition d, Polyline2 path, LateralProfile lat, BuildContext ctx)
+    {
+        if (!lat.HasWiden || d.Reverse || d.Code is "SARJETAO" or "PTA" or "PTD" or "LRV") return null;
+        var type = ctx.Catalog.Linear(d.Code);
+        if (type == null || type.Unidades) return null;
+        var variant = ResolveVariant(type, d.Variant, d.Speed);
+        if (variant == null || variant.Faixas.Count != 1 || !variant.Faixas[0].Continua) return null;
+        var f = variant.Faixas[0];
+        var w = d.WidthOverride is > 0 ? d.WidthOverride.Value : f.Largura;
+        var c = d.Offset + (d.InvertSides ? -f.Deslocamento : f.Deslocamento);
+        var (shift, widen, breaks) = lat.For(path);
+        var samples = LateralProfile.Samples(breaks, path.Length, x => shift(x) + widen(x), lat.Smooth);
+        var s0 = Math.Max(0, d.StartSetback);
+        var s1 = path.Length - Math.Max(0, d.EndSetback);
+        var geo = new MarkingGeometry { PathLength = path.Length };
+        if (s1 - s0 < 1e-3) { geo.Warnings.Add("Os recuos são maiores que o comprimento do caminho."); return geo; }
+        var color = d.ColorOverride ?? f.Cor ?? type.Cor;
+        var thick = f.Espessura > 0 ? f.Espessura : type.Espessura;
+        foreach (var (c0, c1) in LinearPatternGenerator.Chunk(s0, s1, ctx.MaxPieceLength))
+            geo.AddRange(RoadGenerator.VariableBand(path, c0, c1, x => c + shift(x) - Math.Max(0.01, w + widen(x)) / 2,
+                x => c + shift(x) + Math.Max(0.01, w + widen(x)) / 2, samples), color, thick, false);
+        geo.PaintedLength = s1 - s0;
+        if (d.Height is { } top) ApplyTopLevel(geo, top);
+        DeepenForLevels(geo, d);
+        return geo;
+    }
+
+    /// <summary>Zebrado em faixa de largura variável (faixa de segurança/canteiro pintado de uma via de largura variável).</summary>
+    private static MarkingGeometry? VariableHatchStrip(HatchMarkingDefinition d, Polyline2 path, LateralProfile lat, BuildContext ctx)
+    {
+        if (!d.IsStrip || !lat.HasWiden) return null;
+        var preset = ctx.Catalog.Hachura(d.Code);
+        if (preset == null) return null;
+        var geo = new MarkingGeometry { PathLength = path.Length };
+        var width = d.StripWidth!.Value;
+        var border = d.BorderWidth ?? preset.LarguraBorda;
+        var borderColor = d.BorderColor ?? preset.CorBorda;
+        var off = d.StripOffset + StripShift(d, path, width);
+        var (shift, widen, breaks) = lat.For(path);
+        var samples = LateralProfile.Samples(breaks, path.Length, x => shift(x) + widen(x), lat.Smooth);
+        double Lo(double x) => off + shift(x) - Math.Max(0.02, width + widen(x)) / 2;
+        double Hi(double x) => off + shift(x) + Math.Max(0.02, width + widen(x)) / 2;
+        if (border > 0 && width > 2 * border)
+        {
+            foreach (var (c0, c1) in LinearPatternGenerator.Chunk(0, path.Length, ctx.MaxPieceLength))
+            {
+                geo.AddRange(RoadGenerator.VariableBand(path, c0, c1, Lo, x => Lo(x) + border, samples), borderColor);
+                geo.AddRange(RoadGenerator.VariableBand(path, c0, c1, x => Hi(x) - border, Hi, samples), borderColor);
+            }
+            geo.PaintedLength += 2 * path.Length;
+        }
+        foreach (var (c0, c1) in LinearPatternGenerator.Chunk(0, path.Length, 12.0))
+        {
+            var dir = path.TangentAt((c0 + c1) / 2);
+            foreach (var region in RoadGenerator.VariableBand(path, c0, c1, x => Lo(x) + border, x => Hi(x) - border, samples))
+                geo.Merge(HatchGenerator.Generate(region, preset, new HatchOptions
+                {
+                    BarWidth = d.BarWidth, Gap = d.Gap, AngleDeg = d.AngleDeg, BorderWidth = 0,
+                    Chevron = d.Chevron, Crossed = d.Crossed, BarColor = d.BarColor,
+                    ReferenceDirection = dir, AxisPoint = path.PointAt(0), Phase = d.Phase,
+                }));
+        }
+        return geo;
+    }
+
+    /// <summary>
+    /// Calçada com níveis variáveis: a laje desce o quanto o topo sobe (o Revit eleva o topo pelo perfil), para não abrir vão
+    /// entre a calçada elevada e o terreno/pista.
+    /// </summary>
+    private static void DeepenForLevels(MarkingGeometry geo, LinearMarkingDefinition d)
+    {
+        var rise = Automation.SidewalkLevels.MaxRise(d);
+        if (rise < 0.005) return;
+        for (int i = 0; i < geo.Pieces.Count; i++)
+        {
+            var p = geo.Pieces[i];
+            if (p.Solid != null || p.Profile != null) continue;
+            geo.Pieces[i] = p with { Elevation = p.Elevation - rise, Thickness = p.Thickness + rise };
+        }
     }
 
     /// <summary>Espessura mínima da laje de um elemento rebaixado ou no nível da pista (m).</summary>
@@ -725,6 +854,9 @@ public static class MarkingBuilder
                     },
                 } + (rw.Tracks > 1 ? $" ({rw.Tracks} linhas)" : ""), GrupoMarca.Urbanizacao,
                     "ABNT NBR 7641 (via permanente), NBR 7590 (trilhos), NBR 11709 (dormentes), NBR 5564 (lastro)", "m");
+            case RecessMarkingDefinition rc:
+                return new MarkingInfo(rc.DisplayCode, Automation.RecuoVia.Rotulo(rc.Type) + " – marcas", rc.Type == Automation.TipoRecuo.BaiaOnibus ? GrupoMarca.Estacionamento : GrupoMarca.Longitudinal,
+                    "MBST Vol. IV – MVE, LCO e setas; DNIT – Manual de Projeto de Interseções (faixas de mudança de velocidade)", "un");
             case IAnnotationDefinition:
                 return new MarkingInfo(def.DisplayCode, def.KindName, GrupoMarca.Detalhamento, "", "");
             default:

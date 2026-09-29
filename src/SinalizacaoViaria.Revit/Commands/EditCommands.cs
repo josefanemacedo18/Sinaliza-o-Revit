@@ -243,7 +243,13 @@ public sealed class CmdEditar : CommandBase
 
         // O greide da via (perfil longitudinal) é mantido na edição da seção.
         w.OutputSettings.Grade ??= pav.Output.Grade?.Clone();
-        var defs = w.Setup.Build(pav.PathRef, w.OutputSettings, PluginContext.Catalog, pav.GroupId, pav.Id);   // Build clona o caminho por marca
+        var axis = PathResolver.Resolve(doc, pav.PathRef)?.Main;
+        if (w.ReadSurvey && axis != null)
+        {
+            var survey = WidthSurvey.Read(uidoc, axis);
+            if (survey.Count > 0) w.Setup.LargurasVariaveis = survey;
+        }
+        var defs = w.Setup.Build(pav.PathRef, w.OutputSettings, PluginContext.Catalog, pav.GroupId, pav.Id, axis);   // Build clona o caminho por marca
         var newPav = defs.OfType<RoadPavementDefinition>().FirstOrDefault();
         if (newPav != null)
         {

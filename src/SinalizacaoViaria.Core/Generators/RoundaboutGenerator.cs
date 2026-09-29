@@ -679,8 +679,9 @@ public static class RoundaboutGenerator
     public static List<RoundaboutLeg> LegsFromRoads(Vec2 center, IReadOnlyList<IntersectionRoad> roads, double reach)
     {
         var legs = new List<RoundaboutLeg>();
-        foreach (var r in roads)
+        foreach (var r0 in roads)
         {
+            var r = r0.LocalAt(center);
             var (s, dist, _) = IntersectionGenerator.Project(r.Axis, center);
             if (dist > Math.Max(r.Def.TotalLeft, r.Def.TotalRight) + 2) continue;
             foreach (var sign in new[] { -1, 1 })

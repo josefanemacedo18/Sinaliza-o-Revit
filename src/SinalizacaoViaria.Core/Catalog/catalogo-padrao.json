@@ -606,6 +606,36 @@
       ]
     },
     {
+      "codigo": "MVE",
+      "nome": "Marca delimitadora de parada de veículos específicos",
+      "grupo": "Estacionamento",
+      "cor": "Amarela",
+      "descricao": "Delimita a área de parada de veículos específicos (ex.: ponto e baia de ônibus), com a inscrição do veículo no interior.",
+      "referencia": "MBST Vol. IV – Marcas de delimitação e controle de parada (MVE)",
+      "larguraMin": 0.1,
+      "larguraMax": 0.2,
+      "variantes": [
+        {
+          "nome": "Contínua 0,10 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1
+            }
+          ]
+        },
+        {
+          "nome": "Contínua 0,15 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.15
+            }
+          ]
+        }
+      ]
+    },
+    {
       "codigo": "LRE",
       "nome": "Linha de retenção",
       "grupo": "Transversal",

@@ -151,6 +151,7 @@ public sealed class IntersectionService
                 it.RightTurnRadius = template.RightTurnRadius;
                 it.RightTurnLaneWidth = template.RightTurnLaneWidth;
                 it.LeftTurnPockets = template.LeftTurnPockets;
+                it.ContinuityLine = template.ContinuityLine;
                 it.PocketLength = template.PocketLength;
                 it.PocketTaper = template.PocketTaper;
                 it.PocketWidth = template.PocketWidth;

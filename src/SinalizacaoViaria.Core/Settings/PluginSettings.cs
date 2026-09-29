@@ -30,6 +30,8 @@ public sealed class PluginSettings
     public bool AutoCrosswalks { get; set; }
     /// <summary>Pavimento, calçada, meio-fio, sarjeta e grama gerados como Piso do Revit (em vez de forma direta).</summary>
     public bool PhysicalAsFloors { get; set; } = true;
+    /// <summary>Sinalização horizontal (pintura) gerada como Piso do Revit fino sobre o pavimento – editável como os demais pisos.</summary>
+    public bool PaintAsFloors { get; set; } = true;
     public Automation.TipoConexao LastConnection { get; set; } = Automation.TipoConexao.Intersecao;
     public Automation.FimLivre LastFreeEnds { get; set; } = Automation.FimLivre.Nenhum;
     public double LastCurveRadius { get; set; } = 30;

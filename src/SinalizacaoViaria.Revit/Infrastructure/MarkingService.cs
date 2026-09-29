@@ -210,6 +210,17 @@ public sealed class MarkingService
     /// <summary>Greide da via como superfície de apoio de pisos e pinturas (nulo = sem greide).</summary>
     private ISurface? GradeFor(MarkingDefinition def, double baseZ)
     {
+        var g = GradeForCore(def, baseZ);
+        // Calçada com níveis variáveis: a superfície de apoio ganha o perfil de níveis da faixa.
+        if (def.Output.Mode == OutputMode.Modelo3D && def is LinearMarkingDefinition { LevelProfile.Count: > 0 } lm
+            && PathResolver.Resolve(_doc, def.Path)?.Main is { Points.Count: >= 2 } axis
+            && Core.Automation.SidewalkLevels.Function(lm, axis, Catalog) is { } f)
+            return new LevelSampler(g, baseZ, f);
+        return g;
+    }
+
+    private ISurface? GradeForCore(MarkingDefinition def, double baseZ)
+    {
         if (def.Output.Mode == OutputMode.Modelo3D && NodeFor(def) is { } node) return new NodeSampler(node);
         if (!Graded(def)) return null;
         var axis = PathResolver.Resolve(_doc, def.Path)?.Main;
@@ -438,8 +449,23 @@ public sealed class MarkingService
         var primary = true;
         var solidPieces = geo.Pieces;
 
+        // Sinalização horizontal como Piso do Revit: peças de pintura com a espessura do material, sobre o pavimento.
+        var paintFloors = def.Output.Mode == OutputMode.Modelo3D && settings.PaintAsFloors && PaintDefinition(def);
+        if (paintFloors)
+        {
+            var lift = IsOverlay(def) ? thickness : 0;
+            var pt = Math.Max(0.002, thickness);
+            for (int i = 0; i < geo.Pieces.Count; i++)
+            {
+                var pc = geo.Pieces[i];
+                if (pc.Solid == null && pc.Profile == null && MarkingColors.IsPaint(pc.Color))
+                    geo.Pieces[i] = pc with { Elevation = pc.Elevation + lift, Thickness = pt };
+            }
+            solidPieces = geo.Pieces;
+        }
+
         // Pavimento, calçada, meio-fio, sarjeta e grama como Piso do Revit (editáveis com as ferramentas nativas).
-        if (def.Output.Mode == OutputMode.Modelo3D && settings.PhysicalAsFloors)
+        if (def.Output.Mode == OutputMode.Modelo3D && (settings.PhysicalAsFloors || paintFloors))
         {
             // Acompanhando a superfície: o piso é criado na cota do terreno e deformado (edição de forma nativa do piso).
             ISurface? terrain = GradeFor(def, baseZ);
@@ -448,7 +474,7 @@ public sealed class MarkingService
                 terrain = new SurfaceSampler(_doc, def.Output.SurfaceIds, _interactive, terrainOnly: true);
                 if (!terrain.IsAvailable) terrain = null;
             }
-            var floorPieces = geo.Pieces.Where(p => FloorEligible(def, p)).ToList();
+            var floorPieces = geo.Pieces.Where(p => settings.PhysicalAsFloors && FloorEligible(def, p) || paintFloors && PaintFloorEligible(p)).ToList();
             var oldFloors = existing.Where(r => r.Element is Floor).ToList();
             if (floorPieces.Count > 0 || oldFloors.Count > 0)
             {
@@ -474,6 +500,25 @@ public sealed class MarkingService
                              .GroupBy(p => (p.Color, E: Math.Round(p.Elevation, 3), T: Math.Round(p.Thickness, 3), p.Layer)))
                 {
                     var parts = FloorParts(def, grp.Select(p => p.Shape), terrain, baseZ);
+                    if (MarkingColors.IsPaint(grp.Key.Color) && parts.Count > 1)
+                    {
+                        // Pintura: um piso por cor e por plano, com todos os traços/áreas como contornos do mesmo esboço.
+                        var rest = new List<(Polygon2 Shape, Plane3? Plane)>();
+                        foreach (var byPlane in parts.GroupBy(x => x.Plane is { } pl ? $"{pl.A:0.000}|{pl.B:0.00000}|{pl.C:0.00000}" : "plano"))
+                        {
+                            var list = byPlane.ToList();
+                            var plane0 = list[0].Plane;
+                            if (plane0 == null && terrain != null) { rest.AddRange(list); continue; }
+                            var multi = CreateMultiFloor(list.Select(x => x.Shape).ToList(), grp.Key.Color, grp.Key.E, grp.Key.T, plane0,
+                                baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(grp.Key.Color), ref reason);
+                            if (multi == null) { rest.AddRange(list); continue; }
+                            try { multi.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set($"SV {info.Code}"); } catch { /* opcional */ }
+                            Tag(multi, def, info, grp.Key.Color, StyleService.ColorName(grp.Key.Color), FloorArea(multi, list.Sum(x => x.Shape.Area)), geo, primary);
+                            keep.Add(multi.Id);
+                            primary = false;
+                        }
+                        parts = rest;
+                    }
                     foreach (var (shape, plane) in parts)
                     {
                         var piece = new MarkingPiece(shape, grp.Key.Color) { Elevation = grp.Key.E, Thickness = grp.Key.T, Layer = grp.Key.Layer };
@@ -514,7 +559,7 @@ public sealed class MarkingService
             {
                 // Linhas e símbolos sobre pinturas de fundo (ciclofaixa, faixa de caminhada) ficam logo acima delas –
                 // sem faces coincidentes (que no Revit aparecem como emendas/quadrados).
-                var lift = IsOverlay(def) && MarkingColors.IsPaint(g.Key) ? thickness : 0;
+                var lift = !paintFloors && IsOverlay(def) && MarkingColors.IsPaint(g.Key) ? thickness : 0;
                 var solids = BuildSolids(g, baseZ + def.Output.ElevationOffset + lift, thickness, sampler, Styles.Material(g.Key), result.Warnings,
                     def.Output.ElevationOffset + lift);
                 if (solids.Count == 0) continue;
@@ -1099,6 +1144,59 @@ public sealed class MarkingService
     };
 
     // ------------------------------------------------------------------ pisos
+
+    /// <summary>Marca de sinalização horizontal (pintura) – vira piso quando a opção está ligada.</summary>
+    private static bool PaintDefinition(MarkingDefinition def) =>
+        def is LinearMarkingDefinition l && !Core.Automation.RoadSectionInference.IsPhysical(l.Code)
+        || def is HatchMarkingDefinition or SymbolMarkingDefinition or TextMarkingDefinition or ParkingMarkingDefinition or RepeatedMarkingDefinition
+            or RecessMarkingDefinition or ChannelizationDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition;
+
+    private static bool PaintFloorEligible(MarkingPiece p) =>
+        p.Solid == null && p.Profile == null && MarkingColors.IsPaint(p.Color) && p.Shape.Area > 0.0004 && p.Thickness >= 0.0015;
+
+    /// <summary>
+    /// Um piso com vários contornos (pintura de uma cor): topo na cota da pintura; no greide, inclinado no plano dado.
+    /// Nulo se o Revit recusar (as peças seguem uma a uma).
+    /// </summary>
+    private Floor? CreateMultiFloor(List<Polygon2> shapes, MarkingColor color, double elevation, double thickness, Plane3? plane, double baseZm,
+        ElementId? userType, ref string? reason)
+    {
+        if (shapes.Count == 0) return null;
+        var all = shapes.SelectMany(x => x.Outer).ToList();
+        var c0 = new Vec2(all.Average(v => v.X), all.Average(v => v.Y));
+        var groundFt = plane is { } pl ? UnitConv.Ft(pl.Z(c0)) : (double?)null;
+        var topFt = groundFt is { } g ? g + UnitConv.Ft(elevation + thickness) : UnitConv.Ft(baseZm + elevation + thickness);
+        var level = LevelFor(topFt);
+        if (level == null) return null;
+        ElementId typeId;
+        try
+        {
+            typeId = userType != null && userType != ElementId.InvalidElementId && _doc.GetElement(userType) is FloorType ? userType : FloorType(color, thickness);
+        }
+        catch (Exception ex) { reason = ex.Message; return null; }
+        if (typeId == ElementId.InvalidElementId) return null;
+        var loops = new List<CurveLoop>();
+        foreach (var sh in shapes)
+            try { loops.AddRange(ToCurveLoops(sh, level.ProjectElevation)); } catch { /* contorno degenerado */ }
+        if (loops.Count == 0) return null;
+        Floor? f = null;
+        try
+        {
+            if (!BoundaryValidation.IsValidHorizontalBoundary(loops)) { reason = "contornos da pintura inválidos para um único piso"; return null; }
+            f = Floor.Create(_doc, loops, typeId, level.Id, false, null, 0.0);
+            f.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)?.Set(topFt - level.ProjectElevation);
+            FloorSignature.Write(f, loops);
+            if (plane is { IsLevel: false } pp) TiltFloor(f, pp, groundFt!.Value);
+            return f;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Piso da pintura", ex);
+            reason = ex.Message;
+            if (f != null) SafeDelete(f.Id);
+            return null;
+        }
+    }
 
     private static bool FloorEligible(MarkingDefinition def, MarkingPiece p) =>
         p.Solid == null && p.Profile == null && p.Thickness >= 0.005 && p.Shape.Area > 0.01

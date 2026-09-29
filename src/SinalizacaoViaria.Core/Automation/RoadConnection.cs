@@ -336,7 +336,52 @@ public static class RoadConnection
         line.GroupId = pav.GroupId;
         line.Hierarchy = pav.Hierarchy;
         line.SetPath(CopyPath(pav.PathRef));
+        // Via de largura variável: o elemento acompanha o bordo deste lado.
+        line.PathRef.Lateral = pav.EdgeLateral(left, lot: false);
         return offset;
+    }
+
+    /// <summary>
+    /// Pista de largura variável (ferramenta Pista): bordos medidos no levantamento aplicados ao pavimento e às linhas de
+    /// bordo; a linha de eixo fica no eixo. Vazio nas medidas = largura informada.
+    /// </summary>
+    public static void ApplySurvey(List<MarkingDefinition> defs, IReadOnlyList<PontoLargura> points, Polyline2? axis, bool smooth)
+    {
+        var pav = defs.OfType<RoadPavementDefinition>().FirstOrDefault();
+        if (pav == null || points.Count == 0) return;
+        var pts = points.OrderBy(p => p.Estaca).ToList();
+        var stations = new List<double>();
+        for (int i = 0; i < pts.Count; i++)
+        {
+            stations.Add(pts[i].Estaca);
+            if (smooth && i + 1 < pts.Count) for (var x = pts[i].Estaca + 1; x < pts[i + 1].Estaca - 0.5; x += 1) stations.Add(x);
+        }
+        (double L, double R) At(double s)
+        {
+            (double, double) Of(PontoLargura p) => ((p.BordoEsquerdo ?? p.AlinhamentoEsquerdo) is { } l ? l - pav.LeftWidth : 0,
+                                                    (p.BordoDireito ?? p.AlinhamentoDireito) is { } r ? r - pav.RightWidth : 0);
+            if (s <= pts[0].Estaca) return Of(pts[0]);
+            if (s >= pts[^1].Estaca) return Of(pts[^1]);
+            for (int i = 0; i + 1 < pts.Count; i++)
+            {
+                if (s > pts[i + 1].Estaca) continue;
+                var len = pts[i + 1].Estaca - pts[i].Estaca;
+                var u = len < 1e-9 ? 1 : (s - pts[i].Estaca) / len;
+                if (smooth) u = u * u * (3 - 2 * u);
+                var (a0, a1) = Of(pts[i]);
+                var (b0, b1) = Of(pts[i + 1]);
+                return (a0 + (b0 - a0) * u, a1 + (b1 - a1) * u);
+            }
+            return Of(pts[^1]);
+        }
+        Vec2? Anchor(double s) => axis?.PointAt(Math.Clamp(s, 0, axis.Length));
+        pav.EdgeVariation = stations.Distinct().OrderBy(x => x).Select(s =>
+        {
+            var (l, r) = At(s);
+            return new EdgeVariationPoint { Station = s, Anchor = Anchor(s), CurbLeft = l, CurbRight = r, LotLeft = l, LotRight = r };
+        }).ToList();
+        foreach (var line in defs.OfType<LinearMarkingDefinition>().Where(l => Math.Abs(l.Offset) > 0.3))
+            line.PathRef.Lateral = pav.EdgeLateral(line.Offset > 0, lot: false);
     }
 
     public static PathReference CopyPath(PathReference p) => p.Clone();
