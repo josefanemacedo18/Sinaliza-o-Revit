@@ -234,4 +234,38 @@ public class V29SimTests
         TrafficAnalysis.Run(net, opt);
         Assert.Empty(link.CrossingPlans);
     }
+
+    [Fact]
+    public void Solutions_AreTestedAndTheBestOneCleansTheCrossing()
+    {
+        var net = Crossing(0);                                   // PARE entre duas coletoras no pico: nível F
+        var opt = new TrafficOptions { Demand = NivelDemanda.Pico };
+        var res = TrafficAnalysis.Run(net, opt);
+        var nd = net.Nodes.Single(n => n.Kind == TipoNo.Intersecao);
+        Assert.Equal("F", res.Nodes[nd.Index].LOS);
+        var trials = TrafficSolutions.For(net, opt, res, nd.Index, null);
+        Assert.Contains(trials, t => t.Title.StartsWith("Semaforizar"));
+        Assert.Contains(trials, t => t.Title == "Rotatória");
+        var best = trials[0];
+        Assert.True(best.Improves, best.Summary());
+        Assert.True(best.LocalAfter < best.LocalBefore / 2, best.Summary());
+        Assert.False(string.IsNullOrWhiteSpace(best.InProject));
+        // A rede volta ao cenário original depois dos testes.
+        Assert.Equal(ControleNo.Pare, nd.Control);
+        // Aplicar no cenário reproduz o efeito medido.
+        best.Apply(opt);
+        var after = TrafficAnalysis.Run(net, opt);
+        Assert.Equal(best.LocalAfter, after.Nodes[nd.Index].Delay, 3);
+    }
+
+    [Fact]
+    public void Solutions_ScenarioLeftTurnBanReroutesTraffic()
+    {
+        var net = Crossing(1);
+        var opt = new TrafficOptions { Demand = NivelDemanda.Media };
+        var nd = net.Nodes.Single(n => n.Kind == TipoNo.Intersecao);
+        opt.Nodes.Add(new NodeOverride { Node = nd.Key, NoLeft = true });
+        var res = TrafficAnalysis.Run(net, opt);
+        Assert.All(res.Nodes[nd.Index].Approaches, a => Assert.True(a.LeftVolume < 1));
+    }
 }

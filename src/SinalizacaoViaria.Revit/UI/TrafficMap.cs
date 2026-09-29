@@ -522,9 +522,10 @@ public sealed class TrafficMap : FrameworkElement
 
         // Semáforos de travessia no meio da quadra (um ícone por travessia; vermelho/verde dos veículos no instante).
         var drawnX = new List<Vec2>();
-        foreach (var l in net.Links)
-            foreach (var cp in l.CrossingPlans)
+        foreach (var (li, plans) in _res.CrossingPlans)
+            foreach (var cp in plans)
             {
+                var l = net.Links[li];
                 if (drawnX.Any(q => q.DistanceTo(cp.Pos) < 3)) continue;
                 drawnX.Add(cp.Pos);
                 var d = l.Path.TangentAt(cp.At);

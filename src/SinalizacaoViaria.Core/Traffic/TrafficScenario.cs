@@ -38,9 +38,11 @@ public sealed class NodeOverride
     public double? Intergreen { get; set; }
     /// <summary>Defasagem fixa do início do ciclo (s) – nula = 0 ou a da coordenação.</summary>
     public double? Offset { get; set; }
+    /// <summary>Proíbe as conversões à esquerda e retornos no cruzamento (teste de solução; R-4a no projeto).</summary>
+    public bool? NoLeft { get; set; }
 
     [JsonIgnore]
-    public bool IsEmpty => Control == null && Cycle == null && (Greens == null || Greens.Count == 0) && Turns.Count == 0 && Intergreen == null && Offset == null;
+    public bool IsEmpty => Control == null && Cycle == null && (Greens == null || Greens.Count == 0) && Turns.Count == 0 && Intergreen == null && Offset == null && NoLeft != true;
 }
 
 /// <summary>

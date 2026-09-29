@@ -93,6 +93,8 @@ public sealed class TrafficWindow : Window
     private readonly Button _diagMap = new() { Content = "Ver no mapa", IsEnabled = false, Margin = new Thickness(0) };
     private readonly Button _diagModel = new() { Content = "Selecionar no modelo", IsEnabled = false };
     private readonly StackPanel _kpis = new();
+    private readonly Button _diagSolve = new() { Content = "Testar soluções", IsEnabled = false, ToolTip = "Roda a análise com cada alternativa possível para este problema (controle, tempos, onda verde, proibição de conversões, travessia) e mostra o efeito medido – aplique a melhor no cenário." };
+    private readonly StackPanel _diagSolutions = new() { Margin = new Thickness(0, 4, 0, 0) };
     private readonly ListBox _nodeList = new();
     private readonly TextBox _nodeDetail = Mono();
     private readonly Canvas _timing = new() { Height = 96, Background = Brushes.White, ClipToBounds = true };
@@ -485,7 +487,14 @@ public sealed class TrafficWindow : Window
         var db = new StackPanel { Orientation = Orientation.Horizontal };
         db.Children.Add(_diagMap);
         db.Children.Add(_diagModel);
+        db.Children.Add(_diagSolve);
+        _diagSolve.Margin = new Thickness(6, 0, 0, 0);
         det.Children.Add(db);
+        det.Children.Add(new ScrollViewer { Content = _diagSolutions, MaxHeight = 260, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        _diagSolve.Click += (_, _) =>
+        {
+            if (_diagList.SelectedItem is ListBoxItem { Tag: TrafficDiagnostic d }) TestSolutions(d.Node, d.Link, _diagSolutions);
+        };
         _diagMap.Click += (_, _) => ZoomDiagnostic();
         _diagModel.Click += (_, _) =>
         {
@@ -677,7 +686,7 @@ public sealed class TrafficWindow : Window
         }
         o.Nodes = _current.Options.Nodes.Where(x => !x.IsEmpty).Select(x => new NodeOverride
         {
-            Node = x.Node, Control = x.Control, Cycle = x.Cycle, Greens = x.Greens?.ToList(), Intergreen = x.Intergreen, Offset = x.Offset,
+            Node = x.Node, Control = x.Control, Cycle = x.Cycle, Greens = x.Greens?.ToList(), Intergreen = x.Intergreen, Offset = x.Offset, NoLeft = x.NoLeft,
             Turns = x.Turns.Select(t => new TurnCount { Approach = t.Approach, Total = t.Total, Left = t.Left, Through = t.Through, Right = t.Right, UTurn = t.UTurn }).ToList(),
         }).ToList();
         o.Crossings = _current.Options.Crossings.Select(c => new CrossingSignal
@@ -898,9 +907,65 @@ public sealed class TrafficWindow : Window
         if (!string.IsNullOrWhiteSpace(d.Recommendation))
             _diagDetail.Inlines.Add(new System.Windows.Documents.Run("\nO que fazer: " + d.Recommendation) { Foreground = new SolidColorBrush(Color.FromRgb(0x17, 0x4A, 0x83)) });
         _diagMap.IsEnabled = d.Location != null || d.Node != null || d.Link != null;
+        _diagSolve.IsEnabled = d.Node != null || d.Link != null;
+        _diagSolutions.Children.Clear();
         _diagModel.IsEnabled = d.SourceIds.Count > 0;
         if (d.Node is { } n) _map.Select(n, d.Link);
         else if (d.Link is { } l) _map.Select(null, l);
+    }
+
+    /// <summary>
+    /// Testa as soluções possíveis para o nó/trecho (cada uma numa análise completa da rede) e lista o efeito medido, da
+    /// melhor para a pior, com o que fazer no projeto e o botão para aplicar no cenário.
+    /// </summary>
+    private async void TestSolutions(int? node, int? link, Panel target)
+    {
+        if (_res == null) return;
+        TrafficOptions opt;
+        try { opt = ReadOptions(); }
+        catch (FormatException ex) { UiHelpers.Error(ex.Message); return; }
+        target.Children.Clear();
+        target.Children.Add(new TextBlock { Text = "Testando as alternativas na rede…", Foreground = Brushes.Gray });
+        var baseRes = _res;
+        List<SolutionTrial> trials;
+        try { trials = await Task.Run(() => TrafficSolutions.For(_net, opt, baseRes, node, link)); }
+        catch (Exception ex) { target.Children.Clear(); UiHelpers.Error("Não foi possível testar: " + ex.Message); return; }
+        target.Children.Clear();
+        if (trials.Count == 0)
+        {
+            target.Children.Add(new TextBlock { Text = "Não há alternativa de cenário para este item – siga a recomendação acima no projeto.", TextWrapping = TextWrapping.Wrap });
+            return;
+        }
+        var good = trials.Count(t => t.Improves);
+        target.Children.Add(new TextBlock
+        {
+            Text = good > 0 ? $"{good} de {trials.Count} alternativa(s) melhoram o local sem piorar a rede (da melhor para a pior):" : "Nenhuma alternativa de cenário resolve sozinha – veja as medidas de projeto na recomendação acima:",
+            FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4),
+        });
+        foreach (var t in trials)
+        {
+            var box = new Border
+            {
+                BorderBrush = new SolidColorBrush(t.Improves ? Color.FromRgb(0x2E, 0x7D, 0x32) : Color.FromRgb(0xD5, 0xDB, 0xE3)), BorderThickness = new Thickness(t.Improves ? 2 : 1),
+                CornerRadius = new CornerRadius(4), Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 4),
+            };
+            var sp = new StackPanel();
+            sp.Children.Add(new TextBlock { Text = t.Summary(UiHelpers.PtBr), TextWrapping = TextWrapping.Wrap });
+            sp.Children.Add(new TextBlock { Text = t.Description, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)) });
+            sp.Children.Add(new TextBlock { Text = "No projeto: " + t.InProject, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x17, 0x4A, 0x83)) });
+            var apply = new Button { Content = "Aplicar no cenário e simular", Margin = new Thickness(0, 4, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, IsEnabled = !t.Failed };
+            var trial = t;
+            apply.Click += (_, _) =>
+            {
+                trial.Apply(_current.Options);
+                if (SelectedNode() is { } nr) FillOverride(nr);
+                _status.Text = $"Aplicado no cenário: {trial.Title}. Simulando…";
+                Run(true);
+            };
+            sp.Children.Add(apply);
+            box.Child = sp;
+            target.Children.Add(box);
+        }
     }
 
     private void ZoomDiagnostic()
@@ -1127,7 +1192,12 @@ public sealed class TrafficWindow : Window
         row2.Children.Add(_ovSavePlan);
         row2.Children.Add(_ovSetControl);
         row2.Children.Add(_pickRevit);
+        var solveNode = new Button { Content = "Testar soluções para este cruzamento", Margin = new Thickness(0, 4, 6, 0) };
+        row2.Children.Add(solveNode);
         sp.Children.Add(row2);
+        var nodeSolutions = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
+        sp.Children.Add(nodeSolutions);
+        solveNode.Click += (_, _) => { if (SelectedNode() is { } nr) TestSolutions(nr.Node.Index, null, nodeSolutions); };
         sp.Children.Add(BuildRecommendPanel());
         sp.Children.Add(BuildCrossingPanel());
         _pickRevit.Click += (_, _) =>
@@ -1384,7 +1454,7 @@ public sealed class TrafficWindow : Window
         if (cs == null)
         {
             // Sobre uma travessia existente: parte do plano atual dela.
-            var plan = _net.Links.SelectMany(l => l.CrossingPlans).FirstOrDefault(c => c.Pos.DistanceTo(p) < 8);
+            var plan = _res.CrossingPlans.Values.SelectMany(x => x).FirstOrDefault(c => c.Pos.DistanceTo(p) < 8);
             cs = plan != null
                 ? new CrossingSignal { X = plan.Pos.X, Y = plan.Pos.Y, Cycle = plan.Cycle, PedGreen = Math.Max(5, plan.Red - 4), Clearance = 4, Offset = plan.Offset }
                 : new CrossingSignal { X = p.X, Y = p.Y, PedGreen = Math.Ceiling(link.l.Road.CarriageWidth / 1.2 + 4) };

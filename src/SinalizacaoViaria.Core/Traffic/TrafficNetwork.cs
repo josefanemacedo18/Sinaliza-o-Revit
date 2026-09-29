@@ -88,6 +88,8 @@ public sealed class TrafficNode
     // ---------------------------------------------------------------- regulamentação lida do projeto
     /// <summary>Conversões proibidas (R-4, R-5, R-25/R-26) por aproximação.</summary>
     public HashSet<(int In, Giro Turn)> ProhibitedTurns { get; } = new();
+    /// <summary>Conversões à esquerda proibidas só no cenário (teste de solução).</summary>
+    public bool ScenarioNoLeft { get; set; }
     /// <summary>Interseção com conversões à esquerda proibidas (eixo contínuo pela boca, R-4a – CTB art. 207).</summary>
     public bool NoLeftTurns { get; set; }
     /// <summary>Aproximações com PARE (R-1, legenda PARE, LRE) e com "Dê a preferência" (R-2, LDP, SDP).</summary>

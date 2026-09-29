@@ -160,6 +160,8 @@ public sealed class TrafficResult
     public double VKT { get; set; }
     public double VHT { get; set; }
     public double TotalDelayH { get; set; }
+    /// <summary>Travessias semaforizadas de cada trecho neste cenário (cópia: a rede é compartilhada entre cenários).</summary>
+    public Dictionary<int, List<CrossingPlan>> CrossingPlans { get; } = new();
     public double CO2kg { get; set; }
     public double AvgSpeed => VHT > 0 ? VKT / VHT : 0;
     public List<TrafficDiagnostic> Diagnostics { get; } = new();
@@ -191,10 +193,12 @@ public static class TrafficAnalysis
         {
             nd.Control = nd.DesignControl;
             if (opt.Override(nd)?.Control is { } c && !nd.IsZone && nd.Kind != TipoNo.Continuacao) nd.Control = c;
+            nd.ScenarioNoLeft = opt.Override(nd)?.NoLeft == true;
         }
         foreach (var nd in net.Nodes.Where(n => n.IsZone))
             if (opt.ZoneVolumeKeys.TryGetValue(nd.Key, out var zv)) opt.ZoneVolumes[nd.Index] = zv;
         ApplyCrossingSignals(net, opt);
+        foreach (var l in net.Links) if (l.CrossingPlans.Count > 0) res.CrossingPlans[l.Index] = l.CrossingPlans.ToList();
         foreach (var l in net.Links) res.Links[l.Index] = new LinkResult { Link = l };
         if (net.Links.Count == 0) return res;
         BuildOD(net, opt, res);
@@ -341,6 +345,7 @@ public static class TrafficAnalysis
         var t = TurnOf(net, inLink, outLink);
         if (t == Giro.Retorno && nd.Kind is not (TipoNo.Rotatoria or TipoNo.CulDeSac)) return false;
         if (nd.ProhibitedTurns.Contains((inLink, t))) return false;  // R-4, R-5, R-25, R-26
+        if (nd.ScenarioNoLeft && t is Giro.Esquerda or Giro.Retorno && nd.Kind != TipoNo.Rotatoria) return false;
         // Separação física central atravessando o nó: só se entra e sai pela direita dessa via.
         foreach (var road in nd.MedianRoads)
         {
@@ -1035,7 +1040,7 @@ public static class TrafficAnalysis
         var t0 = l.Length / l.FreeSpeed;
         var slow = l.SlowPoints.Sum(sp => Math.Max(0, 30 / Math.Max(1, sp.Speed) - 30 / l.FreeSpeed) * 0.5);
         // Travessia semaforizada: atraso uniforme do vermelho (d = C/2·(r/C)²).
-        slow += l.CrossingPlans.Sum(cp => 0.5 * cp.Cycle * Math.Pow(cp.Red / cp.Cycle, 2));
+        slow += res.CrossingPlans.GetValueOrDefault(l.Index, new List<CrossingPlan>()).Sum(cp => 0.5 * cp.Cycle * Math.Pow(cp.Red / cp.Cycle, 2));
         var t = t0 * (1 + 0.15 * Math.Pow(Math.Min(x, 1.6), 4)) + slow;
         var node = res.Nodes.GetValueOrDefault(l.To);
         var d = node?.Approaches.FirstOrDefault(a => a.Link == l.Index)?.Delay ?? 0;
