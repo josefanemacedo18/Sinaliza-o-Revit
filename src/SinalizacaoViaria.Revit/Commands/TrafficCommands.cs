@@ -24,7 +24,7 @@ public sealed class CmdSimuladorTrafego : CommandBase
         if (net.Roads.Count == 0)
             throw new UserMessageException("Nenhuma via do SinalizaBIM foi encontrada no projeto.\n\nO Simulador de Tráfego lê as vias criadas com Nova Via / Pista " +
                                            "(pavimento com a seção), as interseções, rotatórias e balões. Crie as vias e rode o simulador de novo.");
-        var w = new TrafficWindow(net, doc.Title, (res, sim) => TrafficDrawer.Draw(doc, uidoc.ActiveView, res));
+        var w = new TrafficWindow(net, doc.Title, new TrafficHost(uidoc));
         if (UiHelpers.ShowModal(w) == true && w.SelectIds.Count > 0)
         {
             var all = MarkingStorage.All(doc);
@@ -61,6 +61,81 @@ public sealed class CmdSimuladorTrafego : CommandBase
             return r;
         }
         return TrafficNetworkBuilder.Build(defs, AxisOf);
+    }
+}
+
+/// <summary>Ações do simulador sobre o projeto: cenários, mapa, plano/controle nas interseções e resultados nos elementos.</summary>
+internal sealed class TrafficHost : ITrafficHost
+{
+    private readonly UIDocument _uidoc;
+    public TrafficHost(UIDocument uidoc) => _uidoc = uidoc;
+    private Document Doc => _uidoc.Document;
+
+    public List<TrafficScenario> LoadScenarios() => TrafficScenarioStore.Load(Doc);
+    public void SaveScenarios(List<TrafficScenario> list) => TrafficScenarioStore.Save(Doc, list);
+    public string Draw(TrafficResult res, SimResult? sim) => TrafficDrawer.Draw(Doc, _uidoc.ActiveView, res);
+
+    public string ApplyToIntersection(string nodeKey, ControleNo? control, SignalPlanDef? plan)
+    {
+        var def = MarkingStorage.Definitions(Doc).OfType<IntersectionDefinition>().FirstOrDefault(d => d.Id == nodeKey);
+        if (def == null)
+            return "Este nó não é uma interseção do plugin (rotatória, balão ou cruzamento sem interseção modelada): use as ferramentas Interseção/Rotatória.";
+        if (control is { } c)
+        {
+            def.Control = c switch
+            {
+                ControleNo.Semaforo => ControleIntersecao.Semaforo,
+                ControleNo.DePreferencia => ControleIntersecao.DePreferencia,
+                ControleNo.Pare => ControleIntersecao.Pare,
+                ControleNo.Rotatoria => throw new UserMessageException("Para transformar o cruzamento em rotatória use a ferramenta Rotatória (clique no cruzamento)."),
+                _ => ControleIntersecao.Nenhum,
+            };
+            if (c != ControleNo.Semaforo) def.SignalPlan = null;
+        }
+        if (plan != null)
+        {
+            def.SignalPlan = plan;
+            def.Control = ControleIntersecao.Semaforo;
+        }
+        var results = IntersectionRunner.Run(_uidoc, "Simulador de Tráfego – aplicar na interseção", s => s.Refresh(def));
+        var warn = results.SelectMany(r => r.Warnings).Distinct().ToList();
+        return (plan != null ? $"Plano semafórico gravado na interseção (ciclo {plan.Cycle:0} s, {plan.Phases.Count} fases)." : $"Controle da interseção alterado para {TrafficReport.ControlLabel(control!.Value)}.") +
+               " Rode a análise de novo para ver o efeito." + (warn.Count > 0 ? "\n⚠ " + string.Join("\n⚠ ", warn) : "");
+    }
+
+    public string WriteResults(TrafficResult res, string scenario)
+    {
+        var doc = Doc;
+        var all = MarkingStorage.All(doc);
+        var n = 0;
+        using var t = new Transaction(doc, "Simulador de Tráfego – gravar resultados");
+        t.Start();
+        SharedParameters.Ensure(doc);
+        void Write(string markingId, string los, string summary)
+        {
+            foreach (var s in all.Where(x => x.MarkingId == markingId))
+            {
+                SharedParameters.Set(s.Element, SharedParameters.NivelServico, los);
+                SharedParameters.Set(s.Element, SharedParameters.Trafego, summary);
+                n++;
+            }
+        }
+        foreach (var nr in res.Nodes.Values.Where(x => x.Node.SourceId != null && !x.Node.IsZone))
+        {
+            var sf = res.Safety.GetValueOrDefault(nr.Node.Index);
+            Write(nr.Node.SourceId!, nr.LOS,
+                $"{scenario}: {nr.Node.Label} nível {nr.LOS}, {nr.Volume:0} veh/h, atraso {nr.Delay:0.0} s/veh, {TrafficReport.ControlLabel(nr.Control)}" +
+                (nr.Cycle > 0 ? $", ciclo {nr.Cycle:0} s" : "") + (sf is { CrashesPerYear: > 0 } ? $", {sf.CrashesPerYear:0.0} acid./ano (ref.)" : ""));
+        }
+        foreach (var road in res.Network.Roads)
+        {
+            var links = res.Links.Values.Where(l => ReferenceEquals(l.Link.Road, road)).ToList();
+            if (links.Count == 0) continue;
+            var worst = links.Where(l => l.Volume >= 1).Select(l => l.LOS).DefaultIfEmpty("-").Max()!;
+            Write(road.Id, worst, $"{scenario}: {road.Name} pior trecho nível {worst}, até {links.Max(l => l.Volume):0} veh/h, v/c máx. {links.Max(l => l.X):0.00}, {links.Min(l => l.Speed):0}–{links.Max(l => l.Speed):0} km/h");
+        }
+        t.Commit();
+        return $"Resultados do cenário \"{scenario}\" gravados em {n} elemento(s): parâmetros SV_NivelServico e SV_Trafego (use em tabelas e filtros de vista).";
     }
 }
 

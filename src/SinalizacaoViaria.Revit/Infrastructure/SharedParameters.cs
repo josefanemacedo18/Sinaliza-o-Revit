@@ -32,7 +32,13 @@ public static class SharedParameters
     /// <summary>Quantidade na unidade de medição do item (área, extensão ou unidades) – coluna "Quantidade", somada na tabela.</summary>
     public static readonly Def QtdMedicao = new("SV_QtdMedicao", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B0E"), SpecTypeId.Number, "Quantidade na unidade de medição (m², m ou un).");
 
-    public static IReadOnlyList<Def> All { get; } = new[] { Codigo, Descricao, Grupo, Cor, Material, Area, Extensao, Quantidade, Referencia, Id, Categoria, Hierarquia, Unidade, QtdMedicao };
+    /// <summary>Nível de serviço (HCM) gravado pelo Simulador de Tráfego no cruzamento/via.</summary>
+    public static readonly Def NivelServico = new("SV_NivelServico", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B0F"), SpecTypeId.String.Text, "Nível de serviço (A a F) do último cenário gravado pelo Simulador de Tráfego.");
+
+    /// <summary>Resumo do tráfego (cenário, volume, atraso, controle, ciclo) gravado pelo Simulador de Tráfego.</summary>
+    public static readonly Def Trafego = new("SV_Trafego", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B10"), SpecTypeId.String.Text, "Resumo do Simulador de Tráfego: cenário, volume, atraso, controle e ciclo.");
+
+    public static IReadOnlyList<Def> All { get; } = new[] { Codigo, Descricao, Grupo, Cor, Material, Area, Extensao, Quantidade, Referencia, Id, Categoria, Hierarquia, Unidade, QtdMedicao, NivelServico, Trafego };
 
     private const string GroupName = "Sinalizacao Viaria";
 

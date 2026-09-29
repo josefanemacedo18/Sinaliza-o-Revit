@@ -4,9 +4,23 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
+using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Traffic;
 
 namespace SinalizacaoViaria.Revit.UI;
+
+/// <summary>Ações do Simulador de Tráfego sobre o projeto do Revit (a janela não conhece a API do Revit).</summary>
+public interface ITrafficHost
+{
+    List<TrafficScenario> LoadScenarios();
+    void SaveScenarios(List<TrafficScenario> list);
+    /// <summary>Desenha o mapa de níveis de serviço na vista ativa.</summary>
+    string Draw(TrafficResult res, SimResult? sim);
+    /// <summary>Aplica à interseção do projeto (chave do nó) o controle e/ou o plano semafórico.</summary>
+    string ApplyToIntersection(string nodeKey, ControleNo? control, SignalPlanDef? plan);
+    /// <summary>Grava nível de serviço e resumo nos elementos das interseções, rotatórias e vias.</summary>
+    string WriteResults(TrafficResult res, string scenario);
+}
 
 /// <summary>
 /// Janela do Simulador de Tráfego: cenário (demanda, frota, pedestres, semáforos, volumes nas entradas), mapa da rede com
@@ -16,7 +30,13 @@ public sealed class TrafficWindow : Window
 {
     private readonly TrafficNetwork _net;
     private readonly string _project;
-    private readonly Func<TrafficResult, SimResult?, string>? _draw;
+    private readonly ITrafficHost? _host;
+    private List<TrafficScenario> _scenarios = new();
+    private TrafficScenario _current = new() { Name = "Cenário atual" };
+    private readonly ComboBox _scenario = new() { Margin = new Thickness(0, 2, 0, 2) };
+    private readonly TextBox _scName = new();
+    private readonly TextBox _scNotes = new() { TextWrapping = TextWrapping.Wrap, AcceptsReturn = true, MinHeight = 36 };
+    private bool _loadingScenario;
     private TrafficResult? _res;
     private SimResult? _sim;
     private CancellationTokenSource? _cts;
@@ -30,6 +50,18 @@ public sealed class TrafficWindow : Window
     private readonly TextBox _peds = new() { Text = "150" };
     private readonly CheckBox _optimize = new() { Content = "Otimizar os ciclos semafóricos (Webster)", IsChecked = true };
     private readonly TextBox _cycle = new() { Text = "90", IsEnabled = false };
+    private readonly CheckBox _storedPlans = new() { Content = "Usar os planos gravados nas interseções", IsChecked = true, Margin = new Thickness(0, 4, 0, 0) };
+    private readonly CheckBox _coordinate = new() { Content = "Coordenar os semáforos (onda verde)", IsChecked = false, Margin = new Thickness(0, 4, 0, 0) };
+    private readonly TextBox _progSpeed = new() { Text = "0" };
+    private readonly TextBox _busFreq = new() { Text = "12" };
+    private readonly TextBox _busDwell = new() { Text = "20" };
+    private readonly TextBox _k = new() { Text = "0,10" };
+    private readonly TextBox _vot = new() { Text = "25" };
+    private readonly TextBox _occ = new() { Text = "1,4" };
+    private readonly TextBox _fuel = new() { Text = "6,20" };
+    private readonly TextBox _co2 = new() { Text = "150" };
+    private readonly TextBox _crash = new() { Text = "180000" };
+    private readonly TextBox _hours = new() { Text = "750" };
     private readonly TextBox _duration = new() { Text = "15" };
     private readonly TextBox _warmup = new() { Text = "3" };
     private readonly TextBox _seed = new() { Text = "7" };
@@ -60,21 +92,36 @@ public sealed class TrafficWindow : Window
     private readonly StackPanel _kpis = new();
     private readonly ListBox _nodeList = new();
     private readonly TextBox _nodeDetail = Mono();
+    private readonly Canvas _timing = new() { Height = 96, Background = Brushes.White, ClipToBounds = true };
+    private readonly ComboBox _ovControl = new() { Width = 170 };
+    private readonly TextBox _ovCycle = new() { Width = 60 };
+    private readonly TextBox _ovGreens = new() { Width = 150, ToolTip = "Verdes de cada fase, em segundos, na ordem das fases (ex.: 42; 30; 12). Vazio = calculados." };
+    private readonly DataGrid _ovTurns = new()
+    {
+        AutoGenerateColumns = false, CanUserAddRows = false, CanUserDeleteRows = false, HeadersVisibility = DataGridHeadersVisibility.Column, MaxHeight = 170,
+        ToolTip = "Contagem classificada de cada aproximação: total (veh/h, vazio = o da alocação) e percentuais de conversão.",
+    };
+    private readonly Button _ovApply = new() { Content = "Aplicar ao cenário e recalcular", Margin = new Thickness(0, 0, 6, 0) };
+    private readonly Button _ovClear = new() { Content = "Limpar ajustes", Margin = new Thickness(0, 0, 6, 0) };
+    private readonly Button _ovSavePlan = new() { Content = "Gravar plano semafórico no projeto", Margin = new Thickness(0, 4, 6, 0) };
+    private readonly Button _ovSetControl = new() { Content = "Aplicar este controle no projeto", Margin = new Thickness(0, 4, 6, 0) };
+    private readonly TextBox _compare = Mono();
     private readonly ListView _linkList = new();
     private readonly TextBox _report = Mono();
     private readonly Button _drawBtn = new() { Content = "Desenhar na vista ativa", IsEnabled = false, Margin = new Thickness(0) };
     private readonly Button _export = new() { Content = "Exportar relatório (TXT + CSV)", IsEnabled = false };
     private readonly Button _copy = new() { Content = "Copiar relatório", IsEnabled = false };
+    private readonly Button _writeBtn = new() { Content = "Gravar resultados no modelo", IsEnabled = false, Margin = new Thickness(6, 0, 0, 0) };
 
     /// <summary>Marcas a selecionar no modelo quando a janela fecha (botão "Selecionar no modelo").</summary>
     public List<string> SelectIds { get; private set; } = new();
     public Core.Geometry.Vec2? ShowAt { get; private set; }
 
-    public TrafficWindow(TrafficNetwork net, string project, Func<TrafficResult, SimResult?, string>? draw)
+    public TrafficWindow(TrafficNetwork net, string project, ITrafficHost? host)
     {
         _net = net;
         _project = project;
-        _draw = draw;
+        _host = host;
         Title = "Simulador de Tráfego – SinalizaBIM";
         Width = 1480;
         Height = 900;
@@ -110,16 +157,32 @@ public sealed class TrafficWindow : Window
         bottom.Children.Add(hint);
         var close = new Button { Content = "Fechar", IsCancel = true };
         close.Click += (_, _) => Close();
-        foreach (var b in new[] { close, _copy, _export, _drawBtn }) { DockPanel.SetDock(b, Dock.Right); bottom.Children.Add(b); }
+        foreach (var b in new[] { close, _copy, _export, _writeBtn, _drawBtn }) { DockPanel.SetDock(b, Dock.Right); bottom.Children.Add(b); }
         _drawBtn.Margin = new Thickness(6, 0, 0, 0);
-        _drawBtn.Visibility = draw == null ? Visibility.Collapsed : Visibility.Visible;
+        _drawBtn.Visibility = host == null ? Visibility.Collapsed : Visibility.Visible;
+        _writeBtn.Visibility = host == null ? Visibility.Collapsed : Visibility.Visible;
+        _writeBtn.ToolTip = "Grava SV_NivelServico e SV_Trafego (cenário, volume, atraso, controle, ciclo) nos elementos das interseções, rotatórias e vias – para tabelas e filtros do Revit.";
+        _writeBtn.Click += (_, _) =>
+        {
+            if (_res == null || _host == null) return;
+            try { _status.Text = _host.WriteResults(_res, _current.Name); }
+            catch (Exception ex) { UiHelpers.Error("Não foi possível gravar os resultados: " + ex.Message); }
+        };
         Grid.SetRow(bottom, 1);
         Grid.SetColumnSpan(bottom, 3);
         root.Children.Add(bottom);
         Content = root;
 
         _timer.Tick += (_, _) => Tick();
-        Loaded += (_, _) => { _map.SetData(null, null); Run(false); };
+        Loaded += (_, _) =>
+        {
+            _map.SetData(null, null);
+            try { _scenarios = _host?.LoadScenarios() ?? new(); }
+            catch (Exception ex) { Infrastructure.Log.Error("Cenários", ex); }
+            FillScenarioList(null);
+            if (_scenarios.Count > 0) LoadScenario(_scenarios[0].Clone());
+            Run(false);
+        };
         Closing += (_, _) => { _cts?.Cancel(); _timer.Stop(); };
     }
 
@@ -157,6 +220,28 @@ public sealed class TrafficWindow : Window
             TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)), Margin = new Thickness(0, 2, 0, 4),
         });
 
+        sp.Children.Add(Head("Cenário"));
+        sp.Children.Add(_scenario);
+        sp.Children.Add(Field("Nome", _scName));
+        sp.Children.Add(new TextBlock { Text = "Notas", Margin = new Thickness(0, 2, 0, 0) });
+        sp.Children.Add(_scNotes);
+        var scb = new WrapPanel { Margin = new Thickness(0, 4, 0, 0) };
+        var bSave = new Button { Content = "Salvar", Margin = new Thickness(0, 0, 6, 4), ToolTip = "Salva o cenário (opções, volumes, contagens e ajustes dos cruzamentos) no projeto." };
+        var bSaveAs = new Button { Content = "Salvar como novo", Margin = new Thickness(0, 0, 6, 4) };
+        var bDel = new Button { Content = "Excluir", Margin = new Thickness(0, 0, 6, 4) };
+        scb.Children.Add(bSave);
+        scb.Children.Add(bSaveAs);
+        scb.Children.Add(bDel);
+        sp.Children.Add(scb);
+        bSave.Click += (_, _) => SaveScenario(false);
+        bSaveAs.Click += (_, _) => SaveScenario(true);
+        bDel.Click += (_, _) => DeleteScenario();
+        _scenario.SelectionChanged += (_, _) =>
+        {
+            if (_loadingScenario || _scenario.SelectedItem is not ComboBoxItem { Tag: TrafficScenario sc }) return;
+            LoadScenario(sc.Clone());
+        };
+
         sp.Children.Add(Head("Demanda"));
         foreach (var s in new[] { "Baixa (entrepico) – 40 %", "Média – 70 %", "Hora de pico – 100 %", "Saturada – 140 %" }) _demand.Items.Add(s);
         _demand.SelectedIndex = 2;
@@ -175,6 +260,24 @@ public sealed class TrafficWindow : Window
         _optimize.Checked += (_, _) => _cycle.IsEnabled = false;
         _optimize.Unchecked += (_, _) => _cycle.IsEnabled = true;
         sp.Children.Add(Field("Ciclo fixo (s)", _cycle));
+        sp.Children.Add(_storedPlans);
+        _storedPlans.ToolTip = "Planos gravados pelo botão \"Gravar plano semafórico no projeto\" (ou pelo projetista) valem na análise; desmarque para otimizar todos.";
+        sp.Children.Add(_coordinate);
+        _coordinate.ToolTip = "Ciclo comum (o maior da rede) e defasagens para que os pelotões encontrem o verde ao longo dos trechos entre semáforos.";
+        sp.Children.Add(Field("Velocidade da onda verde (km/h, 0 = da via)", _progSpeed));
+
+        sp.Children.Add(Head("Transporte coletivo"));
+        sp.Children.Add(Field("Ônibus/h que param em cada ponto", _busFreq, "Pontos lidos do projeto: baias (recuos) e placas de ponto/abrigos junto ao meio-fio (parada na faixa)."));
+        sp.Children.Add(Field("Embarque por parada (s)", _busDwell));
+
+        sp.Children.Add(Head("Segurança e custos (referência)"));
+        sp.Children.Add(Field("Fator K (hora/dia)", _k, "Fração do volume diário que ocorre na hora analisada – converte a hora em VDM para os modelos de acidentes."));
+        sp.Children.Add(Field("Valor do tempo (R$/h)", _vot));
+        sp.Children.Add(Field("Ocupação (pessoas/veh)", _occ));
+        sp.Children.Add(Field("Combustível (R$/L)", _fuel));
+        sp.Children.Add(Field("CO₂ (R$/t)", _co2));
+        sp.Children.Add(Field("Custo por acidente (R$)", _crash, "Custo médio (danos, atendimento, perda de produção, vítimas) – use o valor de referência do órgão (IPEA/ANTP) atualizado."));
+        sp.Children.Add(Field("Horas por ano nesta situação", _hours, "Ex.: 3 h de pico × 250 dias úteis = 750 h."));
 
         if (zones.Count > 0)
         {
@@ -352,16 +455,27 @@ public sealed class TrafficWindow : Window
         var ng = new Grid();
         ng.RowDefinitions.Add(new RowDefinition { Height = new GridLength(2, GridUnitType.Star) });
         ng.RowDefinitions.Add(new RowDefinition { Height = new GridLength(3, GridUnitType.Star) });
+        ng.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        ng.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         ng.Children.Add(_nodeList);
         _nodeDetail.Margin = new Thickness(0, 6, 0, 0);
         Grid.SetRow(_nodeDetail, 1);
         ng.Children.Add(_nodeDetail);
+        var tb = new Border { BorderBrush = new SolidColorBrush(Color.FromRgb(0xD5, 0xDB, 0xE3)), BorderThickness = new Thickness(1), Margin = new Thickness(0, 6, 0, 0), Child = _timing };
+        Grid.SetRow(tb, 2);
+        ng.Children.Add(tb);
+        _timing.SizeChanged += (_, _) => DrawTiming();
+        var ovPanel = BuildOverridePanel();
+        Grid.SetRow(ovPanel, 3);
+        ng.Children.Add(ovPanel);
         _nodeList.SelectionChanged += (_, _) =>
         {
             if (_nodeList.SelectedItem is ListBoxItem { Tag: NodeResult nr })
             {
-                _nodeDetail.Text = NodeText(nr);
+                _nodeDetail.Text = NodeText(nr, _res);
                 _map.Select(nr.Node.Index, null);
+                FillOverride(nr);
+                DrawTiming();
             }
         };
         _nodeList.MouseDoubleClick += (_, _) => { if (_nodeList.SelectedItem is ListBoxItem { Tag: NodeResult nr }) _map.ZoomTo(nr.Node.Pos, 70); };
@@ -382,13 +496,41 @@ public sealed class TrafficWindow : Window
         };
         _tabs.Items.Add(new TabItem { Header = "Trechos", Content = _linkList });
 
+        // Cenários: comparação
+        var cg = new DockPanel();
+        var cbar = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
+        var bCmp = new Button { Content = "Comparar os cenários salvos", Margin = new Thickness(0, 0, 6, 0) };
+        var bPresets = new Button { Content = "Criar cenários de exemplo" };
+        bPresets.ToolTip = "Pico atual, horizonte de 10 anos, entrepico e teste de estresse – copie o que precisar e ajuste.";
+        cbar.Children.Add(bCmp);
+        cbar.Children.Add(bPresets);
+        DockPanel.SetDock(cbar, Dock.Top);
+        cg.Children.Add(cbar);
+        var cHint = new TextBlock
+        {
+            Text = "Roda a análise de cada cenário salvo (e do atual) sobre a mesma rede e mostra os indicadores lado a lado. " +
+                   "Use para decidir entre alternativas: rotatória × semáforo, com ou sem baia, horizonte de projeto.",
+            TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)), Margin = new Thickness(0, 0, 0, 6),
+        };
+        DockPanel.SetDock(cHint, Dock.Top);
+        cg.Children.Add(cHint);
+        cg.Children.Add(_compare);
+        bCmp.Click += (_, _) => Compare();
+        bPresets.Click += (_, _) =>
+        {
+            foreach (var p in TrafficScenario.Presets().Where(p => _scenarios.All(x => x.Name != p.Name))) _scenarios.Add(p);
+            PersistScenarios();
+            FillScenarioList(_current.Name);
+        };
+        _tabs.Items.Add(new TabItem { Header = "Cenários", Content = cg });
+
         // Relatório
         _tabs.Items.Add(new TabItem { Header = "Relatório", Content = _report });
 
         _drawBtn.Click += (_, _) =>
         {
-            if (_res == null || _draw == null) return;
-            try { _status.Text = _draw(_res, _sim); }
+            if (_res == null || _host == null) return;
+            try { _status.Text = _host.Draw(_res, _sim); }
             catch (Exception ex) { UiHelpers.Error("Não foi possível desenhar na vista: " + ex.Message); }
         };
         _export.Click += (_, _) => Export();
@@ -427,12 +569,33 @@ public sealed class TrafficWindow : Window
             SimSeconds = (int)(UiHelpers.Parse(_duration, 15, "Duração", 2, 120) * 60),
             WarmupSeconds = (int)(UiHelpers.Parse(_warmup, 3, "Aquecimento", 1, 30) * 60),
             Seed = (int)UiHelpers.Parse(_seed, 7, "Semente", 0, 1e9),
+            UseStoredPlans = _storedPlans.IsChecked == true,
+            Coordinate = _coordinate.IsChecked == true,
+            ProgressionSpeed = UiHelpers.Parse(_progSpeed, 0, "Velocidade da onda verde", 0, 120),
+            BusesPerHourPerStop = UiHelpers.Parse(_busFreq, 12, "Ônibus por hora", 0, 200),
+            BusDwell = UiHelpers.Parse(_busDwell, 20, "Embarque", 3, 180),
+            KFactor = UiHelpers.Parse(_k, 0.10, "Fator K", 0.05, 0.2),
+            ValueOfTime = UiHelpers.Parse(_vot, 25, "Valor do tempo", 0, 1000),
+            Occupancy = UiHelpers.Parse(_occ, 1.4, "Ocupação", 1, 80),
+            FuelPrice = UiHelpers.Parse(_fuel, 6.2, "Combustível", 0, 50),
+            Co2Price = UiHelpers.Parse(_co2, 150, "CO₂", 0, 10000),
+            CrashCost = UiHelpers.Parse(_crash, 180000, "Custo por acidente", 0, 1e8),
+            AnnualHours = UiHelpers.Parse(_hours, 750, "Horas por ano", 0, 8760),
         };
         foreach (var (node, (box, _)) in _zones)
         {
             var v = UiHelpers.ParseNullable(box, "Volume da entrada", 0, 20000);
-            if (v != null) o.ZoneVolumes[node] = v.Value;
+            if (v != null)
+            {
+                o.ZoneVolumes[node] = v.Value;
+                o.ZoneVolumeKeys[_net.Nodes[node].Key] = v.Value;
+            }
         }
+        o.Nodes = _current.Options.Nodes.Where(x => !x.IsEmpty).Select(x => new NodeOverride
+        {
+            Node = x.Node, Control = x.Control, Cycle = x.Cycle, Greens = x.Greens?.ToList(),
+            Turns = x.Turns.Select(t => new TurnCount { Approach = t.Approach, Total = t.Total, Left = t.Left, Through = t.Through, Right = t.Right, UTurn = t.UTurn }).ToList(),
+        }).ToList();
         return o;
     }
 
@@ -510,6 +673,7 @@ public sealed class TrafficWindow : Window
         _quick.IsEnabled = !busy;
         _cancel.IsEnabled = busy;
         _drawBtn.IsEnabled = !busy && _res != null;
+        _writeBtn.IsEnabled = !busy && _res != null;
         _export.IsEnabled = !busy && _res != null;
         _copy.IsEnabled = !busy && _res != null;
     }
@@ -527,6 +691,7 @@ public sealed class TrafficWindow : Window
         }
         FillDiagnostics();
         FillKpis();
+        var keepNode = SelectedNode()?.Node.Key;
         _nodeList.Items.Clear();
         foreach (var nr in _res.Nodes.Values.Where(n => !n.Node.IsZone && n.Node.Kind != TipoNo.Continuacao).OrderBy(n => n.Node.Label))
         {
@@ -538,11 +703,14 @@ public sealed class TrafficWindow : Window
             });
             row.Children.Add(new TextBlock
             {
-                Text = $"{nr.Node.Label} – {TrafficReport.KindLabel(nr.Node.Kind)}, {TrafficReport.ControlLabel(nr.Node.Control)}\n{nr.Volume:0} veh/h, atraso {nr.Delay:0.0} s" + (nr.Cycle > 0 ? $", ciclo {nr.Cycle:0} s" : ""),
+                Text = $"{nr.Node.Label} – {TrafficReport.KindLabel(nr.Node.Kind)}, {TrafficReport.ControlLabel(nr.Control)}\n{nr.Volume:0} veh/h, atraso {nr.Delay:0.0} s" + (nr.Cycle > 0 ? $", ciclo {nr.Cycle:0} s" : ""),
                 VerticalAlignment = VerticalAlignment.Center,
             });
             _nodeList.Items.Add(new ListBoxItem { Content = row, Tag = nr });
         }
+        if (keepNode != null)
+            foreach (ListBoxItem it in _nodeList.Items)
+                if (it.Tag is NodeResult n2 && n2.Node.Key == keepNode) { _nodeList.SelectedItem = it; break; }
         _linkList.Items.Clear();
         foreach (var lr in _res.Links.Values.OrderBy(x => x.Link.Road.Name).ThenBy(x => x.Link.S0))
         {
@@ -665,27 +833,327 @@ public sealed class TrafficWindow : Window
         var dist = string.Join("   ", new[] { "A", "B", "C", "D", "E", "F" }.Select(l => $"{l}: {nodes.Count(n => n.LOS == l)}"));
         Card("Níveis de serviço dos cruzamentos", $"{nodes.Count} cruzamento(s)", dist);
         Card("Emissões estimadas", $"{r.CO2kg:0} kg CO₂/h", "Pelo consumo médio de combustível conforme a velocidade de cada trecho.");
+        var crashes = r.Safety.Values.Sum(x => x.CrashesPerYear);
+        Card("Segurança (referência HSM)", $"{crashes:0.0} acidentes/ano", $"{r.Safety.Values.Sum(x => x.Total)} pontos de conflito nos cruzamentos; {r.Safety.Values.Sum(x => x.InjuryCrashesPerYear):0.0}/ano com vítimas. Compare alternativas – não é previsão calibrada.",
+            crashes > 10 ? Color.FromRgb(0xC6, 0x28, 0x28) : null);
+        var e = r.Economics;
+        Card("Custo anual da operação", $"R$ {e.Total / 1e6:0.00} mi/ano",
+            $"tempo R$ {e.DelayCost / 1e3:0} mil · combustível R$ {e.FuelCost / 1e3:0} mil ({e.FuelLitersPerHour:0} L/h) · CO₂ R$ {e.Co2Cost / 1e3:0} mil · acidentes R$ {e.CrashCost / 1e3:0} mil");
+        if (r.CommonCycle > 0) Card("Coordenação semafórica", $"ciclo comum {r.CommonCycle:0} s", $"{r.Nodes.Values.Count(n => n.Control == ControleNo.Semaforo)} semáforos; {r.Progression.Count} aproximação(ões) com progressão.");
         if (_sim != null)
         {
             Card("Microssimulação – viagens concluídas", $"{_sim.Completed}", $"em {_sim.Duration / 60:0} min; {_sim.InNetwork} na rede no fim" + (_sim.Backlog > 0 ? $"; {_sim.Backlog} não conseguiram entrar" : ""));
             Card("Tempo médio de viagem", $"{_sim.MeanTravelTime:0} s", $"atraso médio {_sim.MeanDelay:0} s por viagem, {_sim.StopsPerTrip:0.0} parada(s) por viagem");
-            Card("Pico de veículos simultâneos", $"{_sim.MaxVehicles}", "");
+            Card("Pico de veículos simultâneos", $"{_sim.MaxVehicles}", $"{_sim.LaneChanges} troca(s) de faixa; {_sim.BusStopsServed} parada(s) de ônibus atendidas.");
         }
         var crit = r.Diagnostics.Count(d => d.Severity == Gravidade.Critico);
         var warn = r.Diagnostics.Count(d => d.Severity == Gravidade.Atencao);
         Card("Diagnóstico", $"{crit} crítico(s), {warn} atenção", $"{r.Diagnostics.Count - crit - warn} informação(ões) – veja a aba Diagnóstico.", crit > 0 ? Color.FromRgb(0xC6, 0x28, 0x28) : null);
     }
 
-    private static string NodeText(NodeResult nr)
+    // ------------------------------------------------------------------------------------------------ cenários
+    private void FillScenarioList(string? select)
+    {
+        _loadingScenario = true;
+        _scenario.Items.Clear();
+        _scenario.Items.Add(new ComboBoxItem { Content = "(cenário não salvo)", Tag = null });
+        foreach (var sc in _scenarios) _scenario.Items.Add(new ComboBoxItem { Content = $"{sc.Name}  ·  {sc.Saved:dd/MM HH:mm}", Tag = sc });
+        _scenario.SelectedIndex = Math.Max(0, _scenarios.FindIndex(x => x.Name == select) + 1);
+        _loadingScenario = false;
+    }
+
+    private static string Num(double v, string fmt = "0.##") => v.ToString(fmt, UiHelpers.PtBr);
+
+    private void LoadScenario(TrafficScenario sc)
+    {
+        _current = sc;
+        var o = sc.Options;
+        _scName.Text = sc.Name;
+        _scNotes.Text = sc.Notes;
+        _demand.SelectedIndex = (int)o.Demand;
+        _growth.Text = Num(o.Growth * 100);
+        _heavy.Text = Num(o.HeavyVehicles * 100);
+        _bus.Text = Num(o.Buses * 100);
+        _phf.Text = Num(o.PeakHourFactor);
+        _peds.Text = Num(o.PedestriansPerHour);
+        _optimize.IsChecked = o.OptimizeSignals;
+        _cycle.Text = Num(o.FixedCycle);
+        _storedPlans.IsChecked = o.UseStoredPlans;
+        _coordinate.IsChecked = o.Coordinate;
+        _progSpeed.Text = Num(o.ProgressionSpeed);
+        _busFreq.Text = Num(o.BusesPerHourPerStop);
+        _busDwell.Text = Num(o.BusDwell);
+        _k.Text = Num(o.KFactor);
+        _vot.Text = Num(o.ValueOfTime);
+        _occ.Text = Num(o.Occupancy);
+        _fuel.Text = Num(o.FuelPrice);
+        _co2.Text = Num(o.Co2Price);
+        _crash.Text = Num(o.CrashCost, "0");
+        _hours.Text = Num(o.AnnualHours);
+        _duration.Text = Num(o.SimSeconds / 60.0);
+        _warmup.Text = Num(o.WarmupSeconds / 60.0);
+        _seed.Text = o.Seed.ToString();
+        foreach (var (node, (box, _)) in _zones)
+            box.Text = o.ZoneVolumeKeys.TryGetValue(_net.Nodes[node].Key, out var v) ? Num(v, "0") : "";
+    }
+
+    private void SaveScenario(bool asNew)
+    {
+        TrafficOptions o;
+        try { o = ReadOptions(); }
+        catch (FormatException ex) { UiHelpers.Error(ex.Message); return; }
+        var name = string.IsNullOrWhiteSpace(_scName.Text) ? "Cenário" : _scName.Text.Trim();
+        if (asNew)
+        {
+            var baseName = name;
+            var k = 2;
+            while (_scenarios.Any(x => x.Name == name)) name = $"{baseName} ({k++})";
+        }
+        var sc = new TrafficScenario { Name = name, Notes = _scNotes.Text ?? "", Saved = DateTime.Now, Options = o };
+        var i = _scenarios.FindIndex(x => x.Name == name);
+        if (i >= 0) _scenarios[i] = sc; else _scenarios.Add(sc);
+        _current = sc.Clone();
+        _scName.Text = name;
+        PersistScenarios();
+        FillScenarioList(name);
+    }
+
+    private void DeleteScenario()
+    {
+        if (_scenario.SelectedItem is not ComboBoxItem { Tag: TrafficScenario sc }) return;
+        if (MessageBox.Show(this, $"Excluir o cenário \"{sc.Name}\" do projeto?", "Simulador de Tráfego", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        _scenarios.RemoveAll(x => x.Name == sc.Name);
+        PersistScenarios();
+        FillScenarioList(null);
+    }
+
+    private void PersistScenarios()
+    {
+        if (_host == null) return;
+        try
+        {
+            _host.SaveScenarios(_scenarios);
+            _status.Text = $"{_scenarios.Count} cenário(s) salvo(s) no projeto (Informações do projeto). Salve o arquivo do Revit para guardá-los.";
+        }
+        catch (Exception ex) { UiHelpers.Error("Não foi possível salvar os cenários no projeto: " + ex.Message); }
+    }
+
+    private async void Compare()
+    {
+        TrafficOptions cur;
+        try { cur = ReadOptions(); }
+        catch (FormatException ex) { UiHelpers.Error(ex.Message); return; }
+        var list = new List<(string, TrafficOptions)> { (string.IsNullOrWhiteSpace(_scName.Text) ? "Atual" : _scName.Text.Trim() + " (atual)", cur) };
+        list.AddRange(_scenarios.Select(x => (x.Name, x.Clone().Options)));
+        _compare.Text = "Analisando os cenários…";
+        try
+        {
+            var runs = await Task.Run(() => list.Select(x => (x.Item1, TrafficAnalysis.Run(_net, x.Item2))).ToList());
+            _compare.Text = TrafficComparison.Text(runs);
+        }
+        catch (Exception ex) { _compare.Text = "Erro: " + ex.Message; }
+        finally
+        {
+            // A rede é compartilhada: refaz o cenário atual para os controles do mapa voltarem a ele.
+            if (_res != null) try { _res = TrafficAnalysis.Run(_net, cur); ShowResults(); } catch { /* mantém */ }
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------------ ajustes por cruzamento
+    public sealed class TurnRow
+    {
+        public string Key { get; init; } = "";
+        public string Name { get; init; } = "";
+        public string Total { get; set; } = "";
+        public string Left { get; set; } = "";
+        public string Through { get; set; } = "";
+        public string Right { get; set; } = "";
+        public string UTurn { get; set; } = "";
+    }
+
+    private static readonly (string Label, ControleNo? Value)[] Controls =
+    {
+        ("Do projeto", null), ("PARE na secundária", ControleNo.Pare), ("Dê a preferência", ControleNo.DePreferencia),
+        ("Semáforo", ControleNo.Semaforo), ("Rotatória (teste)", ControleNo.Rotatoria), ("Sem controle (direita)", ControleNo.PreferenciaDireita),
+    };
+
+    private FrameworkElement BuildOverridePanel()
+    {
+        var sp = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+        sp.Children.Add(new TextBlock { Text = "Ajustes deste cruzamento no cenário", FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(0x17, 0x4A, 0x83)) });
+        foreach (var (l, _) in Controls) _ovControl.Items.Add(l);
+        _ovControl.SelectedIndex = 0;
+        var row1 = new WrapPanel { Margin = new Thickness(0, 2, 0, 2) };
+        row1.Children.Add(new TextBlock { Text = "Controle ", VerticalAlignment = VerticalAlignment.Center });
+        row1.Children.Add(_ovControl);
+        row1.Children.Add(new TextBlock { Text = "  Ciclo (s) ", VerticalAlignment = VerticalAlignment.Center });
+        row1.Children.Add(_ovCycle);
+        row1.Children.Add(new TextBlock { Text = "  Verdes ", VerticalAlignment = VerticalAlignment.Center });
+        row1.Children.Add(_ovGreens);
+        sp.Children.Add(row1);
+        foreach (var (h, prop, w) in new[] { ("Aproximação", "Name", 150.0), ("Total veh/h", "Total", 62.0), ("Esq. %", "Left", 44.0), ("Frente %", "Through", 52.0), ("Dir. %", "Right", 44.0), ("Ret. %", "UTurn", 44.0) })
+            _ovTurns.Columns.Add(new DataGridTextColumn { Header = h, Binding = new System.Windows.Data.Binding(prop) { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged }, Width = w, IsReadOnly = prop == "Name" });
+        sp.Children.Add(new TextBlock { Text = "Contagem classificada (deixe em branco para usar a alocação):", FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)), Margin = new Thickness(0, 2, 0, 2) });
+        sp.Children.Add(_ovTurns);
+        var row2 = new WrapPanel { Margin = new Thickness(0, 4, 0, 0) };
+        row2.Children.Add(_ovApply);
+        row2.Children.Add(_ovClear);
+        row2.Children.Add(_ovSavePlan);
+        row2.Children.Add(_ovSetControl);
+        sp.Children.Add(row2);
+        _ovApply.Click += (_, _) => { if (StoreOverride()) Run(false); };
+        _ovClear.Click += (_, _) =>
+        {
+            if (SelectedNode() is not { } nr) return;
+            _current.Options.Nodes.RemoveAll(x => x.Node == nr.Node.Key);
+            FillOverride(nr);
+            Run(false);
+        };
+        _ovSavePlan.ToolTip = "Grava o plano (ciclo, fases, verdes, amarelo, vermelho geral, defasagem) na interseção do projeto: a análise passa a usá-lo e ele acompanha o modelo.";
+        _ovSavePlan.Click += (_, _) =>
+        {
+            if (_host == null || _res == null || SelectedNode() is not { } nr) return;
+            if (nr.Phases.Count == 0) { UiHelpers.Error("Este cruzamento não é semaforizado neste cenário."); return; }
+            try { _status.Text = _host.ApplyToIntersection(nr.Node.Key, nr.Control == nr.Node.DesignControl ? null : nr.Control, TrafficAnalysis.PlanOf(_res, nr, $"Simulador – {_current.Name}")); }
+            catch (Exception ex) { UiHelpers.Error("Não foi possível gravar o plano: " + ex.Message); }
+        };
+        _ovSetControl.ToolTip = "Troca o controle da interseção no projeto (placas, linhas de retenção e faixas são refeitas). Rotatória: use a ferramenta Rotatória.";
+        _ovSetControl.Click += (_, _) =>
+        {
+            if (_host == null || SelectedNode() is not { } nr) return;
+            var c = Controls[Math.Max(0, _ovControl.SelectedIndex)].Value;
+            if (c == null) { UiHelpers.Error("Escolha o controle a aplicar."); return; }
+            if (MessageBox.Show(this, $"Trocar o controle de {nr.Node.Label} no projeto para \"{TrafficReport.ControlLabel(c.Value)}\"? A interseção será refeita.",
+                    "Simulador de Tráfego", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            try { _status.Text = _host.ApplyToIntersection(nr.Node.Key, c, null); }
+            catch (Exception ex) { UiHelpers.Error("Não foi possível aplicar: " + ex.Message); }
+        };
+        return new ScrollViewer { Content = sp, MaxHeight = 330, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+    }
+
+    private NodeResult? SelectedNode() => _nodeList.SelectedItem is ListBoxItem { Tag: NodeResult nr } ? nr : null;
+
+    private void FillOverride(NodeResult nr)
+    {
+        var ov = _current.Options.Nodes.FirstOrDefault(x => x.Node == nr.Node.Key);
+        _ovControl.SelectedIndex = Math.Max(0, Array.FindIndex(Controls, c => c.Value == ov?.Control));
+        _ovCycle.Text = ov?.Cycle is { } c ? Num(c, "0") : "";
+        _ovGreens.Text = ov?.Greens is { Count: > 0 } g ? string.Join("; ", g.Select(x => Num(x, "0"))) : "";
+        var rows = new List<TurnRow>();
+        foreach (var li in nr.Node.In)
+        {
+            var l = _net.Links[li];
+            var t = ov?.Turns.FirstOrDefault(x => x.Approach == l.Key);
+            rows.Add(new TurnRow
+            {
+                Key = l.Key, Name = l.Name,
+                Total = t?.Total is { } tt ? Num(tt, "0") : "",
+                Left = t != null ? Num(t.Left) : "", Through = t != null ? Num(t.Through) : "", Right = t != null ? Num(t.Right) : "", UTurn = t != null ? Num(t.UTurn) : "",
+            });
+        }
+        _ovTurns.ItemsSource = rows;
+        _ovSavePlan.IsEnabled = _host != null && nr.Phases.Count > 0 && nr.Node.Kind == TipoNo.Intersecao;
+        _ovSetControl.IsEnabled = _host != null && nr.Node.Kind == TipoNo.Intersecao;
+    }
+
+    private bool StoreOverride()
+    {
+        if (SelectedNode() is not { } nr) return false;
+        double? P(string? s, string what, double min, double max)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            if (!double.TryParse(s.Replace('.', ','), System.Globalization.NumberStyles.Float, UiHelpers.PtBr, out var v) || v < min || v > max)
+                throw new FormatException($"{what}: valor inválido \"{s}\" (entre {min} e {max}).");
+            return v;
+        }
+        try
+        {
+            var ov = new NodeOverride { Node = nr.Node.Key, Control = Controls[Math.Max(0, _ovControl.SelectedIndex)].Value, Cycle = P(_ovCycle.Text, "Ciclo", 30, 240) };
+            var greens = (_ovGreens.Text ?? "").Split(new[] { ';', '/', ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(x => P(x, "Verde", 3, 200)!.Value).ToList();
+            if (greens.Count > 0) ov.Greens = greens;
+            _ovTurns.CommitEdit();
+            foreach (var r in (_ovTurns.ItemsSource as IEnumerable<TurnRow>) ?? Array.Empty<TurnRow>())
+            {
+                var parts = new[] { r.Left, r.Through, r.Right, r.UTurn };
+                if (string.IsNullOrWhiteSpace(r.Total) && parts.All(string.IsNullOrWhiteSpace)) continue;
+                var t = new TurnCount
+                {
+                    Approach = r.Key, Total = P(r.Total, "Total", 0, 20000),
+                    Left = P(r.Left, "Esquerda %", 0, 100) ?? 0, Through = P(r.Through, "Frente %", 0, 100) ?? 0,
+                    Right = P(r.Right, "Direita %", 0, 100) ?? 0, UTurn = P(r.UTurn, "Retorno %", 0, 100) ?? 0,
+                };
+                if (t.Left + t.Through + t.Right + t.UTurn <= 0) t.Through = 100;
+                ov.Turns.Add(t);
+            }
+            _current.Options.Nodes.RemoveAll(x => x.Node == nr.Node.Key);
+            if (!ov.IsEmpty) _current.Options.Nodes.Add(ov);
+            return true;
+        }
+        catch (FormatException ex) { UiHelpers.Error(ex.Message); return false; }
+    }
+
+    /// <summary>Diagrama de tempos do semáforo: uma linha por fase (verde, amarelo, vermelho) ao longo do ciclo, com a defasagem.</summary>
+    private void DrawTiming()
+    {
+        _timing.Children.Clear();
+        if (SelectedNode() is not { } nr || nr.Phases.Count == 0 || nr.Cycle <= 0)
+        {
+            _timing.Children.Add(new TextBlock { Text = "Diagrama de tempos: selecione um cruzamento semaforizado.", Margin = new Thickness(6), Foreground = Brushes.Gray });
+            return;
+        }
+        var w = Math.Max(100, _timing.ActualWidth - 110);
+        var n = nr.Phases.Count;
+        var rowH = Math.Min(20, (_timing.Height - 22) / n);
+        var C = nr.Cycle;
+        double X(double t) => 100 + t / C * w;
+        var green = new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32));
+        var yellow = new SolidColorBrush(Color.FromRgb(0xF2, 0xC2, 0x1B));
+        var red = new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28));
+        var t0 = 0.0;
+        for (int k = 0; k < n; k++)
+        {
+            var ph = nr.Phases[k];
+            var y = 4 + k * rowH;
+            _timing.Children.Add(Label($"F{k + 1} {(ph.LeftOnly ? "esq." : "")}", 4, y, 90));
+            void Bar(double a, double b, Brush br)
+            {
+                if (b <= a) return;
+                var r = new System.Windows.Shapes.Rectangle { Width = Math.Max(1, X(b) - X(a)), Height = rowH - 4, Fill = br };
+                Canvas.SetLeft(r, X(a));
+                Canvas.SetTop(r, y);
+                _timing.Children.Add(r);
+            }
+            var yEnd = t0 + ph.Green;
+            var amber = Math.Min(3, nr.Intergreen);
+            Bar(0, C, red);
+            Bar(t0, Math.Min(C, yEnd), green);
+            Bar(Math.Min(C, yEnd), Math.Min(C, yEnd + amber), yellow);
+            _timing.Children.Add(Label($"{ph.Green:0}s", X(t0) + 2, y - 1, 40, Brushes.White));
+            t0 = yEnd + nr.Intergreen;
+        }
+        var axisY = 6 + n * rowH;
+        _timing.Children.Add(Label($"0", 96, axisY, 30));
+        _timing.Children.Add(Label($"ciclo {C:0} s" + (nr.Offset > 0 ? $" · defasagem {nr.Offset:0} s" : "") + $" · {nr.PlanSource}", X(0) + 20, axisY, w));
+        static TextBlock Label(string s, double x, double y, double w, Brush? fg = null)
+        {
+            var tb = new TextBlock { Text = s, FontSize = 10.5, Width = w, Foreground = fg ?? Brushes.Black };
+            Canvas.SetLeft(tb, x);
+            Canvas.SetTop(tb, y);
+            return tb;
+        }
+    }
+
+    private static string NodeText(NodeResult nr, TrafficResult? res)
     {
         var sb = new StringBuilder();
         sb.AppendLine($"{nr.Node.Label} – {TrafficReport.KindLabel(nr.Node.Kind)}");
-        sb.AppendLine($"Controle: {TrafficReport.ControlLabel(nr.Node.Control)}");
+        sb.AppendLine($"Controle: {TrafficReport.ControlLabel(nr.Control)}" + (nr.Control != nr.Node.DesignControl ? $" (cenário; no projeto: {TrafficReport.ControlLabel(nr.Node.DesignControl)})" : ""));
+        if (nr.Node.LeftPockets || nr.Node.RightTurnIslands) sb.AppendLine("Geometria: " + string.Join(", ", new[] { nr.Node.LeftPockets ? "bolsões de conversão à esquerda" : null, nr.Node.RightTurnIslands ? "ilhas de conversão à direita" : null }.Where(x => x != null)));
         sb.AppendLine($"Nível {nr.LOS} ({TrafficReport.LosMeaning(nr.LOS)}), atraso médio {nr.Delay:0.0} s/veh, {nr.Volume:0} veh/h");
         if (nr.Phases.Count > 0)
         {
-            sb.AppendLine($"Ciclo {nr.Cycle:0} s:");
-            foreach (var ph in nr.Phases) sb.AppendLine($"  {ph.Name}: verde {ph.Green:0} s + 4 s de entreverdes");
+            sb.AppendLine($"Ciclo {nr.Cycle:0} s ({nr.PlanSource}):");
+            foreach (var ph in nr.Phases) sb.AppendLine($"  {ph.Name}: verde {ph.Green:0} s + {nr.Intergreen:0} s de entreverdes");
         }
         sb.AppendLine();
         foreach (var a in nr.Approaches)
@@ -696,6 +1164,12 @@ public sealed class TrafficWindow : Window
                 sb.AppendLine("  " + string.Join(", ", a.Movements.Where(m => m.Value >= 0.5).Select(m => $"{GiroLabel(m.Key)} {m.Value:0}")));
         }
         foreach (var n in nr.Notes) sb.AppendLine("ℹ " + n);
+        if (res != null && res.Safety.TryGetValue(nr.Node.Index, out var sf) && sf.Legs >= 3)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"Segurança: {sf.Legs} ramos, {sf.Total} pontos de conflito ({sf.Crossing} cruzamentos, {sf.Merging} convergências, {sf.Diverging} divergências), {sf.Pedestrian} com pedestres.");
+            sb.AppendLine($"  Acidentes previstos: {sf.CrashesPerYear:0.00}/ano ({sf.InjuryCrashesPerYear:0.00} com vítimas) – {sf.Model}; VDM {sf.AadtMajor:0} × {sf.AadtMinor:0}.");
+        }
         return sb.ToString();
     }
 

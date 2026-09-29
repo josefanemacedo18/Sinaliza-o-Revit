@@ -227,10 +227,32 @@ public sealed class TrafficMap : FrameworkElement
             }
         }
 
+        // Faixas auxiliares (desaceleração/aceleração) e pontos de ônibus (baia = quadrado vazado; na faixa = cheio).
+        foreach (var l in net.Links)
+        {
+            double Edge() => l.LaneOffset(0) + l.Road.LaneWidth * 0.5 + 1.6;
+            List<Vec2> Band(double a, double b) =>
+                Enumerable.Range(0, 9).Select(i => { var st = a + (b - a) * i / 8; var d = l.Path.TangentAt(st); return l.Path.PointAt(st) + new Vec2(d.Y, -d.X) * Edge(); }).ToList();
+            if (l.DecelLane > 1) dc.DrawGeometry(null, P(Color.FromRgb(0x6A, 0x1B, 0x9A), Math.Max(2, 2.5 * _scale), 200), Line(Band(Math.Max(0, l.Length - l.DecelLane), l.Length)));
+            if (l.AccelLane > 1) dc.DrawGeometry(null, P(Color.FromRgb(0x00, 0x83, 0x8F), Math.Max(2, 2.5 * _scale), 200), Line(Band(0, Math.Min(l.Length, l.AccelLane))));
+            foreach (var (at, bay, _) in l.BusStops)
+            {
+                var d = l.Path.TangentAt(at);
+                var p = S(l.Path.PointAt(at) + new Vec2(d.Y, -d.X) * (Edge() + (bay ? 1.5 : 0)));
+                var h = Math.Max(4, 2.2 * _scale);
+                dc.DrawRectangle(bay ? B(Colors.White) : B(Color.FromRgb(0x1F, 0x5F, 0xA8)), P(Color.FromRgb(0x1F, 0x5F, 0xA8), 1.5), new Rect(p.X - h, p.Y - h, 2 * h, 2 * h));
+            }
+        }
+        foreach (var (_, pos) in net.EscapeRamps)
+        {
+            var p = S(pos);
+            dc.DrawRectangle(B(Color.FromRgb(0xB0, 0xA0, 0x80)), P(Color.FromRgb(0xC6, 0x28, 0x28), 2), new Rect(p.X - 6, p.Y - 6, 12, 12));
+        }
+
         // Semáforos (estado no instante da animação ou verde/vermelho estático).
         SimFrame? frame = null;
         if (_sim != null && !double.IsNaN(SimTime) && _sim.Frames.Count > 0) frame = FrameAt(SimTime).A;
-        foreach (var nr in _res.Nodes.Values.Where(n => n.Node.Control == ControleNo.Semaforo && n.Phases.Count > 0))
+        foreach (var nr in _res.Nodes.Values.Where(n => n.Control == ControleNo.Semaforo && n.Phases.Count > 0))
         {
             var state = frame != null && frame.SignalPhase.TryGetValue(nr.Node.Index, out var st) ? st : int.MinValue;
             foreach (var li in nr.Node.In)

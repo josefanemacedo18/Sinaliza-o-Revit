@@ -147,6 +147,7 @@ internal sealed partial class AutoTestRunner
             if (_opt.Horizontal) Horizontal();
             if (_opt.Vertical) Vertical();
             if (_opt.Sidewalks) Sidewalks();
+            if (_opt.Roads || _opt.Sidewalks) RoundT();
             if (_opt.Terrain || _opt.Works) Terrain();
             if (_opt.Works) Works();
             if (_opt.Editing) Editing();
@@ -225,6 +226,41 @@ internal sealed partial class AutoTestRunner
             var sim = Core.Traffic.TrafficSimulation.Run(r2);
             s.Note($"{sim.Spawned} veículos gerados, {sim.Completed} viagens concluídas, {sim.InNetwork} na rede, {sim.Backlog} sem entrar, tempo médio {sim.MeanTravelTime:0} s, {sim.Frames.Count} quadros.");
             if (sim.Spawned > 20 && sim.Completed < 0.3 * sim.Spawned) s.Warn("Poucas viagens concluídas: possível travamento na rede simulada.");
+        });
+        Step("Tráfego", "Cenários: PARE × rotatória × semáforo coordenado, contagem e comparação", s =>
+        {
+            var node = net.Nodes.FirstOrDefault(n => n.Kind == Core.Traffic.TipoNo.Intersecao && n.In.Count >= 3);
+            var runs = new List<(string, Core.Traffic.TrafficResult)> { ("Projeto", res) };
+            if (node != null)
+            {
+                foreach (var c in new[] { Core.Traffic.ControleNo.Rotatoria, Core.Traffic.ControleNo.Semaforo })
+                {
+                    var o = new Core.Traffic.TrafficOptions { Coordinate = true };
+                    o.Nodes.Add(new Core.Traffic.NodeOverride { Node = node.Key, Control = c });
+                    runs.Add(($"{node.Label} {c}", Core.Traffic.TrafficAnalysis.Run(net, o)));
+                }
+                var oc = new Core.Traffic.TrafficOptions();
+                var lk = net.Links[node.In[0]];
+                oc.Nodes.Add(new Core.Traffic.NodeOverride { Node = node.Key, Turns = { new Core.Traffic.TurnCount { Approach = lk.Key, Total = 500, Left = 20, Through = 60, Right = 20 } } });
+                runs.Add(("contagem", Core.Traffic.TrafficAnalysis.Run(net, oc)));
+            }
+            var txt = Core.Traffic.TrafficComparison.Text(runs);
+            if (txt.Length < 200) s.Error("Comparação de cenários vazia.");
+            s.Note($"{runs.Count} cenário(s) comparados; acidentes previstos no projeto {res.Safety.Values.Sum(x => x.CrashesPerYear):0.0}/ano; custo anual R$ {res.Economics.Total / 1e6:0.00} mi.");
+            // Cenários guardados no projeto (grava e lê de volta).
+            var list = Core.Traffic.TrafficScenario.Presets();
+            TrafficScenarioStore.Save(_doc, list);
+            var back = TrafficScenarioStore.Load(_doc);
+            if (back.Count != list.Count) s.Error($"Cenários gravados no projeto: {list.Count}, lidos de volta: {back.Count}.");
+            res = Core.Traffic.TrafficAnalysis.Run(net, new Core.Traffic.TrafficOptions { Demand = Core.Traffic.NivelDemanda.Pico });
+        });
+        Step("Tráfego", "Gravar plano semafórico e resultados no modelo", s =>
+        {
+            var host = new TrafficHost(_uidoc);
+            var sig = res.Nodes.Values.FirstOrDefault(n => n.Control == Core.Traffic.ControleNo.Semaforo && n.Phases.Count > 0 && n.Node.Kind == Core.Traffic.TipoNo.Intersecao);
+            if (sig != null) s.Note(host.ApplyToIntersection(sig.Node.Key, null, Core.Traffic.TrafficAnalysis.PlanOf(res, sig, "Autoteste")));
+            else s.Note("Nenhum semáforo no projeto de teste para gravar o plano.");
+            s.Note(host.WriteResults(res, "Autoteste"));
         });
         if (_plan != null)
             Step("Tráfego", "Mapa de níveis de serviço na planta", s =>
