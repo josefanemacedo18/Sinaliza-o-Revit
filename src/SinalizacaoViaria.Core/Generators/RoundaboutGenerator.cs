@@ -11,6 +11,9 @@ public sealed record RoundaboutLegGeometry(RoundaboutLeg Leg, Vec2 Dir, Vec2 Lef
 {
     /// <summary>Ilha separadora pintada (zebrado com linha de canalização) – quando o ramo não tem ilha física.</summary>
     public Polygon2? PaintedSplitter { get; init; }
+    /// <summary>Travessia de pedestres do ramo: distância ao centro e extensão lateral (de calçada a calçada, atravessando os by-pass).</summary>
+    public double CrosswalkT { get; set; }
+    public (double Lo, double Hi)? CrosswalkSpan { get; set; }
     public Vec2 At(Vec2 center, double t, double o) => center + Dir * t + Left * o;
 }
 
@@ -28,6 +31,8 @@ public sealed class RoundaboutLayout
     public List<Polygon2> Gutter { get; } = new();
     public List<Polygon2> SplitterCurb { get; } = new();
     public List<Polygon2> SplitterCore { get; } = new();
+    /// <summary>Ilhas separadoras e do by-pass inteiras (antes das passagens de pedestres) – a faixa de pedestres não é pintada sobre elas.</summary>
+    public List<Polygon2> Refuges { get; } = new();
     /// <summary>Divisores físicos entre as faixas (turbo-rotatória).</summary>
     public List<Polygon2> Dividers { get; } = new();
     public List<RoundaboutLegGeometry> Legs { get; } = new();
@@ -182,7 +187,8 @@ public static class RoundaboutGenerator
                     lobes = PolygonOps.Difference(big, PolygonOps.Offset(full, 0.02)).Where(p => p.Area > 5).ToList();
                     lanes = PolygonOps.Intersect(lobes, band);
                     isl = PolygonOps.Difference(lobes, PolygonOps.Offset(lanes, 0.02));
-                    isl = PolygonOps.Offset(PolygonOps.Offset(isl, -0.4, true), 0.4, true).Where(p => p.Area > 4).ToList();
+                    // Sem fatias estreitas (< 1,5 m) ao longo dos ramos: onde a ilha não cabe, a faixa do by-pass se junta à do ramo.
+                    isl = PolygonOps.Offset(PolygonOps.Offset(isl, -0.75, true), 0.75, true).Where(p => p.Area > 6).ToList();
                     if (isl.Count >= Math.Min(d.Legs.Count, 2)) break;
                     rb *= 1.3;   // sem espaço para a ilha: concordância maior
                 }
@@ -227,6 +233,33 @@ public static class RoundaboutGenerator
         }
 
         var solids = splitters.Concat(bypassIslands).ToList();
+        L.Refuges.AddRange(solids);
+        // Travessias: de calçada a calçada (atravessando também os by-pass) e passagem no nível da pista nas ilhas
+        // (refúgio acessível – NBR 9050), em vez de terminar sobre uma ilha.
+        if (complete)
+        {
+            var passages = new List<Polygon2>();
+            var cwW = Math.Clamp(d.CrosswalkWidth, 2, 10);
+            foreach (var g in L.Legs)
+            {
+                var rou = L.ToOuter(c, g.Dir);
+                g.CrosswalkT = rou + Math.Max(2, d.CrosswalkDistance);
+                if (!(g.Leg.Crosswalk ?? d.Crosswalks)) continue;
+                var tc = g.CrosswalkT;
+                double Reach(double sgn)
+                {
+                    var o = 0.0;
+                    while (o < g.Leg.Width / 2 + 40 && full.Any(p => p.Contains(g.At(c, tc, sgn * (o + 0.1))))) o += 0.1;
+                    return o;
+                }
+                var hi = Reach(1);
+                var lo = -Reach(-1);
+                if (hi - lo < 2) continue;
+                g.CrosswalkSpan = (lo, hi);
+                if (solids.Count > 0) passages.AddRange(PolygonOps.Strip(new[] { g.At(c, tc, lo - 1), g.At(c, tc, hi + 1) }, cwW));
+            }
+            if (passages.Count > 0) solids = PolygonOps.Difference(solids, passages).Where(p => p.Area > 0.4).ToList();
+        }
         if (complete) L.Pavement.AddRange(PolygonOps.Difference(full, solids.Append(apronOuter)));
         else if (d.Integration == IntegracaoRotatoria.Anel) L.Pavement.AddRange(PolygonOps.Difference(full, new[] { apronOuter }));
         if (apronW > 0.01) L.Apron.AddRange(PolygonOps.Difference(new[] { apronOuter }, new[] { island }));
@@ -467,6 +500,73 @@ public static class RoundaboutGenerator
     }
 
     /// <summary>
+    /// Trechos do meio-fio externo real entre os ramos (concordâncias de entrada e saída, faixa do by-pass), das
+    /// travessias de um ramo às do ramo vizinho – para a linha de bordo. Devolve os pontos e o lado (+1 = deslocar
+    /// para a esquerda do sentido dos pontos) que fica para dentro da pista.
+    /// </summary>
+    public static List<(List<Vec2> Points, double InwardSign)>? CurbEdgeChains(RoundaboutDefinition d, RoundaboutLayout L, Vec2 c)
+    {
+        if (L.Pavement.Count == 0 || L.Legs.Count == 0) return null;
+        var outer = L.Pavement.OrderByDescending(p => p.Area).First().Outer;
+        if (outer.Count < 3) return null;
+        // Densifica (trechos retos longos) para cortar certo nas travessias.
+        var pts = new List<Vec2>();
+        for (int i = 0; i < outer.Count; i++)
+        {
+            var a = outer[i];
+            var b = outer[(i + 1) % outer.Count];
+            var n = Math.Max(1, (int)Math.Ceiling(a.DistanceTo(b) / 0.5));
+            for (int k = 0; k < n; k++) pts.Add(a + (b - a) * ((double)k / n));
+        }
+        var cwW = Math.Clamp(d.CrosswalkWidth, 2, 10);
+        bool Keep(Vec2 p)
+        {
+            foreach (var g in L.Legs)
+            {
+                var v = p - c;
+                var t = v.Dot(g.Dir);
+                var o = v.Dot(g.Left);
+                var hw = g.Leg.Width / 2;
+                var (lo, hi) = g.CrosswalkSpan ?? (-hw, hw);
+                // Bordos do próprio ramo e tudo além da travessia (a linha fica entre as travessias de dois ramos).
+                if (t > 0 && o > lo - 0.6 && o < hi + 0.6 && t > L.ToOuter(c, g.Dir) - 0.5) return false;
+                if (t > g.CrosswalkT - cwW / 2 - 0.6 && o > lo - 8 && o < hi + 8) return false;
+            }
+            return true;
+        }
+        var n0 = pts.Count;
+        var start = Enumerable.Range(0, n0).FirstOrDefault(i => !Keep(pts[i]), -1);
+        if (start < 0) return null;
+        var chains = new List<List<Vec2>>();
+        var cur = new List<Vec2>();
+        for (int s = 1; s <= n0; s++)
+        {
+            var p = pts[(start + s) % n0];
+            if (Keep(p)) cur.Add(p);
+            else { if (cur.Count >= 3) chains.Add(cur); cur = new List<Vec2>(); }
+        }
+        if (cur.Count >= 3) chains.Add(cur);
+        // O contorno externo é anti-horário (área positiva): o interior da pista fica à esquerda do sentido dos pontos.
+        var inward = SignedArea(outer) >= 0 ? 1.0 : -1.0;
+        return chains.Where(ch => new Polyline2(ch).Length > 2).Select(ch => (Simplify(ch), inward)).ToList();
+    }
+
+    private static List<Vec2> Simplify(List<Vec2> pts)
+    {
+        var res = new List<Vec2> { pts[0] };
+        for (int i = 1; i < pts.Count - 1; i++)
+        {
+            var a = res[^1];
+            var b = pts[i + 1];
+            var ab = b - a;
+            var dist = ab.Length < 1e-9 ? 0 : Math.Abs(ab.Cross(pts[i] - a)) / ab.Length;
+            if (dist > 0.01 || a.DistanceTo(pts[i]) > 3) res.Add(pts[i]);
+        }
+        res.Add(pts[^1]);
+        return res;
+    }
+
+    /// <summary>
     /// Trechos da borda externa do anel entre os ramos (para a linha de bordo). Um único trecho fechado quando não há
     /// ramos abertos; o polígono é percorrido a partir de uma abertura para não partir um trecho no início.
     /// </summary>
@@ -542,9 +642,18 @@ public static class RoundaboutGenerator
         var reach = L.Zone.Outer.Max(p => p.DistanceTo(c)) + 10;
         if (d.Markings && d.OuterEdgeLine && d.Integration != IntegracaoRotatoria.SomenteIlha)
         {
-            var inward = SignedArea(L.Outer.Outer) >= 0 ? 0.15 : -0.15;
-            foreach (var (pts, closed) in RingEdgeChains(L, c, reach))
-                Add(new LinearMarkingDefinition { Code = "LBO", Offset = inward, PathRef = PathReference.FromPoints(pts, z, closed) });
+            // Completa: ao longo do meio-fio real entre os ramos (concordâncias, by-pass) – o círculo teórico ficaria solto
+            // no asfalto. Anel: na borda do anel.
+            var real = d.Integration == IntegracaoRotatoria.Completa ? CurbEdgeChains(d, L, c) : null;
+            if (real != null)
+                foreach (var (pts, sgn) in real)
+                    Add(new LinearMarkingDefinition { Code = "LBO", Offset = sgn * 0.15, PathRef = PathReference.FromPoints(pts, z, false) });
+            else
+            {
+                var inward = SignedArea(L.Outer.Outer) >= 0 ? 0.15 : -0.15;
+                foreach (var (pts, closed) in RingEdgeChains(L, c, reach))
+                    Add(new LinearMarkingDefinition { Code = "LBO", Offset = inward, PathRef = PathReference.FromPoints(pts, z, closed) });
+            }
         }
 
         // ---- setas de movimento em curva (IMC) no anel, após cada entrada (uma por faixa)
@@ -596,17 +705,8 @@ public static class RoundaboutGenerator
                     var sym = DesignRules.YieldSymbolLength(v);
                     Add(new SymbolMarkingDefinition { Code = "SDP", Length = sym, Position = g.At(c, rou + 1.6 + sym / 2, (o0 + o1) / 2), Direction = -g.Dir, Z = z });
                 }
-                if (g.Splitter != null)
-                {
-                    // Nariz zebrado (branco) na ponta da ilha física.
-                    var t1 = rou + splitLen;
-                    var tip = g.At(c, t1 + 10, 0);
-                    Add(new HatchMarkingDefinition
-                    {
-                        Code = "ZPA",
-                        Boundary = PathReference.FromPoints(new[] { g.At(c, t1 - 0.2, -0.6), tip, g.At(c, t1 - 0.2, 0.6) }, z, true),
-                    });
-                }
+                // Ilha física: a linha dupla amarela (fluxos opostos) chega à ponta da ilha – sem zebrado branco estreito
+                // sobreposto à linha amarela (MBST Vol. IV: a canalização entre fluxos opostos é amarela).
                 if (g.PaintedSplitter is { } ps)
                 {
                     // Gota pintada: zebrado com linha de canalização – amarelo entre fluxos opostos, branco em mão única.
@@ -621,7 +721,7 @@ public static class RoundaboutGenerator
                 if (d.ApproachDoubleLine && leg.TwoWay && d.Integration == IntegracaoRotatoria.Completa)
                 {
                     // LFO-3 entre a ponta da ilha separadora e o fim da zona remodelada (aproximação sem ultrapassagem).
-                    var t0 = (g.Splitter != null || g.PaintedSplitter != null ? rou + splitLen : rou + 2.0) + 0.5;
+                    var t0 = (g.Splitter != null || g.PaintedSplitter != null ? rou + splitLen : rou + 2.0) + 0.3;
                     var t1 = L.ToOuter(c, g.Dir) + Math.Max(0, L.LegLength) - 0.3;
                     var zoneT = Ray(L.Zone, c, g.Dir);
                     if (zoneT > t0 + 2) t1 = zoneT - 0.3;
@@ -631,15 +731,19 @@ public static class RoundaboutGenerator
             if (crosswalk)
             {
                 var tc = rou + Math.Max(2, d.CrosswalkDistance);
-                var a = g.At(c, tc, hw - 0.3);
-                var b = g.At(c, tc, -(hw - 0.3));
+                // De calçada a calçada: com by-pass a travessia cruza também a faixa de conversão livre (refúgio na ilha).
+                var (lo, hi) = g.CrosswalkSpan ?? (-hw, hw);
+                var a = g.At(c, tc, hi - 0.3);
+                var b = g.At(c, tc, lo + 0.3);
                 var cwk = Add(new LinearMarkingDefinition { Code = "FTP-1", WidthOverride = Math.Clamp(d.CrosswalkWidth, 2, 10), Overlay = true,
                     PathRef = PathReference.FromPoints(new[] { a, b }, z) });
-                if (g.Splitter != null) cwk.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = g.Splitter.Outer.ToList() });
-                if (leg.Sidewalk > 0.5 && d.Integration == IntegracaoRotatoria.Completa)
-                    foreach (var sgn in new[] { 1.0, -1.0 })
+                foreach (var isl in L.Refuges.Append(g.Splitter).Where(p => p != null).Distinct())
+                    if (DetailGenerator.SegmentIntervals(isl!, a, b).Any())
+                        cwk.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = isl!.Outer.ToList() });
+                if ((leg.Sidewalk > 0.5 || d.SidewalkWidth > 0.5) && d.Integration == IntegracaoRotatoria.Completa)
+                    foreach (var (sgn, o) in new[] { (1.0, hi), (-1.0, lo) })
                     {
-                        var curb = g.At(c, tc, sgn * hw);
+                        var curb = g.At(c, tc, o);
                         Add(new RampDefinition { PathRef = PathReference.FromPoints(new[] { curb, curb + g.Left * sgn }, z), Height = d.CurbHeight });
                     }
             }

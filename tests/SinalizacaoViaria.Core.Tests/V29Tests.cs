@@ -119,4 +119,86 @@ public class V29Tests
         Assert.All(lfo3, l => Assert.True(l.Points.Max(p => mainAxis.Project(p).Station) <= sn + 16.01 || Math.Abs(l.Project(s.Layout.Node).Signed) > 3));
         Assert.True(Kids(s0, it0).Count(k => k.Code == "LFO-3") == 3);
     }
+
+    // ------------------------------------------------------------------ rotatórias
+
+    private static (RoundaboutDefinition D, RoundaboutLayout L, List<MarkingDefinition> Kids) Roundabout(int tpl, TipoRotatoria type)
+    {
+        var roads = new List<IntersectionRoad>();
+        foreach (var (a, b) in new[] { (new Vec2(-120, 0), new Vec2(120, 0)), (new Vec2(0, -120), new Vec2(0, 120)) })
+        {
+            var pr = PathReference.FromPoints(new[] { a, b }, 0);
+            var g = RoadTemplates.All[tpl].Create().Build(pr, new OutputSettings(), Cat);
+            roads.Add(new IntersectionRoad(g.OfType<RoadPavementDefinition>().First(), new Polyline2(pr.Points)));
+        }
+        var d = new RoundaboutDefinition { Center = Vec2.Zero };
+        d.ApplyPreset(type);
+        d.Legs = RoundaboutGenerator.LegsFromRoads(d.Center, roads, d.OuterRadius + 25);
+        var L = RoundaboutGenerator.Layout(d);
+        return (d, L, RoundaboutGenerator.Children(d, L, new OutputSettings(), 0));
+    }
+
+    private static double ToBoundary(IEnumerable<Polygon2> polys, Vec2 p) =>
+        polys.SelectMany(x => new[] { x.Outer }.Concat(x.Holes)).Min(r => Enumerable.Range(0, r.Count).Min(i => SegDist(p, r[i], r[(i + 1) % r.Count])));
+
+    private static double SegDist(Vec2 p, Vec2 a, Vec2 b)
+    {
+        var ab = b - a;
+        var t = ab.Length < 1e-12 ? 0 : Math.Clamp((p - a).Dot(ab) / ab.Dot(ab), 0, 1);
+        return p.DistanceTo(a + ab * t);
+    }
+
+    [Theory]
+    [InlineData(0, TipoRotatoria.ComBypass)]
+    [InlineData(1, TipoRotatoria.UmaFaixa)]
+    [InlineData(2, TipoRotatoria.DuasFaixas)]
+    public void Rotatoria_linha_de_bordo_acompanha_o_meio_fio_real(int tpl, TipoRotatoria type)
+    {
+        var (_, L, kids) = Roundabout(tpl, type);
+        var lbo = kids.OfType<LinearMarkingDefinition>().Where(k => k.Code == "LBO" && !k.PathRef.Closed).ToList();
+        Assert.NotEmpty(lbo);
+        // Nenhum trecho "solto" no asfalto: todos os pontos a menos de 0,4 m de um meio-fio (borda da pista).
+        foreach (var l in lbo)
+            foreach (var p in l.PathRef.Points)
+                Assert.True(ToBoundary(L.Pavement, p) < 0.4, $"LBO a {ToBoundary(L.Pavement, p):0.00} m do meio-fio em {p}");
+    }
+
+    [Fact]
+    public void Rotatoria_com_bypass_tem_travessia_de_calcada_a_calcada_e_rampas_na_calcada_externa()
+    {
+        var (d, L, kids) = Roundabout(0, TipoRotatoria.ComBypass);
+        Assert.NotEmpty(L.Refuges);
+        var ftp = kids.OfType<LinearMarkingDefinition>().Where(k => k.Code == "FTP-1").ToList();
+        Assert.Equal(4, ftp.Count);
+        foreach (var g in L.Legs)
+        {
+            Assert.NotNull(g.CrosswalkSpan);
+            var (lo, hi) = g.CrosswalkSpan!.Value;
+            // Atravessa os by-pass: bem mais larga que a pista do ramo.
+            Assert.True(hi - lo > g.Leg.Width + 6, $"travessia de {hi - lo:0.0} m num ramo de {g.Leg.Width:0.0} m");
+        }
+        var ramps = kids.OfType<RampDefinition>().ToList();
+        Assert.Equal(8, ramps.Count);
+        // Nenhuma rampa sobre ilha: todas na calçada externa (fora da pista e das ilhas).
+        foreach (var r in ramps)
+        {
+            var tip = r.PathRef.Points[1];
+            Assert.DoesNotContain(L.Refuges, isl => isl.Contains(tip));
+            Assert.DoesNotContain(L.Pavement, pv => pv.Contains(tip));
+        }
+    }
+
+    [Fact]
+    public void Rotatoria_ilha_separadora_tem_refugio_no_nivel_da_pista_e_nariz_sem_zebrado_branco()
+    {
+        var (d, L, kids) = Roundabout(1, TipoRotatoria.UmaFaixa);
+        foreach (var g in L.Legs.Where(g => g.Splitter != null))
+        {
+            var mid = g.At(d.Center, g.CrosswalkT, 0);
+            Assert.DoesNotContain(L.SplitterCore, p => p.Contains(mid));
+            Assert.DoesNotContain(L.SplitterCurb, p => p.Contains(mid));
+            Assert.Contains(L.Pavement, p => p.Contains(mid));
+        }
+        Assert.DoesNotContain(kids.OfType<HatchMarkingDefinition>(), h => h.Code == "ZPA" && h.BarColor != MarkingColor.Amarela);
+    }
 }
