@@ -760,6 +760,17 @@ public sealed class TrafficMap : FrameworkElement
             }
         }
         bk.Close(); blinkG.Freeze();
+        // Pedestres atravessando (círculo com a cabeça, visto de cima).
+        if (a.Peds.Length > 0)
+        {
+            var pr = Math.Max(1.5, 0.35 * _scale);
+            for (int k = 0; k + 1 < a.Peds.Length; k += 2)
+            {
+                var pt = S(new Vec2(a.Peds[k], a.Peds[k + 1]));
+                dc.DrawEllipse(B(Color.FromRgb(0x2E, 0x4A, 0x7A)), P(Colors.White, Math.Max(0.5, pr * 0.3)), pt, pr, pr);
+                dc.DrawEllipse(B(Color.FromRgb(0xF1, 0xC2, 0x8E)), null, pt, pr * 0.45, pr * 0.45);
+            }
+        }
         sh.Close(); shadow.Freeze();
         if (detailed) dc.DrawGeometry(B(Colors.Black, 55), null, shadow);
         var outline = P(Color.FromRgb(0x1B, 0x1F, 0x24), Math.Clamp(_scale * 0.06, 0.4, 1.0), 200);

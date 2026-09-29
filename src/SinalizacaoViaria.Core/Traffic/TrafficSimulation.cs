@@ -81,6 +81,8 @@ public sealed class SimFrame
     public Dictionary<int, int> SignalPhase { get; init; } = new();
     /// <summary>Estado de cada veículo (só com <see cref="TrafficSimulation.Debug"/>): trecho/nó, posição, obstáculo.</summary>
     public Dictionary<int, string>? Info { get; init; }
+    /// <summary>Pedestres atravessando (x, y por pedestre).</summary>
+    public float[] Peds { get; init; } = Array.Empty<float>();
     public int Count => Data.Length / Stride;
 }
 
@@ -124,7 +126,7 @@ public sealed class SimResult
 /// </summary>
 public static class TrafficSimulation
 {
-    private const double Dt = 0.5;
+    private const double Dt = 0.25;
     public static bool Debug { get; set; }
 
     /// <summary>
@@ -185,6 +187,8 @@ public static class TrafficSimulation
         var opt = macro.Options;
         var res = new SimResult();
         var rnd = new Random(opt.Seed);
+        // Perfil do motorista em sorteio próprio: não altera a sequência de chegadas e rotas.
+        var drv = new Random(opt.Seed * 31 + 7);
         var total = opt.WarmupSeconds + opt.SimSeconds;
         res.Duration = opt.SimSeconds;
         if (net.Links.Count == 0 || macro.Routes.Count == 0) return res;
@@ -706,7 +710,11 @@ public static class TrafficSimulation
                 var type = rnd.NextDouble() < opt.HeavyVehicles ? 1 : rnd.NextDouble() < opt.Buses / Math.Max(1e-6, 1 - opt.HeavyVehicles) ? 2 : 0;
                 var v = new SimVehicle
                 {
-                    Id = nextId++, Type = type, Length = type == 0 ? 4.5 : 12, A = type == 0 ? 2.5 : 1.2, B = type == 0 ? 2.5 : 2.0, T = type == 0 ? 1.0 : 1.4,
+                    // Motoristas diferentes: aceleração e intervalo desejado variam (mais e menos agressivos).
+                    Id = nextId++, Type = type, Length = type == 0 ? 4.5 : 12,
+                    A = type == 0 ? 2.2 + drv.NextDouble() * 0.8 : 1.0 + drv.NextDouble() * 0.4,
+                    B = type == 0 ? 2.5 : 2.0,
+                    T = type == 0 ? 0.75 + drv.NextDouble() * 0.5 : 1.2 + drv.NextDouble() * 0.4,
                     SpeedFactor = Math.Clamp(1 + (rnd.NextDouble() + rnd.NextDouble() - 1) * 0.12, 0.85, 1.12), Route = route, Born = time,
                 };
                 if (!queues.TryGetValue(route[0], out var q)) queues[route[0]] = q = new Queue<SimVehicle>();
@@ -1109,7 +1117,36 @@ public static class TrafficSimulation
                             : $"L{v.Link}/{v.Lane} S={v.S:0.0}/{EndOf(net.Links[v.Link]):0.0} V={v.V:0.0}{ob}{(v.Mov is { } pm ? $" plan {pm.From}/{pm.FromLane}->{pm.To}/{pm.ToLane}" : "")}";
                     }
                 }
-                if (time >= opt.WarmupSeconds - 60) res.Frames.Add(new SimFrame { Time = time - opt.WarmupSeconds, Data = data, SignalPhase = sig, Info = info });
+                // Pedestres nas travessias do meio da quadra: grupos atravessando de um meio-fio ao outro no intervalo ocupado.
+                var pedPts = new List<float>();
+                foreach (var ((li, ck), list) in peds)
+                {
+                    var l = net.Links[li];
+                    if (l.Road.TwoWay && !l.Forward) continue;           // a mesma travessia nos dois sentidos
+                    var (at, w) = l.Crosswalks[ck];
+                    foreach (var (from, to) in list)
+                    {
+                        if (time < from || time >= to) continue;
+                        var dirT = l.Path.TangentAt(at);
+                        var nrm = new Vec2(-dirT.Y, dirT.X);
+                        var half = Math.Max(l.Road.LeftWidth, l.Road.RightWidth) + 0.5;
+                        var dur = w / 1.2 + 2;
+                        // Semáforo de pedestres: vários pedestres saindo em sequência dos dois lados.
+                        var n = to - from > dur + 2 ? 4 : 1;
+                        for (int q = 0; q < n; q++)
+                        {
+                            var start = from + q * 2.5;
+                            if (time < start) continue;
+                            var u = Math.Min(1, (time - start) / dur);
+                            if (u >= 1) continue;
+                            var side = (q + (int)(from * 7)) % 2 == 0 ? 1 : -1;
+                            var pp = l.Path.PointAt(at) + nrm * (side * (half - 2 * half * u)) + dirT * ((q % 2) * 0.8 - 0.4);
+                            pedPts.Add((float)pp.X);
+                            pedPts.Add((float)pp.Y);
+                        }
+                    }
+                }
+                if (time >= opt.WarmupSeconds - 60) res.Frames.Add(new SimFrame { Time = time - opt.WarmupSeconds, Data = data, SignalPhase = sig, Info = info, Peds = pedPts.ToArray() });
             }
             progress?.Report(time / total);
         }
