@@ -223,6 +223,8 @@ public static class MarkingBuilder
         BridgeDefinition br => path == null || path.Points.Count < 2 ? Missing("Eixo da obra de arte não encontrado.") : BridgeGenerator.Build(br, path, ctx),
         RailwayDefinition rw => path == null || path.Points.Count < 2 ? Missing("Eixo da via férrea não encontrado.") : RailwayGenerator.Build(rw, path),
         RecessMarkingDefinition rc => path == null || path.Points.Count < 2 ? Missing("Eixo da via do recuo não encontrado.") : RecessGenerator.Build(rc, path, ctx),
+        RumbleStripDefinition rs => path == null || path.Points.Count < 2 ? Missing("Caminho do sonorizador não encontrado.") : RumbleStripGenerator.Generate(rs, path),
+        EscapeRampDefinition er => path == null || path.Points.Count < 2 ? Missing("Eixo da área de escape não encontrado.") : EscapeRampGenerator.Generate(er, path, ctx),
         ChannelizationDefinition cz => path == null || path.Points.Count < 2 ? Missing("Linha de referência da canalização não encontrada.") : ChannelizationGenerator.Generate(cz, path, ctx),
         _ => throw new NotSupportedException(def.GetType().Name),
     };
@@ -857,6 +859,18 @@ public static class MarkingBuilder
             case RecessMarkingDefinition rc:
                 return new MarkingInfo(rc.DisplayCode, Automation.RecuoVia.Rotulo(rc.Type) + " – marcas", rc.Type == Automation.TipoRecuo.BaiaOnibus ? GrupoMarca.Estacionamento : GrupoMarca.Longitudinal,
                     "MBST Vol. IV – MVE, LCO e setas; DNIT – Manual de Projeto de Interseções (faixas de mudança de velocidade)", "un");
+            case RumbleStripDefinition rs:
+                return new MarkingInfo(rs.DisplayCode, rs.Type switch
+                {
+                    TipoSonorizador.Fresado => "Sonorizador fresado",
+                    TipoSonorizador.TermoplasticoRelevo => "Linha em termoplástico com relevo",
+                    TipoSonorizador.BarrasRelevo => "Sonorizador – barras em relevo",
+                    _ => "Tachas sonorizadoras",
+                } + $" ({rs.ElementLength * 100:0}×{rs.ElementWidth * 100:0} cm a cada {rs.Spacing * 100:0} cm)", GrupoMarca.Dispositivo,
+                    "CONTRAN – MBST Vol. IV (dispositivos auxiliares); DNIT IPR-740; FHWA – Rumble Strips (referência)", "un");
+            case EscapeRampDefinition er:
+                return new MarkingInfo(er.DisplayCode, $"Área de escape – caixa de retenção {er.ActualLength:0} × {er.Width:0.#} m", GrupoMarca.Urbanizacao,
+                    "AASHTO Green Book – Emergency Escape Ramps; DNIT – Manual de Projeto Geométrico de Rodovias Rurais", "un");
             case IAnnotationDefinition:
                 return new MarkingInfo(def.DisplayCode, def.KindName, GrupoMarca.Detalhamento, "", "");
             default:

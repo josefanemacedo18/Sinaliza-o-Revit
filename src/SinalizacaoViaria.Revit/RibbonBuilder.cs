@@ -96,7 +96,11 @@ public static class RibbonBuilder
             Data(typeof(CmdDispositivos), "Bloqueios Físicos", "bloqueio",
                 "Todos os dispositivos físicos numa só ferramenta: tachas e tachões refletivos, segregadores, balizadores, pilaretes e frades, New Jersey, " +
                 "defensas metálicas (guard rail simples, dupla e de cabos), gradis, floreiras e canalização provisória de obras."),
-            Data(typeof(CmdTachas), "Tachas e Tachões", "tacha", "Tachas e tachões refletivos ao longo de linhas (mono/bidirecionais, cadência pela velocidade) – atalho de Bloqueios Físicos."));
+            Data(typeof(CmdTachas), "Tachas e Tachões", "tacha", "Tachas e tachões refletivos ao longo de linhas (mono/bidirecionais, cadência pela velocidade) – atalho de Bloqueios Físicos."),
+            Data(typeof(CmdSonorizador), "Sonorizador Longitudinal", "sonorizador",
+                "Sonorizador (rumble strip) no bordo, acostamento ou eixo: fresado, termoplástico com relevo, barras ou tachas – dimensões, espaçamento, ângulo, cor e interrupções para ciclistas."),
+            Data(typeof(CmdAreaEscape), "Área de Escape", "escape",
+                "Caixa de retenção para caminhões sem freio em descidas: comprimento pela velocidade, rampa e material (AASHTO), profundidade com transição, faixa de serviço com âncoras, berma, zebrado e delineadores."));
 
         var det = app.CreateRibbonPanel(TabName, "Detalhamento");
         Split(det, "SvDetalhar", "Detalhar",

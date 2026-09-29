@@ -178,6 +178,8 @@ public enum Justificacao
 [JsonDerivedType(typeof(SlopeDefinition), "talude")]
 [JsonDerivedType(typeof(InterchangeDefinition), "no-viario")]
 [JsonDerivedType(typeof(RecessMarkingDefinition), "recuo")]
+[JsonDerivedType(typeof(RumbleStripDefinition), "sonorizador")]
+[JsonDerivedType(typeof(EscapeRampDefinition), "area-escape")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;

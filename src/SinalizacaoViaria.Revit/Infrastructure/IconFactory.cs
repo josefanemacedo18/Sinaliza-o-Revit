@@ -133,6 +133,20 @@ public static class IconFactory
                 dc.DrawGeometry(B(Color.FromRgb(188, 186, 180)), null, Close(Poly(new Point(8, 4), new Point(13, 4), new Point(13, 26), new Point(20, 26), new Point(20, 30), new Point(4, 30), new Point(4, 26), new Point(8, 26))));
                 dc.DrawLine(P(Color.FromRgb(98, 158, 74), 2), new Point(1, 29), new Point(6, 29));
                 break;
+            case "sonorizador":
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 1, 30, 30));
+                dc.DrawLine(P(White, 2), new Point(12, 1), new Point(12, 31));
+                for (var y = 3.0; y < 31; y += 4) dc.DrawRectangle(B(Color.FromRgb(30, 30, 34)), null, new Rect(16, y, 8, 2));
+                dc.DrawLine(P(Yellow, 1.2), new Point(27, 8), new Point(30, 12));
+                dc.DrawLine(P(Yellow, 1.2), new Point(27, 16), new Point(30, 20));
+                break;
+            case "escape":
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 1, 9, 30));
+                dc.DrawGeometry(B(Color.FromRgb(176, 160, 128)), null, Close(Poly(new Point(10, 31), new Point(10, 22), new Point(22, 4), new Point(31, 4), new Point(31, 12), new Point(20, 31))));
+                dc.DrawGeometry(B(Color.FromRgb(150, 118, 84)), null, Close(Poly(new Point(22, 4), new Point(31, 4), new Point(31, 1), new Point(24, 1))));
+                dc.DrawLine(P(White, 1.2), new Point(8, 28), new Point(8, 20));
+                dc.DrawLine(P(Red, 1.5), new Point(14, 26), new Point(25, 9));
+                break;
             case "talude":
                 dc.DrawGeometry(B(Color.FromRgb(98, 158, 74)), null, Close(Poly(new Point(1, 30), new Point(12, 18), new Point(17, 18), new Point(29, 5), new Point(31, 5), new Point(31, 30))));
                 dc.DrawLine(P(Color.FromRgb(188, 186, 180), 2), new Point(12, 18), new Point(17, 18));
