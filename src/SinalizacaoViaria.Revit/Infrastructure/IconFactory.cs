@@ -334,6 +334,13 @@ public static class IconFactory
                 dc.DrawEllipse(B(Color.FromRgb(255, 190, 0)), null, new Point(27, 9.5), 2, 2);
                 dc.DrawEllipse(B(Color.FromRgb(0, 200, 83)), null, new Point(27, 14.5), 2, 2);
                 break;
+            case "semaforos":
+                // Grupo focal grande com as três luzes.
+                dc.DrawRoundedRectangle(B(Color.FromRgb(30, 30, 30)), null, new Rect(9, 1, 14, 30), 3, 3);
+                dc.DrawEllipse(B(Red), null, new Point(16, 7), 4, 4);
+                dc.DrawEllipse(B(Color.FromRgb(255, 190, 0)), null, new Point(16, 16), 4, 4);
+                dc.DrawEllipse(B(Color.FromRgb(0, 200, 83)), null, new Point(16, 25), 4, 4);
+                break;
             case "autoteste":
                 dc.DrawRectangle(B(White), P(Asphalt, 1.5), new Rect(6, 4, 20, 25));
                 dc.DrawRectangle(B(Asphalt), null, new Rect(11, 2, 10, 5));

@@ -121,6 +121,9 @@ public static class RibbonBuilder
             "faixas de pedestres, vagas, lombadas e greide), estima a demanda, calcula capacidade e nível de serviço (HCM) de cada cruzamento " +
             "e trecho, otimiza os semáforos, anima a microssimulação dos veículos e gera o diagnóstico com recomendações (capacidade, segurança, " +
             "sinalização, CTB, acessibilidade) – com mapa de níveis de serviço na planta e relatório.");
+        Large(traf, typeof(CmdSemaforos), "Semáforos", "semaforos",
+            "Abre o Simulador direto na aba Semáforos: lista de todos os semáforos, criar (clique no mapa ou escolha um elemento do projeto), " +
+            "tempos de cada um (ciclo, verdes, entreverdes, defasagem), recomendação para um, todos ou todos os cruzamentos de uma via com onda verde, e gravar no projeto.");
 
         // ---------------------------------------------------------------- Editar e configurações
         var edit = app.CreateRibbonPanel(TabName, "Editar");

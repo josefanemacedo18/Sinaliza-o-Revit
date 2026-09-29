@@ -935,10 +935,25 @@ public sealed class TrafficMap : FrameworkElement
         HitTest(p);
     }
 
+    /// <summary>Botão direito: ponto do projeto e o cruzamento/trecho sob o cursor (a janela monta o menu de semáforos).</summary>
+    public event Action<Vec2, int?, int?>? ContextRequested;
+
     protected override void OnMouseRightButtonUp(MouseButtonEventArgs e)
     {
-        FitAll();
         e.Handled = true;
+        if (_res == null || ContextRequested == null) { FitAll(); return; }
+        var p = e.GetPosition(this);
+        var net = _res.Network;
+        var nd = net.Nodes.Where(n => n.Kind != TipoNo.Continuacao && !n.IsZone).Select(n => (n, d: (S(n.Pos) - p).Length)).Where(x => x.d < 18).OrderBy(x => x.d).FirstOrDefault().n;
+        var w = W(p);
+        int? link = null;
+        if (nd == null)
+        {
+            var best = net.Links.Select(l => (l, pr: l.Path.Project(w))).Where(x => x.pr.Station > 0 && x.pr.Station < x.l.Length && Math.Abs(x.pr.Signed) < Math.Max(x.l.Road.LeftWidth, x.l.Road.RightWidth) + 2)
+                .OrderBy(x => Math.Abs(x.pr.Signed)).FirstOrDefault();
+            link = best.l?.Index;
+        }
+        ContextRequested(w, nd?.Index, link);
     }
 
     private void HitTest(Point p)

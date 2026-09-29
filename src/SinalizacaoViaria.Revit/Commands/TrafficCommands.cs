@@ -17,14 +17,16 @@ namespace SinalizacaoViaria.Revit.Commands;
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdSimuladorTrafego : CommandBase
 {
-    protected override Result Run(UIApplication app, UIDocument uidoc)
+    protected override Result Run(UIApplication app, UIDocument uidoc) => Open(uidoc, null);
+
+    internal static Result Open(UIDocument uidoc, string? tab)
     {
         var doc = uidoc.Document;
         var net = BuildNetwork(doc);
         if (net.Roads.Count == 0)
             throw new UserMessageException("Nenhuma via do SinalizaBIM foi encontrada no projeto.\n\nO Simulador de Tráfego lê as vias criadas com Nova Via / Pista " +
                                            "(pavimento com a seção), as interseções, rotatórias e balões. Crie as vias e rode o simulador de novo.");
-        var w = new TrafficWindow(net, doc.Title, new TrafficHost(uidoc));
+        var w = new TrafficWindow(net, doc.Title, new TrafficHost(uidoc)) { InitialTab = tab };
         var shown = UiHelpers.ShowModal(w);
         // Depois de gravar planos/controles no projeto, a janela pede para reler a rede e reabre no mesmo cenário.
         while (w.ReopenWith != null)
@@ -33,7 +35,7 @@ public sealed class CmdSimuladorTrafego : CommandBase
             Vec2? picked = null;
             if (w.PickSignalRequested) picked = PickSignalPoint(uidoc);
             net = BuildNetwork(doc);
-            w = new TrafficWindow(net, doc.Title, new TrafficHost(uidoc)) { InitialScenario = sc, PickedPoint = picked };
+            w = new TrafficWindow(net, doc.Title, new TrafficHost(uidoc)) { InitialScenario = sc, PickedPoint = picked, InitialTab = picked != null ? "semaforos" : tab };
             shown = UiHelpers.ShowModal(w);
         }
         if (shown == true && w.SelectIds.Count > 0)
@@ -103,6 +105,13 @@ public sealed class CmdSimuladorTrafego : CommandBase
         }
         return TrafficNetworkBuilder.Build(defs, AxisOf, GeomOf);
     }
+}
+
+/// <summary>Semáforos: o Simulador de Tráfego aberto direto na aba de semáforos.</summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdSemaforos : CommandBase
+{
+    protected override Result Run(UIApplication app, UIDocument uidoc) => CmdSimuladorTrafego.Open(uidoc, "semaforos");
 }
 
 /// <summary>Ações do simulador sobre o projeto: cenários, mapa, plano/controle nas interseções e resultados nos elementos.</summary>

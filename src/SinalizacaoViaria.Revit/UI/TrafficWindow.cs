@@ -87,6 +87,21 @@ public sealed class TrafficWindow : Window
 
     private readonly TabControl _tabs = new();
     private readonly TabItem _tabDiag = new() { Header = "Diagnóstico" };
+    private readonly TabItem _tabNodes = new() { Header = "Cruzamentos" };
+    private readonly TabItem _tabLinks = new() { Header = "Trechos" };
+    private readonly TabItem _tabSignals = new() { Header = "🚦 Semáforos", FontWeight = FontWeights.SemiBold };
+    private readonly DataGrid _sigGrid = new()
+    {
+        AutoGenerateColumns = false, CanUserAddRows = false, CanUserDeleteRows = false, HeadersVisibility = DataGridHeadersVisibility.Column,
+        SelectionMode = DataGridSelectionMode.Single, MinHeight = 160,
+    };
+    private readonly TextBlock _sigInfo = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };
+    private readonly ComboBox _sigRoad = new() { Width = 200 };
+    private readonly CheckBox _sigWave = new() { Content = "com onda verde", IsChecked = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+    private readonly TextBox _sigRec = new() { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Consolas"), FontSize = 11, MaxHeight = 170, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0, 4, 0, 0) };
+    private readonly Button _sigApplyRec = new() { Content = "Usar os tempos recomendados", IsEnabled = false, Margin = new Thickness(0, 4, 6, 0) };
+    /// <summary>Aba aberta ao iniciar (botão Semáforos da faixa de opções).</summary>
+    public string? InitialTab { get; init; }
     private readonly ComboBox _diagFilter = new();
     private readonly ListBox _diagList = new();
     private readonly TextBlock _diagDetail = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 6) };
@@ -189,7 +204,7 @@ public sealed class TrafficWindow : Window
         var bottom = new DockPanel { Margin = new Thickness(0, 10, 0, 0), LastChildFill = false };
         var hint = new TextBlock
         {
-            Text = "A demanda é estimada pela hierarquia das vias: informe as contagens nas entradas para resultados de projeto. Botão direito no mapa = enquadrar.",
+            Text = "A demanda é estimada pela hierarquia das vias: informe as contagens nas entradas para resultados de projeto. Botão direito no mapa = semáforos (criar, editar, remover) e enquadrar. Aba 🚦 Semáforos = todos os semáforos e seus tempos.",
             Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = 700,
         };
         DockPanel.SetDock(hint, Dock.Left);
@@ -222,6 +237,19 @@ public sealed class TrafficWindow : Window
             if (InitialScenario != null) LoadScenario(InitialScenario.Clone());
             else if (_scenarios.Count > 0) LoadScenario(_scenarios[0].Clone());
             Run(false);
+            if (InitialTab == "semaforos") _tabs.SelectedItem = _tabSignals;
+            // Dica única: onde ficam os semáforos.
+            try
+            {
+                var st = Infrastructure.PluginContext.Settings;
+                if (st.Get("dica:semaforos") != "1")
+                {
+                    st.Set("dica:semaforos", "1");
+                    Infrastructure.PluginContext.SaveSettings();
+                    _status.Text = "Novo: aba 🚦 Semáforos (à direita) e botão direito no mapa para criar, editar e remover semáforos.";
+                }
+            }
+            catch { /* opcional */ }
         };
         Closing += (_, _) => { _cts?.Cancel(); _timer.Stop(); };
     }
@@ -384,7 +412,8 @@ public sealed class TrafficWindow : Window
         bar.Children.Add(_pickMap);
         _pickMap.Checked += (_, _) => { _map.PickMode = true; _status.Text = "Clique no mapa: num cruzamento (semáforo do cruzamento) ou num trecho (semáforo de travessia)."; };
         _pickMap.Unchecked += (_, _) => _map.PickMode = false;
-        _map.PointPicked += w => HandlePick(w);
+        _map.PointPicked += w => { HandlePick(w); _pickMap.IsChecked = false; };
+        _map.ContextRequested += OnMapContext;
         _realPlan.Checked += (_, _) => { _map.RealPlan = true; _map.InvalidateVisual(); };
         _realPlan.Unchecked += (_, _) => { _map.RealPlan = false; _map.InvalidateVisual(); };
         _showSigns.Checked += (_, _) => { _map.ShowSigns = true; _map.InvalidateVisual(); };
@@ -507,6 +536,9 @@ public sealed class TrafficWindow : Window
         dg.Children.Add(det);
         _tabDiag.Content = dg;
         _tabs.Items.Add(_tabDiag);
+        // Semáforos logo depois do diagnóstico: lista, tempos, recomendação e criação num lugar só.
+        _tabSignals.Content = BuildSignalsTab();
+        _tabs.Items.Add(_tabSignals);
 
         // Indicadores
         _tabs.Items.Add(new TabItem { Header = "Indicadores", Content = new ScrollViewer { Content = _kpis, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
@@ -539,7 +571,8 @@ public sealed class TrafficWindow : Window
             }
         };
         _nodeList.MouseDoubleClick += (_, _) => { if (_nodeList.SelectedItem is ListBoxItem { Tag: NodeResult nr }) _map.ZoomTo(nr.Node.Pos, 70); };
-        _tabs.Items.Add(new TabItem { Header = "Cruzamentos", Content = ng });
+        _tabNodes.Content = ng;
+        _tabs.Items.Add(_tabNodes);
 
         // Trechos
         var gv = new GridView();
@@ -554,7 +587,8 @@ public sealed class TrafficWindow : Window
         {
             if (_linkList.SelectedItem is LinkRow r) { var l = _net.Links[r.Index]; _map.ZoomTo(l.Path.PointAt(l.Length / 2), Math.Max(60, l.Length * 0.7)); }
         };
-        _tabs.Items.Add(new TabItem { Header = "Trechos", Content = _linkList });
+        _tabLinks.Content = _linkList;
+        _tabs.Items.Add(_tabLinks);
 
         // Sinalização interpretada
         var rg = new DockPanel();
@@ -821,6 +855,7 @@ public sealed class TrafficWindow : Window
         }
         _report.Text = TrafficReport.Build(_res, _sim, _project);
         _tabDiag.Header = $"Diagnóstico ({_res.Diagnostics.Count})";
+        FillSignalRows();
         // Semáforo pedido pelo clique no mapa (cruzamento que acabou de virar semaforizado) ou escolhido no projeto.
         if (_pendingSelect is { } ps) { _pendingSelect = null; Dispatcher.BeginInvoke(() => OnMapSelection(ps, null)); }
         if (PickedPoint is { } pp && !_pickHandled) { _pickHandled = true; Dispatcher.BeginInvoke(() => HandlePick(pp)); }
@@ -980,13 +1015,13 @@ public sealed class TrafficWindow : Window
         if (_res == null) return;
         if (node is { } n && _res.Nodes.TryGetValue(n, out var nr) && !nr.Node.IsZone)
         {
-            _tabs.SelectedIndex = 2;
+            _tabs.SelectedItem = _tabNodes;
             foreach (ListBoxItem it in _nodeList.Items)
                 if (it.Tag == nr) { _nodeList.SelectedItem = it; _nodeList.ScrollIntoView(it); }
         }
         else if (link is { } l)
         {
-            _tabs.SelectedIndex = 3;
+            _tabs.SelectedItem = _tabLinks;
             foreach (var it in _linkList.Items)
                 if (it is LinkRow r && r.Index == l) { _linkList.SelectedItem = it; _linkList.ScrollIntoView(it); }
         }
@@ -1415,7 +1450,8 @@ public sealed class TrafficWindow : Window
         _xsClear.Text = Num(cs.Clearance, "0");
         _xsOffset.Text = Num(cs.Offset, "0");
         _xsPanel.Visibility = Visibility.Visible;
-        _tabs.SelectedIndex = 2;
+        _tabs.SelectedItem = _tabNodes;
+        _xsPanel.BringIntoView();
     }
 
     /// <summary>
@@ -1462,6 +1498,290 @@ public sealed class TrafficWindow : Window
         EditCrossing(cs, isNew);
     }
     private int? _pendingSelect;
+
+    // ------------------------------------------------------------------------------------------------ aba Semáforos
+    public sealed class SignalRow
+    {
+        public string Key { get; init; } = "";
+        public bool Crossing { get; init; }
+        public int? Node { get; init; }
+        public Core.Geometry.Vec2 Pos { get; init; }
+        public string Name { get; init; } = "";
+        public string Kind => Crossing ? "Travessia" : "Cruzamento";
+        public bool Active { get; set; } = true;
+        public string Cycle { get; set; } = "";
+        public string Greens { get; set; } = "";
+        public string Intergreen { get; set; } = "";
+        public string Offset { get; set; } = "";
+        public string Result { get; init; } = "";
+    }
+
+    private FrameworkElement BuildSignalsTab()
+    {
+        var sp = new StackPanel { Margin = new Thickness(2) };
+        sp.Children.Add(new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(0xE8, 0xF1, 0xFB)), CornerRadius = new CornerRadius(4), Padding = new Thickness(8), Margin = new Thickness(0, 0, 0, 6),
+            Child = new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                Text = "Todos os semáforos do cenário estão aqui.\n" +
+                       "• Criar: clique em \"➕ Adicionar no mapa\" e depois num cruzamento (semáforo do cruzamento) ou num trecho/faixa de pedestres (travessia no meio da quadra) – ou botão direito no mapa.\n" +
+                       "• Tempos: edite ciclo, verdes (fases separadas por ;), entreverdes e defasagem direto na tabela e clique em \"Aplicar e recalcular\".\n" +
+                       "• Recomendar: um, todos ou todos os cruzamentos de uma via (com onda verde).\n" +
+                       "• \"Gravar no projeto\" leva os planos para as interseções do Revit.",
+            },
+        });
+        var top = new WrapPanel();
+        Button Big(string t, string tip)
+        {
+            var b = new Button { Content = t, Margin = new Thickness(0, 0, 6, 4), Padding = new Thickness(10, 4, 10, 4), ToolTip = tip };
+            top.Children.Add(b);
+            return b;
+        }
+        var add = Big("➕ Adicionar no mapa", "Depois clique no mapa: num cruzamento ele fica semaforizado; num trecho cria um semáforo de travessia.");
+        var pick = Big("Escolher objeto no projeto…", "A janela fecha, você clica no elemento do Revit (grupo focal, placa, faixa, interseção) e ela reabre com o semáforo.");
+        var recAll = Big("Recomendar todos", "Ciclo e verdes ótimos (Webster/HCM) para todos os semáforos do cenário.");
+        var save = Big("💾 Gravar no projeto", "Grava o plano (ciclo, fases, verdes, entreverdes, defasagem) de cada cruzamento semaforizado nas interseções do projeto.");
+        sp.Children.Add(top);
+        add.Click += (_, _) => { _pickMap.IsChecked = true; };
+        pick.Click += (_, _) => { PickSignalRequested = true; Reload(); };
+        foreach (var (h, prop, w, ro) in new[] { ("Local", "Name", 130.0, true), ("Tipo", "Kind", 70.0, true), ("Ciclo (s)", "Cycle", 55.0, false), ("Verdes / pedestres (s)", "Greens", 110.0, false),
+                     ("Entreverdes", "Intergreen", 65.0, false), ("Defasagem", "Offset", 62.0, false), ("Resultado", "Result", 110.0, true) })
+            _sigGrid.Columns.Add(new DataGridTextColumn { Header = h, Binding = new System.Windows.Data.Binding(prop) { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged }, Width = w, IsReadOnly = ro });
+        _sigGrid.Columns.Insert(0, new DataGridCheckBoxColumn { Header = "Ativo", Binding = new System.Windows.Data.Binding("Active") { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged }, Width = 42 });
+        sp.Children.Add(_sigGrid);
+        _sigGrid.SelectionChanged += (_, _) =>
+        {
+            if (_sigGrid.SelectedItem is not SignalRow r) return;
+            _map.ZoomTo(r.Pos, 60);
+            if (r.Node is { } n && _res != null && _res.Nodes.TryGetValue(n, out var nr))
+                _sigInfo.Text = string.Join("\n", nr.Phases.Select(ph => $"{ph.Name}: verde {ph.Green:0} s")) + $"\nCiclo {nr.Cycle:0} s · entreverdes {nr.Intergreen:0} s · defasagem {nr.Offset:0} s · {nr.PlanSource}";
+            else _sigInfo.Text = "Travessia no meio da quadra: \"Verdes\" = verde dos pedestres; os veículos param no verde dos pedestres + entreverdes.";
+        };
+        var row = new WrapPanel { Margin = new Thickness(0, 4, 0, 0) };
+        var apply = new Button { Content = "Aplicar e recalcular", Margin = new Thickness(0, 0, 6, 0) };
+        var recOne = new Button { Content = "Recomendar o selecionado", Margin = new Thickness(0, 0, 6, 0) };
+        var remove = new Button { Content = "Remover o selecionado", Margin = new Thickness(0, 0, 6, 0) };
+        row.Children.Add(apply);
+        row.Children.Add(recOne);
+        row.Children.Add(remove);
+        sp.Children.Add(row);
+        sp.Children.Add(_sigInfo);
+        var roadRow = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+        roadRow.Children.Add(new TextBlock { Text = "Todos os cruzamentos da via ", VerticalAlignment = VerticalAlignment.Center });
+        foreach (var r in _net.Roads.OrderBy(r => r.Name)) _sigRoad.Items.Add(new ComboBoxItem { Content = r.Name, Tag = r.Id });
+        if (_sigRoad.Items.Count > 0) _sigRoad.SelectedIndex = 0;
+        roadRow.Children.Add(_sigRoad);
+        roadRow.Children.Add(_sigWave);
+        var recRoad = new Button { Content = "Recomendar", Margin = new Thickness(6, 0, 0, 0) };
+        roadRow.Children.Add(recRoad);
+        sp.Children.Add(roadRow);
+        sp.Children.Add(_sigRec);
+        sp.Children.Add(_sigApplyRec);
+
+        apply.Click += (_, _) => { if (StoreSignalRows()) Run(false); };
+        remove.Click += (_, _) =>
+        {
+            if (_sigGrid.SelectedItem is not SignalRow r) return;
+            RemoveSignal(r);
+            Run(false);
+        };
+        void Recommend(List<string> keys, string? road)
+        {
+            if (_res == null) return;
+            TrafficOptions opt;
+            try { StoreSignalRows(); opt = ReadOptions(); }
+            catch (FormatException ex) { UiHelpers.Error(ex.Message); return; }
+            _advice = TrafficSignalAdvisor.Recommend(_net, opt, keys, road);
+            _sigRec.Text = TrafficSignalAdvisor.Text(_advice);
+            _sigApplyRec.IsEnabled = _advice.Count > 0;
+        }
+        recAll.Click += (_, _) => Recommend(_res?.Nodes.Values.Where(n => n.Control == ControleNo.Semaforo && n.Phases.Count > 0).Select(n => n.Node.Key).ToList() ?? new(), null);
+        recOne.Click += (_, _) =>
+        {
+            if (_sigGrid.SelectedItem is not SignalRow { Crossing: false } r) { UiHelpers.Error("Escolha um cruzamento semaforizado na tabela (para travessias use \"Sugerir tempos\" no botão direito do mapa)."); return; }
+            Recommend(new List<string> { r.Key }, null);
+        };
+        recRoad.Click += (_, _) =>
+        {
+            if (_res == null || (_sigRoad.SelectedItem as ComboBoxItem)?.Tag is not string road) return;
+            var keys = TrafficSignalAdvisor.SignalsOnRoad(_res, road).Select(n => n.Key).ToList();
+            if (keys.Count == 0) { _sigRec.Text = "Nenhum cruzamento semaforizado nessa via no cenário – crie os semáforos primeiro (➕ Adicionar no mapa)."; return; }
+            Recommend(keys, _sigWave.IsChecked == true ? road : null);
+        };
+        _sigApplyRec.Click += (_, _) =>
+        {
+            if (_advice.Count == 0) return;
+            TrafficSignalAdvisor.Apply(_current.Options, _advice);
+            Run(false);
+        };
+        save.Click += (_, _) =>
+        {
+            if (_host == null || _res == null) return;
+            var sigs = _res.Nodes.Values.Where(n => n.Control == ControleNo.Semaforo && n.Phases.Count > 0 && n.Node.Kind == TipoNo.Intersecao).ToList();
+            if (sigs.Count == 0) { UiHelpers.Error("Nenhum cruzamento semaforizado do plugin no cenário."); return; }
+            try
+            {
+                var msgs = sigs.Select(nr => $"{nr.Node.Label}: " + _host.ApplyToIntersection(nr.Node.Key, nr.Control == nr.Node.DesignControl ? null : nr.Control, TrafficAnalysis.PlanOf(_res, nr, $"Simulador – {_current.Name}"))).ToList();
+                if (_current.Options.Crossings.Count > 0) msgs.Add("Travessias no meio da quadra: os tempos ficam no cenário – coloque o grupo focal com a ferramenta de dispositivos/placas.");
+                _status.Text = string.Join("\n", msgs);
+                AskReload();
+            }
+            catch (Exception ex) { UiHelpers.Error("Não foi possível gravar: " + ex.Message); }
+        };
+        return new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+    }
+
+    private void FillSignalRows()
+    {
+        if (_res == null) return;
+        var rows = new List<SignalRow>();
+        foreach (var nr in _res.Nodes.Values.Where(n => n.Control == ControleNo.Semaforo && n.Phases.Count > 0).OrderBy(n => n.Node.Label))
+        {
+            var ov = _current.Options.Nodes.FirstOrDefault(o => o.Node == nr.Node.Key);
+            rows.Add(new SignalRow
+            {
+                Key = nr.Node.Key, Node = nr.Node.Index, Pos = nr.Node.Pos, Name = nr.Node.Label,
+                Cycle = Num(nr.Cycle, "0"), Greens = string.Join("; ", nr.Phases.Select(p => Num(p.Green, "0"))), Intergreen = Num(nr.Intergreen, "0"), Offset = Num(nr.Offset, "0"),
+                Result = $"{nr.LOS} · {nr.Delay:0} s/veh",
+            });
+        }
+        var seen = new List<Core.Geometry.Vec2>();
+        foreach (var (li, plans) in _res.CrossingPlans)
+            foreach (var cp in plans)
+            {
+                if (seen.Any(q => q.DistanceTo(cp.Pos) < 3)) continue;
+                seen.Add(cp.Pos);
+                rows.Add(new SignalRow
+                {
+                    Key = $"x:{cp.Pos.X:0.0}:{cp.Pos.Y:0.0}", Crossing = true, Pos = cp.Pos, Name = _net.Links[li].Name,
+                    Cycle = Num(cp.Cycle, "0"), Greens = Num(Math.Max(5, cp.Red - 4), "0"), Intergreen = "4", Offset = Num(cp.Offset, "0"),
+                    Result = $"vermelho {cp.Red:0} s",
+                });
+            }
+        foreach (var cs in _current.Options.Crossings.Where(c => !c.Enabled))
+            rows.Add(new SignalRow
+            {
+                Key = $"x:{cs.X:0.0}:{cs.Y:0.0}", Crossing = true, Pos = new Core.Geometry.Vec2(cs.X, cs.Y), Name = "Travessia (desligada)", Active = false,
+                Cycle = Num(cs.Cycle, "0"), Greens = Num(cs.PedGreen, "0"), Intergreen = Num(cs.Clearance, "0"), Offset = Num(cs.Offset, "0"), Result = "desligada",
+            });
+        _sigGrid.ItemsSource = rows;
+        _tabSignals.Header = $"🚦 Semáforos ({rows.Count(r => r.Active)})";
+    }
+
+    /// <summary>Leva as edições da tabela para o cenário (cruzamentos: ajuste do nó; travessias: semáforo de travessia).</summary>
+    private bool StoreSignalRows()
+    {
+        _sigGrid.CommitEdit();
+        _sigGrid.CommitEdit();
+        double? P(string? s, string what, double min, double max)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            if (!double.TryParse(s.Replace('.', ','), System.Globalization.NumberStyles.Float, UiHelpers.PtBr, out var v) || v < min || v > max)
+                throw new FormatException($"{what}: valor inválido \"{s}\" (entre {min} e {max}).");
+            return v;
+        }
+        try
+        {
+            foreach (var r in (_sigGrid.ItemsSource as IEnumerable<SignalRow>) ?? Array.Empty<SignalRow>())
+            {
+                if (r.Crossing)
+                {
+                    var cs = _current.Options.Crossings.FirstOrDefault(c => new Core.Geometry.Vec2(c.X, c.Y).DistanceTo(r.Pos) < 8);
+                    if (cs == null) _current.Options.Crossings.Add(cs = new CrossingSignal { X = r.Pos.X, Y = r.Pos.Y });
+                    cs.Enabled = r.Active;
+                    cs.Cycle = P(r.Cycle, "Ciclo", 30, 240) ?? cs.Cycle;
+                    cs.PedGreen = P(r.Greens, "Verde de pedestres", 5, 120) ?? cs.PedGreen;
+                    cs.Clearance = P(r.Intergreen, "Entreverdes", 2, 15) ?? cs.Clearance;
+                    cs.Offset = P(r.Offset, "Defasagem", 0, 240) ?? cs.Offset;
+                    continue;
+                }
+                var ov = _current.Options.Nodes.FirstOrDefault(o => o.Node == r.Key);
+                if (ov == null) _current.Options.Nodes.Add(ov = new NodeOverride { Node = r.Key });
+                if (!r.Active) { ov.Control = ControleNo.Pare; ov.Cycle = null; ov.Greens = null; continue; }
+                ov.Control = ControleNo.Semaforo;
+                ov.Cycle = P(r.Cycle, "Ciclo", 30, 240);
+                var greens = (r.Greens ?? "").Split(new[] { ';', '/', ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(x => P(x, "Verde", 3, 200)!.Value).ToList();
+                ov.Greens = greens.Count > 0 ? greens : null;
+                ov.Intergreen = P(r.Intergreen, "Entreverdes", 2, 10);
+                ov.Offset = P(r.Offset, "Defasagem", 0, 240);
+            }
+            return true;
+        }
+        catch (FormatException ex) { UiHelpers.Error(ex.Message); return false; }
+    }
+
+    private void RemoveSignal(SignalRow r)
+    {
+        if (r.Crossing)
+        {
+            var cs = _current.Options.Crossings.FirstOrDefault(c => new Core.Geometry.Vec2(c.X, c.Y).DistanceTo(r.Pos) < 8);
+            // Semáforo que veio do projeto: fica desligado no cenário; criado no simulador: some.
+            if (cs == null) _current.Options.Crossings.Add(new CrossingSignal { X = r.Pos.X, Y = r.Pos.Y, Enabled = false });
+            else if (_net.Links.Any(l => l.SignalizedCrossings.Any(at => l.Path.PointAt(at).DistanceTo(r.Pos) < 8))) cs.Enabled = false;
+            else _current.Options.Crossings.Remove(cs);
+            return;
+        }
+        var nd = _net.Nodes.FirstOrDefault(n => n.Key == r.Key);
+        var ov = _current.Options.Nodes.FirstOrDefault(o => o.Node == r.Key);
+        if (nd != null && nd.DesignControl == ControleNo.Semaforo)
+        {
+            if (ov == null) _current.Options.Nodes.Add(ov = new NodeOverride { Node = r.Key });
+            ov.Control = ControleNo.Pare;
+            ov.Cycle = null;
+            ov.Greens = null;
+        }
+        else if (ov != null) { ov.Control = null; ov.Cycle = null; ov.Greens = null; ov.Offset = null; ov.Intergreen = null; }
+    }
+
+    /// <summary>Menu do botão direito no mapa: criar, editar ou remover semáforo; enquadrar.</summary>
+    private void OnMapContext(Core.Geometry.Vec2 w, int? node, int? link)
+    {
+        var menu = new ContextMenu();
+        MenuItem Item(string t, Action a) { var mi = new MenuItem { Header = t }; mi.Click += (_, _) => a(); menu.Items.Add(mi); return mi; }
+        if (node is { } n && _res != null && _res.Nodes.TryGetValue(n, out var nr))
+        {
+            if (nr.Control == ControleNo.Semaforo)
+            {
+                Item($"Editar tempos de {nr.Node.Label}", () => { _tabs.SelectedItem = _tabSignals; SelectSignalRow(nr.Node.Key); });
+                Item("Recomendar tempos deste semáforo", () =>
+                {
+                    _tabs.SelectedItem = _tabSignals;
+                    SelectSignalRow(nr.Node.Key);
+                    try { _advice = TrafficSignalAdvisor.Recommend(_net, ReadOptions(), new[] { nr.Node.Key }); _sigRec.Text = TrafficSignalAdvisor.Text(_advice); _sigApplyRec.IsEnabled = _advice.Count > 0; }
+                    catch (Exception ex) { UiHelpers.Error(ex.Message); }
+                });
+                Item("Remover o semáforo (cenário)", () => { var r = CurrentRows().FirstOrDefault(x => x.Key == nr.Node.Key); if (r != null) { RemoveSignal(r); Run(false); } });
+            }
+            else if (nr.Node.Kind != TipoNo.Rotatoria)
+                Item($"Tornar {nr.Node.Label} semaforizado", () => HandlePick(nr.Node.Pos));
+            Item("Testar soluções para este cruzamento", () => { OnMapSelection(n, null); });
+        }
+        else if (link != null)
+        {
+            var existing = _res?.CrossingPlans.Values.SelectMany(x => x).FirstOrDefault(c => c.Pos.DistanceTo(w) < 10);
+            if (existing != null)
+            {
+                Item("Editar o semáforo de travessia", () => { _tabs.SelectedItem = _tabSignals; SelectSignalRow(CurrentRows().FirstOrDefault(r => r.Crossing && r.Pos.DistanceTo(existing.Pos) < 3)?.Key); });
+                Item("Remover o semáforo de travessia", () => { var r = CurrentRows().FirstOrDefault(x => x.Crossing && x.Pos.DistanceTo(existing.Pos) < 3); if (r != null) { RemoveSignal(r); Run(false); } });
+            }
+            else Item("Criar semáforo de travessia aqui", () => HandlePick(w));
+        }
+        if (menu.Items.Count > 0) menu.Items.Add(new Separator());
+        Item("Enquadrar tudo", () => { _map.Marker = null; _map.FitAll(); });
+        menu.PlacementTarget = _map;
+        menu.IsOpen = true;
+    }
+
+    private IEnumerable<SignalRow> CurrentRows() => (_sigGrid.ItemsSource as IEnumerable<SignalRow>) ?? Array.Empty<SignalRow>();
+
+    private void SelectSignalRow(string? key)
+    {
+        if (key == null) return;
+        var r = CurrentRows().FirstOrDefault(x => x.Key == key);
+        if (r != null) { _sigGrid.SelectedItem = r; _sigGrid.ScrollIntoView(r); }
+    }
 
     /// <summary>Relê o projeto (a janela reabre no mesmo cenário, com a rede atualizada).</summary>
     private void AskReload()
