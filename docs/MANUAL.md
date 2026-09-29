@@ -594,7 +594,13 @@ desfazer a marca (pavimento, calçadas, placas e dispositivos não entram).
 
 ### 9.3 Autoteste (diagnóstico de todas as ferramentas)
 
-Guia **SinalizaBIM → Editar → Autoteste**. Roda sozinho, sem janelas, as ferramentas do plugin numa **área de teste**
+O Autoteste **saiu da faixa de opções** (era fácil clicar sem querer e o Revit ficava muito tempo ocupado). Ele agora
+fica em **SinalizaBIM → Configurações → Autoteste (diagnóstico)…** e abre com o **teste rápido**: só os blocos Vias,
+Tráfego, Conexões, Horizontal, Vertical e Calçadas, **no máximo 3 etapas por bloco** e **3 minutos no total** – o que
+passar disso é pulado e contado no relatório (linha *Modo*). Para o teste de tudo, marque **Completo** e os demais
+blocos (Topografia, Obras, Edição, Detalhamento, Verificações) – só em um arquivo de testes, pois leva de 10 a 40 min.
+
+Roda sozinho, sem janelas, as ferramentas do plugin numa **área de teste**
 criada 400 m à direita de tudo o que existe no projeto:
 
 | Bloco | O que é testado |
@@ -615,8 +621,8 @@ criada 400 m à direita de tudo o que existe no projeto:
 Cada erro do plugin (inclusive os que antes só iam para o log), cada erro/aviso do Revit e cada verificação que falha
 entram no relatório, salvo em `%AppData%\SinalizaBIM\autoteste-AAAAMMDD-HHMMSS.txt` (gravado a cada etapa – se o
 Revit fechar no meio, o arquivo mostra onde parou). Tudo acontece dentro de um único Desfazer: no fim escolha
-**Desfazer tudo** (recomendado) ou **Manter** para olhar as vistas "SV Autoteste" (planta e 3D). O teste completo leva de
-10 a 40 minutos; o progresso aparece na barra de status do Revit.
+**Desfazer tudo** (recomendado) ou **Manter** para olhar as vistas "SV Autoteste" (planta e 3D). O teste rápido leva
+até ~3 minutos; o completo, de 10 a 40 minutos; o progresso aparece na barra de status do Revit.
 
 ## 10. Quantitativos
 
@@ -1022,6 +1028,16 @@ Travessias, retenções, placas, zebrados e linhas deslocadas da interseção s�
 tipos e o controle escolhidos a todas as interseções do projeto.
 
 ## 20. Rotatórias
+
+**Continuidade das vias existentes (várias sinalizações ao mesmo tempo).** A rotatória recorta das vias ligadas só o
+que ela realmente ocupa, por uma regra única para cada tipo de elemento: pavimento e elementos físicos só dentro da
+área da rotatória (anel + concordâncias e, no by-pass, a faixa do by-pass – antes o recorte ia até 100 m e apagava
+trechos inteiros); pintura das vias só até o início da marcação da rotatória; **vagas** até 5 m antes da entrada
+(CTB art. 181, XIX); recortes antigos de uma geração anterior são removidos ao gerar de novo. Em **avenidas com
+canteiro central**, o canteiro continua como **ilha separadora** do ramo (no modo *só o anel* / *só a ilha* o próprio
+canteiro é usado, sem ilha duplicada), a travessia ganha **refúgio** no canteiro e a LFO-3 não é pintada onde já há
+canteiro. Em **mini-rotatórias** as LDP/LRE não invadem o anel e aparece aviso quando o diâmetro inscrito é menor
+que a via mais larga + 4 m.
 
 **Seguir exatamente os elementos das vias.** Interseções, rotatórias e cul-de-sacs leem os **elementos reais** do grupo de
 cada via ligada – sarjeta, meio-fio, faixa gramada, passeio, com as larguras, alturas e materiais de cada um, inclusive
@@ -1666,11 +1682,32 @@ Com muito tráfego os veículos **formam fila e andam devagar**, sem se atravess
   com cuidado;
 * rotatória: ocupação máxima do anel (sem travamento circular), as duas faixas de uma entrada larga entram
   **alternadas** num anel de uma faixa e só com espaço para o veículo inteiro;
-* calibração urbana: carros 2,0 m/s² e 1,0 s de intervalo; caminhões e ônibus 1,0 m/s² e 1,4 s.
+* calibração urbana com **motoristas diferentes entre si**: carros de 2,2 a 3,0 m/s² e intervalo desejado de 0,75 a
+  1,25 s; caminhões e ônibus de 1,0 a 1,4 m/s² e 1,2 a 1,6 s (sorteio próprio – a demanda e as rotas não mudam);
+* passo de cálculo de **0,25 s** (antes 0,5 s): arrancadas e frenagens mais suaves, fila descarregando com intervalo de
+  ~2,7 s por veículo no verde (vazão de saturação próxima de 1 300–1 400 veíc/h/faixa, típica de via urbana brasileira);
+* **pedestres visíveis** no mapa atravessando nas faixas do meio da quadra (grupo saindo dos dois lados quando o
+  semáforo de pedestres abre, a 1,2 m/s).
 
 O Autoteste confere que não há sobreposição de veículos na animação.
 
 ### 26.11 Semáforos no simulador: escolher, temporizar e recomendar
+
+**Onde fica:** botão **🚦 Semáforos** na faixa de opções (painel Tráfego) – abre o simulador direto na aba
+**🚦 Semáforos**. Também: aba *🚦 Semáforos* dentro do simulador, ou **clique com o botão direito** em qualquer
+cruzamento ou trecho do mapa → *Tornar … semaforizado*, *Editar tempos de …*, *Recomendar tempos deste semáforo*,
+*Remover o semáforo (cenário)*, *Criar semáforo de travessia aqui*, *Testar soluções para este cruzamento*.
+
+A aba **🚦 Semáforos** reúne tudo numa tabela só (um semáforo por linha: ativo, local, tipo, ciclo, verdes,
+entreverdes, defasagem e o resultado – atraso e nível de serviço):
+
+1. **➕ Adicionar no mapa** – clique no cruzamento (semáforo veicular) ou no trecho (travessia no meio da quadra);
+2. **Escolher objeto no projeto…** – clique num elemento do Revit (grupo focal, faixa, interseção);
+3. edite os tempos direto na tabela e clique **Aplicar e recalcular**;
+4. **Recomendar o selecionado** / **Recomendar todos** (Webster/HCM) ou, para uma via, **onda verde**;
+5. **Gravar no projeto** leva os planos para as interseções.
+
+Na primeira abertura aparece uma dica explicando esses passos.
 
 * **🚦 Semáforo no mapa** (barra do mapa): clique num **cruzamento** para torná-lo semaforizado no cenário (e editar os
   tempos) ou num **trecho / faixa de pedestres** para criar um **semáforo de travessia no meio da quadra** – com ciclo,
@@ -1701,8 +1738,32 @@ análise da rede inteira com cada alternativa cabível e mostra o **efeito medid
 | Onda verde na via principal | semáforo com outros semáforos na mesma via |
 | Proibir as conversões à esquerda | aproximações com conversões à esquerda |
 | Travessia: ciclo curto / sem semáforo | trecho com semáforo de travessia |
+| Bolsões de conversão à esquerda | aproximações com esquerda sem bolsão |
 
 Cada item traz o atraso e o nível do local antes → depois, o atraso total e a velocidade média da rede, os itens
 críticos, **o que fazer no projeto** para implantar e o botão **Aplicar no cenário e simular**. Só é marcada como
 solução (✔) a alternativa que melhora o local em pelo menos 10 % sem piorar a rede; quando nenhuma resolve sozinha, a
 recomendação do diagnóstico indica as medidas de projeto (faixa adicional, bolsão, binário etc.).
+
+**Critério normativo (MBST Vol. V).** A alternativa só é marcada como solução quando é justificável pelas normas: o
+semáforo exige volumes mínimos (via principal ≥ 500 veíc/h e aproximação secundária ≥ 150 veíc/h); rotatória com mais
+de 3 600 veíc/h e PARE/preferência com principal > 1 500 e secundária > 250 veíc/h recebem aviso (⚠) de que não
+atendem. Uma alternativa que melhora o atraso mas não passa no critério aparece com o aviso e não é recomendada.
+
+**Pacote completo de projeto.** Cada alternativa traz (expansor *O que entra no projeto*) a lista de **tudo o
+que precisa ser implantado**, com a norma de cada item:
+
+* **Semaforizar**: grupo focal veicular em cada aproximação (repetidor quando há 3+ faixas ou canteiro), grupos focais
+  de pedestres, faixas de pedestres com rampas (NBR 9050) e piso tátil (NBR 16537), LRE a 1,6 m da faixa,
+  A-14 "Semáforo à frente" nas vias ≥ 60 km/h (distância pela velocidade), plano semafórico gravado; remove PARE/R-2;
+* **PARE / Dê a preferência**: R-1 ou R-2 + LRE/LDP + legenda, e aviso de verificar a visibilidade (triângulo);
+* **Rotatória**: tipo pelo volume (1 ou 2 faixas), ramos com ilha separadora, R-33, A-12, LDP e travessias;
+* **Retemporizar / onda verde**: planos com ciclo, verdes, entreverdes e defasagens de cada cruzamento;
+* **Proibir esquerdas**: R-4a em cada aproximação e eixo contínuo (bloqueio da conversão);
+* **Bolsão de esquerda**: bolsões nas aproximações (tipo IV) com setas e LFO;
+* **Travessia**: grupos focais + LRE nos dois lados, ou retirada do semáforo com A-32b.
+
+**✔ Aplicar no PROJETO** grava tudo no Revit num único Desfazer: muda o controle da interseção (ou converte em
+rotatória), liga travessias, rampas, linhas de retenção e bolsões, grava o plano semafórico (e os planos da onda verde
+nos outros cruzamentos), cria os semáforos e placas como elementos urbanos/placas nas posições indicadas e as LRE, e
+remove os semáforos e placas que a solução substitui. Depois o simulador relê o projeto.
