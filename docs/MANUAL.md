@@ -144,6 +144,60 @@ Todos os elementos são associados ao eixo e pertencem ao mesmo **grupo**: mover
 inteira; **Selecionar Conjunto → Todo o grupo** seleciona tudo. Cada elemento pode ser ajustado
 depois com **Editar**.
 
+### 2.0.1 Largura variável ao longo do eixo (levantamento)
+
+Ruas existentes quase nunca têm largura constante: num ponto A a pista tem 10,00 m de meio-fio a meio-fio, num
+ponto B 10,50 m; um muro antigo avança sobre a calçada. No quadro **Largura variável ao longo do eixo (levantamento)**
+(Nova Via, Sinalizar Via, Pista e Editar via) informe, em cada **estaca**, a distância do **eixo** ao **bordo da pista**
+(face do meio-fio / sarjeta) e ao **alinhamento** (muro, divisa do lote) de cada lado. Vazio = medida da seção.
+
+* **Estaca** em metros (`110`) ou em estacas de 20 m (`5+10` = 110 m). *Adicionar entre meios-fios* cria a linha já com a
+  largura total pedida na estaca (ex.: 10,50 m), dividida pelos dois lados.
+* Entre as estacas a largura varia **gradualmente** (linear ou em **curva S suave**); antes do primeiro e depois do
+  último ponto fica constante.
+* **Quem absorve a variação na pista**: a faixa junto ao meio-fio (as outras mantêm a largura), todas as faixas
+  proporcionalmente, ou o acostamento/estacionamento. A linha de bordo, a sarjeta, o meio-fio e as calçadas
+  acompanham o bordo; o alinhamento estreita (ou alarga) a **faixa livre** – aviso se ela ficar abaixo de 1,20 m (NBR 9050).
+* **Ler do desenho**: marque *Depois de indicar o eixo, ler do desenho os meios-fios e muros existentes* e, depois do
+  eixo, clique as linhas do levantamento (meio-fio direito, esquerdo, alinhamento direito, esquerdo – **ESC** pula o
+  lado). O plugin mede a distância a cada 5 m e cria os pontos sozinho (remove os colineares).
+* As **estacas são ancoradas** ao desenho: estender ou mover o eixo mantém cada medida no seu lugar.
+* Interseções, rotatórias e balões usam **a largura que a via tem naquele ponto**.
+
+### 2.0.2 Recuos do meio-fio: baias de ônibus e faixas de aceleração/desaceleração
+
+No quadro **Recuos do meio-fio** adicione, por estaca e lado:
+
+| Tipo | Geometria | Sinalização gerada |
+|---|---|---|
+| **Baia de ônibus** | O meio-fio recua (profundidade, taper de entrada e de saída, curva reversa opcional); a faixa de tráfego continua reta. | MVE amarela (retângulo da baia), legenda ÔNIBUS, **LCO** na boca da baia, placa de ponto e abrigo na calçada. |
+| **Faixa de desaceleração** | Taper + faixa auxiliar paralela antes da saída/conversão. | LCO separando a faixa + setas de conversão (PEM). |
+| **Faixa de aceleração** | Faixa auxiliar paralela + taper de convergência depois da entrada. | LCO + setas de mudança de faixa (SMF). |
+| **Embarque / táxi / carga** | Recuo curto com legenda livre. | MVE + legenda. |
+
+Os valores iniciais vêm da **velocidade da via** (DNIT – Manual de Projeto de Interseções; AASHTO; indicativos).
+*Calçada recua* = o alinhamento fica e a calçada estreita (aviso NBR 9050); desmarcado, a calçada inteira se desloca.
+O simulador de tráfego lê as baias (ônibus param fora da faixa) e as faixas auxiliares (§ 26).
+
+### 2.0.3 Calçadas com níveis variáveis (topografia e edificações antigas)
+
+Selecione a calçada e informe:
+
+* **Inclinação transversal (%, sobe para o lote)** – o caimento para a sarjeta (NBR 9050: até 3 % na faixa livre).
+* **Nível no alinhamento (estaca:nível; …)** – ex.: `0:0; 60:0,35; 120:0,10` – o nível do piso junto ao lote em cada
+  estaca, em relação ao topo do meio-fio (edificações antigas mais altas, soleiras, rampas de garagem).
+
+A **faixa livre** mantém a inclinação transversal; a **faixa de acesso** (junto ao lote) vira **rampa** para absorver o
+desnível. Avisos: inclinação transversal acima de 3 % e rampa longitudinal acima de 8,33 % (NBR 9050 – prever
+patamares/degraus no lote). Os pisos da calçada acompanham os níveis (e ficam mais espessos onde sobem).
+
+### 2.0.4 Sinalização horizontal como piso (edição fácil)
+
+Em **Configurações → Sinalização horizontal … como Piso do Revit** (ligado por padrão) as linhas, zebrados, setas,
+legendas e vagas são criadas como **pisos finos** (uma cor = um piso com todos os contornos) assentados sobre o
+pavimento – como as calçadas e a pista. Assim dá para editar o contorno com as ferramentas do Revit, filtrar por
+material e quantificar pela área real. Desligado, volta o modo anterior (sólidos/regiões).
+
 ## 2.1 Hierarquia viária (CTB art. 60)
 
 Toda via criada recebe a sua **hierarquia viária** – campo **obrigatório** no topo da janela (os modelos
@@ -233,6 +287,39 @@ Cantos vivos do eixo (linhas selecionadas com quebra, ou pontos clicados) são *
 curvas informado na janela (**nunca menor que a meia largura da via + 1,5 m**): a borda interna, as linhas de
 bordo, os meios-fios e as calçadas passam a acompanhar a curva, sem dobras. Para vias já criadas, clique no
 asfalto → **Editar** → *Raio das curvas do eixo* (0 = cantos como desenhados).
+
+## 2.5 Sonorizador longitudinal (rumble strip)
+
+**Bloqueios Físicos → Sonorizador Longitudinal.** Elementos em série ao longo de uma linha – no **acostamento**, sobre
+o **bordo** (LBO) ou no **eixo** – que vibram e fazem ruído quando o pneu passa por cima, alertando o motorista que sai
+da faixa por sono ou distração (saídas de pista e colisões frontais).
+
+| Tipo | Valores iniciais (indicativos – FHWA/DNIT) |
+|---|---|
+| **Fresado** no pavimento | ranhuras 18 × 40 cm (30 cm no eixo) a cada 30 cm, 13 mm de profundidade, escuras |
+| **Termoplástico com relevo** (linha perfilada) | linha-base contínua + relevos 5 × 15 cm a cada 50 cm, 6 mm – continua visível à noite e com chuva |
+| **Barras em relevo** | barras 10 × 30 cm a cada 60 cm, 8 mm |
+| **Tachas sonorizadoras** | 10 × 10 cm a cada 1 m, 15 mm, amarelas |
+
+Tudo é personalizável: comprimento, largura, espaçamento, profundidade/altura, **ângulo** (chevron), cor, deslocamento
+em relação à linha, **trechos com interrupções** (ex.: 12 m de sonorizador e 3,6 m livres para o ciclista passar) e
+recuos no início/fim (deixe livres interseções, acessos e pontes). Quantitativo em unidades. Avisos: fresado com mais
+de 16 mm; acostamento sem interrupções para bicicletas.
+
+## 2.6 Área de escape de caminhões (caixa de retenção)
+
+**Bloqueios Físicos → Área de Escape.** Para descidas longas e íngremes, onde o caminhão pode perder o freio
+(superaquecimento). Desenhe o **eixo da caixa** começando no bordo da pista, no sentido em que o veículo entra
+(saída tangente, à direita).
+
+* **Comprimento** calculado por L = V² / 254 (R + G): velocidade de entrada (AASHTO: 130–140 km/h), **rampa** da caixa
+  (aclive reduz o comprimento) e **material** do leito – seixo rolado uniforme (R = 0,25, recomendado), areia (0,15),
+  cascalho solto (0,10) ou brita (0,05). Informe o comprimento para fixá-lo – o aviso mostra quando ele é menor que o
+  necessário.
+* **Largura** (8 a 12 m), **profundidade do leito** (0,90–1,10 m) com **transição** na entrada (de 8 cm à profundidade
+  total nos primeiros 30–60 m), meios-fios de contenção, **faixa de serviço** pavimentada ao lado (retirada do
+  veículo) com **âncoras** de reboque, **berma** de material no fim, **zebrado de entrada** e **delineadores**.
+* O volume de material aparece na prévia. O Simulador de Tráfego acusa **descida longa sem área de escape** (§ 26).
 
 ## 2.4 Bloqueios físicos
 
@@ -457,11 +544,12 @@ criada 400 m à direita de tudo o que existe no projeto:
 | Horizontal | todas as linhas do catálogo com todas as variantes, zebrados (área, faixa, com furo), setas, legendas, vagas, inscrições, MAC, canalização, ciclovias, faixas de pedestres sobre a via, cruzamento rodoferroviário |
 | Vertical | dispositivos, placas (catálogo completo ou amostra), tipos de suporte, mobiliário (ponto e linha), famílias classificadas |
 | Calçadas | rampas (todos os tipos, com recorte), orelha, áreas de calçada, canteiros, moderação, piso tátil, via férrea, drenagem (todos os tipos e em série) |
+| Largura e recuos / Segurança | via com largura variável e estreitamento do lote, baia de ônibus + faixas de desaceleração e aceleração, calçada com inclinação e níveis do alinhamento, arterial × coletora com LCO, sonorizadores (todos os tipos) e área de escape |
 | Topografia | Toposolid de teste com encosta, dois morros e um vale; vias acompanhando o terreno e suavizadas; cruzamentos no relevo; Perfil da Via em todos os modos e aplicado com obras automáticas |
 | Obras | viaduto sobre outra via, ponte no vale, passarela, túnel, trincheira, muros (todos), taludes, nós viários, terraplenagem (simulação, aplicação, mapa) |
 | Edição | editar linha/interseção/rotatória, mover eixo (atualização automática), Apagar Trecho (na via, fora da via, zebrado, sem linha de referência, devolver peças), 2D/3D, excluir, Atualizar Todas |
 | Detalhamento | detalhe de placas, anotação, legenda, cota de seção + perfil, detalhe típico, quadros, notas, norte, eixos, quantitativos e tabelas |
-| Tráfego | Simulador de Tráfego sobre a área de teste: leitura da rede, análise HCM e diagnóstico, microssimulação de 5 min e mapa de níveis de serviço na planta |
+| Tráfego | Simulador de Tráfego sobre a área de teste: leitura da rede, análise HCM e diagnóstico, microssimulação de 5 min, cenários (rotatória × semáforo coordenado × contagem) com comparação, cenários gravados e lidos do projeto, plano semafórico gravado na interseção, resultados nos parâmetros SV_NivelServico/SV_Trafego e mapa de níveis de serviço na planta |
 | Verificações | pintura escondida sob o piso ou flutuando, buracos e degraus entre pisos da pista, terreno acima da pista ou sem encostar na seção, estruturas invadindo outras vias, formas sem geometria |
 
 Cada erro do plugin (inclusive os que antes só iam para o log), cada erro/aviso do Revit e cada verificação que falha
@@ -812,6 +900,14 @@ aproximações:
 
 Na mão dupla a retenção ocupa a meia pista de chegada (até o eixo, o canteiro ou a ilha); na mão única, a
 pista inteira, só no ramo por onde o tráfego chega.
+
+**Linha de continuidade (LCO) na boca das secundárias.** Quando a via principal tem hierarquia maior (arterial,
+trânsito rápido ou rodovia × coletora/local), o bordo da principal continua **tracejado** atravessando a boca da
+secundária: o motorista da principal vê a continuidade da pista e quem entra ou sai cruza a linha (MBST Vol. IV).
+Em **Linha de continuidade**: *Pela hierarquia* (padrão), *Sempre* ou *Nunca*.
+
+**Plano semafórico gravado.** O Simulador de Tráfego pode gravar na interseção o plano (ciclo, fases, verdes,
+amarelo, vermelho geral, defasagem e verde de pedestres) – ele passa a valer na análise e fica com o modelo (§ 26).
 
 ### 19.2 Tipos de interseção (MBST / DNIT)
 
@@ -1307,5 +1403,74 @@ vista). **Exportar relatório** grava o texto (.txt) e a tabela das aproximaçõ
 `%AppData%\SinalizaBIM`. **Copiar relatório** leva o texto para a área de transferência.
 
 > A demanda padrão é **estimada**. Para decidir a implantação de semáforos, faixas adicionais ou rotatórias, use contagens
-> classificadas na hora de pico e confirme os critérios com contagens de 8 horas (MBST Vol. V). O simulador não modela
-> ainda ônibus em pontos de parada, pedestres nas fases do semáforo além do verde mínimo nem coordenação (onda verde).
+> classificadas na hora de pico e confirme os critérios com contagens de 8 horas (MBST Vol. V).
+
+### 26.1 Cenários salvos no projeto
+
+No topo do painel da esquerda: escolha um **cenário**, dê **nome** e **notas** e use **Salvar** / **Salvar como novo** /
+**Excluir**. O cenário guarda **todas** as opções (demanda, crescimento, frota, FHP, pedestres, semáforos, coordenação,
+ônibus, custos, microssimulação), os **volumes contados nas entradas** e os **ajustes de cada cruzamento** – e fica
+gravado **no próprio arquivo do Revit** (Informações do projeto; salve o arquivo). A aba **Cenários** tem *Criar cenários
+de exemplo* (pico atual, horizonte de 10 anos, entrepico, teste de estresse).
+
+### 26.2 Ajustes por cruzamento e contagens classificadas
+
+Na aba **Cruzamentos**, selecione o cruzamento e, em **Ajustes deste cruzamento no cenário**:
+
+* **Controle** do cenário – teste PARE, Dê a preferência, semáforo, **rotatória** ou sem controle **sem mexer no projeto**.
+* **Ciclo** e **verdes** fixos (ex.: `42; 30; 12`, na ordem das fases).
+* **Contagem classificada** de cada aproximação: total (veh/h) e % à esquerda, em frente, à direita e retorno. Vazio =
+  a alocação da rede.
+
+**Aplicar ao cenário e recalcular** refaz a análise. **Gravar plano semafórico no projeto** grava o plano calculado na
+interseção (e ele passa a valer: *Usar os planos gravados nas interseções*). **Aplicar este controle no projeto** troca o
+controle da interseção de verdade (placas, retenções e faixas refeitas). Rotatória: use a ferramenta Rotatória.
+
+O **diagrama de tempos** mostra cada fase ao longo do ciclo (verde, amarelo, vermelho), a defasagem e a origem do plano
+(otimizado, gravado, fixo do cenário, coordenado).
+
+### 26.3 O que mais é lido do projeto
+
+* **Largura variável**: a faixa mais estreita do trecho entra no fator de largura (HCM); estreitamento abaixo de 2,70 m é
+  acusado.
+* **Baias de ônibus** (recuos) e **pontos sem baia** (placa de ponto de ônibus ou abrigo junto ao meio-fio): o ônibus
+  para fora da faixa ou **na faixa** (bloqueio – fator fbb do HCM), com *Ônibus/h que param em cada ponto* e *Embarque
+  por parada*.
+* **Faixas de desaceleração** e **ilhas de conversão à direita**: quem converte à direita sai da fila dos demais; fila
+  maior que a faixa é acusada. **Faixas de aceleração** aparecem no mapa.
+* **Bolsões de conversão à esquerda**: quem espera para converter não bloqueia a faixa direta.
+* **Greide**: equivalente de veículos pesados maior nos aclives; **descidas longas** (≥ 5 % em mais de 1 km, ou mais de
+  60 m de desnível) **sem área de escape** são críticas.
+* **Sonorizadores**: rodovias e vias rápidas longas sem eles recebem recomendação.
+* **Pedestres** nas faixas do cruzamento seguram a conversão à direita no começo do verde.
+
+### 26.4 Coordenação semafórica (onda verde)
+
+*Coordenar os semáforos*: ciclo **comum** (o maior da rede, ou o que os verdes de pedestres exigirem), **defasagens**
+pela progressão ao longo dos trechos entre semáforos (sentido de maior volume; velocidade da via ou a informada) e
+**fator de progressão** do HCM nas aproximações coordenadas. A microssimulação usa as defasagens.
+
+### 26.5 Microssimulação ampliada
+
+Além do descrito acima: **troca de faixa** (modelo MOBIL – obrigatória para chegar à faixa da conversão ou do ponto de
+ônibus; para ultrapassar, com a regra de manter a direita, CTB art. 29), **ônibus parando** nos pontos (na baia, voltam
+à faixa quando há brecha) e **pedestres** nas conversões. Indicadores de trocas de faixa e paradas atendidas.
+
+### 26.6 Segurança viária e custos
+
+* **Pontos de conflito** de cada cruzamento (FHWA): cruzamentos, convergências, divergências e conflitos com pedestres –
+  a rotatória elimina os cruzamentos; o semáforo deixa só as conversões permitidas.
+* **Acidentes previstos por ano** pelas funções de desempenho do **HSM** (cap. 12, vias urbanas), com VDM = volume da
+  hora ÷ **fator K**, e fatores para rotatória, bolsões, esquerda protegida e ilhas. **São referências internacionais
+  sem calibração local**: use para **comparar alternativas**, não como previsão.
+* **Custos anuais**: tempo perdido (valor do tempo × ocupação), combustível (consumo pela velocidade), CO₂ e acidentes
+  (custo médio por acidente) × horas por ano na situação. Todos os valores são editáveis no painel.
+
+### 26.7 Comparar cenários e gravar no modelo
+
+A aba **Cenários → Comparar os cenários salvos** roda a análise de cada cenário (e do atual) na mesma rede e mostra lado a
+lado: demanda, velocidade, atraso total, pior cruzamento, cruzamentos E/F, trechos saturados, pontos de conflito,
+acidentes previstos, CO₂, custo anual e diagnósticos críticos (★ = melhor) – e o atraso/nível de cada cruzamento em cada
+cenário. **Gravar resultados no modelo** preenche os parâmetros **SV_NivelServico** e **SV_Trafego** (cenário, volume,
+atraso, controle, ciclo, acidentes de referência) nos elementos das interseções, rotatórias e vias – use em tabelas e
+filtros de vista. O mapa mostra os pontos de ônibus (quadrado vazado = baia), as faixas auxiliares e as áreas de escape.
