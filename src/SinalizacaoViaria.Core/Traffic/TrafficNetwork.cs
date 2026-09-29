@@ -41,6 +41,12 @@ public sealed class TrafficRoad
     public double LeftWidth { get; init; }
     /// <summary>Largura da pista entre meios-fios (m).</summary>
     public double CarriageWidth => RightWidth + LeftWidth;
+    /// <summary>Menor largura de faixa ao longo da via (largura variável: estreitamentos), m.</summary>
+    public double MinLaneWidth { get; init; } = 3.5;
+    /// <summary>Menor largura entre meios-fios ao longo da via (m) – igual à nominal sem largura variável.</summary>
+    public double MinCarriageWidth { get; init; }
+    /// <summary>Estaca do ponto mais estreito (m) – só com largura variável.</summary>
+    public double? NarrowestAt { get; init; }
 
     public double Z(double s) => BaseZ + (Grade?.Z(Math.Clamp(s, 0, Axis.Length)) ?? 0);
 }
@@ -64,6 +70,16 @@ public sealed class TrafficNode
     public HashSet<string> RoadIds { get; } = new();
     public string Label { get; set; } = "";
     public bool IsZone => Kind is TipoNo.Extremidade or TipoNo.CulDeSac;
+    /// <summary>Controle do projeto (o cenário pode trocar <see cref="Control"/> temporariamente).</summary>
+    public ControleNo DesignControl { get; set; }
+    /// <summary>Bolsões de conversão à esquerda na interseção.</summary>
+    public bool LeftPockets { get; init; }
+    /// <summary>Ilhas de conversão à direita (faixa de giro livre canalizada).</summary>
+    public bool RightTurnIslands { get; init; }
+    /// <summary>Plano semafórico gravado na interseção.</summary>
+    public SignalPlanDef? StoredPlan { get; init; }
+    /// <summary>Chave estável do nó (id da interseção/rotatória ou posição) – cenários e contagens.</summary>
+    public string Key => SourceId ?? $"{Pos.X:0}:{Pos.Y:0}";
 }
 
 /// <summary>Trecho direcional (um sentido) de uma via entre dois nós.</summary>
@@ -104,6 +120,18 @@ public sealed class TrafficLink
     }
 
     public string Name => Road.Name + (Road.TwoWay ? (Forward ? " (sentido do eixo)" : " (sentido contrário)") : "");
+    /// <summary>Chave estável da aproximação: id da via + sentido.</summary>
+    public string Key => Road.Id + (Forward ? "|+" : "|-");
+    /// <summary>Pontos de ônibus no trecho: posição (m), em baia (fora da faixa) ou na faixa, id da marca.</summary>
+    public List<(double At, bool Bay, string? Id)> BusStops { get; } = new();
+    /// <summary>Faixa de desaceleração (conversão à direita) antes do nó de jusante: extensão (m), 0 = sem.</summary>
+    public double DecelLane { get; set; }
+    /// <summary>Faixa de aceleração depois do nó de montante: extensão (m), 0 = sem.</summary>
+    public double AccelLane { get; set; }
+    /// <summary>Equivalente de caminhão/ônibus em automóveis no trecho (cresce nos aclives – HCM).</summary>
+    public double HeavyEquivalent { get; set; } = 2.0;
+    /// <summary>Menor largura de faixa no trecho (m).</summary>
+    public double LaneWidth { get; set; } = 3.5;
 }
 
 /// <summary>Placa do projeto (para conferir a sinalização da rede).</summary>
@@ -125,6 +153,10 @@ public sealed class TrafficNetwork
     public List<(string Id, Polyline2 Path, TipoModeracao Type)> Calming { get; } = new();
     /// <summary>Cruzamentos em desnível (viadutos, túneis): as vias passam sem conflito.</summary>
     public List<(Vec2 Pos, string A, string B, double Dz)> GradeSeparations { get; } = new();
+    /// <summary>Áreas de escape de caminhões (id, início da caixa).</summary>
+    public List<(string Id, Vec2 Pos)> EscapeRamps { get; } = new();
+    /// <summary>Sonorizadores longitudinais (id, caminho).</summary>
+    public List<(string Id, Polyline2 Path)> RumbleStrips { get; } = new();
     public List<string> Notes { get; } = new();
 
     public TrafficRoad? Road(string id) => Roads.FirstOrDefault(r => r.Id == id);
@@ -169,12 +201,13 @@ public static class TrafficNetworkBuilder
             nd.RoadIds.Add(r.Id);
         }
         TrafficNode NewNode(TipoNo kind, ControleNo control, Vec2 pos, double z, string? src, string? main = null, int rbLanes = 1, double rbR = 0,
-            bool crosswalks = false, bool signs = false)
+            bool crosswalks = false, bool signs = false, bool pockets = false, bool islands = false, SignalPlanDef? plan = null)
         {
             var nd = new TrafficNode
             {
-                Index = net.Nodes.Count, Kind = kind, Control = control, Pos = pos, Z = z, SourceId = src, MainRoadId = main,
-                RoundaboutLanes = rbLanes, RoundaboutRadius = rbR, Crosswalks = crosswalks, Signs = signs,
+                Index = net.Nodes.Count, Kind = kind, Control = control, DesignControl = control, Pos = pos, Z = z, SourceId = src, MainRoadId = main,
+                RoundaboutLanes = rbLanes, RoundaboutRadius = rbR, Crosswalks = crosswalks, Signs = signs, LeftPockets = pockets,
+                RightTurnIslands = islands, StoredPlan = plan,
             };
             net.Nodes.Add(nd);
             return nd;
@@ -191,7 +224,8 @@ public static class TrafficNetworkBuilder
                 ControleIntersecao.Semaforo => ControleNo.Semaforo,
                 _ => ControleNo.PreferenciaDireita,
             };
-            var nd = NewNode(TipoNo.Intersecao, control, it.Node, it.Z, it.Id, it.MainRoadId, crosswalks: it.Crosswalks, signs: it.Signs);
+            var nd = NewNode(TipoNo.Intersecao, control, it.Node, it.Z, it.Id, it.MainRoadId, crosswalks: it.Crosswalks, signs: it.Signs,
+                pockets: it.LeftTurnPockets, islands: it.RightTurnIslands != TipoIlha.Nenhuma, plan: it.SignalPlan);
             foreach (var r in roads) Attach(r, r.Axis.Project(it.Node).Station, nd);
         }
         foreach (var rb in defs.OfType<RoundaboutDefinition>().GroupBy(d => d.Id).Select(g => g.First()))
@@ -294,6 +328,13 @@ public static class TrafficNetworkBuilder
         foreach (var tc in defs.OfType<TrafficCalmingDefinition>().GroupBy(d => d.Id).Select(g => g.First()))
             if (axisOf(tc) is { } a) net.Calming.Add((tc.Id, a.Axis, tc.Type));
 
+        foreach (var er in defs.OfType<EscapeRampDefinition>().GroupBy(d => d.Id).Select(g => g.First()))
+            if (axisOf(er) is { } a && a.Axis.Points.Count > 0) net.EscapeRamps.Add((er.Id, a.Axis.Points[0]));
+        foreach (var rs in defs.OfType<RumbleStripDefinition>().GroupBy(d => d.Id).Select(g => g.First()))
+            if (axisOf(rs) is { } a) net.RumbleStrips.Add((rs.Id, a.Axis));
+        ReadRecesses(net, defs, axisOf);
+        ReadBusStops(net, defs);
+
         foreach (var lk in net.Links) Characterize(net, lk);
         Label(net);
         return net;
@@ -356,8 +397,25 @@ public static class TrafficNetworkBuilder
             }
             speed = h is { } hh ? Hierarquia.DefaultSpeed(hh) : 50;
         }
+        // Largura variável: o ponto mais estreito limita a largura das faixas (gargalo).
+        double minCarriage = pav.RightWidth + pav.LeftWidth, minLane = laneW;
+        double? narrowAt = null;
+        if (pav.HasEdgeVariation)
+        {
+            var (fn, _) = pav.EdgeFunctions(axis);
+            var totalLanes = Math.Max(1, fwd + bwd + busF + busB);
+            var nominal = pav.RightWidth + pav.LeftWidth;
+            for (var st = 0.0; st <= axis.Length + 1e-6; st += Math.Max(2, axis.Length / 200))
+            {
+                var v = fn(Math.Min(st, axis.Length));
+                var wdt = nominal + v.CurbL + v.CurbR;
+                if (wdt < minCarriage - 1e-6) { minCarriage = wdt; narrowAt = st; }
+            }
+            minLane = Math.Max(2.0, laneW - Math.Max(0, nominal - minCarriage) / totalLanes);
+        }
         return new TrafficRoad
         {
+            MinCarriageWidth = minCarriage, MinLaneWidth = minLane, NarrowestAt = narrowAt,
             Id = pav.Id, GroupId = pav.GroupId, Hierarchy = h, Axis = axis, BaseZ = z, Grade = pav.Output.Grade, TwoWay = twoWay,
             LanesForward = fwd, LanesBackward = bwd, BusLanesForward = busF, BusLanesBackward = busB, LaneWidth = laneW,
             SpeedKmh = speed > 0 ? speed : 50, SpeedFromSection = fromSection, ParkingForward = parkF, ParkingBackward = parkB, BikeLane = bike,
@@ -367,6 +425,88 @@ public static class TrafficNetworkBuilder
         };
     }
 
+    /// <summary>Trecho direcional da via que passa na estaca <paramref name="s"/> no sentido pedido.</summary>
+    private static TrafficLink? LinkAt(TrafficNetwork net, TrafficRoad r, double s, bool forward) =>
+        net.Links.FirstOrDefault(l => ReferenceEquals(l.Road, r) && l.Forward == forward && s >= l.S0 - 0.5 && s <= l.S1 + 0.5);
+
+    /// <summary>Via cujo eixo passa junto ao ponto (até <paramref name="tol"/> m do eixo, ou dentro da pista).</summary>
+    private static (TrafficRoad Road, double S, double Signed)? RoadNear(TrafficNetwork net, Vec2 p, double tol)
+    {
+        (TrafficRoad, double, double)? best = null;
+        var bd = double.MaxValue;
+        foreach (var r in net.Roads)
+        {
+            var pr = r.Axis.Project(p);
+            var d = Math.Abs(pr.Signed);
+            var reach = (pr.Signed > 0 ? r.LeftWidth : r.RightWidth) + tol;
+            if (d > reach || d >= bd) continue;
+            bd = d;
+            best = (r, pr.Station, pr.Signed);
+        }
+        return best;
+    }
+
+    /// <summary>Baias de ônibus e faixas de aceleração/desaceleração (recuos da via) ligadas aos trechos.</summary>
+    private static void ReadRecesses(TrafficNetwork net, IReadOnlyCollection<MarkingDefinition> defs, Func<MarkingDefinition, (Polyline2 Axis, double Z)?> axisOf)
+    {
+        foreach (var rc in defs.OfType<RecessMarkingDefinition>().GroupBy(d => d.Id).Select(g => g.First()))
+        {
+            if (axisOf(rc) is not { } a) continue;
+            var ax = a.Axis;
+            var mid = ax.PointAt(Math.Clamp((rc.S1 + rc.S2) / 2, 0, ax.Length));
+            var r = net.Roads.Where(x => Math.Abs(x.Axis.Project(mid).Signed) < 1.0).OrderBy(x => Math.Abs(x.Axis.Project(mid).Signed)).FirstOrDefault();
+            if (r == null) continue;
+            double St(double s) => r.Axis.Project(ax.PointAt(Math.Clamp(s, 0, ax.Length))).Station;
+            // Lado esquerdo de via de mão dupla = tráfego contra o eixo.
+            var forward = !rc.Reverse && !(rc.Left && r.TwoWay);
+            var s1 = St(rc.S1);
+            var s2 = St(rc.S2);
+            var lk = LinkAt(net, r, (s1 + s2) / 2, forward);
+            if (lk == null) continue;
+            double Along(double s) => lk.Forward ? s - lk.S0 : lk.S1 - s;
+            switch (rc.Type)
+            {
+                case TipoRecuo.BaiaOnibus:
+                    lk.BusStops.Add((Math.Clamp(Along((s1 + s2) / 2), 0, lk.Length), true, rc.Id));
+                    break;
+                case TipoRecuo.FaixaDesaceleracao:
+                    // A faixa termina junto ao nó de jusante: extensão útil = do início da faixa até o fim do trecho.
+                    lk.DecelLane = Math.Max(lk.DecelLane, lk.Length - Math.Clamp(Math.Min(Along(s1), Along(s2)), 0, lk.Length));
+                    break;
+                case TipoRecuo.FaixaAceleracao:
+                    lk.AccelLane = Math.Max(lk.AccelLane, Math.Clamp(Math.Max(Along(s1), Along(s2)), 0, lk.Length));
+                    break;
+            }
+        }
+    }
+
+    /// <summary>Pontos de ônibus sem baia (placa de ponto de ônibus ou abrigo junto ao meio-fio): param na faixa.</summary>
+    private static void ReadBusStops(TrafficNetwork net, IReadOnlyCollection<MarkingDefinition> defs)
+    {
+        var points = new List<(Vec2 P, string Id)>();
+        foreach (var sg in defs.OfType<SignDefinition>().GroupBy(d => d.Id).Select(g => g.First()))
+        {
+            var c = (sg.Code ?? "").ToUpperInvariant();
+            if (c.Contains("ONIBUS") || c.Contains("ÔNIBUS") || c == "SAU-19" || (sg.Legend ?? "").Contains("ÔNIBUS", StringComparison.OrdinalIgnoreCase))
+                points.Add((sg.Position, sg.Id));
+        }
+        foreach (var ue in defs.OfType<UrbanElementDefinition>().GroupBy(d => d.Id).Select(g => g.First()))
+            if ((ue.Code ?? "").StartsWith("ABRIGO", StringComparison.OrdinalIgnoreCase) && !ue.UsePath)
+                points.Add((ue.Position, ue.Id));
+        foreach (var (p, id) in points)
+        {
+            if (RoadNear(net, p, 8) is not { } hit) continue;
+            var (r, s, signed) = hit;
+            var forward = signed <= 0 || !r.TwoWay;
+            var lk = LinkAt(net, r, s, forward);
+            if (lk == null) continue;
+            var at = Math.Clamp(lk.Forward ? s - lk.S0 : lk.S1 - s, 0, lk.Length);
+            // Já é uma baia (placa e abrigo que acompanham o recuo).
+            if (lk.BusStops.Any(b => Math.Abs(b.At - at) < 30)) continue;
+            lk.BusStops.Add((at, false, id));
+        }
+    }
+
     /// <summary>Capacidade, velocidade livre, raio mínimo, rampa, moderação e travessias do trecho.</summary>
     private static void Characterize(TrafficNetwork net, TrafficLink lk)
     {
@@ -374,7 +514,9 @@ public static class TrafficNetworkBuilder
         var rank = Hierarquia.Rank(r.Hierarchy);
         // Fluxo de saturação base por faixa (ucp/h): vias expressas/rodovias multifaixa maiores, locais menores.
         var basePerLane = rank >= 5 ? 2000 : rank == 4 ? 1800 : rank == 3 ? 1700 : rank == 2 ? 1600 : 1500;
-        var fw = Math.Clamp(1 + (r.LaneWidth - 3.6) / 9.0, 0.85, 1.05);            // largura de faixa (HCM)
+        // Largura de faixa no trecho: a menor quando o estreitamento cai dentro dele.
+        lk.LaneWidth = r.NarrowestAt is { } na && na >= lk.S0 - 1 && na <= lk.S1 + 1 ? r.MinLaneWidth : r.LaneWidth;
+        var fw = Math.Clamp(1 + (lk.LaneWidth - 3.6) / 9.0, 0.80, 1.05);           // largura de faixa (HCM)
         var park = lk.Forward ? r.ParkingForward : r.ParkingBackward;
         var fp = park ? 0.90 : 1.0;                                               // manobras de estacionamento
         // Rampa média do trecho.
@@ -382,8 +524,14 @@ public static class TrafficNetworkBuilder
         var grade = (lk.Forward ? dz : -dz) / Math.Max(1, lk.S1 - lk.S0) * 100;
         lk.GradePct = grade;
         var fg = Math.Clamp(1 - grade / 200.0, 0.85, 1.05);
+        // Caminhões e ônibus nos aclives: equivalente maior (HCM – veículos pesados em rampa).
+        lk.HeavyEquivalent = 2.0 + Math.Max(0, grade - 2) * 0.35;
+        // Pontos de ônibus na faixa (sem baia) bloqueiam a faixa da direita durante o embarque.
+        var inLaneStops = lk.BusStops.Count(b => !b.Bay);
         lk.SaturationPerLane = basePerLane * fw * fp * fg;
-        lk.Capacity = lk.SaturationPerLane * lk.Lanes;
+        // Bloqueio por ônibus parados na faixa (HCM: fbb = (N − 14,4·Nb/3600)/N, 12 ônibus/h de referência).
+        var fbb = inLaneStops > 0 ? Math.Max(0.5, (lk.Lanes - inLaneStops * 14.4 * 12 / 3600.0) / lk.Lanes) : 1.0;
+        lk.Capacity = lk.SaturationPerLane * lk.Lanes * fbb;
         // Raio mínimo de curva no trecho (três pontos a cada 5 m).
         var minR = double.PositiveInfinity;
         for (var s = 5.0; s < lk.Length - 5; s += 5)

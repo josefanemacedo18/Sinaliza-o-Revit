@@ -30,6 +30,16 @@ public static class TrafficReport
         _ => "livre",
     };
 
+    public static string ControlShort(ControleNo c) => c switch
+    {
+        ControleNo.Semaforo => "sem.",
+        ControleNo.Pare => "PARE",
+        ControleNo.DePreferencia => "DP",
+        ControleNo.Rotatoria => "rot.",
+        ControleNo.PreferenciaDireita => "dir.",
+        _ => "livre",
+    };
+
     public static string LosMeaning(string los) => los switch
     {
         "A" => "fluxo livre",
@@ -53,7 +63,20 @@ public static class TrafficReport
         if (!string.IsNullOrWhiteSpace(project)) L($"Projeto: {project}");
         L($"Gerado em {DateTime.Now:dd/MM/yyyy HH:mm}");
         L($"Cenário: demanda {o.DemandLabel}; veículos pesados {F(o.HeavyVehicles * 100)}%, ônibus {F(o.Buses * 100)}%, FHP {F(o.PeakHourFactor, "0.00")}, " +
-          $"{F(o.PedestriansPerHour)} pedestres/h por travessia; semáforos {(o.OptimizeSignals ? "com ciclo otimizado (Webster)" : $"com ciclo fixo de {F(o.FixedCycle)} s")}.");
+          $"{F(o.PedestriansPerHour)} pedestres/h por travessia; semáforos {(o.OptimizeSignals ? "com ciclo otimizado (Webster)" : $"com ciclo fixo de {F(o.FixedCycle)} s")}" +
+          (o.UseStoredPlans ? ", planos gravados nas interseções respeitados" : "") + (o.Coordinate ? $", coordenados (ciclo comum {F(r.CommonCycle)} s)" : "") + ".");
+        var ovs = o.Nodes.Where(x => !x.IsEmpty).ToList();
+        if (ovs.Count > 0)
+            L($"Ajustes do cenário em {ovs.Count} cruzamento(s): " + string.Join("; ", ovs.Select(x =>
+            {
+                var nd = net.Nodes.FirstOrDefault(n => n.Key == x.Node);
+                var parts = new List<string>();
+                if (x.Control is { } c) parts.Add(ControlLabel(c));
+                if (x.Cycle is { } cy) parts.Add($"ciclo {F(cy)} s");
+                if (x.Greens is { Count: > 0 } gs) parts.Add("verdes " + string.Join("/", gs.Select(g => F(g))));
+                if (x.Turns.Count > 0) parts.Add($"{x.Turns.Count} contagem(ns) de conversão");
+                return $"{nd?.Label ?? x.Node} – {string.Join(", ", parts)}";
+            })) + ".");
 
         // ------------------------------------------------------------------ resumo
         H("1. Resumo");
@@ -104,10 +127,11 @@ public static class TrafficReport
         foreach (var nr in nodes.OrderBy(n => n.Node.Label))
         {
             var nd = nr.Node;
-            L($"{nd.Label} – {KindLabel(nd.Kind)}, {ControlLabel(nd.Control)}: nível {nr.LOS} ({LosMeaning(nr.LOS)}), atraso médio {F(nr.Delay, "0.0")} s/veh, {F(nr.Volume)} veh/h");
+            L($"{nd.Label} – {KindLabel(nd.Kind)}, {ControlLabel(nr.Control)}: nível {nr.LOS} ({LosMeaning(nr.LOS)}), atraso médio {F(nr.Delay, "0.0")} s/veh, {F(nr.Volume)} veh/h");
             if (nr.Phases.Count > 0)
             {
-                L($"    Plano semafórico: ciclo {F(nr.Cycle)} s, {nr.Phases.Count} fases (entreverdes de 4 s cada):");
+                L($"    Plano semafórico ({nr.PlanSource}): ciclo {F(nr.Cycle)} s, {nr.Phases.Count} fases (entreverdes de {F(nr.Intergreen)} s cada)" +
+                  (nr.Offset > 0 ? $", defasagem {F(nr.Offset)} s" : "") + ":");
                 foreach (var ph in nr.Phases) L($"      {ph.Name}: verde {F(ph.Green)} s");
             }
             L($"    {"Aproximação",-44} {"veh/h",6} {"cap.",6} {"v/c",5} {"atraso",7} {"nível",5} {"fila95",7}");
@@ -134,8 +158,28 @@ public static class TrafficReport
               (sim != null ? $"  {F(simV)}" : ""));
         }
 
+        // ------------------------------------------------------------------ segurança e custos
+        H("6. Segurança viária e custos");
+        L("Pontos de conflito (FHWA) e acidentes previstos pelas funções de desempenho do HSM (EUA, sem calibração local) –");
+        L("números de referência para COMPARAR alternativas (rotatória × semáforo × PARE), não para prever acidentes reais.");
+        L($"  {"Nó",-6} {"ramos",5} {"cruz.",5} {"conv.",5} {"div.",5} {"pedestre",8} {"VDM princ.",10} {"VDM sec.",9} {"acid./ano",9} {"c/ vítimas",10}");
+        foreach (var nr in nodes.OrderBy(n => n.Node.Label))
+        {
+            if (!r.Safety.TryGetValue(nr.Node.Index, out var sf) || sf.Legs < 3) continue;
+            L($"  {nr.Node.Label,-6} {sf.Legs,5} {sf.Crossing,5} {sf.Merging,5} {sf.Diverging,5} {sf.Pedestrian,8} {F(sf.AadtMajor),10} {F(sf.AadtMinor),9} {F(sf.CrashesPerYear, "0.00"),9} {F(sf.InjuryCrashesPerYear, "0.00"),10}");
+        }
+        var ec = r.Economics;
+        L();
+        L($"Custos anuais estimados ({F(o.AnnualHours)} h/ano nesta situação; tempo R$ {F(o.ValueOfTime, "0.00")}/h × {F(o.Occupancy, "0.0")} pessoa/veículo;");
+        L($"combustível R$ {F(o.FuelPrice, "0.00")}/L; CO₂ R$ {F(o.Co2Price)}/t; acidente R$ {F(o.CrashCost)}):");
+        L($"  Tempo perdido (atrasos):  R$ {F(ec.DelayCost)}");
+        L($"  Combustível ({F(ec.FuelLitersPerHour)} L/h): R$ {F(ec.FuelCost)}");
+        L($"  Emissões de CO₂:          R$ {F(ec.Co2Cost)}");
+        L($"  Acidentes:                R$ {F(ec.CrashCost)}");
+        L($"  TOTAL:                    R$ {F(ec.Total)} por ano");
+
         // ------------------------------------------------------------------ diagnóstico
-        H("6. Diagnóstico e recomendações");
+        H("7. Diagnóstico e recomendações");
         if (r.Diagnostics.Count == 0) L("Nenhum problema encontrado.");
         var i = 0;
         foreach (var d in r.Diagnostics)
@@ -155,7 +199,7 @@ public static class TrafficReport
         }
 
         // ------------------------------------------------------------------ método
-        H("7. Método e limitações");
+        H("8. Método e limitações");
         L("• Capacidade e nível de serviço: HCM (Highway Capacity Manual, 7ª ed.) – semáforos pelo atraso de controle d1 + d2 com plano de");
         L("  Webster (fase protegida à esquerda pelo critério do produto de volumes); PARE/Dê a preferência e preferência à direita por");
         L("  aceitação de brechas; rotatórias pelo modelo exponencial do HCM 6; trechos pela relação de velocidades (urbano) ou densidade.");
@@ -164,6 +208,11 @@ public static class TrafficReport
         L("• Microssimulação: seguimento de veículo IDM, chegadas de Poisson, rotas da alocação, aceitação de brechas nos nós, plano");
         L("  semafórico calculado, travessias de pedestres no meio da quadra. Mostra bloqueios entre cruzamentos (filas que alcançam o");
         L("  nó anterior) que a análise nó a nó não vê.");
+        L("• Fatores do HCM no fluxo de saturação: largura de faixa (inclusive estreitamentos da largura variável), rampa, veículos");
+        L("  pesados (equivalente maior nos aclives), estacionamento, bloqueio por ônibus parados na faixa, pedestres nas conversões à");
+        L("  direita, bolsões de esquerda e faixas de desaceleração/ilhas de giro livre (lidos do projeto).");
+        L("• Coordenação: ciclo comum e defasagens pela progressão ao longo dos trechos; fator de progressão do HCM nas aproximações.");
+        L("• Segurança: HSM (Highway Safety Manual, cap. 12) e CMF de rotatórias/bolsões – referência internacional sem calibração.");
         L("• A demanda é ESTIMADA pela hierarquia das vias. Para decisões de projeto, informe os volumes contados nas entradas");
         L("  (contagens classificadas na hora de pico) e confirme os critérios de semáforo com contagens de 8 horas (MBST Vol. V).");
         return sb.ToString();
@@ -178,7 +227,7 @@ public static class TrafficReport
             foreach (var a in nr.Approaches)
             {
                 var sa = sim != null && sim.Approaches.TryGetValue(a.Link, out var x) ? x : null;
-                sb.AppendLine(string.Join(";", nr.Node.Label, KindLabel(nr.Node.Kind), ControlLabel(nr.Node.Control), nr.LOS, a.Name,
+                sb.AppendLine(string.Join(";", nr.Node.Label, KindLabel(nr.Node.Kind), ControlLabel(nr.Control), nr.LOS, a.Name,
                     F(a.Volume), F(a.Capacity), F(a.X, "0.00"), F(a.Delay, "0.0"), a.LOS, F(a.Queue95), F(a.Green), F(nr.Cycle),
                     a.Major ? "sim" : "não", a.ProtectedLeft ? "sim" : "não", sa is { Vehicles: > 0 } ? F(sa.MeanDelay, "0.0") : "", sa != null ? F(sa.MaxQueue) : ""));
             }

@@ -192,6 +192,7 @@ public class V24Tests
             var p = new Vec2(f.Data[k * SimFrame.Stride], f.Data[k * SimFrame.Stride + 1]);
             var h = f.Data[k * SimFrame.Stride + 2];
             var d = new Vec2(Math.Cos(h), Math.Sin(h));
+            if (net2.Nodes.Any(n => !n.IsZone && n.Pos.DistanceTo(p) < 15)) continue;      // dentro do cruzamento: a via mais próxima é ambígua
             var road = net2.Roads.MinBy(r => Math.Abs(r.Axis.Project(p).Signed))!;
             var (st, signed) = road.Axis.Project(p);
             if (st < 5 || st > road.Axis.Length - 5 || Math.Abs(signed) > 12) continue;
@@ -213,7 +214,8 @@ public class V24Tests
         Assert.Contains("I01", txt);
         Assert.Contains("R01", txt);
         Assert.Contains("Plano semafórico", txt);
-        Assert.Contains("6. DIAGNÓSTICO", txt);
+        Assert.Contains("7. DIAGNÓSTICO", txt);
+        Assert.Contains("SEGURANÇA VIÁRIA E CUSTOS", txt);
         Assert.Contains("HCM", txt);
         var csv = TrafficReport.Csv(res);
         var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);

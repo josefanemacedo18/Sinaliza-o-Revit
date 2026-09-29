@@ -26,6 +26,13 @@ internal sealed class SimVehicle
     public double RingAngle = double.NaN;   // rotatória: ângulo atual no anel
     public int Stops;
     public bool WasStopped;
+    // Ônibus: próximo ponto no trecho, fim do embarque, parado na baia.
+    public int NextStop;
+    public double DwellUntil = -1;
+    public bool InBay;
+    // Troca de faixa: deslocamento lateral ainda por percorrer (animação) e instante da última troca.
+    public double LaneShift;
+    public double LastLaneChange = -100;
     public int Link => Route[Step];
 }
 
@@ -66,6 +73,8 @@ public sealed class SimResult
     public double StopsPerTrip { get; set; }
     public double Duration { get; set; }
     public int MaxVehicles { get; set; }
+    public int LaneChanges { get; set; }
+    public int BusStopsServed { get; set; }
     public List<string> Events { get; } = new();
 
     public double MeanSpeedKmh(int link) => LinkSpeed.TryGetValue(link, out var x) && x.Time > 0 ? x.Dist / x.Time * 3.6 : double.NaN;
@@ -119,19 +128,22 @@ public static class TrafficSimulation
         foreach (var l in net.Links) res.Approaches[l.Index] = new SimApproach { Link = l.Index };
 
         // Plano semafórico: início de cada fase no ciclo (fases em sequência, 4 s de amarelo + vermelho geral).
-        var plans = new Dictionary<int, (double C, List<(double Start, double G, HashSet<int> Links, SignalPhase Phase)> Phases)>();
-        foreach (var nr in macro.Nodes.Values.Where(n => n.Node.Control == ControleNo.Semaforo && n.Phases.Count > 0))
+        var plans = new Dictionary<int, (double C, List<(double Start, double G, HashSet<int> Links, SignalPhase Phase)> Phases, double Offset)>();
+        foreach (var nr in macro.Nodes.Values.Where(n => n.Control == ControleNo.Semaforo && n.Phases.Count > 0))
         {
             var list = new List<(double, double, HashSet<int>, SignalPhase)>();
             var t0 = 0.0;
-            foreach (var ph in nr.Phases) { list.Add((t0, ph.Green, ph.Links.ToHashSet(), ph)); t0 += ph.Green + 4; }
-            plans[nr.Node.Index] = (Math.Max(nr.Cycle, t0), list);
+            foreach (var ph in nr.Phases) { list.Add((t0, ph.Green, ph.Links.ToHashSet(), ph)); t0 += ph.Green + nr.Intergreen; }
+            plans[nr.Node.Index] = (Math.Max(nr.Cycle, t0), list, nr.Offset);
         }
+        // Tempo dentro do ciclo, com a defasagem da coordenação.
+        static double InCycle((double C, List<(double Start, double G, HashSet<int> Links, SignalPhase Phase)> Phases, double Offset) p, double t) =>
+            ((t - p.Offset) % p.C + p.C) % p.C;
         var protectedLeft = macro.Nodes.Values.SelectMany(n => n.Approaches).Where(a => a.ProtectedLeft).Select(a => a.Link).ToHashSet();
         int GreenPhase(int node, double t)
         {
             if (!plans.TryGetValue(node, out var p)) return -1;
-            var tc = t % p.C;
+            var tc = InCycle(p, t);
             for (int k = 0; k < p.Phases.Count; k++)
                 if (tc >= p.Phases[k].Start && tc < p.Phases[k].Start + p.Phases[k].G) return k;
             return -1;
@@ -142,7 +154,7 @@ public static class TrafficSimulation
             var k = GreenPhase(node, t);
             if (k >= 0) return k;
             var p = plans[node];
-            var tc = t % p.C;
+            var tc = InCycle(p, t);
             for (int j = p.Phases.Count - 1; j >= 0; j--)
                 if (tc >= p.Phases[j].Start + p.Phases[j].G) return -(j + 2);
             return -(p.Phases.Count - 1 + 2);
@@ -154,7 +166,7 @@ public static class TrafficSimulation
             if (k < 0) return 0;
             var ph = plans[node].Phases[k];
             if (!ph.Links.Contains(link) || !ph.Phase.Allows(g)) return 0;
-            if ((t % plans[node].C) >= ph.Start + ph.G - margin) return 0;
+            if (InCycle(plans[node], t) >= ph.Start + ph.G - margin) return 0;
             // Protegido: fase só de esquerdas ou verde antecipado (o sentido oposto está no vermelho).
             return ph.Phase.LeftOnly || !OpposingThrough(net.Nodes[node], link).Any(ph.Links.Contains) ? 2 : 1;
         }
@@ -163,7 +175,7 @@ public static class TrafficSimulation
         bool JustEnded(int node, int link, Giro g, double t, double within)
         {
             if (!plans.TryGetValue(node, out var p)) return false;
-            var tc = t % p.C;
+            var tc = InCycle(p, t);
             foreach (var ph in p.Phases)
                 if (ph.Links.Contains(link) && ph.Phase.Allows(g) && tc >= ph.Start + ph.G && tc < ph.Start + ph.G + within) return true;
             return false;
@@ -197,6 +209,32 @@ public static class TrafficSimulation
         int nextId = 0;
         double sumTT = 0, sumDelay = 0;
         var lastFrame = -1.0;
+
+        // Pontos de ônibus de cada trecho em ordem (afastados do fim para não travar a entrada no nó).
+        var stops = net.Links.ToDictionary(l => l.Index, l => l.BusStops.Select(b => (At: Math.Clamp(b.At, 6, Math.Max(6, l.Length - 8)), b.Bay)).OrderBy(b => b.At).ToList());
+        double V0(SimVehicle x, TrafficLink l) => l.FreeSpeed * x.SpeedFactor;
+        // Aceleração IDM de x atrás de lead (nulo = via livre).
+        double Idm(SimVehicle x, SimVehicle? lead, TrafficLink l)
+        {
+            var v0 = Math.Max(0.5, V0(x, l));
+            var free = 1 - Math.Pow(x.V / v0, 4);
+            if (lead == null) return x.A * free;
+            var gap = Math.Max(0.1, lead.S - lead.Length - x.S);
+            var sStar = 2.0 + Math.Max(0, x.V * x.T + x.V * (x.V - lead.V) / (2 * Math.Sqrt(x.A * x.B)));
+            return Math.Max(-9, x.A * (free - Math.Pow(sStar / gap, 2)));
+        }
+        // Faixas aceitáveis no trecho: conversão no fim do trecho e ponto de ônibus pela frente.
+        HashSet<int> Allowed(SimVehicle v, TrafficLink l)
+        {
+            var all = Enumerable.Range(0, l.Lanes).ToHashSet();
+            if (v.Type == 2 && v.NextStop < stops[l.Index].Count) return new HashSet<int> { 0 };
+            if (v.Step + 1 >= v.Route.Count) return all;
+            var g = TrafficAnalysis.TurnOf(net, l.Index, v.Route[v.Step + 1]);
+            if (g == Giro.Direita) return new HashSet<int> { 0 };
+            if (g is Giro.Esquerda or Giro.Retorno) return new HashSet<int> { l.Lanes - 1 };
+            if (protectedLeft.Contains(l.Index) && l.Lanes >= 3) all.Remove(l.Lanes - 1);
+            return all;
+        }
 
         int LaneFor(TrafficLink l, int? nextLink)
         {
@@ -262,20 +300,54 @@ public static class TrafficSimulation
                 if (list.Count == 0) continue;
                 var l = net.Links[link];
                 list.Sort((a, b) => b.S.CompareTo(a.S));   // do mais à frente para o de trás
+                var st = stops[link];
                 for (int i = 0; i < list.Count; i++)
                 {
                     var v = list[i];
+                    // Ônibus no ponto: embarque; na baia, só volta à faixa com brecha para o veículo de trás.
+                    if (v.DwellUntil > 0)
+                    {
+                        if (time < v.DwellUntil) { v.V = 0; continue; }
+                        if (v.InBay)
+                        {
+                            SimVehicle? fol = null;
+                            for (int j = i + 1; j < list.Count; j++) if (!list[j].InBay) { fol = list[j]; break; }
+                            if (fol != null && v.S - v.Length - fol.S < 6 + fol.V * 1.6) { v.V = 0; continue; }
+                            v.InBay = false;
+                        }
+                        v.DwellUntil = -1;
+                        v.NextStop++;
+                        if (measuring) res.BusStopsServed++;
+                    }
                     var v0 = l.FreeSpeed * v.SpeedFactor;
                     foreach (var (at, sp, _) in l.SlowPoints)
                         if (v.S > at - 30 && v.S < at + 10) v0 = Math.Min(v0, sp);
                     // Obstáculo: veículo à frente, linha de retenção (se não puder seguir) ou pedestres na travessia.
                     var gap = double.PositiveInfinity;
                     var dv = 0.0;
-                    if (i > 0)
+                    SimVehicle? lead = null;
+                    for (int j = i - 1; j >= 0; j--) if (!list[j].InBay) { lead = list[j]; break; }
+                    if (lead != null)
                     {
-                        var lead = list[i - 1];
                         gap = lead.S - lead.Length - v.S;
                         dv = v.V - lead.V;
+                    }
+                    if (v.Type == 2 && v.Lane == 0)
+                    {
+                        while (v.NextStop < st.Count && st[v.NextStop].At < v.S - 2) v.NextStop++;
+                        if (v.NextStop < st.Count)
+                        {
+                            var gs = st[v.NextStop].At - v.S;
+                            // Obstáculo virtual 2 m além do ponto: com a distância mínima do IDM o ônibus para rente a ele.
+                            if (gs + 2 < gap) { gap = gs + 2; dv = v.V; }
+                            if (gs < 1.5 && v.V < 0.6)
+                            {
+                                v.DwellUntil = time + opt.BusDwell * (0.6 + 0.8 * rnd.NextDouble());
+                                v.InBay = st[v.NextStop].Bay;
+                                v.V = 0;
+                                continue;
+                            }
+                        }
                     }
                     for (int k = 0; k < l.Crosswalks.Count; k++)
                     {
@@ -286,7 +358,7 @@ public static class TrafficSimulation
                             if (gp < gap) { gap = gp; dv = v.V; }
                         }
                     }
-                    if (i == 0)
+                    if (lead == null)
                     {
                         // Obstáculo virtual 1,5 m além do fim: com a distância mínima do IDM (2 m) o veículo para rente à linha.
                         var stop = l.Length + 1.5;
@@ -302,12 +374,71 @@ public static class TrafficSimulation
                     acc = Math.Max(acc, -8);
                     var nv = Math.Max(0, v.V + acc * Dt);
                     var ds = Math.Max(0, (v.V + nv) / 2 * Dt);
-                    if (!double.IsInfinity(gap)) ds = Math.Min(ds, Math.Max(0, gap - 0.2 + (i == 0 ? 0.2 : 0)));
+                    if (!double.IsInfinity(gap)) ds = Math.Min(ds, Math.Max(0, gap - 0.2 + (lead == null ? 0.2 : 0)));
                     v.V = nv;
                     v.S += ds;
+                    if (v.LaneShift != 0) v.LaneShift = Math.Sign(v.LaneShift) * Math.Max(0, Math.Abs(v.LaneShift) - 1.4 * Dt);
                     if (v.V < 0.3) { if (!v.WasStopped) { v.Stops++; v.WasStopped = true; } v.StoppedFor += Dt; }
                     else if (v.V > 3) v.WasStopped = false;
                 }
+            }
+
+            // ---------------------------------------------------- troca de faixa (obrigatória para a conversão / o ponto; e para ultrapassar)
+            var changes = new List<(SimVehicle V, int Link, int From, int To)>();
+            foreach (var l in net.Links.Where(x => x.Lanes > 1))
+            {
+                for (int k = 0; k < l.Lanes; k++)
+                {
+                    var list = Tail(l.Index, k);
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        var v = list[i];
+                        if (v.InBay || v.DwellUntil > 0 || time - v.LastLaneChange < 3 || v.S < 5 || v.S > l.Length - 12) continue;
+                        var ok = Allowed(v, l);
+                        var toEnd = l.Length - v.S;
+                        SimVehicle? curLead = null;
+                        for (int j = i - 1; j >= 0; j--) if (!list[j].InBay) { curLead = list[j]; break; }
+                        var aCur = Idm(v, curLead, l);
+                        var best = -1;
+                        var bestGain = double.NegativeInfinity;
+                        foreach (var tk in new[] { k - 1, k + 1 })
+                        {
+                            if (tk < 0 || tk >= l.Lanes) continue;
+                            var nearOk = ok.Count == 0 ? k : ok.OrderBy(x => Math.Abs(x - k)).First();
+                            var mandatory = !ok.Contains(k) && Math.Abs(tk - nearOk) < Math.Abs(k - nearOk);
+                            if (!mandatory && !ok.Contains(tk) && toEnd < 150) continue;
+                            if (!mandatory && v.Type == 2 && ok.Count == 1) continue;
+                            var target = Tail(l.Index, tk);
+                            SimVehicle? nl = null, nf = null;
+                            foreach (var x in target)
+                            {
+                                if (x.InBay) continue;
+                                if (x.S > v.S) { if (nl == null || x.S < nl.S) nl = x; }
+                                else if (nf == null || x.S > nf.S) nf = x;
+                            }
+                            if (nl != null && nl.S - nl.Length - v.S < 1.5) continue;
+                            if (nf != null && v.S - v.Length - nf.S < 1.5) continue;
+                            // Segurança (MOBIL): o novo seguidor não precisa frear forte.
+                            if (nf != null && Idm(nf, v, l) < (mandatory ? -4.0 : -2.5)) continue;
+                            var aNew = Idm(v, nl, l);
+                            // Mantenha a direita (CTB art. 29, IV): à direita basta um ganho pequeno; à esquerda, só para ultrapassar.
+                            var threshold = mandatory ? -3.0 : tk < k ? 0.1 : 0.6;
+                            var gain = aNew - aCur - threshold;
+                            if (gain > 0 && gain > bestGain) { bestGain = gain; best = tk; }
+                        }
+                        if (best >= 0) changes.Add((v, l.Index, k, best));
+                    }
+                }
+            }
+            foreach (var (v, link, from, to) in changes)
+            {
+                var l = net.Links[link];
+                if (!Tail(link, from).Remove(v)) continue;
+                LaneList(link, to).Add(v);
+                v.LaneShift += l.LaneOffset(from) - l.LaneOffset(to);
+                v.Lane = to;
+                v.LastLaneChange = time;
+                if (measuring) res.LaneChanges++;
             }
 
             // ---------------------------------------------------- entrada nos nós
@@ -316,7 +447,7 @@ public static class TrafficSimulation
                 if (list.Count == 0) continue;
                 var l = net.Links[link];
                 var v = list.MaxBy(x => x.S)!;
-                if (v.S < l.Length - 1.3) continue;
+                if (v.S < l.Length - 1.3 || v.DwellUntil > 0 || v.InBay) continue;
                 if (!CanProceed(v, time, true)) continue;
                 list.Remove(v);
                 var nd = net.Nodes[l.To];
@@ -331,6 +462,8 @@ public static class TrafficSimulation
                     res.LinkSpeed[link] = (ls.Dist + l.Length, ls.Time + (time - v.LinkEnter), ls.N + 1);
                 }
                 v.FreeTime += free;
+                v.NextStop = 0;
+                v.LaneShift = 0;
                 v.Stops = 0;
                 v.StoppedFor = 0;
                 if (v.Step + 1 >= v.Route.Count)
@@ -435,7 +568,7 @@ public static class TrafficSimulation
                         var s = Math.Min(v.S, l.Length);
                         var c = l.Path.PointAt(s);
                         d = l.Path.TangentAt(s);
-                        p = c + new Vec2(d.Y, -d.X) * l.LaneOffset(v.Lane);
+                        p = c + new Vec2(d.Y, -d.X) * (l.LaneOffset(v.Lane) + v.LaneShift + (v.InBay ? 3.0 : 0));
                     }
                     data[k++] = (float)p.X;
                     data[k++] = (float)p.Y;
@@ -468,6 +601,8 @@ public static class TrafficSimulation
         res.MeanDelay = res.Completed > 0 ? sumDelay / res.Completed : 0;
         var appr = res.Approaches.Values.Where(a => a.Vehicles > 0).ToList();
         res.StopsPerTrip = res.Completed > 0 ? appr.Sum(a => a.Stops) / (double)res.Completed : 0;
+        if (res.LaneChanges > 0) res.Events.Add($"{res.LaneChanges} troca(s) de faixa durante a medição.");
+        if (res.BusStopsServed > 0) res.Events.Add($"{res.BusStopsServed} parada(s) de ônibus atendidas (embarque de {opt.BusDwell:0} s em média).");
         if (res.Backlog > 20) res.Events.Add($"{res.Backlog} veículo(s) não conseguiram entrar na rede (entradas bloqueadas por filas).");
         return res;
 
@@ -517,6 +652,14 @@ public static class TrafficSimulation
                         if (atLine && left && v.StoppedFor > 2 && JustEnded(nd.Index, link, g, t, 4.0)) return true;
                         Why(v, "vermelho");
                         return false;
+                    }
+                    // Conversão à direita cede aos pedestres que atravessam no começo do verde (faixas de pedestres no cruzamento).
+                    if (g == Giro.Direita && nd.Crosswalks && opt.PedestriansPerHour > 0 && GreenPhase(nd.Index, t) is var kp && kp >= 0)
+                    {
+                        var p = plans[nd.Index];
+                        var sinceStart = InCycle(p, t) - p.Phases[kp].Start;
+                        var block = Math.Min(p.Phases[kp].G * 0.6, 2 + opt.PedestriansPerHour / 60.0);
+                        if (sinceStart < block) { Why(v, "pedestre"); return false; }
                     }
                     // Conversão à esquerda permitida: cede ao sentido oposto que está com verde (quem espera muito aceita brechas menores).
                     if (left && green == 1 && !Clear(v, nd, link, OpposingThrough(nd, link).Where(b => IsGreen(nd.Index, b, t, 0)).ToList(), v.StoppedFor > 20 ? 2.5 : 4.5))

@@ -1509,6 +1509,9 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public double PocketWidth { get; set; } = 3.0;
 
     /// <summary>Ids das marcas criadas pela interseção (faixas, retenções, rampas) – regeneradas com ela.</summary>
+    /// <summary>Plano semafórico gravado (Simulador de Tráfego ou informado). Nulo = calculado pelo simulador.</summary>
+    public SignalPlanDef? SignalPlan { get; set; }
+
     public List<string> ChildIds { get; set; } = new();
 
     public override double? PointZ => Z;

@@ -289,6 +289,118 @@ public static class TrafficDiagnostics
                     "Insira rampas (Rampa) nas duas pontas ou use faixa elevada.", path.PointAt(path.Length / 2), ids: new[] { id });
         }
 
+        // ------------------------------------------------------------ descidas longas: área de escape e sonorizadores
+        foreach (var r in net.Roads)
+        {
+            if (r.Grade == null || r.Axis.Length < 300) continue;
+            foreach (var forward in r.TwoWay ? new[] { true, false } : new[] { true })
+            {
+                // Maior sequência contínua de declive no sentido do tráfego (≥ 3 %).
+                var step = 20.0;
+                double runStart = -1, drop = 0, bestLen = 0, bestDrop = 0, bestEnd = 0;
+                for (var s0 = 0.0; s0 + step <= r.Axis.Length + 1e-6; s0 += step)
+                {
+                    var dz = r.Z(s0 + step) - r.Z(s0);
+                    var g = (forward ? dz : -dz) / step;
+                    if (g <= -0.03)
+                    {
+                        if (runStart < 0) { runStart = s0; drop = 0; }
+                        drop += -g * step;
+                        var len = s0 + step - runStart;
+                        if (len > bestLen) { bestLen = len; bestDrop = drop; bestEnd = forward ? s0 + step : runStart; }
+                    }
+                    else runStart = -1;
+                }
+                if (bestLen < 500) continue;
+                var mean = bestDrop / bestLen * 100;
+                // Critério usual (AASHTO/DNIT): declive ≥ 5 % em mais de 1 km, ou ≥ 3 % com mais de 60 m de desnível, com caminhões.
+                var need = (mean >= 5 && bestLen >= 1000) || bestDrop >= 60;
+                if (!need || res.Options.HeavyVehicles <= 0) continue;
+                var endP = r.Axis.PointAt(Math.Clamp(bestEnd, 0, r.Axis.Length));
+                var hasEscape = net.EscapeRamps.Any(e => e.Pos.DistanceTo(endP) < bestLen);
+                if (!hasEscape)
+                    Add(Gravidade.Critico, "Segurança", $"{r.Name}: descida de {bestLen:0} m a {mean:0.0}% sem área de escape",
+                        $"Desnível de {bestDrop:0} m no sentido {(forward ? "do eixo" : "contrário")}: caminhões podem perder o freio (superaquecimento). " +
+                        "AASHTO/DNIT recomendam área de escape (caixa de retenção) antes do ponto crítico – curva fechada, interseção ou área urbana no pé da descida.",
+                        "Insira Área de Escape (Bloqueios Físicos) à direita, tangente à pista, nos últimos 2/3 da descida; sinalize com A-40/A-45 e placa de escape a 1 km, 500 m e na entrada.",
+                        endP, ids: RoadIds(r));
+                else
+                    Add(Gravidade.Informacao, "Segurança", $"{r.Name}: descida de {bestLen:0} m a {mean:0.0}% com área de escape",
+                        "A caixa de retenção atende a descida – confira o comprimento pela velocidade de entrada no relatório da área de escape.", "", endP, ids: RoadIds(r));
+            }
+        }
+        foreach (var r in net.Roads.Where(r => Hierarquia.Rank(r.Hierarchy) >= 5 || r.Hierarchy == HierarquiaViaria.Estrada))
+        {
+            if (r.Axis.Length < 1000 || r.SpeedKmh < 70) continue;
+            var covered = net.RumbleStrips.Any(x => x.Path.Points.Any(p => Math.Abs(r.Axis.Project(p).Signed) < Math.Max(r.RightWidth, r.LeftWidth) + 4));
+            if (!covered)
+                Add(Gravidade.Informacao, "Segurança", $"{r.Name}: via de {r.SpeedKmh:0} km/h sem sonorizador longitudinal",
+                    "Saídas de pista por sono ou distração são o principal tipo de acidente fatal em rodovias; sonorizadores no bordo/acostamento reduzem 20 a 40 % delas (FHWA).",
+                    "Insira Sonorizador Longitudinal no acostamento (fresado) ou linha de bordo perfilada; no eixo de pistas simples, contra colisões frontais.",
+                    r.Axis.PointAt(r.Axis.Length / 2), ids: RoadIds(r));
+        }
+
+        // ------------------------------------------------------------ largura variável, ônibus e faixas auxiliares
+        foreach (var r in net.Roads.Where(r => r.NarrowestAt != null))
+        {
+            if (r.MinLaneWidth < 2.7)
+                Add(Gravidade.Atencao, "Geometria", $"{r.Name}: estreitamento deixa faixas de {r.MinLaneWidth:0.00} m",
+                    $"No ponto mais estreito a pista tem {r.MinCarriageWidth:0.00} m entre meios-fios. Faixas abaixo de 2,70 m reduzem a capacidade e não comportam ônibus e caminhões lado a lado.",
+                    "Reduza o número de faixas no trecho (com transição e LBO/zebrado) ou recupere a largura.", r.Axis.PointAt(r.NarrowestAt!.Value), ids: RoadIds(r));
+            else if (r.MinCarriageWidth < r.CarriageWidth - 0.3)
+                Add(Gravidade.Informacao, "Capacidade", $"{r.Name}: largura variável ({r.MinCarriageWidth:0.00} a {r.CarriageWidth:0.00} m)",
+                    $"O simulador usa a faixa mais estreita ({r.MinLaneWidth:0.00} m) nos trechos em que ela ocorre.", "", r.Axis.PointAt(r.NarrowestAt!.Value), ids: RoadIds(r));
+        }
+        foreach (var lr in res.Links.Values)
+        {
+            var l = lr.Link;
+            foreach (var (at, bay, id) in l.BusStops.Where(b => !b.Bay))
+            {
+                if (l.Lanes == 1 && Hierarquia.Rank(l.Road.Hierarchy) >= 3 && lr.Volume > 400)
+                    Add(Gravidade.Atencao, "Capacidade", $"{l.Name}: ponto de ônibus na única faixa ({lr.Volume:0} veh/h)",
+                        $"Com {res.Options.BusesPerHourPerStop:0} ônibus/h e {res.Options.BusDwell:0} s de embarque, a faixa fica bloqueada {res.Options.BusesPerHourPerStop * res.Options.BusDwell / 36:0.0}% do tempo e forma fila atrás do ônibus.",
+                        "Crie baia de ônibus (Nova Via / Editar via → Recuos) ou faixa exclusiva.", l.Path.PointAt(at), link: l.Index, ids: new[] { id });
+                var toEnd = l.Length - at;
+                if (toEnd < 30 && toEnd >= 0)
+                    Add(Gravidade.Informacao, "Segurança", $"{l.Name}: ponto de ônibus a {toEnd:0} m do cruzamento",
+                        "Ponto junto à esquina, antes do cruzamento, esconde o pedestre que atravessa na frente do ônibus e bloqueia a conversão à direita.",
+                        "Prefira o ponto depois do cruzamento (far-side) ou afaste 30 m da esquina.", l.Path.PointAt(at), link: l.Index, ids: new[] { id });
+            }
+        }
+        foreach (var nr in res.Nodes.Values.Where(n => !n.Node.IsZone && n.Node.Kind is TipoNo.Intersecao or TipoNo.CruzamentoSemControle))
+        {
+            var nd = nr.Node;
+            foreach (var a in nr.Approaches)
+            {
+                var l = net.Links[a.Link];
+                var right = a.Movements.GetValueOrDefault(Giro.Direita);
+                if (right >= 300 && l.DecelLane <= 0 && !nd.RightTurnIslands && l.Road.SpeedKmh >= 60)
+                    Add(Gravidade.Atencao, "Capacidade", $"{nd.Label}: {right:0} veh/h convertem à direita vindo de {a.Name}",
+                        $"A {l.Road.SpeedKmh:0} km/h, quem desacelera para converter freia na faixa direta (colisão traseira) e reduz a capacidade.",
+                        "Crie faixa de desaceleração (Recuos da via) ou ilha de conversão à direita.", nd.Pos, nd.Index, a.Link, ids: new[] { nd.SourceId });
+                if (a.LeftVolume >= 100 && !nd.LeftPockets && l.Lanes == 1 && (l.Road.TwoWay))
+                    Add(Gravidade.Atencao, "Capacidade", $"{nd.Label}: conversão à esquerda sem bolsão ({a.LeftVolume:0} veh/h de {a.Name})",
+                        "Quem espera para converter à esquerda bloqueia a única faixa – filas e colisões traseiras.",
+                        "Ative os bolsões de conversão à esquerda na interseção (Editar interseção).", nd.Pos, nd.Index, a.Link, ids: new[] { nd.SourceId });
+            }
+        }
+
+        // ------------------------------------------------------------ segurança: conflitos e acidentes previstos
+        foreach (var (idx, sf) in res.Safety.Where(x => x.Value.CrashesPerYear > 0))
+        {
+            var nr = res.Nodes[idx];
+            var nd = nr.Node;
+            if (sf.CrashesPerYear >= 4)
+                Add(sf.CrashesPerYear >= 8 ? Gravidade.Critico : Gravidade.Atencao, "Segurança",
+                    $"{nd.Label}: {sf.CrashesPerYear:0.0} acidentes/ano previstos ({sf.Total} pontos de conflito)",
+                    $"Modelo {sf.Model}, VDM principal {sf.AadtMajor:0} e secundária {sf.AadtMinor:0} (volume da hora ÷ K = {res.Options.KFactor:0.00}). " +
+                    $"≈ {sf.InjuryCrashesPerYear:0.0}/ano com vítimas. Estimativa sem calibração local – use para comparar alternativas.",
+                    nr.Control == ControleNo.Rotatoria ? "Reforce a deflexão das entradas e a sinalização de preferência."
+                        : nr.Control == ControleNo.Semaforo ? "Proteja as conversões à esquerda, avalie rotatória ou reduza a velocidade de aproximação."
+                        : "Avalie rotatória (menos pontos de conflito e menor velocidade) ou semáforo, conforme os volumes.",
+                    nd.Pos, nd.Index, ids: new[] { nd.SourceId });
+        }
+
         // Junta os repetidos (mesmo problema no mesmo lugar, p. ex. os dois lados da via) e ordena: críticos primeiro.
         var sorted = d.GroupBy(x => (x.Title, x.Node, x.Link))
             .Select(g => g.Count() == 1 ? g.First() : new TrafficDiagnostic
