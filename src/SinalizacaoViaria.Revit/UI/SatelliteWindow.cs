@@ -40,6 +40,11 @@ public sealed class SatelliteWindow : Window
     private readonly TextBox _height = new() { Text = "600" };
     private readonly TextBox _res = new() { Text = "0,30" };
     private readonly TextBox _alt = new();
+    private readonly TextBox _north = new();
+    private readonly CheckBox _useProjectNorth = new() { Content = "Usar o Norte do projeto (0°) – ignorar o ângulo lido" };
+    private readonly TextBlock _altWarn = Warn();
+    private readonly TextBlock _northWarn = Warn();
+    private readonly TextBlock _centerWarn = Warn();
     private readonly ComboBox _anchor = new();
     private readonly CheckBox _resetOrigin = new() { Content = "Redefinir a origem geográfica (as imagens anteriores deixam de encaixar)" };
     private readonly CheckBox _replace = new() { Content = "Substituir a imagem anterior", IsChecked = true };
@@ -70,7 +75,8 @@ public sealed class SatelliteWindow : Window
 
         _source.Items.Add(SatelliteSource.Google.Nome + " (foto aérea – chave própria)");
         _source.Items.Add(SatelliteSource.Osm.Nome + " – é mapa, não foto de satélite");
-        _source.SelectedIndex = PluginContext.Settings.LastUsed.TryGetValue("satelite:fonte", out var f) && f == "osm" ? 1 : 0;
+        // Sem chave do Google gravada, abre no OpenStreetMap (não exige chave).
+        _source.SelectedIndex = string.IsNullOrWhiteSpace(GoogleKeyStore.Key) || PluginContext.Settings.LastUsed.TryGetValue("satelite:fonte", out var f) && f == "osm" ? 1 : 0;
         var stored = ctx.Stored;
         var lat = stored?.Latitude ?? ctx.SiteLatitude;
         var lon = stored?.Longitude ?? ctx.SiteLongitude;
@@ -80,7 +86,14 @@ public sealed class SatelliteWindow : Window
             (lat, lon) = stored.ModelToGeo(ctx.ViewCenter);
         }
         _center.Text = FormattableString.Invariant($"{lat:0.000000}, {lon:0.000000}");
-        _alt.Text = UiHelpers.F(stored?.Altitude ?? ctx.SiteAltitude, "0");
+        // A elevação do local do Revit pode vir sem significado (ex.: 8633): fora de −500…6000 m vira 0 com aviso.
+        _alt.Text = UiHelpers.F(GeoReference.SanitizeAltitude(stored?.Altitude ?? ctx.SiteAltitude, out var altWarn), "0");
+        _altWarn.Text = altWarn ?? "";
+        var northDeg = GeoReference.NorthAngleToDegrees(stored?.NorthAngle ?? ctx.NorthAngle);
+        _north.Text = UiHelpers.F(northDeg, "0.00");
+        _north.ToolTip = $"Ângulo lido do projeto (Gerenciar → Local → Posição): {UiHelpers.F(GeoReference.NorthAngleToDegrees(ctx.NorthAngle), "0.00")}°. " +
+                         "Positivo = anti-horário. Confira com o valor do Revit ou digite o correto.";
+        if (stored != null) _north.IsEnabled = _useProjectNorth.IsEnabled = false;   // fixo pela origem gravada
         if (PluginContext.Settings.LastUsed.TryGetValue("satelite:area", out var area) && area.Split('x') is { Length: 3 } a)
         {
             _width.Text = a[0];
@@ -105,10 +118,12 @@ public sealed class SatelliteWindow : Window
         });
         form.Children.Add(Row("Fonte", _source));
         form.Children.Add(Row("Centro (lat, lon)", _center, "Cole o texto copiado do Google Maps (clique com o botão direito no local → copiar as coordenadas), ex.: -23.550520, -46.633308"));
+        form.Children.Add(_centerWarn);
         form.Children.Add(Row("Largura (m)", _width, "Até 3000 m."));
         form.Children.Add(Row("Altura (m)", _height, "Até 3000 m."));
         form.Children.Add(Row("Resolução (m/px)", _res, "0,30 m/px por padrão; o zoom da fonte é escolhido por ela."));
-        form.Children.Add(Row("Altitude média (m)", _alt, "Altitude do local: as medidas no Revit valem no terreno (a 800 m, 12,5 cm/km a mais que no elipsoide)."));
+        form.Children.Add(Row("Altitude média (m)", _alt, "Altitude do local: só afeta o fator de escala (a 800 m, 12,5 cm/km a mais que no elipsoide) – nunca impede a imagem."));
+        form.Children.Add(_altWarn);
         if (stored == null) form.Children.Add(Row("Posição no projeto", _anchor, "Ponto do modelo que recebe o centro da primeira imagem (a origem geográfica do projeto)."));
         else
         {
@@ -121,12 +136,16 @@ public sealed class SatelliteWindow : Window
             form.Children.Add(_resetOrigin);
             if (stored.LastImageElements.Count > 0) form.Children.Add(_replace);
         }
-        var north = (stored?.NorthAngle ?? ctx.NorthAngle) * 180 / Math.PI;
+        form.Children.Add(Row("Norte verdadeiro (°)", _north));
         form.Children.Add(new TextBlock
         {
-            Text = Math.Abs(north) < 0.001 ? "Norte verdadeiro = Norte do projeto." : $"Norte verdadeiro girado {north:0.00}° em relação ao Norte do projeto – a imagem sai no Norte verdadeiro.",
-            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0), Foreground = Brushes.DimGray,
+            Text = $"Lido do projeto: {UiHelpers.F(GeoReference.NorthAngleToDegrees(ctx.NorthAngle), "0.00")}° (Gerenciar → Local → Posição → Ângulo para o Norte verdadeiro). " +
+                   (stored != null ? "Fixado pela origem geográfica gravada." : "A imagem sai girada por este ângulo; 0° = Norte verdadeiro igual ao Norte do projeto."),
+            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(150, 0, 0, 2), Foreground = Brushes.DimGray,
         });
+        _useProjectNorth.Margin = new Thickness(150, 0, 0, 0);
+        form.Children.Add(_useProjectNorth);
+        form.Children.Add(_northWarn);
         var keyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
         var cfg = new Button { Content = "Chave do Google…", Margin = new Thickness(0) };
         cfg.Click += (_, _) => { UiHelpers.ShowModal(new SettingsWindow()); Refresh(); };
@@ -155,7 +174,9 @@ public sealed class SatelliteWindow : Window
         root.Children.Add(buttons);
         Content = root;
 
-        foreach (var tb in new[] { _center, _width, _height, _res, _alt }) tb.TextChanged += (_, _) => { _debounce.Stop(); _debounce.Start(); };
+        _useProjectNorth.Checked += (_, _) => { _north.IsEnabled = false; Refresh(); };
+        _useProjectNorth.Unchecked += (_, _) => { _north.IsEnabled = _ctx.Stored == null; Refresh(); };
+        foreach (var tb in new[] { _center, _width, _height, _res, _alt, _north }) tb.TextChanged += (_, _) => { _debounce.Stop(); _debounce.Start(); };
         _source.SelectionChanged += (_, _) => Refresh();
         _anchor.SelectionChanged += (_, _) => Refresh();
         _resetOrigin.Checked += (_, _) => Refresh();
@@ -170,6 +191,11 @@ public sealed class SatelliteWindow : Window
         };
         Loaded += (_, _) => Refresh();
     }
+
+    private static TextBlock Warn() => new()
+    {
+        TextWrapping = TextWrapping.Wrap, Margin = new Thickness(150, 0, 0, 2), Foreground = new SolidColorBrush(Color.FromRgb(0xA8, 0x56, 0x1F)),
+    };
 
     private static FrameworkElement Row(string label, FrameworkElement input, string? hint = null)
     {
@@ -188,9 +214,20 @@ public sealed class SatelliteWindow : Window
     /// <summary>Georreferência e centro (modelo) com os valores da janela.</summary>
     private (GeoReference Geo, Vec2 Center) Inputs()
     {
+        _centerWarn.Text = "";
         if (!GeoReference.TryParseLatLon(_center.Text, out var lat, out var lon))
-            throw new FormatException("Centro inválido: use \"latitude, longitude\" em graus decimais (ex.: -23.550520, -46.633308).");
-        var alt = UiHelpers.Parse(_alt, 0, "Altitude", -500, 6000);
+        {
+            _centerWarn.Text = "Centro inválido: use \"latitude, longitude\" em graus decimais (ex.: -23.550520, -46.633308).";
+            throw new FormatException(_centerWarn.Text);
+        }
+        // Altitude e Norte nunca bloqueiam: valor inválido vira o padrão, com aviso ao lado do campo.
+        var alt = GeoReference.SanitizeAltitude(UiHelpers.ParseOpt(_alt.Text), out var altWarn);
+        _altWarn.Text = altWarn ?? "";
+        _northWarn.Text = "";
+        var northAngle = _ctx.NorthAngle;
+        if (_useProjectNorth.IsChecked == true) northAngle = 0;
+        else if (UiHelpers.ParseOpt(_north.Text) is { } nd) northAngle = GeoReference.NorthAngleFromDegrees(nd);
+        else _northWarn.Text = $"Ângulo inválido: usando o lido do projeto ({UiHelpers.F(GeoReference.NorthAngleToDegrees(_ctx.NorthAngle), "0.00")}°).";
         var stored = _ctx.Stored;
         if (stored != null && _resetOrigin.IsChecked != true)
         {
@@ -206,7 +243,7 @@ public sealed class SatelliteWindow : Window
         var origin = stored == null && _anchor.SelectedIndex == 1 ? Vec2.Zero : _ctx.ViewCenter;
         var g2 = new GeoReference
         {
-            Latitude = lat, Longitude = lon, Altitude = alt, NorthAngle = _ctx.NorthAngle, OriginX = origin.X, OriginY = origin.Y,
+            Latitude = lat, Longitude = lon, Altitude = alt, NorthAngle = northAngle, OriginX = origin.X, OriginY = origin.Y,
             LastImageElements = stored?.LastImageElements ?? new(),
         };
         return (g2, origin);
@@ -240,6 +277,7 @@ public sealed class SatelliteWindow : Window
         }
         catch (FormatException ex)
         {
+            // Só centro/área/resolução inválidos impedem a imagem – a mensagem fica também ao lado do campo.
             _info.Text = ex.Message;
             _go.IsEnabled = _previewBtn.IsEnabled = false;
         }

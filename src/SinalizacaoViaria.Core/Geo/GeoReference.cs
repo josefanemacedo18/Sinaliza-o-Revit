@@ -58,6 +58,32 @@ public sealed class GeoReference
         return GroundToModel(new Vec2(e, n) / ElevationFactor);
     }
 
+    public const double MinAltitude = -500;
+    public const double MaxAltitude = 6000;
+
+    /// <summary>
+    /// Altitude utilizável: ausente ou fora de −500…6000 m (ex.: elevação do local do Revit sem significado) vira 0 com
+    /// aviso – a altitude só muda o fator de escala (12,5 cm/km a 800 m), nunca impede a imagem.
+    /// </summary>
+    public static double SanitizeAltitude(double? value, out string? warning)
+    {
+        warning = null;
+        if (value is not { } v || double.IsNaN(v)) { warning = "Altitude não informada: usando 0 m (só afeta o fator de escala, ~1,6 cm/km a cada 100 m)."; return 0; }
+        if (v < MinAltitude || v > MaxAltitude) { warning = $"Altitude {v:0} m fora de {MinAltitude:0}…{MaxAltitude:0} m: usando 0 m. Informe a altitude real do local."; return 0; }
+        return v;
+    }
+
+    /// <summary>Ângulo do Norte (graus, como em Gerenciar → Local → Posição) → radianos em (−π, π].</summary>
+    public static double NorthAngleFromDegrees(double degrees)
+    {
+        var d = degrees % 360;
+        if (d > 180) d -= 360;
+        if (d <= -180) d += 360;
+        return d * Math.PI / 180;
+    }
+
+    public static double NorthAngleToDegrees(double radians) => NorthAngleFromDegrees(radians * 180 / Math.PI) * 180 / Math.PI;
+
     public string ToJson() => JsonSerializer.Serialize(this, JsonConfig.Compact);
 
     public static GeoReference? FromJson(string? json)

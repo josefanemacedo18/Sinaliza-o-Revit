@@ -244,4 +244,44 @@ public class X31GeoTests
         Assert.Equal(lat, la, 9);
         Assert.Equal(lon, lo, 9);
     }
+
+    [Theory]
+    [InlineData(8633.0)]          // valor visto na captura (elevação do local do Revit sem significado)
+    [InlineData(-900.0)]
+    [InlineData(double.NaN)]
+    public void Altitude_OutOfRangeOrMissing_BecomesZeroWithWarning_AndThePlanStillWorks(double value)
+    {
+        var alt = GeoReference.SanitizeAltitude(value, out var warn);
+        Assert.Equal(0, alt);
+        Assert.NotNull(warn);
+        Assert.Equal(0, GeoReference.SanitizeAltitude(null, out var w2));
+        Assert.NotNull(w2);
+        Assert.Equal(812, GeoReference.SanitizeAltitude(812, out var ok));
+        Assert.Null(ok);
+        // O plano continua válido com a altitude saneada.
+        var geo = new GeoReference { Latitude = -6.344007, Longitude = -47.396659, Altitude = alt };
+        var plan = SatellitePlan.Create(geo, SatelliteSource.Osm, Vec2.Zero, 800, 600, 0.3);
+        Assert.True(plan.PixelWidth > 0 && plan.TileCount > 0);
+    }
+
+    [Theory]
+    [InlineData(0.0, 0.0)]
+    [InlineData(30.0, 30.0)]
+    [InlineData(-45.0, -45.0)]
+    [InlineData(315.0, -45.0)]
+    [InlineData(390.0, 30.0)]
+    public void NorthAngle_DegreesConvertToRadiansAndBack(double degrees, double expected)
+    {
+        var rad = GeoReference.NorthAngleFromDegrees(degrees);
+        Assert.Equal(expected * Math.PI / 180, rad, 12);
+        Assert.Equal(expected, GeoReference.NorthAngleToDegrees(rad), 9);
+        // 30°: o Norte verdadeiro fica, no modelo, na direção (sin 30°, cos 30°).
+        if (expected == 30)
+        {
+            var geo = new GeoReference { Latitude = -6.34, Longitude = -47.39, NorthAngle = rad };
+            var n = (geo.GeoToModel(-6.335, -47.39) - geo.Origin).Normalized();
+            Assert.Equal(0.5, n.X, 3);
+            Assert.Equal(Math.Sqrt(3) / 2, n.Y, 3);
+        }
+    }
 }
