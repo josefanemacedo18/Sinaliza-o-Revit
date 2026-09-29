@@ -162,4 +162,76 @@ public class V29SimTests
         var sim = TrafficSimulation.Run(TrafficAnalysis.Run(net, new TrafficOptions { Demand = NivelDemanda.Baixa, SimSeconds = 300, WarmupSeconds = 60 }));
         Assert.True(sim.Completed > 0);
     }
+
+    /// <summary>Avenida (coletora) com três cruzamentos semaforizados a 250 m.</summary>
+    private static TrafficNetwork Corridor(out string avenue)
+    {
+        var s = new Scene();
+        var a = s.Road(1, new Vec2(-500, 0), new Vec2(500, 0));
+        avenue = a.Id;
+        foreach (var x in new[] { -250.0, 0, 250 })
+        {
+            var b = s.Road(0, new Vec2(x, -250), new Vec2(x, 250));
+            s.Defs.Add(new IntersectionDefinition { Node = new Vec2(x, 0), RoadIds = { a.Id, b.Id }, MainRoadId = a.Id, Control = ControleIntersecao.Semaforo });
+        }
+        return s.Network();
+    }
+
+    [Fact]
+    public void Advisor_RecommendsBetterTimingForAPoorlyTimedSignal()
+    {
+        var net = Crossing(1);
+        var opt = new TrafficOptions { Demand = NivelDemanda.Media };
+        var key = net.Nodes.Single(n => n.Kind == TipoNo.Intersecao).Key;
+        opt.Nodes.Add(new NodeOverride { Node = key, Cycle = 160 });     // ciclo longo demais
+        var adv = TrafficSignalAdvisor.Recommend(net, opt, new[] { key });
+        var a = Assert.Single(adv);
+        Assert.True(a.Cycle < 160, $"ciclo {a.Cycle}");
+        Assert.True(a.DelayAfter < a.DelayBefore, $"{a.DelayBefore} → {a.DelayAfter}");
+        TrafficSignalAdvisor.Apply(opt, adv);
+        var res = TrafficAnalysis.Run(net, opt);
+        var nr = res.Nodes.Values.Single(n => n.Node.Key == key);
+        Assert.Equal(a.Cycle, nr.Cycle, 0);
+        Assert.Contains("verdes fixos", nr.PlanSource);
+        Assert.False(string.IsNullOrWhiteSpace(TrafficSignalAdvisor.Text(adv)));
+    }
+
+    [Fact]
+    public void Advisor_CoordinatesAllSignalsOfARoad()
+    {
+        var net = Corridor(out var avenue);
+        var opt = new TrafficOptions { Demand = NivelDemanda.Pico };
+        var res = TrafficAnalysis.Run(net, opt);
+        var chain = TrafficSignalAdvisor.SignalsOnRoad(res, avenue);
+        Assert.Equal(3, chain.Count);
+        var adv = TrafficSignalAdvisor.Recommend(net, opt, chain.Select(n => n.Key).ToList(), avenue);
+        Assert.Equal(3, adv.Count);
+        Assert.Single(adv.Select(a => a.Cycle).Distinct());                   // ciclo comum
+        Assert.Equal(2, adv.Count(a => a.Offset > 0));                         // defasagens da onda verde
+        Assert.Contains(adv, a => a.Offset == 0);
+        TrafficSignalAdvisor.Apply(opt, adv);
+        var after = TrafficAnalysis.Run(net, opt);
+        foreach (var a in adv) Assert.Equal(a.Offset, after.Nodes.Values.Single(n => n.Node.Key == a.NodeKey).Offset, 0);
+    }
+
+    [Fact]
+    public void CrossingSignal_CreatedInTheScenario_StopsTrafficAndCostsCapacity()
+    {
+        var net = Corridor(out _);
+        var opt = new TrafficOptions { Demand = NivelDemanda.Media };
+        var baseRes = TrafficAnalysis.Run(net, opt);
+        var link = net.Links.First(l => l.Road.Id == net.Roads[0].Id && l.Forward && l.Length > 200);
+        var p = link.Path.PointAt(link.Length / 2);
+        opt.Crossings.Add(new CrossingSignal { X = p.X, Y = p.Y + 1, Cycle = 60, PedGreen = 15, Clearance = 4, Offset = 10 });
+        var res = TrafficAnalysis.Run(net, opt);
+        var cp = Assert.Single(link.CrossingPlans);
+        Assert.Equal(60, cp.Cycle);
+        Assert.Equal(19, cp.Red);
+        Assert.True(link.Capacity < link.BaseCapacity * 0.7);
+        Assert.True(res.Links[link.Index].TravelTime > baseRes.Links[link.Index].TravelTime);
+        // Desligado no cenário: some.
+        opt.Crossings[0].Enabled = false;
+        TrafficAnalysis.Run(net, opt);
+        Assert.Empty(link.CrossingPlans);
+    }
 }

@@ -243,8 +243,8 @@ public static class TrafficSimulation
         // Pedestres nas travessias do meio da quadra: intervalos ocupados.
         var peds = new Dictionary<(int Link, int K), List<(double From, double To)>>();
         foreach (var l in net.Links)
-            foreach (var at in l.SignalizedCrossings)
-                if (!l.Crosswalks.Any(c => Math.Abs(c.At - at) < 3)) l.Crosswalks.Add((at, l.Road.CarriageWidth));
+            foreach (var cp in l.CrossingPlans)
+                if (!l.Crosswalks.Any(c => Math.Abs(c.At - cp.At) < 3)) l.Crosswalks.Add((cp.At, l.Road.CarriageWidth));
         foreach (var l in net.Links)
             for (int k = 0; k < l.Crosswalks.Count; k++)
             {
@@ -252,11 +252,10 @@ public static class TrafficSimulation
                 var t = 0.0;
                 var dur = l.Crosswalks[k].Width / 1.2 + 2;
                 var cwAt = l.Crosswalks[k].At;
-                if (l.SignalizedCrossings.Any(sx => Math.Abs(sx - cwAt) < 3))
+                if (l.CrossingPlans.FirstOrDefault(cp => Math.Abs(cp.At - cwAt) < 3) is { } plan)
                 {
-                    // Travessia semaforizada: vermelho para os veículos 22 s a cada 75 s (18 s de verde de pedestres + 4 s).
-                    var phase = (cwAt * 7.3) % 75;
-                    for (var c0 = -phase; c0 < total; c0 += 75) list.Add((c0, c0 + 22));
+                    // Travessia semaforizada: vermelho dos veículos (verde de pedestres + entreverdes) a cada ciclo, com a defasagem.
+                    for (var c0 = plan.Offset - plan.Cycle * Math.Ceiling((plan.Offset + 1) / plan.Cycle); c0 < total; c0 += plan.Cycle) list.Add((c0, c0 + plan.Red));
                     peds[(l.Index, k)] = list;
                     continue;
                 }

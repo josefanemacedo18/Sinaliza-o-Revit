@@ -34,9 +34,30 @@ public sealed class NodeOverride
     /// <summary>Verdes fixos de cada fase (s), na ordem das fases.</summary>
     public List<double>? Greens { get; set; }
     public List<TurnCount> Turns { get; set; } = new();
+    /// <summary>Entreverdes por fase (amarelo + vermelho geral), s – nulo = 4 s (ou o do plano gravado).</summary>
+    public double? Intergreen { get; set; }
+    /// <summary>Defasagem fixa do início do ciclo (s) – nula = 0 ou a da coordenação.</summary>
+    public double? Offset { get; set; }
 
     [JsonIgnore]
-    public bool IsEmpty => Control == null && Cycle == null && (Greens == null || Greens.Count == 0) && Turns.Count == 0;
+    public bool IsEmpty => Control == null && Cycle == null && (Greens == null || Greens.Count == 0) && Turns.Count == 0 && Intergreen == null && Offset == null;
+}
+
+/// <summary>
+/// Semáforo de travessia de pedestres no meio da quadra (cenário): posição (m, coordenadas do projeto), ativo ou não
+/// (desligar um semáforo existente), ciclo, verde de pedestres, entreverdes e defasagem.
+/// </summary>
+public sealed class CrossingSignal
+{
+    public double X { get; set; }
+    public double Y { get; set; }
+    public bool Enabled { get; set; } = true;
+    public double Cycle { get; set; } = 75;
+    public double PedGreen { get; set; } = 18;
+    public double Clearance { get; set; } = 4;
+    public double Offset { get; set; }
+    [JsonIgnore]
+    public double VehicleRed => Math.Min(Cycle - 5, PedGreen + Clearance);
 }
 
 /// <summary>Cenário de simulação salvo no projeto: todas as opções e ajustes por cruzamento, com nome e notas.</summary>

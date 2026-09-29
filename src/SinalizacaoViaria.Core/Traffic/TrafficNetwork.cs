@@ -172,6 +172,13 @@ public sealed class TrafficLink
     public bool TrucksForbidden { get; set; }
     /// <summary>Travessias de pedestres semaforizadas no meio da quadra (posição ao longo do trecho).</summary>
     public List<double> SignalizedCrossings { get; } = new();
+    /// <summary>
+    /// Tempos das travessias semaforizadas do trecho no cenário (ciclo, vermelho dos veículos, defasagem): as do projeto
+    /// com o plano padrão ou o do cenário, e as criadas no simulador.
+    /// </summary>
+    public List<CrossingPlan> CrossingPlans { get; } = new();
+    /// <summary>Capacidade do trecho sem as travessias semaforizadas (veh/h).</summary>
+    public double BaseCapacity { get; set; }
     /// <summary>Quantas faixas ficam abertas no ponto mais restrito do trecho.</summary>
     public int MinOpenLanes => Math.Max(0, Lanes - (ClosedLanes.Count == 0 ? 0 : ClosedLanes.GroupBy(c => c.Lane).Count()));
     /// <summary>A faixa está fechada na posição <paramref name="s"/>.</summary>
@@ -220,6 +227,9 @@ public sealed class TrafficNetwork
 }
 
 /// <summary>Monta a rede viária a partir das definições do projeto (vias, interseções, rotatórias, balões, placas...).</summary>
+/// <summary>Travessia semaforizada no meio da quadra: estaca no trecho, ciclo, vermelho dos veículos e defasagem (s).</summary>
+public sealed record CrossingPlan(double At, double Cycle, double Red, double Offset, Vec2 Pos);
+
 public static class TrafficNetworkBuilder
 {
     /// <param name="axisOf">Eixo resolvido (m) e cota base de uma marca com caminho; nulo se não resolvido.</param>
@@ -612,6 +622,7 @@ public static class TrafficNetworkBuilder
         // Faixas fechadas (zebrado, cones, faixa exclusiva pintada): o trecho vale pelo gargalo.
         if (lk.ClosedLanes.Count > 0) lk.Capacity *= (double)lk.MinOpenLanes / Math.Max(1, lk.Lanes);
         // Travessia semaforizada no meio da quadra: o trecho só escoa no verde dos veículos (ciclo 75 s, 18 s de pedestres + 4 s).
+        lk.BaseCapacity = lk.Capacity;
         foreach (var _ in lk.SignalizedCrossings) lk.Capacity *= 53.0 / 75.0;
         if (lk.Closed || lk.MinOpenLanes == 0) { lk.Capacity = 1; lk.Closed = true; lk.ClosedWhy ??= "todas as faixas fechadas"; }
         // Raio mínimo de curva no trecho (três pontos a cada 5 m).

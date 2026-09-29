@@ -39,6 +39,9 @@ public sealed class TrafficMap : FrameworkElement
     public Vec2? Marker { get; set; }
 
     public event Action<int?, int?>? SelectionChanged;
+    /// <summary>Modo "escolher ponto": o clique devolve o ponto do projeto em vez de selecionar.</summary>
+    public bool PickMode { get; set; }
+    public event Action<Vec2>? PointPicked;
 
     /// <summary>Desenha a planta real do projeto (pisos e pintura gerados pelo plugin); senão, o esquema pelo eixo.</summary>
     public bool RealPlan { get; set; } = true;
@@ -517,6 +520,32 @@ public sealed class TrafficMap : FrameworkElement
             }
         }
 
+        // Semáforos de travessia no meio da quadra (um ícone por travessia; vermelho/verde dos veículos no instante).
+        var drawnX = new List<Vec2>();
+        foreach (var l in net.Links)
+            foreach (var cp in l.CrossingPlans)
+            {
+                if (drawnX.Any(q => q.DistanceTo(cp.Pos) < 3)) continue;
+                drawnX.Add(cp.Pos);
+                var d = l.Path.TangentAt(cp.At);
+                var side = new Vec2(d.Y, -d.X) * (Math.Max(l.Road.RightWidth, l.Road.LeftWidth) + 0.8);
+                Color c;
+                if (frame == null) c = Color.FromRgb(0x44, 0x44, 0x44);
+                else
+                {
+                    var t = SimTime + _res.Options.WarmupSeconds;
+                    var tc = ((t - cp.Offset) % cp.Cycle + cp.Cycle) % cp.Cycle;
+                    c = tc < cp.Red ? Color.FromRgb(0xE5, 0x39, 0x35) : tc > cp.Cycle - 3 ? Color.FromRgb(0xFF, 0xB3, 0x00) : Color.FromRgb(0x00, 0xC8, 0x53);
+                }
+                foreach (var sgn in new[] { 1.0, -1.0 })
+                {
+                    var p = S(cp.Pos + side * sgn);
+                    var r = Math.Max(3, 1.0 * _scale);
+                    dc.DrawRoundedRectangle(B(Color.FromRgb(0x1A, 0x1A, 0x1A)), null, new Rect(p.X - r - 1.5, p.Y - r - 1.5, 2 * r + 3, 2 * r + 3), 2, 2);
+                    dc.DrawEllipse(B(c), null, p, r, r);
+                }
+            }
+
         // Veículos e sinalização.
         (int Count, int Stopped, double MeanKmh) hud = (0, 0, 0);
         if (ShowVehicles && _sim != null && !double.IsNaN(SimTime) && _sim.Frames.Count > 0) hud = DrawVehicles(dc);
@@ -900,7 +929,9 @@ public sealed class TrafficMap : FrameworkElement
         ReleaseMouseCapture();
         var p = e.GetPosition(this);
         _drag = null;
-        if (!_moved) HitTest(p);
+        if (_moved) return;
+        if (PickMode) { PointPicked?.Invoke(W(p)); return; }
+        HitTest(p);
     }
 
     protected override void OnMouseRightButtonUp(MouseButtonEventArgs e)

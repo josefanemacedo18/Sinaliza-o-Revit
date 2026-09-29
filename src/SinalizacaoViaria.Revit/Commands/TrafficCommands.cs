@@ -30,8 +30,10 @@ public sealed class CmdSimuladorTrafego : CommandBase
         while (w.ReopenWith != null)
         {
             var sc = w.ReopenWith;
+            Vec2? picked = null;
+            if (w.PickSignalRequested) picked = PickSignalPoint(uidoc);
             net = BuildNetwork(doc);
-            w = new TrafficWindow(net, doc.Title, new TrafficHost(uidoc)) { InitialScenario = sc };
+            w = new TrafficWindow(net, doc.Title, new TrafficHost(uidoc)) { InitialScenario = sc, PickedPoint = picked };
             shown = UiHelpers.ShowModal(w);
         }
         if (shown == true && w.SelectIds.Count > 0)
@@ -46,6 +48,30 @@ public sealed class CmdSimuladorTrafego : CommandBase
             else TaskDialog.Show(AppTitle, "Os elementos deste item não foram encontrados na vista/projeto.");
         }
         return Result.Succeeded;
+    }
+
+    /// <summary>
+    /// Elemento do Revit escolhido para ser o semáforo (família de semáforo, placa, faixa de pedestres, interseção ou
+    /// qualquer elemento): o ponto dele em planta (m). ESC = nenhum.
+    /// </summary>
+    private static Vec2? PickSignalPoint(UIDocument uidoc)
+    {
+        try
+        {
+            var r = uidoc.Selection.PickObject(Autodesk.Revit.UI.Selection.ObjectType.Element,
+                "Simulador de Tráfego: clique no elemento que será o semáforo (cruzamento, faixa de pedestres, grupo focal…). ESC cancela.");
+            var e = uidoc.Document.GetElement(r);
+            XYZ? p = e?.Location switch
+            {
+                LocationPoint lp => lp.Point,
+                LocationCurve lc => lc.Curve.Evaluate(0.5, true),
+                _ => null,
+            };
+            if (p == null && e?.get_BoundingBox(null) is { } bb) p = (bb.Min + bb.Max) / 2;
+            if (p == null && r.GlobalPoint != null) p = r.GlobalPoint;
+            return p == null ? null : UnitConv.ToVec2(p);
+        }
+        catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return null; }
     }
 
     /// <summary>Rede viária a partir das definições guardadas no projeto.</summary>

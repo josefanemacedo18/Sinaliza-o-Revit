@@ -28,6 +28,8 @@ public sealed class TrafficOptions
     public Dictionary<string, double> ZoneVolumeKeys { get; set; } = new();
     /// <summary>Ajustes por cruzamento: controle, ciclo/verdes fixos e contagens de conversão.</summary>
     public List<NodeOverride> Nodes { get; set; } = new();
+    /// <summary>Semáforos de travessia no meio da quadra (criados, ajustados ou desligados no cenário).</summary>
+    public List<CrossingSignal> Crossings { get; set; } = new();
     /// <summary>Usar os planos semafóricos gravados nas interseções (senão, otimiza todos).</summary>
     public bool UseStoredPlans { get; set; } = true;
     /// <summary>Coordenar os semáforos: ciclo comum e defasagens pela progressão ("onda verde").</summary>
@@ -192,6 +194,7 @@ public static class TrafficAnalysis
         }
         foreach (var nd in net.Nodes.Where(n => n.IsZone))
             if (opt.ZoneVolumeKeys.TryGetValue(nd.Key, out var zv)) opt.ZoneVolumes[nd.Index] = zv;
+        ApplyCrossingSignals(net, opt);
         foreach (var l in net.Links) res.Links[l.Index] = new LinkResult { Link = l };
         if (net.Links.Count == 0) return res;
         BuildOD(net, opt, res);
@@ -199,12 +202,54 @@ public static class TrafficAnalysis
         ApplyTurnCounts(net, opt, res);
         foreach (var nd in net.Nodes) res.Nodes[nd.Index] = AnalyzeNode(net, opt, res, nd);
         if (opt.Coordinate) Coordinate(net, opt, res);
+        // Defasagem fixa do cenário (tem precedência sobre a da coordenação).
+        foreach (var nr in res.Nodes.Values)
+            if (nr.Phases.Count > 0 && opt.Override(nr.Node)?.Offset is { } off)
+            {
+                nr.Offset = ((off % nr.Cycle) + nr.Cycle) % nr.Cycle;
+                nr.PlanSource += $"; defasagem {nr.Offset:0} s (cenário)";
+            }
         foreach (var lr in res.Links.Values) AnalyzeLink(res, lr);
         Totals(res);
         foreach (var nr in res.Nodes.Values) res.Safety[nr.Node.Index] = TrafficSafety.Analyze(res, nr);
         res.Economics = TrafficSafety.Economics(res);
         TrafficDiagnostics.Run(res);
         return res;
+    }
+
+    /// <summary>Distância máxima (m) para associar um semáforo de travessia do cenário a um trecho.</summary>
+    public const double CrossingSnap = 6;
+
+    /// <summary>
+    /// Travessias semaforizadas do cenário em cada trecho: as do projeto (plano padrão 75 s, 22 s de vermelho) ajustadas
+    /// ou desligadas pelo cenário, mais as criadas no simulador sobre uma faixa de pedestres ou um ponto qualquer do trecho.
+    /// A capacidade do trecho passa a valer pela fração de verde dos veículos.
+    /// </summary>
+    public static void ApplyCrossingSignals(TrafficNetwork net, TrafficOptions opt)
+    {
+        foreach (var l in net.Links)
+        {
+            l.CrossingPlans.Clear();
+            var pts = new List<(double At, Vec2 P)>();
+            foreach (var at in l.SignalizedCrossings) pts.Add((at, l.Path.PointAt(at)));
+            foreach (var cs in opt.Crossings)
+            {
+                var q = new Vec2(cs.X, cs.Y);
+                var (st, signed) = l.Path.Project(q);
+                if (Math.Abs(signed) > Math.Max(l.Road.LeftWidth, l.Road.RightWidth) + CrossingSnap || st < 3 || st > l.Length - 3) continue;
+                if (!pts.Any(x => Math.Abs(x.At - st) < 4)) pts.Add((st, l.Path.PointAt(st)));
+            }
+            foreach (var (at, p) in pts.OrderBy(x => x.At))
+            {
+                var cs = opt.Crossings.Where(c => new Vec2(c.X, c.Y).DistanceTo(p) < Math.Max(l.Road.LeftWidth, l.Road.RightWidth) + CrossingSnap)
+                    .OrderBy(c => new Vec2(c.X, c.Y).DistanceTo(p)).FirstOrDefault();
+                if (cs == null) l.CrossingPlans.Add(new CrossingPlan(at, 75, 22, (at * 7.3) % 75, p));
+                else if (cs.Enabled) l.CrossingPlans.Add(new CrossingPlan(at, Math.Clamp(cs.Cycle, 30, 240), cs.VehicleRed, cs.Offset, p));
+            }
+            if (l.Closed || l.BaseCapacity <= 0) continue;
+            l.Capacity = l.BaseCapacity;
+            foreach (var cp in l.CrossingPlans) l.Capacity *= (cp.Cycle - cp.Red) / cp.Cycle;
+        }
     }
 
     // ------------------------------------------------------------------ demanda
@@ -725,6 +770,7 @@ public static class TrafficAnalysis
             fixedC = commonCycle;
             nr.PlanSource = $"ciclo comum da coordenação ({commonCycle:0} s)";
         }
+        if (ov?.Intergreen is { } ig) inter = Math.Clamp(ig, 2, 10);
         nr.Intergreen = inter;
         var lost = inter * Math.Max(2, phases.Count);
         var Y = phases.Sum(p => p.Y);
@@ -988,8 +1034,8 @@ public static class TrafficAnalysis
         var x = lr.X;
         var t0 = l.Length / l.FreeSpeed;
         var slow = l.SlowPoints.Sum(sp => Math.Max(0, 30 / Math.Max(1, sp.Speed) - 30 / l.FreeSpeed) * 0.5);
-        // Travessia semaforizada: atraso uniforme do vermelho (22 s em 75 s).
-        slow += l.SignalizedCrossings.Count * 0.5 * 75 * Math.Pow(22.0 / 75, 2);
+        // Travessia semaforizada: atraso uniforme do vermelho (d = C/2·(r/C)²).
+        slow += l.CrossingPlans.Sum(cp => 0.5 * cp.Cycle * Math.Pow(cp.Red / cp.Cycle, 2));
         var t = t0 * (1 + 0.15 * Math.Pow(Math.Min(x, 1.6), 4)) + slow;
         var node = res.Nodes.GetValueOrDefault(l.To);
         var d = node?.Approaches.FirstOrDefault(a => a.Link == l.Index)?.Delay ?? 0;
