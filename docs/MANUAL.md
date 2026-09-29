@@ -179,6 +179,13 @@ Os valores iniciais vêm da **velocidade da via** (DNIT – Manual de Projeto de
 *Calçada recua* = o alinhamento fica e a calçada estreita (aviso NBR 9050); desmarcado, a calçada inteira se desloca.
 O simulador de tráfego lê as baias (ônibus param fora da faixa) e as faixas auxiliares (§ 26).
 
+**Recuo numa via já criada.** **Conexões → Recuo na Via (baia / faixa auxiliar)**: clique junto ao bordo da via, no
+início do recuo e do lado dele – a janela abre com a estaca e o lado já preenchidos, os valores pela velocidade e a
+prévia sobre a seção da própria via. A via é refeita com o recuo (meio-fio, calçada, sarjeta, linhas, MVE, LCO,
+setas, placa e abrigo) mantendo eixo, greide, trechos apagados e conexões. Para **alterar ou remover** um recuo
+depois, use **Editar** sobre a marca do recuo (MVE, LCO ou setas): a janela do recuo abre direto, com a opção
+*REMOVER este recuo da via*. Também continua valendo **Editar → A via inteira → Recuos do meio-fio**.
+
 ### 2.0.3 Calçadas com níveis variáveis (topografia e edificações antigas)
 
 Selecione a calçada e informe:
@@ -197,6 +204,33 @@ Em **Configurações → Sinalização horizontal … como Piso do Revit** (liga
 legendas e vagas são criadas como **pisos finos** (uma cor = um piso com todos os contornos) assentados sobre o
 pavimento – como as calçadas e a pista. Assim dá para editar o contorno com as ferramentas do Revit, filtrar por
 material e quantificar pela área real. Desligado, volta o modo anterior (sólidos/regiões).
+
+### 2.0.5 Via nova a partir da ponta de outra (emenda concordada)
+
+Quando uma via nova começa (ou termina) exatamente na **ponta** de uma via existente – pelo ímã de conexão ou
+desenhando a partir dela – e as duas mudam de direção, o encontro vira uma **emenda concordada**, não um cruzamento:
+a pista, a sarjeta, o meio-fio, a faixa gramada, a calçada e o canteiro central seguem por uma **curva** entre os dois
+eixos (raio no eixo = o maior entre o raio de esquina da conexão e duas vezes a meia largura da seção mais larga),
+sem a cunha vazia do lado de fora nem a sobreposição
+do lado de dentro. Se as seções forem diferentes (largura de pista, calçada ou canteiro), a emenda faz a **transição
+suave de largura** (1 : 8 por lado). As **linhas pintadas continuam pela curva** (eixo, divisórias, bordos – cada
+linha liga à linha correspondente da outra via; as sem par vão até o meio da emenda). A emenda não recebe faixas de
+pedestres, retenções nem placas, e o simulador a trata como continuação livre. Deflexão acima de 60° gera um aviso
+(considere interseção em T, rotatória ou curva de raio maior). Em vias já criadas, use **Atualizar Todas**.
+
+### 2.0.6 Várias linhas de uma vez: uma malha inteira de vias
+
+Em **Sinalizar Via** / **Pista** com *Selecionar linhas existentes*, selecione todas as linhas do traçado de uma vez
+(por exemplo, uma malha desenhada com linhas de referência). O plugin separa as linhas em **vias**:
+
+* linhas encadeadas **só entre si** pela ponta (curva, deflexão) formam uma via só;
+* num nó com três ou mais linhas, as que **seguem alinhadas** (desvio até 25°) continuam a mesma via – a rua que
+  atravessa o cruzamento – e as demais viram vias próprias;
+* uma linha que termina no **meio** de outra é outra via (entroncamento em T).
+
+Cada via recebe a seção escolhida e as **interseções** são criadas em todos os encontros (T, cruz, esconsos), como se
+as vias fossem criadas uma a uma. A largura variável e os recuos, que valem para um eixo só, ficam para a edição de
+cada via (a janela avisa).
 
 ## 2.1 Hierarquia viária (CTB art. 60)
 
@@ -544,12 +578,12 @@ criada 400 m à direita de tudo o que existe no projeto:
 | Horizontal | todas as linhas do catálogo com todas as variantes, zebrados (área, faixa, com furo), setas, legendas, vagas, inscrições, MAC, canalização, ciclovias, faixas de pedestres sobre a via, cruzamento rodoferroviário |
 | Vertical | dispositivos, placas (catálogo completo ou amostra), tipos de suporte, mobiliário (ponto e linha), famílias classificadas |
 | Calçadas | rampas (todos os tipos, com recorte), orelha, áreas de calçada, canteiros, moderação, piso tátil, via férrea, drenagem (todos os tipos e em série) |
-| Largura e recuos / Segurança | via com largura variável e estreitamento do lote, baia de ônibus + faixas de desaceleração e aceleração, calçada com inclinação e níveis do alinhamento, arterial × coletora com LCO, sonorizadores (todos os tipos) e área de escape |
+| Largura e recuos / Segurança | via com largura variável e estreitamento do lote, baia de ônibus + faixas de desaceleração e aceleração, calçada com inclinação e níveis do alinhamento, arterial × coletora com LCO, sonorizadores (todos os tipos) e área de escape; via nova emendada na ponta de outra em ângulo (emenda concordada); várias linhas selecionadas virando uma malha de vias com T e cruz; recuo (baia) acrescentado numa via já criada |
 | Topografia | Toposolid de teste com encosta, dois morros e um vale; vias acompanhando o terreno e suavizadas; cruzamentos no relevo; Perfil da Via em todos os modos e aplicado com obras automáticas |
 | Obras | viaduto sobre outra via, ponte no vale, passarela, túnel, trincheira, muros (todos), taludes, nós viários, terraplenagem (simulação, aplicação, mapa) |
 | Edição | editar linha/interseção/rotatória, mover eixo (atualização automática), Apagar Trecho (na via, fora da via, zebrado, sem linha de referência, devolver peças), 2D/3D, excluir, Atualizar Todas |
 | Detalhamento | detalhe de placas, anotação, legenda, cota de seção + perfil, detalhe típico, quadros, notas, norte, eixos, quantitativos e tabelas |
-| Tráfego | Simulador de Tráfego sobre a área de teste: leitura da rede, análise HCM e diagnóstico, microssimulação de 5 min, cenários (rotatória × semáforo coordenado × contagem) com comparação, cenários gravados e lidos do projeto, plano semafórico gravado na interseção, resultados nos parâmetros SV_NivelServico/SV_Trafego e mapa de níveis de serviço na planta |
+| Tráfego | Simulador de Tráfego sobre a área de teste: leitura da rede, análise HCM e diagnóstico, microssimulação de 5 min, cenários (rotatória × semáforo coordenado × contagem) com comparação, cenários gravados e lidos do projeto, plano semafórico gravado na interseção, sinalização interpretada (placas, marcas, dispositivos e semáforos associados a trechos e cruzamentos), resultados nos parâmetros SV_NivelServico/SV_Trafego e mapa de níveis de serviço na planta |
 | Verificações | pintura escondida sob o piso ou flutuando, buracos e degraus entre pisos da pista, terreno acima da pista ou sem encostar na seção, estruturas invadindo outras vias, formas sem geometria |
 
 Cada erro do plugin (inclusive os que antes só iam para o log), cada erro/aviso do Revit e cada verificação que falha
@@ -753,6 +787,13 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   plataforma, canteiro), **cotas horizontais** e total sob o perfil, **eixo**, linha do terreno, **legenda dos
   materiais** com espessuras e o título **SEÇÃO TRANSVERSAL A–A** com a escala. A letra avança sozinha (A, B, C…).
   Tudo se atualiza quando a via muda; a cadeia de cotas em planta é opcional.
+  **Caimento real** (*Desenhar o caimento real*, ligado por padrão): a pista é desenhada **em duas águas** a partir do
+  eixo com o caimento do greide da via (ou o indicado, 2 %) – ou com a **superelevação** do greide na estaca do corte –
+  e a **calçada sobe para o lote** com a inclinação da seção (ou a informada, 2 %). Os **níveis** mostram as cotas
+  reais (ex.: −0,11 na sarjeta, +0,04 no topo da guia), as setas de caimento aparecem também nas calçadas com o
+  valor de cada trecho e as cotas verticais medem o degrau real do meio-fio. O título traz a **via e a estaca do corte**
+  (ex.: *V01 – coletora – estaca 5+10,00 (110,00 m)*), também na planta; em vias de largura variável o corte usa a
+  largura daquela estaca.
 * **Cotar Seção** (cadeia em planta): cadeia de cotas com **nome de cada trecho** (calçada, meio-fio, faixa de
   rolamento, ciclofaixa, faixa de ônibus, faixa de caminhada, canteiro, estacionamento, zebrado),
   **eixo da via** em traço-ponto com a inscrição EIXO (opcionalmente dividindo as cotas em
@@ -1474,3 +1515,85 @@ acidentes previstos, CO₂, custo anual e diagnósticos críticos (★ = melhor)
 cenário. **Gravar resultados no modelo** preenche os parâmetros **SV_NivelServico** e **SV_Trafego** (cenário, volume,
 atraso, controle, ciclo, acidentes de referência) nos elementos das interseções, rotatórias e vias – use em tabelas e
 filtros de vista. O mapa mostra os pontos de ônibus (quadrado vazado = baia), as faixas auxiliares e as áreas de escape.
+
+### 26.8 Sinalização interpretada – o simulador lê o que foi projetado
+
+Toda vez que o simulador abre (ou que se clica em **Reler o projeto**), ele percorre **toda a sinalização do projeto** e
+traduz cada elemento no que ele significa para o motorista: em que trecho e em que sentido vale, em que cruzamento, em
+que faixa. A associação é feita pela **posição** e, nas placas e setas, pela **direção** para onde o elemento está
+voltado (a placa vale para o sentido de quem a vê de frente). Nada precisa ser informado à mão.
+
+**Placas (sinalização vertical de regulamentação)**
+
+| Placa | Efeito na análise e na microssimulação |
+|---|---|
+| R-1 PARE / R-2 Dê a preferência | a aproximação (cruzamento a até 70 m à frente) passa a parar / ceder; um cruzamento sem controle vira PARE ou Dê a preferência nas aproximações sinalizadas |
+| R-3 Sentido proibido | o sentido do trecho é fechado – a via passa a ser de mão única e as rotas mudam |
+| R-4a/R-4b, R-5a/R-5b | proíbe a conversão à esquerda / à direita / o retorno naquela aproximação (a demanda é redistribuída) |
+| R-25a–d, R-26 | movimentos obrigatórios (siga em frente, só à esquerda/direita…) – os demais giros ficam proibidos |
+| R-19 Velocidade máxima | o limite da legenda vale a partir da placa, no sentido dela, até a próxima R-19 ou o fim da via (velocidade livre, capacidade e simulação) |
+| R-7 | ultrapassagem proibida no trecho |
+| R-8a/R-8b | troca de faixa proibida no trecho (a microssimulação não muda de faixa) |
+| R-6a/R-6c e R-6b | sem estacionamento / estacionamento regulamentado (manobras de vaga reduzem a capacidade – HCM) |
+| R-9, R-14 a R-18 | caminhões fora do fluxo do trecho (o volume equivalente cai) |
+| R-10, R-32, R-39 | trecho fechado ao tráfego geral (automotores proibidos, exclusivo de ônibus ou de caminhões) |
+| Demais (advertência, indicação…) | listadas como informativas, sem efeito na circulação |
+
+**Marcas no pavimento**
+
+| Marca | Efeito |
+|---|---|
+| LFO-1, LFO-3 (e LFO-4 em um sentido) sobre o eixo | ultrapassagem proibida na parcela do trecho coberta |
+| LMS-1 entre faixas do mesmo sentido | troca de faixa proibida |
+| LRE / LDP atravessando uma aproximação | linha de parada do semáforo/PARE; num cruzamento sem controle, cria PARE / Dê a preferência |
+| Legenda PARE / símbolo SDP | reforça o controle ou cria a parada / a preferência na aproximação |
+| LRV, MCF | redução de velocidade no ponto (MCF: 20 km/h na passagem em nível) |
+| Legendas DEVAGAR, ESCOLA (30 km/h), LENTO, CUIDADO, PEDESTRE, HOSPITAL | os motoristas reduzem junto à legenda |
+| Legenda ÔNIBUS / EXCLUSIVA numa faixa | aquela faixa fica só para ônibus |
+| Setas PEM-F/D/E/FD/FE/DE/RE/RD (até 90 m do cruzamento) | define os movimentos de **cada faixa** – a demanda escolhe a faixa pela seta (faixa exclusiva de conversão = fila própria) |
+| Zebrados e canalizações sobre faixas | as faixas cobertas ficam fechadas no trecho (gargalo, convergência antes) |
+| Vagas pintadas junto ao bordo | estacionamento com manobras no trecho |
+
+**Dispositivos, barreiras e semáforos**
+
+| Elemento | Efeito |
+|---|---|
+| Barreira, separador, balizadores ou tachões **sobre o eixo** de via de mão dupla | sentidos separados: sem ultrapassagem e, nos cruzamentos que a separação atravessa, só conversão à direita (sem cruzar nem virar à esquerda) |
+| Balizadores/tachões **entre faixas** do mesmo sentido | troca de faixa impedida fisicamente |
+| Cones, cavaletes, tambores, barreiras **dentro de uma faixa** | faixa interditada no trecho (obra) |
+| Bloqueio **atravessando** a pista (≥ 60 % de um sentido) | sentido bloqueado – o tráfego procura outro caminho |
+| Semáforo (elemento urbano) junto a um cruzamento | o cruzamento passa a ser semaforizado (se ainda não era) |
+| Semáforo junto a uma faixa de pedestres no meio da quadra | travessia semaforizada: vermelho para os veículos 22 s a cada 75 s (18 s de pedestres) |
+| Proteções laterais, dispositivos na calçada ou na ciclovia | informativos (não afetam as faixas de tráfego) |
+
+A aba **Sinalização (n)** da janela lista tudo o que foi lido, com o efeito de cada item e o motivo de um item **não**
+ter sido associado (ex.: "sem cruzamento a menos de 70 m à frente, no sentido da placa", "não está sobre o eixo de uma
+via de mão dupla"). Filtre por *Aplicadas*, *Não associadas*, *Placas*, *Marcas* ou *Dispositivos e semáforos*; duplo
+clique mostra o item no mapa. O relatório traz o bloco **Sinalização interpretada** e o diagnóstico acusa as
+**incoerências**: PARE num cruzamento semaforizado, PARE em todas as aproximações, PARE na via de hierarquia maior,
+seta pintada contradizendo uma placa, R-19 acima da velocidade da hierarquia, faixas e trechos fechados, separação
+central cortando conversões e sinalização que não ficou associada a nada.
+
+**Mudou a sinalização?** Com a janela aberta, altere o projeto e clique em **Reler o projeto** (aba Sinalização): a
+janela reabre no **mesmo cenário** com a rede atualizada. Os comandos que alteram o projeto a partir da janela
+(trocar o controle de um cruzamento, gravar plano) já oferecem a releitura.
+
+### 26.9 Visualização do tráfego
+
+O mapa foi redesenhado para parecer uma planta de verdade: **calçadas** com o meio-fio contornado, **asfalto** com
+canteiro central, miolo dos cruzamentos contínuo, e – com zoom – o **eixo amarelo** (contínuo onde a ultrapassagem é
+proibida), divisórias, bordos, **faixas de pedestres**, **linhas de retenção**, **setas por faixa** lidas do projeto e
+faixas fechadas zebradas. Trechos fechados aparecem hachurados em vermelho. Parado, cada sentido é tingido pelo nível de
+serviço; na animação o nível vira uma fita junto ao bordo, para os veículos ficarem em evidência.
+
+* **Veículos**: com zoom, carros com carroceria chanfrada, para-brisa e vidro traseiro nas **cores reais da frota**,
+  ônibus com faixa de janelas e ar-condicionado, caminhões com cavalo e carreta, **lanternas de freio acesas** quando
+  freiam ou estão parados, e sombra; sem zoom, cada veículo vira um ponto. **Veículos pela velocidade** troca as cores
+  reais pela rampa vermelho (parado) → verde (livre).
+* **Semáforos** com a cor da fase de cada instante (com brilho), ícones da **sinalização lida** (PARE, dê a preferência,
+  velocidade máxima, bloqueios) – liga/desliga em **Sinalização** –, pontos de ônibus (quadrado vazado = baia), faixas
+  auxiliares e áreas de escape.
+* **Painel da animação**: tempo simulado, veículos na rede, quantos estão parados, velocidade média instantânea e barra
+  de progresso.
+* **Veículos**, **Rótulos** e **Sinalização** ligam/desligam cada camada; roda do mouse = zoom no cursor, arrastar =
+  mover, clique = selecionar cruzamento/trecho.

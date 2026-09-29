@@ -199,6 +199,8 @@ internal sealed partial class AutoTestRunner
         Step("Tráfego", "Rede do projeto", s =>
         {
             net = CmdSimuladorTrafego.BuildNetwork(_doc);
+            s.Note($"Sinalização interpretada: {net.Regulations.Count(r => r.Applied)} aplicada(s), {net.Regulations.Count(r => !r.Applied && r.Kind != Core.Traffic.TipoRegra.Informativa)} não associada(s); " +
+                   $"{net.Links.Count(l => l.Closed)} trecho(s) fechado(s), {net.Links.Sum(l => l.ClosedLanes.Count)} faixa(s) fechada(s), {net.Nodes.Sum(n => n.ProhibitedTurns.Count)} conversão(ões) proibida(s).");
             s.Note($"{net.Roads.Count} via(s), {net.Nodes.Count} nó(s) ({net.Nodes.Count(n => n.IsZone)} entradas), {net.Links.Count} trecho(s), " +
                    $"{net.Signs.Count} placa(s), {net.Crosswalks.Count} travessia(s), {net.GradeSeparations.Count} cruzamento(s) em desnível.");
             foreach (var n in net.Notes) s.Note("Rede: " + n);

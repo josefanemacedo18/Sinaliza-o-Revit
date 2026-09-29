@@ -57,6 +57,58 @@ internal sealed partial class AutoTestRunner
             if (it == null) s.Error("A interseção não foi criada.");
             else s.Note($"Interseção criada; linha de continuidade: {it.ContinuityLine}, via principal {it.MainRoadId?[..6]}…");
         });
+        Step("Largura e recuos", "Via nova emendada na ponta de outra em ângulo (emenda concordada)", s =>
+        {
+            MakeRoad(s, "emenda A", T(0), 0, true, RelevoVia.Plana, FimLivre.Nenhum, (700, Y + 120), (700, Y + 40));
+            MakeRoad(s, "emenda B", T(0), 0, true, RelevoVia.Plana, FimLivre.Nenhum, (700, Y + 40), (760, Y - 20));
+            var it = ItNear(P(700, Y + 40), 6);
+            if (it == null) s.Error("A emenda das duas vias pela ponta não foi criada.");
+            else if (TestDefs().Any(d => d.GroupId == it.Id && d is SignDefinition or RampDefinition))
+                s.Error("A emenda gerou placas/rampas de cruzamento (deveria ser só a curva com as linhas contínuas).");
+            else s.Note($"Emenda criada com {TestDefs().Count(d => d.GroupId == it.Id)} linha(s) contínua(s) na curva.");
+        });
+        Step("Largura e recuos", "Várias linhas selecionadas viram várias vias (malha com T e cruz)", s =>
+        {
+            var segs = new[] { ((900.0, Y), (1000.0, Y)), ((1000.0, Y), (1100.0, Y)), ((1000.0, Y - 80), (1000.0, Y)), ((1000.0, Y), (1000.0, Y + 80)), ((1050.0, Y), (1050.0, Y + 60)) };
+            var ids = new List<ElementId>();
+            using (var t = new Transaction(_doc, "SV Autoteste - malha de linhas"))
+            {
+                t.Start();
+                foreach (var (a0, b0) in segs)
+                    ids.AddRange(Picking.CreateAxis(_doc, _plan ?? _uidoc.ActiveView, new[] { new RoadConnection.Piece(P(a0.Item1, a0.Item2), P(b0.Item1, b0.Item2), null) }, UnitConv.Ft(_z0)));
+                t.Commit();
+            }
+            var pts = ids.Select(id => (IReadOnlyList<Vec2>)((CurveElement)_doc.GetElement(id)).GeometryCurve.Tessellate().Select(UnitConv.ToVec2).ToList()).ToList();
+            var groups = RoadChains.Split(pts, 0.05);
+            if (groups.Count != 3) s.Error($"Esperadas 3 vias (avenida, transversal, T); o traçado virou {groups.Count}.");
+            var opt = new CmdSinalizarVia.RoadCreation(true, TipoConexao.Intersecao, FimLivre.Nenhum, true, null, true, RelevoVia.Plana, Out());
+            foreach (var g in groups)
+            {
+                var path = PathReference.FromElements(g.Select(i => _doc.GetElement(ids[i]).UniqueId));
+                var setup = T(0);
+                var defs = setup.Build(path, Out(), PluginContext.Catalog);
+                Take(s, CmdSinalizarVia.Create(_uidoc, defs, opt, setup.Warnings), defs);
+            }
+            var cross = ItNear(P(1000, Y), 8);
+            var tee = ItNear(P(1050, Y), 8);
+            if (cross == null) s.Error("Sem interseção no cruzamento da malha.");
+            if (tee == null) s.Error("Sem interseção no T da malha.");
+        });
+        Step("Largura e recuos", "Recuo (baia) acrescentado numa via já criada", s =>
+        {
+            var pav = TestDefs().OfType<RoadPavementDefinition>().FirstOrDefault(p => p.GroupId != null && _roadNames.GetValueOrDefault(p.GroupId) == "níveis da calçada");
+            if (pav == null) { s.Error("Via de teste não encontrada."); return; }
+            var setup = RoadTemplates.FromJson(pav.SetupJson);
+            if (setup == null) { s.Error("A via não guardou a seção."); return; }
+            var r = RecuoVia.Padrao(TipoRecuo.BaiaOnibus, setup.Speed, 3.3);
+            r.Estaca = 60;
+            r.Profundidade = 2.0;
+            setup.Recuos.Add(r);
+            var members = MarkingStorage.Definitions(_doc).Where(d => d.GroupId == pav.GroupId).ToList();
+            Take(s, RoadRegen.Regenerate(_uidoc, pav, members, setup, pav.Output.Clone(), PathResolver.Resolve(_doc, pav.PathRef)?.Main));
+            if (!MarkingStorage.Definitions(_doc).OfType<RecessMarkingDefinition>().Any(x => x.GroupId == pav.GroupId))
+                s.Error("A baia não foi criada na via existente.");
+        });
         foreach (var v in Enum.GetValues<TipoSonorizador>())
             Step("Segurança viária", $"Sonorizador longitudinal – {v}", s =>
             {
