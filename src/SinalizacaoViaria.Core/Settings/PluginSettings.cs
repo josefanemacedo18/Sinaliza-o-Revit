@@ -56,6 +56,12 @@ public sealed class PluginSettings
     /// <summary>Caminho do catálogo do usuário. Vazio = %AppData%\SinalizacaoViaria\catalogo.json.</summary>
     public string? UserCatalogPath { get; set; }
 
+    /// <summary>
+    /// Chave da Google Maps Platform (Map Tiles API) do próprio usuário, cifrada com a proteção de dados do Windows (só
+    /// este usuário neste computador consegue ler). Nunca é gravada no projeto, no log nem no código.
+    /// </summary>
+    public string? GoogleMapsKeyProtected { get; set; }
+
     /// <summary>Últimas escolhas por janela (lembradas entre sessões).</summary>
     public Dictionary<string, string> LastUsed { get; set; } = new();
 
