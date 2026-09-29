@@ -401,6 +401,68 @@ public static class TrafficDiagnostics
                     nd.Pos, nd.Index, ids: new[] { nd.SourceId });
         }
 
+        // ------------------------------------------------------------ sinalização interpretada: conflitos e efeitos
+        foreach (var nd in net.Nodes.Where(n => !n.IsZone && n.Kind != TipoNo.Continuacao))
+        {
+            var nr = res.Nodes.GetValueOrDefault(nd.Index);
+            var ctl = nr?.Control ?? nd.Control;
+            if (ctl == ControleNo.Semaforo && nd.StopApproaches.Count > 0)
+                Add(Gravidade.Atencao, "Sinalização", $"{nd.Label}: PARE (R-1/legenda) em cruzamento semaforizado",
+                    "A parada obrigatória só vale com o semáforo apagado ou em amarelo intermitente – com o semáforo operando ela confunde o condutor.",
+                    "Retire o R-1/PARE das aproximações semaforizadas ou use-o só como sinalização de contingência.", nd.Pos, nd.Index, ids: new[] { nd.SourceId });
+            var ins = nd.In.Select(i => net.Links[i]).ToList();
+            if (ins.Count >= 3 && nd.StopApproaches.Count >= ins.Count)
+                Add(Gravidade.Atencao, "Sinalização", $"{nd.Label}: PARE em todas as aproximações",
+                    "Parada obrigatória em todos os ramos não define quem tem a preferência (o CTB não prevê 'all-way stop'): todos param e seguem pela direita.",
+                    "Defina a via preferencial (sem R-1) ou implante rotatória/semáforo.", nd.Pos, nd.Index, ids: new[] { nd.SourceId });
+            // Parada sinalizada na via de maior hierarquia enquanto a menor segue livre.
+            if (nd.StopApproaches.Count > 0 && ctl is ControleNo.Pare or ControleNo.DePreferencia)
+            {
+                var stopRank = nd.StopApproaches.Select(i => Hierarquia.Rank(net.Links[i].Road.Hierarchy)).Max();
+                var freeRank = ins.Where(l => !nd.MinorApproaches.Contains(l.Index)).Select(l => Hierarquia.Rank(l.Road.Hierarchy)).DefaultIfEmpty(0).Max();
+                if (stopRank > freeRank && freeRank > 0)
+                    Add(Gravidade.Atencao, "Sinalização", $"{nd.Label}: a via de maior hierarquia tem o PARE",
+                        "A sinalização dá a preferência à via de menor hierarquia – contraria o fluxo natural e costuma ser desrespeitada.",
+                        "Inverta a sinalização (R-1/R-2 e retenção na via secundária).", nd.Pos, nd.Index, ids: new[] { nd.SourceId });
+            }
+            foreach (var l in ins)
+                foreach (var (k, set) in l.LaneTurns)
+                    foreach (var g in set.Where(g => nd.ProhibitedTurns.Contains((l.Index, g))))
+                        Add(Gravidade.Atencao, "Sinalização", $"{nd.Label}: seta permite {TrafficRegulations.GiroLabel(g)} mas a placa proíbe",
+                            $"Na aproximação {l.Name} a seta pintada na faixa indica {TrafficRegulations.GiroLabel(g)}, proibida por placa (R-4/R-5/R-25/R-26).",
+                            "Compatibilize setas e placas.", nd.Pos, nd.Index, l.Index, ids: new[] { nd.SourceId });
+            if (nd.MedianRoads.Count > 0)
+                Add(Gravidade.Informacao, "Rede", $"{nd.Label}: separação central contínua – só entradas e saídas pela direita",
+                    "A barreira/separador atravessa o cruzamento: travessias e conversões à esquerda pela via separada são impossíveis e o tráfego busca retornos e outras rotas.",
+                    "Se a travessia for necessária, abra o canteiro com uma interseção canalizada ou retorno.", nd.Pos, nd.Index, ids: new[] { nd.SourceId });
+            if (nd.SignalHeads && nd.SourceId != null && net.Regulations.Any(r => r.Kind == TipoRegra.Semaforo && r.Node == nd.Index && r.Effect.Contains("passa a ser")))
+                Add(Gravidade.Informacao, "Sinalização", $"{nd.Label}: semáforo do projeto, interseção sem controle semafórico",
+                    "Há semáforos (elementos urbanos) no cruzamento: o simulador trata o nó como semaforizado, mas a interseção foi criada com outro controle (placas e retenções dela não batem).",
+                    "Edite a interseção e escolha o controle Semáforo – ou use 'Aplicar este controle no projeto' na aba Cruzamentos.", nd.Pos, nd.Index, ids: new[] { nd.SourceId });
+        }
+        foreach (var lk in net.Links.Where(l => l.Closed))
+            Add(Gravidade.Informacao, "Rede", $"{lk.Name}: fechado ao tráfego geral ({lk.ClosedWhy})",
+                "O trecho não recebe viagens de automóveis: o tráfego é redistribuído pelas rotas possíveis.", "", Mid(lk), link: lk.Index, ids: RoadIds(lk.Road));
+        foreach (var lr in res.Links.Values.Where(x => x.Link.ClosedLanes.Count > 0 && !x.Link.Closed))
+        {
+            var lk = lr.Link;
+            var why = string.Join(", ", lk.ClosedLanes.Select(c => c.Why).Distinct());
+            Add(lr.X > 0.85 ? Gravidade.Atencao : Gravidade.Informacao, "Capacidade", $"{lk.Name}: {lk.Lanes - lk.MinOpenLanes} faixa(s) fechada(s) ({why})",
+                $"O trecho escoa por {lk.MinOpenLanes} de {lk.Lanes} faixa(s) no ponto mais restrito (v/c {lr.X:0.00}) e os veículos convergem antes do fechamento.",
+                lr.X > 0.85 ? "Reduza a extensão do fechamento, sinalize a transição com antecedência (MBST Vol. VII – obras) ou desvie parte do tráfego." : "",
+                lk.Path.PointAt(lk.ClosedLanes.Average(c => (c.S0 + c.S1) / 2)), link: lk.Index, ids: RoadIds(lk.Road));
+        }
+        foreach (var lk in net.Links.Where(l => l.SpeedLimitKmh is { } v && l.Road.Hierarchy is { } h && h != HierarquiaViaria.NaoDefinida && v > Hierarquia.DefaultSpeed(h) + 0.5))
+            Add(Gravidade.Atencao, "Legislação", $"{lk.Name}: R-19 de {lk.SpeedLimitKmh:0} km/h acima da máxima da hierarquia",
+                $"Para {Hierarquia.Label(lk.Road.Hierarchy).ToLowerInvariant()} o CTB (art. 61) fixa {Hierarquia.DefaultSpeed(lk.Road.Hierarchy!.Value):0} km/h; velocidade maior exige estudo técnico.",
+                "Confirme o estudo que justifica a velocidade ou ajuste a placa.", Mid(lk), link: lk.Index, ids: RoadIds(lk.Road));
+        var loose = net.Regulations.Where(r => !r.Applied && r.Kind != TipoRegra.Informativa).ToList();
+        foreach (var g in loose.GroupBy(r => r.Source))
+            Add(Gravidade.Informacao, "Sinalização", $"{g.Key}: {g.Count()} item(ns) não associado(s) ao tráfego",
+                string.Join(" ", g.Select(r => r.Effect).Distinct().Take(3)) + ".",
+                "Confira a posição e o sentido (a placa lê o sentido do tráfego que se aproxima; setas e legendas ficam dentro da faixa).",
+                g.First().Position, ids: g.Select(r => r.SourceId));
+
         // Junta os repetidos (mesmo problema no mesmo lugar, p. ex. os dois lados da via) e ordena: críticos primeiro.
         var sorted = d.GroupBy(x => (x.Title, x.Node, x.Link))
             .Select(g => g.Count() == 1 ? g.First() : new TrafficDiagnostic

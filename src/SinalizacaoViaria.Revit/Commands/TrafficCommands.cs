@@ -25,7 +25,16 @@ public sealed class CmdSimuladorTrafego : CommandBase
             throw new UserMessageException("Nenhuma via do SinalizaBIM foi encontrada no projeto.\n\nO Simulador de Tráfego lê as vias criadas com Nova Via / Pista " +
                                            "(pavimento com a seção), as interseções, rotatórias e balões. Crie as vias e rode o simulador de novo.");
         var w = new TrafficWindow(net, doc.Title, new TrafficHost(uidoc));
-        if (UiHelpers.ShowModal(w) == true && w.SelectIds.Count > 0)
+        var shown = UiHelpers.ShowModal(w);
+        // Depois de gravar planos/controles no projeto, a janela pede para reler a rede e reabre no mesmo cenário.
+        while (w.ReopenWith != null)
+        {
+            var sc = w.ReopenWith;
+            net = BuildNetwork(doc);
+            w = new TrafficWindow(net, doc.Title, new TrafficHost(uidoc)) { InitialScenario = sc };
+            shown = UiHelpers.ShowModal(w);
+        }
+        if (shown == true && w.SelectIds.Count > 0)
         {
             var all = MarkingStorage.All(doc);
             var ids = all.Where(s => w.SelectIds.Contains(s.MarkingId)).Select(s => s.Element.Id).Distinct().ToList();
@@ -60,7 +69,13 @@ public sealed class CmdSimuladorTrafego : CommandBase
             cache[d.Id] = r;
             return r;
         }
-        return TrafficNetworkBuilder.Build(defs, AxisOf);
+        var ctx = new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs };
+        Core.Model.MarkingGeometry? GeomOf(MarkingDefinition d)
+        {
+            try { return MarkingBuilder.Build(d, AxisOf(d)?.Axis, ctx); }
+            catch (Exception ex) { Log.Error("Simulador de Tráfego – geometria", ex); return null; }
+        }
+        return TrafficNetworkBuilder.Build(defs, AxisOf, GeomOf);
     }
 }
 

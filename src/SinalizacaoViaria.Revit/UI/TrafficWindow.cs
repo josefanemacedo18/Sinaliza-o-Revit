@@ -113,6 +113,13 @@ public sealed class TrafficWindow : Window
     private readonly Button _copy = new() { Content = "Copiar relatório", IsEnabled = false };
     private readonly Button _writeBtn = new() { Content = "Gravar resultados no modelo", IsEnabled = false, Margin = new Thickness(6, 0, 0, 0) };
 
+    /// <summary>Cenário para reabrir a janela com a rede relida do projeto (depois de gravar plano/controle).</summary>
+    public TrafficScenario? ReopenWith { get; private set; }
+    /// <summary>Cenário carregado ao abrir (reabertura).</summary>
+    public TrafficScenario? InitialScenario { get; init; }
+    private readonly ListBox _regList = new();
+    private readonly ComboBox _regFilter = new();
+
     /// <summary>Marcas a selecionar no modelo quando a janela fecha (botão "Selecionar no modelo").</summary>
     public List<string> SelectIds { get; private set; } = new();
     public Core.Geometry.Vec2? ShowAt { get; private set; }
@@ -179,8 +186,9 @@ public sealed class TrafficWindow : Window
             _map.SetData(null, null);
             try { _scenarios = _host?.LoadScenarios() ?? new(); }
             catch (Exception ex) { Infrastructure.Log.Error("Cenários", ex); }
-            FillScenarioList(null);
-            if (_scenarios.Count > 0) LoadScenario(_scenarios[0].Clone());
+            FillScenarioList(InitialScenario?.Name);
+            if (InitialScenario != null) LoadScenario(InitialScenario.Clone());
+            else if (_scenarios.Count > 0) LoadScenario(_scenarios[0].Clone());
             Run(false);
         };
         Closing += (_, _) => { _cts?.Cancel(); _timer.Stop(); };
@@ -496,6 +504,39 @@ public sealed class TrafficWindow : Window
         };
         _tabs.Items.Add(new TabItem { Header = "Trechos", Content = _linkList });
 
+        // Sinalização interpretada
+        var rg = new DockPanel();
+        foreach (var f in new[] { "Todas", "Aplicadas", "Não associadas", "Placas", "Marcas no pavimento", "Dispositivos e semáforos" }) _regFilter.Items.Add(f);
+        _regFilter.SelectedIndex = 0;
+        _regFilter.SelectionChanged += (_, _) => FillRegulations();
+        DockPanel.SetDock(_regFilter, Dock.Top);
+        rg.Children.Add(_regFilter);
+        var regHint = new TextBlock
+        {
+            Text = "Tudo o que a sinalização do projeto significa para o tráfego: placas R-1/R-2/R-3/R-4/R-5/R-6/R-7/R-8/R-9/R-10/R-19/R-25/R-26/R-32, " +
+                   "linhas (LFO, LMS, LRE, LDP, LRV), legendas, setas por faixa, zebrados e canalizações, barreiras, balizadores, cones e semáforos. Duplo clique = ver no mapa.",
+            TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)), Margin = new Thickness(0, 4, 0, 4),
+        };
+        DockPanel.SetDock(regHint, Dock.Top);
+        rg.Children.Add(regHint);
+        var reload = new Button { Content = "Reler o projeto (depois de mudar a sinalização)", Margin = new Thickness(0, 4, 0, 0) };
+        reload.Click += (_, _) => Reload();
+        reload.Visibility = _host == null ? Visibility.Collapsed : Visibility.Visible;
+        DockPanel.SetDock(reload, Dock.Bottom);
+        rg.Children.Add(reload);
+        ScrollViewer.SetHorizontalScrollBarVisibility(_regList, ScrollBarVisibility.Disabled);
+        _regList.MouseDoubleClick += (_, _) =>
+        {
+            if (_regList.SelectedItem is ListBoxItem { Tag: TrafficRegulation r })
+            {
+                if (r.Node is { } n) _map.Select(n, r.Link);
+                else if (r.Link is { } l) _map.Select(null, l);
+                _map.ZoomTo(r.Position, 60);
+            }
+        };
+        rg.Children.Add(_regList);
+        _tabs.Items.Add(new TabItem { Header = $"Sinalização ({_net.Regulations.Count(x => x.Applied)})", Content = rg });
+
         // Cenários: comparação
         var cg = new DockPanel();
         var cbar = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
@@ -690,6 +731,7 @@ public sealed class TrafficWindow : Window
             hint.Text = _res.Options.ZoneVolumes.ContainsKey(node) ? $"informado: entram {v:0} veh/h" : $"estimado: entram {v:0} veh/h";
         }
         FillDiagnostics();
+        FillRegulations();
         FillKpis();
         var keepNode = SelectedNode()?.Node.Key;
         _nodeList.Items.Clear();
@@ -723,6 +765,36 @@ public sealed class TrafficWindow : Window
         }
         _report.Text = TrafficReport.Build(_res, _sim, _project);
         _tabDiag.Header = $"Diagnóstico ({_res.Diagnostics.Count})";
+    }
+
+    private void FillRegulations()
+    {
+        _regList.Items.Clear();
+        var f = _regFilter.SelectedIndex;
+        foreach (var r in _net.Regulations.OrderBy(x => x.Kind).ThenBy(x => x.Source))
+        {
+            var ok = f switch
+            {
+                1 => r.Applied,
+                2 => !r.Applied && r.Kind != TipoRegra.Informativa,
+                3 => r.Source.StartsWith("Placa"),
+                4 => r.Source.StartsWith("Linha") || r.Source.StartsWith("Legenda") || r.Source.StartsWith("Seta") || r.Source.StartsWith("Zebrado") || r.Source.StartsWith("Canaliza") || r.Source.StartsWith("Vagas") || r.Source.StartsWith("Símbolo"),
+                5 => r.Source.StartsWith("Dispositivo") || r.Source.StartsWith("Semáforo"),
+                _ => true,
+            };
+            if (!ok) continue;
+            var color = r.Applied ? Color.FromRgb(0x2E, 0x7D, 0x32) : r.Kind == TipoRegra.Informativa ? Color.FromRgb(0x9E, 0xA7, 0xB3) : Color.FromRgb(0xC6, 0x28, 0x28);
+            var row = new DockPanel { Margin = new Thickness(0, 2, 0, 2) };
+            var bar = new Border { Width = 5, Background = new SolidColorBrush(color), Margin = new Thickness(0, 0, 8, 0), CornerRadius = new CornerRadius(2) };
+            DockPanel.SetDock(bar, Dock.Left);
+            row.Children.Add(bar);
+            var txt = new StackPanel();
+            txt.Children.Add(new TextBlock { Text = $"{r.Source} – {TrafficRegulation.KindLabel(r.Kind)}", FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+            txt.Children.Add(new TextBlock { Text = r.Effect, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x3A, 0x44, 0x52)) });
+            row.Children.Add(txt);
+            _regList.Items.Add(new ListBoxItem { Content = row, Tag = r, HorizontalContentAlignment = HorizontalAlignment.Stretch });
+        }
+        if (_regList.Items.Count == 0) _regList.Items.Add(new ListBoxItem { Content = "Nenhuma sinalização neste filtro.", IsEnabled = false });
     }
 
     private void FillDiagnostics()
@@ -1014,7 +1086,11 @@ public sealed class TrafficWindow : Window
         {
             if (_host == null || _res == null || SelectedNode() is not { } nr) return;
             if (nr.Phases.Count == 0) { UiHelpers.Error("Este cruzamento não é semaforizado neste cenário."); return; }
-            try { _status.Text = _host.ApplyToIntersection(nr.Node.Key, nr.Control == nr.Node.DesignControl ? null : nr.Control, TrafficAnalysis.PlanOf(_res, nr, $"Simulador – {_current.Name}")); }
+            try
+            {
+                _status.Text = _host.ApplyToIntersection(nr.Node.Key, nr.Control == nr.Node.DesignControl ? null : nr.Control, TrafficAnalysis.PlanOf(_res, nr, $"Simulador – {_current.Name}"));
+                AskReload();
+            }
             catch (Exception ex) { UiHelpers.Error("Não foi possível gravar o plano: " + ex.Message); }
         };
         _ovSetControl.ToolTip = "Troca o controle da interseção no projeto (placas, linhas de retenção e faixas são refeitas). Rotatória: use a ferramenta Rotatória.";
@@ -1025,10 +1101,35 @@ public sealed class TrafficWindow : Window
             if (c == null) { UiHelpers.Error("Escolha o controle a aplicar."); return; }
             if (MessageBox.Show(this, $"Trocar o controle de {nr.Node.Label} no projeto para \"{TrafficReport.ControlLabel(c.Value)}\"? A interseção será refeita.",
                     "Simulador de Tráfego", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-            try { _status.Text = _host.ApplyToIntersection(nr.Node.Key, c, null); }
+            try
+            {
+                _status.Text = _host.ApplyToIntersection(nr.Node.Key, c, null);
+                // O controle do projeto mudou: o ajuste do cenário para este nó deixa de ser necessário.
+                _current.Options.Nodes.RemoveAll(x => x.Node == nr.Node.Key && x.Control == c && x.Cycle == null && x.Greens == null && x.Turns.Count == 0);
+                AskReload();
+            }
             catch (Exception ex) { UiHelpers.Error("Não foi possível aplicar: " + ex.Message); }
         };
         return new ScrollViewer { Content = sp, MaxHeight = 330, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+    }
+
+    /// <summary>Relê o projeto (a janela reabre no mesmo cenário, com a rede atualizada).</summary>
+    private void AskReload()
+    {
+        if (MessageBox.Show(this, _status.Text + "\n\nReler o projeto agora? A janela reabre no mesmo cenário com a rede atualizada.", "Simulador de Tráfego",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        Reload();
+    }
+
+    private void Reload()
+    {
+        try
+        {
+            var o = ReadOptions();
+            ReopenWith = new TrafficScenario { Name = string.IsNullOrWhiteSpace(_scName.Text) ? _current.Name : _scName.Text.Trim(), Notes = _scNotes.Text ?? "", Options = o };
+        }
+        catch (FormatException) { ReopenWith = _current.Clone(); }
+        DialogResult = false;
     }
 
     private NodeResult? SelectedNode() => _nodeList.SelectedItem is ListBoxItem { Tag: NodeResult nr } ? nr : null;

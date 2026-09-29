@@ -290,8 +290,28 @@ public static class TrafficAnalysis
     public static bool Allowed(TrafficNetwork net, TrafficNode nd, int inLink, int outLink)
     {
         if (inLink == outLink) return false;
+        var a = net.Links[inLink];
+        var o = net.Links[outLink];
+        if (o.Closed) return false;                                  // R-3, R-10, R-32, bloqueio físico
         var t = TurnOf(net, inLink, outLink);
-        if (t == Giro.Retorno) return nd.Kind is TipoNo.Rotatoria or TipoNo.CulDeSac;
+        if (t == Giro.Retorno && nd.Kind is not (TipoNo.Rotatoria or TipoNo.CulDeSac)) return false;
+        if (nd.ProhibitedTurns.Contains((inLink, t))) return false;  // R-4, R-5, R-25, R-26
+        // Separação física central atravessando o nó: só se entra e sai pela direita dessa via.
+        foreach (var road in nd.MedianRoads)
+        {
+            var fromR = a.Road.Id == road;
+            var toR = o.Road.Id == road;
+            if (fromR && toR) { if (t is Giro.Esquerda or Giro.Retorno) return false; }
+            else if (fromR || toR) { if (t is Giro.Esquerda or Giro.Retorno) return false; }
+            else if (t != Giro.Direita) return false;               // atravessar a via separada
+        }
+        // Setas nas faixas: o movimento precisa de pelo menos uma faixa que o permita (faixa sem seta = livre).
+        if (a.LaneTurns.Count > 0)
+        {
+            var any = false;
+            for (int k = 0; k < a.Lanes && !any; k++) any = a.TurnsOf(k) is not { } set || set.Contains(t) || (t == Giro.Retorno && set.Contains(Giro.Esquerda));
+            if (!any) return false;
+        }
         return true;
     }
 
@@ -314,6 +334,7 @@ public static class TrafficAnalysis
         var pq = new PriorityQueue<int, double>();
         foreach (var li in net.Nodes[origin].Out)
         {
+            if (net.Links[li].Closed) continue;
             var c = cost(net.Links[li]);
             dist[li] = c;
             pq.Enqueue(li, c);
@@ -548,9 +569,13 @@ public static class TrafficAnalysis
     private static string LosUnsignalized(double d, double x) => x > 1 ? "F" : d <= 10 ? "A" : d <= 15 ? "B" : d <= 25 ? "C" : d <= 35 ? "D" : d <= 50 ? "E" : "F";
     private static string LosSignal(double d, double x) => x > 1 ? "F" : d <= 10 ? "A" : d <= 20 ? "B" : d <= 35 ? "C" : d <= 55 ? "D" : d <= 80 ? "E" : "F";
 
+    /// <summary>Há uma faixa só para este movimento (setas PEM) e outra para os demais.</summary>
+    public static bool ExclusiveLane(TrafficLink l, Giro g) =>
+        l.Lanes >= 2 && Enumerable.Range(0, l.Lanes).Any(k => l.TurnsOf(k) is { } set && set.All(x => x == g || (g == Giro.Esquerda && x == Giro.Retorno)) && set.Contains(g));
+
     private static double Pcu(TrafficOptions o) => 1 + o.HeavyVehicles * (2.0 - 1) + o.Buses * (2.0 - 1);
     /// <summary>Equivalente em automóveis no trecho (caminhões/ônibus pesam mais nos aclives).</summary>
-    private static double Pcu(TrafficOptions o, TrafficLink l) => 1 + (o.HeavyVehicles + o.Buses) * (l.HeavyEquivalent - 1);
+    private static double Pcu(TrafficOptions o, TrafficLink l) => 1 + ((l.TrucksForbidden ? 0 : o.HeavyVehicles) + o.Buses) * (l.HeavyEquivalent - 1);
 
     /// <summary>Atraso de controle HCM (brechas / rotatória), s/veh.</summary>
     private static double GapDelay(double v, double c, double T = 0.25, double extra = 5)
@@ -639,7 +664,8 @@ public static class TrafficAnalysis
                 perm[a.Link] = o == null ? 1e9 : Permitted(V(vo, o.Link), 90);
                 satL[a.Link] = net.Links[a.Link].SaturationPerLane * 0.95;
                 // Conversão à direita em faixa própria: faixa de desaceleração no fim do trecho ou ilha de giro livre.
-                rightOwn[a.Link] = net.Links[a.Link].DecelLane >= 20 || nd.RightTurnIslands;
+                var lkA = net.Links[a.Link];
+                rightOwn[a.Link] = lkA.DecelLane >= 20 || nd.RightTurnIslands || ExclusiveLane(lkA, Giro.Direita);
             }
             var prot = grp.Where(a => a.ProtectedLeft).ToList();
             if (prot.Count > 0)
@@ -657,7 +683,7 @@ public static class TrafficAnalysis
                 var pl = tr > 0 ? a.LeftVolume / tr : 0;
                 var pr = tr > 0 && !rightOwn[a.Link] ? right / tr : 0;
                 // Bolsão de esquerda: quem converte espera fora da faixa direta.
-                var leftF = nd.LeftPockets ? (a.ProtectedLeft ? 0.05 : 0.12) : (a.ProtectedLeft ? 0.15 : 0.35);
+                var leftF = nd.LeftPockets || ExclusiveLane(lk, Giro.Esquerda) ? (a.ProtectedLeft ? 0.05 : 0.12) : (a.ProtectedLeft ? 0.15 : 0.35);
                 // Ônibus parando na faixa perto da linha de retenção (HCM fbb).
                 var busNear = lk.BusStops.Any(b => !b.Bay && b.At > lk.Length - 75);
                 var fbb = busNear ? Math.Max(0.5, (lk.Lanes - 14.4 * opt.BusesPerHourPerStop / 3600) / lk.Lanes) : 1.0;
@@ -850,8 +876,11 @@ public static class TrafficAnalysis
         }
         var multilane = nr.Approaches.Any(a => net.Links[a.Link].Lanes >= 2);
         Vec2 Dir(ApproachResult a) { var l = net.Links[a.Link]; return l.Path.TangentAt(l.Path.Length); }
+        var signed = nd.MinorApproaches;
         foreach (var a in nr.Approaches)
-            a.Major = major != null && ReferenceEquals(net.Links[a.Link].Road, major);
+            a.Major = signed.Count > 0 && nd.Control is ControleNo.Pare or ControleNo.DePreferencia
+                ? !signed.Contains(a.Link)                                  // a sinalização (R-1/R-2, PARE, LDP) define quem cede
+                : major != null && ReferenceEquals(net.Links[a.Link].Road, major);
         var vMaj = nr.Approaches.Where(a => a.Major).Sum(a => a.Volume * pcu);
         // Conversão à esquerda da principal (cede ao sentido oposto): probabilidade de fila vazia afeta as secundárias.
         var p0 = 1.0;
@@ -881,7 +910,7 @@ public static class TrafficAnalysis
                 return g switch { Giro.Direita => 0.5 * right, Giro.Frente => right, _ => right + 0.6 * opposite };
             }
             var mult = multilane ? 1 : 0;
-            var yieldAdj = nd.Control == ControleNo.DePreferencia ? -0.2 : 0;
+            var yieldAdj = nd.YieldApproaches.Contains(a.Link) || (nd.Control == ControleNo.DePreferencia && !nd.StopApproaches.Contains(a.Link)) ? -0.2 : 0;
             double cap(Giro g) => g switch
             {
                 Giro.Direita => GapCapacity(vc(g), 6.2 + 0.7 * mult + yieldAdj, 3.3),
@@ -959,6 +988,8 @@ public static class TrafficAnalysis
         var x = lr.X;
         var t0 = l.Length / l.FreeSpeed;
         var slow = l.SlowPoints.Sum(sp => Math.Max(0, 30 / Math.Max(1, sp.Speed) - 30 / l.FreeSpeed) * 0.5);
+        // Travessia semaforizada: atraso uniforme do vermelho (22 s em 75 s).
+        slow += l.SignalizedCrossings.Count * 0.5 * 75 * Math.Pow(22.0 / 75, 2);
         var t = t0 * (1 + 0.15 * Math.Pow(Math.Min(x, 1.6), 4)) + slow;
         var node = res.Nodes.GetValueOrDefault(l.To);
         var d = node?.Approaches.FirstOrDefault(a => a.Link == l.Index)?.Delay ?? 0;

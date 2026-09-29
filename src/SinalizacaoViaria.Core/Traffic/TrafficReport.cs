@@ -105,6 +105,19 @@ public static class TrafficReport
             L($"  • {nd.Label}: {KindLabel(nd.Kind)}{(nd.IsZone ? "" : " – " + ControlLabel(nd.Control))} em ({F(nd.Pos.X, "0.0")}; {F(nd.Pos.Y, "0.0")})");
         foreach (var n in net.Notes) L($"  ℹ {n}");
 
+        // ------------------------------------------------------------------ sinalização
+        if (net.Regulations.Count > 0)
+        {
+            L();
+            L($"Sinalização interpretada ({net.Regulations.Count(x => x.Applied)} aplicada(s), {net.Regulations.Count(x => !x.Applied && x.Kind != TipoRegra.Informativa)} não associada(s)):");
+            foreach (var g in net.Regulations.GroupBy(x => x.Kind).OrderBy(g => g.Key))
+            {
+                L($"  {TrafficRegulation.KindLabel(g.Key)} ({g.Count()}):");
+                foreach (var x in g.Take(40)) L($"    {(x.Applied ? "✓" : x.Kind == TipoRegra.Informativa ? "·" : "✗")} {x.Source}: {x.Effect}");
+                if (g.Count() > 40) L($"    … e mais {g.Count() - 40}.");
+            }
+        }
+
         // ------------------------------------------------------------------ demanda
         H("3. Demanda (estimada)");
         L("Volumes de pico por faixa conforme a hierarquia viária de cada entrada, multiplicados pelo nível de demanda; viagens distribuídas");

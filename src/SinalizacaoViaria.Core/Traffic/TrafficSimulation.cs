@@ -189,11 +189,23 @@ public static class TrafficSimulation
         // Pedestres nas travessias do meio da quadra: intervalos ocupados.
         var peds = new Dictionary<(int Link, int K), List<(double From, double To)>>();
         foreach (var l in net.Links)
+            foreach (var at in l.SignalizedCrossings)
+                if (!l.Crosswalks.Any(c => Math.Abs(c.At - at) < 3)) l.Crosswalks.Add((at, l.Road.CarriageWidth));
+        foreach (var l in net.Links)
             for (int k = 0; k < l.Crosswalks.Count; k++)
             {
                 var list = new List<(double, double)>();
                 var t = 0.0;
                 var dur = l.Crosswalks[k].Width / 1.2 + 2;
+                var cwAt = l.Crosswalks[k].At;
+                if (l.SignalizedCrossings.Any(sx => Math.Abs(sx - cwAt) < 3))
+                {
+                    // Travessia semaforizada: vermelho para os veículos 22 s a cada 75 s (18 s de verde de pedestres + 4 s).
+                    var phase = (cwAt * 7.3) % 75;
+                    for (var c0 = -phase; c0 < total; c0 += 75) list.Add((c0, c0 + 22));
+                    peds[(l.Index, k)] = list;
+                    continue;
+                }
                 while (opt.PedestriansPerHour > 0)
                 {
                     t += -Math.Log(1 - rnd.NextDouble()) * 3600 / opt.PedestriansPerHour;
@@ -228,16 +240,50 @@ public static class TrafficSimulation
         {
             var all = Enumerable.Range(0, l.Lanes).ToHashSet();
             if (v.Type == 2 && v.NextStop < stops[l.Index].Count) return new HashSet<int> { 0 };
-            if (v.Step + 1 >= v.Route.Count) return all;
-            var g = TrafficAnalysis.TurnOf(net, l.Index, v.Route[v.Step + 1]);
-            if (g == Giro.Direita) return new HashSet<int> { 0 };
-            if (g is Giro.Esquerda or Giro.Retorno) return new HashSet<int> { l.Lanes - 1 };
-            if (protectedLeft.Contains(l.Index) && l.Lanes >= 3) all.Remove(l.Lanes - 1);
-            return all;
+            HashSet<int> res;
+            if (v.Step + 1 >= v.Route.Count) res = all;
+            else
+            {
+                var g = TrafficAnalysis.TurnOf(net, l.Index, v.Route[v.Step + 1]);
+                if (l.LaneTurns.Count > 0)
+                {
+                    // Setas pintadas: só as faixas que permitem o movimento.
+                    res = all.Where(k => l.TurnsOf(k) is not { } set || set.Contains(g) || (g == Giro.Retorno && set.Contains(Giro.Esquerda))).ToHashSet();
+                    if (res.Count == 0) res = all;
+                }
+                else if (g == Giro.Direita) res = new HashSet<int> { 0 };
+                else if (g is Giro.Esquerda or Giro.Retorno) res = new HashSet<int> { l.Lanes - 1 };
+                else
+                {
+                    res = all;
+                    if (protectedLeft.Contains(l.Index) && l.Lanes >= 3) res.Remove(l.Lanes - 1);
+                }
+            }
+            // Faixa fechada à frente (zebrado, cones, exclusiva): sai dela antes.
+            if (l.ClosedLanes.Count > 0)
+            {
+                var open = res.Where(k => !l.ClosedLanes.Any(c => c.Lane == k && c.S1 > v.S && c.S0 - v.S < 150)).ToHashSet();
+                if (open.Count > 0) res = open;
+                else
+                {
+                    var any = all.Where(k => !l.ClosedLanes.Any(c => c.Lane == k && c.S1 > v.S && c.S0 - v.S < 150)).ToHashSet();
+                    if (any.Count > 0) res = any;
+                }
+            }
+            return res;
         }
 
         int LaneFor(TrafficLink l, int? nextLink)
         {
+            if (l.Lanes > 1 && (l.LaneTurns.Count > 0 || l.ClosedLanes.Count > 0))
+            {
+                // Faixas permitidas pelas setas e abertas no início do trecho; a menos carregada.
+                var g0 = nextLink == null ? Giro.Frente : TrafficAnalysis.TurnOf(net, l.Index, nextLink.Value);
+                var cand = Enumerable.Range(0, l.Lanes).Where(k => nextLink == null || l.TurnsOf(k) is not { } set || set.Contains(g0) || (g0 == Giro.Retorno && set.Contains(Giro.Esquerda)))
+                    .Where(k => !l.ClosedLanes.Any(c => c.Lane == k && c.S0 < 150)).ToList();
+                if (cand.Count == 0) cand = Enumerable.Range(0, l.Lanes).Where(k => !l.ClosedLanes.Any(c => c.Lane == k && c.S0 < 20)).ToList();
+                if (cand.Count > 0) return cand.OrderBy(k => Tail(l.Index, k).Count + rnd.NextDouble() * 0.9).First();
+            }
             if (l.Lanes <= 1 || nextLink == null) return rnd.Next(l.Lanes);
             var g = TrafficAnalysis.TurnOf(net, l.Index, nextLink.Value);
             if (g == Giro.Direita) return 0;
@@ -332,6 +378,13 @@ public static class TrafficSimulation
                         gap = lead.S - lead.Length - v.S;
                         dv = v.V - lead.V;
                     }
+                    // Faixa fechada adiante: quem não conseguiu sair para no começo do fechamento.
+                    foreach (var c in l.ClosedLanes)
+                        if (c.Lane == v.Lane && c.S0 > v.S - 0.5)
+                        {
+                            var gc = c.S0 - v.S + 1.5;
+                            if (gc < gap) { gap = gc; dv = v.V; }
+                        }
                     if (v.Type == 2 && v.Lane == 0)
                     {
                         while (v.NextStop < st.Count && st[v.NextStop].At < v.S - 2) v.NextStop++;
@@ -408,6 +461,8 @@ public static class TrafficSimulation
                             var mandatory = !ok.Contains(k) && Math.Abs(tk - nearOk) < Math.Abs(k - nearOk);
                             if (!mandatory && !ok.Contains(tk) && toEnd < 150) continue;
                             if (!mandatory && v.Type == 2 && ok.Count == 1) continue;
+                            if (!mandatory && l.LaneChangeForbidden) continue;       // LMS-1, R-8, tachões entre faixas
+                            if (l.LaneClosedAt(tk, v.S + 5)) continue;
                             var target = Tail(l.Index, tk);
                             SimVehicle? nl = null, nf = null;
                             foreach (var x in target)
@@ -697,7 +752,8 @@ public static class TrafficSimulation
                     var isMajor = major[nd.Index].Contains(link);
                     var toLine = Math.Max(0, l.Length - v.S);
                     // PARE: parada obrigatória na linha; nos demais, segue sem parar se houver brecha até chegar à linha.
-                    if (nd.Control == ControleNo.Pare && !isMajor && (!atLine || v.StoppedFor < 1.0)) return false;
+                    var mustStop = nd.StopApproaches.Contains(link) || (nd.Control == ControleNo.Pare && !isMajor && !nd.YieldApproaches.Contains(link));
+                    if (mustStop && (!atLine || v.StoppedFor < 1.0)) return false;
                     if (!atLine && !isMajor && toLine > 25) return false;
                     List<int> pri;
                     if (isMajor)

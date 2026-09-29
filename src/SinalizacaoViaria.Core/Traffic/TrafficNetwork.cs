@@ -80,6 +80,19 @@ public sealed class TrafficNode
     public SignalPlanDef? StoredPlan { get; init; }
     /// <summary>Chave estável do nó (id da interseção/rotatória ou posição) – cenários e contagens.</summary>
     public string Key => SourceId ?? $"{Pos.X:0}:{Pos.Y:0}";
+
+    // ---------------------------------------------------------------- regulamentação lida do projeto
+    /// <summary>Conversões proibidas (R-4, R-5, R-25/R-26) por aproximação.</summary>
+    public HashSet<(int In, Giro Turn)> ProhibitedTurns { get; } = new();
+    /// <summary>Aproximações com PARE (R-1, legenda PARE, LRE) e com "Dê a preferência" (R-2, LDP, SDP).</summary>
+    public HashSet<int> StopApproaches { get; } = new();
+    public HashSet<int> YieldApproaches { get; } = new();
+    /// <summary>Aproximações secundárias pela sinalização (vazio = pela via principal/hierarquia).</summary>
+    public HashSet<int> MinorApproaches => StopApproaches.Union(YieldApproaches).ToHashSet();
+    /// <summary>Vias com canteiro/barreira contínua atravessando o nó: não se cruza nem se converte à esquerda através delas.</summary>
+    public HashSet<string> MedianRoads { get; } = new();
+    /// <summary>Semáforo físico (elemento urbano) no cruzamento.</summary>
+    public bool SignalHeads { get; set; }
 }
 
 /// <summary>Trecho direcional (um sentido) de uma via entre dois nós.</summary>
@@ -132,6 +145,33 @@ public sealed class TrafficLink
     public double HeavyEquivalent { get; set; } = 2.0;
     /// <summary>Menor largura de faixa no trecho (m).</summary>
     public double LaneWidth { get; set; } = 3.5;
+
+    // ---------------------------------------------------------------- regulamentação lida do projeto
+    /// <summary>Velocidade máxima regulamentada no trecho (R-19), km/h. Nulo = a da via.</summary>
+    public double? SpeedLimitKmh { get; set; }
+    /// <summary>Parcela do trecho com ultrapassagem proibida (LFO-1/LFO-3, R-7), 0–1.</summary>
+    public double NoPassing { get; set; }
+    /// <summary>Troca de faixa proibida (LMS-1, R-8, tachões/balizadores entre faixas).</summary>
+    public bool LaneChangeForbidden { get; set; }
+    /// <summary>Faixas fechadas num trecho: zebrado/canalização, obra (cones), faixa exclusiva pintada…</summary>
+    public List<(double S0, double S1, int Lane, string Why)> ClosedLanes { get; } = new();
+    /// <summary>Movimentos permitidos por faixa (setas PEM junto ao fim do trecho). Faixa sem seta = livre.</summary>
+    public Dictionary<int, HashSet<Giro>> LaneTurns { get; } = new();
+    /// <summary>Trecho fechado ao tráfego geral (R-3 contra o sentido, R-10, R-32, bloqueio físico transversal).</summary>
+    public bool Closed { get; set; }
+    public string? ClosedWhy { get; set; }
+    /// <summary>Estacionamento: R-6a/R-6c proíbem (false), R-6b/vagas pintadas regulamentam (true). Nulo = o da seção.</summary>
+    public bool? ParkingOverride { get; set; }
+    /// <summary>R-9: caminhões proibidos.</summary>
+    public bool TrucksForbidden { get; set; }
+    /// <summary>Travessias de pedestres semaforizadas no meio da quadra (posição ao longo do trecho).</summary>
+    public List<double> SignalizedCrossings { get; } = new();
+    /// <summary>Quantas faixas ficam abertas no ponto mais restrito do trecho.</summary>
+    public int MinOpenLanes => Math.Max(0, Lanes - (ClosedLanes.Count == 0 ? 0 : ClosedLanes.GroupBy(c => c.Lane).Count()));
+    /// <summary>A faixa está fechada na posição <paramref name="s"/>.</summary>
+    public bool LaneClosedAt(int lane, double s) => ClosedLanes.Any(c => c.Lane == lane && s >= c.S0 && s <= c.S1);
+    /// <summary>Movimentos permitidos na faixa (setas); nulo = livre.</summary>
+    public HashSet<Giro>? TurnsOf(int lane) => LaneTurns.TryGetValue(lane, out var t) ? t : null;
 }
 
 /// <summary>Placa do projeto (para conferir a sinalização da rede).</summary>
@@ -157,6 +197,8 @@ public sealed class TrafficNetwork
     public List<(string Id, Vec2 Pos)> EscapeRamps { get; } = new();
     /// <summary>Sonorizadores longitudinais (id, caminho).</summary>
     public List<(string Id, Polyline2 Path)> RumbleStrips { get; } = new();
+    /// <summary>Tudo o que a sinalização do projeto significa para o tráfego (lido e aplicado, ou não associado).</summary>
+    public List<TrafficRegulation> Regulations { get; } = new();
     public List<string> Notes { get; } = new();
 
     public TrafficRoad? Road(string id) => Roads.FirstOrDefault(r => r.Id == id);
@@ -173,7 +215,9 @@ public sealed class TrafficNetwork
 public static class TrafficNetworkBuilder
 {
     /// <param name="axisOf">Eixo resolvido (m) e cota base de uma marca com caminho; nulo se não resolvido.</param>
-    public static TrafficNetwork Build(IReadOnlyCollection<MarkingDefinition> defs, Func<MarkingDefinition, (Polyline2 Axis, double Z)?> axisOf)
+    /// <param name="geometryOf">Geometria de uma marca (zebrados e canalizações que fecham faixas); opcional.</param>
+    public static TrafficNetwork Build(IReadOnlyCollection<MarkingDefinition> defs, Func<MarkingDefinition, (Polyline2 Axis, double Z)?> axisOf,
+        Func<MarkingDefinition, Model.MarkingGeometry?>? geometryOf = null)
     {
         var net = new TrafficNetwork();
         // ------------------------------------------------------------ vias
@@ -217,6 +261,13 @@ public static class TrafficNetworkBuilder
         {
             var roads = it.RoadIds.Select(net.Road).Where(r => r != null).Cast<TrafficRoad>().ToList();
             if (roads.Count < 2) continue;
+            // Emenda de duas vias pela ponta (continuação em curva): não é cruzamento, o tráfego segue livre.
+            if (roads.Count == 2 && roads.All(r => { var st = r.Axis.Project(it.Node).Station; return st < 2 || st > r.Axis.Length - 2; }))
+            {
+                var cn = NewNode(TipoNo.Continuacao, ControleNo.Livre, it.Node, it.Z, it.Id);
+                foreach (var r in roads) Attach(r, r.Axis.Project(it.Node).Station, cn);
+                continue;
+            }
             var control = it.Control switch
             {
                 ControleIntersecao.Pare => ControleNo.Pare,
@@ -334,6 +385,7 @@ public static class TrafficNetworkBuilder
             if (axisOf(rs) is { } a) net.RumbleStrips.Add((rs.Id, a.Axis));
         ReadRecesses(net, defs, axisOf);
         ReadBusStops(net, defs);
+        TrafficRegulations.Read(net, defs, axisOf, geometryOf);
 
         foreach (var lk in net.Links) Characterize(net, lk);
         Label(net);
@@ -517,7 +569,7 @@ public static class TrafficNetworkBuilder
         // Largura de faixa no trecho: a menor quando o estreitamento cai dentro dele.
         lk.LaneWidth = r.NarrowestAt is { } na && na >= lk.S0 - 1 && na <= lk.S1 + 1 ? r.MinLaneWidth : r.LaneWidth;
         var fw = Math.Clamp(1 + (lk.LaneWidth - 3.6) / 9.0, 0.80, 1.05);           // largura de faixa (HCM)
-        var park = lk.Forward ? r.ParkingForward : r.ParkingBackward;
+        var park = lk.ParkingOverride ?? (lk.Forward ? r.ParkingForward : r.ParkingBackward);
         var fp = park ? 0.90 : 1.0;                                               // manobras de estacionamento
         // Rampa média do trecho.
         var dz = r.Z(lk.S1) - r.Z(lk.S0);
@@ -532,6 +584,11 @@ public static class TrafficNetworkBuilder
         // Bloqueio por ônibus parados na faixa (HCM: fbb = (N − 14,4·Nb/3600)/N, 12 ônibus/h de referência).
         var fbb = inLaneStops > 0 ? Math.Max(0.5, (lk.Lanes - inLaneStops * 14.4 * 12 / 3600.0) / lk.Lanes) : 1.0;
         lk.Capacity = lk.SaturationPerLane * lk.Lanes * fbb;
+        // Faixas fechadas (zebrado, cones, faixa exclusiva pintada): o trecho vale pelo gargalo.
+        if (lk.ClosedLanes.Count > 0) lk.Capacity *= (double)lk.MinOpenLanes / Math.Max(1, lk.Lanes);
+        // Travessia semaforizada no meio da quadra: o trecho só escoa no verde dos veículos (ciclo 75 s, 18 s de pedestres + 4 s).
+        foreach (var _ in lk.SignalizedCrossings) lk.Capacity *= 53.0 / 75.0;
+        if (lk.Closed || lk.MinOpenLanes == 0) { lk.Capacity = 1; lk.Closed = true; lk.ClosedWhy ??= "todas as faixas fechadas"; }
         // Raio mínimo de curva no trecho (três pontos a cada 5 m).
         var minR = double.PositiveInfinity;
         for (var s = 5.0; s < lk.Length - 5; s += 5)
@@ -545,7 +602,9 @@ public static class TrafficNetworkBuilder
             minR = Math.Min(minR, R);
         }
         lk.MinRadius = minR;
-        var v = r.SpeedKmh / 3.6;
+        var v = (lk.SpeedLimitKmh ?? r.SpeedKmh) / 3.6;
+        // Ultrapassagem proibida em pista simples de mão dupla (HCM – pistas simples): velocidade média menor.
+        if (lk.Lanes == 1 && r.TwoWay && r.SpeedKmh >= 60) v *= 1 - 0.06 * Math.Clamp(lk.NoPassing, 0, 1);
         // Velocidade segura na curva: v² = 127 R (e + f), com e + f ≈ 0,20 no urbano.
         if (!double.IsInfinity(minR)) v = Math.Min(v, Math.Sqrt(127 * minR * 0.20) / 3.6);
         if (grade > 6) v *= 0.9;
