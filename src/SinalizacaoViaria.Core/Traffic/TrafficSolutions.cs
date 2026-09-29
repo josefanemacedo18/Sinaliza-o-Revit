@@ -6,6 +6,15 @@ namespace SinalizacaoViaria.Core.Traffic;
 public sealed class SolutionTrial
 {
     public string Title { get; init; } = "";
+    /// <summary>Tipo da medida (monta o pacote de intervenção): semaforo, pare, preferencia, rotatoria, retemporizar, ondaverde,
+    /// proibiresquerda, bolsao, travessia-ciclo, travessia-sem.</summary>
+    public string Kind { get; init; } = "";
+    public int? Node { get; set; }
+    public int? Link { get; set; }
+    /// <summary>Outros nós envolvidos (semáforos da onda verde).</summary>
+    public List<string> RelatedKeys { get; init; } = new();
+    /// <summary>Pacote completo a aplicar no projeto (placas, marcas, semáforos, geometria) com as normas de cada item.</summary>
+    public ProjectPackage? Package { get; set; }
     public string Description { get; init; } = "";
     /// <summary>O que fazer no projeto para implantar (ferramenta do plugin, sinalização a colocar).</summary>
     public string InProject { get; init; } = "";
@@ -24,8 +33,10 @@ public sealed class SolutionTrial
     public bool Failed { get; set; }
     public string Error { get; set; } = "";
 
-    /// <summary>Melhora de verdade: o local melhora ≥ 10 % sem piorar a rede mais de 3 %.</summary>
-    public bool Improves => !Failed && LocalAfter < LocalBefore * 0.9 && NetDelayAfter <= NetDelayBefore * 1.03 + 0.05;
+    /// <summary>Critério normativo não atendido (ex.: volumes que não justificam semáforo) – aparece, mas não é recomendada.</summary>
+    public string? NormNote { get; set; }
+    /// <summary>Melhora de verdade: o local melhora ≥ 10 % sem piorar a rede mais de 3 % e atende aos critérios das normas.</summary>
+    public bool Improves => !Failed && NormNote == null && LocalAfter < LocalBefore * 0.9 && NetDelayAfter <= NetDelayBefore * 1.03 + 0.05;
     /// <summary>Ganho para ordenar (atraso total da rede evitado, veh·h/h, mais o ganho local ponderado).</summary>
     public double Score => Failed ? double.NegativeInfinity : (NetDelayBefore - NetDelayAfter) + (LocalBefore - LocalAfter) / 100.0;
 
@@ -34,7 +45,8 @@ public sealed class SolutionTrial
         ci ??= CultureInfo.GetCultureInfo("pt-BR");
         if (Failed) return $"✖ {Title}: não foi possível testar ({Error}).";
         var mark = Improves ? "✔" : LocalAfter <= LocalBefore ? "≈" : "✖";
-        return $"{mark} {Title}: atraso local {LocalBefore.ToString("0.0", ci)} → {LocalAfter.ToString("0.0", ci)} s/veh ({LosBefore} → {LosAfter}); " +
+        var norm = NormNote != null ? $" ⚠ {NormNote}" : "";
+        return $"{mark} {Title}{norm}: atraso local {LocalBefore.ToString("0.0", ci)} → {LocalAfter.ToString("0.0", ci)} s/veh ({LosBefore} → {LosAfter}); " +
                $"rede {NetDelayBefore.ToString("0.0", ci)} → {NetDelayAfter.ToString("0.0", ci)} veh·h/h, {SpeedBefore:0} → {SpeedAfter:0} km/h; " +
                $"críticos {CriticalBefore} → {CriticalAfter}.";
     }
@@ -72,6 +84,10 @@ public static class TrafficSolutions
                 var o = Clone(opt);
                 s.Apply(o);
                 var r = TrafficAnalysis.Run(net, o);
+                s.Node = nd?.Index;
+                s.Link = lk?.Index;
+                s.Package = TrafficPackages.For(net, r, s);
+                if (nd != null) s.NormNote = Warrant(net, baseRes, nd, s.Kind);
                 s.LocalAfter = Local(r);
                 s.LosAfter = Los(r);
                 s.NetDelayAfter = r.TotalDelayH;
@@ -83,6 +99,36 @@ public static class TrafficSolutions
         // A rede é compartilhada: volta ao cenário original (controles e travessias do cenário atual).
         TrafficAnalysis.Run(net, opt);
         return list.OrderByDescending(s => s.Improves).ThenByDescending(s => s.Score).ToList();
+    }
+
+    /// <summary>
+    /// Critérios de implantação (MBST Vol. V – semáforo por volume veicular; rotatória com volumes equilibrados; PARE só
+    /// abaixo da capacidade das brechas). Nulo = atende.
+    /// </summary>
+    public static string? Warrant(TrafficNetwork net, TrafficResult res, TrafficNode nd, string kind)
+    {
+        var nr = res.Nodes[nd.Index];
+        var byRoad = nr.Approaches.GroupBy(a => net.Links[a.Link].Road.Id).Select(g => g.Sum(a => a.Volume)).OrderByDescending(v => v).ToList();
+        var major = byRoad.FirstOrDefault();
+        var minor = byRoad.Skip(1).FirstOrDefault();
+        var minorApp = nr.Approaches.Where(a => nd.MainRoadId == null || net.Links[a.Link].Road.Id != nd.MainRoadId).Select(a => a.Volume).DefaultIfEmpty(0).Max();
+        switch (kind)
+        {
+            case "semaforo":
+                // Critério 1 (volume veicular mínimo): principal ≥ 500 veic/h (2 sentidos) e secundária ≥ 150 veic/h na aproximação mais carregada.
+                if (major < 500 || minorApp < 150)
+                    return $"volumes abaixo do critério do MBST Vol. V (principal {major:0} de 500 veic/h, secundária {minorApp:0} de 150 veic/h) – semáforo não justificado";
+                return null;
+            case "rotatoria":
+                if (major + minor > 3600) return $"volume total {major + minor:0} veic/h acima da capacidade típica de rotatória urbana – só com duas faixas e estudo";
+                return null;
+            case "pare":
+            case "preferencia":
+                if (major > 1500 && minorApp > 250) return "principal muito carregada: a secundária não encontra brechas (considere semáforo ou rotatória)";
+                return null;
+            default:
+                return null;
+        }
     }
 
     public static TrafficOptions Clone(TrafficOptions o)
@@ -107,7 +153,7 @@ public static class TrafficSolutions
         if (cross && c != ControleNo.Semaforo)
             yield return new SolutionTrial
             {
-                Title = "Semaforizar o cruzamento",
+                Title = "Semaforizar o cruzamento", Kind = "semaforo",
                 Description = "Semáforo com tempos otimizados (Webster) e fase protegida de esquerda quando o volume pede.",
                 InProject = "Interseção → controle \"Semáforo\" (ou \"Aplicar este controle no projeto\" na aba Cruzamentos) e gravar o plano.",
                 Apply = o => { var ov = Ov(o, nd); ov.Control = ControleNo.Semaforo; ov.Cycle = null; ov.Greens = null; ov.Offset = null; },
@@ -116,14 +162,14 @@ public static class TrafficSolutions
         {
             yield return new SolutionTrial
             {
-                Title = "PARE na via secundária",
+                Title = "PARE na via secundária", Kind = "pare",
                 Description = "Define a preferência da via principal (R-1 e linha de retenção na secundária).",
                 InProject = "Interseção → controle \"PARE\".",
                 Apply = o => Ov(o, nd).Control = ControleNo.Pare,
             };
             yield return new SolutionTrial
             {
-                Title = "Dê a preferência na via secundária",
+                Title = "Dê a preferência na via secundária", Kind = "preferencia",
                 Description = "R-2 e linha de dê a preferência: quem chega pela secundária não precisa parar se houver brecha.",
                 InProject = "Interseção → controle \"Dê a preferência\".",
                 Apply = o => Ov(o, nd).Control = ControleNo.DePreferencia,
@@ -132,7 +178,7 @@ public static class TrafficSolutions
         if (cross && c != ControleNo.Rotatoria && nd.RoadIds.Count >= 2)
             yield return new SolutionTrial
             {
-                Title = "Rotatória",
+                Title = "Rotatória", Kind = "rotatoria",
                 Description = "Rotatória moderna (preferência de quem circula): reduz conflitos e atrasos com volumes equilibrados.",
                 InProject = "Ferramenta Rotatória, clicando no cruzamento (a interseção é substituída).",
                 Apply = o => Ov(o, nd).Control = ControleNo.Rotatoria,
@@ -141,7 +187,7 @@ public static class TrafficSolutions
         {
             yield return new SolutionTrial
             {
-                Title = "Retemporizar o semáforo",
+                Title = "Retemporizar o semáforo", Kind = "retemporizar",
                 Description = "Ciclo e verdes recalculados pela demanda atual (Webster/HCM).",
                 InProject = "Aba Cruzamentos → Recomendação de tempos → \"Aplicar e gravar no projeto\".",
                 Apply = o =>
@@ -154,7 +200,7 @@ public static class TrafficSolutions
             if (main != null && TrafficSignalAdvisor.SignalsOnRoad(res, main) is { Count: >= 2 } chain)
                 yield return new SolutionTrial
                 {
-                    Title = $"Onda verde na {net.Road(main)?.Name ?? "via principal"}",
+                    Title = $"Onda verde na {net.Road(main)?.Name ?? "via principal"}", Kind = "ondaverde", RelatedKeys = chain.Select(n => n.Key).ToList(),
                     Description = $"Ciclo comum e defasagens nos {chain.Count} semáforos da via: os pelotões chegam no verde.",
                     InProject = "Aba Cruzamentos → Recomendação de tempos → \"Todos os cruzamentos de uma via\" + onda verde → gravar no projeto.",
                     Apply = o =>
@@ -167,10 +213,18 @@ public static class TrafficSolutions
         if (cross && nr.Approaches.Any(a => a.LeftVolume >= 30))
             yield return new SolutionTrial
             {
-                Title = "Proibir as conversões à esquerda",
+                Title = "Proibir as conversões à esquerda", Kind = "proibiresquerda",
                 Description = "Quem convertia à esquerda passa a usar outro caminho (quadra ao lado, retorno, rotatória): menos conflitos e menos fases.",
                 InProject = "Interseção → desmarcar \"Conversões à esquerda permitidas\" (eixo contínuo pela boca e R-4a em cada aproximação).",
                 Apply = o => Ov(o, nd).NoLeft = true,
+            };
+        if (cross && !nd.LeftPockets && nr.Approaches.Any(a => a.LeftVolume >= 60 && net.Links[a.Link].Road.TwoWay))
+            yield return new SolutionTrial
+            {
+                Title = "Bolsões de conversão à esquerda", Kind = "bolsao",
+                Description = "Faixa exclusiva para quem converte à esquerda: a espera pela brecha sai da faixa direta.",
+                InProject = "Interseção → Tipo IV (bolsão de conversão à esquerda).",
+                Apply = o => Ov(o, nd).LeftPockets = true,
             };
     }
 
@@ -182,14 +236,14 @@ public static class TrafficSolutions
             var ped = Math.Ceiling(width / 1.2 + 4);
             yield return new SolutionTrial
             {
-                Title = "Travessia: ciclo curto e verde de pedestres mínimo",
+                Title = "Travessia: ciclo curto e verde de pedestres mínimo", Kind = "travessia-ciclo",
                 Description = $"Ciclo 60 s com {ped:0} s de verde de pedestres ({width:0.0} m a 1,2 m/s + 4 s): menos tempo parado para os veículos.",
                 InProject = "Grupo focal da travessia: programar o controlador com os tempos do cenário.",
                 Apply = o => Set(o, cp, 60, ped, true),
             };
             yield return new SolutionTrial
             {
-                Title = "Travessia sem semáforo (teste)",
+                Title = "Travessia sem semáforo (teste)", Kind = "travessia-sem",
                 Description = "Faixa de pedestres com prioridade do pedestre (CTB art. 70) – só com volume de pedestres e velocidade baixos.",
                 InProject = "Remover o grupo focal; manter a faixa, a placa A-32b e, se preciso, faixa elevada.",
                 Apply = o => Set(o, cp, cp.Cycle, Math.Max(5, cp.Red - 4), false),

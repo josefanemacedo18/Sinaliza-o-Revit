@@ -77,7 +77,10 @@ public sealed class TrafficNode
     /// <summary>Controle do projeto (o cenário pode trocar <see cref="Control"/> temporariamente).</summary>
     public ControleNo DesignControl { get; set; }
     /// <summary>Bolsões de conversão à esquerda na interseção.</summary>
-    public bool LeftPockets { get; init; }
+    /// <summary>Bolsões de conversão à esquerda no cenário (os do projeto ou os acrescentados como teste de solução).</summary>
+    public bool LeftPockets { get; set; }
+    /// <summary>Bolsões de conversão à esquerda do projeto.</summary>
+    public bool DesignLeftPockets { get; init; }
     /// <summary>Ilhas de conversão à direita (faixa de giro livre canalizada).</summary>
     public bool RightTurnIslands { get; init; }
     /// <summary>Plano semafórico gravado na interseção.</summary>
@@ -277,7 +280,7 @@ public static class TrafficNetworkBuilder
             var nd = new TrafficNode
             {
                 Index = net.Nodes.Count, Kind = kind, Control = control, DesignControl = control, Pos = pos, Z = z, SourceId = src, MainRoadId = main,
-                RoundaboutLanes = rbLanes, RoundaboutRadius = rbR, Crosswalks = crosswalks, Signs = signs, LeftPockets = pockets,
+                RoundaboutLanes = rbLanes, RoundaboutRadius = rbR, Crosswalks = crosswalks, Signs = signs, LeftPockets = pockets, DesignLeftPockets = pockets,
                 RightTurnIslands = islands, StoredPlan = plan,
             };
             net.Nodes.Add(nd);

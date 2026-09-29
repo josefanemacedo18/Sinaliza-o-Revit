@@ -40,9 +40,11 @@ public sealed class NodeOverride
     public double? Offset { get; set; }
     /// <summary>Proíbe as conversões à esquerda e retornos no cruzamento (teste de solução; R-4a no projeto).</summary>
     public bool? NoLeft { get; set; }
+    /// <summary>Acrescenta bolsões de conversão à esquerda (teste de solução).</summary>
+    public bool? LeftPockets { get; set; }
 
     [JsonIgnore]
-    public bool IsEmpty => Control == null && Cycle == null && (Greens == null || Greens.Count == 0) && Turns.Count == 0 && Intergreen == null && Offset == null && NoLeft != true;
+    public bool IsEmpty => Control == null && Cycle == null && (Greens == null || Greens.Count == 0) && Turns.Count == 0 && Intergreen == null && Offset == null && NoLeft != true && LeftPockets != true;
 }
 
 /// <summary>

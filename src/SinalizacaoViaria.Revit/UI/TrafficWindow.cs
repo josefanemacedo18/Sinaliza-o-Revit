@@ -18,6 +18,8 @@ public interface ITrafficHost
     string Draw(TrafficResult res, SimResult? sim);
     /// <summary>Aplica à interseção do projeto (chave do nó) o controle e/ou o plano semafórico.</summary>
     string ApplyToIntersection(string nodeKey, ControleNo? control, SignalPlanDef? plan);
+    /// <summary>Aplica no projeto o pacote completo de uma solução (interseção/rotatória, planos, grupos focais, placas, retenções).</summary>
+    string ApplyPackage(ProjectPackage package);
     /// <summary>Grava nível de serviço e resumo nos elementos das interseções, rotatórias e vias.</summary>
     string WriteResults(TrafficResult res, string scenario);
 }
@@ -720,7 +722,7 @@ public sealed class TrafficWindow : Window
         }
         o.Nodes = _current.Options.Nodes.Where(x => !x.IsEmpty).Select(x => new NodeOverride
         {
-            Node = x.Node, Control = x.Control, Cycle = x.Cycle, Greens = x.Greens?.ToList(), Intergreen = x.Intergreen, Offset = x.Offset, NoLeft = x.NoLeft,
+            Node = x.Node, Control = x.Control, Cycle = x.Cycle, Greens = x.Greens?.ToList(), Intergreen = x.Intergreen, Offset = x.Offset, NoLeft = x.NoLeft, LeftPockets = x.LeftPockets,
             Turns = x.Turns.Select(t => new TurnCount { Approach = t.Approach, Total = t.Total, Left = t.Left, Through = t.Through, Right = t.Right, UTurn = t.UTurn }).ToList(),
         }).ToList();
         o.Crossings = _current.Options.Crossings.Select(c => new CrossingSignal
@@ -988,8 +990,36 @@ public sealed class TrafficWindow : Window
             sp.Children.Add(new TextBlock { Text = t.Summary(UiHelpers.PtBr), TextWrapping = TextWrapping.Wrap });
             sp.Children.Add(new TextBlock { Text = t.Description, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)) });
             sp.Children.Add(new TextBlock { Text = "No projeto: " + t.InProject, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x17, 0x4A, 0x83)) });
-            var apply = new Button { Content = "Aplicar no cenário e simular", Margin = new Thickness(0, 4, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, IsEnabled = !t.Failed };
             var trial = t;
+            if (t.Package is { } pk)
+            {
+                var exp = new Expander { Header = $"O que entra no projeto ({pk.Items.Count} itens, {pk.Points.Count} elementos posicionados)", Margin = new Thickness(0, 4, 0, 0) };
+                exp.Content = new TextBox { Text = pk.Text(), IsReadOnly = true, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Consolas"), FontSize = 11, MaxHeight = 220, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+                sp.Children.Add(exp);
+            }
+            var btns = new WrapPanel();
+            var apply = new Button { Content = "Aplicar no cenário e simular", Margin = new Thickness(0, 4, 6, 0), IsEnabled = !t.Failed };
+            var applyProj = new Button
+            {
+                Content = "✔ Aplicar no PROJETO", Margin = new Thickness(0, 4, 0, 0), IsEnabled = !t.Failed && _host != null && t.Package is { ScenarioOnly: false },
+                FontWeight = FontWeights.SemiBold,
+                ToolTip = "Coloca no modelo tudo o que a solução exige (controle, rotatória, planos, grupos focais, placas, marcas, travessias) numa única operação desfazível; depois a rede é relida e simulada de novo para confirmar.",
+            };
+            applyProj.Click += (_, _) =>
+            {
+                if (_host == null || trial.Package == null) return;
+                if (MessageBox.Show(this, trial.Package.Text() + "\nAplicar tudo isso no projeto? (um único Desfazer)", "Aplicar solução no projeto", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                try
+                {
+                    _status.Text = _host.ApplyPackage(trial.Package);
+                    // Reabre com a rede relida (o controle agora vem do projeto) e simula para confirmar.
+                    _current.Options.Nodes.RemoveAll(x => trial.Package.NodeKey != null && x.Node == trial.Package.NodeKey && x.Turns.Count == 0);
+                    Reload();
+                }
+                catch (Exception ex) { UiHelpers.Error("Não foi possível aplicar: " + ex.Message); }
+            };
+            btns.Children.Add(apply);
+            btns.Children.Add(applyProj);
             apply.Click += (_, _) =>
             {
                 trial.Apply(_current.Options);
@@ -997,7 +1027,7 @@ public sealed class TrafficWindow : Window
                 _status.Text = $"Aplicado no cenário: {trial.Title}. Simulando…";
                 Run(true);
             };
-            sp.Children.Add(apply);
+            sp.Children.Add(btns);
             box.Child = sp;
             target.Children.Add(box);
         }

@@ -268,4 +268,56 @@ public class V29SimTests
         var res = TrafficAnalysis.Run(net, opt);
         Assert.All(res.Nodes[nd.Index].Approaches, a => Assert.True(a.LeftVolume < 1));
     }
+
+    [Fact]
+    public void SolutionPackage_Signal_ListsEverythingForTheProject()
+    {
+        var net = Crossing(0);
+        var opt = new TrafficOptions { Demand = NivelDemanda.Pico };
+        var res = TrafficAnalysis.Run(net, opt);
+        var nd = net.Nodes.Single(n => n.Kind == TipoNo.Intersecao);
+        var sig = TrafficSolutions.For(net, opt, res, nd.Index, null).Single(t => t.Kind == "semaforo");
+        var pk = Assert.IsType<ProjectPackage>(sig.Package);
+        Assert.Equal(Definitions.ControleIntersecao.Semaforo, pk.Control);
+        Assert.NotNull(pk.Plan);
+        Assert.True(pk.Plan!.Phases.Count >= 2);
+        // Um grupo focal por aproximação (4), junto à retenção, virado para quem chega.
+        var heads = pk.Points.Where(p => p.Kind == "Semaforo").ToList();
+        Assert.True(heads.Count >= 4);
+        foreach (var h in heads) Assert.InRange(h.Position.Length, 5, 40);
+        Assert.Contains(pk.Items, i => i.Norm.Contains("MBST Vol. V"));
+        Assert.Contains(pk.Items, i => i.Norm.Contains("NBR 9050"));
+        Assert.Null(sig.NormNote);
+        Assert.Contains("Semáforo", pk.Text());
+    }
+
+    [Fact]
+    public void SolutionWarrant_BlocksSignalWhenVolumesDoNotJustifyIt()
+    {
+        var net = Crossing(2);
+        var opt = new TrafficOptions { Demand = NivelDemanda.Baixa, Growth = -0.8 };
+        var res = TrafficAnalysis.Run(net, opt);
+        var nd = net.Nodes.Single(n => n.Kind == TipoNo.Intersecao);
+        var sig = TrafficSolutions.For(net, opt, res, nd.Index, null).Single(t => t.Kind == "semaforo");
+        Assert.NotNull(sig.NormNote);
+        Assert.False(sig.Improves);
+        Assert.Contains("MBST Vol. V", sig.Summary());
+    }
+
+    [Fact]
+    public void SolutionPackages_RoundaboutAndLeftBan_AreComplete()
+    {
+        var net = Crossing(0);
+        var opt = new TrafficOptions { Demand = NivelDemanda.Pico };
+        var res = TrafficAnalysis.Run(net, opt);
+        var nd = net.Nodes.Single(n => n.Kind == TipoNo.Intersecao);
+        var trials = TrafficSolutions.For(net, opt, res, nd.Index, null);
+        var rb = trials.Single(t => t.Kind == "rotatoria").Package!;
+        Assert.NotNull(rb.Roundabout);
+        Assert.Contains(rb.Items, i => i.Item.Contains("R-33"));
+        var left = trials.Single(t => t.Kind == "proibiresquerda").Package!;
+        Assert.False(left.LeftTurns);
+        Assert.Contains(left.Items, i => i.Item.Contains("R-4a"));
+        Assert.Contains(trials, t => t.Kind == "bolsao");
+    }
 }

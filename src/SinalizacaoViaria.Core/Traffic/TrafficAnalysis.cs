@@ -194,6 +194,7 @@ public static class TrafficAnalysis
             nd.Control = nd.DesignControl;
             if (opt.Override(nd)?.Control is { } c && !nd.IsZone && nd.Kind != TipoNo.Continuacao) nd.Control = c;
             nd.ScenarioNoLeft = opt.Override(nd)?.NoLeft == true;
+            nd.LeftPockets = nd.DesignLeftPockets || opt.Override(nd)?.LeftPockets == true;
         }
         foreach (var nd in net.Nodes.Where(n => n.IsZone))
             if (opt.ZoneVolumeKeys.TryGetValue(nd.Key, out var zv)) opt.ZoneVolumes[nd.Index] = zv;
