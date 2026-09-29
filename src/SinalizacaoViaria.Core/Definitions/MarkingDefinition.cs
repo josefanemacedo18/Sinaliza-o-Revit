@@ -1031,6 +1031,10 @@ public sealed class SectionProfileDefinition : MarkingDefinition, IProjectWideAn
     public double ProfileScale { get; set; } = 50;
     public double VerticalExaggeration { get; set; } = 1;
     public double CrossSlopePct { get; set; } = 2;
+    /// <summary>Desenha o caimento real: pista em duas águas (ou superelevação) e calçada caindo para a sarjeta.</summary>
+    public bool DrawSlopes { get; set; } = true;
+    /// <summary>Inclinação transversal da calçada para a sarjeta (%) quando a via não informa a sua.</summary>
+    public double SidewalkSlopePct { get; set; } = 2;
     public bool ProfileLevels { get; set; } = true;
     public bool ProfileHeights { get; set; } = true;
     public bool ProfileLegend { get; set; } = true;
@@ -1053,7 +1057,7 @@ public sealed class SectionProfileDefinition : MarkingDefinition, IProjectWideAn
     public static SectionProfileDefinition From(SectionDimensionDefinition sd, Vec2 position) => new()
     {
         SectionId = sd.Id, Position = position, ProfileScale = sd.ProfileScale, VerticalExaggeration = sd.VerticalExaggeration,
-        CrossSlopePct = sd.CrossSlopePct, ProfileLevels = sd.ProfileLevels, ProfileHeights = sd.ProfileHeights, ProfileLegend = sd.ProfileLegend,
+        CrossSlopePct = sd.CrossSlopePct, DrawSlopes = sd.DrawSlopes, SidewalkSlopePct = sd.SidewalkSlopePct, ProfileLevels = sd.ProfileLevels, ProfileHeights = sd.ProfileHeights, ProfileLegend = sd.ProfileLegend,
         TextMm = sd.TextMm, Decimals = sd.Decimals, Terminal = sd.Terminal, Letter = string.IsNullOrWhiteSpace(sd.SectionLetter) ? "A" : sd.SectionLetter,
         Output = sd.Output.Clone(),
     };
@@ -1180,6 +1184,8 @@ public sealed class SectionDimensionDefinition : MarkingDefinition, IProjectWide
     public double VerticalExaggeration { get; set; } = 1;
     /// <summary>Caimento transversal indicado na pista (%). 0 = não indicar.</summary>
     public double CrossSlopePct { get; set; } = 2;
+    public bool DrawSlopes { get; set; } = true;
+    public double SidewalkSlopePct { get; set; } = 2;
     /// <summary>Níveis (+0,15 / ±0,00) de cada trecho no perfil.</summary>
     public bool ProfileLevels { get; set; } = true;
     /// <summary>Cotas verticais dos desníveis (meios-fios, plataformas, canteiros).</summary>

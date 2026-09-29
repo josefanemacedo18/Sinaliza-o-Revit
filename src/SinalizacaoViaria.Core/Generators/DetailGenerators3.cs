@@ -88,6 +88,61 @@ public static partial class DetailGenerator
         _ => s.Paint ? "Pintura de demarcação viária" : "Elemento físico",
     };
 
+    /// <summary>Eixo de via cruzado pela seção: estação no corte, pavimento, seno do ângulo, lado esquerdo (+1/−1) e estaca no eixo.</summary>
+    public sealed record SectionAxis(double S, RoadPavementDefinition Pav, double Sin, double LeftSign, double Station, Polyline2 Path);
+
+    public static List<SectionAxis> SectionAxes(SectionDimensionDefinition sd, BuildContext ctx)
+    {
+        var a = sd.Start;
+        var b = sd.End;
+        var L = a.DistanceTo(b);
+        var u = (b - a) / Math.Max(1e-9, L);
+        var res = new List<SectionAxis>();
+        foreach (var d in (ctx.AllDefinitions?.Invoke() ?? Array.Empty<MarkingDefinition>()).OfType<RoadPavementDefinition>())
+        {
+            if (ctx.PathOf?.Invoke(d) is not { } path) continue;
+            foreach (var t in Crossings(path, a, b))
+            {
+                var p = a + (b - a) * t;
+                var (st, _) = path.Project(p);
+                var tan = path.TangentAt(st);
+                var sin = Math.Max(0.2, Math.Abs(u.Cross(tan)));
+                var left = u.Dot(tan.PerpLeft) >= 0 ? 1.0 : -1.0;
+                var local = d.HasEdgeVariation ? d.Local(st, path) : d;
+                if (!res.Any(x => Math.Abs(x.S - t * L) < 0.05)) res.Add(new SectionAxis(t * L, local, sin, left, st, path));
+            }
+        }
+        return res.OrderBy(x => x.S).ToList();
+    }
+
+    /// <summary>
+    /// Deslocamento vertical do desenho na estação <paramref name="s"/> do corte: pista em duas águas a partir do eixo (ou
+    /// superelevação), e calçada subindo para o lote com a sua inclinação – a partir da cota do bordo.
+    /// </summary>
+    private static double SlopeDz(IReadOnlyList<SectionAxis> axes, double s, double crossPct, double walkPct)
+    {
+        if (axes.Count == 0) return 0;
+        var ax = axes.OrderBy(x => Math.Abs(x.S - s)).First();
+        var o = (s - ax.S) * ax.Sin * ax.LeftSign;               // afastamento perpendicular, + à esquerda do eixo
+        var p = ax.Pav;
+        var grade = p.Output.Grade;
+        var cross = grade is { Crossfall: > 1e-6 } ? grade.Crossfall : crossPct / 100.0;
+        var e = grade?.E(ax.Station) ?? 0;
+        var w = o >= 0 ? p.LeftWidth : p.RightWidth;
+        var total = o >= 0 ? p.TotalLeft : p.TotalRight;
+        var ao = Math.Abs(o);
+        double Road(double y) => Math.Abs(e) > 1e-9 ? e * y : -cross * Math.Abs(y);
+        if (ao <= w) return Road(o);
+        var edge = Road(Math.Sign(o) * w);
+        if (ao > total + 0.5) return edge;
+        // Calçada: sobe para o lote a partir da face do meio-fio (inclinação da seção guardada ou a informada).
+        var slope = walkPct / 100.0;
+        var setup = Automation.RoadTemplates.FromJson(p.SetupJson);
+        var walkEl = setup == null ? null : (o >= 0 ? setup.Left : setup.Right).FirstOrDefault(x => x.Tipo == Automation.TipoElementoSecao.Calcada);
+        if (walkEl != null && Math.Abs(walkEl.InclinacaoTransversal) > 1e-6) slope = walkEl.InclinacaoTransversal / 100.0;
+        return edge + slope * Math.Max(0, ao - w - p.CurbWidth);
+    }
+
     /// <summary>
     /// Perfil transversal desenhado em escala ampliada: camadas cortadas preenchidas e contornadas, nome e nível de cada trecho,
     /// caimento da pista, cotas horizontais (larguras) e verticais (desníveis), eixo, legenda dos materiais e título.
@@ -102,13 +157,41 @@ public static partial class DetailGenerator
         var firstPiece = geo.Pieces.Count;
         var segs = ProfileSegments(a, b, withGeo);
         if (segs.Count == 0) { geo.Warnings.Add("Perfil transversal: nada cortado pela linha de seção."); return; }
+        // Caimento real: os trechos são quebrados no eixo e nos bordos e cada ponta recebe o desnível do caimento.
+        var saxes = pd.DrawSlopes ? SectionAxes(sd, ctx) : new List<SectionAxis>();
+        double Dz(double s) => pd.DrawSlopes ? SlopeDz(saxes, s, pd.CrossSlopePct, pd.SidewalkSlopePct) : 0;
+        if (saxes.Count > 0)
+        {
+            var cuts = new List<double>();
+            foreach (var x in saxes)
+            {
+                cuts.Add(x.S);
+                foreach (var sg in new[] { 1.0, -1.0 })
+                {
+                    var side = sg * x.LeftSign >= 0;
+                    var w = side ? x.Pav.LeftWidth : x.Pav.RightWidth;
+                    cuts.Add(x.S + sg * w / x.Sin);
+                    cuts.Add(x.S + sg * (w + x.Pav.CurbWidth) / x.Sin);
+                }
+            }
+            var split = new List<ProfileSegment>();
+            foreach (var sg in segs)
+            {
+                var pts = cuts.Where(c => c > sg.S0 + 0.01 && c < sg.S1 - 0.01).OrderBy(c => c).ToList();
+                var s0 = sg.S0;
+                foreach (var c in pts) { split.Add(sg with { S0 = s0, S1 = c }); s0 = c; }
+                split.Add(sg with { S0 = s0 });
+            }
+            segs = split;
+        }
+        const double Eps = 0.004;
 
         var mag = ctx.ViewScale / Math.Max(1, pd.ProfileScale);
         var vex = Math.Clamp(pd.VerticalExaggeration, 1, 10);
         var vmag = mag * vex;
         var paintMin = ctx.Mm(0.35) / vmag;           // pintura: faixa fina visível no papel
-        var zMax = segs.Max(x => x.Paint ? x.Z1 + paintMin : x.Z1);
-        var zMin = Math.Min(segs.Min(x => x.Z0), 0);
+        var zMax = segs.Max(x => (x.Paint ? x.Z1 + paintMin : x.Z1) + Math.Max(Dz(x.S0 + Eps), Dz(x.S1 - Eps)));
+        var zMin = Math.Min(segs.Min(x => x.Z0 + Math.Min(Dz(x.S0 + Eps), Dz(x.S1 - Eps))), 0);
         var tMm = pd.TextMm;
         var fmt = pd.Decimals <= 0 ? "0" : "0." + new string('0', Math.Clamp(pd.Decimals, 0, 3));
 
@@ -125,10 +208,12 @@ public static partial class DetailGenerator
         foreach (var sg in segs.OrderBy(x => x.Paint).ThenBy(x => x.Z1 - x.Z0 > 0.3 ? 1 : 0))
         {
             var z1 = sg.Paint ? sg.Z1 + paintMin : sg.Z1;
-            var rect = Polygon2.Rectangle(P(sg.S0, sg.Z0), P(sg.S1, z1));
-            geo.Pieces.Add(new MarkingPiece(rect, sg.Color));
+            var d0 = Dz(sg.S0 + Eps);
+            var d1 = Dz(sg.S1 - Eps);
+            var quad = new[] { P(sg.S0, sg.Z0 + d0), P(sg.S1, sg.Z0 + d1), P(sg.S1, z1 + d1), P(sg.S0, z1 + d0) };
+            geo.Pieces.Add(new MarkingPiece(new Polygon2(quad), sg.Color));
             if (!sg.Paint)
-                geo.Annotations.Add(new AnnotationLine(new[] { P(sg.S0, sg.Z0), P(sg.S1, sg.Z0), P(sg.S1, z1), P(sg.S0, z1), P(sg.S0, sg.Z0) }, MarkingColor.Preta));
+                geo.Annotations.Add(new AnnotationLine(quad.Append(quad[0]).ToList(), MarkingColor.Preta));
         }
         // Linha do terreno/subleito sob o corte, com pequenas marcas de solo.
         var ground = Y(zMin) - ctx.Mm(0.6);
@@ -151,8 +236,9 @@ public static partial class DetailGenerator
             var s1 = stations[i + 1];
             var len = s1 - s0;
             var mid = (s0 + s1) / 2;
-            var top = SurfaceTop(segs, mid);
-            if (top == null) { lastLevel = null; continue; }
+            var top0 = SurfaceTop(segs, mid);
+            if (top0 == null) { lastLevel = null; continue; }
+            double? top = top0.Value + Dz(mid);
             var w = len * mag;
             var name = SectionLabel(withGeo, a + (b - a) * (mid / L), len);
             if (name != null)
@@ -183,19 +269,29 @@ public static partial class DetailGenerator
                     geo.Annotations.Add(new AnnotationText(tip + new Vec2(0, th + ctx.Mm(lm + 0.9)), lt, lm));
                 }
             }
-            // Caimento transversal da pista, para fora do eixo mais próximo.
-            if (pd.CrossSlopePct > 0 && name is "Faixa de rolamento" or "Pista" && w > ctx.Mm(14))
+            // Caimento transversal (pista e calçada): seta para o lado mais baixo com a inclinação real do trecho.
+            var slopeHere = len > 0.05 ? (Dz(s1 - Eps) - Dz(s0 + Eps)) / len : 0;
+            var isRoad = name is "Faixa de rolamento" or "Pista" or "Faixa de ônibus" or "Ciclofaixa" or "Estacionamento";
+            var isWalk = name is "Calçada";
+            var pct = Math.Abs(slopeHere) * 100;
+            if (pd.CrossSlopePct > 0 && (isRoad || isWalk) && w > ctx.Mm(isWalk ? 10 : 14) && (pct > 0.05 || !pd.DrawSlopes))
             {
-                var ax = axes.Count > 0 ? axes.OrderBy(x => Math.Abs(x - mid)).First() : L / 2;
-                var dir = mid >= ax ? 1.0 : -1.0;
-                var y = Y(top.Value) + ctx.Mm(tMm * 0.75 + 2.2) + levelBand * 0.0;
+                double dir;
+                if (pd.DrawSlopes && pct > 0.05) dir = slopeHere < 0 ? 1.0 : -1.0;
+                else
+                {
+                    var ax = axes.Count > 0 ? axes.OrderBy(x => Math.Abs(x - mid)).First() : L / 2;
+                    dir = mid >= ax ? 1.0 : -1.0;
+                    pct = isWalk ? pd.SidewalkSlopePct : pd.CrossSlopePct;
+                }
+                var y = Y(top.Value) + ctx.Mm(tMm * 0.75 + 2.2);
                 var half = Math.Min(w * 0.3, ctx.Mm(9));
                 var from = new Vec2(X(mid) - dir * half, y);
                 var to = new Vec2(X(mid) + dir * half, y);
                 geo.Annotations.Add(new AnnotationLine(new[] { from, to }, MarkingColor.Preta));
                 var ah = ctx.Mm(1.1);
                 geo.Pieces.Add(new MarkingPiece(new Polygon2(new[] { to, to + new Vec2(-dir * ah * 1.6, ah * 0.5), to + new Vec2(-dir * ah * 1.6, -ah * 0.5) }), MarkingColor.Preta));
-                geo.Annotations.Add(new AnnotationText(new Vec2(X(mid), y + ctx.Mm(tMm * 0.75 + 0.6)), $"i = {pd.CrossSlopePct.ToString("0.0", Pt)} %", tMm * 0.75));
+                geo.Annotations.Add(new AnnotationText(new Vec2(X(mid), y + ctx.Mm(tMm * 0.75 + 0.6)), $"i = {pct.ToString("0.0", Pt)} %", tMm * 0.75));
             }
         }
 
@@ -204,8 +300,8 @@ public static partial class DetailGenerator
             for (int i = 1; i + 1 < stations.Count; i++)
             {
                 var s = stations[i];
-                var left = SurfaceTop(segs, (stations[i - 1] + s) / 2);
-                var right = SurfaceTop(segs, (s + stations[i + 1]) / 2);
+                var left = SurfaceTop(segs, (stations[i - 1] + s) / 2) + Dz(s - Eps);
+                var right = SurfaceTop(segs, (s + stations[i + 1]) / 2) + Dz(s + Eps);
                 if (left == null || right == null || Math.Abs(left.Value - right.Value) < 0.03) continue;
                 var low = Math.Min(left.Value, right.Value);
                 var high = Math.Max(left.Value, right.Value);
@@ -242,6 +338,13 @@ public static partial class DetailGenerator
 
         // Título e escala.
         var title = letter.Length > 0 ? $"SEÇÃO TRANSVERSAL {letter}–{letter}" : "SEÇÃO TRANSVERSAL";
+        var where = saxes.Count > 0 ? saxes : SectionAxes(sd, ctx);
+        var sub = string.Join(" · ", where.Select(x =>
+        {
+            var nm = !string.IsNullOrWhiteSpace(x.Pav.Notes) ? x.Pav.Notes!.Trim() : Hierarquia.Label(x.Pav.Hierarchy);
+            var est = (int)(x.Station / 20);
+            return $"{nm} – estaca {est}+{(x.Station - est * 20).ToString("0.00", Pt)} ({x.Station.ToString("0.00", Pt)} m)";
+        }).Distinct());
         var scale = vex > 1.001 ? $"ESCALA H 1:{pd.ProfileScale:0} – V 1:{pd.ProfileScale / vex:0.#} (EXAGERO VERTICAL {vex:0.#}×) – COTAS EM METROS"
                                 : $"ESCALA 1:{pd.ProfileScale:0} – COTAS E NÍVEIS EM METROS";
         var titleMm = tMm * 1.5;
@@ -251,6 +354,7 @@ public static partial class DetailGenerator
         var uy = ty - ctx.Mm(titleMm * 1.15);
         geo.Annotations.Add(new AnnotationLine(new[] { new Vec2(X(L / 2) - tw / 2, uy), new Vec2(X(L / 2) + tw / 2, uy) }, MarkingColor.Preta));
         geo.Annotations.Add(new AnnotationText(new Vec2(X(L / 2), uy - ctx.Mm(1.2)), scale, tMm * 0.75));
+        if (sub.Length > 0) geo.Annotations.Add(new AnnotationText(new Vec2(X(L / 2), uy - ctx.Mm(1.2 + tMm * 0.75 * 1.6)), sub, tMm * 0.75));
 
         // Legenda dos materiais cortados (amostra + nome + espessura).
         if (pd.ProfileLegend)

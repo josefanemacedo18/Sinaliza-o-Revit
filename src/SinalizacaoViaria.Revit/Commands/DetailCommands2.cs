@@ -63,6 +63,8 @@ internal static class DetailForms
             .Number("Exagero vertical (×)", () => d.VerticalExaggeration, v => d.VerticalExaggeration = v, 1, 10, "0.#",
                 "1 = verdadeira grandeza. 2 a 5 realça meios-fios e desníveis (a escala vertical aparece no título).")
             .Number("Caimento transversal indicado na pista (%)", () => d.CrossSlopePct, v => d.CrossSlopePct = v, 0, 10, "0.#", "0 = não indicar.")
+            .Check("Desenhar o caimento real (pista em duas águas / superelevação do greide, calçada para a sarjeta)", () => d.DrawSlopes, v => d.DrawSlopes = v)
+            .Number("Inclinação da calçada para a sarjeta (%, quando a via não informa)", () => d.SidewalkSlopePct, v => d.SidewalkSlopePct = v, 0, 8, "0.#")
             .Check("Níveis de cada trecho (+0,15 / ±0,00)", () => d.ProfileLevels, v => d.ProfileLevels = v)
             .Check("Cotas verticais dos desníveis", () => d.ProfileHeights, v => d.ProfileHeights = v)
             .Check("Legenda dos materiais cortados", () => d.ProfileLegend, v => d.ProfileLegend = v)
@@ -93,6 +95,8 @@ internal static class DetailForms
             .Number("Escala do perfil 1:", () => d.ProfileScale, v => d.ProfileScale = v, 5, 500, "0")
             .Number("Exagero vertical (×)", () => d.VerticalExaggeration, v => d.VerticalExaggeration = v, 1, 10, "0.#")
             .Number("Caimento transversal indicado na pista (%)", () => d.CrossSlopePct, v => d.CrossSlopePct = v, 0, 10, "0.#", "0 = não indicar.")
+            .Check("Desenhar o caimento real (pista em duas águas / superelevação do greide, calçada para a sarjeta)", () => d.DrawSlopes, v => d.DrawSlopes = v)
+            .Number("Inclinação da calçada para a sarjeta (%, quando a via não informa)", () => d.SidewalkSlopePct, v => d.SidewalkSlopePct = v, 0, 8, "0.#")
             .Number("Altura do texto (mm)", () => d.TextMm, v => d.TextMm = v, 0.8, 10, "0.#")
             .Choice("Terminal da cota", Terminals, () => d.Terminal, v => d.Terminal = v)
             .Check("Níveis de cada trecho (+0,15 / ±0,00)", () => d.ProfileLevels, v => d.ProfileLevels = v)

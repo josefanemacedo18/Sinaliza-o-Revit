@@ -285,7 +285,12 @@ public static partial class DetailGenerator
             var tMm = sd.TextMm * 1.5;
             // Bloco de 2 linhas além da cota total: o topo do texto fica do lado de fora, o texto cresce em direção à seção.
             var tPos = (a + b) / 2 + tUp * (outer + ctx.Mm(sd.TextMm * 1.6 + 6 + 2 * tMm * 1.45));
-            geo.Annotations.Add(new AnnotationText(tPos, title + "\n(cotas em metros)", tMm) { Rotation = titleRot });
+            var where = SectionAxes(sd, ctx).Select(x =>
+            {
+                var est = (int)(x.Station / 20);
+                return $"estaca {est}+{(x.Station - est * 20).ToString("0.00", Pt)}";
+            }).Distinct().ToList();
+            geo.Annotations.Add(new AnnotationText(tPos, title + "\n(cotas em metros" + (where.Count > 0 ? " – " + string.Join(", ", where) : "") + ")", tMm) { Rotation = titleRot });
         }
         // Seções antigas com o perfil embutido (hoje o perfil é um detalhe separado – SectionProfileDefinition).
         if (sd.Profile && sd.ProfilePosition is { } pos)
@@ -425,7 +430,7 @@ public static partial class DetailGenerator
             if (!geos.TryGetValue(d, out var g)) geos[d] = g = new MarkingGeometry();
             g.Pieces.Add(new MarkingPiece(Polygon2.Rectangle(new Vec2(0, y0), new Vec2(30, y1)), c) { Elevation = elev, Thickness = thick });
         }
-        var road = new RoadPavementDefinition();
+        var road = new RoadPavementDefinition { RightWidth = 5.3, LeftWidth = 5.3, RightSidewalk = 3.15, LeftSidewalk = 3.15, CurbWidth = 0.15 };
         defs.Add(road);
         geos[road] = new MarkingGeometry();
         geos[road].Pieces.Add(new MarkingPiece(Polygon2.Rectangle(new Vec2(0, -5.0), new Vec2(30, 5.0)), MarkingColor.Asfalto) { Elevation = -0.05, Thickness = 0.05 });

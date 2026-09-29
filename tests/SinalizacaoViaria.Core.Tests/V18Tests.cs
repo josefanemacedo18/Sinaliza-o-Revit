@@ -103,7 +103,7 @@ public class V18Tests
     public void SectionProfile_DrawsLayersLevelsHeightsAndTitle()
     {
         var (defs, geo, path) = DetailGenerator.SectionSample();
-        var sd = new SectionDimensionDefinition { Start = new Vec2(15, -8.45), End = new Vec2(15, 8.45), ProfilePosition = new Vec2(25, 10) };
+        var sd = new SectionDimensionDefinition { Start = new Vec2(15, -8.45), End = new Vec2(15, 8.45), ProfilePosition = new Vec2(25, 10), DrawSlopes = false };
         var c = new BuildContext { Catalog = Cat, ViewScale = 100, AllDefinitions = () => defs, GeometryOf = geo, PathOf = path };
         var g = DetailGenerator.SectionDimensions(sd, c);
         var texts = g.Annotations.OfType<AnnotationText>().Select(t => t.Text).ToList();
@@ -116,6 +116,11 @@ public class V18Tests
         Assert.Contains(texts, t => t.StartsWith("Meio-fio de concreto"));
         // Camadas do perfil desenhadas à direita (fora da planta), incluindo o asfalto.
         Assert.Contains(g.Pieces, p => p.Color == MarkingColor.Asfalto && p.Shape.Bounds.Min.X > 24);
+        // Caimento real: pista em duas águas a partir do eixo (níveis negativos junto à sarjeta) e estaca no título.
+        sd.DrawSlopes = true;
+        var sl = DetailGenerator.SectionDimensions(sd, c).Annotations.OfType<AnnotationText>().Select(t => t.Text).ToList();
+        Assert.Contains(sl, t => t.StartsWith("−0,"));
+        Assert.Contains(sl, t => t.Contains("estaca 0+15,00"));
         // Sem posição = sem perfil (só a cota em planta, como antes).
         sd.ProfilePosition = null;
         var plan = DetailGenerator.SectionDimensions(sd, c);
