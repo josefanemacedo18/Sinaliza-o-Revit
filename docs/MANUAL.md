@@ -1037,6 +1037,58 @@ Na janela da interseção, bloco **Linhas no cruzamento e regras de conversão**
   sempre limitadas à metade da quadra quando há outro cruzamento perto.
 * As linhas da via são **cortadas e substituídas** por essas marcas (nada fica sobreposto).
 
+### 19.1.2 Rampas das travessias (definidas antes de gerar)
+
+Na janela da interseção, bloco **Rampas das travessias (NBR 9050)**. As medidas valem para **todas as rampas** da
+interseção, ficam **lembradas entre sessões** e são usadas também nas **travessias automáticas** (conexões ao criar ou
+mover vias):
+
+| Campo | Padrão | Limite |
+|---|---|---|
+| **Tipo** | com abas laterais | com abas / sem abas (laterais protegidas) / rebaixamento total |
+| **Largura** | 0 = a largura da faixa de pedestres | mínimo 1,50 m (NBR 9050, 6.12.7.3.1) |
+| **Inclinação da rampa** | 8,33 % | no máximo 8,33 % (com meio-fio de 15 cm a rampa tem 1,80 m) |
+| **Inclinação das abas** | 10 % | no máximo 10 % |
+| **Faixa livre atrás da rampa** | 1,20 m | no mínimo 1,20 m |
+| **Piso tátil (NBR 16537)** | alerta na rampa | sem / alerta / alerta + direcional no eixo |
+| **Altura do meio-fio** | 0 = a da via | – |
+
+Para **alterar todas as rampas de uma vez** depois: *Interseção → Todos os cruzamentos* (aplica as medidas a todas as
+interseções do projeto) ou **Editar** numa interseção. Editar uma rampa que pertence a uma interseção abre esse mesmo
+bloco – a mudança vale para todas as rampas daquela interseção (uma rampa solta seria refeita na próxima atualização).
+
+**Sem falhas de modelagem.** Cada rampa fica **centrada no eixo da faixa de pedestres**, subindo perpendicular ao meio-fio a
+partir da face dele, e **inteira no trecho reto do meio-fio** (conferida contra a pista real da esquina). A grama, a
+calçada e o meio-fio são recortados no **retângulo da rampa com as abas**; os cantos atrás das abas viram calçada nivelada –
+não sobram triângulos de grama nem recortes em diagonal. A sarjeta continua inteira à frente da rampa. Quando a rampa pedida
+não cabe, ela é ajustada e o **relatório avisa**:
+
+1. **Calçada estreita** (não comporta a rampa e a faixa livre): **rebaixamento total** da calçada, com rampas laterais a no
+   máximo 5 % (NBR 9050, 6.12.7.3.3);
+2. **Rampa que invadiria a curva da esquina**: a travessia (com a rampa centrada nela) é **recuada** para o trecho reto,
+   até 2 m além do recuo pedido;
+3. ainda não cabe: a **largura automática é reduzida** (mínimo 1,50 m) e, por fim, a rampa fica **sem abas**;
+4. ramo curto demais: a rampa é omitida (com aviso).
+
+### 19.1.3 Ajustes por esquina e por ramo
+
+Numa interseção existente (**Editar** sobre ela, ou **Conexões** → clicar no cruzamento → *Interseção*), o bloco **Ajustes
+por esquina e por ramo** permite mudar um ramo de cada vez. Escolha o **Ramo** na lista (via, largura e direção); a
+pré-visualização mostra uma **seta** sobre ele e um arco na esquina ajustada – a **esquina à direita de quem chega** pelo
+ramo. Campos em branco, 0 ou *Geral da interseção* seguem os valores gerais:
+
+* **Raio da esquina** – só aquela esquina muda (a curva maior ou menor fica só no setor dela);
+* **Faixa de pedestres** sim/não, **largura** e **recuo** em relação à esquina;
+* **Rampas** sim/não nesta travessia;
+* **Controle da aproximação** – PARE, Dê a preferência, semáforo ou nenhum (ex.: PARE também na via principal = parada em
+  todas as aproximações; as linhas da principal passam a parar na retenção);
+* **Ilha separadora / bolsão** – na via secundária liga ou desliga a ilha gota (tipo II); na principal, o bolsão de conversão
+  à esquerda (tipo IV).
+
+**Aplicar este ajuste a todas as esquinas e ramos** copia os valores do ramo escolhido para todos; **Limpar** volta um ramo
+(ou todos) ao geral. Os ajustes ficam gravados na interseção e são mantidos quando as vias mudam; a janela *Interseção →
+Todos os cruzamentos* não os apaga.
+
 ### 19.2 Tipos de interseção (MBST / DNIT)
 
 Os tipos podem ser combinados na mesma interseção:
@@ -1059,6 +1111,25 @@ Os tipos podem ser combinados na mesma interseção:
 
 A janela mostra uma **pré-visualização** ao vivo: na criação, um exemplo (cruzamento, T, oblíquo 60° ou
 Y 45°, com via local, coletora ou avenida); na edição, as vias reais da interseção.
+
+### 19.2.1 Vias que chegam pela ponta do eixo
+
+Uma via **criada a partir da ponta** de outra, ou **ligada direto na ponta** de uma via existente, forma o mesmo cruzamento
+sem falhas, com larguras, ângulos e seções diferentes (local × arterial, com e sem canteiro central, mão única):
+
+* ponta que **não chega** ao eixo da outra via: o eixo é prolongado **na própria direção** até onde encontra a outra (sem
+  dobra junto ao nó); ponta que **passa** do eixo: o trecho que sobra além do nó sai da via (a calçada dele não invade a
+  calçada do outro lado);
+* **três vias pela ponta** no mesmo ponto (ou a menos de 3 m): todas entram no mesmo cruzamento;
+* **duas vias diferentes emendadas em linha reta** com uma terceira chegando: o lado reto vira esquina – o bordo das duas é
+  concordado e o meio-fio e a calçada são refeitos com a transição de largura;
+* **emenda de duas vias pela ponta** com seções diferentes: as linhas de bordo acompanham a transição da pista e as demais
+  linhas só vão até onde cabem (fora do canteiro em transição);
+* vias com **canteiro central em qualquer direção** têm as duas pistas separadas (antes, fora dos eixos X/Y, o canteiro virava
+  um furo encostado na ponta da pista e o piso ficava com autointerseção).
+
+Critérios conferidos nos testes automáticos: pavimento contínuo sem furos nem sobreposição, meio-fio e calçada fechando nas
+esquinas, nenhum piso menor que 0,01 m² nem com autointerseção, pintura dentro da pista.
 
 ### 19.3 Atualização
 
@@ -1120,6 +1191,11 @@ distância e largura das **travessias**, número de **árvores**. A janela mostr
 a **faixa de pedestres** vai de calçada a calçada atravessando também as faixas de desvio (by-pass), com as rampas nas
 duas pontas, os **refúgios** são recortados no nível da pista dentro das ilhas separadoras, o zebrado do "nariz" da ilha
 foi retirado (a ilha já é física) e a LFO-3 da aproximação começa junto à ilha.
+
+**Rampas das travessias da rotatória.** Ficam perpendiculares ao meio-fio e inteiras fora da curva de entrada/saída do
+ramo: se a travessia na distância pedida cairia na curva, ela é recuada até as rampas caberem (até 8 m); junto ao meio-fio
+curvo do by-pass, as rampas ficam sem abas (com aviso). A faixa de pedestres termina dentro da pista mesmo quando o meio-fio
+na ponta é curvo, e a ilha separadora que continua o canteiro da via recorta o canteiro dela (sem sobreposição).
 
 ### 20.1 Integração com as vias – só a rotatória, sem refazer o cruzamento
 
