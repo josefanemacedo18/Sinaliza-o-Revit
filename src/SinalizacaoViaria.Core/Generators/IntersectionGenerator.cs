@@ -125,6 +125,10 @@ public sealed class IntersectionLayout
     public List<string> Warnings { get; } = new();
     /// <summary>Rampas planejadas de cada travessia (via, sentido do ramo) – medidas da interseção já ajustadas.</summary>
     public Dictionary<(int Road, int Sign), RampPlan> RampPlans { get; } = new();
+    /// <summary>Orelhas (avanços de calçada) das esquinas geradas com a interseção.</summary>
+    public List<EarPlan> Ears { get; } = new();
+    /// <summary>Trecho de cada lado de ramo (via, sentido, +1 alto / −1 baixo) coberto por orelha.</summary>
+    public Dictionary<(int Road, int Sign, int Side), EarSide> EarSides { get; } = new();
     public MarkingColor PavementColor { get; set; } = MarkingColor.Asfalto;
     public double PavementThickness { get; set; } = 0.05;
     public double CurbHeight { get; set; } = 0.15;
@@ -209,7 +213,7 @@ public sealed class IntersectionLayout
 /// Geometria de interseções entre vias do "Sinalizar via": pavimento contínuo no miolo, esquinas com raio na face do
 /// meio-fio, calçadas e canteiros reconstruídos junto ao nó e recortes da sinalização das vias.
 /// </summary>
-public static class IntersectionGenerator
+public static partial class IntersectionGenerator
 {
     public const double NodeMergeDistance = 3.0;
     private static readonly string[] PhysicalCodes = { "CALCADA", "GRAMADO", "SARJETA", "SARJETAO", "PLATAFORMA" };
@@ -711,6 +715,8 @@ public static class IntersectionGenerator
         {
             CornerRadius = src.CornerRadius, Crosswalk = src.Crosswalk, CrosswalkWidth = src.CrosswalkWidth, CrosswalkSetback = src.CrosswalkSetback,
             Ramps = src.Ramps, Control = src.Control, Treatment = src.Treatment,
+            CurbExtension = src.CurbExtension, CurbExtensionLength = src.CurbExtensionLength,
+            CurbExtensionLengthOther = src.CurbExtensionLengthOther, CurbExtensionToParking = src.CurbExtensionToParking,
         };
         foreach (var leg in L.Legs)
         {
@@ -722,6 +728,10 @@ public static class IntersectionGenerator
             s.Ramps = copy.Ramps;
             s.Control = copy.Control;
             s.Treatment = copy.Treatment;
+            s.CurbExtension = copy.CurbExtension;
+            s.CurbExtensionLength = copy.CurbExtensionLength;
+            s.CurbExtensionLengthOther = copy.CurbExtensionLengthOther;
+            s.CurbExtensionToParking = copy.CurbExtensionToParking;
         }
         d.LegSettings.RemoveAll(x => x.IsEmpty);
     }
@@ -762,7 +772,7 @@ public static class IntersectionGenerator
         if (leg.Road >= L.Roads.Count || !RampsOn(d, L, leg)) return RampPlan.None;
         if (L.RampPlans.TryGetValue((leg.Road, leg.Sign), out var p)) return p;
         p = PlanRamps(d, L.Roads[leg.Road].Def, leg.Sign, CrosswalkWidthOf(d, L, leg),
-            Math.Max(0, LegSet(d, L, leg)?.CrosswalkSetback ?? d.CrosswalkSetback));
+            Math.Max(0, LegSet(d, L, leg)?.CrosswalkSetback ?? d.CrosswalkSetback), CrosswalkInset(L, leg, 1), CrosswalkInset(L, leg, -1));
         L.RampPlans[(leg.Road, leg.Sign)] = p;
         return p;
     }
@@ -788,7 +798,7 @@ public static class IntersectionGenerator
                 foreach (var (sgn, rp) in new[] { (1.0, p.Hi), (-1.0, p.Lo) })
                 {
                     if (rp == null) continue;
-                    var w = sgn > 0 ? L.HiEdge(leg, tc) : L.LoEdge(leg, tc);
+                    var w = (sgn > 0 ? L.HiEdge(leg, tc) : L.LoEdge(leg, tc)) - EarInset(L, leg, (int)sgn, tc);
                     var curb = L.At(leg, tc, sgn * w);
                     var up = (L.At(leg, tc, sgn * (w + 1)) - curb).Normalized();
                     var f = new RampGenerator.Frame(curb, up, up.PerpLeft);
@@ -899,11 +909,15 @@ public static class IntersectionGenerator
     /// </list>
     /// Cada ajuste gera um aviso. As duas rampas (lado alto e baixo do ramo) ficam no eixo da mesma faixa.
     /// </summary>
-    public static RampPlan PlanRamps(IntersectionDefinition d, RoadPavementDefinition r, int sign, double crosswalkWidth, double setback)
+    public static RampPlan PlanRamps(IntersectionDefinition d, RoadPavementDefinition r, int sign, double crosswalkWidth, double setback,
+        double earHi = 0, double earLo = 0)
     {
         var notes = new List<string>();
         var free = Math.Max(1.20, d.RampFreeWidth);
+        // Com orelha, a rampa começa na borda dela: a profundidade disponível é a calçada + o avanço.
         var walks = new[] { sign > 0 ? r.LeftSidewalk : r.RightSidewalk, sign > 0 ? r.RightSidewalk : r.LeftSidewalk };
+        if (walks[0] > 0.5) walks[0] += earHi;
+        if (walks[1] > 0.5) walks[1] += earLo;
         var ramps = new RampDefinition?[2];
         for (int k = 0; k < 2; k++)
         {
@@ -1306,7 +1320,21 @@ public static class IntersectionGenerator
         }
         L.Features.RemoveAll(f => !legs.Contains(f.Leg));
         L.Legs.AddRange(legs);
+        var warn0 = L.Warnings.Count;
         FinishRampPlans(d, L, pav);
+        if (EarCorners(d, L).Any())
+        {
+            // Orelhas nas esquinas: planejadas com folga, as rampas refeitas na borda delas (a travessia fica sobre a orelha)
+            // e o plano final com a posição definitiva das travessias.
+            PlanEars(d, L, pav, true);
+            if (L.Ears.Count > 0)
+            {
+                L.Warnings.RemoveRange(warn0, L.Warnings.Count - warn0);
+                L.RampPlans.Clear();
+                FinishRampPlans(d, L, PolygonOps.Difference(pav, L.Ears.Select(e => e.Footprint)));
+                PlanEars(d, L, pav, false);
+            }
+        }
 
         // Zona refeita pela interseção: cada ramo até o fim da curva da esquina (e até sair das calçadas das outras
         // vias) + os cantos entre ramos vizinhos. Assim a curva da esquina, o meio-fio e a calçada que a contorna
@@ -1528,6 +1556,14 @@ public static class IntersectionGenerator
     /// <summary>Recortes a aplicar numa marca do grupo da via <paramref name="road"/>.</summary>
     public static List<Polygon2> CutsFor(MarkingDefinition member, int road, IntersectionLayout L)
     {
+        var cuts = BaseCutsFor(member, road, L);
+        // Orelhas das esquinas: saem o pavimento, a sarjeta, a pintura e as vagas da via por baixo delas.
+        if (L.Ears.Count == 0 || !CutByEars(member)) return cuts;
+        return PolygonOps.Union(cuts.Concat(L.Ears.Select(e => e.Footprint)));
+    }
+
+    private static List<Polygon2> BaseCutsFor(MarkingDefinition member, int road, IntersectionLayout L)
+    {
         var phys = L.PhysicalCuts.GetValueOrDefault(road) ?? new List<Polygon2> { L.Zone };
         if (member is IAnnotationDefinition) return new();
         if (member is LinearMarkingDefinition { Code: "SARJETA" } && road < L.Roads.Count)
@@ -1730,6 +1766,9 @@ public static class IntersectionGenerator
         var geo = new MarkingGeometry();
         geo.Warnings.AddRange(L.Warnings);
         if (L.Pavement.Count == 0) return geo;
+        // Orelhas das esquinas (marcas filhas): a pista e a sarjeta da interseção saem de baixo delas.
+        var earFp = L.Ears.Select(e => e.Footprint).ToList();
+        List<Polygon2> NoEars(List<Polygon2> a) => earFp.Count == 0 ? a : PolygonOps.Difference(a, earFp).Where(p => p.Area >= 0.01).ToList();
         void Raised(IEnumerable<Polygon2> shapes, MarkingColor c, double h, double elev = 0)
         {
             foreach (var s in shapes)
@@ -1772,19 +1811,21 @@ public static class IntersectionGenerator
                 : Automation.EdgeProfile.Apply(L.Pavement, region, profile, new[] { L.Zone });
             if (rampBodies.Count > 0)
                 pieces = pieces.SelectMany(p => PolygonOps.Difference(new[] { p.Shape }, rampBodies).Where(x => x.Area >= 0.01).Select(x => p with { Shape = x })).ToList();
+            if (earFp.Count > 0)
+                pieces = pieces.SelectMany(p => NoEars(new List<Polygon2> { p.Shape }).Select(x => p with { Shape = x })).ToList();
             // Sarjetas que as vias mantêm dentro da zona (junto ao meio-fio delas) também saem do pavimento da interseção.
             inside.AddRange(KeptGutters(L));
             // Sem lascas nem "espinhos" (diferença pista − sarjetas de vias em ângulo): abre/fecha 5 mm e descarta pisos < 0,01 m².
             if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
-                Raised(Sound(inside.Count > 0 ? PolygonOps.Difference(L.Pavement, inside) : L.Pavement), L.PavementColor, L.PavementThickness, -L.PavementThickness);
+                Raised(Sound(NoEars(inside.Count > 0 ? PolygonOps.Difference(L.Pavement, inside) : L.Pavement)), L.PavementColor, L.PavementThickness, -L.PavementThickness);
             AddPieces(geo, pieces.SelectMany(p => Sound(new[] { p.Shape }).Select(x => p with { Shape = x })));
         }
         else
         {
             if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
-                Raised(Sound(L.Gutter.Count > 0 ? PolygonOps.Difference(L.Pavement, L.Gutter) : L.Pavement), L.PavementColor, L.PavementThickness, -L.PavementThickness);
+                Raised(Sound(NoEars(L.Gutter.Count > 0 ? PolygonOps.Difference(L.Pavement, L.Gutter) : L.Pavement)), L.PavementColor, L.PavementThickness, -L.PavementThickness);
             AddPieces(geo, L.Curb.Select(c => new MarkingPiece(c, MarkingColor.Concreto) { Thickness = L.CurbHeight, Layer = "MEIO-FIO" }));
-            Raised(L.Gutter, MarkingColor.Concreto, 0.005);
+            Raised(NoEars(L.Gutter), MarkingColor.Concreto, 0.005);
             if (L.SidewalkService.Count > 0)
             {
                 Raised(PolygonOps.Difference(L.Sidewalk, L.SidewalkService), MarkingColor.Concreto, L.CurbHeight);
@@ -2053,8 +2094,8 @@ public static class IntersectionGenerator
     {
         var r = L.Roads[leg.Road].Def;
         var f = L.FeatureOf(leg);
-        var hi = L.HiEdge(leg, t) - 0.3;
-        var floor = -L.LoEdge(leg, t) + 0.3;
+        var hi = L.HiEdge(leg, t) - EarInset(L, leg, 1, t) - 0.3;
+        var floor = -(L.LoEdge(leg, t) - EarInset(L, leg, -1, t)) + 0.3;
         if (r.TwoWay) floor = f?.Kind == TipoRamo.BolsaoAlargado ? -f.Delta(t) : 0;
         var a = L.At(leg, t, hi);
         var b = L.At(leg, t, floor);
@@ -2113,8 +2154,8 @@ public static class IntersectionGenerator
             // Travessia de pedestres e rebaixamentos.
             if (crosswalk)
             {
-                var a = L.At(leg, tc, L.HiEdge(leg, tc));
-                var b = L.At(leg, tc, -L.LoEdge(leg, tc));
+                var a = L.At(leg, tc, L.HiEdge(leg, tc) - EarInset(L, leg, 1, tc));
+                var b = L.At(leg, tc, -(L.LoEdge(leg, tc) - EarInset(L, leg, -1, tc)));
                 var cwDefs = new CrosswalkSetup { CrosswalkWidth = cwW, StopLines = false, EdgeSetback = 0.3 }
                     .Build(a, b, z, output, cwW, 0.40);
                 var near = new[] { Circle(L.At(leg, tc, 0), cwW * 3 + L.HiEdge(leg, tc) + L.LoEdge(leg, tc)) };
@@ -2127,7 +2168,7 @@ public static class IntersectionGenerator
                 // Rampas com as medidas da interseção (já ajustadas), centradas no eixo da faixa, subindo perpendicular ao
                 // meio-fio a partir da face dele.
                 var plan = RampPlanOf(d, L, leg);
-                foreach (var (sgn, w, tpl) in new[] { (1.0, L.HiEdge(leg, tc), plan.Hi), (-1.0, L.LoEdge(leg, tc), plan.Lo) })
+                foreach (var (sgn, w, tpl) in new[] { (1.0, L.HiEdge(leg, tc) - EarInset(L, leg, 1, tc), plan.Hi), (-1.0, L.LoEdge(leg, tc) - EarInset(L, leg, -1, tc), plan.Lo) })
                 {
                     if (tpl == null) continue;
                     var curb = L.At(leg, tc, sgn * w);
@@ -2150,7 +2191,7 @@ public static class IntersectionGenerator
                 var secondary = (own != null || !isMain) && control is ControleIntersecao.Pare or ControleIntersecao.DePreferencia;
                 var signal = control == ControleIntersecao.Semaforo;
                 var walkHi = (leg.Sign > 0 ? r.Def.LeftSidewalk : r.Def.RightSidewalk) > 0.5;
-                var signAt = L.At(leg, tStop + 0.3, L.HiEdge(leg, tStop) + (walkHi ? L.CurbWidth + 0.45 : 1.0));
+                var signAt = L.At(leg, tStop + 0.3, L.HiEdge(leg, tStop) - EarInset(L, leg, 1, tStop + 0.3) + (walkHi ? L.CurbWidth + 0.45 : 1.0));
                 if (secondary && control == ControleIntersecao.Pare || signal)
                 {
                     if (d.StopLines && hi - lo > 0.5)
@@ -2262,7 +2303,7 @@ public static class IntersectionGenerator
                 if (t > MaxT(L, leg) - 1) continue;
                 var walkHi = (leg.Sign > 0 ? r.Def.LeftSidewalk : r.Def.RightSidewalk) > 0.5;
                 hierarchy = r.Def.Hierarchy;
-                Add(new SignDefinition { Code = "R-4a", Position = L.At(leg, t, L.HiEdge(leg, t) + (walkHi ? L.CurbWidth + 0.45 : 1.0)), Direction = L.Inbound(leg, t), Z = z });
+                Add(new SignDefinition { Code = "R-4a", Position = L.At(leg, t, L.HiEdge(leg, t) - EarInset(L, leg, 1, t) + (walkHi ? L.CurbWidth + 0.45 : 1.0)), Direction = L.Inbound(leg, t), Z = z });
             }
         hierarchy = L.Roads[L.Main].Def.Hierarchy;
 
@@ -2270,7 +2311,38 @@ public static class IntersectionGenerator
         // principal e entra na secundária (ou vice-versa) cruza a linha (MBST Vol. IV).
         if (UseContinuityLine(d, L))
             foreach (var lco in ContinuityLines(d, L, z, roadMembers != null && L.Main < roadMembers.Count ? roadMembers[L.Main] : null)) Add(lco);
+
+        // Orelhas das esquinas: recortam a pintura da interseção e são recortadas pelas rampas (que ficam na borda delas).
+        if (L.Ears.Count > 0)
+        {
+            hierarchy = L.Roads[L.Main].Def.Hierarchy;
+            var rampFps = res.OfType<RampDefinition>().Select(r => RampGenerator.Footprint(r, new Polyline2(r.PathRef.Points))).ToList();
+            foreach (var c in res.Where(c => c is not RampDefinition && CutByEars(c)))
+                foreach (var e in L.Ears)
+                    if (Near(c, e.Footprint)) c.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = e.Footprint.Outer.ToList() });
+            foreach (var e in L.Ears)
+            {
+                var ear = (CurbExtensionDefinition)e.Template.CloneWithNewId();
+                ear.PathRef = PathReference.FromPoints(e.Path.Points, z);
+                foreach (var fp in rampFps)
+                    if (PolygonOps.TotalArea(PolygonOps.Intersect(new[] { fp }, new[] { e.Footprint })) > 1e-4)
+                        ear.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = fp.Outer.ToList() });
+                Add(ear);
+            }
+        }
         return res;
+    }
+
+    /// <summary>A marca pode tocar o polígono (caixas envolventes com 3 m de folga).</summary>
+    private static bool Near(MarkingDefinition c, Polygon2 p)
+    {
+        var pts = (c.Path ?? (c as HatchMarkingDefinition)?.Boundary)?.Points.ToList() ?? new List<Vec2>();
+        if (c is SymbolMarkingDefinition sm) pts.Add(sm.Position);
+        if (c is TextMarkingDefinition tm) pts.Add(tm.Position);
+        if (pts.Count == 0) return true;
+        var (mn, mx) = p.Bounds;
+        const double m = 3.0;
+        return pts.Max(q => q.X) >= mn.X - m && pts.Min(q => q.X) <= mx.X + m && pts.Max(q => q.Y) >= mn.Y - m && pts.Min(q => q.Y) <= mx.Y + m;
     }
 
     /// <summary>A interseção recebe LCO no bordo da principal? Automático: principal arterial/rodovia/trânsito rápido com secundária de hierarquia menor.</summary>

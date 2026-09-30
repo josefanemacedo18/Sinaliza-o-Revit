@@ -1566,7 +1566,7 @@ public sealed class IntersectionDefinition : MarkingDefinition
     /// <summary>Altura do meio-fio junto à rampa (m). Nulo = a altura do meio-fio da via.</summary>
     public double? RampCurbHeight { get; set; }
 
-    /// <summary>Copia as medidas das rampas de outra interseção (janela lembrada, alterar todas de uma vez).</summary>
+    /// <summary>Copia as medidas das rampas e das orelhas de outra interseção (janela lembrada, alterar todas de uma vez).</summary>
     public void CopyRampSettingsFrom(IntersectionDefinition o)
     {
         RampType = o.RampType;
@@ -1577,7 +1577,27 @@ public sealed class IntersectionDefinition : MarkingDefinition
         RampTactile = o.RampTactile;
         RampDirectional = o.RampDirectional;
         RampCurbHeight = o.RampCurbHeight;
+        CurbExtensions = o.CurbExtensions;
+        CurbExtensionLength = o.CurbExtensionLength;
+        CurbExtensionDepth = o.CurbExtensionDepth;
+        CurbExtensionEnds = o.CurbExtensionEnds;
+        CurbExtensionEndRadius = o.CurbExtensionEndRadius;
+        CurbExtensionToParking = o.CurbExtensionToParking;
     }
+
+    // Orelhas de calçada nas esquinas (avanço sobre a faixa de estacionamento): a travessia e as rampas vão para a borda da orelha.
+    /// <summary>Orelhas em todas as esquinas (ajuste por esquina liga/desliga cada uma).</summary>
+    public bool CurbExtensions { get; set; }
+    /// <summary>Avanço da orelha ao longo de cada via, medido na face do meio-fio a partir do fim da curva da esquina (m).</summary>
+    public double CurbExtensionLength { get; set; } = 5.0;
+    /// <summary>Largura do avanço sobre a pista (m). Nulo = a faixa de estacionamento (com a sarjeta) daquele lado.</summary>
+    public double? CurbExtensionDepth { get; set; }
+    /// <summary>Forma das pontas da orelha (curva, chanfro ou reta – acompanhando a calçada).</summary>
+    public TipoTransicao CurbExtensionEnds { get; set; } = TipoTransicao.Curva;
+    /// <summary>Raio da curva (ou comprimento do chanfro) das pontas (m).</summary>
+    public double CurbExtensionEndRadius { get; set; } = 1.5;
+    /// <summary>A orelha vai até onde começa o estacionamento (fim da área sem vagas junto ao cruzamento).</summary>
+    public bool CurbExtensionToParking { get; set; }
 
     /// <summary>Ajustes por ramo (raio da esquina, faixa, rampas, controle, ilha/bolsão). Sem ajuste = o geral.</summary>
     public List<IntersectionLegSettings> LegSettings { get; set; } = new();
@@ -1614,10 +1634,19 @@ public sealed class IntersectionLegSettings
     public ControleIntersecao? Control { get; set; }
     /// <summary>Ilha separadora (via secundária) ou bolsão de conversão à esquerda (via principal) neste ramo.</summary>
     public bool? Treatment { get; set; }
+    /// <summary>Orelha na esquina à direita de quem chega pelo ramo.</summary>
+    public bool? CurbExtension { get; set; }
+    /// <summary>Avanço da orelha desta esquina ao longo deste ramo (m).</summary>
+    public double? CurbExtensionLength { get; set; }
+    /// <summary>Avanço da orelha desta esquina ao longo da outra via (ramo seguinte, m). Nulo = igual ao deste ramo.</summary>
+    public double? CurbExtensionLengthOther { get; set; }
+    /// <summary>A orelha desta esquina vai até onde começa o estacionamento.</summary>
+    public bool? CurbExtensionToParking { get; set; }
 
     [JsonIgnore]
     public bool IsEmpty => CornerRadius == null && Crosswalk == null && CrosswalkWidth == null && CrosswalkSetback == null
-                           && Ramps == null && Control == null && Treatment == null;
+                           && Ramps == null && Control == null && Treatment == null && CurbExtension == null && CurbExtensionLength == null
+                           && CurbExtensionLengthOther == null && CurbExtensionToParking == null;
 }
 
 /// <summary>Uso da linha de continuidade (LCO) na boca das vias secundárias.</summary>

@@ -86,6 +86,10 @@ public sealed class CmdEditar : CommandBase
             Report("Rampas", IntersectionRunner.Run(uidoc, "SV - Rampas da interseção", s => s.Refresh(parent)).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;
         }
+        // Orelha gerada pela interseção: as medidas são as da interseção (gerais e por esquina) – refeita com ela.
+        if (stored.Definition is CurbExtensionDefinition { GroupId: { } eg }
+            && MarkingStorage.Definitions(uidoc.Document).OfType<IntersectionDefinition>().FirstOrDefault(i => i.Id == eg) is { } earParent)
+            return IntersectionEarEdit.Run(uidoc, earParent, stored.Definition as CurbExtensionDefinition);
         // Recuo da via (baia, faixa auxiliar): edita só este recuo e regenera a via.
         if (stored.Definition is RecessMarkingDefinition rec) return RecessCommand.EditExisting(uidoc, rec);
         // Elemento de uma via: escolher o que editar (só ele, a via inteira ou o pavimento/raios).

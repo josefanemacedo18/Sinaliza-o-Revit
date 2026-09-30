@@ -223,7 +223,8 @@ public static class SidewalkGenerator
         var ring = PolygonOps.Difference(new[] { fp }, inner);
         // O meio-fio existente permanece: remove a faixa junto à face original.
         var alongFace = PolygonOps.Strip(path.Points, 2 * cw + 0.02, roundJoins: true);
-        var curb = PolygonOps.Difference(ring, alongFace);
+        // Lascas do anel junto às emendas do caminho (< 0,01 m²) ficam na plataforma.
+        var curb = PolygonOps.Difference(ring, alongFace).Where(p => p.Area >= 0.01).ToList();
 
         var planter = new List<Polygon2>();
         if (d.Planter)

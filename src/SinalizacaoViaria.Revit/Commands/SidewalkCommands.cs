@@ -479,8 +479,136 @@ internal static class SidewalkCommandRunner
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdOrelha : CommandBase
 {
-    protected override Result Run(UIApplication app, UIDocument uidoc) =>
-        SidewalkCommandRunner.Run(uidoc, SidewalkCommandRunner.Last<CurbExtensionDefinition>(), d => SidewalkForms.CurbExtension((CurbExtensionDefinition)d, false));
+    protected override Result Run(UIApplication app, UIDocument uidoc)
+    {
+        // Rápido: clique na esquina de uma interseção e informe quanto a orelha avança (sem desenhar linhas). ESC: modo livre.
+        if (MarkingStorage.Definitions(uidoc.Document).OfType<IntersectionDefinition>().Any())
+        {
+            var pick = Picking.PickPoint(uidoc, "Orelha: clique na ESQUINA de uma interseção (perto do meio-fio da via em que ela avança) – ESC: desenhar/selecionar a face do meio-fio");
+            if (pick != null)
+            {
+                var r = IntersectionEarEdit.AtCorner(uidoc, UnitConv.ToVec2(pick));
+                if (r != null) return r.Value;
+            }
+        }
+        return SidewalkCommandRunner.Run(uidoc, SidewalkCommandRunner.Last<CurbExtensionDefinition>(), d => SidewalkForms.CurbExtension((CurbExtensionDefinition)d, false));
+    }
+}
+
+/// <summary>
+/// Orelhas geradas pela interseção: por clique na esquina (avanço ao longo da via clicada e da outra, ou até o início do
+/// estacionamento) e edição de uma orelha existente – as medidas ficam na interseção, que as refaz a cada atualização.
+/// </summary>
+internal static class IntersectionEarEdit
+{
+    private static double _along = 5.0, _other = 5.0;
+    private static bool _toParking;
+
+    private static (IntersectionDefinition It, IntersectionLayout L)? Find(UIDocument uidoc, Vec2 p, IntersectionDefinition? only = null)
+    {
+        var doc = uidoc.Document;
+        var svc = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
+        var roads = svc.Roads();
+        foreach (var it in (only != null ? new[] { only } : MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().ToArray())
+                     .OrderBy(i => i.Node.DistanceTo(p)))
+        {
+            if (only == null && it.Node.DistanceTo(p) > 60) break;
+            var rs = roads.Where(r => it.RoadIds.Contains(r.Def.Id)).ToList();
+            if (rs.Count < 2) continue;
+            try
+            {
+                var L = IntersectionGenerator.Layout((IntersectionDefinition)MarkingDefinition.FromJson(it.ToJson())!, rs);
+                if (L.IsBend || L.Legs.Count < 3) continue;
+                if (only == null && !L.Zone.Contains(p) && L.Zone.Outer.Min(v => v.DistanceTo(p)) > 15) continue;
+                return (it, L);
+            }
+            catch (Exception ex) { Log.Error("Orelha na esquina", ex); }
+        }
+        return null;
+    }
+
+    /// <summary>Clique na esquina: nulo = não há interseção ali (segue o modo livre).</summary>
+    public static Result? AtCorner(UIDocument uidoc, Vec2 p)
+    {
+        if (Find(uidoc, p) is not { } f || IntersectionGenerator.CornerAt(f.L, p) is not { } c) return null;
+        var work = (IntersectionDefinition)MarkingDefinition.FromJson(f.It.ToJson())!;
+        var fw = new FormWindow("Orelha na esquina", "Orelha na esquina da interseção",
+            $"Esquina entre {IntersectionGenerator.LegLabel(f.L, c.A)} e {IntersectionGenerator.LegLabel(f.L, c.B)}. A orelha avança sobre a faixa de " +
+            "estacionamento, contorna a curva da esquina e fica ligada à interseção (refeita quando ela é editada). A largura e as pontas valem para " +
+            "todas as orelhas desta interseção.", null, null, false, "Aplicar", 640, 560);
+        fw.Section("Avanço")
+          .Number("Avança pela calçada a partir da esquina, na via clicada (m)", () => _along, v => _along = Math.Max(0.5, v), 0.5, 60,
+              tooltip: "Medido na face do meio-fio a partir do fim da curva da esquina.")
+          .Number("Avanço ao longo da outra via da esquina (m) – 0 = só na via clicada", () => _other, v => _other = v < 0.05 ? 0 : Math.Max(0.5, v), 0, 60)
+          .Check("Terminar no início do estacionamento", () => _toParking, v => _toParking = v,
+              "Lê a faixa de estacionamento de cada via: a orelha vai até a primeira vaga (5 m depois da travessia/retenção – CTB art. 181).");
+        EarShape(fw, work);
+        if (UiHelpers.ShowModal(fw) != true) return Result.Cancelled;
+        CopyShape(f.It, work);
+        IntersectionGenerator.SetCornerEar(f.It, f.L, c.A, c.NearA, _along, _other, _toParking);
+        CommandBase.ReportResults("Orelha", IntersectionRunner.Run(uidoc, "SV - Orelha na esquina", s => s.Refresh(f.It)).Where(r => r.Warnings.Count > 0).ToList());
+        return Result.Succeeded;
+    }
+
+    /// <summary>Editar uma orelha gerada pela interseção: ajustes da esquina dela e as medidas gerais das orelhas.</summary>
+    public static Result Run(UIDocument uidoc, IntersectionDefinition parent, CurbExtensionDefinition? ear)
+    {
+        var mid = ear?.PathRef.Points is { Count: >= 2 } pts ? new Polyline2(pts).PointAt(new Polyline2(pts).Length / 2) : parent.Node;
+        var f = Find(uidoc, mid, parent);
+        var work = (IntersectionDefinition)MarkingDefinition.FromJson(parent.ToJson())!;
+        var corner = f is { } ff ? IntersectionGenerator.CornerAt(ff.L, mid) : null;
+        IntersectionLegSettings? set = corner is { } c0 && f is { } f0 ? IntersectionGenerator.LegSet(parent, f0.L, c0.A) : null;
+        var remove = false;
+        var lenA = set?.CurbExtensionLength ?? -1;
+        var lenB = set?.CurbExtensionLengthOther ?? -1;
+        bool? toParking = set?.CurbExtensionToParking;
+        var fw = new FormWindow("Orelha da interseção", "Orelha gerada pela interseção",
+            "Esta orelha é da interseção: as medidas abaixo ficam nela e a orelha é refeita a cada atualização (travessia e rampas na borda dela).",
+            null, null, false, "Aplicar", 640, 600);
+        if (corner != null)
+            fw.Section("Esta esquina")
+              .Check("Remover a orelha desta esquina", () => remove, v => remove = v)
+              .Number("Avanço ao longo do ramo dono da esquina (m) – −1 = geral, 0 = sem orelha deste lado", () => lenA, v => lenA = v, -1, 60)
+              .Number("Avanço ao longo da outra via (m) – −1 = o mesmo, 0 = sem orelha nela", () => lenB, v => lenB = v, -1, 60)
+              .Choice("Terminar no início do estacionamento", new (string, bool?)[] { ("Geral da interseção", null), ("Sim", true), ("Não", false) },
+                  () => toParking, v => toParking = v);
+        IntersectionForms.EarSection(fw, work);
+        if (UiHelpers.ShowModal(fw) != true) return Result.Cancelled;
+        CopyShape(parent, work);
+        parent.CurbExtensions = work.CurbExtensions;
+        parent.CurbExtensionLength = work.CurbExtensionLength;
+        parent.CurbExtensionToParking = work.CurbExtensionToParking;
+        if (corner is { } c && f is { } fl)
+        {
+            var s = IntersectionGenerator.LegSetOrNew(parent, fl.L, c.A);
+            s.CurbExtension = remove ? false : s.CurbExtension;
+            s.CurbExtensionLength = lenA < -0.5 ? null : lenA < 0.05 ? 0 : Math.Max(0.5, lenA);
+            s.CurbExtensionLengthOther = lenB < -0.5 ? null : lenB < 0.05 ? 0 : Math.Max(0.5, lenB);
+            s.CurbExtensionToParking = toParking;
+            parent.LegSettings.RemoveAll(x => x.IsEmpty);
+        }
+        CommandBase.ReportResults("Orelha", IntersectionRunner.Run(uidoc, "SV - Orelha da interseção", sv => sv.Refresh(parent)).Where(r => r.Warnings.Count > 0).ToList());
+        return Result.Succeeded;
+    }
+
+    private static void EarShape(FormWindow fw, IntersectionDefinition d)
+    {
+        fw.Section("Forma (todas as orelhas desta interseção)")
+          .Number("Largura do avanço (m) – 0 = a da faixa de estacionamento", () => d.CurbExtensionDepth ?? 0,
+              v => d.CurbExtensionDepth = v < 0.05 ? null : Math.Clamp(v, 0.3, 10), 0, 10)
+          .Choice("Forma das pontas", new[]
+              {
+                  ("Curvas reversas", TipoTransicao.Curva), ("Chanfro", TipoTransicao.Chanfro), ("Reta – acompanha a calçada", TipoTransicao.Reta),
+              }, () => d.CurbExtensionEnds, v => d.CurbExtensionEnds = v)
+          .Number("Raio da curva / comprimento do chanfro das pontas (m)", () => d.CurbExtensionEndRadius, v => d.CurbExtensionEndRadius = Math.Clamp(v, 0.1, 10), 0.1, 10);
+    }
+
+    private static void CopyShape(IntersectionDefinition to, IntersectionDefinition from)
+    {
+        to.CurbExtensionDepth = from.CurbExtensionDepth;
+        to.CurbExtensionEnds = from.CurbExtensionEnds;
+        to.CurbExtensionEndRadius = from.CurbExtensionEndRadius;
+    }
 }
 
 [Transaction(TransactionMode.Manual)]

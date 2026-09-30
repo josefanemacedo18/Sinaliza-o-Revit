@@ -112,6 +112,7 @@ internal static class IntersectionForms
              "Repete nas esquinas a faixa de serviço gramada definida na seção das vias que se cruzam, alinhando o desenho com as vias.");
 
         RampSection(w, d);
+        EarSection(w, d);
         LegSection(w, d, legsLayout, () => legIdx, v => legIdx = v, Cur, CurLeg, real != null);
 
         w.Section("Linhas no cruzamento e regras de conversão (MBST Vol. IV / CTB art. 207)",
@@ -183,6 +184,13 @@ internal static class IntersectionForms
              "Ex.: PARE também na via principal (parada em todas as aproximações) ou nenhum controle num ramo de saída.")
          .Choice("Ilha separadora (via secundária) / bolsão (via principal)", triState, () => cur().Treatment, v => cur().Treatment = v,
              "Via secundária: ilha gota (tipo II, física se a geral estiver em \"Nenhuma\"). Via principal: bolsão de conversão à esquerda (tipo IV).")
+         .Choice("Orelha nesta esquina", triState, () => cur().CurbExtension, v => cur().CurbExtension = v,
+             "Avanço da calçada sobre a faixa de estacionamento na esquina à direita de quem chega por este ramo.")
+         .Number("Avanço da orelha ao longo deste ramo (m) – −1 = geral, 0 = sem orelha deste lado", () => cur().CurbExtensionLength ?? -1,
+             v => cur().CurbExtensionLength = v < -0.5 ? null : v < 0.05 ? 0 : Math.Max(0.5, v), -1, 60, tooltip: "Medido na face do meio-fio a partir do fim da curva da esquina.")
+         .Number("Avanço ao longo da outra via da esquina (m) – −1 = o mesmo, 0 = sem orelha nela", () => cur().CurbExtensionLengthOther ?? -1,
+             v => cur().CurbExtensionLengthOther = v < -0.5 ? null : v < 0.05 ? 0 : Math.Max(0.5, v), -1, 60)
+         .Choice("Orelha termina onde começa o estacionamento", triState, () => cur().CurbExtensionToParking, v => cur().CurbExtensionToParking = v)
          .Button("Aplicar este ajuste a todas as esquinas e ramos", () =>
              {
                  if (curLeg() == null) return;
@@ -201,6 +209,31 @@ internal static class IntersectionForms
     /// de gerar. Rampa que não cabe é ajustada (rebaixamento total, travessia recuada, largura mínima de 1,50 m, sem abas) e
     /// o ajuste aparece no relatório.
     /// </summary>
+    /// <summary>
+    /// Orelhas nas esquinas (avanço da calçada sobre a faixa de estacionamento): geradas e refeitas com a interseção; a
+    /// travessia e as rampas vão para a borda da orelha e a pintura e as vagas por baixo dela são recortadas.
+    /// </summary>
+    public static void EarSection(FormWindow w, IntersectionDefinition d)
+    {
+        w.Section("Orelhas nas esquinas",
+                "Avanço da calçada sobre a faixa de estacionamento em cada esquina (encurta a travessia e protege a visibilidade – CTB art. 181). " +
+                "A orelha acompanha a curva da esquina; a travessia e as rampas ficam na borda dela; vagas, pintura, sarjeta e pavimento por baixo são recortados. " +
+                "Esquina sem faixa de estacionamento não recebe orelha (a não ser com a largura informada). Ajuste cada esquina em \"Ajustes por esquina\".")
+         .Check("Orelhas nas esquinas", () => d.CurbExtensions, v => d.CurbExtensions = v)
+         .Number("Avanço ao longo de cada via a partir da esquina (m)", () => d.CurbExtensionLength, v => d.CurbExtensionLength = Math.Max(0.5, v), 0.5, 60,
+             tooltip: "Medido na face do meio-fio a partir do fim da curva da esquina. Com travessia no ramo, a orelha vai além da faixa e das rampas.")
+         .Number("Largura do avanço (m) – 0 = a da faixa de estacionamento", () => d.CurbExtensionDepth ?? 0,
+             v => d.CurbExtensionDepth = v < 0.05 ? null : Math.Clamp(v, 0.3, 10), 0, 10,
+             tooltip: "Automática (0): a largura da faixa de estacionamento (com a sarjeta) de cada lado, lida da seção da via.")
+         .Choice("Forma das pontas", new[]
+             {
+                 ("Curvas reversas", TipoTransicao.Curva), ("Chanfro", TipoTransicao.Chanfro), ("Reta – acompanha a calçada", TipoTransicao.Reta),
+             }, () => d.CurbExtensionEnds, v => d.CurbExtensionEnds = v)
+         .Number("Raio da curva / comprimento do chanfro das pontas (m)", () => d.CurbExtensionEndRadius, v => d.CurbExtensionEndRadius = Math.Clamp(v, 0.1, 10), 0.1, 10)
+         .Check("Terminar onde começa o estacionamento", () => d.CurbExtensionToParking, v => d.CurbExtensionToParking = v,
+             "Lê a faixa de estacionamento da via: a orelha vai até a primeira vaga (fim da área proibida junto à esquina – 5 m após a travessia/retenção).");
+    }
+
     public static void RampSection(FormWindow w, IntersectionDefinition d)
     {
         var tactile = !d.RampTactile ? 0 : d.RampDirectional ? 2 : 1;
