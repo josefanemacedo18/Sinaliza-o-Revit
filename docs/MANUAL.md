@@ -904,7 +904,12 @@ centro do balão para criar uma **rua sem saída** saindo dela: o ramal recebe u
 linhas, sarjeta, meio-fio, grama, calçada), a interseção em T é feita automaticamente e o balão usa o mesmo perfil de
 calçada. Com ESC, o balão é posicionado livremente por dois cliques.
 
-* **Orelha de Calçada**: desenhe (ou clique dois pontos) na **face do meio-fio** existente, no trecho
+* **Orelha de Calçada – rápida, na esquina de uma interseção**: ao abrir a ferramenta, **clique na esquina** (perto do
+  meio-fio da via em que a orelha vai avançar) e informe **quanto ela avança pela calçada a partir da esquina** nessa via
+  (X m) e, se quiser, na outra via da esquina (Y m; 0 = só na via clicada) – ou marque **Terminar no início do
+  estacionamento**. Não é preciso desenhar linhas: a orelha fica ligada à interseção (ajuste da esquina) e é refeita com
+  ela; veja 19.1.4. Com **ESC** no clique, a ferramenta segue no modo livre abaixo.
+* **Orelha de Calçada – modo livre**: desenhe (ou clique dois pontos) na **face do meio-fio** existente, no trecho
   do avanço – em linha reta (meio de quadra) ou **contornando a esquina** (selecione as linhas/arco da
   esquina ou desenhe os pontos em volta dela; o meio-fio da orelha acompanha a esquina com raio =
   raio da esquina + avanço, ou com o *raio mínimo na esquina* informado), com a calçada à esquerda do sentido do desenho (ou desmarque a opção). Parâmetros:
@@ -1089,6 +1094,31 @@ ramo. Campos em branco, 0 ou *Geral da interseção* seguem os valores gerais:
 (ou todos) ao geral. Os ajustes ficam gravados na interseção e são mantidos quando as vias mudam; a janela *Interseção →
 Todos os cruzamentos* não os apaga.
 
+### 19.1.4 Orelhas nas esquinas
+
+O bloco **Orelhas nas esquinas** da janela da interseção gera, junto com ela, o **avanço da calçada sobre a faixa de
+estacionamento** em cada esquina (encurta a travessia, melhora a visibilidade e impede o estacionamento junto à esquina –
+CTB art. 181):
+
+* **Avanço ao longo de cada via a partir da esquina** (ex.: 5 m) – medido na **face do meio-fio** a partir do fim da curva
+  da esquina; a orelha contorna a curva (meio-fio com raio = raio da esquina + avanço);
+* **Largura do avanço** – 0 = a **largura da faixa de estacionamento** (com a sarjeta) lida da seção de cada via; esquina
+  sem faixa de estacionamento não recebe orelha (a não ser com a largura informada – aviso);
+* **Forma das pontas** – curvas reversas (raio), chanfro ou reta (acompanha a calçada);
+* **Terminar onde começa o estacionamento** – a orelha vai até a primeira vaga (fim do trecho sem vagas junto ao
+  cruzamento: travessia/retenção + 5 m).
+
+Por esquina (bloco *Ajustes por esquina*, a esquina à direita de quem chega pelo ramo): **orelha sim/não**, **avanço neste
+ramo** e **na outra via** (−1 = geral; 0 = sem orelha daquele lado, a orelha não contorna a esquina) e **terminar no
+estacionamento**. *Aplicar a todas* copia também esses valores.
+
+Regras aplicadas: com travessia no ramo, a **faixa de pedestres e as rampas vão para a borda da orelha** (a orelha é
+estendida além da faixa e das rampas quando o avanço pedido é menor – aviso) e a rampa usa a profundidade da calçada + a
+orelha; a orelha é recortada pelas rampas, e **pavimento, sarjeta, pintura (linhas, zebrados, setas) e vagas** por baixo
+dela são recortados. Esquinas canalizadas (faixa de conversão livre) não recebem orelha. As orelhas são marcas da
+interseção: **refeitas sempre que ela é atualizada/editada**; **Editar** sobre uma delas abre os ajustes daquela esquina e
+as medidas gerais das orelhas.
+
 ### 19.2 Tipos de interseção (MBST / DNIT)
 
 Os tipos podem ser combinados na mesma interseção:
@@ -1137,6 +1167,40 @@ Tudo é regenerado quando um eixo é movido, ao editar a interseção (**Editar*
 Travessias, retenções, placas, zebrados e linhas deslocadas da interseção são recriados nessas ocasiões
 (ajustes manuais neles são perdidos). A ferramenta **Interseção** com *Todos os cruzamentos* aplica os
 tipos e o controle escolhidos a todas as interseções do projeto.
+
+### 19.4 Abrir acesso numa via existente (retorno em U ou nova via em T)
+
+**Conexões → Trocar Conexão → "Abrir acesso numa via"**: clique na via, no ponto do acesso, do lado de quem vai retornar (ou
+do lado da nova via). Tudo é feito numa **só operação** (um *Desfazer* volta tudo).
+
+**Retorno em U** – escolha a forma e o **veículo de projeto** (DNIT, raios mínimos de giro, editáveis):
+
+| Veículo | Raio externo (roda dianteira) | Raio interno (roda traseira) |
+|---|---|---|
+| VP – automóvel | 7,30 m | 4,70 m |
+| CO – caminhão/ônibus | 12,80 m | 8,70 m |
+| SR – semirreboque | 13,70 m | 6,00 m |
+
+* **Abertura no canteiro central**: o veículo começa o giro na faixa junto ao canteiro; o canteiro abre onde a faixa varrida
+  (do raio interno ao externo + 0,50 m) passa, com **pontas em semicírculo** e meio-fio contínuo. Se a roda externa não
+  couber a 0,50 m do meio-fio da pista oposta, essa pista é **alargada** (transições 1:12, vagas interrompidas); se o
+  alargamento não deixar 1,20 m de calçada (NBR 9050), a calçada inteira se desloca e o aviso sugere rotatória ou retorno em
+  quadra.
+* **Bolsão de espera**: com canteiro largo (≥ faixa + 1 m), o bolsão é **recortado do canteiro** (teiper + espera, LMS-2/LMS-1);
+  sem isso, **bolsão lateral à direita** – o veículo sai da faixa, espera junto ao meio-fio e cruza a via inteira.
+* **Alargamento da pista oposta** (via sem canteiro): só o alargamento para o giro.
+* **Rotatória no ponto**: cria uma rotatória ligada à via (retorno pela rotatória).
+
+Sinalização: seta **PEM-RE** na faixa de espera, **R-3** nas pontas do canteiro voltadas para o vão (ninguém entra na
+contramão ao cruzar), **R-5a** para o sentido oposto (o giro foi dimensionado para um sentido), **R-6a** nos alargamentos e
+bolsões; as linhas junto ao canteiro são interrompidas no vão. O retorno fica gravado **na seção da via**: **Editar** sobre a
+via (opção *Retornos em U desta via*), sobre a seta ou as placas do retorno altera a estaca, a forma, o veículo, os raios ou
+remove o retorno – a via é refeita com ele.
+
+**Nova via menor (T)**: escolha a **seção** (modelo de via), o **ângulo** com a via existente (90° = perpendicular, medido
+para o lado do clique), o **comprimento** e o **raio das esquinas**. O eixo sai do eixo da via existente no ponto clicado e a
+via nova é ligada por **interseção** (meio-fio, calçada e canteiro central da via existente abertos na boca). A via nova e a
+interseção são editáveis como qualquer outra.
 
 ## 20. Rotatórias
 
