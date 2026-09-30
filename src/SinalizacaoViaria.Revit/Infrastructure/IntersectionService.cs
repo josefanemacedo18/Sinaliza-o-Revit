@@ -29,7 +29,7 @@ public sealed class IntersectionService
     public static IntersectionDefinition AutoTemplate(bool? crosswalks = null)
     {
         var cw = crosswalks ?? PluginContext.Settings.AutoCrosswalks;
-        return new IntersectionDefinition
+        var t = new IntersectionDefinition
         {
             Control = ControleIntersecao.Pare,
             StopLines = true,
@@ -38,6 +38,9 @@ public sealed class IntersectionService
             Ramps = cw,
             Output = PluginContext.Settings.NewOutput(),
         };
+        // Rampas das travessias automáticas com as medidas lembradas da janela Interseção.
+        if (UI.UiHelpers.Remembered<IntersectionDefinition>("Intersecao") is { } last) t.CopyRampSettingsFrom(last);
+        return t;
     }
 
     /// <summary>
@@ -158,6 +161,7 @@ public sealed class IntersectionService
                 it.PocketLength = template.PocketLength;
                 it.PocketTaper = template.PocketTaper;
                 it.PocketWidth = template.PocketWidth;
+                it.CopyRampSettingsFrom(template);
             }
             foreach (var i in ids) if (!it.RoadIds.Contains(roads[i].Def.Id)) it.RoadIds.Add(roads[i].Def.Id);
             results.AddRange(Refresh(it));
@@ -331,7 +335,7 @@ public sealed class IntersectionService
                 m.Exclusions.RemoveAll(e => e.SourceId == it.Id || (e.SourceId != null && (e.SourceId.StartsWith(it.Id + ":") || oldIds.Contains(e.SourceId))));
                 foreach (var cut in IntersectionGenerator.CutsFor(m, k, layout))
                     m.Exclusions.Add(new ExclusionZone { SourceId = it.Id, Points = cut.Outer.ToList() });
-                if (IntersectionGenerator.IsPhysical(m))
+                if (IntersectionGenerator.CutByRamps(m))
                     foreach (var (rid, fp) in ramps)
                         m.Exclusions.Add(new ExclusionZone { SourceId = rid, Points = fp.Outer.ToList() });
                 try { results.Add(_service.Render(m)); }

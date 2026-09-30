@@ -688,6 +688,11 @@ public sealed class RampDefinition : MarkingDefinition
     public double LandingDepth { get; set; }
     /// <summary>Material da rampa (concreto, bloquete...).</summary>
     public MarkingColor RampColor { get; set; } = MarkingColor.Concreto;
+    /// <summary>
+    /// Recorte retangular: calçada, grama e meio-fio são recortados no retângulo que envolve a rampa e as abas, e os cantos
+    /// atrás das abas viram calçada nivelada (sem sobras de grama nem recortes em diagonal). Usado nas rampas das interseções.
+    /// </summary>
+    public bool SquareCut { get; set; }
 
     public override string KindName => "Rampa";
     public override string DisplayCode => Type switch
@@ -1543,6 +1548,40 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public double PocketTaper { get; set; } = 20.0;
     public double PocketWidth { get; set; } = 3.0;
 
+    // Rampas das travessias (NBR 9050): as mesmas medidas em todas as travessias, ajustadas quando não cabem.
+    /// <summary>Tipo das rampas das travessias (com abas, sem abas ou rebaixamento total).</summary>
+    public TipoRampa RampType { get; set; } = TipoRampa.RebaixamentoComAbas;
+    /// <summary>Largura da rampa (m). Nulo = a largura da faixa de pedestres (mínimo 1,50 m).</summary>
+    public double? RampWidth { get; set; }
+    /// <summary>Inclinação longitudinal da rampa (no máximo 8,33 %).</summary>
+    public double RampSlope { get; set; } = 0.0833;
+    /// <summary>Inclinação das abas laterais (no máximo 10 %).</summary>
+    public double RampFlareSlope { get; set; } = 0.10;
+    /// <summary>Faixa livre mínima da calçada que precisa sobrar atrás da rampa (m, no mínimo 1,20).</summary>
+    public double RampFreeWidth { get; set; } = 1.20;
+    /// <summary>Piso tátil de alerta na rampa (NBR 16537).</summary>
+    public bool RampTactile { get; set; } = true;
+    /// <summary>Piso tátil direcional no eixo da rampa até o fim da subida (NBR 16537).</summary>
+    public bool RampDirectional { get; set; }
+    /// <summary>Altura do meio-fio junto à rampa (m). Nulo = a altura do meio-fio da via.</summary>
+    public double? RampCurbHeight { get; set; }
+
+    /// <summary>Copia as medidas das rampas de outra interseção (janela lembrada, alterar todas de uma vez).</summary>
+    public void CopyRampSettingsFrom(IntersectionDefinition o)
+    {
+        RampType = o.RampType;
+        RampWidth = o.RampWidth;
+        RampSlope = o.RampSlope;
+        RampFlareSlope = o.RampFlareSlope;
+        RampFreeWidth = o.RampFreeWidth;
+        RampTactile = o.RampTactile;
+        RampDirectional = o.RampDirectional;
+        RampCurbHeight = o.RampCurbHeight;
+    }
+
+    /// <summary>Ajustes por ramo (raio da esquina, faixa, rampas, controle, ilha/bolsão). Sem ajuste = o geral.</summary>
+    public List<IntersectionLegSettings> LegSettings { get; set; } = new();
+
     /// <summary>Ids das marcas criadas pela interseção (faixas, retenções, rampas) – regeneradas com ela.</summary>
     /// <summary>Plano semafórico gravado (Simulador de Tráfego ou informado). Nulo = calculado pelo simulador.</summary>
     public SignalPlanDef? SignalPlan { get; set; }
@@ -1553,6 +1592,32 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public override void Translate(Vec2 delta, double dz) { Node += delta; Z += dz; }
     public override string KindName => "Interseção";
     public override string DisplayCode => "INTERSECAO";
+}
+
+/// <summary>
+/// Ajustes de um ramo da interseção (via + sentido a partir do nó). Valores nulos seguem o geral da interseção.
+/// </summary>
+public sealed class IntersectionLegSettings
+{
+    /// <summary>Via (pavimento) do ramo.</summary>
+    public string RoadId { get; set; } = "";
+    /// <summary>+1: o ramo segue o sentido do eixo a partir do nó; −1: o sentido contrário.</summary>
+    public int Sign { get; set; } = 1;
+    /// <summary>Raio da esquina à direita de quem chega pelo ramo (face do meio-fio, m).</summary>
+    public double? CornerRadius { get; set; }
+    public bool? Crosswalk { get; set; }
+    public double? CrosswalkWidth { get; set; }
+    /// <summary>Recuo da faixa de pedestres em relação ao fim da curva da esquina (m).</summary>
+    public double? CrosswalkSetback { get; set; }
+    public bool? Ramps { get; set; }
+    /// <summary>Controle da aproximação por este ramo (PARE, Dê a preferência, semáforo, nenhum).</summary>
+    public ControleIntersecao? Control { get; set; }
+    /// <summary>Ilha separadora (via secundária) ou bolsão de conversão à esquerda (via principal) neste ramo.</summary>
+    public bool? Treatment { get; set; }
+
+    [JsonIgnore]
+    public bool IsEmpty => CornerRadius == null && Crosswalk == null && CrosswalkWidth == null && CrosswalkSetback == null
+                           && Ramps == null && Control == null && Treatment == null;
 }
 
 /// <summary>Uso da linha de continuidade (LCO) na boca das vias secundárias.</summary>

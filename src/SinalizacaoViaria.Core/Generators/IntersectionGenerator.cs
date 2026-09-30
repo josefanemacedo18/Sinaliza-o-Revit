@@ -19,6 +19,15 @@ public sealed record IntersectionLeg(int Road, int Sign, double NodeStation, dou
     public double StationAt(double t) => NodeStation + Sign * t;
 }
 
+/// <summary>
+/// Rampas de uma travessia: a do lado alto (+o) e a do lado baixo (−o) do ramo (nula = sem calçada ou omitida), o
+/// deslocamento extra da travessia para as rampas caberem no trecho reto do meio-fio e os avisos dos ajustes.
+/// </summary>
+public sealed record RampPlan(RampDefinition? Hi, RampDefinition? Lo, double Shift, IReadOnlyList<string> Notes)
+{
+    public static RampPlan None { get; } = new(null, null, 0, Array.Empty<string>());
+}
+
 /// <summary>Tipo de tratamento aplicado num ramo.</summary>
 public enum TipoRamo { Simples, Gota, BolsaoCanteiro, BolsaoAlargado }
 
@@ -114,6 +123,8 @@ public sealed class IntersectionLayout
     /// <summary>Por via: áreas onde os elementos físicos (pavimento, meio-fio, calçada, canteiro) são refeitos pela interseção.</summary>
     public Dictionary<int, List<Polygon2>> PhysicalCuts { get; } = new();
     public List<string> Warnings { get; } = new();
+    /// <summary>Rampas planejadas de cada travessia (via, sentido do ramo) – medidas da interseção já ajustadas.</summary>
+    public Dictionary<(int Road, int Sign), RampPlan> RampPlans { get; } = new();
     public MarkingColor PavementColor { get; set; } = MarkingColor.Asfalto;
     public double PavementThickness { get; set; } = 0.05;
     public double CurbHeight { get; set; } = 0.15;
@@ -200,6 +211,13 @@ public static class IntersectionGenerator
 
     public static bool IsPhysical(MarkingDefinition d) =>
         d is LinearMarkingDefinition l && (PhysicalCodes.Contains(l.Code) || l.Code.StartsWith("MEIO-FIO"));
+
+    /// <summary>
+    /// Elementos da via recortados pelas rampas: calçada, grama, meio-fio e plataforma. A sarjeta fica no nível da pista, à
+    /// frente da face do meio-fio onde a rampa começa – não é recortada (senão sobrava um entalhe de 5 cm na sarjeta).
+    /// </summary>
+    public static bool CutByRamps(MarkingDefinition d) =>
+        IsPhysical(d) && d is LinearMarkingDefinition l && !l.Code.StartsWith("SARJETA");
 
     private static Polygon2 Circle(Vec2 c, double r) => new(CurveTools.Circle(c, r, Math.Max(0.005, r * 0.0015)));
 
@@ -593,8 +611,216 @@ public static class IntersectionGenerator
     }
 
     /// <summary>Distância livre das travessias/retenção a partir do fim da esquina.</summary>
-    private static double StopFar(IntersectionDefinition d) =>
-        d.Crosswalks ? d.CrosswalkSetback + d.CrosswalkWidth + (d.StopLines ? 1.6 + 0.4 : 0) + 0.3 : (d.StopLines ? 1.5 : 0.3);
+    private static double StopFar(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
+        CrosswalkOn(d, L, leg) ? SetbackOf(d, L, leg) + CrosswalkWidthOf(d, L, leg) + (d.StopLines ? 1.6 + 0.4 : 0) + 0.3 : (d.StopLines ? 1.5 : 0.3);
+
+    // ------------------------------------------------------------------ ajustes por ramo e rampas das travessias
+
+    /// <summary>Ajustes gravados para o ramo (via + sentido a partir do nó), se houver.</summary>
+    public static IntersectionLegSettings? LegSet(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
+        d.LegSettings.Count == 0 || leg.Road >= L.Roads.Count ? null
+            : d.LegSettings.FirstOrDefault(s => s.RoadId == L.Roads[leg.Road].Def.Id && s.Sign == leg.Sign);
+
+    /// <summary>O ramo tem faixa de pedestres.</summary>
+    public static bool CrosswalkOn(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) => LegSet(d, L, leg)?.Crosswalk ?? d.Crosswalks;
+
+    /// <summary>Largura da faixa de pedestres do ramo (m).</summary>
+    public static double CrosswalkWidthOf(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
+        Math.Max(1.0, LegSet(d, L, leg)?.CrosswalkWidth ?? d.CrosswalkWidth);
+
+    /// <summary>A travessia do ramo tem rampas.</summary>
+    public static bool RampsOn(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
+        CrosswalkOn(d, L, leg) && (LegSet(d, L, leg)?.Ramps ?? d.Ramps);
+
+    /// <summary>Recuo da faixa a partir do fim da curva: o pedido + o deslocamento para as rampas caberem no trecho reto.</summary>
+    public static double SetbackOf(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
+        Math.Max(0, LegSet(d, L, leg)?.CrosswalkSetback ?? d.CrosswalkSetback) + RampPlanOf(d, L, leg).Shift;
+
+    /// <summary>Distância do nó ao eixo da faixa de pedestres do ramo.</summary>
+    public static double CrosswalkT(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
+        leg.Clear + SetbackOf(d, L, leg) + CrosswalkWidthOf(d, L, leg) / 2;
+
+    /// <summary>Rampas planejadas para a travessia do ramo (calculadas uma vez por arranjo).</summary>
+    public static RampPlan RampPlanOf(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg)
+    {
+        if (leg.Road >= L.Roads.Count || !RampsOn(d, L, leg)) return RampPlan.None;
+        if (L.RampPlans.TryGetValue((leg.Road, leg.Sign), out var p)) return p;
+        p = PlanRamps(d, L.Roads[leg.Road].Def, leg.Sign, CrosswalkWidthOf(d, L, leg),
+            Math.Max(0, LegSet(d, L, leg)?.CrosswalkSetback ?? d.CrosswalkSetback));
+        L.RampPlans[(leg.Road, leg.Sign)] = p;
+        return p;
+    }
+
+    /// <summary>
+    /// Confere as rampas nos ramos definitivos contra a pista real (curva da esquina, faixa de conversão, alargamentos):
+    /// enquanto o corpo da rampa (da face do meio-fio para dentro) tocar a pista, a travessia é recuada mais 5 cm. Ramo
+    /// curto: rampa omitida. Junta os avisos dos ajustes.
+    /// </summary>
+    private static void FinishRampPlans(IntersectionDefinition d, IntersectionLayout L, List<Polygon2> pav)
+    {
+        if (L.Legs.Count <= 2) return;
+        var notes = new List<(string Text, int Count)>();
+        var shifts = new List<double>();
+        foreach (var leg in L.Legs)
+        {
+            var p = RampPlanOf(d, L, leg);
+            if (p.Hi == null && p.Lo == null) continue;
+            var extra = 0.0;
+            bool Touches()
+            {
+                var tc = CrosswalkT(d, L, leg) + extra;
+                foreach (var (sgn, rp) in new[] { (1.0, p.Hi), (-1.0, p.Lo) })
+                {
+                    if (rp == null) continue;
+                    var w = sgn > 0 ? L.HiEdge(leg, tc) : L.LoEdge(leg, tc);
+                    var curb = L.At(leg, tc, sgn * w);
+                    var up = (L.At(leg, tc, sgn * (w + 1)) - curb).Normalized();
+                    var f = new RampGenerator.Frame(curb, up, up.PerpLeft);
+                    var (_, len, _) = RampGenerator.Dimensions(rp);
+                    var ext = RampHalfExtent(rp);
+                    var body = new Polygon2(new[] { f.P(-ext, 0.01), f.P(ext, 0.01), f.P(ext, len), f.P(-ext, len) });
+                    if (PolygonOps.TotalArea(PolygonOps.Intersect(new[] { body }, pav)) > 1e-4) return true;
+                }
+                return false;
+            }
+            while (extra < 3.0 && Touches()) extra += 0.05;
+            if (extra > 1e-6)
+            {
+                var shift = p.Shift + extra;
+                var ns = p.Notes.Where(n => !n.StartsWith("travessia recuada")).Append(
+                    $"travessia recuada mais {shift:0.00} m para a rampa ficar inteira no trecho reto do meio-fio, fora da curva da esquina").ToList();
+                p = p with { Shift = shift, Notes = ns };
+                L.RampPlans[(leg.Road, leg.Sign)] = p;
+            }
+            // A rampa (até a ponta da aba do lado de fora do nó) precisa caber antes do fim do ramo.
+            var room = MaxT(L, leg) - 0.5 - CrosswalkT(d, L, leg);
+            var hi = p.Hi != null && RampHalfExtent(p.Hi) > room ? null : p.Hi;
+            var lo = p.Lo != null && RampHalfExtent(p.Lo) > room ? null : p.Lo;
+            if (hi != p.Hi || lo != p.Lo)
+            {
+                p = p with { Hi = hi, Lo = lo, Notes = p.Notes.Append("ramo curto demais para a rampa inteira – rampa omitida; prolongue a via ou reduza a rampa").ToList() };
+                L.RampPlans[(leg.Road, leg.Sign)] = p;
+            }
+            if (p.Shift > 1e-6) shifts.Add(p.Shift);
+            foreach (var n in p.Notes.Where(n => !n.StartsWith("travessia recuada")).Distinct())
+            {
+                var k = notes.FindIndex(x => x.Text == n);
+                if (k < 0) notes.Add((n, 1));
+                else notes[k] = (n, notes[k].Count + 1);
+            }
+        }
+        foreach (var (n, c) in notes) L.Warnings.Add($"Rampas: {n}{(c > 1 ? $" ({c} travessias)" : "")}.");
+        if (shifts.Count > 0)
+        {
+            var (a, b) = (shifts.Min(), shifts.Max());
+            var span = b - a < 0.005 ? $"{a:0.00} m" : $"{a:0.00} a {b:0.00} m";
+            L.Warnings.Add($"Rampas: travessia recuada mais {span} (além do recuo pedido) para a rampa ficar inteira no trecho reto do meio-fio, " +
+                           $"fora da curva da esquina{(shifts.Count > 1 ? $" ({shifts.Count} travessias)" : "")}.");
+        }
+    }
+
+    /// <summary>Rampa com as medidas pedidas na interseção (antes dos ajustes).</summary>
+    public static RampDefinition RampTemplate(IntersectionDefinition d, RoadPavementDefinition r, double crosswalkWidth) => new()
+    {
+        Type = d.RampType == TipoRampa.AcessoVeiculos ? TipoRampa.RebaixamentoComAbas : d.RampType,
+        Width = Math.Max(MinRampWidth, d.RampWidth ?? crosswalkWidth),
+        Height = Math.Clamp(d.RampCurbHeight is > 0.02 ? d.RampCurbHeight.Value : r.CurbHeight, 0.02, 0.40),
+        Slope = Math.Clamp(d.RampSlope, 0.02, MaxRampSlope),
+        FlareSlope = Math.Clamp(d.RampFlareSlope, 0.02, MaxFlareSlope),
+        Tactile = d.RampTactile,
+        DirectionalTactile = d.RampDirectional,
+        SquareCut = true,
+    };
+
+    public const double MinRampWidth = 1.50;
+    public const double MaxRampSlope = 0.0833;
+    public const double MaxFlareSlope = 0.10;
+    /// <summary>Inclinação máxima das rampas laterais do rebaixamento total (NBR 9050, 6.12.7.3.3: 5 %).</summary>
+    public const double TotalSideSlope = 0.05;
+    /// <summary>Deslocamento máximo da travessia (além do recuo pedido) antes de reduzir a largura ou tirar as abas.</summary>
+    public const double MaxRampShift = 2.0;
+    /// <summary>Folga entre a rampa (ponta da aba) e o fim da curva do meio-fio.</summary>
+    public const double RampCurveGap = 0.10;
+
+    /// <summary>Extensão da rampa ao longo do meio-fio, do centro até a ponta da aba (ou da rampa lateral).</summary>
+    public static double RampHalfExtent(RampDefinition r)
+    {
+        var (w, _, fl) = RampGenerator.Dimensions(r);
+        return w / 2 + (r.Type == TipoRampa.RebaixamentoSemAbas ? 0 : fl);
+    }
+
+    /// <summary>
+    /// Rampas de uma travessia com as medidas da interseção, ajustadas para caber sem falhas (NBR 9050):
+    /// <list type="number">
+    /// <item>calçada que não comporta a rampa e a faixa livre → rebaixamento total da calçada (rampas laterais ≤ 5 %);</item>
+    /// <item>rampa que invadiria a curva da esquina → a travessia (com a rampa centrada nela) é deslocada para o trecho
+    /// reto do meio-fio, até 2 m além do recuo pedido;</item>
+    /// <item>ainda não cabe → largura automática reduzida (mínimo 1,50 m), depois rampa sem abas; por fim a travessia é
+    /// deslocada o que for preciso.</item>
+    /// </list>
+    /// Cada ajuste gera um aviso. As duas rampas (lado alto e baixo do ramo) ficam no eixo da mesma faixa.
+    /// </summary>
+    public static RampPlan PlanRamps(IntersectionDefinition d, RoadPavementDefinition r, int sign, double crosswalkWidth, double setback)
+    {
+        var notes = new List<string>();
+        var free = Math.Max(1.20, d.RampFreeWidth);
+        var walks = new[] { sign > 0 ? r.LeftSidewalk : r.RightSidewalk, sign > 0 ? r.RightSidewalk : r.LeftSidewalk };
+        var ramps = new RampDefinition?[2];
+        for (int k = 0; k < 2; k++)
+        {
+            var walk = walks[k];
+            if (walk <= 0.5) continue;
+            var rp = RampTemplate(d, r, crosswalkWidth);
+            if (rp.Type != TipoRampa.RebaixamentoTotal)
+            {
+                var (_, run, _) = RampGenerator.Dimensions(rp);
+                // Tolerância de 1 cm: 8,33 % é 1:12 (a rampa de 0,15 m tem 1,80 m).
+                if (walk - run - rp.LandingDepth < free - 0.01)
+                {
+                    notes.Add($"calçada de {walk:0.00} m não comporta a rampa de {run:0.00} m e a faixa livre de {free:0.00} m – feito o rebaixamento total da calçada (NBR 9050, 6.12.7.3.3)");
+                    rp.Type = TipoRampa.RebaixamentoTotal;
+                }
+            }
+            if (rp.Type == TipoRampa.RebaixamentoTotal)
+            {
+                // Platô no nível da pista em toda a profundidade da calçada; rampas laterais ao longo do meio-fio.
+                rp.SidewalkDepth = walk;
+                rp.Slope = Math.Min(rp.Slope, TotalSideSlope);
+                rp.DirectionalTactile = false;
+            }
+            ramps[k] = rp;
+        }
+        if (ramps.All(x => x == null)) return RampPlan.None;
+        var avail = setback + crosswalkWidth / 2 - RampCurveGap;
+        double Need() => ramps.Where(x => x != null).Select(x => RampHalfExtent(x!) - avail).Max();
+        if (Need() > MaxRampShift && d.RampWidth == null)
+        {
+            // Largura automática (= faixa): reduz só o necessário para o deslocamento não passar do máximo.
+            var before = ramps.Where(x => x != null).Max(x => x!.Width);
+            foreach (var x in ramps.Where(x => x != null))
+            {
+                var over = RampHalfExtent(x!) - avail - MaxRampShift;
+                if (over > 0) x!.Width = Math.Max(MinRampWidth, Math.Round(x.Width - 2 * over - 0.005, 2));
+            }
+            var after = ramps.Where(x => x != null).Min(x => x!.Width);
+            if (after < before - 1e-6)
+                notes.Add($"largura da rampa reduzida de {before:0.00} m para {after:0.00} m (mínimo 1,50 m, NBR 9050, 6.12.7.3.1) para caber fora da curva da esquina");
+        }
+        if (Need() > MaxRampShift)
+            foreach (var x in ramps.Where(x => x is { Type: TipoRampa.RebaixamentoComAbas }))
+                if (RampHalfExtent(x!) - avail > MaxRampShift)
+                {
+                    x!.Type = TipoRampa.RebaixamentoSemAbas;
+                    notes.Add("rampa sem abas para caber fora da curva da esquina – proteja as laterais (faixa de serviço, mobiliário)");
+                }
+        var shift = Math.Max(0, Need());
+        if (shift > 1e-3)
+        {
+            shift = Math.Ceiling(shift * 20 - 1e-6) / 20;
+            notes.Add($"travessia recuada mais {shift:0.00} m para a rampa ficar inteira no trecho reto do meio-fio, fora da curva da esquina");
+        }
+        return new RampPlan(ramps[0], ramps[1], shift, notes);
+    }
 
     /// <summary>Tratamentos dos ramos (gota nas secundárias, bolsão de conversão à esquerda na principal).</summary>
     private static List<LegFeature> Features(IntersectionDefinition d, IntersectionLayout L, IReadOnlyList<IntersectionLeg> legs,
@@ -619,7 +845,7 @@ public static class IntersectionGenerator
                 while (tEdge < c && others.Any(o => o.Contains(L.At(leg, tEdge, 0)))) tEdge += 0.25;
                 var w = Math.Clamp(d.SplitterWidth, 1.0, 8.0);
                 var t0 = tEdge + 1.0;
-                var len = Math.Max(Math.Max(6, d.SplitterLength), d.Crosswalks ? c + d.CrosswalkSetback + d.CrosswalkWidth + 3.5 - t0 : 0);
+                var len = Math.Max(Math.Max(6, d.SplitterLength), CrosswalkOn(d, L, leg) ? c + SetbackOf(d, L, leg) + CrosswalkWidthOf(d, L, leg) + 3.5 - t0 : 0);
                 var delta = w / 2;
                 var taper = Math.Max(10, 12 * delta);
                 var tEnd = t0 + len + taper;
@@ -845,7 +1071,7 @@ public static class IntersectionGenerator
                 var stopAt = new List<Polygon2>();
                 foreach (var leg in legs0.Where(l => l.Road == i))
                 {
-                    var tEnd = leg.Clear + (d.Crosswalks ? d.CrosswalkSetback + d.CrosswalkWidth + 0.8 : 1.0);
+                    var tEnd = leg.Clear + (CrosswalkOn(d, L, leg) ? SetbackOf(d, L, leg) + CrosswalkWidthOf(d, L, leg) + 0.8 : 1.0);
                     var wide = Math.Max(r.Def.TotalLeft, r.Def.TotalRight) + 2;
                     stopAt.AddRange(L.LegPoly(leg, -maxHalf, tEnd, _ => -wide, _ => wide));
                 }
@@ -900,6 +1126,7 @@ public static class IntersectionGenerator
         }
         L.Features.RemoveAll(f => !legs.Contains(f.Leg));
         L.Legs.AddRange(legs);
+        FinishRampPlans(d, L, pav);
 
         // Zona refeita pela interseção: cada ramo até o fim da curva da esquina (e até sair das calçadas das outras
         // vias) + os cantos entre ramos vizinhos. Assim a curva da esquina, o meio-fio e a calçada que a contorna
@@ -969,13 +1196,12 @@ public static class IntersectionGenerator
         var obstacles = PolygonOps.Union(medT.SelectMany(x => x).Concat(gotas).Concat(islands));
         L.Obstacles.AddRange(obstacles);
         var refuges = L.Roads.Select(_ => new List<Polygon2>()).ToList();
-        if (d.Crosswalks)
         {
             var bands = new List<Polygon2>();
-            foreach (var leg in L.Legs)
+            foreach (var leg in L.Legs.Where(l => CrosswalkOn(d, L, l)))
             {
-                var tc = leg.Clear + d.CrosswalkSetback + d.CrosswalkWidth / 2;
-                var hw = d.CrosswalkWidth / 2 - 0.1;
+                var tc = CrosswalkT(d, L, leg);
+                var hw = CrosswalkWidthOf(d, L, leg) / 2 - 0.1;
                 var band = L.LegPoly(leg, tc - hw, tc + hw, t => -L.LoEdge(leg, t), t => L.HiEdge(leg, t));
                 bands.AddRange(band);
                 // Refúgio: o canteiro central da própria via é cortado no nível da pista na travessia (também fora do nó).
@@ -1065,7 +1291,6 @@ public static class IntersectionGenerator
         L.SpanStops.AddRange(L.Obstacles.Concat(L.PaintedMedians).Concat(L.PaintedIslands));
 
         // Recortes da sinalização pintada: miolo + aproximação até depois da retenção + trechos tratados.
-        var stopFar = L.Legs.Count <= 2 ? 0.3 : StopFar(d);
         for (int i = 0; i < L.Roads.Count; i++)
         {
             var r = L.Roads[i];
@@ -1091,7 +1316,8 @@ public static class IntersectionGenerator
             }
             foreach (var leg in L.Legs.Where(l => l.Road == i))
             {
-                if (through && !d.Crosswalks) continue;
+                if (through && !CrosswalkOn(d, L, leg)) continue;
+                var stopFar = L.Legs.Count <= 2 ? 0.3 : StopFar(d, L, leg);
                 var s0 = leg.NodeStation;
                 var s1 = Math.Clamp(leg.StationAt(leg.Clear + stopFar), 0, r.Axis.Length);
                 var s1p = Math.Clamp(leg.StationAt(leg.Clear + stopFar + 5.0), 0, r.Axis.Length);
@@ -1213,7 +1439,7 @@ public static class IntersectionGenerator
         // 1. Miolo da principal que atravessa o nó.
         if (through)
         {
-            var box = legs.Select(l => l.StationAt(l.Clear + (d.Crosswalks ? Math.Max(0, d.CrosswalkSetback - 0.4) : 0))).ToList();
+            var box = legs.Select(l => l.StationAt(l.Clear + (CrosswalkOn(d, L, l) ? Math.Max(0, SetbackOf(d, L, l) - 0.4) : 0))).ToList();
             var (s0, s1) = (box.Min(), box.Max());
             if (s1 - s0 > 1)
             {
@@ -1244,7 +1470,7 @@ public static class IntersectionGenerator
             foreach (var leg in legs)
             {
                 if (L.FeatureOf(leg) != null) continue;                       // gota/bolsão têm linhas próprias
-                var t0 = through && !d.Crosswalks ? leg.Clear : leg.Clear + StopFar(d);
+                var t0 = through && !CrosswalkOn(d, L, leg) ? leg.Clear : leg.Clear + StopFar(d, L, leg);
                 var lim = LegLimit(L, leg, d.NeighborNodes);
                 if (role == PapelLinha.Eixo && dashed)
                 {
@@ -1327,19 +1553,26 @@ public static class IntersectionGenerator
                 if (ss != null && ss.Area > 1e-4) geo.Pieces.Add(new MarkingPiece(ss, c) { Thickness = h, Elevation = elev });
             }
         }
-        // Rebaixamentos das travessias recortam as calçadas refeitas pela interseção.
-        if (d.Crosswalks && d.Ramps)
+        // Rebaixamentos das travessias recortam as calçadas refeitas pela interseção (retângulo da rampa com as abas: a
+        // grama e o meio-fio saem inteiros, sem lascas).
+        var rampBodies = new List<Polygon2>();
+        if (L.Legs.Any(l => RampsOn(d, L, l)))
         {
             var ramps = Children(d, L, new OutputSettings(), 0).OfType<RampDefinition>()
                 .Select(r => RampGenerator.Footprint(r, new Polyline2(r.PathRef.Points))).ToList();
+            // Corpo das rampas (da face do meio-fio para dentro): nada do perfil de calçada da esquina fica por baixo.
+            rampBodies = PolygonOps.Difference(ramps, L.Pavement);
             if (ramps.Count > 0)
             {
-                var sw = PolygonOps.Difference(L.Sidewalk, ramps);
-                var cb = PolygonOps.Difference(L.Curb, ramps);
-                var sv = PolygonOps.Difference(L.SidewalkService, ramps);
+                static List<Polygon2> Cut(List<Polygon2> a, List<Polygon2> b, double min) => PolygonOps.Difference(a, b).Where(p => p.Area >= min).ToList();
+                var sw = Cut(L.Sidewalk, ramps, 0.01);
+                var cb = Cut(L.Curb, ramps, 0.01);
+                var sv = Cut(L.SidewalkService, ramps, 0.01);
+                var sm = Cut(L.SidewalkMax, ramps, 0.01);
                 L.Sidewalk.Clear(); L.Sidewalk.AddRange(sw);
                 L.Curb.Clear(); L.Curb.AddRange(cb);
                 L.SidewalkService.Clear(); L.SidewalkService.AddRange(sv);
+                L.SidewalkMax.Clear(); L.SidewalkMax.AddRange(sm);
             }
         }
         var profile = d.MatchRoadSection ? d.EdgeProfile : new List<Automation.EdgeBand>();
@@ -1352,6 +1585,8 @@ public static class IntersectionGenerator
             var (pieces, inside) = perRoad.Count > 0
                 ? ApplyPerRoad(L, d.RoadProfiles, profile, region)
                 : Automation.EdgeProfile.Apply(L.Pavement, region, profile, new[] { L.Zone });
+            if (rampBodies.Count > 0)
+                pieces = pieces.SelectMany(p => PolygonOps.Difference(new[] { p.Shape }, rampBodies).Where(x => x.Area >= 0.01).Select(x => p with { Shape = x })).ToList();
             // Sarjetas que as vias mantêm dentro da zona (junto ao meio-fio delas) também saem do pavimento da interseção.
             inside.AddRange(KeptGutters(L));
             if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
@@ -1645,7 +1880,6 @@ public static class IntersectionGenerator
             res.Add(def);
             return def;
         }
-        var stopFar = StopFar(d);
         // Emenda pela ponta: as linhas das vias continuam pela curva, sem travessias nem controle.
         if (L.IsBend)
         {
@@ -1662,38 +1896,39 @@ public static class IntersectionGenerator
             var isMain = leg.Road == L.Main;
             var inbound = r.Def.TwoWay || leg.Sign < 0;   // mão única: só o ramo por onde o tráfego chega ao nó
             var max = MaxT(L, leg);
-            var tc = leg.Clear + d.CrosswalkSetback + d.CrosswalkWidth / 2;
-            var tStop = d.Crosswalks ? leg.Clear + d.CrosswalkSetback + d.CrosswalkWidth + 1.6 + 0.2 : leg.Clear + 1.0;
+            var crosswalk = CrosswalkOn(d, L, leg);
+            var cwW = CrosswalkWidthOf(d, L, leg);
+            var tc = CrosswalkT(d, L, leg);
+            var stopFar = StopFar(d, L, leg);
+            var tStop = crosswalk ? leg.Clear + SetbackOf(d, L, leg) + cwW + 1.6 + 0.2 : leg.Clear + 1.0;
             if (tStop > max - 1) continue;
 
             // Travessia de pedestres e rebaixamentos.
-            if (d.Crosswalks)
+            if (crosswalk)
             {
                 var a = L.At(leg, tc, L.HiEdge(leg, tc));
                 var b = L.At(leg, tc, -L.LoEdge(leg, tc));
-                var cwDefs = new CrosswalkSetup { CrosswalkWidth = d.CrosswalkWidth, StopLines = false, EdgeSetback = 0.3 }
-                    .Build(a, b, z, output, d.CrosswalkWidth, 0.40);
-                var near = new[] { Circle(L.At(leg, tc, 0), d.CrosswalkWidth * 3 + L.HiEdge(leg, tc) + L.LoEdge(leg, tc)) };
+                var cwDefs = new CrosswalkSetup { CrosswalkWidth = cwW, StopLines = false, EdgeSetback = 0.3 }
+                    .Build(a, b, z, output, cwW, 0.40);
+                var near = new[] { Circle(L.At(leg, tc, 0), cwW * 3 + L.HiEdge(leg, tc) + L.LoEdge(leg, tc)) };
                 foreach (var def in cwDefs)
                 {
                     foreach (var gp in PolygonOps.Intersect(L.Obstacles, near))
                         def.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = gp.Outer.ToList() });
                     Add(def);
                 }
-                if (d.Ramps)
-                    foreach (var (sgn, w, walk) in new[] { (1.0, L.HiEdge(leg, tc), leg.Sign > 0 ? r.Def.LeftSidewalk : r.Def.RightSidewalk),
-                                                           (-1.0, L.LoEdge(leg, tc), leg.Sign > 0 ? r.Def.RightSidewalk : r.Def.LeftSidewalk) })
-                    {
-                        if (walk <= 0.5) continue;
-                        var curb = L.At(leg, tc, sgn * w);
-                        var side = (L.At(leg, tc, sgn * (w + 1)) - curb).Normalized();
-                        Add(new RampDefinition
-                        {
-                            PathRef = PathReference.FromPoints(new[] { curb, curb + side }, z),
-                            Width = Math.Min(1.50, d.CrosswalkWidth),
-                            Height = r.Def.CurbHeight,
-                        });
-                    }
+                // Rampas com as medidas da interseção (já ajustadas), centradas no eixo da faixa, subindo perpendicular ao
+                // meio-fio a partir da face dele.
+                var plan = RampPlanOf(d, L, leg);
+                foreach (var (sgn, w, tpl) in new[] { (1.0, L.HiEdge(leg, tc), plan.Hi), (-1.0, L.LoEdge(leg, tc), plan.Lo) })
+                {
+                    if (tpl == null) continue;
+                    var curb = L.At(leg, tc, sgn * w);
+                    var side = (L.At(leg, tc, sgn * (w + 1)) - curb).Normalized();
+                    var ramp = (RampDefinition)tpl.CloneWithNewId();
+                    ramp.PathRef = PathReference.FromPoints(new[] { curb, curb + side }, z);
+                    Add(ramp);
+                }
             }
 
             // Controle do direito de passagem.
@@ -1814,7 +2049,7 @@ public static class IntersectionGenerator
             {
                 var r = L.Roads[leg.Road];
                 if (!(r.Def.TwoWay || leg.Sign < 0)) continue;
-                var t = leg.Clear + StopFar(d) + 6;
+                var t = leg.Clear + StopFar(d, L, leg) + 6;
                 if (t > MaxT(L, leg) - 1) continue;
                 var walkHi = (leg.Sign > 0 ? r.Def.LeftSidewalk : r.Def.RightSidewalk) > 0.5;
                 hierarchy = r.Def.Hierarchy;

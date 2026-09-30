@@ -80,9 +80,10 @@ internal static class IntersectionForms
          .Check("Faixas de pedestres em cada ramo", () => d.Crosswalks, v => d.Crosswalks = v)
          .Number("Largura da faixa de pedestres (m)", () => d.CrosswalkWidth, v => d.CrosswalkWidth = v, 3, 10)
          .Number("Recuo da faixa em relação à esquina (m)", () => d.CrosswalkSetback, v => d.CrosswalkSetback = v, 0, 20)
-         .Check("Rebaixamentos de calçada nas travessias (NBR 9050)", () => d.Ramps, v => d.Ramps = v)
          .Check("Esquinas com a mesma composição das calçadas das vias (meio-fio + faixa gramada + passeio)", () => d.MatchRoadSection, v => d.MatchRoadSection = v,
              "Repete nas esquinas a faixa de serviço gramada definida na seção das vias que se cruzam, alinhando o desenho com as vias.");
+
+        RampSection(w, d);
 
         w.Section("Linhas no cruzamento e regras de conversão (MBST Vol. IV / CTB art. 207)",
                 "Linha contínua amarela proíbe a conversão (CTB art. 207). Na via principal que atravessa o cruzamento, o eixo vira linha de " +
@@ -118,6 +119,39 @@ internal static class IntersectionForms
              .Choice("Via principal do exemplo", new[] { ("Via local", 0), ("Via coletora (2 + 2 faixas)", 1), ("Avenida com canteiro central", 2) },
                  () => exampleRoad, v => exampleRoad = v);
         return w;
+    }
+
+    /// <summary>
+    /// Rampas das travessias (NBR 9050 / NBR 16537): as mesmas medidas em todas as travessias da interseção, definidas antes
+    /// de gerar. Rampa que não cabe é ajustada (rebaixamento total, travessia recuada, largura mínima de 1,50 m, sem abas) e
+    /// o ajuste aparece no relatório.
+    /// </summary>
+    public static void RampSection(FormWindow w, IntersectionDefinition d)
+    {
+        var tactile = !d.RampTactile ? 0 : d.RampDirectional ? 2 : 1;
+        w.Section("Rampas das travessias (NBR 9050)",
+                "As mesmas medidas em todas as travessias – ficam lembradas e valem também para as travessias automáticas. A rampa fica " +
+                "centrada na faixa e inteira no trecho reto do meio-fio; a grama e a calçada são recortadas no retângulo da rampa. " +
+                "Se não couber: rebaixamento total (calçada estreita), travessia recuada, largura reduzida até 1,50 m ou sem abas – sempre com aviso.")
+         .Check("Rebaixamentos de calçada nas travessias", () => d.Ramps, v => d.Ramps = v)
+         .Choice("Tipo", new[]
+             {
+                 ("Rebaixamento com abas laterais", TipoRampa.RebaixamentoComAbas),
+                 ("Rebaixamento sem abas (laterais protegidas)", TipoRampa.RebaixamentoSemAbas),
+                 ("Rebaixamento total da calçada", TipoRampa.RebaixamentoTotal),
+             }, () => d.RampType == TipoRampa.AcessoVeiculos ? TipoRampa.RebaixamentoComAbas : d.RampType, v => d.RampType = v)
+         .Number("Largura da rampa (m) – 0 = a da faixa", () => d.RampWidth ?? 0, v => d.RampWidth = v < 0.01 ? null : Math.Max(1.50, v), 0, 12,
+             tooltip: "Automática (0): igual à largura da faixa de pedestres. Mínimo 1,50 m (NBR 9050, 6.12.7.3.1).")
+         .Number("Inclinação da rampa (%)", () => d.RampSlope * 100, v => d.RampSlope = Math.Clamp(v, 2, 8.33) / 100, 2, 8.33,
+             tooltip: "Máximo 8,33 % (1:12). Com meio-fio de 15 cm a rampa tem 1,80 m.")
+         .Number("Inclinação das abas laterais (%)", () => d.RampFlareSlope * 100, v => d.RampFlareSlope = Math.Clamp(v, 2, 10) / 100, 2, 10,
+             tooltip: "Máximo 10 %. Para rampa sem abas escolha o tipo \"sem abas\".")
+         .Number("Faixa livre mínima atrás da rampa (m)", () => d.RampFreeWidth, v => d.RampFreeWidth = Math.Max(1.20, v), 1.20, 5,
+             tooltip: "NBR 9050: no mínimo 1,20 m. Calçada que não comporta a rampa e a faixa livre recebe rebaixamento total.")
+         .Choice("Piso tátil (NBR 16537)", new[] { ("Sem piso tátil", 0), ("Alerta na rampa", 1), ("Alerta + direcional no eixo da rampa", 2) },
+             () => tactile, v => { tactile = v; d.RampTactile = v > 0; d.RampDirectional = v == 2; })
+         .Number("Altura do meio-fio na rampa (m) – 0 = a da via", () => d.RampCurbHeight ?? 0, v => d.RampCurbHeight = v < 0.01 ? null : Math.Clamp(v, 0.05, 0.40), 0, 0.40,
+             tooltip: "Desnível vencido pela rampa. Automática (0): a altura do meio-fio de cada via.");
     }
 
     /// <summary>Vias da interseção (para escolher a principal) e cena real da pré-visualização.</summary>

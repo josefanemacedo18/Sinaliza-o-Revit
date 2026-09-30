@@ -71,6 +71,21 @@ public sealed class CmdEditar : CommandBase
             Report("Interseção", IntersectionRunner.Run(uidoc, "SV - Editar interseção", s => s.Refresh(inter)).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;
         }
+        // Rampa de uma interseção: as medidas são as da interseção (todas as rampas dela mudam juntas, com os mesmos ajustes
+        // que evitam falhas de modelagem) – editar uma rampa solta seria desfeito na próxima atualização da interseção.
+        if (stored.Definition is RampDefinition { GroupId: { } rg }
+            && MarkingStorage.Definitions(uidoc.Document).OfType<IntersectionDefinition>().FirstOrDefault(i => i.Id == rg) is { } parent)
+        {
+            var work = (IntersectionDefinition)MarkingDefinition.FromJson(parent.ToJson())!;
+            var fw = new FormWindow("Rampas da interseção", "Rampas das travessias",
+                    "As rampas desta interseção têm as mesmas medidas: o que for alterado aqui vale para todas elas.", null, null, false, "Aplicar", 640, 600);
+            IntersectionForms.RampSection(fw, work);
+            if (UiHelpers.ShowModal(fw) != true) return Result.Cancelled;
+            parent.CopyRampSettingsFrom(work);
+            parent.Ramps = work.Ramps;
+            Report("Rampas", IntersectionRunner.Run(uidoc, "SV - Rampas da interseção", s => s.Refresh(parent)).Where(r => r.Warnings.Count > 0).ToList());
+            return Result.Succeeded;
+        }
         // Recuo da via (baia, faixa auxiliar): edita só este recuo e regenera a via.
         if (stored.Definition is RecessMarkingDefinition rec) return RecessCommand.EditExisting(uidoc, rec);
         // Elemento de uma via: escolher o que editar (só ele, a via inteira ou o pavimento/raios).

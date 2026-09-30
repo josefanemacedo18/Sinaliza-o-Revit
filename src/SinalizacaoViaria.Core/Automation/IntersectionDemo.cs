@@ -74,7 +74,7 @@ public static class IntersectionDemo
             ? IntersectionGenerator.Children(d, L, new OutputSettings(), 0, groups.Select(g => (IReadOnlyCollection<MarkingDefinition>)g).ToList())
             : new List<MarkingDefinition>();
         var ramps = children.OfType<RampDefinition>().Select(r => RampGenerator.Footprint(r, new Polyline2(r.PathRef.Points))).ToList();
-        foreach (var m in defs.Where(IntersectionGenerator.IsPhysical))
+        foreach (var m in defs.Where(IntersectionGenerator.CutByRamps))
             foreach (var fp in ramps) m.Exclusions.Add(new ExclusionZone { Points = fp.Outer.ToList() });
         defs.Add(d);
         defs.AddRange(children);

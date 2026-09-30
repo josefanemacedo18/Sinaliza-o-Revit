@@ -347,6 +347,12 @@ public static class RampGenerator
         const double e = 0.05; // avança sobre a face do meio-fio para garantir o recorte da guia
         if (d.Type == TipoRampa.RebaixamentoTotal)
             return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw + flare, len), f.P(-hw - flare, len) });
+        if (d.SquareCut && d.Type != TipoRampa.AcessoVeiculos)
+        {
+            // Retângulo da rampa com as abas (os cantos atrás das abas são preenchidos pela própria rampa, nivelados).
+            var top = len + Math.Max(0, d.LandingDepth > 0.05 ? d.LandingDepth : 0);
+            return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw + flare, top), f.P(-hw - flare, top) });
+        }
         if (d.LandingDepth > 0.05)
             return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw, len), f.P(hw, len + d.LandingDepth),
                 f.P(-hw, len + d.LandingDepth), f.P(-hw, len) });
@@ -420,6 +426,21 @@ public static class RampGenerator
                         : new[] { Vec3.At(p3, 0), Vec3.At(p1, 0), Vec3.At(p3, h) },          // face encostada na rampa
                 };
                 geo.Pieces.Add(Polyhedron.Piece(new Polyhedron(faces), concrete));
+            }
+        }
+
+        // Recorte retangular: cantos atrás das abas (e ao lado do patamar) em calçada nivelada – nada de grama ou calçada
+        // recortada em diagonal junto às abas.
+        if (d.SquareCut && flare > 0.01 && d.Type != TipoRampa.AcessoVeiculos)
+        {
+            var top = len + (d.LandingDepth > 0.05 ? d.LandingDepth : 0);
+            foreach (var s in new[] { 1.0, -1.0 })
+            {
+                var pts = new List<Vec2> { f.P(s * (hw + flare), 0), f.P(s * (hw + flare), top) };
+                if (top > len + 1e-6) pts.Add(f.P(s * hw, top));
+                pts.Add(f.P(s * hw, len));
+                if (s < 0) pts.Reverse();
+                geo.Pieces.Add(Polyhedron.Piece(Polyhedron.Prism(pts, _ => 0, _ => h), concrete));
             }
         }
 
