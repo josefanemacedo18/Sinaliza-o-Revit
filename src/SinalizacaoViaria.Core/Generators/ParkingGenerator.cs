@@ -22,6 +22,9 @@ public sealed class ParkingOptions
     /// <summary>Recuo inicial ao longo do meio-fio (m).</summary>
     public double StartOffset { get; set; }
 
+    /// <summary>Encosta as vagas no fim do caminho (a sobra fica no início), p. ex. junto à orelha ou à esquina.</summary>
+    public bool AlignEnd { get; set; }
+
     /// <summary>Afastamento entre o meio-fio (caminho) e o início das vagas (m).</summary>
     public double CurbOffset { get; set; }
 
@@ -109,6 +112,7 @@ public static class ParkingGenerator
         var lines = new List<Polygon2>();
         var boundaries = new List<double>();
         double st = opt.StartOffset;
+        if (opt.AlignEnd) st += Math.Max(0, available - used - (parallel ? 0 : len * Math.Abs(Math.Cos(alpha))));
         boundaries.Add(st);
         foreach (var sl in slots) { st += sl.Front; boundaries.Add(st); }
 

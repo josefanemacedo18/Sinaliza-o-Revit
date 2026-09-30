@@ -194,7 +194,7 @@ public class Y34TipTests
 
     private static double Perimeter(IReadOnlyList<Vec2> r) => Enumerable.Range(0, r.Count).Sum(i => r[i].DistanceTo(r[(i + 1) % r.Count]));
 
-    private static bool SelfIntersects(Polygon2 p)
+    public static bool SelfIntersects(Polygon2 p)
     {
         foreach (var ring in new[] { p.Outer }.Concat(p.Holes))
         {

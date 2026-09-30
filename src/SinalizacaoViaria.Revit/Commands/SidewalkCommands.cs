@@ -91,7 +91,9 @@ internal static class FootprintCutter
         switch (def)
         {
             case CurbExtensionDefinition ce:
-                Apply(uidoc, ce, One(ce.CutRoadMarkings && path != null ? SidewalkGenerator.EarFootprint(ce, path) : null), RoadMarking);
+                // A orelha substitui a pista, a pintura e o meio-fio antigo atrás da face (o dela contorna a frente).
+                Apply(uidoc, ce, ce.CutRoadMarkings && path != null ? SidewalkGenerator.EarCutZone(ce, path) : Array.Empty<Polygon2>(),
+                    d => RoadMarking(d) || d is LinearMarkingDefinition l && l.Code.StartsWith("MEIO-FIO"));
                 break;
             case SidewalkAreaDefinition sa:
                 Apply(uidoc, sa, One(sa.CutExisting && path != null ? SidewalkGenerator.AreaOutline(sa, path) : null), d => RoadMarking(d) || Sidewalk(d));

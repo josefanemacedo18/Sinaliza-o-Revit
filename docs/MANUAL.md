@@ -1068,12 +1068,18 @@ calçada e o meio-fio são recortados no **retângulo da rampa com as abas**; os
 não sobram triângulos de grama nem recortes em diagonal. A sarjeta continua inteira à frente da rampa. Quando a rampa pedida
 não cabe, ela é ajustada e o **relatório avisa**:
 
-1. **Calçada estreita** (não comporta a rampa e a faixa livre): **rebaixamento total** da calçada, com rampas laterais a no
-   máximo 5 % (NBR 9050, 6.12.7.3.3);
-2. **Rampa que invadiria a curva da esquina**: a travessia (com a rampa centrada nela) é **recuada** para o trecho reto,
+1. **Calçada estreita** (não comporta a rampa e a faixa livre de 1,20 m atrás dela – NBR 9050, 6.12.7): **rebaixamento
+   total** da calçada. O trecho da travessia fica **no nível da pista/sarjeta** em toda a profundidade da calçada (platô
+   com **piso tátil de alerta** junto à face, NBR 16537), e o pedestre que segue pela calçada desce e sobe por **rampas
+   longitudinais laterais** a no máximo 5 % (NBR 9050, 6.12.7.3.3). O meio-fio acompanha o rebaixamento. A escolha é
+   automática pela largura da calçada (profundidade da rampa a 8,33 % + patamar + 1,20 m livres); o tipo aparece no rótulo
+   da rampa na pré-visualização e no relatório (*feito o rebaixamento total...*);
+2. **Calçada larga**: rampa comum, com **patamar** até a faixa de passeio – a **faixa livre de 1,20 m** fica sempre atrás da
+   rampa, também quando a rampa está numa orelha (o patamar atravessa a orelha e a faixa de serviço/grama até o passeio);
+3. **Rampa que invadiria a curva da esquina**: a travessia (com a rampa centrada nela) é **recuada** para o trecho reto,
    até 2 m além do recuo pedido;
-3. ainda não cabe: a **largura automática é reduzida** (mínimo 1,50 m) e, por fim, a rampa fica **sem abas**;
-4. ramo curto demais: a rampa é omitida (com aviso).
+4. ainda não cabe: a **largura automática é reduzida** (mínimo 1,50 m) e, por fim, a rampa fica **sem abas**;
+5. ramo curto demais: a rampa é omitida (com aviso).
 
 ### 19.1.3 Ajustes por esquina e por ramo
 
@@ -1112,10 +1118,17 @@ Por esquina (bloco *Ajustes por esquina*, a esquina à direita de quem chega pel
 ramo** e **na outra via** (−1 = geral; 0 = sem orelha daquele lado, a orelha não contorna a esquina) e **terminar no
 estacionamento**. *Aplicar a todas* copia também esses valores.
 
+**A orelha é a própria calçada avançada.** Calçada e orelha formam **um piso só, no nível da calçada**: o meio-fio antigo
+(e a sarjeta) atrás da orelha saem e o lugar deles vira piso; o **meio-fio e a sarjeta passam a contornar a face externa da
+orelha**, voltados para a pista, e voltam ao alinhamento da via nas pontas. Cada orelha é **um único polígono** com bordas
+retas paralelas à via, curva com o raio da esquina + avanço e pontas conforme a forma escolhida – sem lóbulos, dentes,
+autointerseções ou pedaços soltos, e sem ficar sob faixas de pedestres ou rampas (as rampas encaixam na borda dela). O mesmo
+vale para a **orelha avulsa** (clique na esquina) e para a ferramenta **Orelha** fora das interseções.
+
 Regras aplicadas: com travessia no ramo, a **faixa de pedestres e as rampas vão para a borda da orelha** (a orelha é
 estendida além da faixa e das rampas quando o avanço pedido é menor – aviso) e a rampa usa a profundidade da calçada + a
 orelha; a orelha é recortada pelas rampas, e **pavimento, sarjeta, pintura (linhas, zebrados, setas) e vagas** por baixo
-dela são recortados. Esquinas canalizadas (faixa de conversão livre) não recebem orelha. As orelhas são marcas da
+dela são recortados; as vagas depois da orelha encostam nela (a sobra fica na outra ponta do trecho). Esquinas canalizadas (faixa de conversão livre) não recebem orelha. As orelhas são marcas da
 interseção: **refeitas sempre que ela é atualizada/editada**; **Editar** sobre uma delas abre os ajustes daquela esquina e
 as medidas gerais das orelhas.
 

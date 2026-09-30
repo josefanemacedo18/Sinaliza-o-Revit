@@ -881,6 +881,18 @@ public static partial class IntersectionGenerator
         SquareCut = true,
     };
 
+    /// <summary>Largura da faixa de serviço da calçada de um lado da via (entre o meio-fio e a faixa livre; 0 sem ela).</summary>
+    public static double ServiceStrip(RoadPavementDefinition r, bool left)
+    {
+        var setup = RoadTemplates.FromJson(r.SetupJson);
+        if (setup == null) return 0;
+        var side = left ? setup.Left : setup.Right;
+        var walk = side.FirstOrDefault(e => e.Tipo == TipoElementoSecao.Calcada);
+        if (walk == null) return 0;
+        var cw = Math.Min(walk.MeioFioEfetivo, walk.Largura - 0.05);
+        return Math.Max(0, Math.Clamp(walk.FaixaServico, cw, walk.Largura) - cw);
+    }
+
     public const double MinRampWidth = 1.50;
     public const double MaxRampSlope = 0.0833;
     public const double MaxFlareSlope = 0.10;
@@ -924,6 +936,15 @@ public static partial class IntersectionGenerator
             var walk = walks[k];
             if (walk <= 0.5) continue;
             var rp = RampTemplate(d, r, crosswalkWidth);
+            // Com orelha a rampa fica sobre ela: um patamar nivelado atravessa o resto da orelha, a faixa do meio-fio antigo e a
+            // faixa de serviço (grama) até a faixa livre da calçada – senão a rampa desembocava na grama.
+            var ear = k == 0 ? earHi : earLo;
+            if (ear > 0.05 && rp.Type != TipoRampa.RebaixamentoTotal)
+            {
+                var (_, run0, _) = RampGenerator.Dimensions(rp);
+                var service = ServiceStrip(r, (k == 0) == (sign > 0));
+                rp.LandingDepth = Math.Max(rp.LandingDepth, Math.Round(Math.Max(0, ear + r.CurbWidth + service - run0), 2));
+            }
             if (rp.Type != TipoRampa.RebaixamentoTotal)
             {
                 var (_, run, _) = RampGenerator.Dimensions(rp);
@@ -1559,7 +1580,7 @@ public static partial class IntersectionGenerator
         var cuts = BaseCutsFor(member, road, L);
         // Orelhas das esquinas: saem o pavimento, a sarjeta, a pintura e as vagas da via por baixo delas.
         if (L.Ears.Count == 0 || !CutByEars(member)) return cuts;
-        return PolygonOps.Union(cuts.Concat(L.Ears.Select(e => e.Footprint)));
+        return PolygonOps.Union(cuts.Concat(L.Ears.SelectMany(e => EarCut(e, member))));
     }
 
     private static List<Polygon2> BaseCutsFor(MarkingDefinition member, int road, IntersectionLayout L)
@@ -1767,7 +1788,7 @@ public static partial class IntersectionGenerator
         geo.Warnings.AddRange(L.Warnings);
         if (L.Pavement.Count == 0) return geo;
         // Orelhas das esquinas (marcas filhas): a pista e a sarjeta da interseção saem de baixo delas.
-        var earFp = L.Ears.Select(e => e.Footprint).ToList();
+        var earFp = L.Ears.SelectMany(e => e.CutZone.Count > 0 ? e.CutZone : new List<Polygon2> { e.Footprint }).ToList();
         List<Polygon2> NoEars(List<Polygon2> a) => earFp.Count == 0 ? a : PolygonOps.Difference(a, earFp).Where(p => p.Area >= 0.01).ToList();
         void Raised(IEnumerable<Polygon2> shapes, MarkingColor c, double h, double elev = 0)
         {
@@ -1824,7 +1845,7 @@ public static partial class IntersectionGenerator
         {
             if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
                 Raised(Sound(NoEars(L.Gutter.Count > 0 ? PolygonOps.Difference(L.Pavement, L.Gutter) : L.Pavement)), L.PavementColor, L.PavementThickness, -L.PavementThickness);
-            AddPieces(geo, L.Curb.Select(c => new MarkingPiece(c, MarkingColor.Concreto) { Thickness = L.CurbHeight, Layer = "MEIO-FIO" }));
+            AddPieces(geo, NoEars(L.Curb).Select(c => new MarkingPiece(c, MarkingColor.Concreto) { Thickness = L.CurbHeight, Layer = "MEIO-FIO" }));
             Raised(NoEars(L.Gutter), MarkingColor.Concreto, 0.005);
             if (L.SidewalkService.Count > 0)
             {
@@ -2319,7 +2340,9 @@ public static partial class IntersectionGenerator
             var rampFps = res.OfType<RampDefinition>().Select(r => RampGenerator.Footprint(r, new Polyline2(r.PathRef.Points))).ToList();
             foreach (var c in res.Where(c => c is not RampDefinition && CutByEars(c)))
                 foreach (var e in L.Ears)
-                    if (Near(c, e.Footprint)) c.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = e.Footprint.Outer.ToList() });
+                    if (Near(c, e.Footprint))
+                        foreach (var zc in EarCut(e, c))
+                            c.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = zc.Outer.ToList() });
             foreach (var e in L.Ears)
             {
                 var ear = (CurbExtensionDefinition)e.Template.CloneWithNewId();
@@ -2328,6 +2351,14 @@ public static partial class IntersectionGenerator
                     if (PolygonOps.TotalArea(PolygonOps.Intersect(new[] { fp }, new[] { e.Footprint })) > 1e-4)
                         ear.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = fp.Outer.ToList() });
                 Add(ear);
+                // A sarjeta da via contorna a frente da orelha, no nível da pista.
+                if (e.GutterPath != null)
+                {
+                    var g = new LinearMarkingDefinition { Code = "SARJETA", WidthOverride = e.Gutter, PathRef = PathReference.FromPoints(e.GutterPath.Points, z) };
+                    // Nas pontas a sarjeta nova encosta na da via (que segue além da orelha) sem entrar na orelha.
+                    g.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = e.Footprint.Outer.ToList() });
+                    Add(g);
+                }
             }
         }
         return res;

@@ -754,12 +754,22 @@ public static class MarkingBuilder
                 var inside = path.Offset(sideSign * (d.CurbOffset + 1.0));
                 double? start = null;
                 var step = 0.5;
+                bool Hit(double s) { var p = inside.PointAtParam(path.ParamAt(Math.Clamp(s, 0, path.Length))); return zones.Any(z => z.Contains(p)); }
+                // Borda exata (±1 cm) entre uma amostra livre e uma bloqueada.
+                double Edge(double free, double hit)
+                {
+                    for (var k = 0; k < 6; k++) { var m = (free + hit) / 2; if (Hit(m)) hit = m; else free = m; }
+                    return hit;
+                }
                 for (var s = 0.0; s <= path.Length + 1e-6; s += step)
                 {
-                    var p = inside.PointAtParam(path.ParamAt(Math.Min(s, path.Length)));
-                    var hit = zones.Any(z => z.Contains(p));
-                    if (hit && start == null) start = Math.Max(0, s - step / 2);
-                    if ((!hit || s + step > path.Length + 1e-6) && start is { } a0) { blocked.Add((a0, Math.Min(path.Length, s + step / 2))); start = null; }
+                    var hit = Hit(s);
+                    if (hit && start == null) start = s < 1e-6 ? 0 : Math.Max(0, Edge(s - step, s) - 0.02);
+                    if ((!hit || s + step > path.Length + 1e-6) && start is { } a0)
+                    {
+                        blocked.Add((a0, hit ? path.Length : Math.Min(path.Length, Edge(s, s - step) + 0.02)));
+                        start = null;
+                    }
                 }
             }
         }
@@ -789,6 +799,9 @@ public static class MarkingBuilder
             {
                 Angle = opt.Angle, StallWidth = opt.StallWidth, StallLength = opt.StallLength, LineWidth = opt.LineWidth, Color = opt.Color,
                 Count = 0, RightSide = opt.RightSide, StartOffset = lead, CurbOffset = opt.CurbOffset, FlipAngle = opt.FlipAngle,
+                // Trecho do início do caminho até um bloqueio (orelha, esquina): as vagas encostam no bloqueio e a sobra fica
+                // na ponta livre, sem deixar um vão de quase uma vaga junto à orelha.
+                AlignEnd = first && b < path.Length - 1e-6,
                 BackLine = opt.BackLine, FullOutline = opt.FullOutline, IncludeSymbols = opt.IncludeSymbols, FillColor = opt.FillColor,
                 SymbolSize = opt.SymbolSize, LegendHeight = opt.LegendHeight,
             }, ctx.Catalog, ctx.Glyphs);

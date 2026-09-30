@@ -208,6 +208,32 @@ public static class SidewalkGenerator
         return fp;
     }
 
+    /// <summary>
+    /// Faixa atrás da face original do meio-fio, ao longo da orelha: onde estava o meio-fio antigo. Vira piso da orelha (a
+    /// calçada e a orelha ficam um só piso, no nível da calçada) e o meio-fio antigo é recortado ali.
+    /// </summary>
+    public static List<Polygon2> EarBackFill(CurbExtensionDefinition d, Polyline2 path, Polygon2 footprint) =>
+        PolygonOps.Difference(BehindFace(d, path), new[] { footprint }).Where(p => p.Area >= 1e-3).ToList();
+
+    /// <summary>Faixa da largura do meio-fio atrás da face original (lado da calçada) ao longo do caminho da orelha.</summary>
+    private static List<Polygon2> BehindFace(CurbExtensionDefinition d, Polyline2 path)
+    {
+        var cw = Math.Max(0.05, d.CurbWidth);
+        var sidewalk = d.SidewalkOnLeft ? 1.0 : -1.0;
+        return PolygonOps.Strip(path.Offset(sidewalk * cw / 2).Points, cw, roundJoins: true);
+    }
+
+    /// <summary>
+    /// Zona que a orelha substitui nas marcas vizinhas: o contorno dela mais a faixa do meio-fio antigo atrás da face (o
+    /// meio-fio e a sarjeta passam a contornar a frente da orelha, e não a ficar entre ela e a calçada).
+    /// </summary>
+    public static List<Polygon2> EarCutZone(CurbExtensionDefinition d, Polyline2 path)
+    {
+        var fp = EarFootprint(d, path);
+        if (fp == null) return new();
+        return PolygonOps.Union(BehindFace(d, path).Append(fp));
+    }
+
     public static MarkingGeometry CurbExtension(CurbExtensionDefinition d, Polyline2 path, BuildContext ctx)
     {
         var L = path.Length;
@@ -219,12 +245,11 @@ public static class SidewalkGenerator
         var sign = d.SidewalkOnLeft ? -1.0 : 1.0;
         var cw = Math.Max(0.05, d.CurbWidth);
 
-        var inner = PolygonOps.Offset(new[] { fp }, -cw);
-        var ring = PolygonOps.Difference(new[] { fp }, inner);
-        // O meio-fio existente permanece: remove a faixa junto à face original.
-        var alongFace = PolygonOps.Strip(path.Points, 2 * cw + 0.02, roundJoins: true);
-        // Lascas do anel junto às emendas do caminho (< 0,01 m²) ficam na plataforma.
-        var curb = PolygonOps.Difference(ring, alongFace).Where(p => p.Area >= 0.01).ToList();
+        // Meio-fio na FACE EXTERNA da orelha (voltado para a pista), de uma ponta à outra; atrás da face original o meio-fio
+        // antigo sai (ver EarCutZone) e o lugar dele vira piso: a orelha é um avanço da calçada, no mesmo nível dela.
+        var outer = EarOuterEdge(d, path);
+        var curb = PolygonOps.Intersect(new[] { fp }, PolygonOps.Strip(outer, 2 * cw, roundJoins: true)).Where(p => p.Area >= 0.005).ToList();
+        var back = EarBackFill(d, path, fp);
 
         var planter = new List<Polygon2>();
         if (d.Planter)
@@ -250,9 +275,10 @@ public static class SidewalkGenerator
             else geo.Warnings.Add("Orelha pequena demais para o canteiro com as margens indicadas.");
         }
 
-        var platform = PolygonOps.Difference(new[] { fp }, curb.Concat(planter));
+        var platform = PolygonOps.Difference(PolygonOps.Union(back.Append(fp)), curb.Concat(planter));
         AddRaised(geo, platform, MarkingColor.Concreto, d.Height);
-        AddRaised(geo, curb, MarkingColor.Concreto, d.Height);
+        foreach (var c in curb)
+            if (c.Simplified() is { Area: >= 1e-4 } cs) geo.Pieces.Add(new MarkingPiece(cs, MarkingColor.Concreto) { Thickness = Math.Max(0.001, d.Height), Layer = "MEIO-FIO" });
         AddRaised(geo, planter, MarkingColor.Grama, d.Height);
         geo.PathLength = L;
         geo.PaintedLength = L;

@@ -10,7 +10,15 @@ namespace SinalizacaoViaria.Core.Generators;
 /// o caminho na face do meio-fio (de A para B, contornando a curva; a calçada fica à direita do caminho).
 /// </summary>
 public sealed record EarPlan(IntersectionLeg LegA, IntersectionLeg LegB, bool SideA, bool SideB, double LenA, double LenB, double Depth,
-    Polyline2 Path, Polygon2 Footprint, CurbExtensionDefinition Template);
+    Polyline2 Path, Polygon2 Footprint, CurbExtensionDefinition Template)
+{
+    /// <summary>Largura da sarjeta que contorna a frente da orelha (a orelha avança Depth − Gutter; a sarjeta ocupa o resto).</summary>
+    public double Gutter { get; init; }
+    /// <summary>O que a orelha substitui nas marcas vizinhas: o contorno e a faixa do meio-fio antigo atrás da face.</summary>
+    public List<Polygon2> CutZone { get; init; } = new();
+    /// <summary>Eixo da sarjeta nova, na frente da face da orelha (nulo sem sarjeta).</summary>
+    public Polyline2? GutterPath { get; init; }
+}
 
 /// <summary>Trecho de um lado de ramo coberto por orelha: avanço e estacas (t) onde a orelha tem a largura toda.</summary>
 public sealed record EarSide(double Depth, double TFullStart, double TFullEnd, double TStart, double TEnd);
@@ -21,7 +29,12 @@ public static partial class IntersectionGenerator
     /// Largura da faixa de estacionamento junto ao meio-fio de um lado da via (com a sarjeta somada), lida da seção gravada
     /// na via. Nulo = aquele lado não tem estacionamento junto ao meio-fio (a orelha invadiria uma faixa de rolamento).
     /// </summary>
-    public static double? ParkingDepth(RoadPavementDefinition r, bool left)
+    public static double? ParkingDepth(RoadPavementDefinition r, bool left) => Parking(r, left)?.Depth;
+
+    /// <summary>Largura da sarjeta junto ao meio-fio de um lado da via com estacionamento (0 = sem sarjeta).</summary>
+    public static double ParkingGutter(RoadPavementDefinition r, bool left) => Parking(r, left)?.Gutter ?? 0;
+
+    private static (double Depth, double Gutter)? Parking(RoadPavementDefinition r, bool left)
     {
         var setup = RoadTemplates.FromJson(r.SetupJson);
         if (setup == null) return null;
@@ -30,7 +43,7 @@ public static partial class IntersectionGenerator
         var last = k < 0 ? side.Count - 1 : k - 1;
         if (last < 0 || side[last].Tipo != TipoElementoSecao.Estacionamento) return null;
         var gutter = k >= 0 && setup.SarjetaSomada == true && setup.PhysicalElements && !side[last].Elevado ? Math.Max(0, side[k].Sarjeta) : 0;
-        return side[last].Largura + gutter;
+        return (side[last].Largura + gutter, gutter);
     }
 
     /// <summary>Comprimento da ponta da orelha ao longo do meio-fio (da face até o avanço inteiro).</summary>
@@ -56,11 +69,23 @@ public static partial class IntersectionGenerator
     public static double CrosswalkInset(IntersectionLayout L, IntersectionLeg leg, int side) =>
         L.EarSides.TryGetValue((leg.Road, leg.Sign, side), out var e) && e.TFullEnd > e.TFullStart ? e.Depth : 0;
 
-    /// <summary>Marcas da via recortadas pelas orelhas: pavimento, sarjeta e toda a pintura (vagas, linhas, símbolos).</summary>
+    /// <summary>
+    /// Área que a orelha tira de <paramref name="m"/>: o pavimento, a sarjeta e o meio-fio saem também da faixa atrás da face
+    /// original (vira piso da orelha) e da nova sarjeta em frente; a pintura (vagas, linhas) sai só de baixo da orelha.
+    /// </summary>
+    public static List<Polygon2> EarCut(EarPlan e, MarkingDefinition m) =>
+        e.CutZone.Count > 0 && (m is RoadPavementDefinition || m is LinearMarkingDefinition l && (l.Code.StartsWith("SARJETA") || l.Code.StartsWith("MEIO-FIO")))
+            ? e.CutZone
+            : new List<Polygon2> { e.Footprint };
+
+    /// <summary>
+    /// Marcas da via recortadas pelas orelhas: pavimento, sarjeta, meio-fio (o antigo, atrás da face – a orelha tem o seu na
+    /// frente) e toda a pintura (vagas, linhas, símbolos).
+    /// </summary>
     public static bool CutByEars(MarkingDefinition m) => m switch
     {
         RoadPavementDefinition => true,
-        LinearMarkingDefinition l => l.Code.StartsWith("SARJETA") || !IsPhysical(l),
+        LinearMarkingDefinition l => l.Code.StartsWith("SARJETA") || l.Code.StartsWith("MEIO-FIO") || !IsPhysical(l),
         HatchMarkingDefinition or ParkingMarkingDefinition or RepeatedMarkingDefinition or SymbolMarkingDefinition or TextMarkingDefinition => true,
         _ => false,
     };
@@ -116,8 +141,13 @@ public static partial class IntersectionGenerator
             }
             var depth = explicitDepth ?? new[] { sideA ? parkA : null, sideB ? parkB : null }.Where(x => x != null).Min()!.Value;
             depth = Math.Clamp(depth, 0.3, 10);
+            // Sarjeta da via: continua na frente da orelha (a face do meio-fio da orelha fica a Depth − sarjeta da original).
+            var gutter = new[] { sideA && parkA != null ? ParkingGutter(ra, la.Sign > 0) : double.NaN, sideB && parkB != null ? ParkingGutter(rb, lb.Sign < 0) : double.NaN }
+                .Where(g => !double.IsNaN(g)).DefaultIfEmpty(0).Max();
+            if (depth - gutter < 0.6) gutter = 0;
+            var face = depth - gutter;
             var toParking = ls?.CurbExtensionToParking ?? d.CurbExtensionToParking;
-            var lt = EarTransition(d.CurbExtensionEnds, d.CurbExtensionEndRadius, depth);
+            var lt = EarTransition(d.CurbExtensionEnds, d.CurbExtensionEndRadius, face);
             double Length(IntersectionLeg leg, double? requested, int side)
             {
                 var len = toParking ? StopFar(d, L, leg) + 5.0 : Math.Max(0.5, requested is > 0.05 ? requested.Value : d.CurbExtensionLength);
@@ -146,22 +176,34 @@ public static partial class IntersectionGenerator
             }
             var tpl = new CurbExtensionDefinition
             {
-                Depth = depth, Transition = d.CurbExtensionEnds, EndTransition = d.CurbExtensionEnds,
+                Depth = face, Transition = d.CurbExtensionEnds, EndTransition = d.CurbExtensionEnds,
                 Radius = d.CurbExtensionEndRadius, EndRadius = d.CurbExtensionEndRadius, SidewalkOnLeft = false,
                 Height = L.CurbHeight, CurbWidth = L.CurbWidth, CutRoadMarkings = true,
             };
             var fp = SidewalkGenerator.EarFootprint(tpl, path);
             if (fp == null) continue;
-            L.Ears.Add(new EarPlan(la, lb, sideA, sideB, lenA, lenB, depth, path, fp, tpl));
+            Polyline2? gutterPath = null;
+            if (gutter > 0.01)
+            {
+                var edge = new Polyline2(CleanFacePath(SidewalkGenerator.EarOuterEdge(tpl, path)));
+                if (edge.Length > 1) gutterPath = edge.Offset(gutter / 2);
+            }
+            // A sarjeta da via sai de onde passa a sarjeta nova (nas pontas da orelha as duas se encontram sem sobrepor).
+            var cut = SidewalkGenerator.EarCutZone(tpl, path);
+            if (gutterPath != null) cut = PolygonOps.Union(cut.Concat(PolygonOps.Strip(gutterPath.Points, gutter, roundJoins: true)));
+            L.Ears.Add(new EarPlan(la, lb, sideA, sideB, lenA, lenB, depth, path, fp, tpl)
+            {
+                Gutter = gutter, GutterPath = gutterPath, CutZone = cut,
+            });
             // Trechos de cada lado com a largura toda (a ponta da curva da esquina fica cheia quando a orelha contorna a esquina).
             if (sideA)
                 L.EarSides[(la.Road, la.Sign, 1)] = sideB
-                    ? new EarSide(depth, 0, la.Clear + lenA - lt, 0, la.Clear + lenA)
-                    : new EarSide(depth, la.Clear + lt, la.Clear + lenA - lt, la.Clear, la.Clear + lenA);
+                    ? new EarSide(face, 0, la.Clear + lenA - lt, 0, la.Clear + lenA)
+                    : new EarSide(face, la.Clear + lt, la.Clear + lenA - lt, la.Clear, la.Clear + lenA);
             if (sideB)
                 L.EarSides[(lb.Road, lb.Sign, -1)] = sideA
-                    ? new EarSide(depth, 0, lb.Clear + lenB - lt, 0, lb.Clear + lenB)
-                    : new EarSide(depth, lb.Clear + lt, lb.Clear + lenB - lt, lb.Clear, lb.Clear + lenB);
+                    ? new EarSide(face, 0, lb.Clear + lenB - lt, 0, lb.Clear + lenB)
+                    : new EarSide(face, lb.Clear + lt, lb.Clear + lenB - lt, lb.Clear, lb.Clear + lenB);
         }
         if (!provisional)
             foreach (var n in notes.Distinct()) L.Warnings.Add($"Orelhas: {n}.");
@@ -204,7 +246,45 @@ public static partial class IntersectionGenerator
                 Add(L.At(lb, t, -L.LoEdge(lb, t)));
             }
         }
-        return pts.Count >= 2 ? new Polyline2(pts) : null;
+        var clean = CleanFacePath(pts);
+        return clean.Count >= 2 ? new Polyline2(clean) : null;
+    }
+
+    /// <summary>
+    /// Caminho da face do meio-fio sem idas e voltas: nas emendas do trecho reto com a curva da esquina o ponto do fim da
+    /// curva e o do contorno da pista não coincidem e o caminho dava um degrau de ~3 cm para dentro da calçada – o contorno
+    /// externo da orelha contornava esse degrau com um arco de 90° do raio do avanço (o "lóbulo" na pista) e voltava (o
+    /// dente). Tira os degraus curtos com giro forte, as voltas e os pontos colados.
+    /// </summary>
+    public static List<Vec2> CleanFacePath(IReadOnlyList<Vec2> input)
+    {
+        var pts = input.ToList();
+        var changed = true;
+        while (changed && pts.Count > 2)
+        {
+            changed = false;
+            for (int i = 1; i < pts.Count - 1; i++)
+            {
+                var a = pts[i - 1];
+                var b = pts[i];
+                var c = pts[i + 1];
+                var ab = b - a;
+                var bc = c - b;
+                var la = ab.Length;
+                var lc = bc.Length;
+                var cos = la > 1e-9 && lc > 1e-9 ? ab.Dot(bc) / (la * lc) : 1;
+                // Degrau curto (até 0,15 m) com giro de mais de 45°, ou volta (mais de 100°) num trecho de até 1 m.
+                var step = Math.Min(la, lc) < 0.15 && cos < 0.7 || Math.Min(la, lc) < 1.0 && cos < -0.17;
+                if (la < 0.02 || step)
+                {
+                    pts.RemoveAt(i);
+                    changed = true;
+                    break;
+                }
+            }
+        }
+        if (pts.Count >= 2 && pts[^1].DistanceTo(pts[^2]) < 0.02) pts.RemoveAt(pts.Count - 2);
+        return pts;
     }
 
     /// <summary>
