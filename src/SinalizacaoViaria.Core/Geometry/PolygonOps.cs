@@ -90,6 +90,13 @@ public static class PolygonOps
         Offset(Offset(Offset(Offset(polys, -r), r), r), -r).Select(p => p.Simplified(0.01) ?? p).Where(p => p.Area > 1e-4).ToList();
 
 
+    /// <summary>
+    /// Remove "pescoços" e lascas mais finos que 2·<paramref name="r"/> e fecha fendas do mesmo tamanho (abre e fecha), sem
+    /// simplificar o contorno – para recortes cujas bordas coincidem (a menos de 1–2 mm) com as da peça recortada.
+    /// </summary>
+    public static List<Polygon2> Heal(IEnumerable<Polygon2> polys, double r = 0.002) =>
+        Offset(Offset(Offset(Offset(polys, -r), r), r), -r).Where(p => p.Area > 1e-6).ToList();
+
     // ---------------------------------------------------------------- conversões
 
     internal static PathD ToPath(IReadOnlyList<Vec2> pts)

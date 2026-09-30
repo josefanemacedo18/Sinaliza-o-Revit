@@ -345,8 +345,10 @@ public static class RampGenerator
         var (w, len, flare) = Dimensions(d);
         var hw = w / 2;
         const double e = 0.05; // avança sobre a face do meio-fio para garantir o recorte da guia
+        // Rebaixamento total: o recorte passa 5 cm do fundo da calçada (como passa 5 cm da face do meio-fio) – com o fundo
+        // exatamente no alinhamento, sobrava uma lasca de largura quase nula ligando os dois lados (contorno com autointerseção).
         if (d.Type == TipoRampa.RebaixamentoTotal)
-            return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw + flare, len), f.P(-hw - flare, len) });
+            return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw + flare, len + e), f.P(-hw - flare, len + e) });
         if (d.SquareCut && d.Type != TipoRampa.AcessoVeiculos)
         {
             // Retângulo da rampa com as abas (os cantos atrás das abas são preenchidos pela própria rampa, nivelados).

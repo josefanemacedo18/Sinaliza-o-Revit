@@ -240,10 +240,14 @@ public static class MarkingBuilder
                 if (!holes.Any(h => h.Contains(p.Shape.Centroid))) res.Pieces.Add(p);
                 continue;
             }
-            foreach (var part in PolygonOps.Difference(new[] { p.Shape }, holes))
+            // Sobras do recorte menores que 0,01 m² (entre o limite de uma zona e uma rampa, por exemplo) são lascas.
+            var min = p.Shape.Area >= 0.01 ? 0.01 : 0;
+            // Bordas do recorte que coincidem com as da peça (faixas das mesmas vias, refúgio no canteiro) deixavam pescoços de
+            // 1–2 mm que viravam contornos com autointerseção: abre e fecha 2 mm.
+            foreach (var part in PolygonOps.Heal(PolygonOps.Difference(new[] { p.Shape }, holes)))
             {
                 var s = part.Simplified();
-                if (s != null) res.Pieces.Add(p with { Shape = s });
+                if (s != null && s.Area >= min) res.Pieces.Add(p with { Shape = s });
             }
         }
         return res;

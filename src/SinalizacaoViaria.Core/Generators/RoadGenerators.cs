@@ -63,10 +63,20 @@ public static class RoadGenerator
     {
         if (d.HasEdgeVariation) return VariableCarriageway(d, axis, withGaps);
         var a = Trimmed(axis, d.StartSetback, d.EndSetback);
-        var band = Band(a, -d.RightWidth, d.LeftWidth);
-        if (!withGaps || d.Gaps.Count == 0) return band;
-        var gaps = d.Gaps.SelectMany(g => Band(a, g.Offset - g.Width / 2, g.Offset + g.Width / 2));
-        return PolygonOps.Difference(band, gaps);
+        if (!withGaps || d.Gaps.Count == 0) return Band(a, -d.RightWidth, d.LeftWidth);
+        // Pista faixa a faixa entre os vãos (canteiros, sarjetas), sem operação booleana: numa via fora dos eixos X/Y a
+        // diferença "faixa − canteiro" deixava o canteiro como FURO encostado nas pontas (a 0,1 mm do contorno) em vez de
+        // duas pistas – piso frágil que, depois dos recortes da interseção, virava contorno com autointerseção e cobria o
+        // canteiro.
+        var res = new List<Polygon2>();
+        var at = -d.RightWidth;
+        foreach (var (lo, hi) in d.Gaps.Select(g => (Lo: g.Offset - g.Width / 2, Hi: g.Offset + g.Width / 2)).Where(g => g.Hi > g.Lo).OrderBy(g => g.Lo))
+        {
+            if (Math.Min(lo, d.LeftWidth) > at + 1e-4) res.AddRange(Band(a, at, Math.Min(lo, d.LeftWidth)));
+            at = Math.Max(at, hi);
+        }
+        if (d.LeftWidth > at + 1e-4) res.AddRange(Band(a, at, d.LeftWidth));
+        return res;
     }
 
     /// <summary>Pista de largura variável: bordos (faces dos meios-fios) e faixas sem pavimento acompanham a variação.</summary>

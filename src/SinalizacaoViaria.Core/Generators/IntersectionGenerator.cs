@@ -129,6 +129,11 @@ public sealed class IntersectionLayout
     public double PavementThickness { get; set; } = 0.05;
     public double CurbHeight { get; set; } = 0.15;
     public double CurbWidth { get; set; } = 0.15;
+    /// <summary>Emenda: meia largura da pista à direita / à esquerda ao longo do eixo da emenda (transição).</summary>
+    public Func<double, double>? BendRight { get; set; }
+    public Func<double, double>? BendLeft { get; set; }
+    /// <summary>Emenda: largura do canteiro central ao longo do eixo da emenda (0 = sem canteiro).</summary>
+    public Func<double, double>? BendMedian { get; set; }
 
     public LegFeature? FeatureOf(IntersectionLeg leg) => Features.FirstOrDefault(f => ReferenceEquals(f.Leg, leg));
 
@@ -242,12 +247,30 @@ public static class IntersectionGenerator
         return (bestS, best, bestP);
     }
 
-    /// <summary>Eixo prolongado até o nó quando a via termina junto a outra (entroncamento em T).</summary>
+    /// <summary>
+    /// Eixo prolongado até o nó quando a via termina junto a outra (entroncamento em T). Só prolonga quando o nó fica
+    /// ADIANTE da ponta: se a ponta já passou do nó (eixo avançando sobre a outra via), o eixo já passa por ele – inserir o
+    /// nó antes da ponta fazia o eixo ir e voltar (grampo), com furos no pavimento e bordos sem meio-fio.
+    /// </summary>
     public static Polyline2 ExtendTo(Polyline2 axis, Vec2 node, double tolerance)
     {
         var pts = axis.Points.ToList();
-        if (pts[0].DistanceTo(node) <= tolerance && pts[0].DistanceTo(node) > 0.01) pts.Insert(0, node);
-        else if (pts[^1].DistanceTo(node) <= tolerance && pts[^1].DistanceTo(node) > 0.01) pts.Add(node);
+        if (pts.Count < 2) return axis;
+        // Prolonga NA DIREÇÃO do próprio eixo até o pé do nó nessa reta: um vértice novo fora dela (dobra a menos de 1 m do
+        // nó) invertia o trecho curto nas faixas deslocadas de 5–10 m (calçada, sarjeta) – "cauda de andorinha" que abria
+        // furos na pista. Nó muito fora da direção do eixo (> 1,5 m): mantém o prolongamento até o próprio nó.
+        Vec2? Extension(Vec2 end, Vec2 inner)
+        {
+            var t = (end - inner).Normalized();
+            var along = (node - end).Dot(t);
+            if (along <= 0.01) return null;
+            var lateral = Math.Abs(t.Cross(node - end));
+            return lateral <= 1.5 ? end + t * along : node;
+        }
+        var d0 = pts[0].DistanceTo(node);
+        var d1 = pts[^1].DistanceTo(node);
+        if (d0 <= tolerance && d0 > 0.01 && d0 <= d1 && Extension(pts[0], pts[1]) is { } e0) pts.Insert(0, e0);
+        else if (d1 <= tolerance && d1 > 0.01 && Extension(pts[^1], pts[^2]) is { } e1) pts.Add(e1);
         return new Polyline2(pts);
     }
 
@@ -269,10 +292,22 @@ public static class IntersectionGenerator
                     var ax = roads[x].Axis;
                     var tol = Math.Max(roads[y].Def.TotalLeft, roads[y].Def.TotalRight) + 2.0;
                     var def = roads[x].Def;
-                    foreach (var end in new[] { def.MergeStart ? (Vec2?)null : ax.Points[0], def.MergeEnd ? null : ax.Points[^1] }.Where(e => e != null).Select(e => e!.Value))
+                    foreach (var (end, inner) in new[]
+                             {
+                                 def.MergeStart ? ((Vec2, Vec2)?)null : (ax.Points[0], ax.Points[1]),
+                                 def.MergeEnd ? null : (ax.Points[^1], ax.Points[^2]),
+                             }.Where(e => e != null).Select(e => e!.Value))
                     {
                         var (_, dist, q) = Project(roads[y].Axis, end);
-                        if (dist <= tol && !raw.Any(r => r.Item1.DistanceTo(q) < NodeMergeDistance)) raw.Add((q, x, y));
+                        // Ponta que não chega (ou passa) do eixo da outra: o nó é onde a DIREÇÃO do eixo encontra o da outra via
+                        // (o eixo é prolongado em linha reta até ele), não a projeção perpendicular da ponta.
+                        if (dist > 0.01 && dist <= tol && RayHit(end, (end - inner).Normalized(), roads[y].Axis, 2 * tol) is { } hit
+                            && hit.DistanceTo(end) <= 2.5 * dist + 0.5)
+                            q = hit;
+                        // Um nó por PAR de vias: um nó próximo de outro par (ex.: duas vias emendadas pela ponta) não impede
+                        // que a terceira via, chegando pela ponta, entre no mesmo cruzamento (o agrupamento abaixo os junta).
+                        if (dist <= tol && !raw.Any(r => r.Item1.DistanceTo(q) < NodeMergeDistance && (r.Item2 == x && r.Item3 == y || r.Item2 == y && r.Item3 == x)))
+                            raw.Add((q, x, y));
                     }
                 }
             }
@@ -312,6 +347,24 @@ public static class IntersectionGenerator
         var near = roads.Where(r => Project(r.Axis, node).Distance < Math.Max(r.Def.TotalLeft, r.Def.TotalRight) + 3).ToList();
         return near.Count == 2 && (Math.Abs(near[0].Def.RightWidth + near[0].Def.LeftWidth - near[1].Def.RightWidth - near[1].Def.LeftWidth) > 0.05
                                    || Math.Abs(near[0].Def.TotalLeft + near[0].Def.TotalRight - near[1].Def.TotalLeft - near[1].Def.TotalRight) > 0.05);
+    }
+
+    /// <summary>Primeiro ponto em que a semirreta (origem <paramref name="o"/>, direção <paramref name="dir"/>) cruza o eixo.</summary>
+    private static Vec2? RayHit(Vec2 o, Vec2 dir, Polyline2 axis, double maxDist)
+    {
+        Vec2? best = null;
+        var bestT = maxDist;
+        for (int j = 0; j + 1 < axis.Points.Count; j++)
+        {
+            var q = axis.Points[j];
+            var s = axis.Points[j + 1] - q;
+            var den = dir.Cross(s);
+            if (Math.Abs(den) < 1e-9) continue;
+            var t = (q - o).Cross(s) / den;
+            var u = (q - o).Cross(dir) / den;
+            if (t >= -1e-6 && t <= bestT && u >= -1e-9 && u <= 1 + 1e-9) { bestT = t; best = o + dir * t; }
+        }
+        return best;
     }
 
     private static IEnumerable<Vec2> AxisCrossings(Polyline2 a, Polyline2 b)
@@ -401,7 +454,8 @@ public static class IntersectionGenerator
         var samples = Enumerable.Range(1, 39).Select(i => len * i / 40.0).ToList();
         List<Polygon2> Band(Func<double, double> lo, Func<double, double> hi) => RoadGenerator.VariableBand(bend, 0, len, lo, hi, samples);
 
-        var L = new IntersectionLayout { Node = node, IsBend = true, BendAxis = bend, BendReversed = new[] { flipA, flipB }, Definition = d };
+        var L = new IntersectionLayout { Node = node, IsBend = true, BendAxis = bend, BendReversed = new[] { flipA, flipB }, Definition = d, BendRight = Right, BendLeft = Left,
+            BendMedian = s => Lp(sa.Med, sb.Med, s) };
         L.Roads.AddRange(input);
         L.PavementColor = A.Def.Color;
         L.PavementThickness = A.Def.ActualThickness;
@@ -526,10 +580,30 @@ public static class IntersectionGenerator
                 var ob = pair.Off;
                 Emit(la, s => oa + (ob - oa) * U(s), 0, len);
             }
-            else Emit(la, _ => oa, 0, len / 2);
+            else Unpaired(la, oa, 0, len / 2, true);
         }
-        foreach (var (lb, ob) in b.Where(x => !usedB.Contains(x.Line))) Emit(lb, _ => ob, len / 2, len);
+        foreach (var (lb, ob) in b.Where(x => !usedB.Contains(x.Line))) Unpaired(lb, ob, len / 2, len, false);
         return res;
+
+        // Linha sem par: a de bordo (LBO) acompanha o bordo da pista na transição, à mesma distância do meio-fio que tem na
+        // via; as demais só vão até onde cabem na pista em transição (antes saíam da pista quando a outra via é mais estreita).
+        void Unpaired(LinearMarkingDefinition src, double off, double s0, double s1, bool fromA)
+        {
+            Func<double, double>? half = off >= 0 ? L.BendLeft : L.BendRight;
+            if (half == null) { Emit(src, _ => off, s0, s1); return; }
+            var sg = Math.Sign(off);
+            var gap = half(fromA ? 0 : len) - Math.Abs(off);
+            if (src.Code.StartsWith("LBO") && gap > 0 && gap <= 1.0)   // bordo externo (não a linha junto ao canteiro)
+            {
+                Emit(src, s => sg * (half(s) - gap), s0, s1);
+                return;
+            }
+            // Cabe na pista: dentro do bordo e fora do canteiro central (que também está em transição).
+            bool Fits(double s) => Math.Abs(off) + 0.3 <= half(s) && (L.BendMedian == null || L.BendMedian(s) < 0.05 || Math.Abs(off) - 0.2 >= L.BendMedian(s) / 2);
+            const double step = 0.25;
+            if (fromA) { var e = s0; while (e + step <= s1 && Fits(e + step)) e += step; Emit(src, _ => off, s0, e); }
+            else { var b0 = s1; while (b0 - step >= s0 && Fits(b0 - step)) b0 -= step; Emit(src, _ => off, b0, s1); }
+        }
     }
 
     // ------------------------------------------------------------------ layout
@@ -717,6 +791,29 @@ public static class IntersectionGenerator
             L.Warnings.Add($"Rampas: travessia recuada mais {span} (além do recuo pedido) para a rampa ficar inteira no trecho reto do meio-fio, " +
                            $"fora da curva da esquina{(shifts.Count > 1 ? $" ({shifts.Count} travessias)" : "")}.");
         }
+    }
+
+    /// <summary>
+    /// Ponta da via que passou do nó (menos de 3 m além dele, sem ramo): o trecho da ponta – pista, meio-fio e calçada,
+    /// com a tampa – sai da via. Sem isso a tampa oblíqua da calçada invadia a calçada da outra via do lado oposto.
+    /// </summary>
+    private static List<Polygon2> Stubs(IntersectionLayout L, int i)
+    {
+        var res = new List<Polygon2>();
+        var r = L.Roads[i];
+        var axis = r.Axis;
+        var sn = Project(axis, L.Node).Station;
+        var wide = Math.Max(r.Def.TotalLeft, r.Def.TotalRight) + 0.3;
+        foreach (var sign in new[] { -1, 1 })
+        {
+            var rest = sign > 0 ? axis.Length - sn : sn;
+            if (rest < 0.01 || rest >= 3) continue;
+            var a = axis.PointAt(sn);
+            var tip = axis.PointAt(sign > 0 ? axis.Length : 0);
+            var dir = (tip - a).Length > 1e-6 ? (tip - a).Normalized() : axis.TangentAt(sn) * sign;
+            res.AddRange(RoadGenerator.Band(new Polyline2(new[] { a, tip + dir * 1.0 }), -wide, wide));
+        }
+        return res;
     }
 
     /// <summary>Rampa com as medidas pedidas na interseção (antes dos ajustes).</summary>
@@ -1159,7 +1256,7 @@ public static class IntersectionGenerator
         for (int k = 0; k < byAngle.Count && byAngle.Count > 1; k++)
         {
             var next = byAngle[(k + 1) % byAngle.Count];
-            if (Ccw(byAngle[k].A, next.A) >= 179) continue;
+            if (Straight(byAngle[k].Leg, next.Leg, Ccw(byAngle[k].A, next.A))) continue;
             hiCorner.Add(byAngle[k].Leg);
             loCorner.Add(next.Leg);
         }
@@ -1173,7 +1270,7 @@ public static class IntersectionGenerator
         {
             var (la, aa) = byAngle[k];
             var (lb, ab) = byAngle[(k + 1) % byAngle.Count];
-            if (Ccw(aa, ab) >= 179) continue;
+            if (Straight(la, lb, Ccw(aa, ab))) continue;
             var tri = new Polygon2(new[] { node, L.At(la, reachT[la], HiTot(la)), L.At(lb, reachT[lb], -LoTot(lb)) });
             if (tri.Area < 0.01) continue;
             var fixedTri = PolygonOps.Union(new[] { tri });
@@ -1204,9 +1301,12 @@ public static class IntersectionGenerator
                 var hw = CrosswalkWidthOf(d, L, leg) / 2 - 0.1;
                 var band = L.LegPoly(leg, tc - hw, tc + hw, t => -L.LoEdge(leg, t), t => L.HiEdge(leg, t));
                 bands.AddRange(band);
-                // Refúgio: o canteiro central da própria via é cortado no nível da pista na travessia (também fora do nó).
+                // Refúgio: o canteiro central da própria via é cortado no nível da pista na travessia (também fora do nó). O corte
+                // da via começa 0,30 m antes, do lado do nó: com a faixa logo além do limite da zona sobrava uma tira de 5 cm do
+                // canteiro da via (lascas de meio-fio < 0,01 m²); o canteiro da interseção cresce até o refúgio.
                 if (medBands[leg.Road].Count > 0)
-                    refuges[leg.Road].AddRange(PolygonOps.Intersect(band, medBands[leg.Road]).Where(p => p.Area > 0.2));
+                    refuges[leg.Road].AddRange(PolygonOps.Intersect(L.LegPoly(leg, tc - hw - 0.3, tc + hw, t => -L.LoEdge(leg, t), t => L.HiEdge(leg, t)),
+                        medBands[leg.Road]).Where(p => p.Area > 0.2));
             }
             if (bands.Count > 0)
             {
@@ -1224,7 +1324,7 @@ public static class IntersectionGenerator
             ext[f.Leg.Road].AddRange(L.LegPoly(f.Leg, 0, f.TEnd + 0.5, _ => f.ExtLo, _ => f.ExtHi, 1.0));
         for (int i = 0; i < L.Roads.Count; i++) ext[i].AddRange(refuges[i]);
         for (int i = 0; i < L.Roads.Count; i++) ext[i].AddRange(latCuts[i].Select(p => PolygonOps.Offset(new[] { p }, 0.05)).SelectMany(x => x));
-        for (int i = 0; i < L.Roads.Count; i++) L.PhysicalCuts[i] = PolygonOps.Union(core0.Concat(ext[i]));
+        for (int i = 0; i < L.Roads.Count; i++) L.PhysicalCuts[i] = PolygonOps.Union(core0.Concat(ext[i]).Concat(Stubs(L, i)));
         var rebuild = PolygonOps.Union(core0.Concat(ext.SelectMany(x => x)));
         L.Rebuild.AddRange(rebuild);
 
@@ -1589,14 +1689,15 @@ public static class IntersectionGenerator
                 pieces = pieces.SelectMany(p => PolygonOps.Difference(new[] { p.Shape }, rampBodies).Where(x => x.Area >= 0.01).Select(x => p with { Shape = x })).ToList();
             // Sarjetas que as vias mantêm dentro da zona (junto ao meio-fio delas) também saem do pavimento da interseção.
             inside.AddRange(KeptGutters(L));
+            // Sem lascas nem "espinhos" (diferença pista − sarjetas de vias em ângulo): abre/fecha 5 mm e descarta pisos < 0,01 m².
             if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
-                Raised(inside.Count > 0 ? PolygonOps.Difference(L.Pavement, inside) : L.Pavement, L.PavementColor, L.PavementThickness, -L.PavementThickness);
-            AddPieces(geo, pieces);
+                Raised(Sound(inside.Count > 0 ? PolygonOps.Difference(L.Pavement, inside) : L.Pavement), L.PavementColor, L.PavementThickness, -L.PavementThickness);
+            AddPieces(geo, pieces.SelectMany(p => Sound(new[] { p.Shape }).Select(x => p with { Shape = x })));
         }
         else
         {
             if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
-                Raised(L.Gutter.Count > 0 ? PolygonOps.Difference(L.Pavement, L.Gutter) : L.Pavement, L.PavementColor, L.PavementThickness, -L.PavementThickness);
+                Raised(Sound(L.Gutter.Count > 0 ? PolygonOps.Difference(L.Pavement, L.Gutter) : L.Pavement), L.PavementColor, L.PavementThickness, -L.PavementThickness);
             AddPieces(geo, L.Curb.Select(c => new MarkingPiece(c, MarkingColor.Concreto) { Thickness = L.CurbHeight, Layer = "MEIO-FIO" }));
             Raised(L.Gutter, MarkingColor.Concreto, 0.005);
             if (L.SidewalkService.Count > 0)
@@ -1656,7 +1757,8 @@ public static class IntersectionGenerator
             if (chain == null) continue;
             var (pts, nrm, wts) = chain.Value;
             var aligned = Automation.EdgeProfile.Aligned(a, b);
-            var clip = PolygonOps.Offset(new[] { comp }, 0.02);
+            // Exatamente a calçada da esquina: 2 cm a mais sobrepunham a calçada da via no limite da zona.
+            var clip = new[] { comp };
             var covered = new List<Polygon2>();
             foreach (var (shape, attr, ins) in Automation.EdgeProfile.AlongChain(pts, nrm, wts, aligned))
             {
@@ -1686,6 +1788,9 @@ public static class IntersectionGenerator
             }
         }
         var rest = (done.Count > 0 ? PolygonOps.Difference(region, PolygonOps.Union(done)) : region).Where(p => p.Area > 0.02).ToList();
+        // Sarjeta das esquinas (vai 2 m além da calçada da esquina): os trechos retos não a repetem por cima.
+        var cornerInside = PolygonOps.Union(inside);
+        var skip = done.Concat(cornerInside).ToList();
         foreach (var part in rest)
         {
             var (road, left) = NearestSide(L, part.Centroid);
@@ -1695,11 +1800,11 @@ public static class IntersectionGenerator
             var (pc, ins) = Automation.EdgeProfile.Apply(L.Pavement, new[] { part }, bands, null, true, cache);
             foreach (var pi in pc)
             {
-                var shapes = done.Count > 0 ? PolygonOps.Difference(new[] { pi.Shape }, done) : new List<Polygon2> { pi.Shape };
+                var shapes = skip.Count > 0 ? PolygonOps.Difference(new[] { pi.Shape }, skip) : new List<Polygon2> { pi.Shape };
                 foreach (var sh in shapes.Where(x => x.Area > 1e-3))
                     pieces.Add(new MarkingPiece(sh, pi.Color) { Thickness = pi.Thickness, Elevation = pi.Elevation, Layer = pi.Layer });
             }
-            inside.AddRange((done.Count > 0 ? PolygonOps.Difference(ins, done) : ins).Where(x => x.Area > 1e-3));
+            inside.AddRange((skip.Count > 0 ? PolygonOps.Difference(ins, skip) : ins).Where(x => x.Area > 1e-3));
         }
         return (pieces, PolygonOps.Union(inside));
     }
@@ -1813,6 +1918,23 @@ public static class IntersectionGenerator
         }
         return res;
     }
+
+    /// <summary>
+    /// Lado sem esquina: a MESMA via segue reta do outro lado do nó (a calçada e o meio-fio dela continuam). Duas vias
+    /// diferentes emendadas em linha reta (uma começa na ponta da outra) têm esquina reta: os bordos, que podem ter larguras
+    /// diferentes, são concordados e o meio-fio e a calçada refeitos com a transição – antes o degrau ficava sem meio-fio.
+    /// </summary>
+    private static bool Straight(IntersectionLeg a, IntersectionLeg b, double span) => span >= 179 && a.Road == b.Road;
+
+    /// <summary>Menor piso gerado (m²): abaixo disso é lasca de operação booleana.</summary>
+    public const double MinFloorArea = 0.01;
+
+    /// <summary>
+    /// Pisos sem lascas: abre e fecha 5 mm (some com "espinhos" e fendas finas que o Revit não consegue desenhar) e
+    /// descarta pedaços menores que <see cref="MinFloorArea"/>.
+    /// </summary>
+    internal static List<Polygon2> Sound(IEnumerable<Polygon2> polys) =>
+        PolygonOps.Clean(polys, 0.005).Where(p => p.Area >= MinFloorArea).ToList();
 
     /// <summary>Acrescenta peças já prontas (simplificadas, sem lascas).</summary>
     internal static void AddPieces(MarkingGeometry geo, IEnumerable<MarkingPiece> pieces)
