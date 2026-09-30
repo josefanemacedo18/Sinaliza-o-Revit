@@ -22,6 +22,11 @@ public interface ITrafficHost
     string ApplyPackage(ProjectPackage package);
     /// <summary>Grava nível de serviço e resumo nos elementos das interseções, rotatórias e vias.</summary>
     string WriteResults(TrafficResult res, string scenario);
+    /// <summary>
+    /// Cópia do modelo (definições e eixos resolvidos, na thread da API) para testar cada solução com o pacote aplicado,
+    /// como o "Aplicar no PROJETO" faz – nulo se não der para ler o modelo.
+    /// </summary>
+    ModelSnapshot? Snapshot();
 }
 
 /// <summary>
@@ -962,10 +967,17 @@ public sealed class TrafficWindow : Window
         try { opt = ReadOptions(); }
         catch (FormatException ex) { UiHelpers.Error(ex.Message); return; }
         target.Children.Clear();
-        target.Children.Add(new TextBlock { Text = "Testando as alternativas na rede…", Foreground = Brushes.Gray });
+        target.Children.Add(new TextBlock
+        {
+            Text = $"Testando as alternativas: cada uma aplicada numa cópia do modelo e microssimulada {TrafficSolutions.DefaultSeeds} vezes (sementes diferentes)…",
+            Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap,
+        });
         var baseRes = _res;
+        ModelSnapshot? snap = null;
+        try { snap = _host?.Snapshot(); }
+        catch (Exception ex) { Infrastructure.Log.Error("Simulador de Tráfego – cópia do modelo", ex); }
         List<SolutionTrial> trials;
-        try { trials = await Task.Run(() => TrafficSolutions.For(_net, opt, baseRes, node, link)); }
+        try { trials = await Task.Run(() => TrafficSolutions.For(_net, opt, baseRes, node, link, TrafficSolutions.DefaultSeeds, snap)); }
         catch (Exception ex) { target.Children.Clear(); UiHelpers.Error("Não foi possível testar: " + ex.Message); return; }
         target.Children.Clear();
         if (trials.Count == 0)
@@ -976,7 +988,9 @@ public sealed class TrafficWindow : Window
         var good = trials.Count(t => t.Improves);
         target.Children.Add(new TextBlock
         {
-            Text = good > 0 ? $"{good} de {trials.Count} alternativa(s) melhoram o local sem piorar a rede (da melhor para a pior):" : "Nenhuma alternativa de cenário resolve sozinha – veja as medidas de projeto na recomendação acima:",
+            Text = good > 0
+                ? $"{good} de {trials.Count} alternativa(s) melhoram o local e a rede na microssimulação (média e pior caso das rodadas) – da melhor para a pior:"
+                : "Nenhuma alternativa melhora o local e a rede na microssimulação – veja as medidas de projeto na recomendação acima:",
             FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4),
         });
         foreach (var t in trials)
@@ -1012,8 +1026,9 @@ public sealed class TrafficWindow : Window
                 try
                 {
                     _status.Text = _host.ApplyPackage(trial.Package);
-                    // Reabre com a rede relida (o controle agora vem do projeto) e simula para confirmar.
-                    _current.Options.Nodes.RemoveAll(x => trial.Package.NodeKey != null && x.Node == trial.Package.NodeKey && x.Turns.Count == 0);
+                    // Reabre com a rede relida (o que foi implantado agora vem do projeto: sai do ajuste dos nós alterados, fica a
+                    // contagem e a programação da travessia) e simula para confirmar – o mesmo cenário em que a solução foi testada.
+                    TrafficSolutions.AfterApply(_current.Options, trial);
                     Reload();
                 }
                 catch (Exception ex) { UiHelpers.Error("Não foi possível aplicar: " + ex.Message); }

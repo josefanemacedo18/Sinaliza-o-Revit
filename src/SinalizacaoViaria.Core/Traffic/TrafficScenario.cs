@@ -42,9 +42,20 @@ public sealed class NodeOverride
     public bool? NoLeft { get; set; }
     /// <summary>Acrescenta bolsões de conversão à esquerda (teste de solução).</summary>
     public bool? LeftPockets { get; set; }
+    /// <summary>Faixas de pedestres na interseção (teste de solução: o semáforo implanta as travessias).</summary>
+    public bool? Crosswalks { get; set; }
+    /// <summary>Tipo da rotatória testada no lugar do cruzamento (faixas e raio do gerador – o mesmo do pacote).</summary>
+    public Definitions.TipoRotatoria? RoundaboutType { get; set; }
 
     [JsonIgnore]
-    public bool IsEmpty => Control == null && Cycle == null && (Greens == null || Greens.Count == 0) && Turns.Count == 0 && Intergreen == null && Offset == null && NoLeft != true && LeftPockets != true;
+    public bool IsEmpty => Control == null && Cycle == null && (Greens == null || Greens.Count == 0) && Turns.Count == 0 && Intergreen == null && Offset == null && NoLeft != true && LeftPockets != true
+                           && Crosswalks == null && RoundaboutType == null;
+
+    /// <summary>Tira do ajuste tudo o que uma solução aplicada no projeto passou a trazer do próprio modelo (fica a contagem).</summary>
+    public void ClearDesignFields()
+    {
+        Control = null; Cycle = null; Greens = null; Intergreen = null; Offset = null; NoLeft = null; LeftPockets = null; Crosswalks = null; RoundaboutType = null;
+    }
 }
 
 /// <summary>

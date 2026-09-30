@@ -269,7 +269,7 @@ internal sealed partial class AutoTestRunner
         {
             var worst = res.Nodes.Values.Where(n => !n.Node.IsZone && n.Node.Kind == Core.Traffic.TipoNo.Intersecao).OrderByDescending(n => n.Delay).FirstOrDefault();
             if (worst == null) { s.Note("Sem cruzamento no projeto de teste."); return; }
-            var trials = Core.Traffic.TrafficSolutions.For(net, res.Options, res, worst.Node.Index, null);
+            var trials = Core.Traffic.TrafficSolutions.For(net, res.Options, res, worst.Node.Index, null, seeds: 1);
             if (trials.Count == 0) s.Warn($"{worst.Node.Label}: nenhuma alternativa gerada.");
             foreach (var t in trials.Take(5)) s.Note(t.Summary());
             if (trials.Any(t => t.Failed)) s.Error("Alguma alternativa falhou ao ser testada: " + trials.First(t => t.Failed).Error);

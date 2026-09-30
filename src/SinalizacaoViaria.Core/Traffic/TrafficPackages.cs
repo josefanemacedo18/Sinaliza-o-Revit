@@ -82,12 +82,15 @@ public static class TrafficPackages
     /// <summary>Distância de visibilidade da placa de advertência antes do ponto (MBST Vol. II – tabela por velocidade).</summary>
     public static double WarningDistance(double kmh) => kmh <= 40 ? 50 : kmh <= 60 ? 80 : kmh <= 80 ? 120 : 160;
 
+    /// <summary>Tipo da rotatória para o volume do cruzamento (duas faixas acima de 2 200 veic/h).</summary>
+    public static TipoRotatoria RoundaboutTypeFor(double volume) => volume > 2200 ? TipoRotatoria.DuasFaixas : TipoRotatoria.UmaFaixa;
+
     public static ProjectPackage For(TrafficNetwork net, TrafficResult after, SolutionTrial t)
     {
         var nd = t.Node is { } ni ? net.Nodes[ni] : null;
         var lk = t.Link is { } li ? net.Links[li] : null;
         var key = nd?.SourceId;
-        var p = new ProjectPackage { Title = t.Title, NodeKey = key, ScenarioOnly = nd != null && (nd.SourceId == null || nd.Kind != TipoNo.Intersecao) && t.Kind is not ("travessia-ciclo" or "travessia-sem") };
+        var p = new ProjectPackage { Title = t.Title, NodeKey = key, ScenarioOnly = nd != null && (nd.SourceId == null || nd.DesignKind != TipoNo.Intersecao) && t.Kind is not ("travessia-ciclo" or "travessia-sem") };
         var nr = nd != null ? after.Nodes[nd.Index] : null;
         void I(string g, string item, string q, string norm) => p.Items.Add(new PackageItem(g, item, q, norm));
         var approaches = nd?.In.Select(i => net.Links[i]).Where(l => !net.Nodes[l.From].IsZone || l.Length > 20).ToList() ?? new();
@@ -141,7 +144,7 @@ public static class TrafficPackages
             case "rotatoria":
             {
                 var vol = nr?.Volume ?? 0;
-                p.Roundabout = vol > 2200 ? TipoRotatoria.DuasFaixas : TipoRotatoria.UmaFaixa;
+                p.Roundabout = t.RoundaboutType ?? RoundaboutTypeFor(vol);
                 p.Justification = $"Rotatória {(p.Roundabout == TipoRotatoria.DuasFaixas ? "de duas faixas" : "de uma faixa")} ({vol:0} veic/h): elimina os conflitos de cruzamento e reduz a velocidade na entrada.";
                 I("Geometria", "Ilha central, pista giratória, ilhas separadoras (gota) em cada ramo, calçada contornando", "1 rotatória", "MBST Vol. IV; DNIT – Manual de Projeto de Interseções");
                 I("Sinalização vertical", "R-2 Dê a preferência + R-33 sentido de circulação em cada entrada; A-12 \"Interseção em círculo\" antecipada; marcadores de alinhamento na ilha", "1 conjunto por ramo", "MBST Vol. I/II; DER-SP projetos-tipo");
@@ -155,7 +158,7 @@ public static class TrafficPackages
             {
                 if (nr != null && nr.Phases.Count > 0) p.Plan = TrafficAnalysis.PlanOf(after, nr, t.Kind == "ondaverde" ? "Solução testada – onda verde" : "Solução testada – retemporização");
                 if (t.Kind == "ondaverde")
-                    foreach (var o in after.Nodes.Values.Where(x => x.Control == ControleNo.Semaforo && x.Phases.Count > 0 && x.Node.SourceId != null && x.Node != nd && x.Node.Kind == TipoNo.Intersecao))
+                    foreach (var o in after.Nodes.Values.Where(x => x.Control == ControleNo.Semaforo && x.Phases.Count > 0 && x.Node.SourceId != null && x.Node != nd && x.Node.DesignKind == TipoNo.Intersecao))
                         if (t.RelatedKeys.Contains(o.Node.Key)) p.OtherPlans[o.Node.SourceId!] = TrafficAnalysis.PlanOf(after, o, "Solução testada – onda verde");
                 p.Justification = t.Kind == "ondaverde"
                     ? $"Ciclo comum e defasagens: os pelotões chegam no verde ao longo da via ({1 + p.OtherPlans.Count} semáforos)."

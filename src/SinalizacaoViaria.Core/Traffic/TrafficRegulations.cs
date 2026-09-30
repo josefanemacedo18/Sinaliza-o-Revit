@@ -328,6 +328,14 @@ public static class TrafficRegulations
             if (turns.Length == 0) continue;
             var rg = Reg(TipoRegra.SetaDeFaixa, sm.Code!, $"Seta {sm.Code}", sm.Position, sm.Id);
             var h2 = LinkAt(net, sm.Position, dir, 1);
+            // Seta de esquerda no bolsão da interseção: é a faixa a mais do bolsão (TrafficLink.PocketLength), não uma
+            // faixa direta que passa a ser só de conversão.
+            if (h2 is { } hp && hp.Link.PocketLength > 0 && code == "PEM-E" && hp.Link.Length - hp.At <= hp.Link.PocketLength + 10
+                && -hp.Link.Path.Project(sm.Position).Signed < hp.Link.LaneOffset(hp.Link.Lanes - 1))
+            {
+                Apply(rg, net.Nodes[hp.Link.To], hp.Link, $"{hp.Link.Name}: bolsão de conversão à esquerda ({hp.Link.PocketLength:0} m)");
+                continue;
+            }
             if (h2 is { } hh && hh.Link.Length - hh.At <= 90 && LaneAt(hh.Link, sm.Position) is { } ln)
             {
                 if (!hh.Link.LaneTurns.TryGetValue(ln, out var set)) hh.Link.LaneTurns[ln] = set = new HashSet<Giro>();

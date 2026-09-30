@@ -181,21 +181,14 @@ internal sealed class TrafficHost : ITrafficHost
                 if (def == null) msgs.Add("A interseção não foi encontrada no projeto – nada alterado nela.");
                 else if (p.Roundabout is { } type)
                 {
-                    var tpl = new RoundaboutDefinition();
-                    tpl.ApplyPreset(type);
-                    tpl.Output = def.Output.Clone();
+                    var tpl = TrafficPackageModel.RoundaboutTemplate(def, type);
                     var r = IntersectionRunner.Run(_uidoc, "Solução – rotatória", s => s.ConvertToRoundabout(def.Node, tpl));
                     msgs.Add($"Cruzamento convertido em rotatória ({type}); {r.SelectMany(x => x.Warnings).Distinct().Count()} aviso(s).");
                 }
                 else
                 {
-                    if (p.Control is { } c) def.Control = c;
-                    if (p.LeftTurns is { } lt) def.LeftTurns = lt;
-                    if (p.LeftTurnPockets is { } lp) def.LeftTurnPockets = lp;
-                    if (p.Crosswalks is { } cw) { def.Crosswalks = cw; if (cw) def.Ramps = true; }
-                    if (p.ApproachLines is { } al) def.ApproachLines = al;
-                    if (p.Plan != null) def.SignalPlan = p.Plan;
-                    else if (def.Control != ControleIntersecao.Semaforo) def.SignalPlan = null;
+                    // A mesma regra do modelo em memória em que a solução foi conferida (TrafficPackageModel).
+                    TrafficPackageModel.ApplyTo(def, p);
                     var r = IntersectionRunner.Run(_uidoc, "Solução – interseção", s => s.Refresh(def));
                     msgs.Add($"Interseção refeita ({def.Control}{(def.LeftTurns ? "" : ", sem conversão à esquerda")}{(def.LeftTurnPockets ? ", com bolsões" : "")}).");
                     msgs.AddRange(r.SelectMany(x => x.Warnings).Distinct().Take(5).Select(w => "⚠ " + w));
@@ -205,8 +198,7 @@ internal sealed class TrafficHost : ITrafficHost
             {
                 var d2 = MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().FirstOrDefault(d => d.Id == key);
                 if (d2 == null) continue;
-                d2.SignalPlan = plan;
-                d2.Control = ControleIntersecao.Semaforo;
+                TrafficPackageModel.ApplyPlan(d2, plan);
                 IntersectionRunner.Run(_uidoc, "Solução – plano semafórico", s => s.Refresh(d2));
             }
             if (p.OtherPlans.Count > 0) msgs.Add($"Planos gravados em mais {p.OtherPlans.Count} semáforo(s) (onda verde).");
@@ -218,25 +210,15 @@ internal sealed class TrafficHost : ITrafficHost
                 var svc = new MarkingService(doc, _uidoc.ActiveView);
                 if (p.RemoveNear is { } rm)
                 {
-                    var gone = MarkingStorage.Definitions(doc).OfType<UrbanElementDefinition>()
-                        .Where(u => (u.Code ?? "").StartsWith(rm.Code, StringComparison.OrdinalIgnoreCase) && u.Position.DistanceTo(rm.At) < rm.Radius).ToList();
+                    var gone = MarkingStorage.Definitions(doc).Where(d => TrafficPackageModel.Removes(p, d)).ToList();
                     foreach (var u in gone) svc.Delete(u.Id);
                     msgs.Add($"{gone.Count} grupo(s) focal(is) retirado(s).");
                 }
                 var made = 0;
-                foreach (var pt in p.Points)
+                foreach (var d in TrafficPackageModel.Elements(p, ZAt, () => st.NewOutput()))
                 {
-                    MarkingDefinition d = pt.Kind == "Semaforo"
-                        ? new UrbanElementDefinition { Code = pt.Code, Position = pt.Position, Direction = pt.Direction, Z = ZAt(pt.Position), Output = st.NewOutput() }
-                        : new SignDefinition { Code = pt.Code, Position = pt.Position, Direction = pt.Direction, Z = ZAt(pt.Position), Output = st.NewOutput() };
                     try { svc.Render(d); made++; }
                     catch (Exception ex) { Log.Error("Solução – elemento", ex); }
-                }
-                foreach (var ln in p.Lines)
-                {
-                    var d = new LinearMarkingDefinition { Code = ln.Code, Variant = "0,40 m", PathRef = PathReference.FromPoints(new[] { ln.A, ln.B }, ZAt(ln.A)), Output = st.NewOutput() };
-                    try { svc.Render(d); made++; }
-                    catch (Exception ex) { Log.Error("Solução – linha", ex); }
                 }
                 t.Commit();
                 if (made > 0) msgs.Add($"{made} elemento(s) criados (grupos focais, placas, retenções).");
@@ -249,6 +231,24 @@ internal sealed class TrafficHost : ITrafficHost
             throw;
         }
         return $"Solução aplicada: {p.Title}.\n" + string.Join("\n", msgs);
+    }
+
+    public ModelSnapshot? Snapshot()
+    {
+        var doc = Doc;
+        var defs = MarkingStorage.Definitions(doc);
+        var axes = new Dictionary<string, (Polyline2 Axis, double Z)>();
+        foreach (var d in defs)
+        {
+            if (d.Path == null) continue;
+            try
+            {
+                var rp = PathResolver.Resolve(doc, d.Path);
+                if (rp?.Main is { } m && m.Length > 0.5) axes[d.Id] = (m, rp.Z);
+            }
+            catch (Exception ex) { Log.Error("Simulador de Tráfego – cópia do modelo", ex); }
+        }
+        return new ModelSnapshot { Defs = defs, Axes = axes, Catalog = PluginContext.Catalog };
     }
 
     public string WriteResults(TrafficResult res, string scenario)

@@ -10,6 +10,16 @@ internal sealed class SimVehicle
     public double Length = 4.5;
     public double A = 1.3, B = 2.0, T = 1.3;
     public double SpeedFactor = 1.0;
+    /// <summary>Tempo de reação ao abrir o verde / ao líder partir (s) e desvio pessoal da brecha crítica (s, aceitação heterogênea).</summary>
+    public double React = 1.0, GapShift;
+    /// <summary>Instante a partir do qual o veículo parado começa a andar (reação em curso; −1 = sem espera).</summary>
+    public double GoAt = -1;
+    /// <summary>Parado na linha pelo vermelho: ao abrir o verde, arranca depois do tempo de percepção e reação.</summary>
+    public bool RedWait;
+    /// <summary>Calibração: posição na fila desde o início do verde (0 = não medido), início do verde e faixa de chegada.</summary>
+    public int DisPos;
+    public double DisGreen;
+    public (int Link, int Lane) DisLane;
     public List<int> Route = new();
     public int Step;                 // índice do trecho atual na rota
     public int Lane;
@@ -93,6 +103,12 @@ public sealed class SimApproach
     public int Vehicles { get; set; }
     public double DelaySum { get; set; }
     public double MeanDelay => Vehicles > 0 ? DelaySum / Vehicles : 0;
+    /// <summary>Veículos ainda na aproximação (ou esperando para entrar na rede por ela) no fim da simulação.</summary>
+    public int PendingVehicles { get; set; }
+    /// <summary>Atraso já acumulado por esses veículos (s) – a fila que não escoou também conta.</summary>
+    public double PendingDelay { get; set; }
+    /// <summary>Atraso médio de todos os que usaram a aproximação, inclusive os que ficaram na fila (s/veh).</summary>
+    public double MeanDelayAll => Vehicles + PendingVehicles > 0 ? (DelaySum + PendingDelay) / (Vehicles + PendingVehicles) : 0;
     public double MaxQueue { get; set; }      // m
     public int Stops { get; set; }
 }
@@ -109,11 +125,32 @@ public sealed class SimResult
     public int Backlog { get; set; }
     public double MeanTravelTime { get; set; }
     public double MeanDelay { get; set; }
+    /// <summary>
+    /// Atraso médio na rede (s/veh) de todos os veículos gerados na medição – os que chegaram, os que ainda estão na rede
+    /// (atraso até o fim) e os que não conseguiram entrar (espera na entrada). Com filas que não escoam, o atraso médio
+    /// só dos que chegaram engana: quem ficou preso não entra nele.
+    /// </summary>
+    public double NetworkDelay { get; set; }
     public double StopsPerTrip { get; set; }
     public double Duration { get; set; }
     public int MaxVehicles { get; set; }
     public int LaneChanges { get; set; }
     public int BusStopsServed { get; set; }
+    /// <summary>
+    /// Descarga das filas nos semáforos (calibração): posição do veículo na fila desde o início do verde, intervalo de
+    /// entrada (s; o 1º medido desde o início do verde) e tipo do veículo.
+    /// </summary>
+    public List<(int Pos, double Headway, int Type, Giro Turn)> Discharge { get; } = new();
+    /// <summary>Trocas de faixa obrigatórias (para a conversão seguinte): distância à linha de retenção quando feitas (m).</summary>
+    public List<double> MandatoryChanges { get; } = new();
+    /// <summary>
+    /// Brechas nos nós sem semáforo (calibração, método de Siegloch): passagem de quem tem a preferência em frente a uma
+    /// entrada (rotatória: o veículo que circula passa pela entrada <c>Link</c>; PARE/preferência: veículo da via principal
+    /// entra no nó, <c>Link</c> = −1) e entrada de quem cede (<c>Entry</c> = true, <c>Link</c> = a aproximação).
+    /// </summary>
+    public List<(int Node, int Link, double Time, bool Entry)> GapEvents { get; } = new();
+    /// <summary>Desvio pessoal da brecha aceita de cada motorista gerado na medição (s; + = mais cauteloso).</summary>
+    public List<double> DriverGapShifts { get; } = new();
     public List<string> Events { get; } = new();
 
     public double MeanSpeedKmh(int link) => LinkSpeed.TryGetValue(link, out var x) && x.Time > 0 ? x.Dist / x.Time * 3.6 : double.NaN;
@@ -128,6 +165,35 @@ public static class TrafficSimulation
 {
     private const double Dt = 0.25;
     public static bool Debug { get; set; }
+
+    // ---------------------------------------------------------------- calibração (referências no manual, seção do simulador)
+    /// <summary>Descarga de referência da faixa ideal (3,6 m, sem estacionamento, plana): ~1 850 veíc/h de verde (h ≈ 1,95 s).</summary>
+    public const double ReferenceSaturation = 1850;
+    /// <summary>Parada obrigatória no PARE antes de avaliar a brecha (s).</summary>
+    public const double StopDwell = 0.3;
+
+    /// <summary>Brecha crítica HCM 7 (cap. 20) do movimento: base por giro e principal de 2 ou 4 faixas.</summary>
+    public static double CriticalGap(Giro g, bool fromMajor, bool multilaneMajor) => fromMajor
+        ? 4.1 + (multilaneMajor ? 0.1 : 0)
+        : g switch
+        {
+            Giro.Direita => 6.2 + (multilaneMajor ? 0.7 : 0),
+            Giro.Frente => 6.5 + (multilaneMajor ? 1.0 : 0),
+            _ => 7.1 + (multilaneMajor ? 0.4 : 0),
+        };
+
+    /// <summary>Brecha crítica de entrada na rotatória (HCM 7, cap. 22): ~5,0 s (uma faixa) e ~4,3 s (duas faixas).</summary>
+    public static double RoundaboutCriticalGap(int ringLanes) => ringLanes >= 2 ? 4.3 : 5.0;
+    /// <summary>Intervalo de seguimento na entrada da rotatória (HCM 7, cap. 22): ~2,6 s (uma faixa) e ~2,5 s (duas).</summary>
+    public static double RoundaboutFollowUp(int ringLanes) => ringLanes >= 2 ? 2.5 : 2.6;
+
+    /// <summary>Ocupação da faixa de pedestres no verde (HCM 7, fator fRpb): fração do verde em que as conversões cedem.</summary>
+    public static double PedestrianOccupancy(double pedPerHour, double cycle, double pedGreen)
+    {
+        if (pedPerHour <= 0 || pedGreen <= 0) return 0;
+        var vpg = Math.Min(5000, pedPerHour * cycle / pedGreen);
+        return vpg <= 1000 ? vpg / 2000 : Math.Min(0.9, 0.4 + vpg / 10000);
+    }
 
     /// <summary>
     /// Pares de veículos sobrepostos nos quadros (segmentos frente–traseira a menos de <paramref name="tol"/> m) – deve ser
@@ -188,6 +254,7 @@ public static class TrafficSimulation
     public static double StopLineClear(TrafficNetwork net, TrafficLink l, int node)
     {
         var nd = net.Nodes[node];
+        if (nd.ScenarioRoundabout) return Math.Min(nd.RoundaboutRadius, l.Length * 0.45);
         if (nd.IsZone || nd.Kind is not (TipoNo.Intersecao or TipoNo.CruzamentoSemControle)) return 0;
         var w = nd.In.Concat(nd.Out).Select(i => net.Links[i].Road).Where(r => r.Id != l.Road.Id).Select(r => r.CarriageWidth / 2)
             .DefaultIfEmpty(3.5).Max();
@@ -242,7 +309,7 @@ public static class TrafficSimulation
         var none = new List<SimVehicle>();
         List<SimVehicle> Tail(int link, int lane) => lanes.TryGetValue((link, lane), out var l) ? l : none;
         // Todas as faixas existem desde o início (a lista de faixas não muda durante as varreduras).
-        foreach (var l in net.Links) for (int k = 0; k < l.Lanes; k++) LaneList(l.Index, k);
+        foreach (var l in net.Links) for (int k = 0; k < l.SimLanes; k++) LaneList(l.Index, k);
         var inNode = net.Nodes.Select(_ => new List<SimVehicle>()).ToArray();
         foreach (var l in net.Links) res.Approaches[l.Index] = new SimApproach { Link = l.Index };
 
@@ -333,6 +400,10 @@ public static class TrafficSimulation
                     peds[(l.Index, k)] = list;
                     continue;
                 }
+                // Faixa de pedestres do próprio cruzamento semaforizado: os pedestres atravessam no verde deles (as conversões
+                // cedem – regra do nó); os veículos em frente não param para eles como numa faixa do meio da quadra.
+                bool NearSignal(int node, double dist) => net.Nodes[node].Control == ControleNo.Semaforo && dist < 25;
+                if (NearSignal(l.To, l.Length - cwAt) || NearSignal(l.From, cwAt)) continue;
                 while (opt.PedestriansPerHour > 0)
                 {
                     t += -Math.Log(1 - rnd.NextDouble()) * 3600 / opt.PedestriansPerHour;
@@ -346,14 +417,19 @@ public static class TrafficSimulation
 
         var why = new Dictionary<string, int>();
         var lastEntry = new Dictionary<(int, int), double>();
+        var discharge = new Dictionary<(int, int), (double GreenStart, int N, double Prev)>();
+        var rearPass = new Dictionary<(int, int), (double Green, double T)>();
         var headways = new List<double>();
         int nextId = 0;
-        double sumTT = 0, sumDelay = 0;
+        double sumTT = 0, sumDelay = 0, allDelay = 0;
+        var allN = 0;
         var lastFrame = -1.0;
 
         // Pontos de ônibus de cada trecho em ordem (afastados do fim para não travar a entrada no nó).
         var stops = net.Links.ToDictionary(l => l.Index, l => l.BusStops.Select(b => (At: Math.Clamp(b.At, 6 + startClear[l.Index], Math.Max(6 + startClear[l.Index], EndOf(l) - 8)), b.Bay)).OrderBy(b => b.At).ToList());
         double V0(SimVehicle x, TrafficLink l) => l.FreeSpeed * x.SpeedFactor;
+        // Intervalo desejado na faixa: o do motorista + o atrito lateral da faixa (largura, estacionamento, rampa – HCM).
+        var extraT = net.Links.Select(l => Math.Max(0, 3600 / (ReferenceSaturation * Math.Clamp(l.Friction, 0.6, 1.0)) - 3600 / ReferenceSaturation)).ToArray();
         // Aceleração IDM de x atrás de lead (nulo = via livre).
         double Idm(SimVehicle x, SimVehicle? lead, TrafficLink l)
         {
@@ -361,7 +437,7 @@ public static class TrafficSimulation
             var free = 1 - Math.Pow(x.V / v0, 4);
             if (lead == null) return x.A * free;
             var gap = Math.Max(0.1, lead.S - lead.Length - x.S);
-            var sStar = 2.0 + Math.Max(0, x.V * x.T + x.V * (x.V - lead.V) / (2 * Math.Sqrt(x.A * x.B)));
+            var sStar = 2.0 + Math.Max(0, x.V * (x.T + extraT[l.Index]) + x.V * (x.V - lead.V) / (2 * Math.Sqrt(x.A * x.B)));
             return Math.Max(-9, x.A * (free - Math.Pow(sStar / gap, 2)));
         }
         // Faixas aceitáveis no trecho: conversão no fim do trecho e ponto de ônibus pela frente.
@@ -377,7 +453,9 @@ public static class TrafficSimulation
             else
             {
                 var g = TrafficAnalysis.TurnOf(net, l.Index, v.Route[v.Step + 1]);
-                if (l.LaneTurns.Count > 0)
+                // Bolsão de conversão à esquerda: quem converte entra nele assim que ele começa.
+                if (l.PocketLength > 0 && g is Giro.Esquerda or Giro.Retorno) res = new HashSet<int> { l.Lanes };
+                else if (l.LaneTurns.Count > 0)
                 {
                     // Setas pintadas: só as faixas que permitem o movimento.
                     res = all.Where(k => l.TurnsOf(k) is not { } set || set.Contains(g) || (g == Giro.Retorno && set.Contains(Giro.Esquerda))).ToHashSet();
@@ -454,8 +532,8 @@ public static class TrafficSimulation
             var d1 = to.Path.TangentAt(0);
             var turn = Math.Abs(Math.Atan2(d0.Cross(d1), d0.Dot(d1)));
             var v0 = Math.Min(from.FreeSpeed, to.FreeSpeed);
-            if (nd.Kind == TipoNo.Rotatoria) v0 = Math.Min(v0, Math.Sqrt(2.5 * RingRadius(nd)));
-            else if (turn > 0.25) v0 = Math.Min(v0, Math.Sqrt(2.5 * Math.Max(4, len / turn)));
+            if (nd.Kind == TipoNo.Rotatoria) v0 = Math.Min(v0, Math.Sqrt(3.5 * RingRadius(nd)));   // ~25 km/h no anel de 14 m (HCM: 25–30 km/h)
+            else if (turn > 0.25) v0 = Math.Min(v0, Math.Sqrt(3.0 * Math.Max(4, len / turn)));   // conversão a ~15–20 km/h
             p = new SimPath
             {
                 Pts = pts, Line = line, Length = len, V0 = Math.Max(3.0, v0), Samples = samples, St = st,
@@ -592,11 +670,12 @@ public static class TrafficSimulation
                 if (nd.IsZone) continue;
                 actors.Clear();
                 // "Dentro" é quem já avançou de fato além da linha (ou vem embalado): quem parou rente a ela ainda espera como os demais.
-                foreach (var v in inNode[n]) actors.Add((v, v.Mov!.Value, v.NodeS, true, v.StuckFor > 6 ? -1 : 0, false, v.NodeS > 1.5 || v.V > 4));
+                // Na rotatória, quem passou da linha de "Dê a preferência" já aceitou a brecha: está dentro.
+                foreach (var v in inNode[n]) actors.Add((v, v.Mov!.Value, v.NodeS, true, v.StuckFor > 6 ? -1 : 0, false, v.NodeS > 1.5 || v.V > 4 || nd.Kind == TipoNo.Rotatoria));
                 foreach (var li in nd.In)
                 {
                     var l = net.Links[li];
-                    for (int k = 0; k < l.Lanes; k++)
+                    for (int k = 0; k < l.SimLanes; k++)
                     {
                         var list = Tail(li, k);
                         if (list.Count == 0) continue;
@@ -665,7 +744,8 @@ public static class TrafficSimulation
                                     var g = (sameStart ? bOnA - b.V.Length : Math.Max(run.AIn - 0.8, bOnA - b.V.Length)) - a.S;
                                     if (g < gap) { gap = g; leadV = b.V.V; whyO = $"segue:{b.V.Id}"; }
                                 }
-                                else if (bFront <= 0 && aIn <= 0 && b.Claims && Yields(a, b, run.AIn - a.S, run.BIn - b.S))
+                                // Rotatória: quem ainda está na aproximação decide pela brecha na linha (CanProceed), não pela fusão.
+                                else if (bFront <= 0 && aIn <= 0 && b.Claims && !(nd.Kind == TipoNo.Rotatoria && !a.Inside) && Yields(a, b, run.AIn - a.S, run.BIn - b.S, nd.Kind == TipoNo.Rotatoria))
                                 {
                                     var g = run.AIn - 0.8 - a.S;
                                     if (g < gap) { gap = g; leadV = 0; whyO = $"fusao:{b.V.Id}"; }
@@ -681,7 +761,7 @@ public static class TrafficSimulation
                                     if (bInside && bFront > aIn && b.Claims) { if (0 < gap) { gap = 0; leadV = 0; whyO = $"dentro:{b.V.Id}"; } }
                                     continue;
                                 }
-                                if (bInside || (b.Claims && Yields(a, b, run.AIn - a.S, run.BIn - b.S)))
+                                if (bInside || (b.Claims && Yields(a, b, run.AIn - a.S, run.BIn - b.S, nd.Kind == TipoNo.Rotatoria)))
                                 {
                                     // Não entra no cruzamento para ficar parado dentro dele (CTB art. 45): com a zona ocupada (ou
                                     // prestes a ser) por quem está parado lá dentro, espera na linha – senão três ou quatro veículos se travam no meio do nó.
@@ -699,22 +779,26 @@ public static class TrafficSimulation
         // Ordem de passagem numa zona: quem não consegue mais parar, depois quem chega antes, a prioridade (no nó >
         // principal > secundária, quem espera muito vira prioridade) e o número do veículo (desempate sem impasse).
         static bool Yields((SimVehicle V, SimMove M, double S, bool Claims, int Rank, bool Tail, bool Inside) a,
-            (SimVehicle V, SimMove M, double S, bool Claims, int Rank, bool Tail, bool Inside) b, double da, double db)
+            (SimVehicle V, SimMove M, double S, bool Claims, int Rank, bool Tail, bool Inside) b, double da, double db, bool ring = false)
         {
-            static (int C, int In, double T, int R, int Id) Key((SimVehicle V, SimMove M, double S, bool Claims, int Rank, bool Tail, bool Inside) x, double d)
+            static (int C, int In, double T, int R, int Id) Key((SimVehicle V, SimMove M, double S, bool Claims, int Rank, bool Tail, bool Inside) x, double d, bool ring)
             {
                 var v = x.V.V;
                 var committed = v * v / (2 * 4.0) > d - 0.3 ? 0 : 1;
-                var ta = d <= 0 ? 0 : d / Math.Max(v, 1.5) + (v < 0.5 ? 1.2 : 0);
-                // Quem já passou da linha termina a travessia: não para no meio do nó para ceder a quem ainda chega.
-                return (committed, x.Inside ? 0 : 1, Math.Round(ta, 1), x.Rank, x.V.Id);
+                var ta = d <= 0 ? 0 : ring ? (-v + Math.Sqrt(v * v + 2 * x.V.A * d)) / x.V.A : d / Math.Max(v, 1.5) + (v < 0.5 ? 1.2 : 0);
+                // Quem já passou da linha termina a travessia: não para no meio do nó para ceder a quem ainda chega. No anel da
+                // rotatória, quem circula longe (mais de 2,5 s da fusão) não trava quem já entrou – a brecha foi aceita na entrada.
+                var inside = x.Inside && !(ring && ta > 2.5);
+                return (committed, inside ? 0 : 1, Math.Round(ta, 1), x.Rank, x.V.Id);
             }
-            return Key(b, db).CompareTo(Key(a, da)) < 0;
+            return Key(b, db, ring).CompareTo(Key(a, da, ring)) < 0;
         }
 
+        var endTime = 0.0;
         for (var time = 0.0; time < total; time += Dt)
         {
             if (cancel.IsCancellationRequested) break;
+            endTime = time;
             var measuring = time >= opt.WarmupSeconds;
             // ---------------------------------------------------- chegadas
             while (next < arrivals.Count && arrivals[next].T <= time)
@@ -725,18 +809,23 @@ public static class TrafficSimulation
                 var route = routes[^1].Links;
                 foreach (var (w, links) in routes) { r -= w; if (r <= 0) { route = links; break; } }
                 var type = rnd.NextDouble() < opt.HeavyVehicles ? 1 : rnd.NextDouble() < opt.Buses / Math.Max(1e-6, 1 - opt.HeavyVehicles) ? 2 : 0;
+                // Motoristas diferentes: aceleração, intervalo desejado, reação e brecha aceita variam (mais e menos agressivos).
+                // Automóvel 4,5 m, 1,7–2,5 m/s²; caminhão 11,5 m, 0,6–1,0 m/s²; ônibus 12 m, 0,9–1,2 m/s² (arrancada).
+                var (u1, u2, u3, u4) = (drv.NextDouble(), drv.NextDouble(), drv.NextDouble(), drv.NextDouble());
+                var gauss = Math.Sqrt(-2 * Math.Log(1 - u4 * 0.999999)) * Math.Cos(2 * Math.PI * u3);
                 var v = new SimVehicle
                 {
-                    // Motoristas diferentes: aceleração e intervalo desejado variam (mais e menos agressivos).
-                    Id = nextId++, Type = type, Length = type == 0 ? 4.5 : 12,
-                    A = type == 0 ? 2.2 + drv.NextDouble() * 0.8 : 1.0 + drv.NextDouble() * 0.4,
-                    B = type == 0 ? 2.5 : 2.0,
-                    T = type == 0 ? 0.75 + drv.NextDouble() * 0.5 : 1.2 + drv.NextDouble() * 0.4,
-                    SpeedFactor = Math.Clamp(1 + (rnd.NextDouble() + rnd.NextDouble() - 1) * 0.12, 0.85, 1.12), Route = route, Born = time,
+                    Id = nextId++, Type = type, Length = type switch { 1 => 11.5, 2 => 12.0, _ => 4.5 },
+                    A = type switch { 1 => 0.6 + u1 * 0.4, 2 => 0.9 + u1 * 0.3, _ => 1.7 + u1 * 0.8 },
+                    B = type == 0 ? 2.5 : 1.8,
+                    T = type switch { 1 => 1.6 + u2 * 0.4, 2 => 1.5 + u2 * 0.4, _ => 1.0 + u2 * 0.45 },
+                    React = type == 0 ? 1.3 + u3 * 0.7 : 1.5 + u3 * 0.6,
+                    GapShift = Math.Clamp(gauss * 0.5, -1.0, 1.2),
+                    SpeedFactor = Math.Clamp(1 + (rnd.NextDouble() + rnd.NextDouble() - 1) * 0.12, 0.85, 1.12) * (type == 1 ? 0.92 : 1.0), Route = route, Born = time,
                 };
                 if (!queues.TryGetValue(route[0], out var q)) queues[route[0]] = q = new Queue<SimVehicle>();
                 q.Enqueue(v);
-                if (measuring) res.Spawned++;
+                if (measuring) { res.Spawned++; if (res.DriverGapShifts.Count < 20000) res.DriverGapShifts.Add(v.GapShift); }
             }
             foreach (var (link, q) in queues)
             {
@@ -860,6 +949,19 @@ public static class TrafficSimulation
                             if (gp < gap) { gap = gp; dv = v.V; }
                         }
                     }
+                    // Bolsão cheio: quem vai converter à esquerda espera na entrada dele, na faixa direta (segurando-a), e não
+                    // segue até a retenção pela faixa errada.
+                    if (l.PocketLength > 0 && v.Lane != l.Lanes && v.Step + 1 < v.Route.Count
+                        && TrafficAnalysis.TurnOf(net, l.Index, v.Route[v.Step + 1]) is Giro.Esquerda or Giro.Retorno)
+                    {
+                        var entry = EndOf(l) - l.PocketLength + 4;
+                        if (v.S < entry + 0.5)
+                        {
+                            var gp = entry + 2.0 - v.S;
+                            if (gp < gap) { gap = gp; dv = v.V; }
+                        }
+                    }
+                    var stopLine = double.PositiveInfinity;
                     if (lead == null)
                     {
                         // Obstáculo virtual 1 m além da linha: com a distância mínima do IDM (2 m) o veículo para 1 m antes dela, sem avançar sobre o cruzamento.
@@ -869,14 +971,31 @@ public static class TrafficSimulation
                         {
                             var gp = stop - v.S;
                             if (gp < gap) { gap = gp; dv = v.V; }
+                            stopLine = EndOf(l) - 1.0 - v.S;
                         }
                         // E sempre: quem está no nó à frente (inclusive a traseira de quem acabou de entrar), no conflito ou
                         // na fila da saída.
                         if (obstacle.TryGetValue(v.Id, out var ob) && ob.Gap < gap) { gap = Math.Max(0, ob.Gap); dv = v.V - ob.LeadV; }
                     }
-                    var sStar = 2.0 + Math.Max(0, v.V * v.T + v.V * dv / (2 * Math.Sqrt(v.A * v.B)));
+                    var sStar = 2.0 + Math.Max(0, v.V * (v.T + extraT[link]) + v.V * dv / (2 * Math.Sqrt(v.A * v.B)));
                     var acc = v.A * (1 - Math.Pow(v.V / Math.Max(0.5, v0), 4) - (double.IsInfinity(gap) ? 0 : Math.Pow(sStar / Math.Max(0.1, gap), 2)));
                     acc = Math.Max(acc, -8);
+                    // Parada na linha (PARE, vermelho, cedendo): aproximação cinemática – acelera livre e freia a ~2 m/s² só no
+                    // fim (o IDM puro "rasteja" os últimos metros e alongava muito o intervalo de seguimento no PARE).
+                    if (!double.IsInfinity(stopLine) && Math.Abs(gap - (stopLine + 2.0)) < 0.05)
+                    {
+                        var room = Math.Max(0, stopLine - 0.1);
+                        var need = v.V * v.V / (2 * Math.Max(v.B, 3.0));
+                        acc = room <= need + v.V * Dt ? -Math.Min(8, v.V * v.V / (2 * Math.Max(0.05, room))) : Math.Min(acc > 0 ? acc : v.A * (1 - Math.Pow(v.V / Math.Max(0.5, v0), 4)), v.A);
+                        if (room < 0.05) acc = -v.V / Dt;
+                    }
+                    // Partida da fila: quem está parado só arranca depois do tempo de reação (onda de partida – tempo perdido inicial).
+                    if (v.V < 0.2 && acc > 0.05)
+                    {
+                        if (v.GoAt < 0) v.GoAt = time + v.React * 0.45;
+                        if (time < v.GoAt) acc = 0;
+                    }
+                    else if (v.V > 0.5) v.GoAt = -1;
                     var nv = Math.Max(0, v.V + acc * Dt);
                     var ds = Math.Max(0, (v.V + nv) / 2 * Dt);
                     if (!double.IsInfinity(gap)) ds = Math.Min(ds, Math.Max(0, gap - 0.2 + (lead == null ? 0.2 : 0)));
@@ -890,9 +1009,9 @@ public static class TrafficSimulation
 
             // ---------------------------------------------------- troca de faixa (obrigatória para a conversão / o ponto; e para ultrapassar)
             var changes = new List<(SimVehicle V, int Link, int From, int To)>();
-            foreach (var l in net.Links.Where(x => x.Lanes > 1))
+            foreach (var l in net.Links.Where(x => x.SimLanes > 1))
             {
-                for (int k = 0; k < l.Lanes; k++)
+                for (int k = 0; k < l.SimLanes; k++)
                 {
                     var list = Tail(l.Index, k);
                     for (int i = 0; i < list.Count; i++)
@@ -909,10 +1028,15 @@ public static class TrafficSimulation
                         var bestGain = double.NegativeInfinity;
                         foreach (var tk in new[] { k - 1, k + 1 })
                         {
-                            if (tk < 0 || tk >= l.Lanes) continue;
+                            if (tk < 0 || tk >= l.SimLanes) continue;
+                            // O bolsão só existe nos seus últimos metros; dentro dele ninguém volta para a faixa direta.
+                            if (tk == l.Lanes && toEnd > l.PocketLength) continue;
                             var nearOk = ok.Count == 0 ? k : ok.OrderBy(x => Math.Abs(x - k)).First();
                             var mandatory = !ok.Contains(k) && Math.Abs(tk - nearOk) < Math.Abs(k - nearOk);
-                            if (!mandatory && !ok.Contains(tk) && toEnd < 150) continue;
+                            if (k == l.Lanes && !mandatory) continue;
+                            // Perto do cruzamento (ou atrás da fila dele) ninguém troca para uma faixa de onde não faz a sua
+                            // conversão – depois não consegue voltar na fila e para na linha pela faixa errada.
+                            if (!mandatory && !ok.Contains(tk) && toEnd < 300) continue;
                             if (!mandatory && v.Type == 2 && ok.Count == 1) continue;
                             if (!mandatory && l.LaneChangeForbidden) continue;       // LMS-1, R-8, tachões entre faixas
                             if (l.LaneClosedAt(tk, v.S + 5)) continue;
@@ -939,8 +1063,13 @@ public static class TrafficSimulation
                             var gain = aNew - aCur - threshold;
                             if (gain > 0 && gain > bestGain) { bestGain = gain; best = tk; }
                         }
-                        if (best >= 0) { changes.Add((v, l.Index, k, best)); v.WantsLane = -1; }
-                        else if (!ok.Contains(k) && ok.Count > 0 && toEnd < 80)
+                        if (best >= 0)
+                        {
+                            changes.Add((v, l.Index, k, best));
+                            v.WantsLane = -1;
+                            if (measuring && !ok.Contains(k) && v.Step + 1 < v.Route.Count && v.Type != 2) res.MandatoryChanges.Add(toEnd);
+                        }
+                        else if (!ok.Contains(k) && ok.Count > 0 && toEnd < 160)
                         {
                             // Obrigatória sem brecha: sinaliza a vontade (seta) – quem vem atrás na faixa ao lado abre espaço.
                             var nearOk = ok.OrderBy(x => Math.Abs(x - k)).First();
@@ -955,7 +1084,7 @@ public static class TrafficSimulation
                 var l = net.Links[link];
                 if (!Tail(link, from).Remove(v)) continue;
                 LaneList(link, to).Add(v);
-                v.LaneShift += l.LaneOffset(from) - l.LaneOffset(to);
+                v.LaneShift += l.LaneOffsetAt(from, v.S) - l.LaneOffsetAt(to, v.S);
                 v.LaneFrom = from;
                 v.WantsLane = -1;
                 v.Lane = to;
@@ -970,7 +1099,15 @@ public static class TrafficSimulation
                 var l = net.Links[link];
                 var v = list.MaxBy(x => x.S)!;
                 if (v.S < EndOf(l) - 1.3 || v.DwellUntil > 0 || v.InBay) continue;
-                if (!CanProceed(v, time, true)) continue;
+                if (!CanProceed(v, time, true)) { if (v.V < 0.2) v.GoAt = -1; continue; }
+                // Abriu o verde para quem está parado na linha: tempo de percepção e reação antes de arrancar (só na troca do
+                // vermelho para o verde – quem esperava a brecha do fluxo oposto já tem a reação na brecha crítica).
+                if (v.V < 0.2 && v.RedWait && net.Nodes[l.To].Control == ControleNo.Semaforo)
+                {
+                    if (v.GoAt < 0) v.GoAt = time + v.React;
+                    if (time < v.GoAt) continue;
+                }
+                v.RedWait = false;
                 list.Remove(v);
                 if (Debug)
                 {
@@ -978,6 +1115,23 @@ public static class TrafficSimulation
                     lastEntry[(link, lane)] = time;
                 }
                 var nd = net.Nodes[l.To];
+                // Calibração: intervalo de descarga da fila por posição desde o início do verde (só quem estava parado na fila).
+                if (measuring && nd.Control == ControleNo.Semaforo && plans.TryGetValue(nd.Index, out var dp) && GreenPhase(nd.Index, time) is var gk && gk >= 0)
+                {
+                    var gs = time - (InCycle(dp, time) - dp.Phases[gk].Start);
+                    (double GreenStart, int N, double Prev) st0 = discharge.TryGetValue((link, lane), out var ds0) && Math.Abs(ds0.GreenStart - gs) < 0.5 ? ds0 : (gs, 0, gs);
+                    // A sequência só vale enquanto todos seguem em frente (conversões esperam brechas/pedestres – não é saturação).
+                    // O intervalo é medido quando a traseira passa pela linha de retenção (como no HCM).
+                    var turnD = v.Step + 1 < v.Route.Count ? TrafficAnalysis.TurnOf(net, link, v.Route[v.Step + 1]) : Giro.Frente;
+                    if (st0.N >= 0 && v.Stops > 0)
+                    {
+                        v.DisPos = st0.N + 1;
+                        v.DisGreen = gs;
+                        v.DisLane = (link, lane);
+                        discharge[(link, lane)] = (gs, turnD == Giro.Frente ? st0.N + 1 : -1, st0.Prev);
+                    }
+                    else discharge[(link, lane)] = (gs, -1, st0.Prev);
+                }
                 var sa = res.Approaches[link];
                 var free = l.Length / l.FreeSpeed;
                 if (measuring)
@@ -1003,6 +1157,7 @@ public static class TrafficSimulation
                         sumTT += time - v.Born;
                         sumDelay += Math.Max(0, time - v.Born - v.FreeTime);
                     }
+                    if (v.Born >= opt.WarmupSeconds) { allDelay += Math.Max(0, time - v.Born - v.FreeTime); allN++; }
                     continue;
                 }
                 var to = net.Links[v.Route[v.Step + 1]];
@@ -1021,6 +1176,8 @@ public static class TrafficSimulation
                 v.NodeLen = path.Length;
                 v.StuckFor = 0;
                 if (nd.Kind == TipoNo.Rotatoria) v.RingAngle = Math.Atan2(v.NodePath[0].Y - nd.Pos.Y, v.NodePath[0].X - nd.Pos.X);
+                if (time >= opt.WarmupSeconds && (nd.Kind == TipoNo.Rotatoria || nd.Control is ControleNo.Pare or ControleNo.DePreferencia))
+                    res.GapEvents.Add(nd.Kind == TipoNo.Rotatoria || !major[nd.Index].Contains(link) ? (nd.Index, link, time, true) : (nd.Index, -1, time, false));
                 inNode[nd.Index].Add(v);
             }
 
@@ -1044,12 +1201,31 @@ public static class TrafficSimulation
                     if (!double.IsInfinity(gap)) ds = Math.Min(ds, Math.Max(0, gap - 0.2));
                     v.V = ds < 1e-6 && nv > 0 && !double.IsInfinity(gap) && gap < 0.4 ? 0 : nv;
                     v.NodeS += ds;
+                    // Calibração: traseira passou pela linha – intervalo desde a traseira anterior da mesma faixa (ou do início do verde).
+                    if (v.DisPos > 0 && v.NodeS >= v.Length)
+                    {
+                        var prevRear = rearPass.TryGetValue(v.DisLane, out var pr) && Math.Abs(pr.Green - v.DisGreen) < 0.5 ? pr.T : v.DisGreen;
+                        res.Discharge.Add((v.DisPos, time - prevRear, v.Type, TrafficAnalysis.TurnOf(net, v.Mov!.Value.From, v.Mov.Value.To)));
+                        rearPass[v.DisLane] = (v.DisGreen, time);
+                        v.DisPos = 0;
+                    }
                     if (v.V < 0.3) { v.StuckFor += Dt; if (!v.WasStopped) { v.Stops++; v.WasStopped = true; } }
                     else { v.StuckFor = 0; if (v.V > 3) v.WasStopped = false; }
                     if (net.Nodes[n].Kind == TipoNo.Rotatoria && v.NodeS >= 0)
                     {
                         var p = path.Line.PointAt(Math.Min(v.NodeS, path.Length));
+                        var prevAng = v.RingAngle;
                         v.RingAngle = Math.Atan2(p.Y - net.Nodes[n].Pos.Y, p.X - net.Nodes[n].Pos.X);
+                        // Passou em frente a uma entrada (anti-horário): brecha para quem espera nela.
+                        if (time >= opt.WarmupSeconds && !double.IsNaN(prevAng))
+                            foreach (var li in net.Nodes[n].In)
+                            {
+                                if (li == v.FromLink) continue;
+                                var ep = net.Links[li].NodeEdge(net, true);
+                                var ea = Math.Atan2(ep.Y - net.Nodes[n].Pos.Y, ep.X - net.Nodes[n].Pos.X);
+                                double Rel(double a) { var d = a - ea; while (d <= -Math.PI) d += 2 * Math.PI; while (d > Math.PI) d -= 2 * Math.PI; return d; }
+                                if (Rel(prevAng) < 0 && Rel(v.RingAngle) >= 0 && Rel(v.RingAngle) < 1) res.GapEvents.Add((n, li, time, false));
+                            }
                     }
                     if (v.NodeS < path.Length) continue;
                     var to = net.Links[v.ToLink];
@@ -1194,6 +1370,27 @@ public static class TrafficSimulation
         }
         res.InNetwork = vehicles.Count;
         res.Backlog = queues.Values.Sum(q => q.Count);
+        // Quem não terminou: atraso até agora (no trecho em que está, pela distância percorrida) e espera na entrada.
+        foreach (var v in vehicles)
+        {
+            var l = net.Links[v.Link];
+            var done = v.InNode ? l.Length : Math.Clamp(v.S, 0, l.Length);
+            var d = Math.Max(0, endTime - v.Born - v.FreeTime - done / Math.Max(1, l.FreeSpeed));
+            if (v.Born >= opt.WarmupSeconds) { allDelay += d; allN++; }
+            if (!v.InNode && res.Approaches.TryGetValue(v.Link, out var sa))
+            {
+                sa.PendingVehicles++;
+                sa.PendingDelay += Math.Max(0, endTime - Math.Max(v.LinkEnter, opt.WarmupSeconds) - done / Math.Max(1, l.FreeSpeed));
+            }
+        }
+        foreach (var (link, q) in queues)
+            foreach (var v in q)
+            {
+                var d = endTime - v.Born;
+                if (v.Born >= opt.WarmupSeconds) { allDelay += d; allN++; }
+                if (res.Approaches.TryGetValue(link, out var sa)) { sa.PendingVehicles++; sa.PendingDelay += endTime - Math.Max(v.Born, opt.WarmupSeconds); }
+            }
+        res.NetworkDelay = allN > 0 ? allDelay / allN : 0;
         res.MeanTravelTime = res.Completed > 0 ? sumTT / res.Completed : 0;
         res.MeanDelay = res.Completed > 0 ? sumDelay / res.Completed : 0;
         var appr = res.Approaches.Values.Where(a => a.Vehicles > 0).ToList();
@@ -1266,6 +1463,7 @@ public static class TrafficSimulation
         // Faixa aceita o movimento? (setas pintadas; sem setas: direita pela da direita, esquerda pela da esquerda).
         bool LaneOk(TrafficLink l, int k, Giro g)
         {
+            if (k >= l.Lanes && l.PocketLength > 0) return g is Giro.Esquerda or Giro.Retorno;
             if (l.LaneTurns.Count > 0) return l.TurnsOf(k) is not { } set || set.Contains(g) || (g == Giro.Retorno && set.Contains(Giro.Esquerda));
             if (l.Lanes <= 1) return true;
             return g switch { Giro.Direita => k == 0, Giro.Esquerda or Giro.Retorno => k == l.Lanes - 1, _ => true };
@@ -1322,7 +1520,7 @@ public static class TrafficSimulation
                 var s = v.NodeS - back;
                 if (s >= 0) { var pl = PathOf(m).Line; return pl.PointAt(Math.Min(s, pl.Length)); }
                 var l = net.Links[m.From];
-                return OnLink(l, EndOf(l) + s, l.LaneOffset(m.FromLane));
+                return OnLink(l, EndOf(l) + s, l.LaneOffsetAt(m.FromLane, EndOf(l) + s));
             }
             var lk = net.Links[v.Link];
             var sl = v.S - back;
@@ -1332,9 +1530,9 @@ public static class TrafficSimulation
                 var t = pl.Length + sl - startClear[lk.Index];
                 if (t >= 0) return pl.PointAt(Math.Min(t, pl.Length));
                 var fl = net.Links[pm.From];
-                return OnLink(fl, EndOf(fl) + t, fl.LaneOffset(pm.FromLane));
+                return OnLink(fl, EndOf(fl) + t, fl.LaneOffsetAt(pm.FromLane, EndOf(fl) + t));
             }
-            return OnLink(lk, sl, lk.LaneOffset(v.Lane) + v.LaneShift + (v.InBay ? 3.0 : 0));
+            return OnLink(lk, sl, lk.LaneOffsetAt(v.Lane, sl) + v.LaneShift + (v.InBay ? 3.0 : 0));
         }
 
         // ---------------------------------------------------- regras de passagem no nó
@@ -1349,12 +1547,12 @@ public static class TrafficSimulation
             var g = TrafficAnalysis.TurnOf(net, link, to);
             // Na faixa errada para o movimento (não conseguiu trocar antes): espera na linha pela troca – nunca converte
             // cruzando a faixa ao lado.
-            if (l.Lanes > 1 && v.Type != 2 && !Allowed(v, l).Contains(v.Lane))
+            if (l.SimLanes > 1 && v.Type != 2 && !Allowed(v, l).Contains(v.Lane))
             {
                 // Parado há muito na faixa errada: desiste da conversão, segue pela faixa em que está e recalcula a rota.
-                if (atLine && v.StoppedFor > 15 && Reroute(v, l, nd)) return false;
+                if (atLine && v.StoppedFor > 6 && Reroute(v, l, nd)) return false;
                 // Sem rota alternativa: depois de muito tempo converte com cuidado (os conflitos no nó impedem o choque).
-                if (!(atLine && v.StoppedFor > 30)) { Why(v, "faixa"); return false; }
+                if (!(atLine && v.StoppedFor > 20)) { Why(v, "faixa"); return false; }
             }
             // Espaço no trecho de saída para quem já está no nó e para este veículo (CTB art. 45: não bloquear o cruzamento).
             var outL = net.Links[to];
@@ -1379,17 +1577,23 @@ public static class TrafficSimulation
                     var green = GreenFor(nd.Index, link, g, t, atLine ? 0 : 2.5);
                     if (green == 0)
                     {
-                        // Conversão à esquerda que esperava na linha sai no começo do entreverdes (o oposto já está parando).
-                        if (atLine && left && v.StoppedFor > 2 && JustEnded(nd.Index, link, g, t, 4.0)) return true;
+                        // Conversão à esquerda que esperava na linha sai no começo do entreverdes (o oposto já está parando) – o
+                        // que esperava e o seguinte que chega devagar à linha (os ~2 "sneakers" por ciclo do HCM).
+                        if (atLine && left && (v.StoppedFor > 2 || v.V < 3) && JustEnded(nd.Index, link, g, t, 4.0)) return true;
                         Why(v, "vermelho");
+                        if (atLine) v.RedWait = true;
                         return false;
                     }
                     // Conversão à direita cede aos pedestres que atravessam no começo do verde (faixas de pedestres no cruzamento).
-                    if (g == Giro.Direita && nd.Crosswalks && opt.PedestriansPerHour > 0 && GreenPhase(nd.Index, t) is var kp && kp >= 0)
+                    // Conversões cedem aos pedestres liberados no começo do verde: a faixa fica ocupada pela fração do verde que a
+                    // ocupação do HCM 7 dá (OCCpedg); à esquerda a travessia é alcançada depois do fluxo oposto (metade).
+                    if (g is Giro.Direita or Giro.Esquerda && nd.Crosswalks && opt.PedestriansPerHour > 0 && GreenPhase(nd.Index, t) is var kp && kp >= 0
+                        && !plans[nd.Index].Phases[kp].Phase.LeftOnly)
                     {
                         var p = plans[nd.Index];
+                        var gph = p.Phases[kp].G;
                         var sinceStart = InCycle(p, t) - p.Phases[kp].Start;
-                        var block = Math.Min(p.Phases[kp].G * 0.6, 2 + opt.PedestriansPerHour / 60.0);
+                        var block = PedestrianOccupancy(opt.PedestriansPerHour, p.C, gph) * gph * (g == Giro.Esquerda ? 0.5 : 1.0);
                         if (sinceStart < block) { Why(v, "pedestre"); return false; }
                     }
                     // Conversão à esquerda permitida: cede ao sentido oposto que está com verde (quem espera muito aceita brechas menores).
@@ -1403,21 +1607,25 @@ public static class TrafficSimulation
                     // pelo tempo de chegar à linha mais a brecha crítica.
                     var toLine = Math.Max(0, EndOf(l) - v.S);
                     if (!atLine && toLine > 25) return false;
-                    var tcR = 3.2 + (atLine ? 0 : toLine / Math.Max(3, v.V));
-                    var ang = Math.Atan2(l.Path.Points[^1].Y - nd.Pos.Y, l.Path.Points[^1].X - nd.Pos.X);
+                    // Lag mínimo aceito até o próximo veículo do anel chegar à entrada: t0 = tc − tf/2 (Siegloch – a mesma
+                    // hipótese da capacidade do HCM 7, cap. 22), com o desvio pessoal do motorista.
+                    // (menos ~0,3 s: o veículo que passa ainda está na frente da entrada – regra "passando" abaixo).
+                    var tcR = RoundaboutCriticalGap(nd.RoundaboutLanes) - RoundaboutFollowUp(nd.RoundaboutLanes) / 2 - 0.3 + v.GapShift * 0.8 + (atLine ? 0 : toLine / Math.Max(3, v.V));
+                    var lp = l.NodeEdge(net, true);
+                    var ang = Math.Atan2(lp.Y - nd.Pos.Y, lp.X - nd.Pos.X);
                     var R = RingRadius(nd);
                     var ringLanes = Math.Max(1, nd.RoundaboutLanes);
                     // Anel cheio: com os veículos parados à distância mínima em toda a volta ninguém mais sai (travamento
                     // circular). Quem entra respeita a ocupação – no máximo ~80 % da volta por faixa do anel.
                     var occupied = inNode[nd.Index].Sum(o => o.Length + 2.5);
-                    if (occupied + v.Length + 2.5 > 0.8 * 2 * Math.PI * R * ringLanes) { Why(v, "anel cheio"); return false; }
+                    if (occupied + v.Length + 2.5 > 0.8 * RingLength(nd)) { Why(v, "anel cheio"); return false; }
                     foreach (var o in inNode[nd.Index])
                     {
                         if (double.IsNaN(o.RingAngle)) continue;
                         if (o.FromLink == link)
                         {
                             // Anel de uma faixa: as duas faixas da mesma entrada entram alternadas (afunilamento), nunca lado a lado.
-                            if (ringLanes <= 1 && o.NodeS < o.Length + 3) { Why(v, "anel"); return false; }
+                            if (ringLanes <= 1 && o.NodeS < o.Length + 1.5) { Why(v, "anel-mesma"); return false; }
                             continue;
                         }
                         var d = ang - o.RingAngle;                          // quanto falta para ele passar em frente (anti-horário)
@@ -1425,14 +1633,15 @@ public static class TrafficSimulation
                         while (d >= 2 * Math.PI) d -= 2 * Math.PI;
                         // Passando pela entrada agora – ou parado logo depois dela sem deixar lugar para este veículo inteiro.
                         var past = (2 * Math.PI - d) * R;
-                        if (past < o.Length + 1 || o.V < 3 && past < o.Length + v.Length + 3) { Why(v, "anel"); return false; }
+                        // A frente de quem circula já passou da entrada: dá para entrar atrás dele (a fusão no anel mantém a distância).
+                        if (past < 1.5 || o.V < 3 && past < o.Length + v.Length + 3) { Why(v, "anel-passando"); return false; }
                         // Sai do anel antes de passar por esta entrada (ângulo da saída dele antes do desta entrada).
                         var e = Math.Atan2(o.NodePath![^1].Y - nd.Pos.Y, o.NodePath[^1].X - nd.Pos.X) - o.RingAngle;
                         while (e < 0) e += 2 * Math.PI;
                         while (e >= 2 * Math.PI) e -= 2 * Math.PI;
                         if (o.NodeLen - o.NodeS < 15 && e > Math.PI) e = 0;   // já no ramo de saída
                         if (e < d) continue;
-                        if (d * R / Math.Max(3, o.V) < tcR) { Why(v, "anel"); return false; }
+                        if (d * R / Math.Max(3, o.V) < tcR) { Why(v, "anel-chegando"); return false; }
                     }
                     return true;
                 }
@@ -1442,7 +1651,7 @@ public static class TrafficSimulation
                     var toLine = Math.Max(0, EndOf(l) - v.S);
                     // PARE: parada obrigatória na linha; nos demais, segue sem parar se houver brecha até chegar à linha.
                     var mustStop = nd.StopApproaches.Contains(link) || (nd.Control == ControleNo.Pare && !isMajor && !nd.YieldApproaches.Contains(link));
-                    if (mustStop && (!atLine || v.StoppedFor < 1.0)) return false;
+                    if (mustStop && (!atLine || v.StoppedFor < StopDwell)) return false;
                     if (!atLine && !isMajor && toLine > 25) return false;
                     List<int> pri;
                     if (isMajor)
@@ -1457,9 +1666,13 @@ public static class TrafficSimulation
                         pri = nd.In.Where(b => b != link && d.Cross(EndDir(b)) > 0.3).ToList();
                         if (g == Giro.Esquerda) pri.AddRange(nd.In.Where(b => b != link && d.Dot(EndDir(b)) < -0.5));
                     }
-                    var tc = g == Giro.Direita ? 5.2 : g == Giro.Frente ? 6.0 : 6.5;     // brechas críticas próximas das do HCM
-                    // Espera longa: alguém cede (evita o impasse da preferência à direita nos quatro ramos).
-                    if (v.StoppedFor > 15) tc = 1.5;
+                    // Brecha crítica HCM 7 (cap. 20) do movimento, com o desvio pessoal do motorista (aceitação heterogênea) e a
+                    // impaciência de quem espera muito (até −1 s depois de 30 s parado).
+                    var multi = pri.Any(b => net.Links[b].Lanes >= 2);
+                    var tc = CriticalGap(g, isMajor, multi) + v.GapShift - Math.Clamp((v.StoppedFor - 30) / 60, 0, 1.0);
+                    if (nd.YieldApproaches.Contains(link) || nd.Control == ControleNo.DePreferencia && !nd.StopApproaches.Contains(link)) tc -= 0.2;
+                    // Sem controle (preferência à direita nos quatro ramos): quem espera muito passa (sem impasse).
+                    if (nd.Control is ControleNo.PreferenciaDireita or ControleNo.Livre && v.StoppedFor > 15) tc = 1.5;
                     if (!atLine) tc += toLine / Math.Max(3, v.V);
                     return Clear(v, nd, link, pri, tc);
                 }
@@ -1475,17 +1688,23 @@ public static class TrafficSimulation
         // Nenhum veículo das aproximações prioritárias chegando em menos de tc segundos, nem cruzando o nó vindo delas.
         bool Clear(SimVehicle me, TrafficNode nd, int myLink, List<int> priority, double tc)
         {
+            // Quem converte à esquerda não cede ao que converte à esquerda no sentido oposto: os dois viram ao mesmo tempo,
+            // passando um pela frente do outro (o conflito que resta – a fusão na mesma saída – é o do miolo).
+            var meLeft = me.Step + 1 < me.Route.Count && TrafficAnalysis.TurnOf(net, myLink, me.Route[me.Step + 1]) is Giro.Esquerda or Giro.Retorno;
+            bool OppLeft(int from, int to) => meLeft && TrafficAnalysis.TurnOf(net, from, to) is Giro.Esquerda or Giro.Retorno;
             foreach (var o in inNode[nd.Index])
-                if (priority.Contains(o.FromLink) && o.NodeS < o.NodeLen * 0.7) return false;
+                if (priority.Contains(o.FromLink) && o.NodeS < o.NodeLen * 0.7 && !OppLeft(o.FromLink, o.ToLink)) return false;
             foreach (var b in priority)
             {
                 var lb = net.Links[b];
-                for (int lane = 0; lane < lb.Lanes; lane++)
+                for (int lane = 0; lane < lb.SimLanes; lane++)
                 {
                     if (!lanes.TryGetValue((b, lane), out var list) || list.Count == 0) continue;
                     foreach (var o in list)
                     {
-                        var dist = EndOf(lb) - o.S;
+                        if (o.Step + 1 < o.Route.Count && OppLeft(b, o.Route[o.Step + 1])) continue;
+                        // Lag até o ponto de conflito (centro do nó), como a brecha do HCM é medida – não só até a linha.
+                        var dist = lb.Length - o.S;
                         if (dist > 120) continue;
                         var eta = dist / Math.Max(0.5, o.V);
                         if (o.V > 1.0 && eta < tc) return false;
@@ -1500,7 +1719,16 @@ public static class TrafficSimulation
         }
     }
 
+    /// <summary>
+    /// Raio do trajeto no anel (um círculo no meio da pista giratória).
+    /// </summary>
     private static double RingRadius(TrafficNode nd) => Math.Max(4, nd.RoundaboutRadius - Math.Max(3, nd.RoundaboutLanes * 2.5));
+
+    /// <summary>
+    /// Volta do anel (m) – o que cabe de veículos em fila nele. Os trajetos seguem um só círculo (também no anel de duas
+    /// faixas): contar a volta duas vezes deixava o anel encher além do que cabe e travar em círculo.
+    /// </summary>
+    private static double RingLength(TrafficNode nd) => 2 * Math.PI * RingRadius(nd);
 
     /// <summary>Trajeto dentro do nó: curva de Bézier entre as faixas (ou arco anti-horário no anel da rotatória).</summary>
     private static List<Vec2> NodePath(TrafficNetwork net, TrafficNode nd, TrafficLink from, int fromLane, TrafficLink to, int toLane, Giro g,
@@ -1509,8 +1737,8 @@ public static class TrafficSimulation
         var e0 = from.Length - endClear;
         var d0 = from.Path.TangentAt(e0);
         var d1 = to.Path.TangentAt(startClear);
-        var p0 = from.Path.PointAt(e0) + new Vec2(d0.Y, -d0.X) * from.LaneOffset(fromLane);
-        var p1 = to.Path.PointAt(startClear) + new Vec2(d1.Y, -d1.X) * to.LaneOffset(toLane);
+        var p0 = from.Path.PointAt(e0) + new Vec2(d0.Y, -d0.X) * from.LaneOffsetAt(fromLane, e0);
+        var p1 = to.Path.PointAt(startClear) + new Vec2(d1.Y, -d1.X) * to.LaneOffsetAt(toLane, startClear);
         var pts = new List<Vec2>();
         if (nd.Kind == TipoNo.Rotatoria && nd.RoundaboutRadius > 3)
         {

@@ -47,7 +47,7 @@ public class V27TrafficTests
         return (s, a, b, it);
     }
 
-    private static NodeResult Node(TrafficResult r) => r.Nodes.Values.First(n => n.Node.Kind == TipoNo.Intersecao);
+    private static NodeResult Node(TrafficResult r) => r.Nodes.Values.First(n => n.Node.DesignKind == TipoNo.Intersecao);
 
     [Fact]
     public void Scenario_RoundTripsAndOverridesTheControl()

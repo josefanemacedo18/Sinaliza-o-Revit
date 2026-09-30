@@ -189,12 +189,46 @@ public static class TrafficAnalysis
     {
         var res = new TrafficResult { Network = net, Options = opt };
         // Controle do cenário (a rede é compartilhada entre cenários: parte sempre do projeto).
+        foreach (var l in net.Links) l.RestoreCrosswalks();
         foreach (var nd in net.Nodes)
         {
+            nd.RestoreDesign();
             nd.Control = nd.DesignControl;
-            if (opt.Override(nd)?.Control is { } c && !nd.IsZone && nd.Kind != TipoNo.Continuacao) nd.Control = c;
-            nd.ScenarioNoLeft = opt.Override(nd)?.NoLeft == true;
-            nd.LeftPockets = nd.DesignLeftPockets || opt.Override(nd)?.LeftPockets == true;
+            var ov = opt.Override(nd);
+            if (ov?.Control is { } c && !nd.IsZone && nd.Kind != TipoNo.Continuacao) nd.Control = c;
+            nd.ScenarioNoLeft = ov?.NoLeft == true;
+            nd.LeftPockets = nd.DesignLeftPockets || ov?.LeftPockets == true;
+            if (ov?.Crosswalks is { } cw && nd.Kind == TipoNo.Intersecao) nd.Crosswalks = cw;
+            // Rotatória no lugar do cruzamento (teste de solução): a mesma geometria que o pacote implanta – faixas do anel e
+            // raio externo do tipo escolhido.
+            if (nd.Control == ControleNo.Rotatoria && nd.Kind is TipoNo.Intersecao or TipoNo.CruzamentoSemControle)
+            {
+                var tpl = new Definitions.RoundaboutDefinition();
+                tpl.ApplyPreset(ov?.RoundaboutType ?? Definitions.TipoRotatoria.UmaFaixa);
+                nd.Kind = TipoNo.Rotatoria;
+                nd.RoundaboutLanes = Math.Max(1, tpl.Lanes);
+                nd.RoundaboutRadius = tpl.OuterRadius;
+                nd.Crosswalks = tpl.CrosswalkWidth > 0;
+                nd.ScenarioRoundabout = true;
+                nd.LeftPockets = false;
+                // Travessias nos ramos, como o gerador da rotatória põe: a CrosswalkDistance do anel externo, recuada até as
+                // rampas ficarem no meio-fio reto (~7 m); as do cruzamento que ficam dentro da rotatória somem.
+                var at = tpl.OuterRadius + Math.Max(2, tpl.CrosswalkDistance) + tpl.CrosswalkWidth / 2 + (tpl.Crosswalks ? 7 : 0);
+                foreach (var li in nd.In)
+                {
+                    var l = net.Links[li];
+                    l.Crosswalks.RemoveAll(c => c.At > l.Length - tpl.OuterRadius - 2);
+                    if (tpl.Crosswalks && l.Length - at > 12) l.Crosswalks.Add((l.Length - at, l.Road.CarriageWidth));
+                }
+                foreach (var lo in nd.Out)
+                {
+                    var l = net.Links[lo];
+                    l.Crosswalks.RemoveAll(c => c.At < tpl.OuterRadius + 2);
+                    if (tpl.Crosswalks && l.Length - at > 12) l.Crosswalks.Add((at, l.Road.CarriageWidth));
+                    l.Crosswalks.Sort((a, b) => a.At.CompareTo(b.At));
+                }
+            }
+            TrafficNetworkBuilder.SetPockets(net, nd);
         }
         foreach (var nd in net.Nodes.Where(n => n.IsZone))
             if (opt.ZoneVolumeKeys.TryGetValue(nd.Key, out var zv)) opt.ZoneVolumes[nd.Index] = zv;
@@ -501,9 +535,9 @@ public static class TrafficAnalysis
         foreach (var ph in nr.Phases)
         {
             var fast = ph.Links.Any(l => net.Links[l].Road.SpeedKmh > 60);
-            var yellow = fast ? 4.0 : 3.0;
-            var allRed = Math.Max(0, nr.Intergreen - yellow);
-            if (allRed < 1) { allRed = 1; }
+            // Amarelo + vermelho geral = os entreverdes analisados (o plano gravado reproduz o que foi avaliado).
+            var yellow = Math.Min(fast ? 4.0 : 3.0, Math.Max(3.0, nr.Intergreen - 1));
+            var allRed = Math.Max(1, nr.Intergreen - yellow);
             plan.Phases.Add(new SignalPhaseDef
             {
                 Name = ph.Name, Green = Math.Round(ph.Green), Yellow = yellow, AllRed = allRed, LeftOnly = ph.LeftOnly,
@@ -748,10 +782,14 @@ public static class TrafficAnalysis
 
         // Tempos: plano fixo do cenário, plano gravado na interseção, ciclo comum (coordenação) ou Webster.
         var ov = opt.Override(nd);
-        var stored = opt.UseStoredPlans && ov == null ? nd.StoredPlan : null;
+        // Plano gravado: vale sempre que o cenário não fixa os tempos (uma contagem de conversões no ajuste não o desliga).
+        var stored = opt.UseStoredPlans && ov?.Cycle == null && (ov?.Greens == null || ov.Greens.Count == 0) ? nd.StoredPlan : null;
         List<double>? fixedG = null;
         double? fixedC = null;
-        var inter = 4.0;
+        double? storedOffset = null;
+        // Entreverdes: 3 s de amarelo + 1 s de vermelho geral; 4 + 1 com aproximação acima de 60 km/h (MBST Vol. V) – o
+        // mesmo que o plano gravado pela solução (PlanOf) leva ao projeto.
+        var inter = nr.Approaches.Any(a => net.Links[a.Link].Road.SpeedKmh > 60) ? 5.0 : 4.0;
         if (ov?.Greens is { Count: > 0 } og && og.Count == phases.Count)
         {
             fixedG = og.ToList();
@@ -766,8 +804,17 @@ public static class TrafficAnalysis
         else if (stored is { Phases.Count: > 0 })
         {
             fixedC = stored.Cycle;
+            storedOffset = stored.Offset;
             inter = Math.Max(2, stored.LostTime / stored.Phases.Count);
-            if (stored.Phases.Count == phases.Count) fixedG = stored.Phases.Select(p => p.Green).ToList();
+            // Fases gravadas casadas pelas aproximações (chave via + sentido) e pelo tipo (só esquerdas); na falta, pela ordem.
+            var matched = phases.Select(ph =>
+            {
+                var keys = ph.Apps.Select(a => net.Links[a.Link].Key).ToHashSet();
+                return stored.Phases.FindIndex(sp => sp.LeftOnly == ph.LeftOnly && sp.Approaches.Count > 0 && keys.SetEquals(sp.Approaches));
+            }).ToList();
+            if (stored.Phases.Count == phases.Count && matched.All(i => i >= 0) && matched.Distinct().Count() == matched.Count)
+                fixedG = matched.Select(i => stored.Phases[i].Green).ToList();
+            else if (stored.Phases.Count == phases.Count) fixedG = stored.Phases.Select(p => p.Green).ToList();
             nr.PlanSource = "plano gravado na interseção" + (string.IsNullOrWhiteSpace(stored.Source) ? "" : $" ({stored.Source})") +
                             (fixedG == null ? $" – {stored.Phases.Count} fase(s) gravada(s) × {phases.Count} calculada(s): só o ciclo foi usado" : "");
         }
@@ -837,6 +884,8 @@ public static class TrafficAnalysis
             greens[kMax] += C - lost - sumG;
         }
         nr.Cycle = C;
+        // Defasagem do plano gravado (onda verde aplicada no projeto); a coordenação e o cenário podem trocá-la depois.
+        if (storedOffset is { } so) nr.Offset = ((so % C) + C) % C;
         for (int k = 0; k < phases.Count; k++)
             nr.Phases.Add(new SignalPhase { Name = $"Fase {k + 1} – {phases[k].Name}", Green = greens[k], Links = phases[k].Apps.Select(a => a.Link).ToList(), LeftOnly = phases[k].LeftOnly });
 
@@ -1001,8 +1050,8 @@ public static class TrafficAnalysis
         var pcu = Pcu(opt);
         double Ang(Vec2 p) => Math.Atan2(p.Y - nd.Pos.Y, p.X - nd.Pos.X);
         // Entradas e saídas em ordem anti-horária (circulação no Brasil).
-        var entries = nd.In.Select(i => (Link: i, A: Ang(net.Links[i].Path.Points[^1]))).ToList();
-        var exits = nd.Out.Select(o => (Link: o, A: Ang(net.Links[o].Path.Points[0]))).ToList();
+        var entries = nd.In.Select(i => (Link: i, A: Ang(net.Links[i].NodeEdge(net, true)))).ToList();
+        var exits = nd.Out.Select(o => (Link: o, A: Ang(net.Links[o].NodeEdge(net, false)))).ToList();
         static double Ccw(double from, double to) { var d = to - from; while (d < 0) d += 2 * Math.PI; while (d >= 2 * Math.PI) d -= 2 * Math.PI; return d; }
         foreach (var a in nr.Approaches)
         {

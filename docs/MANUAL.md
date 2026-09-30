@@ -1862,10 +1862,12 @@ Com muito tráfego os veículos **formam fila e andam devagar**, sem se atravess
   com cuidado;
 * rotatória: ocupação máxima do anel (sem travamento circular), as duas faixas de uma entrada larga entram
   **alternadas** num anel de uma faixa e só com espaço para o veículo inteiro;
-* calibração urbana com **motoristas diferentes entre si**: carros de 2,2 a 3,0 m/s² e intervalo desejado de 0,75 a
-  1,25 s; caminhões e ônibus de 1,0 a 1,4 m/s² e 1,2 a 1,6 s (sorteio próprio – a demanda e as rotas não mudam);
-* passo de cálculo de **0,25 s** (antes 0,5 s): arrancadas e frenagens mais suaves, fila descarregando com intervalo de
-  ~2,7 s por veículo no verde (vazão de saturação próxima de 1 300–1 400 veíc/h/faixa, típica de via urbana brasileira);
+* calibração urbana com **motoristas diferentes entre si** (sorteio próprio – a demanda e as rotas não mudam): carros
+  de 4,5 m, 1,7 a 2,5 m/s², intervalo desejado de 1,0 a 1,45 s e reação de 1,3 a 2,0 s; caminhões de 11,5 m, 0,6 a
+  1,0 m/s² e 1,6 a 2,0 s; ônibus de 12 m, 0,9 a 1,2 m/s² e 1,5 a 1,9 s; cada motorista tem a sua **brecha aceita**
+  (desvio de ~0,5 s em torno da brecha crítica do HCM) – ver 26.13;
+* passo de cálculo de **0,25 s**: fila descarregando com ~2,0 s por veículo depois dos primeiros (vazão de saturação de
+  ~1 770 veíc/h de verde por faixa) e ~2 s de tempo perdido na partida;
 * **pedestres visíveis** no mapa atravessando nas faixas do meio da quadra (grupo saindo dos dois lados quando o
   semáforo de pedestres abre, a 1,2 m/s).
 
@@ -1906,8 +1908,11 @@ Na primeira abertura aparece uma dica explicando esses passos.
 
 ### 26.12 O que fazer para resolver – soluções testadas
 
-No **Diagnóstico** (ou na aba Cruzamentos, *Testar soluções para este cruzamento*) o botão **Testar soluções** roda a
-análise da rede inteira com cada alternativa cabível e mostra o **efeito medido**, da melhor para a pior:
+No **Diagnóstico** (ou na aba Cruzamentos, *Testar soluções para este cruzamento*) o botão **Testar soluções** aplica
+cada alternativa cabível numa **cópia do modelo** – pela mesma regra do *Aplicar no PROJETO* (interseção refeita pelo
+gerador, rotatória no lugar do cruzamento, bolsões, travessias, planos gravados, grupos focais e placas) –, relê a
+rede e roda a **análise (HCM) e a microssimulação** com **3 sementes** (e o mesmo para a rede como está). O efeito
+medido aparece da melhor para a pior:
 
 | Alternativa | Quando aparece |
 |---|---|
@@ -1920,10 +1925,22 @@ análise da rede inteira com cada alternativa cabível e mostra o **efeito medid
 | Travessia: ciclo curto / sem semáforo | trecho com semáforo de travessia |
 | Bolsões de conversão à esquerda | aproximações com esquerda sem bolsão |
 
-Cada item traz o atraso e o nível do local antes → depois, o atraso total e a velocidade média da rede, os itens
-críticos, **o que fazer no projeto** para implantar e o botão **Aplicar no cenário e simular**. Só é marcada como
-solução (✔) a alternativa que melhora o local em pelo menos 10 % sem piorar a rede; quando nenhuma resolve sozinha, a
-recomendação do diagnóstico indica as medidas de projeto (faixa adicional, bolsão, binário etc.).
+Cada item traz, na **microssimulação**, o atraso do local e da rede antes → depois como **média [melhor–pior]** das
+3 rodadas (s/veh, contando também quem ficou na fila e quem não conseguiu entrar na rede), e, como referência, o atraso
+e o nível do HCM, o atraso total, a velocidade média e os itens críticos; mais **o que fazer no projeto** e o botão
+**Aplicar no cenário e simular**. Só é marcada como solução (✔) a alternativa que, na microssimulação,
+**melhora o local** em pelo menos 10 % na média e não piora no pior caso **e melhora a rede** na média sem piorar no
+pior caso (e passa no critério normativo abaixo). A análise macroscópica sozinha não decide mais: ela não vê fila que
+transborda nem a descarga real das filas. Quando nenhuma resolve sozinha, a recomendação do diagnóstico indica as
+medidas de projeto (faixa adicional, bolsão, binário etc.).
+
+**O que é recomendado é o que é implantado.** Como o "depois" é medido no modelo com o pacote aplicado, os números da
+recomendação são os que o simulador mostra depois do *Aplicar no PROJETO* (mesmo cenário, mesmas sementes). Ao aplicar,
+o cenário perde o que passou a vir do projeto (controle, tempos, bolsões, proibições e rotatória daquele cruzamento e
+dos semáforos da onda verde – a contagem de conversões fica) e guarda a programação da travessia semaforizada, que não é
+desenho. *Aplicar no cenário* usa o cenário equivalente (rotatória com o tipo, o raio e as travessias do pacote,
+travessias do semáforo, bolsões como faixa a mais, plano com entreverdes e defasagem) – fica a menos de 10 % do
+aplicado em todos os tipos de solução.
 
 **Critério normativo (MBST Vol. V).** A alternativa só é marcada como solução quando é justificável pelas normas: o
 semáforo exige volumes mínimos (via principal ≥ 500 veíc/h e aproximação secundária ≥ 150 veíc/h); rotatória com mais
@@ -1947,3 +1964,32 @@ que precisa ser implantado**, com a norma de cada item:
 rotatória), liga travessias, rampas, linhas de retenção e bolsões, grava o plano semafórico (e os planos da onda verde
 nos outros cruzamentos), cria os semáforos e placas como elementos urbanos/placas nas posições indicadas e as LRE, e
 remove os semáforos e placas que a solução substitui. Depois o simulador relê o projeto.
+
+### 26.13 Calibração da microssimulação (antes × depois)
+
+Medidas em cenas controladas (testes automáticos `AA2CalibrationTests`), comparadas às referências do HCM 7 e da prática
+brasileira. Brechas pelo método de Siegloch (entrada sempre com fila: brecha média × número de entradas).
+
+| Medida | Referência | Antes | Depois |
+|---|---|---|---|
+| Intervalo de saturação no semáforo (da 5ª posição em diante) | ~2,0 s (1 700–1 900 veh/h de verde por faixa) | 1,66 s (2 165 veh/h) | 2,04 s (1 764 veh/h) |
+| Tempo perdido na partida | ~2 s | 0,7 s | 1,9 s |
+| Equivalência de caminhão/ônibus (E_T) | 2,0 | 1,39 | 2,19 |
+| PARE, secundária em frente: tc / tf | 6,5 s / 4,0 s | tf ~5,4 s (capacidade 667 veh/h sem fluxo principal) | tc 6,3–7,4 s / tf 3,9–4,1 s |
+| PARE: capacidade com 300 / 600 veh/h na principal | 616 / 417 veh/h | 626 / 547 | 554 / 338 |
+| Rotatória (1 faixa): tc / tf | 4,98 s / 2,61 s | – | tc 4,6–4,8 s / tf 2,8–3,0 s |
+| Rotatória: capacidade com 0 / 300 / 600 veh/h circulando | 1 380 / 1 016 / 748 | 1 363 / 890 / 475 | 1 356 / 907 / 502 |
+| Aceitação de brechas | heterogênea | brecha fixa (e 1,5 s depois de 15 s parado) | desvio pessoal com desvio-padrão 0,48 s (−1,0 a +1,2 s); 14 % aceitam brechas de 6 s |
+| Conversão à direita com 300 / 600 ped/h (fração da vazão sem pedestres) | ~0,66 / ~0,47 | 0,45 / 0,15 | 0,65 / 0,46 |
+| Trocas de faixa obrigatórias antes da conversão | antecipadas | mediana 183 m, 12 % a menos de 30 m | mediana 265 m, 3 % a menos de 30 m |
+| Fila que transborda para o cruzamento anterior (90 m) | fila chega, miolo livre | vazão de montante 1 082 veh/h | 890 veh/h, fila de 61 m, ninguém parado no miolo, sem sobreposição |
+
+Veículos: carro 4,5 m (1,7–2,5 m/s²), caminhão 11,5 m (0,6–1,0 m/s²), ônibus 12 m (0,9–1,2 m/s²); reação de 1,3 a
+2,1 s na abertura do verde. Conversão à esquerda permitida: as esquerdas opostas viram juntas e até dois veículos saem no
+começo do entreverdes. Bolsão de esquerda: faixa a mais no fim da aproximação (quem converte espera nela; bolsão cheio
+segura a faixa direta).
+
+**Limitações conhecidas.** Com fluxo circulante alto a capacidade de entrada da rotatória fica abaixo da fórmula do HCM
+(502 × 748 veh/h com 600 veh/h circulando): o fluxo que circula chega em pelotões, e o anel de duas faixas é simulado como
+um único trajeto circular. No semáforo com conversão à esquerda permitida em faixa compartilhada, o atraso simulado fica
+acima do HCM. Por isso a recomendação de uma solução exige melhora **na microssimulação** – é conservadora.

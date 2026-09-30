@@ -65,9 +65,25 @@ public sealed class TrafficNode
     public double Z { get; set; }
     public string? SourceId { get; init; }
     public string? MainRoadId { get; set; }
-    public int RoundaboutLanes { get; init; } = 1;
-    public double RoundaboutRadius { get; init; }
-    public bool Crosswalks { get; init; }
+    public int RoundaboutLanes { get; set; } = 1;
+    public double RoundaboutRadius { get; set; }
+    public bool Crosswalks { get; set; }
+    /// <summary>
+    /// Rotatória só do cenário (teste de solução num cruzamento): o nó passa a ser uma rotatória com as faixas e o raio do
+    /// tipo que o pacote implanta, mas os trechos da rede continuam chegando ao centro – a linha de "Dê a preferência" fica
+    /// no anel externo (<see cref="RoundaboutRadius"/>), onde a rotatória aplicada corta as vias.
+    /// </summary>
+    public bool ScenarioRoundabout { get; set; }
+    private (TipoNo Kind, int Lanes, double Radius, bool Crosswalks)? _design;
+    /// <summary>Guarda (na 1ª análise) e restaura o nó do projeto antes de aplicar o cenário.</summary>
+    public void RestoreDesign()
+    {
+        _design ??= (Kind, RoundaboutLanes, RoundaboutRadius, Crosswalks);
+        (Kind, RoundaboutLanes, RoundaboutRadius, Crosswalks) = _design.Value;
+        ScenarioRoundabout = false;
+    }
+    /// <summary>Tipo do nó no projeto (sem o cenário).</summary>
+    public TipoNo DesignKind => _design?.Kind ?? Kind;
     public bool Signs { get; init; }
     public List<int> In { get; } = new();
     public List<int> Out { get; } = new();
@@ -81,6 +97,9 @@ public sealed class TrafficNode
     public bool LeftPockets { get; set; }
     /// <summary>Bolsões de conversão à esquerda do projeto.</summary>
     public bool DesignLeftPockets { get; init; }
+    /// <summary>Comprimento útil do bolsão (armazenamento + meio taper) da interseção – o mesmo que o gerador desenha (m).</summary>
+    public double PocketDesignLength { get; init; } = 40;
+    public double PocketDesignWidth { get; init; } = 3.0;
     /// <summary>Ilhas de conversão à direita (faixa de giro livre canalizada).</summary>
     public bool RightTurnIslands { get; init; }
     /// <summary>Plano semafórico gravado na interseção.</summary>
@@ -121,9 +140,54 @@ public sealed class TrafficLink
     public double S1 { get; init; }
     public double Length => Path.Length;
     public int Lanes { get; init; } = 1;
+    /// <summary>
+    /// Bolsão de conversão à esquerda no fim do trecho (m; 0 = sem): uma faixa a mais, índice <see cref="Lanes"/>, que só
+    /// existe nos últimos metros antes da retenção – quem converte à esquerda espera nela sem segurar a faixa direta.
+    /// </summary>
+    public double PocketLength { get; set; }
+    /// <summary>Largura do bolsão (m).</summary>
+    public double PocketWidth { get; set; } = 3.0;
+    /// <summary>Afastamento das faixas diretas no fim do trecho (m, para fora) – o alargamento que abre o bolsão no eixo.</summary>
+    public double EndShift { get; set; }
+    /// <summary>Afastamento das faixas no início do trecho (m) – o mesmo alargamento, do lado de quem sai do nó pelo ramo do bolsão.</summary>
+    public double StartShift { get; set; }
+    public double StartShiftLength { get; set; }
+
+    /// <summary>Posição lateral da faixa na estaca <paramref name="s"/>, com o alargamento dos bolsões (m à direita do eixo do trecho).</summary>
+    public double LaneOffsetAt(int lane, double s)
+    {
+        var off = LaneOffset(lane);
+        if (lane >= Lanes) return off;
+        if (EndShift > 0) off += EndShift * Math.Clamp((s - (Length - PocketLength - 40)) / 25, 0, 1);
+        if (StartShift > 0) off += StartShift * Math.Clamp(1 - (s - StartShiftLength) / 25, 0, 1);
+        return off;
+    }
+    /// <summary>
+    /// Ponto onde o trecho encontra o nó na ponta de chegada (<paramref name="atEnd"/>) ou de saída: a ponta do trecho, ou o
+    /// anel externo quando o nó é uma rotatória só do cenário (os trechos seguem até o centro).
+    /// </summary>
+    public Vec2 NodeEdge(TrafficNetwork net, bool atEnd)
+    {
+        var nd = net.Nodes[atEnd ? To : From];
+        if (!nd.ScenarioRoundabout) return atEnd ? Path.Points[^1] : Path.Points[0];
+        var r = Math.Min(nd.RoundaboutRadius, Length * 0.45);
+        return Path.PointAt(atEnd ? Length - r : r);
+    }
+    private List<(double At, double Width)>? _designCrosswalks;
+    /// <summary>Guarda (na 1ª análise) e restaura as travessias do projeto antes de aplicar o cenário.</summary>
+    public void RestoreCrosswalks()
+    {
+        _designCrosswalks ??= Crosswalks.ToList();
+        Crosswalks.Clear();
+        Crosswalks.AddRange(_designCrosswalks);
+    }
+    /// <summary>Faixas da microssimulação (as de tráfego mais o bolsão).</summary>
+    public int SimLanes => Lanes + (PocketLength > 0 ? 1 : 0);
     public double FreeSpeed { get; set; }          // m/s
     public double Capacity { get; set; }           // veh/h (todas as faixas)
     public double SaturationPerLane { get; set; }  // veh/h/faixa
+    /// <summary>Atrito lateral da faixa (largura, estacionamento, rampa – fw·fp·fg do HCM): alonga o intervalo na microssimulação.</summary>
+    public double Friction { get; set; } = 1.0;
     public double MinRadius { get; set; } = double.PositiveInfinity;
     public double GradePct { get; set; }
     /// <summary>Pontos de velocidade reduzida (moderação de tráfego): posição ao longo do trecho (m), velocidade (m/s), o quê.</summary>
@@ -137,6 +201,9 @@ public sealed class TrafficLink
     public double LaneOffset(int lane)
     {
         var w = Road.LaneWidth;
+        // Bolsão de conversão à esquerda: faixa a mais no eixo (alargamento – as faixas diretas se afastam, EndShift) ou
+        // recortada no canteiro, só no fim do trecho.
+        if (lane >= Lanes && PocketLength > 0) return Road.TwoWay ? (Road.Median ? 1.0 - PocketWidth / 2 : 0) : (Lanes / 2.0 - Lanes - 0.5) * w;
         lane = Math.Clamp(lane, 0, Lanes - 1);
         if (!Road.TwoWay) return (Lanes / 2.0 - lane - 0.5) * w;
         var inner = Road.Median ? 1.0 : 0.0;
@@ -275,13 +342,13 @@ public static class TrafficNetworkBuilder
             nd.RoadIds.Add(r.Id);
         }
         TrafficNode NewNode(TipoNo kind, ControleNo control, Vec2 pos, double z, string? src, string? main = null, int rbLanes = 1, double rbR = 0,
-            bool crosswalks = false, bool signs = false, bool pockets = false, bool islands = false, SignalPlanDef? plan = null)
+            bool crosswalks = false, bool signs = false, bool pockets = false, bool islands = false, SignalPlanDef? plan = null, double pocketLength = 40, double pocketWidth = 3.0)
         {
             var nd = new TrafficNode
             {
                 Index = net.Nodes.Count, Kind = kind, Control = control, DesignControl = control, Pos = pos, Z = z, SourceId = src, MainRoadId = main,
                 RoundaboutLanes = rbLanes, RoundaboutRadius = rbR, Crosswalks = crosswalks, Signs = signs, LeftPockets = pockets, DesignLeftPockets = pockets,
-                RightTurnIslands = islands, StoredPlan = plan,
+                RightTurnIslands = islands, StoredPlan = plan, PocketDesignLength = pocketLength, PocketDesignWidth = pocketWidth,
             };
             net.Nodes.Add(nd);
             return nd;
@@ -306,7 +373,8 @@ public static class TrafficNetworkBuilder
                 _ => ControleNo.PreferenciaDireita,
             };
             var nd = NewNode(TipoNo.Intersecao, control, it.Node, it.Z, it.Id, it.MainRoadId, crosswalks: it.Crosswalks, signs: it.Signs,
-                pockets: it.LeftTurnPockets, islands: it.RightTurnIslands != TipoIlha.Nenhuma, plan: it.SignalPlan);
+                pockets: it.LeftTurnPockets, islands: it.RightTurnIslands != TipoIlha.Nenhuma, plan: it.SignalPlan,
+                pocketLength: Math.Max(5, it.PocketLength) + Math.Max(5, it.PocketTaper) / 2, pocketWidth: Math.Clamp(it.PocketWidth, 2.5, 5.0));
             nd.NoLeftTurns = !it.LeftTurns;
             foreach (var r in roads) Attach(r, r.Axis.Project(it.Node).Station, nd);
         }
@@ -422,6 +490,10 @@ public static class TrafficNetworkBuilder
                 nd.ProhibitedTurns.Add((li, Giro.Esquerda));
                 nd.ProhibitedTurns.Add((li, Giro.Retorno));
             }
+        foreach (var nd in net.Nodes) SetPockets(net, nd);
+        // Antes: as travessias só entravam nos trechos depois da leitura da sinalização, e o grupo focal de uma travessia no
+        // meio da quadra ficava "longe de faixas de pedestres" – o semáforo de pedestres do projeto era ignorado.
+        AssignCrosswalks(net);
         TrafficRegulations.Read(net, defs, axisOf, geometryOf);
         if (geometryOf != null) TrafficBackdrop.Read(net, defs, geometryOf);
 
@@ -600,6 +672,44 @@ public static class TrafficNetworkBuilder
     }
 
     /// <summary>Capacidade, velocidade livre, raio mínimo, rampa, moderação e travessias do trecho.</summary>
+    /// <summary>
+    /// Aproximações que recebem o bolsão de conversão à esquerda – a mesma regra do gerador da interseção: ramos da via
+    /// principal, de mão dupla, com comprimento para o bolsão e canteiro (se houver) de pelo menos 3,00 m.
+    /// </summary>
+    public static IEnumerable<TrafficLink> PocketApproaches(TrafficNetwork net, TrafficNode nd)
+    {
+        if (nd.Kind != TipoNo.Intersecao) yield break;
+        var main = nd.MainRoadId ?? nd.RoadIds.FirstOrDefault();
+        foreach (var li in nd.In)
+        {
+            var l = net.Links[li];
+            if (l.Road.Id != main || !l.Road.TwoWay || l.Length < nd.PocketDesignLength + 15) continue;
+            if (l.Road.Median && l.Road.MedianWidth < 3.0) continue;
+            yield return l;
+        }
+    }
+
+    /// <summary>Bolsões do nó no cenário (<see cref="TrafficNode.LeftPockets"/>): faixa a mais no fim das aproximações da principal.</summary>
+    public static void SetPockets(TrafficNetwork net, TrafficNode nd)
+    {
+        foreach (var li in nd.In) { net.Links[li].PocketLength = 0; net.Links[li].EndShift = 0; }
+        foreach (var lo in nd.Out) { net.Links[lo].StartShift = 0; net.Links[lo].StartShiftLength = 0; }
+        if (!nd.LeftPockets) return;
+        foreach (var l in PocketApproaches(net, nd))
+        {
+            l.PocketLength = nd.PocketDesignLength;
+            l.PocketWidth = nd.PocketDesignWidth;
+            if (l.Road.Median) continue;
+            // Alargamento (sem canteiro): as faixas diretas deste sentido e as de quem sai pelo mesmo ramo se afastam P/2.
+            l.EndShift = nd.PocketDesignWidth / 2;
+            if (nd.Out.Select(o => net.Links[o]).FirstOrDefault(o => o.Road.Id == l.Road.Id && o.Forward != l.Forward) is { } rev)
+            {
+                rev.StartShift = nd.PocketDesignWidth / 2;
+                rev.StartShiftLength = l.PocketLength + 15;
+            }
+        }
+    }
+
     private static void Characterize(TrafficNetwork net, TrafficLink lk)
     {
         var r = lk.Road;
@@ -621,6 +731,7 @@ public static class TrafficNetworkBuilder
         // Pontos de ônibus na faixa (sem baia) bloqueiam a faixa da direita durante o embarque.
         var inLaneStops = lk.BusStops.Count(b => !b.Bay);
         lk.SaturationPerLane = basePerLane * fw * fp * fg;
+        lk.Friction = fw * fp * fg;
         // Bloqueio por ônibus parados na faixa (HCM: fbb = (N − 14,4·Nb/3600)/N, 12 ônibus/h de referência).
         var fbb = inLaneStops > 0 ? Math.Max(0.5, (lk.Lanes - inLaneStops * 14.4 * 12 / 3600.0) / lk.Lanes) : 1.0;
         lk.Capacity = lk.SaturationPerLane * lk.Lanes * fbb;
@@ -658,9 +769,18 @@ public static class TrafficNetworkBuilder
                     TipoModeracao.OndulacaoB => 20 / 3.6,
                     _ => 30 / 3.6,
                 }, type.ToString()));
-        foreach (var (_, _, path) in net.Crosswalks)
-            foreach (var at in Crossings(lk.Path, path))
-                if (at > 12 && at < lk.Length - 12) lk.Crosswalks.Add((at, r.CarriageWidth));
+    }
+
+    /// <summary>
+    /// Travessias de pedestres (FTP) que cruzam cada trecho fora da boca dos cruzamentos – antes da leitura da
+    /// sinalização, que precisa delas para achar o semáforo de travessia no meio da quadra.
+    /// </summary>
+    private static void AssignCrosswalks(TrafficNetwork net)
+    {
+        foreach (var lk in net.Links)
+            foreach (var (_, _, path) in net.Crosswalks)
+                foreach (var at in Crossings(lk.Path, path))
+                    if (at > 12 && at < lk.Length - 12 && !lk.Crosswalks.Any(c => Math.Abs(c.At - at) < 1)) lk.Crosswalks.Add((at, lk.Road.CarriageWidth));
     }
 
     /// <summary>Posições (ao longo de <paramref name="along"/>) onde <paramref name="across"/> o cruza.</summary>

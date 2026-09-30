@@ -122,7 +122,6 @@ public sealed partial class RoadSetup
         MedianOpening? opening = null;
         var recesses = new List<RecuoVia>();
         var pocketW = 0.0;
-        var bay = false;
         if (mode == TipoRetorno.Bolsao && median && MedianWidth >= Math.Min(3.0, lane) + 1.0)
         {
             pocketW = Math.Min(lane, MedianWidth - 1.0);
@@ -131,7 +130,6 @@ public sealed partial class RoadSetup
         else if (mode == TipoRetorno.Bolsao)
         {
             // Bolsão lateral (à direita): o veículo sai da faixa, espera junto ao meio-fio e cruza a via inteira.
-            bay = true;
             var depth = Math.Max(2.8, Math.Min(3.5, lane));
             laneU = -(nearEdge + depth - 0.5) + vw / 2;   // roda externa a 0,50 m da face do meio-fio do bolsão
             // Largura total na espera e até o início do giro; taper de entrada antes e curta saída depois.
