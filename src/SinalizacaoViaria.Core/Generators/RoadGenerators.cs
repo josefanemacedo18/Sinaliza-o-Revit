@@ -64,6 +64,16 @@ public static class RoadGenerator
         if (d.HasEdgeVariation) return VariableCarriageway(d, axis, withGaps);
         var a = Trimmed(axis, d.StartSetback, d.EndSetback);
         if (!withGaps || d.Gaps.Count == 0) return Band(a, -d.RightWidth, d.LeftWidth);
+        if (d.MedianOpenings.Count > 0)
+        {
+            // Retornos: o vão do canteiro (e o bolsão) é pista – faixas entre os vãos + preenchimento das aberturas.
+            var fill = MedianOpenings(d, axis).Fill;
+            var plain = Carriageway(new RoadPavementDefinition
+            {
+                RightWidth = d.RightWidth, LeftWidth = d.LeftWidth, Gaps = d.Gaps, StartSetback = d.StartSetback, EndSetback = d.EndSetback,
+            }, axis);
+            return fill.Count == 0 ? plain : PolygonOps.Union(plain.Concat(fill));
+        }
         // Pista faixa a faixa entre os vãos (canteiros, sarjetas), sem operação booleana: numa via fora dos eixos X/Y a
         // diferença "faixa − canteiro" deixava o canteiro como FURO encostado nas pontas (a 0,1 mm do contorno) em vez de
         // duas pistas – piso frágil que, depois dos recortes da interseção, virava contorno com autointerseção e cobria o
@@ -98,7 +108,91 @@ public static class RoadGenerator
             }
             else gaps.AddRange(VariableBand(axis, s0, s1, _ => g.Offset - g.Width / 2, _ => g.Offset + g.Width / 2, samples));
         }
+        if (d.MedianOpenings.Count > 0) gaps = PolygonOps.Difference(gaps, MedianOpenings(d, axis).Fill);
         return PolygonOps.Difference(band, gaps);
+    }
+
+    /// <summary>
+    /// Aberturas do canteiro central (retornos): preenchimento de pista no vão e no bolsão, e o canteiro refeito no trecho –
+    /// pontas em semicírculo voltadas para o vão, meio-fio contínuo com o do canteiro da via e grama.
+    /// </summary>
+    public static (List<Polygon2> Fill, List<Polygon2> Curb, List<Polygon2> Core) MedianOpenings(RoadPavementDefinition d, Polyline2 axis)
+    {
+        var fill = new List<Polygon2>();
+        var curb = new List<Polygon2>();
+        var core = new List<Polygon2>();
+        var cw = Math.Max(0.05, d.CurbWidth);
+        Vec2 P(double s, double o)
+        {
+            var ss = Math.Clamp(s, 0, axis.Length);
+            return axis.PointAt(ss) + axis.TangentAt(ss).PerpLeft * o;
+        }
+        foreach (var g in d.Gaps.Where(g => g.Median && g.Width > 0.3))
+        {
+            var (lo, hi) = (g.Offset - g.Width / 2, g.Offset + g.Width / 2);
+            foreach (var op in d.MedianOpenings)
+            {
+                var (a, b) = (Math.Min(op.Start, op.End), Math.Max(op.Start, op.End));
+                if (b - a < 0.5) continue;
+                var pw = Math.Clamp(op.PocketWidth, 0, g.Width - 0.6);
+                var pocket = pw > 0.3 && Math.Abs(op.PocketFull - op.PocketTaper) + Math.Abs(op.PocketFull - a) > 0.5;
+                // Bolsão do lado de a (estacas menores) ou de b.
+                var pocketAtA = pocket && op.PocketFull <= a + 1e-6;
+                var ext = new List<double> { a, b };
+                if (pocket) ext.AddRange(new[] { op.PocketTaper, op.PocketFull });
+                var r0 = Math.Max(0, ext.Min() - g.Width / 2 - 0.5);
+                var r1 = Math.Min(axis.Length, ext.Max() + g.Width / 2 + 0.5);
+                var band = VariableBand(axis, r0, r1, _ => lo, _ => hi);
+                var remove = VariableBand(axis, a, b, _ => lo - 0.02, _ => hi + 0.02);
+                // Bolsão: faixa do lado de chegada, com taper linear.
+                (double Lo, double Hi) KeptAt(bool atA) => pocket && pocketAtA == atA ? (op.PocketSide > 0 ? (lo, hi - pw) : (lo + pw, hi)) : (lo, hi);
+                if (pocket)
+                {
+                    var (p0, p1) = pocketAtA ? (Math.Min(op.PocketTaper, a), a) : (b, Math.Max(op.PocketTaper, b));
+                    double Wd(double s)
+                    {
+                        var full = pocketAtA ? s >= op.PocketFull : s <= op.PocketFull;
+                        if (full) return pw;
+                        var len = Math.Abs(op.PocketFull - op.PocketTaper);
+                        return len < 1e-6 ? pw : pw * Math.Clamp(Math.Abs(s - op.PocketTaper) / len, 0, 1);
+                    }
+                    var samples = Enumerable.Range(0, 41).Select(i => p0 + (p1 - p0) * i / 40.0).ToList();
+                    remove.AddRange(op.PocketSide > 0
+                        ? VariableBand(axis, p0, p1 + (pocketAtA ? 0.02 : 0), s => hi - Wd(s), _ => hi + 0.02, samples)
+                        : VariableBand(axis, p0 - (pocketAtA ? 0 : 0.02), p1, _ => lo - 0.02, s => lo + Wd(s), samples));
+                }
+                var kept = PolygonOps.Difference(band, remove);
+                // Pontas do canteiro em semicírculo voltadas para o vão.
+                foreach (var (e, atA) in new[] { (a, true), (b, false) })
+                {
+                    var (k0, k1) = KeptAt(atA);
+                    var r = (k1 - k0) / 2;
+                    if (r < 0.1) continue;
+                    var sc = atA ? e - r : e + r;
+                    var cut = VariableBand(axis, atA ? e - r : e - 0.02, atA ? e + 0.02 : e + r, _ => k0 - 0.02, _ => k1 + 0.02);
+                    var disk = new Polygon2(CurveTools.Circle(P(sc, (k0 + k1) / 2), r, 0.01));
+                    kept = PolygonOps.Difference(kept, PolygonOps.Difference(cut, new[] { disk }));
+                }
+                kept = kept.Where(p => p.Area > 0.05).ToList();
+                fill.AddRange(PolygonOps.Difference(band, kept).Where(p => p.Area > 1e-3));
+                // Meio-fio contínuo com o do canteiro da via: o anel não fecha nas emendas do trecho refeito.
+                var extended = PolygonOps.Union(kept.Concat(VariableBand(axis, r0 - 1, r0 + 0.01, _ => lo, _ => hi))
+                    .Concat(VariableBand(axis, r1 - 0.01, r1 + 1, _ => lo, _ => hi)));
+                var inner = PolygonOps.Offset(extended, -cw);
+                var ring = PolygonOps.Difference(kept, inner).Where(p => p.Area > 0.005).ToList();
+                curb.AddRange(ring);
+                core.AddRange(PolygonOps.Difference(kept, ring).Where(p => p.Area > 0.01));
+            }
+        }
+        return (fill, curb, core);
+    }
+
+    /// <summary>Trecho [início, fim] do canteiro refeito por uma abertura (os elementos do canteiro da via são interrompidos nele).</summary>
+    public static (double S0, double S1) MedianOpeningSpan(MedianOpening op, double medianWidth)
+    {
+        var ext = new List<double> { op.Start, op.End };
+        if (op.PocketWidth > 0.3) ext.AddRange(new[] { op.PocketTaper, op.PocketFull });
+        return (Math.Max(0, ext.Min() - medianWidth / 2 - 0.5), ext.Max() + medianWidth / 2 + 0.5);
     }
 
     /// <summary>Corredor completo (pista + calçadas).</summary>
@@ -118,6 +212,13 @@ public static class RoadGenerator
         var t = d.ActualThickness;
         foreach (var p in Carriageway(d, axis))
             geo.Pieces.Add(new MarkingPiece(p, d.Color) { Thickness = t, Elevation = -t });
+        if (d.MedianOpenings.Count > 0)
+        {
+            // Canteiro refeito junto às aberturas (pontas arredondadas, bolsão): meio-fio e grama.
+            var (_, curb, core) = MedianOpenings(d, axis);
+            foreach (var c in curb) geo.Pieces.Add(new MarkingPiece(c, MarkingColor.Concreto) { Thickness = d.CurbHeight, Layer = "MEIO-FIO" });
+            foreach (var c in core) geo.Pieces.Add(new MarkingPiece(c, MarkingColor.Grama) { Thickness = d.CurbHeight });
+        }
         geo.PathLength = axis.Length;
         geo.UnitCount = 0;
         return geo;

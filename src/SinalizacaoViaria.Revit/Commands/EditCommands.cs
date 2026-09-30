@@ -97,6 +97,15 @@ public sealed class CmdEditar : CommandBase
         {
             var members = MarkingStorage.Definitions(uidoc.Document).Where(d => d.GroupId == gid).ToList();
             var pavement = members.OfType<RoadPavementDefinition>().FirstOrDefault();
+            var hasRetornos = RoadTemplates.FromJson(pavement?.SetupJson)?.Retornos.Count > 0;
+            // Seta ou placa de um retorno em U: edita o retorno (a via é refeita com ele).
+            if (pavement != null && hasRetornos && stored.Definition is SymbolMarkingDefinition { Code: "PEM-RE" } or SignDefinition { Code: "R-3" or "R-5a" or "R-6a" })
+                return RoadAccessCommand.EditRetornos(uidoc, pavement, stored.Definition switch
+                {
+                    SymbolMarkingDefinition sm => sm.Position,
+                    SignDefinition sg => sg.Position,
+                    _ => null,
+                });
             if (pavement != null && members.Count > 1)
             {
                 var info = MarkingBuilder.Describe(stored.Definition, PluginContext.Catalog);
@@ -109,10 +118,13 @@ public sealed class CmdEditar : CommandBase
                 td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "A via inteira (seção transversal)",
                     "Faixas, calçadas, meios-fios, sarjetas, canteiros, ciclofaixas e linhas – adicionar, remover ou alterar. A via é regenerada mantendo o eixo, o pavimento e as conexões.");
                 td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Pavimento, hierarquia e raios", "Material, espessura, hierarquia viária, raio das esquinas e das curvas do eixo.");
+                if (hasRetornos)
+                    td.AddCommandLink(TaskDialogCommandLinkId.CommandLink4, "Retornos em U desta via", "Abertura do canteiro, bolsão, alargamento, veículo de projeto e sinalização – alterar ou remover.");
                 td.CommonButtons = TaskDialogCommonButtons.Cancel;
                 var choice = td.Show();
                 if (choice == TaskDialogResult.CommandLink2) return EditWholeRoad(uidoc, pavement, members);
                 if (choice == TaskDialogResult.CommandLink3) return EditPavement(uidoc, pavement);
+                if (choice == TaskDialogResult.CommandLink4) return RoadAccessCommand.EditRetornos(uidoc, pavement);
                 if (choice != TaskDialogResult.CommandLink1) return Result.Cancelled;
                 if (stored.Definition is RoadPavementDefinition) return EditPavement(uidoc, pavement);
             }

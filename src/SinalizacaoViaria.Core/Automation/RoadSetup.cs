@@ -459,12 +459,18 @@ public sealed partial class RoadSetup
         });
 
         // ------------------------------------------------ pavimento (sempre registrado: guarda a seção para interseções)
+        RoadPavementDefinition? pavement = null;
         if (Pavement != TipoPavimento.Nenhum)
         {
             var pav = Add(PavementDefinition());
             pav.SetupJson = RoadTemplates.ToJson(this);
             if (existingPavementId != null) pav.Id = existingPavementId;
+            pavement = pav;
         }
+        // Retornos: alargamentos e bolsões laterais entram como recuos derivados (só nesta geração – a seção gravada guarda o retorno).
+        var retornos = RetornoPlans();
+        var derived = retornos.SelectMany(p => p.Recesses).ToList();
+        Recuos.AddRange(derived);
 
         // ------------------------------------------------ eixo central
         var half = MedianHalf;
@@ -506,7 +512,7 @@ public sealed partial class RoadSetup
         BuildSide(Right, -1, reverseTraffic: false);
         BuildSide(Left, +1, reverseTraffic: TwoWay);
         // Largura variável (levantamento) e recuos (baias, faixas de aceleração/desaceleração).
-        ApplyVariation(res, axis, new Dictionary<MarkingDefinition, (int, double, double)>(), d =>
+        MarkingDefinition AddVar(MarkingDefinition d)
         {
             d.Output = output.Clone();
             d.GroupId = groupId;
@@ -516,11 +522,17 @@ public sealed partial class RoadSetup
                 case SignDefinition sg: sg.Z = path.Z; break;
                 case UrbanElementDefinition ue: ue.Z = path.Z; break;
                 case RecessMarkingDefinition rc: rc.Reverse = rc.Left && TwoWay; d.SetPath(Clone(path)); break;
+                case SymbolMarkingDefinition sm: sm.Z = path.Z; break;
+                case LinearMarkingDefinition { PathRef.Points.Count: >= 2 }: break;
                 default: d.SetPath(Clone(path)); break;
             }
             res.Add(d);
             return d;
-        });
+        }
+        ApplyVariation(res, axis, new Dictionary<MarkingDefinition, (int, double, double)>(), AddVar);
+        // Retornos em U: abertura do canteiro, vagas e linhas interrompidas e a sinalização.
+        ApplyRetornos(res, pavement, retornos, axis ?? (path.Points.Count >= 2 ? new Polyline2(path.Points) : null), AddVar);
+        Recuos.RemoveAll(derived.Contains);
         return res;
 
         // ------------------------------------------------ lados
@@ -786,6 +798,7 @@ public sealed partial class RoadSetup
         c.Left = Left.Select(e => e.Clone()).ToList();
         c.LargurasVariaveis = LargurasVariaveis.Select(p => p.Clone()).ToList();
         c.Recuos = Recuos.Select(r => r.Clone()).ToList();
+        c.Retornos = Retornos.Select(r => r.Clone()).ToList();
         return c;
     }
 }

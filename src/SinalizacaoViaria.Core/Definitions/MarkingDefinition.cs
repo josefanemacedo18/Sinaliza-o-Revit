@@ -303,6 +303,24 @@ public sealed class SidewalkLevelPoint
 }
 
 /// <summary>Trecho do caminho entre duas estacas (com os pontos do eixo, para acompanhar prolongamentos do eixo).</summary>
+/// <summary>
+/// Abertura no canteiro central (retorno em U): vão livre entre as pontas do canteiro (estacas) e, opcionalmente, bolsão de
+/// espera recortado do canteiro do lado de chegada (estacas do início do taper e da largura total, largura e lado).
+/// </summary>
+public sealed class MedianOpening
+{
+    /// <summary>Estacas das pontas do canteiro (o vão livre fica entre elas).</summary>
+    public double Start { get; set; }
+    public double End { get; set; }
+    /// <summary>Bolsão no canteiro: largura (0 = sem bolsão), lado (+1 = lado esquerdo do eixo) e estacas do taper e da largura total.</summary>
+    public double PocketWidth { get; set; }
+    public int PocketSide { get; set; } = -1;
+    public double PocketTaper { get; set; }
+    public double PocketFull { get; set; }
+    /// <summary>Retorno que criou a abertura.</summary>
+    public string? Source { get; set; }
+}
+
 public sealed class StationRange
 {
     public double Start { get; set; }
@@ -1358,6 +1376,8 @@ public sealed class RoadPavementDefinition : MarkingDefinition
     public bool TwoWay { get; set; } = true;
     /// <summary>Faixas sem pavimento (canteiros físicos, sarjetas), offset + à esquerda.</summary>
     public List<PavementGap> Gaps { get; set; } = new();
+    /// <summary>Aberturas no canteiro central (retornos): pista contínua no vão, pontas do canteiro arredondadas e bolsão.</summary>
+    public List<MedianOpening> MedianOpenings { get; set; } = new();
     public double StartSetback { get; set; }
     public double EndSetback { get; set; }
     /// <summary>Raio das esquinas (face do meio-fio) nas conexões automáticas desta via. Nulo = pela hierarquia.</summary>

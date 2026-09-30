@@ -65,6 +65,8 @@ public enum TipoRecuo
     FaixaAceleracao,
     /// <summary>Recuo para embarque/desembarque, táxi ou carga e descarga.</summary>
     RecuoEmbarque,
+    /// <summary>Alargamento ou bolsão lateral de um retorno em U (derivado do retorno, sem marcas próprias).</summary>
+    Retorno,
 }
 
 /// <summary>Recuo do meio-fio (baia de ônibus, faixa de aceleração/desaceleração, recuo de embarque).</summary>
@@ -102,6 +104,7 @@ public sealed class RecuoVia
         TipoRecuo.BaiaOnibus => "Baia de ônibus",
         TipoRecuo.FaixaDesaceleracao => "Faixa de desaceleração (saída)",
         TipoRecuo.FaixaAceleracao => "Faixa de aceleração (entrada)",
+        TipoRecuo.Retorno => "Alargamento / bolsão de retorno",
         _ => "Recuo de embarque / táxi / carga e descarga",
     };
 
@@ -407,7 +410,7 @@ public sealed partial class RoadSetup
             var side = r.LadoEsquerdo ? Left : Right;
             var sigma = r.LadoEsquerdo ? 1 : -1;
             var z = Zones(side);
-            var bay = r.Tipo is TipoRecuo.BaiaOnibus or TipoRecuo.RecuoEmbarque;
+            var bay = r.Tipo is TipoRecuo.BaiaOnibus or TipoRecuo.RecuoEmbarque or TipoRecuo.Retorno;
             if (bay)
                 foreach (var lbo in res.OfType<LinearMarkingDefinition>().Where(l => l.Code == EdgeCode && Math.Sign(l.Offset) == sigma && Math.Abs(Math.Abs(l.Offset) - (z.LaneEdge - EdgeInset)) < 0.6))
                     lbo.Breaks.Add(new StationRange { Start = r.Estaca, End = r.S3, AnchorStart = Anchor(r.Estaca), AnchorEnd = Anchor(r.S3) });
