@@ -381,83 +381,45 @@ de 16 mm; acostamento sem interrupções para bicicletas.
   veículo) com **âncoras** de reboque, **berma** de material no fim, **zebrado de entrada** e **delineadores**.
 * O volume de material aparece na prévia. O Simulador de Tráfego acusa **descida longa sem área de escape** (§ 26).
 
-## 2.7 Imagem Aérea – referência na escala métrica real (sem chave de API)
+## 2.7 Calibrar Escala da Imagem – referência aérea na medida certa
 
-Guia **SinalizaBIM → Vias → Imagem Aérea** (com uma vista de **planta** aberta). A imagem aérea entra atrás de tudo, na
-**escala métrica real** e na **posição geográfica do projeto** – desenhe o eixo por cima (*Desenhar Eixo*, *Via*, *Pista*).
-Nenhuma opção precisa de chave de API.
+Guia **SinalizaBIM → Vias → Calibrar Imagem**. Serve para usar uma imagem aérea (captura do Google Earth ou do Google Maps,
+ortofoto, voo de drone) como referência para desenhar o eixo, com **1 m na imagem = 1 m no Revit**.
 
-### Opção 1 – Google Earth Pro com calibração automática
+### Calibrar Escala da Imagem
 
-Precisa do **Google Earth Pro para computador** (gratuito: google.com/earth/versions → *Google Earth Pro para computador*).
+1. Coloque a imagem na vista de planta (Inserir → Imagem do Revit, ou *Importar Imagem e Calibrar*, abaixo).
+2. **Calibrar Escala da Imagem** → selecione a imagem → clique **2 pontos sobre ela**, o mais afastados possível (esquinas de
+   quadras, marcas no pavimento).
+3. Informe a **distância real** entre eles – medida com a régua do Google Earth, na planta do loteamento ou em campo – ou a
+   **latitude/longitude** dos dois pontos.
+4. Pela distância, a imagem é redimensionada em torno do 1º ponto (ex.: medido 93,70 m, real 100,00 m → fator 1,06724; o 1º
+   ponto não se move). Pelas coordenadas, além da escala a imagem vai para a posição geográfica do projeto e gira para o
+   Norte verdadeiro (se o Revit não permitir girar a imagem, o relatório avisa).
+5. O tamanho final é **medido no modelo** e mostrado (esperado × obtido).
 
-1. *Imagem Aérea* → aba **1 · Google Earth Pro** → **Abrir no Google Earth Pro**. O plugin grava um KML com um
-   *NetworkLink* (`viewRefreshMode = onStop`, `viewFormat` com a caixa da vista, rumo, inclinação, distância e campo de
-   visão) apontando para um servidor **só no próprio computador** (127.0.0.1). A cada parada da vista o Google Earth manda a
-   área visível e recebe **2 miras magenta** (perto dos cantos noroeste e sudeste), em posições geográficas conhecidas.
-2. No Google Earth, aproxime com a **roda do mouse** e arraste até a área. Aperte **N** (Norte para cima) e **U** (vista de
-   cima) – a janela do plugin mostra ao vivo a área visível em metros, o rumo e a inclinação, e avisa enquanto não estiverem
-   em 0°.
-3. Com as 2 miras visíveis, **Arquivo → Salvar → Salvar imagem** na pasta indicada na janela (o plugin percebe a imagem
-   nova sozinho) – ou use **Usar a imagem salva…**.
-4. O plugin **encontra as 2 miras na imagem** (precisão de fração de pixel) e calibra **escala, posição e Norte
-   verdadeiro**; mostra os metros por pixel e a coerência com a área visível do Google Earth.
-5. **Gerar e colocar na vista**. Sem as miras (fora da tela ou cobertas), a escala é estimada pela área visível e a
-   calibração por 2 pontos abre em seguida para confirmar.
+### Importar Imagem e Calibrar
 
-O plugin usa só recursos do próprio Google Earth Pro (arquivo KML e *Salvar imagem*) – não baixa imagens do Google. O uso
-das imagens segue os **termos do Google Earth**; os créditos (© Google) acompanham a imagem colocada.
+Escolha um arquivo JPG, PNG, TIF ou BMP:
 
-### Opção 2 – Mapa no plugin (OpenStreetMap, fonte própria ou WMS)
+* com **world file** (`.jgw`, `.pgw`, `.tfw`, `.wld`) ou **GeoTIFF**, a imagem é reprojetada para o plano do projeto e entra
+  **na escala e na posição corretas** (geográficas, UTM SIRGAS 2000 ou metros do projeto; o sistema vem do GeoTIFF/`.prj` ou é
+  perguntado);
+* sem georreferência, informe o tamanho aproximado do pixel; a imagem é colocada no centro da vista e a **calibração por 2
+  pontos** abre em seguida.
 
-Aba **2 · Mapa no plugin**: busque o endereço (Nominatim/OpenStreetMap, 1 consulta por segundo) ou cole "lat, lon"; no
-mapa, **arraste** para mover, **roda do mouse** para aproximar, **clique duplo** centraliza; ajuste o **recorte** pelos
-cantos (ou arraste-o pelo meio) – a largura × altura aparece em **metros reais**. Escolha a fonte:
+A licença da imagem é de quem a obteve.
 
-* **OpenStreetMap** – mapa das ruas (não é foto), política de uso respeitada (identificação do plugin, no máximo 2
-  conexões, cache, sem download em massa);
-* **Fonte própria (XYZ)** – serviço de tiles que você tem direito de usar (Configurações → Imagem aérea);
-* **WMS** – ortofoto oficial (prefeitura, estado, IBGE…): cole o endereço do serviço, **Carregar camadas**, escolha a
-  camada. O plugin pede a imagem em UTM SIRGAS 2000 ou EPSG:4674 com a caixa exata do recorte (em pedaços de até 2000 px),
-  então a escala vem do próprio pedido.
+### Como a medida fica certa
 
-**Prévia do recorte** mostra a imagem já reprojetada; **Gerar e colocar na vista** baixa, reprojeta e coloca.
+O tamanho que o Revit dá a uma imagem depende do DPI do arquivo e o parâmetro *Largura* é "na vista, depois de escalar"; por
+isso toda imagem colocada ou calibrada é **medida no modelo** pelos cantos e corrigida até a diferença ficar **abaixo de
+1 mm**. O diagnóstico fica em `%AppData%\SinalizaBIM\imagem-aerea-diagnostico.txt`. Imagens georreferenciadas são
+reamostradas pela Transversa de Mercator local (GRS80/SIRGAS 2000, k0 = 1, com fator de altitude e Norte verdadeiro) – o
+fator de escala e a convergência do UTM ficam corrigidos.
 
-### Como a escala fica certa
-
-Toda imagem é **reamostrada** para a grade métrica do projeto pela cadeia modelo → Norte verdadeiro → plano local no
-terreno → fator de altitude → **Transversa de Mercator local** (GRS80/SIRGAS 2000, k0 = 1 no centro do projeto) →
-latitude/longitude → pixel da origem – nunca esticada por um fator único (a Web Mercator erra ~0,5 % no norte–sul e o UTM
-até 0,1 % de escala e alguns décimos de grau de rotação).
-
-**Tamanho conferido no Revit.** O tamanho que o Revit dá a uma imagem depende do DPI do arquivo e o parâmetro *Largura* é
-"na vista, depois de escalar"; por isso cada bloco é **medido no modelo** pelos cantos e corrigido até **< 1 mm**. O
-relatório mostra *esperado × obtido* e o diagnóstico completo fica em `%AppData%\SinalizaBIM\imagem-aerea-diagnostico.txt`.
-
-**O que é colocado:** blocos de até 4000 px (camada *Fundo*, fixados), **escala gráfica** 0–10–50–100 m e o texto de
-**créditos**. *Substituir a imagem anterior* apaga imagem, escala e créditos da vez anterior. A origem geográfica fica
-gravada no projeto: as imagens seguintes encaixam na primeira.
-
-### Importar Imagem Aérea e Calibrar Escala
-
-* **Importar Imagem Aérea** – qualquer JPG/PNG/TIF/BMP (ortofoto, drone, imagem salva de outro programa): com **world file**
-  (`.jgw`, `.pgw`, `.tfw`, `.wld`) ou **GeoTIFF** entra na escala e posição corretas (geográficas, UTM SIRGAS 2000 ou metros
-  do projeto); sem georreferência é colocada e calibrada por 2 pontos. A licença da imagem é de quem a obteve.
-* **Calibrar Escala da Imagem** – clique 2 pontos sobre a imagem e informe a **distância real** (ex.: medido 93,70 m, real
-  100,00 m → fator 1,06724, o 1º ponto fica) ou a **lat/lon** dos dois (escala, posição e Norte verdadeiro).
-
-### Fonte própria (XYZ)
-
-Em **Configurações → Imagem aérea – fonte própria**: endereço `https://…/{z}/{x}/{y}` (ou `{-y}`), nome, créditos e zoom
-máximo. O plugin não traz endereços pré-preenchidos; a licença e os créditos são de quem configura.
-
-### Precisão e conferência
-
-As medidas **dentro** da imagem ficam na escala correta. A **posição absoluta** de imagens aéreas tem erro de alguns metros;
-no Google Earth o relevo e a perspectiva (se a vista não estiver exatamente de cima) deslocam a imagem – as miras corrigem
-escala, posição e rotação, mas não o relevo. Para projeto executivo, **ortofoto oficial ou levantamento topográfico
-prevalecem**. **Conferir:** com *Anotar → Alinhada*, meça a escala gráfica (exatamente 10/50/100 m) e uma distância
-conhecida (a mesma medida no Google Earth com a régua).
+**Conferir:** com *Anotar → Alinhada*, meça de novo os dois pontos e uma outra distância conhecida. A posição absoluta de
+imagens aéreas tem erro de alguns metros; para projeto executivo, ortofoto oficial ou levantamento topográfico prevalecem.
 
 ## 2.4 Bloqueios físicos
 

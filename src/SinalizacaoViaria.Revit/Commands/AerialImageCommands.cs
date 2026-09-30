@@ -13,6 +13,9 @@ using SinalizacaoViaria.Revit.UI;
 
 namespace SinalizacaoViaria.Revit.Commands;
 
+/// <summary>Um bloco de imagem já na grade métrica do projeto: arquivo, extensão no modelo (m) e pixels.</summary>
+internal sealed record ImageBlock(string File, Vec2 Min, Vec2 Max, int PixelWidth, int PixelHeight);
+
 /// <summary>
 /// Coloca imagens na escala exata. O tamanho que o Revit dá a uma imagem depende da resolução (DPI) do arquivo e o
 /// parâmetro "Largura" é o da imagem "na vista, depois de escalar" (RASTER_SHEETWIDTH) – não dá para confiar que um
@@ -23,6 +26,10 @@ namespace SinalizacaoViaria.Revit.Commands;
 internal static class ImagePlacer
 {
     public const double ToleranceM = 0.001;
+    /// <summary>Limite de pixels da imagem inteira (memória do Revit): acima disso a resolução é reduzida.</summary>
+    public const long MaxPixels = 36_000_000;
+    /// <summary>Lado máximo de cada imagem do Revit (px).</summary>
+    public const int BlockSize = 4000;
 
     public static (List<ElementId> Ids, List<string> Report) Place(Document doc, View view, IEnumerable<ImageBlock> blocks, double z)
     {
@@ -201,15 +208,15 @@ public sealed class CmdImportarImagem : CommandBase
         var min = new Vec2(corners.Min(p => p.X), corners.Min(p => p.Y));
         var max = new Vec2(corners.Max(p => p.X), corners.Max(p => p.Y));
         var srcMpp = corners[0].DistanceTo(corners[1]) / sw;
-        var outMpp = Math.Max(srcMpp, Math.Sqrt((max.X - min.X) * (max.Y - min.Y) / SatellitePlan.MaxPixels));
+        var outMpp = Math.Max(srcMpp, Math.Sqrt((max.X - min.X) * (max.Y - min.Y) / ImagePlacer.MaxPixels));
         var pw = (int)Math.Ceiling((max.X - min.X) / outMpp);
         var ph = (int)Math.Ceiling((max.Y - min.Y) / outMpp);
         max = min + new Vec2(pw * outMpp, ph * outMpp);
         var folder = Path.Combine(PluginPaths.Root, "imagens-importadas", DateTime.Now.ToString("yyyyMMdd-HHmmss"));
         Directory.CreateDirectory(folder);
         var blocks = new List<ImageBlock>();
-        var nx = (pw + SatellitePlan.BlockSize - 1) / SatellitePlan.BlockSize;
-        var ny = (ph + SatellitePlan.BlockSize - 1) / SatellitePlan.BlockSize;
+        var nx = (pw + ImagePlacer.BlockSize - 1) / ImagePlacer.BlockSize;
+        var ny = (ph + ImagePlacer.BlockSize - 1) / ImagePlacer.BlockSize;
         for (int r = 0; r < ny; r++)
             for (int c = 0; c < nx; c++)
             {

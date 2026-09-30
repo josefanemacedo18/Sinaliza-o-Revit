@@ -334,19 +334,6 @@ public static class IconFactory
                 dc.DrawEllipse(B(Color.FromRgb(255, 190, 0)), null, new Point(27, 9.5), 2, 2);
                 dc.DrawEllipse(B(Color.FromRgb(0, 200, 83)), null, new Point(27, 14.5), 2, 2);
                 break;
-            case "satelite":
-                // Foto aérea com uma via, escala gráfica e o satélite no canto.
-                dc.DrawRoundedRectangle(B(Color.FromRgb(96, 128, 80)), null, new Rect(1, 5, 26, 26), 3, 3);
-                dc.DrawRectangle(B(Color.FromRgb(140, 160, 110)), null, new Rect(3, 7, 9, 8));
-                dc.DrawRectangle(B(Color.FromRgb(170, 162, 140)), null, new Rect(16, 20, 9, 8));
-                dc.DrawLine(P(Color.FromRgb(90, 90, 96), 4), new Point(1, 22), new Point(27, 12));
-                dc.DrawLine(P(White, 1.5), new Point(4, 28), new Point(14, 28));
-                dc.DrawLine(P(White, 1.2), new Point(4, 26), new Point(4, 28));
-                dc.DrawLine(P(White, 1.2), new Point(14, 26), new Point(14, 28));
-                dc.DrawRectangle(B(Blue), null, new Rect(22, 1, 4, 4));
-                dc.DrawRectangle(B(Color.FromRgb(160, 200, 240)), null, new Rect(17, 2, 4, 2));
-                dc.DrawRectangle(B(Color.FromRgb(160, 200, 240)), null, new Rect(27, 2, 4, 2));
-                break;
             case "importarimagem":
                 dc.DrawRoundedRectangle(B(Color.FromRgb(96, 128, 80)), null, new Rect(1, 9, 22, 22), 3, 3);
                 dc.DrawLine(P(Color.FromRgb(90, 90, 96), 3), new Point(1, 24), new Point(23, 15));

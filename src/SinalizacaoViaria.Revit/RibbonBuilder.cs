@@ -30,15 +30,13 @@ public static class RibbonBuilder
                 "TR-45/57/68, UIC-60 ou Ri-60 – ou via em laje e via embutida no pavimento (VLT) –, bitola larga, métrica, padrão ou mista, várias linhas e valetas."),
             Data(typeof(CmdDesenharEixo), "Desenhar Eixo", "eixo",
                 "Eixo com a ferramenta nativa Linha de modelo (reta, arco, spline, cadeia, snaps) ou por pontos com encaixe nas vias."));
-        Split(via, "SvImagem", "Imagem Aérea",
-            Data(typeof(CmdImagemSatelite), "Imagem Aérea (Google Earth / Mapa)", "satelite",
-                "Imagem aérea sem chave: Google Earth Pro com calibração automática ou mapa no plugin (OpenStreetMap, fonte própria, WMS), na escala métrica real, " +
-                "atrás de tudo na planta – desenhe o eixo por cima. Tamanho medido no modelo e corrigido até < 1 mm."),
-            Data(typeof(CmdImportarImagem), "Importar Imagem Aérea", "importarimagem",
-                "Qualquer imagem aérea (Google Earth Pro, ortofoto, drone): com world file ou GeoTIFF entra na escala e posição certas; " +
-                "sem georreferência, é colocada e calibrada por 2 pontos."),
+        Split(via, "SvImagem", "Calibrar Imagem",
             Data(typeof(CmdCalibrarImagem), "Calibrar Escala da Imagem", "calibrarimagem",
-                "Clique 2 pontos na imagem e informe a distância real (ou a lat/lon deles): a imagem é redimensionada (e posicionada/girada) na escala exata."));
+                "Selecione uma imagem já no projeto (ex.: vista aérea colada ou importada), clique 2 pontos sobre ela e informe a distância real " +
+                "(ou a lat/lon dos dois): a imagem é redimensionada – e posicionada/girada para o Norte verdadeiro com lat/lon – na escala exata, medida no modelo."),
+            Data(typeof(CmdImportarImagem), "Importar Imagem e Calibrar", "importarimagem",
+                "Qualquer imagem aérea (captura, ortofoto, drone): com world file ou GeoTIFF entra na escala e posição certas; " +
+                "sem georreferência, é colocada e a calibração por 2 pontos abre em seguida."));
         Split(via, "SvConexoes", "Conexões",
             Data(typeof(CmdRotatoria), "Rotatória", "rotatoria",
                 "Clique o centro (encaixa no cruzamento mais próximo; os ramos vêm das vias) ou um ponto livre para uma rotatória isolada. " +

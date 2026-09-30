@@ -11,8 +11,6 @@ public class X31GeoTests
     public X31GeoTests(ITestOutputHelper output) => _out = output;
 
     private static readonly Ellipsoid El = Ellipsoid.Grs80;
-    /// <summary>Fonte de foto aérea (XYZ própria) com zoom até 20.</summary>
-    private static readonly SatelliteSource Aerial = SatelliteSource.Custom("Teste", null, 20);
 
     /// <summary>Diferença entre dois pontos geográficos em metros (pelos raios de curvatura locais).</summary>
     private static double MetersBetween(double lat1, double lon1, double lat2, double lon2)
@@ -84,27 +82,6 @@ public class X31GeoTests
     }
 
     [Fact]
-    public void WebMercator_MetersPerPixel_FollowsTheCosineFormula()
-    {
-        var mpp = WebMercator.MetersPerPixel(-23, 18);
-        _out.WriteLine($"zoom 18 a −23°: {mpp:0.000000} m/px");
-        Assert.Equal(156543.03392 * Math.Cos(-23 * Math.PI / 180) / Math.Pow(2, 18), mpp, 9);
-        Assert.Equal(0.5497, mpp, 4);
-        // No equador e o dobro a cada zoom a menos.
-        Assert.Equal(156543.03392, WebMercator.MetersPerPixel(0, 0), 3);
-        Assert.Equal(2 * WebMercator.MetersPerPixel(-10, 19), WebMercator.MetersPerPixel(-10, 18), 12);
-        // Ida e volta do pixel.
-        var (x, y) = WebMercator.ToPixel(-23.5, -46.6, 19);
-        var (la, lo) = WebMercator.FromPixel(x, y, 19);
-        Assert.Equal(-23.5, la, 10);
-        Assert.Equal(-46.6, lo, 10);
-        // Zoom escolhido: menor com pixel ≤ resolução pedida.
-        Assert.Equal(19, WebMercator.ZoomFor(-23, 0.3, 20));
-        Assert.Equal(18, WebMercator.ZoomFor(-23, 0.55, 20));
-        Assert.Equal(17, WebMercator.ZoomFor(-23, 0.3, 17));
-    }
-
-    [Fact]
     public void ElevationFactor_At800m_IsAbout1Minus1Point25e4()
     {
         var f = El.ElevationFactor(-23, 800);
@@ -139,102 +116,6 @@ public class X31GeoTests
         Assert.True(geo.GeoToModel(lat, lon).DistanceTo(p) < 0.001);
     }
 
-    [Fact]
-    public void Reprojection_PraçaDaSé_MapsToTheRightTileAndPixel()
-    {
-        // Praça da Sé (marco zero de São Paulo): −23,550520, −46,633308. Pixel global calculado à parte (fórmula do EPSG:3857):
-        // zoom 19 → x = 49 722 706,642, y = 76 147 354,611 → tile (194229, 297450), pixel (82,64; 154,61) dentro dele.
-        var geo = new GeoReference { Latitude = -23.550520, Longitude = -46.633308, Altitude = 760 };
-        var plan = SatellitePlan.Create(geo, Aerial, Vec2.Zero, 200, 200, 0.3);
-        Assert.Equal(19, plan.Zoom);
-        var (sx, sy) = SatelliteReprojection.SourcePixel(plan, Vec2.Zero);
-        Assert.Equal(49722706.642, sx, 2);
-        Assert.Equal(76147354.611, sy, 2);
-        Assert.Equal(194229, (long)Math.Floor(sx / 256));
-        Assert.Equal(297450, (long)Math.Floor(sy / 256));
-        Assert.InRange(plan.TileX0, 194220, 194229);
-        Assert.InRange(plan.TileX1, 194229, 194240);
-
-        // O centro do pixel de saída que contém a origem vai para o mesmo ponto da fonte (grade interpolada).
-        var b = plan.Blocks.Single();
-        var g = SatelliteReprojection.Grid(plan, b);
-        var u = (0 - b.Min.X) / plan.OutputMpp;
-        var v = (b.Max.Y - 0) / plan.OutputMpp;
-        var at = g.At(u, v);
-        Assert.True(Math.Abs(at.X - sx) < 0.01 && Math.Abs(at.Y - sy) < 0.01, $"{at.X - sx:0.0000}, {at.Y - sy:0.0000}");
-
-        // 100 m para leste e para norte no terreno: deslocamento na fonte pelos raios do elipsoide – e NÃO pelo fator único
-        // de "m/px", que erraria ~0,5 % no sentido norte–sul (a Web Mercator não é conforme ao elipsoide).
-        var z = Math.Pow(2, plan.Zoom) * 256 / (2 * Math.PI);
-        var lat = geo.Latitude * Math.PI / 180;
-        var east = SatelliteReprojection.SourcePixel(plan, new Vec2(100, 0));
-        var north = SatelliteReprojection.SourcePixel(plan, new Vec2(0, 100));
-        var ef = geo.ElevationFactor;
-        var expEast = 100 * ef / (El.PrimeVerticalRadius(geo.Latitude) * Math.Cos(lat)) * z;
-        var expNorth = 100 * ef / El.MeridianRadius(geo.Latitude) / Math.Cos(lat) * z;
-        Assert.Equal(expEast, east.X - sx, 1);
-        Assert.Equal(expNorth, sy - north.Y, 1);
-        var naive = 100 / plan.SourceMpp;
-        _out.WriteLine($"100 m: leste {east.X - sx:0.000} px, norte {sy - north.Y:0.000} px; fator único daria {naive:0.000} px " +
-                       $"(erro {(naive / (sy - north.Y) - 1) * 100:0.00} % no norte–sul)");
-        Assert.True(Math.Abs(naive / (sy - north.Y) - 1) > 0.004);
-    }
-
-    [Fact]
-    public void Plan_LimitsPixelsAndTiles_AndInterpolationErrorIsSubMillimetre()
-    {
-        var geo = new GeoReference { Latitude = -15.7939, Longitude = -47.8828, Altitude = 1170, NorthAngle = 0.3 };
-        // 3 km × 3 km a 0,3 m/px passaria de 100 milhões de pixels: resolução ajustada e blocos de até 4000 px.
-        var big = SatellitePlan.Create(geo, Aerial, new Vec2(100, 100), 3000, 3000, 0.3);
-        Assert.True((long)big.PixelWidth * big.PixelHeight <= SatellitePlan.MaxPixels);
-        Assert.All(big.Blocks, b => Assert.True(b.Width <= SatellitePlan.BlockSize && b.Height <= SatellitePlan.BlockSize));
-        Assert.Equal(big.PixelWidth, big.Blocks.Where(b => b.Row == 0).Sum(b => b.Width));
-        Assert.Equal(big.Width, big.PixelWidth * big.OutputMpp, 6);
-        Assert.True(big.TileCount <= Aerial.MaxTiles);
-        Assert.NotEmpty(big.Notes);
-        // Blocos contíguos: a borda de um é a do vizinho.
-        foreach (var b in big.Blocks.Where(b => b.Col > 0))
-            Assert.Equal(big.Blocks.Single(o => o.Row == b.Row && o.Col == b.Col - 1).Max.X, b.Min.X, 9);
-        // OSM: limite baixo de tiles (política de uso).
-        var osm = SatellitePlan.Create(geo, SatelliteSource.Osm, Vec2.Zero, 3000, 3000, 0.3);
-        Assert.True(osm.TileCount <= SatelliteSource.Osm.MaxTiles);
-        // Erro geométrico da grade de interpolação.
-        var small = SatellitePlan.Create(geo, Aerial, Vec2.Zero, 800, 600, 0.3);
-        var err = SatelliteReprojection.MaxInterpolationError(small);
-        _out.WriteLine($"800×600 m: zoom {small.Zoom}, {small.OutputMpp:0.000} m/px, {small.TileCount} tiles, erro da grade {err * 1000:0.0000} mm");
-        Assert.True(err < 0.001, $"{err * 1000:0.000} mm");
-    }
-
-    [Fact]
-    public void Resample_PutsTheSourceColourAtTheRightPlace()
-    {
-        // Mosaico sintético: cada tile pinta de vermelho o pixel global da Praça da Sé e o resto de azul.
-        var geo = new GeoReference { Latitude = -23.550520, Longitude = -46.633308 };
-        var plan = SatellitePlan.Create(geo, Aerial, Vec2.Zero, 60, 60, 0.3);
-        var (sx, sy) = SatelliteReprojection.SourcePixel(plan, Vec2.Zero);
-        long gx = (long)Math.Floor(sx), gy = (long)Math.Floor(sy);
-        byte[] Tile(long tx, long ty)
-        {
-            var t = new byte[256 * 256 * 4];
-            for (int i = 0; i < 256 * 256; i++) { t[i * 4] = 255; t[i * 4 + 3] = 255; }
-            if (gx / 256 == tx && gy / 256 == ty)
-            {
-                var o = ((int)(gy % 256) * 256 + (int)(gx % 256)) * 4;
-                t[o] = 0; t[o + 2] = 255;
-            }
-            return t;
-        }
-        var b = plan.Blocks.Single();
-        var img = SatelliteReprojection.Resample(plan, b, Tile);
-        // Pixel mais vermelho da saída = o que contém a origem do modelo (± 1 px).
-        int best = -1, bestR = -1;
-        for (int i = 0; i < b.Width * b.Height; i++) if (img[i * 4 + 2] > bestR) { bestR = img[i * 4 + 2]; best = i; }
-        var u = best % b.Width;
-        var v = best / b.Width;
-        var model = SatelliteReprojection.ModelOf(plan, b, u + 0.5, v + 0.5);
-        Assert.True(model.Length < 2 * Math.Max(plan.OutputMpp, plan.SourceMpp), $"{model}");
-    }
-
     [Theory]
     [InlineData("-23.550520, -46.633308", -23.550520, -46.633308)]
     [InlineData("-23,550520; -46,633308", -23.550520, -46.633308)]
@@ -260,10 +141,11 @@ public class X31GeoTests
         Assert.NotNull(w2);
         Assert.Equal(812, GeoReference.SanitizeAltitude(812, out var ok));
         Assert.Null(ok);
-        // O plano continua válido com a altitude saneada.
+        // A georreferência continua válida com a altitude saneada (1 km no modelo = 1 km no terreno).
         var geo = new GeoReference { Latitude = -6.344007, Longitude = -47.396659, Altitude = alt };
-        var plan = SatellitePlan.Create(geo, SatelliteSource.Osm, Vec2.Zero, 800, 600, 0.3);
-        Assert.True(plan.PixelWidth > 0 && plan.TileCount > 0);
+        var a = geo.ModelToGeo(Vec2.Zero);
+        var b = geo.ModelToGeo(new Vec2(1000, 0));
+        Assert.Equal(1000, Geodesic.Distance(a.Lat, a.Lon, b.Lat, b.Lon), 2);
     }
 
     [Theory]
