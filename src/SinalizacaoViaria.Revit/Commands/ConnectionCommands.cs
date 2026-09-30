@@ -94,9 +94,16 @@ public sealed class CmdConexao : CommandBase
             case Acao.Intersecao:
             {
                 var d = UiHelpers.Remembered<IntersectionDefinition>("Intersecao") ?? new IntersectionDefinition();
-                if (target.Intersection != null) d = (IntersectionDefinition)MarkingDefinition.FromJson(target.Intersection.ToJson())!;
-                if (UiHelpers.ShowModal(IntersectionForms.Intersection(d, false)) != true) return Result.Cancelled;
-                UiHelpers.Remember("Intersecao", d);
+                // Interseção existente: a janela mostra as vias reais e permite ajustar cada esquina e cada ramo.
+                IReadOnlyList<IntersectionForms.RoadOption>? roadOptions = null;
+                IntersectionForms.RealScene? real = null;
+                if (target.Intersection != null)
+                {
+                    d = (IntersectionDefinition)MarkingDefinition.FromJson(target.Intersection.ToJson())!;
+                    (roadOptions, real) = IntersectionForms.ForEdit(uidoc, target.Intersection);
+                }
+                if (UiHelpers.ShowModal(IntersectionForms.Intersection(d, false, roadOptions, real)) != true) return Result.Cancelled;
+                IntersectionForms.RememberDefaults(d);
                 results = IntersectionRunner.Run(uidoc, "SV - Conexão: interseção", s =>
                 {
                     if (target.Roundabout != null) s.Remove(target.Roundabout);

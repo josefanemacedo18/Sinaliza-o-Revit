@@ -30,7 +30,10 @@ public class Y34TipTests
     public static Vec2 Dir(double deg) => new(Math.Cos(deg * Math.PI / 180), Math.Sin(deg * Math.PI / 180));
 
     /// <summary>Vias pelos pontos do eixo (como o "Sinalizar via" gera) e as interseções nos nós, como o plugin faz.</summary>
-    public static World Make(IntersectionDefinition? template, params (int Tpl, Vec2[] Pts)[] roads)
+    public static World Make(IntersectionDefinition? template, params (int Tpl, Vec2[] Pts)[] roads) => Make(template, null, roads);
+
+    /// <summary>Idem, com <paramref name="tune"/> ajustando cada interseção (ex.: ajustes por ramo) antes de gerar.</summary>
+    public static World Make(IntersectionDefinition? template, Action<IntersectionDefinition, IReadOnlyList<IntersectionRoad>>? tune, params (int Tpl, Vec2[] Pts)[] roads)
     {
         var w = new World();
         foreach (var (tpl, pts) in roads)
@@ -51,6 +54,7 @@ public class Y34TipTests
             if (!IntersectionGenerator.NeedsIntersection(rs, node)) continue;
             var d = (IntersectionDefinition)template.CloneWithNewId();
             d.Node = node;
+            tune?.Invoke(d, rs);
             w.Nodes.Add(IntersectionDemo.Create(d, rs, ids.Select(i => w.Groups[i]).ToList(), w.Paths, w.Defs, Cat));
         }
         return w;
@@ -83,15 +87,18 @@ public class Y34TipTests
                                            && !IntersectionGenerator.IsPhysical(x.Def) && !IsPavement(x.Piece) && !IsRaised(x.Piece);
 
     /// <summary>Falhas de modelagem em volta de cada nó (lista vazia = sem falhas).</summary>
-    internal static List<string> Faults(World w)
+    public static List<string> Faults(World w)
+    {
+        var parts = Geometry(w);
+        return w.Nodes.SelectMany(s => FaultsAt(parts, s.Layout.Node, Math.Max(25, s.Layout.Radius + 6),
+            s.Layout.Roads.All(r => r.Def.LeftSidewalk > 0.5 && r.Def.RightSidewalk > 0.5))).ToList();
+    }
+
+    /// <summary>Falhas de modelagem num disco de raio <paramref name="R"/> em volta de <paramref name="node"/>.</summary>
+    public static List<string> FaultsAt(List<Part> parts, Vec2 node, double R, bool walks)
     {
         var faults = new List<string>();
-        var parts = Geometry(w);
-        foreach (var s in w.Nodes)
         {
-            var L = s.Layout;
-            var node = L.Node;
-            var R = Math.Max(25, L.Radius + 6);
             var disk = new[] { new Polygon2(CurveTools.Circle(node, R, 0.01)) };
             List<Part> Near(Func<Part, bool> f) => parts.Where(f).Where(x => PolygonOps.Intersect(new[] { x.Piece.Shape }, disk).Sum(p => p.Area) > 1e-6).ToList();
             var pav = Near(x => IsPavement(x.Piece));
@@ -134,7 +141,6 @@ public class Y34TipTests
                 }
 
             // 2. Meio-fio e calçada fechando nas esquinas: todo bordo da pista junto ao nó tem piso elevado encostado.
-            var walks = L.Roads.All(r => r.Def.LeftSidewalk > 0.5 && r.Def.RightSidewalk > 0.5);
             if (walks)
             {
                 var raisedU = PolygonOps.Union(raised.Select(x => x.Piece.Shape));

@@ -261,6 +261,22 @@ public sealed class FormWindow : Window
         return this;
     }
 
+    /// <summary>Botão de ação: grava os campos, executa a ação e relê os campos (ex.: "aplicar a todas as esquinas").</summary>
+    public FormWindow Button(string label, Action onClick, string? tooltip = null)
+    {
+        _grid = null;
+        var b = new Button { Content = label, ToolTip = tooltip, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 4), Padding = new Thickness(10, 2, 10, 2) };
+        b.Click += (_, _) =>
+        {
+            if (!ApplyAll(out var err)) { _warnings.Text = "⚠ " + err; return; }
+            onClick();
+            ReloadFields();
+        };
+        _fields.Children.Add(b);
+        Track(b);
+        return this;
+    }
+
     /// <summary>Relê todos os campos a partir da definição (após aplicar um modelo) e atualiza a prévia.</summary>
     public void ReloadFields()
     {

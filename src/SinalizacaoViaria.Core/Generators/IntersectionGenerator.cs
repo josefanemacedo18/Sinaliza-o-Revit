@@ -695,6 +695,48 @@ public static class IntersectionGenerator
         d.LegSettings.Count == 0 || leg.Road >= L.Roads.Count ? null
             : d.LegSettings.FirstOrDefault(s => s.RoadId == L.Roads[leg.Road].Def.Id && s.Sign == leg.Sign);
 
+    /// <summary>Ajustes do ramo, criados vazios quando ainda não existem (janela de ajustes por esquina).</summary>
+    public static IntersectionLegSettings LegSetOrNew(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg)
+    {
+        if (LegSet(d, L, leg) is { } s) return s;
+        s = new IntersectionLegSettings { RoadId = L.Roads[leg.Road].Def.Id, Sign = leg.Sign };
+        d.LegSettings.Add(s);
+        return s;
+    }
+
+    /// <summary>"Aplicar a todas as esquinas": copia os ajustes de um ramo para todos os ramos da interseção.</summary>
+    public static void ApplyToAllLegs(IntersectionDefinition d, IntersectionLayout L, IntersectionLegSettings src)
+    {
+        var copy = new IntersectionLegSettings
+        {
+            CornerRadius = src.CornerRadius, Crosswalk = src.Crosswalk, CrosswalkWidth = src.CrosswalkWidth, CrosswalkSetback = src.CrosswalkSetback,
+            Ramps = src.Ramps, Control = src.Control, Treatment = src.Treatment,
+        };
+        foreach (var leg in L.Legs)
+        {
+            var s = LegSetOrNew(d, L, leg);
+            s.CornerRadius = copy.CornerRadius;
+            s.Crosswalk = copy.Crosswalk;
+            s.CrosswalkWidth = copy.CrosswalkWidth;
+            s.CrosswalkSetback = copy.CrosswalkSetback;
+            s.Ramps = copy.Ramps;
+            s.Control = copy.Control;
+            s.Treatment = copy.Treatment;
+        }
+        d.LegSettings.RemoveAll(x => x.IsEmpty);
+    }
+
+    /// <summary>Nome de um ramo para a janela: via, largura da pista e para onde ele vai a partir do nó.</summary>
+    public static string LegLabel(IntersectionLayout L, IntersectionLeg leg)
+    {
+        string[] rosa = { "leste", "nordeste", "norte", "noroeste", "oeste", "sudoeste", "sul", "sudeste" };
+        var a = (AngleOf(leg.Dir) + 360) % 360;
+        var dir = rosa[(int)Math.Round(a / 45) % 8];
+        var r = L.Roads[leg.Road].Def;
+        var roadNo = L.Roads.Select(x => x.Def.Id).Distinct().ToList().IndexOf(r.Id) + 1;
+        return $"Via {roadNo} ({(r.RightWidth + r.LeftWidth).ToString("0.0", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))} m) – ramo para o {dir}{(leg.Road == L.Main ? ", principal" : "")}";
+    }
+
     /// <summary>O ramo tem faixa de pedestres.</summary>
     public static bool CrosswalkOn(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) => LegSet(d, L, leg)?.Crosswalk ?? d.Crosswalks;
 
@@ -931,7 +973,10 @@ public static class IntersectionGenerator
             var hiW = leg.Sign > 0 ? r.LeftWidth : r.RightWidth;
             var loW = leg.Sign > 0 ? r.RightWidth : r.LeftWidth;
             var c = leg.Clear;
-            if (leg.Road != L.Main && d.SplitterIslands != TipoIlha.Nenhuma)
+            // Ajuste do ramo: ilha (secundária) / bolsão (principal) sim ou não; sem ajuste, a regra geral.
+            var treat = LegSet(d, L, leg)?.Treatment;
+            var islandType = d.SplitterIslands != TipoIlha.Nenhuma ? d.SplitterIslands : TipoIlha.Fisica;
+            if (leg.Road != L.Main && (treat ?? d.SplitterIslands != TipoIlha.Nenhuma))
             {
                 if (!r.TwoWay) continue;
                 // Ramo quase paralelo a outro (< 25°): não cabe ilha separadora.
@@ -958,10 +1003,10 @@ public static class IntersectionGenerator
                     Delta = t => t <= tl ? delta : t >= tEnd ? 0 : delta * (1 - (t - tl) / taper),
                     ExtLo = -(leg.Sign > 0 ? r.TotalRight : r.TotalLeft) - delta - 0.3,
                     ExtHi = (leg.Sign > 0 ? r.TotalLeft : r.TotalRight) + delta + 0.3,
-                    IslandStart = t0, IslandLength = len, IslandWidth = w, Painted = d.SplitterIslands == TipoIlha.Pintada,
+                    IslandStart = t0, IslandLength = len, IslandWidth = w, Painted = islandType == TipoIlha.Pintada,
                 });
             }
-            else if (leg.Road == L.Main && d.LeftTurnPockets)
+            else if (leg.Road == L.Main && (treat ?? d.LeftTurnPockets))
             {
                 if (!r.TwoWay) continue;
                 var P = Math.Clamp(d.PocketWidth, 2.5, 5.0);
@@ -1039,8 +1084,13 @@ public static class IntersectionGenerator
         // Duas vias que se encontram pela ponta: emenda concordada, não cruzamento.
         if (Bend(d, input) is { } bend) return bend;
         var rc = Math.Max(0, d.CornerRadius);
+        // Raio por esquina (ajuste por ramo: esquina à direita de quem chega): o menor fecha a pista toda; os maiores
+        // acrescentam a curva só na esquina deles.
+        var radii = d.LegSettings.Where(x => x.CornerRadius != null).Select(x => Math.Max(0, x.CornerRadius!.Value)).Append(rc).ToList();
+        var rMin = radii.Min();
+        var rMax = radii.Max();
         var channels = d.RightTurnIslands != TipoIlha.Nenhuma;
-        var rs = channels ? Math.Max(d.RightTurnRadius, rc + 3) : rc;
+        var rs = channels ? Math.Max(d.RightTurnRadius, rMax + 3) : rMax;
         var maxHalf = input.Max(r => Math.Max(r.Def.TotalLeft, r.Def.TotalRight));
         foreach (var r in input) L.Roads.Add(r with { Axis = ExtendTo(r.Axis, node, maxHalf + 3) });
         L.PavementColor = L.Roads[0].Def.Color;
@@ -1057,8 +1107,9 @@ public static class IntersectionGenerator
                 minSin = Math.Min(minSin, Math.Abs(dirs[i].Cross(dirs[j])));
         if (minSin < 0.5 && !channels)
             L.Warnings.Add("Vias muito oblíquas (< 30°): considere canalizar as esquinas (Tipo III) ou realinhar o ramo secundário (T entre 75° e 105°).");
-        var reachFeat = (d.SplitterIslands != TipoIlha.Nenhuma ? Math.Max(d.SplitterLength, 12) + 25 : 0);
-        reachFeat = Math.Max(reachFeat, d.LeftTurnPockets ? d.PocketLength + d.PocketTaper + Math.Max(15, 10 * d.PocketWidth) : 0);
+        var anyTreatment = d.LegSettings.Any(x => x.Treatment == true);
+        var reachFeat = (d.SplitterIslands != TipoIlha.Nenhuma || anyTreatment ? Math.Max(d.SplitterLength, 12) + 25 : 0);
+        reachFeat = Math.Max(reachFeat, d.LeftTurnPockets || anyTreatment ? d.PocketLength + d.PocketTaper + Math.Max(15, 10 * d.PocketWidth) : 0);
         var baseReach = maxHalf / Math.Max(0.25, minSin) * 2 + 2 * rs + 12;
         var r1 = Math.Min(260, baseReach + reachFeat + (reachFeat > 0 ? 10 : 0));
         var big = Circle(node, r1);
@@ -1070,9 +1121,41 @@ public static class IntersectionGenerator
         var medBands = L.Roads.Select(r => PolygonOps.Intersect(PolygonOps.Union(r.Def.Gaps.Where(g => g.Median)
             .SelectMany(g => RoadGenerator.Band(r.Axis, g.Offset - g.Width / 2, g.Offset + g.Width / 2))), new[] { big })).ToList();
 
+        // Pista com o raio de cada esquina: o menor em toda a pista + a curva maior só no setor da esquina que a pede.
+        List<Polygon2> Corners(List<Polygon2> u, IReadOnlyList<IntersectionLeg> lg)
+        {
+            var basis = PolygonOps.Intersect(Close(u, rMin), clip);
+            if (rMax - rMin < 0.05 || lg.Count < 2) return basis;
+            var sorted = lg.Select(l => (Leg: l, A: AngleOf(l.Dir))).OrderBy(x => x.A).ToList();
+            var extra = new List<Polygon2>();
+            var cache = new Dictionary<double, List<Polygon2>>();
+            for (int k = 0; k < sorted.Count; k++)
+            {
+                var (la, aa) = sorted[k];
+                var (lb, ab) = sorted[(k + 1) % sorted.Count];
+                var span = Ccw(aa, ab);
+                if (Straight(la, lb, span)) continue;
+                var R = Math.Round(Math.Max(0, LegSet(d, L, la)?.CornerRadius ?? rc), 2);
+                if (R - rMin < 0.05) continue;
+                if (!cache.TryGetValue(R, out var closed)) cache[R] = closed = PolygonOps.Difference(PolygonOps.Intersect(Close(u, R), clip), basis);
+                foreach (var lobe in closed.Where(p => p.Area > 0.05))
+                {
+                    var v = lobe.Centroid - node;
+                    if (v.Length < reach && Ccw(aa, AngleOf(v)) <= span) extra.Add(lobe);
+                }
+            }
+            return extra.Count == 0 ? basis : PolygonOps.Union(basis.Concat(extra));
+        }
+
         // 1ª passada: esquinas simples → ramos, via principal e tratamentos dos ramos.
-        var pav0 = PolygonOps.Intersect(Close(PolygonOps.Union(cn.SelectMany(x => x)), rc), clip);
+        var u0 = PolygonOps.Union(cn.SelectMany(x => x));
+        var pav0 = PolygonOps.Intersect(Close(u0, rMin), clip);
         var legs0 = ComputeLegs(L, pav0, cn, reach, false);
+        if (rMax - rMin >= 0.05)
+        {
+            pav0 = Corners(u0, legs0);
+            legs0 = ComputeLegs(L, pav0, cn, reach, false);
+        }
         L.Main = MainRoad(d, L.Roads, legs0);
         L.Features.AddRange(Features(d, L, legs0, cn));
 
@@ -1102,7 +1185,7 @@ public static class IntersectionGenerator
 
         // 2ª passada: pista final com esquinas (raio simples ou faixa de conversão livre).
         var U = PolygonOps.Union(own.SelectMany(x => x));
-        var pavS = PolygonOps.Intersect(Close(U, rc), clip);
+        var pavS = Corners(U, legs0);
         var pav = pavS;
         var islands = new List<Polygon2>();
         var paintedIslands = new List<Polygon2>();
@@ -1399,7 +1482,9 @@ public static class IntersectionGenerator
             // Via preferencial que atravessa o nó (sem semáforo): as linhas dela seguem contínuas; só o bordo é
             // interrompido na boca das outras vias (e as vagas a 5 m dela).
             var through = i == L.Main && L.Legs.Count >= 3 && L.Legs.Count(l => l.Road == i) >= 2
-                          && d.Control != ControleIntersecao.Semaforo && !L.Features.Any(f => f.Leg.Road == i);
+                          && d.Control != ControleIntersecao.Semaforo && !L.Features.Any(f => f.Leg.Road == i)
+                          // Ramo da principal com controle próprio (PARE em todas, semáforo): as linhas param na retenção.
+                          && L.Legs.Where(l => l.Road == i).All(l => LegSet(d, L, l)?.Control is null or ControleIntersecao.Nenhum);
             if (through)
             {
                 L.ThroughMain = true;
@@ -2059,8 +2144,10 @@ public static class IntersectionGenerator
                 var (lo, hi) = ApproachSpan(L, leg, tStop);
                 var mid = (lo + hi) / 2;
                 var dir = L.Inbound(leg, tStop);
-                var control = d.Control;
-                var secondary = !isMain && control is ControleIntersecao.Pare or ControleIntersecao.DePreferencia;
+                // Controle da aproximação: o do ramo (ajuste – ex.: PARE também na principal) ou o geral.
+                var own = LegSet(d, L, leg)?.Control;
+                var control = own ?? d.Control;
+                var secondary = (own != null || !isMain) && control is ControleIntersecao.Pare or ControleIntersecao.DePreferencia;
                 var signal = control == ControleIntersecao.Semaforo;
                 var walkHi = (leg.Sign > 0 ? r.Def.LeftSidewalk : r.Def.RightSidewalk) > 0.5;
                 var signAt = L.At(leg, tStop + 0.3, L.HiEdge(leg, tStop) + (walkHi ? L.CurbWidth + 0.45 : 1.0));

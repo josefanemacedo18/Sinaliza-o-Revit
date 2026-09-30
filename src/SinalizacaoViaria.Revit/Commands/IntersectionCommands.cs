@@ -22,8 +22,20 @@ internal static class IntersectionForms
         var example = 0;
         var exampleRoad = 1;
         var ctx = new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs };
+        // Ramos da interseção real (ajustes por esquina/ramo) – arranjo calculado com as vias do projeto.
+        IntersectionLayout? legsLayout = null;
+        if (real != null)
+        {
+            try { legsLayout = IntersectionGenerator.Layout((IntersectionDefinition)MarkingDefinition.FromJson(d.ToJson())!, real.Roads); }
+            catch (Exception ex) { Log.Error("Ramos da interseção", ex); }
+            if (legsLayout is { IsBend: true } || legsLayout?.Legs.Count < 3) legsLayout = null;
+        }
+        var legIdx = 0;
+        IntersectionLeg? CurLeg() => legsLayout == null || legsLayout.Legs.Count == 0 ? null : legsLayout.Legs[Math.Clamp(legIdx, 0, legsLayout.Legs.Count - 1)];
+        IntersectionLegSettings Cur() => CurLeg() is { } lg ? IntersectionGenerator.LegSetOrNew(d, legsLayout!, lg) : new IntersectionLegSettings();
         FormPreview? Preview()
         {
+            d.LegSettings.RemoveAll(x => x.IsEmpty);
             var c = (IntersectionDefinition)MarkingDefinition.FromJson(d.ToJson())!;
             IntersectionDemo.Scene scene;
             string info;
@@ -53,7 +65,23 @@ internal static class IntersectionForms
             if (scene.Layout.Features.Count > 0) R = Math.Max(R, scene.Layout.Features.Max(f => f.TEnd) + 5);
             var node = scene.Layout.Node;
             geo.Pieces.RemoveAll(p => p.Shape.Centroid.DistanceTo(node) > R);
-            return new FormPreview(geo, null, null, info, ViewScale: 250);
+            // Ramo escolhido nos ajustes por esquina: seta ao longo dele e arco na esquina à direita de quem chega.
+            List<IReadOnlyList<Core.Geometry.Vec2>>? guides = null;
+            if (CurLeg() is { } sel && scene.Layout.Legs.FirstOrDefault(l => l.Road == sel.Road && l.Sign == sel.Sign) is { } lg)
+            {
+                var Ls = scene.Layout;
+                var hi = Ls.HiEdge(lg, lg.Clear);
+                var t1 = lg.Clear + 14;
+                var tip = Ls.At(lg, lg.Clear + 2, 0);
+                guides = new List<IReadOnlyList<Core.Geometry.Vec2>>
+                {
+                    new[] { Ls.At(lg, t1, 0), tip },
+                    new[] { tip + (Ls.At(lg, lg.Clear + 3.2, 0.9) - tip), tip, tip + (Ls.At(lg, lg.Clear + 3.2, -0.9) - tip) },
+                    Enumerable.Range(0, 13).Select(k => Ls.At(lg, lg.Clear * k / 12.0, hi + 0.6 + 0.4 * Math.Sin(Math.PI * k / 12.0))).ToList(),
+                };
+                info += $"\nAjustando: {IntersectionGenerator.LegLabel(Ls, lg)} (seta) e a esquina à direita de quem chega por ele.";
+            }
+            return new FormPreview(geo, null, guides, info, ViewScale: 250);
         }
 
         var w = new FormWindow(edit ? "Editar interseção" : "Interseção", "Interseção de vias",
@@ -84,6 +112,7 @@ internal static class IntersectionForms
              "Repete nas esquinas a faixa de serviço gramada definida na seção das vias que se cruzam, alinhando o desenho com as vias.");
 
         RampSection(w, d);
+        LegSection(w, d, legsLayout, () => legIdx, v => legIdx = v, Cur, CurLeg, real != null);
 
         w.Section("Linhas no cruzamento e regras de conversão (MBST Vol. IV / CTB art. 207)",
                 "Linha contínua amarela proíbe a conversão (CTB art. 207). Na via principal que atravessa o cruzamento, o eixo vira linha de " +
@@ -122,6 +151,52 @@ internal static class IntersectionForms
     }
 
     /// <summary>
+    /// Ajustes por esquina e por ramo (interseção existente): raio da esquina à direita de quem chega, faixa de pedestres
+    /// (sim/não, largura, recuo), rampas, controle da aproximação e ilha/bolsão – com "aplicar a todas as esquinas".
+    /// </summary>
+    private static void LegSection(FormWindow w, IntersectionDefinition d, IntersectionLayout? L, Func<int> getIdx, Action<int> setIdx,
+        Func<IntersectionLegSettings> cur, Func<IntersectionLeg?> curLeg, bool real)
+    {
+        if (L == null)
+        {
+            w.Section("Ajustes por esquina e por ramo",
+                real ? "Disponível para cruzamentos e entroncamentos com três ramos ou mais."
+                     : "Crie a interseção e depois use Editar (ou Conexões) sobre ela para ajustar cada esquina e cada ramo: raio, faixa, rampas, controle e ilha/bolsão.");
+            return;
+        }
+        var geral = "Geral da interseção";
+        (string, bool?)[] triState = { (geral, null), ("Sim", true), ("Não", false) };
+        w.Section("Ajustes por esquina e por ramo",
+                "Escolha o ramo (a seta na prévia mostra qual). A esquina ajustada é a da direita de quem chega por ele. Campos em branco/0 ou \"Geral\" seguem a interseção.")
+         .Choice("Ramo", L.Legs.Select((lg, i) => (IntersectionGenerator.LegLabel(L, lg), i)).ToList(), getIdx, setIdx, preset: setIdx)
+         .Number("Raio da esquina à direita de quem chega (m) – 0 = geral", () => cur().CornerRadius ?? 0, v => cur().CornerRadius = v < 0.05 ? null : v, 0, 60,
+             tooltip: "Face do meio-fio. Só esta esquina muda; as demais seguem o raio geral.")
+         .Choice("Faixa de pedestres neste ramo", triState, () => cur().Crosswalk, v => cur().Crosswalk = v)
+         .Number("Largura da faixa (m) – 0 = geral", () => cur().CrosswalkWidth ?? 0, v => cur().CrosswalkWidth = v < 0.05 ? null : Math.Max(2.0, v), 0, 12)
+         .Number("Recuo da faixa em relação à esquina (m) – −1 = geral", () => cur().CrosswalkSetback ?? -1, v => cur().CrosswalkSetback = v < -0.5 ? null : Math.Max(0, v), -1, 20)
+         .Choice("Rampas nesta travessia", triState, () => cur().Ramps, v => cur().Ramps = v)
+         .Choice("Controle desta aproximação", new (string, ControleIntersecao?)[]
+             {
+                 (geral, null), ("PARE (R-1 + retenção)", ControleIntersecao.Pare), ("Dê a preferência (R-2)", ControleIntersecao.DePreferencia),
+                 ("Semáforo (retenção)", ControleIntersecao.Semaforo), ("Sem controle", ControleIntersecao.Nenhum),
+             }, () => cur().Control, v => cur().Control = v,
+             "Ex.: PARE também na via principal (parada em todas as aproximações) ou nenhum controle num ramo de saída.")
+         .Choice("Ilha separadora (via secundária) / bolsão (via principal)", triState, () => cur().Treatment, v => cur().Treatment = v,
+             "Via secundária: ilha gota (tipo II, física se a geral estiver em \"Nenhuma\"). Via principal: bolsão de conversão à esquerda (tipo IV).")
+         .Button("Aplicar este ajuste a todas as esquinas e ramos", () =>
+             {
+                 if (curLeg() == null) return;
+                 IntersectionGenerator.ApplyToAllLegs(d, L, cur());
+             }, "Copia os valores deste ramo (raio, faixa, rampas, controle, ilha/bolsão) para todos.")
+         .Button("Limpar os ajustes deste ramo", () =>
+             {
+                 if (curLeg() is not { } lg) return;
+                 d.LegSettings.RemoveAll(x => x.RoadId == L.Roads[lg.Road].Def.Id && x.Sign == lg.Sign);
+             })
+         .Button("Limpar os ajustes de todos os ramos", () => d.LegSettings.Clear());
+    }
+
+    /// <summary>
     /// Rampas das travessias (NBR 9050 / NBR 16537): as mesmas medidas em todas as travessias da interseção, definidas antes
     /// de gerar. Rampa que não cabe é ajustada (rebaixamento total, travessia recuada, largura mínima de 1,50 m, sem abas) e
     /// o ajuste aparece no relatório.
@@ -152,6 +227,18 @@ internal static class IntersectionForms
              () => tactile, v => { tactile = v; d.RampTactile = v > 0; d.RampDirectional = v == 2; })
          .Number("Altura do meio-fio na rampa (m) – 0 = a da via", () => d.RampCurbHeight ?? 0, v => d.RampCurbHeight = v < 0.01 ? null : Math.Clamp(v, 0.05, 0.40), 0, 0.40,
              tooltip: "Desnível vencido pela rampa. Automática (0): a altura do meio-fio de cada via.");
+    }
+
+    /// <summary>
+    /// Lembra os valores da janela para as próximas interseções e travessias automáticas – sem os ajustes por ramo, que são
+    /// da interseção editada (vias específicas).
+    /// </summary>
+    public static void RememberDefaults(IntersectionDefinition d)
+    {
+        var copy = (IntersectionDefinition)MarkingDefinition.FromJson(d.ToJson())!;
+        copy.LegSettings.Clear();
+        copy.MainRoadId = null;
+        UiHelpers.Remember("Intersecao", copy);
     }
 
     /// <summary>Vias da interseção (para escolher a principal) e cena real da pré-visualização.</summary>
@@ -226,7 +313,7 @@ public sealed class CmdIntersecao : CommandBase
              .Choice("Cruzamentos", new[] { ("Todos os cruzamentos e entroncamentos do projeto", true), ("Somente o cruzamento que eu clicar", false) },
                  () => all, v => all = v);
         if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
-        UiHelpers.Remember("Intersecao", d);
+        IntersectionForms.RememberDefaults(d);
         PluginContext.SaveSettings();
 
         Core.Geometry.Vec2? near = null;

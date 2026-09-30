@@ -14,6 +14,10 @@ public sealed record RoundaboutLegGeometry(RoundaboutLeg Leg, Vec2 Dir, Vec2 Lef
     /// <summary>Travessia de pedestres do ramo: distância ao centro e extensão lateral (de calçada a calçada, atravessando os by-pass).</summary>
     public double CrosswalkT { get; set; }
     public (double Lo, double Hi)? CrosswalkSpan { get; set; }
+    /// <summary>Rampas da travessia (ajustadas ao meio-fio): tipo e, em cada ponta (+o, −o), o ponto no meio-fio e o sentido da subida.</summary>
+    public TipoRampa RampType { get; set; } = TipoRampa.RebaixamentoComAbas;
+    public (Vec2 Curb, Vec2 Up)? RampHi { get; set; }
+    public (Vec2 Curb, Vec2 Up)? RampLo { get; set; }
     public Vec2 At(Vec2 center, double t, double o) => center + Dir * t + Left * o;
 }
 
@@ -128,6 +132,8 @@ public static class RoundaboutGenerator
         {
             res.Add(L.Zone);
             res.AddRange(L.MedianPassages);
+            // A ilha separadora continua o canteiro da via até 0,30 m além da zona: o canteiro da via sai debaixo dela.
+            res.AddRange(L.SplitterCurb.Concat(L.SplitterCore));
             return res;
         }
         res.Add(m is ParkingMarkingDefinition ? L.ParkingZone : L.RoadPaintZone);
@@ -298,12 +304,26 @@ public static class RoundaboutGenerator
         // Zonas de recorte da pintura das vias: completa = a zona inteira; anel/ilha = até depois da travessia e da ilha
         // separadora (linhas não cruzam a faixa de pedestres nem a ilha), estacionamento 5 m antes da travessia.
         var reach = 0.0;
+        var withRamps = complete && d.Legs.Any(l => l.Sidewalk > 0.5) || complete && d.SidewalkWidth > 0.5;
         foreach (var g in L.Legs)
         {
             var rou = L.ToOuter(c, g.Dir);
             g.CrosswalkT = rou + Math.Max(2, d.CrosswalkDistance);
             var cwOn = g.Leg.Crosswalk ?? d.Crosswalks;
-            var r1 = (cwOn ? Math.Max(2, d.CrosswalkDistance) + Math.Clamp(d.CrosswalkWidth, 2, 10) : 0) + 0.5;
+            // Travessia com rampas: recuada (a partir da distância pedida) até as rampas ficarem inteiras no trecho reto do
+            // meio-fio, fora da curva de entrada/saída do ramo.
+            if (cwOn && withRamps && (g.Leg.Sidewalk > 0.5 || d.SidewalkWidth > 0.5))
+            {
+                var fit = FitRamps(d, g, c, full, g.CrosswalkT);
+                g.CrosswalkT = fit.T;
+                g.RampType = fit.Type;
+                g.RampHi = fit.Hi;
+                g.RampLo = fit.Lo;
+                if (!fit.Ok) L.Warnings.Add($"Ramo a {g.Leg.AngleDeg:0}°: meio-fio curvo junto à travessia – confira as rampas (sem abas).");
+                else if (fit.Type == TipoRampa.RebaixamentoSemAbas)
+                    L.Warnings.Add($"Ramo a {g.Leg.AngleDeg:0}°: rampas sem abas (meio-fio curvo junto à travessia) – proteja as laterais.");
+            }
+            var r1 = (cwOn ? g.CrosswalkT - rou + Math.Clamp(d.CrosswalkWidth, 2, 10) : 0) + 0.5;
             if (g.Splitter != null || g.PaintedSplitter != null) r1 = Math.Max(r1, Math.Max(3, g.Leg.SplitterLength ?? d.SplitterLength) + 0.5);
             reach = Math.Max(reach, r1);
             // Canteiro central atravessado pela faixa de pedestres: passagem no nível da pista (refúgio).
@@ -324,18 +344,10 @@ public static class RoundaboutGenerator
             var cwW = Math.Clamp(d.CrosswalkWidth, 2, 10);
             foreach (var g in L.Legs)
             {
-                var rou = L.ToOuter(c, g.Dir);
-                g.CrosswalkT = rou + Math.Max(2, d.CrosswalkDistance);
                 if (!(g.Leg.Crosswalk ?? d.Crosswalks)) continue;
                 var tc = g.CrosswalkT;
-                double Reach(double sgn)
-                {
-                    var o = 0.0;
-                    while (o < g.Leg.Width / 2 + 40 && full.Any(p => p.Contains(g.At(c, tc, sgn * (o + 0.1))))) o += 0.1;
-                    return o;
-                }
-                var hi = Reach(1);
-                var lo = -Reach(-1);
+                var hi = Reach(full, g, c, tc, 1);
+                var lo = -Reach(full, g, c, tc, -1);
                 if (hi - lo < 2) continue;
                 g.CrosswalkSpan = (lo, hi);
                 if (solids.Count > 0) passages.AddRange(PolygonOps.Strip(new[] { g.At(c, tc, lo - 1), g.At(c, tc, hi + 1) }, cwW));
@@ -388,6 +400,66 @@ public static class RoundaboutGenerator
             if (d.GutterWidth > 0.05) L.Gutter.AddRange(Automation.SectionMatch.GutterBand(full, curb, d.GutterWidth));
         }
         return L;
+    }
+
+    /// <summary>
+    /// Distância do eixo do ramo até o bordo da pista na estaca <paramref name="t"/> (lado <paramref name="sgn"/>), com
+    /// precisão de 1 mm: com passos de 10 cm a rampa começava até 10 cm dentro da pista.
+    /// </summary>
+    private static double Reach(IReadOnlyList<Polygon2> full, RoundaboutLegGeometry g, Vec2 c, double t, double sgn)
+    {
+        bool In(double o) => full.Any(p => p.Contains(g.At(c, t, sgn * o)));
+        var o = 0.0;
+        while (o < g.Leg.Width / 2 + 40 && In(o + 0.1)) o += 0.1;
+        double a = o, b = o + 0.1;
+        for (int k = 0; k < 12; k++) { var m = (a + b) / 2; if (In(m)) a = m; else b = m; }
+        return a;
+    }
+
+    /// <summary>Rampa das travessias da rotatória (NBR 9050, recorte retangular).</summary>
+    internal static RampDefinition RampOf(RoundaboutDefinition d, TipoRampa type = TipoRampa.RebaixamentoComAbas) =>
+        new() { Type = type, Height = d.CurbHeight, SquareCut = true };
+
+    /// <summary>Ponto do meio-fio na ponta da travessia e o sentido da subida, perpendicular ao meio-fio ali (entrada alargada).</summary>
+    private static (Vec2 Curb, Vec2 Up) RampFrame(IReadOnlyList<Polygon2> full, RoundaboutLegGeometry g, Vec2 c, double t, double sgn)
+    {
+        Vec2 P(double tt) => g.At(c, tt, sgn * Reach(full, g, c, tt, sgn));
+        var curb = P(t);
+        var tan = (P(t + 1) - P(t - 1)).Normalized();
+        if (tan.Length < 0.5) tan = g.Dir;
+        var up = tan.PerpLeft;
+        if (up.Dot(g.Left * sgn) < 0) up = -up;
+        return (curb, up);
+    }
+
+    /// <summary>
+    /// Estaca da travessia (a partir de <paramref name="t0"/>, até 8 m além) em que as duas rampas ficam inteiras fora da
+    /// pista, perpendiculares ao meio-fio; se com abas não couber (meio-fio curvo do by-pass), rampas sem abas.
+    /// </summary>
+    private static (double T, TipoRampa Type, (Vec2, Vec2)? Hi, (Vec2, Vec2)? Lo, bool Ok) FitRamps(RoundaboutDefinition d, RoundaboutLegGeometry g, Vec2 c,
+        IReadOnlyList<Polygon2> full, double t0)
+    {
+        if (full.Count == 0) return (t0, TipoRampa.RebaixamentoComAbas, null, null, true);
+        foreach (var type in new[] { TipoRampa.RebaixamentoComAbas, TipoRampa.RebaixamentoSemAbas })
+        {
+            var rp = RampOf(d, type);
+            var (_, len, _) = RampGenerator.Dimensions(rp);
+            var ext = IntersectionGenerator.RampHalfExtent(rp);
+            for (var t = t0; t < t0 + 8; t += 0.25)
+            {
+                var hi = RampFrame(full, g, c, t, 1);
+                var lo = RampFrame(full, g, c, t, -1);
+                var ok = true;
+                foreach (var (curb, up) in new[] { hi, lo })
+                {
+                    var side = up.PerpLeft;
+                    var body = new Polygon2(new[] { curb - side * ext + up * 0.01, curb + side * ext + up * 0.01, curb + side * ext + up * len, curb - side * ext + up * len });
+                    if (PolygonOps.TotalArea(PolygonOps.Intersect(new[] { body }, full)) > 1e-4) { ok = false; break; }
+                }
+                if (ok) return (t, type, hi, lo, true);
+            }
+        }
+        return (t0, TipoRampa.RebaixamentoSemAbas, RampFrame(full, g, c, t0, 1), RampFrame(full, g, c, t0, -1), false);
     }
 
     /// <summary>
@@ -467,8 +539,8 @@ public static class RoundaboutGenerator
         {
             if (hp > 0)
             {
-                var ring = PolygonOps.Intersect(L.Pavement, new[] { L.Outer });
-                var rest = PolygonOps.Difference(L.Pavement, new[] { L.Outer });
+                var ring = IntersectionGenerator.Sound(PolygonOps.Intersect(L.Pavement, new[] { L.Outer }));
+                var rest = IntersectionGenerator.Sound(PolygonOps.Difference(L.Pavement, new[] { L.Outer }));
                 Raised(ring, pavColor, pt + hp, -pt);
                 Raised(rest, pavColor, pt, -pt);
                 var rl = Math.Clamp(d.RampLength, 0.5, 6);
@@ -483,7 +555,8 @@ public static class RoundaboutGenerator
                 }
                 geo.Warnings.Add($"Rotatória elevada: platô de {hp * 100:0} cm com rampas de {rl:0.0} m – sinalize com A-18/A-32b e confira a drenagem.");
             }
-            else Raised(L.Pavement, pavColor, pt, -pt);
+            // Sem lascas de pavimento (by-pass × anel × ilhas): pisos ≥ 0,01 m², sem pescoços finos.
+            else Raised(IntersectionGenerator.Sound(L.Pavement), pavColor, pt, -pt);
         }
         Raised(L.Apron, MarkingColor.Bloquete, Math.Clamp(d.ApronHeight, 0.02, 0.15), hp);   // galgável: bloquete elevado
         Raised(L.IslandCurb, MarkingColor.Concreto, d.CurbHeight, hp);
@@ -814,21 +887,35 @@ public static class RoundaboutGenerator
             }
             if (crosswalk)
             {
-                var tc = rou + Math.Max(2, d.CrosswalkDistance);
+                // Mesma estaca do arranjo (recuada quando as rampas não cabiam junto à curva de entrada).
+                var tc = g.CrosswalkT > rou ? g.CrosswalkT : rou + Math.Max(2, d.CrosswalkDistance);
                 // De calçada a calçada: com by-pass a travessia cruza também a faixa de conversão livre (refúgio na ilha).
                 var (lo, hi) = g.CrosswalkSpan ?? (-hw, hw);
-                var a = g.At(c, tc, hi - 0.3);
-                var b = g.At(c, tc, lo + 0.3);
+                // Pontas da faixa: os dois cantos da pintura dentro da pista – junto ao meio-fio curvo do by-pass a ponta reta
+                // a 0,30 m do meio-fio (medida no eixo da faixa) ainda saía da pista num dos cantos.
+                var cwHalf = Math.Clamp(d.CrosswalkWidth, 2, 10) / 2;
+                var road = L.Pavement.Concat(L.Refuges).Concat(L.Apron).ToList();
+                double End(double o0, double sgn)
+                {
+                    var o = o0;
+                    for (int k = 0; k < 80 && !(road.Any(p => p.Contains(g.At(c, tc - cwHalf, o))) && road.Any(p => p.Contains(g.At(c, tc + cwHalf, o)))); k++) o -= sgn * 0.05;
+                    return o;
+                }
+                var a = g.At(c, tc, End(hi - 0.3, 1));
+                var b = g.At(c, tc, End(lo + 0.3, -1));
                 var cwk = Add(new LinearMarkingDefinition { Code = "FTP-1", WidthOverride = Math.Clamp(d.CrosswalkWidth, 2, 10), Overlay = true,
                     PathRef = PathReference.FromPoints(new[] { a, b }, z) });
                 foreach (var isl in L.Refuges.Append(g.Splitter).Where(p => p != null).Distinct())
                     if (DetailGenerator.SegmentIntervals(isl!, a, b).Any())
                         cwk.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = isl!.Outer.ToList() });
                 if ((leg.Sidewalk > 0.5 || d.SidewalkWidth > 0.5) && d.Integration == IntegracaoRotatoria.Completa)
-                    foreach (var (sgn, o) in new[] { (1.0, hi), (-1.0, lo) })
+                    foreach (var (sgn, o, frame) in new[] { (1.0, hi, g.RampHi), (-1.0, lo, g.RampLo) })
                     {
-                        var curb = g.At(c, tc, o);
-                        Add(new RampDefinition { PathRef = PathReference.FromPoints(new[] { curb, curb + g.Left * sgn }, z), Height = d.CurbHeight });
+                        // Ajustada ao meio-fio no arranjo (perpendicular a ele, com ou sem abas); sem ajuste, perpendicular ao ramo.
+                        var (curb, up) = frame ?? (g.At(c, tc, o), g.Left * sgn);
+                        var ramp = RampOf(d, g.RampType);
+                        ramp.PathRef = PathReference.FromPoints(new[] { curb, curb + up }, z);
+                        Add(ramp);
                     }
             }
             if (signs)

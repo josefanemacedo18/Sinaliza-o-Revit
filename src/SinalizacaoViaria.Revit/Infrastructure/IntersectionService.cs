@@ -162,6 +162,14 @@ public sealed class IntersectionService
                 it.PocketTaper = template.PocketTaper;
                 it.PocketWidth = template.PocketWidth;
                 it.CopyRampSettingsFrom(template);
+                // Ajustes por ramo vêm só da janela da própria interseção (Conexões sobre ela): os de outra ficam como estão.
+                if (template.LegSettings.Count > 0 && near != null)
+                    it.LegSettings = template.LegSettings.Where(x => !x.IsEmpty).Select(x => new IntersectionLegSettings
+                    {
+                        RoadId = x.RoadId, Sign = x.Sign, CornerRadius = x.CornerRadius, Crosswalk = x.Crosswalk, CrosswalkWidth = x.CrosswalkWidth,
+                        CrosswalkSetback = x.CrosswalkSetback, Ramps = x.Ramps, Control = x.Control, Treatment = x.Treatment,
+                    }).ToList();
+                if (template.MainRoadId != null && near != null) it.MainRoadId = template.MainRoadId;
             }
             foreach (var i in ids) if (!it.RoadIds.Contains(roads[i].Def.Id)) it.RoadIds.Add(roads[i].Def.Id);
             results.AddRange(Refresh(it));
