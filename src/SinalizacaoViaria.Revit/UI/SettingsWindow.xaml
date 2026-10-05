@@ -52,6 +52,11 @@
                         <CheckBox x:Name="CkFloors" Content="Pavimento, calçada, meio-fio, sarjeta e grama como Piso do Revit (editáveis com as ferramentas nativas)" IsChecked="True"/>
                         <CheckBox x:Name="CkPaintFloors" Content="Sinalização horizontal (linhas, zebrados, setas, legendas, vagas) como Piso do Revit fino sobre o pavimento" IsChecked="True"
                                   ToolTip="Cada marca vira um piso por cor (vários contornos num só piso), com o material da pintura – edite o esboço do piso para ajustar traços e áreas. Desmarcado: forma direta (DirectShape)."/>
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,2"
+                                    ToolTip="Curvas viram arcos e retas viram uma linha só no esboço dos pisos e formas (modelo leve, sem 'tracinhos'). Desvio máximo nos pontos do traçado. 0 = uma reta por vértice, como antes.">
+                            <TextBlock Text="Contornos com linhas e arcos inteiros – desvio máximo (mm)" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox x:Name="TbBoundaryTol" Width="60"/>
+                        </StackPanel>
                         <CheckBox x:Name="CkAutoCrosswalks" Content="Interseções automáticas com faixas de pedestres e rebaixamentos" IsChecked="False"/>
                         <CheckBox x:Name="CkAutoConnect" Content="Ímã de conexão: ponta de via solta sobre outra via encaixa no eixo dela (e vias ligadas acompanham)" IsChecked="True"/>
                         <CheckBox x:Name="CkBoundary" Content="Contorno visível nas regiões 2D (recomendado para marcas brancas)"/>

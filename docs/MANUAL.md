@@ -560,6 +560,16 @@ Painel **Representação no Revit** (em todas as janelas):
   **Contorno editado à mão é preservado**: se você editar o contorno de um piso (ou movê-lo), o plugin não o
   refaz nas regenerações seguintes – para voltar ao contorno gerado, apague o piso e use **Atualizar**.
   Se o Revit recusar algum contorno, aquela parte é gerada como forma direta e o motivo aparece no aviso.
+  **Contornos leves, com linhas e arcos inteiros**: ao editar o esboço de um piso, cada
+  trecho reto é **uma linha só** e cada curva vira **arcos** (Arco do Revit) – sem as dezenas de "tracinhos" das versões
+  anteriores (nas formas diretas, as curvas viram superfícies curvas reais). Os pontos do traçado ficam a no máximo **5 mm** do contorno gerado (**Configurações → Contornos com linhas e
+  arcos inteiros – desvio máximo**; 0 volta às retas uma a uma). Entre esses pontos o arco segue a curva real, onde a
+  corda antiga se afastava dela. Polígonos de verdade (octógono da placa, chanfros) continuam com cantos: só viram arco
+  as sequências em que cada corda gira até 12°. Pisos que acompanham o terreno por edição de forma mantêm os vértices
+  (são os pontos de apoio da deformação).
+  **Regeneração mais rápida**: ao atualizar a via, os pisos que saem iguais (mesmo contorno, tipo, nível, cota e
+  inclinação) são **mantidos**, sem apagar e recriar; a inclinação dos pisos no greide é feita para todos de uma vez (uma
+  regeneração do Revit por marca, não uma por piso).
   Projetos feitos em versões anteriores: use **Atualizar Todas** para converter pavimentos, calçadas,
   meios-fios e sarjetas em pisos. Desligue em **Configurações** para voltar à forma direta. A sinalização
   pintada e os dispositivos continuam como modelo genérico.
@@ -767,6 +777,12 @@ temporária de obras** (fundo laranja). Cada placa tem descrição do significad
 desenhado** (setas, curvas, veículos, pedestres, animais, tarja de proibição...). Placas com valor
 (R-14 a R-19, A-20, A-37, A-38, A-46 a A-48) usam a legenda editável (ex.: `3,0 m`, `10 t`, `40`).
 A lista tem miniaturas e pesquisa por código, nome ou descrição.
+
+**Placa inteira, fácil de girar.** Cada placa é **um elemento só** (Modelo genérico) com coluna, chapa, orla, fundo e
+legenda – cada parte com o seu material. Selecione com um clique e gire com a ferramenta **Girar** do Revit (em torno da
+coluna) ou mova com **Mover**: na próxima atualização (Atualizar, edição da via) o plugin lê o giro/movimento e o grava
+na placa – ele **não é desfeito**. Placas de projetos anteriores (uma forma por cor) viram um elemento só na primeira
+atualização; o giro passa a ser lido a partir daí.
 
 Os pictogramas são esquemáticos e reconhecíveis; para o desenho oficial exato, confira a edição
 vigente do manual. O catálogo pode ser alterado (seção `placas`, campo `pictograma` – ver

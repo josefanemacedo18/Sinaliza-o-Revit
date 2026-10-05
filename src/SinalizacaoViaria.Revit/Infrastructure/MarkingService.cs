@@ -73,6 +73,8 @@ public sealed class MarkingService
     private MarkingGeometry FilterPresent(MarkingDefinition d, MarkingGeometry geo)
     {
         if (!Present.TryGetValue(d.Id, out var els) || els.Count == 0) return geo;
+        // Placa num elemento só: todas as cores estão nele.
+        if (ElementPlan.SingleElement(d)) return geo;
         var colors = els.Select(e => e.Color).ToHashSet();
         var res = new MarkingGeometry { PaintedLength = geo.PaintedLength, PathLength = geo.PathLength, UnitCount = geo.UnitCount };
         res.Annotations.AddRange(geo.Annotations);
@@ -402,6 +404,8 @@ public sealed class MarkingService
 
         // Detalhe movido à mão (ou o grupo dele): a nova posição passa a valer antes de regenerar.
         if (def is IPlacedAnnotation placed) FollowManualMove(def, placed, existing);
+        // Placa girada/movida com as ferramentas do Revit: o giro vai para a definição antes de regenerar.
+        if (def is SignDefinition sign) FollowSignMove(sign, existing);
         // Grupo de detalhes: desfeito para trocar os elementos e refeito no fim.
         if (def is IGroupedAnnotation) Ungroup(existing);
 
@@ -483,7 +487,11 @@ public sealed class MarkingService
                 // Pisos editados à mão (contorno alterado ou movidos) são preservados: a edição do usuário prevalece.
                 var edited = oldFloors.Where(r => FloorEdited((Floor)r.Element)).ToList();
                 var locked = edited.Select(r => r.Color).ToHashSet();
-                foreach (var old in oldFloors.Where(r => !locked.Contains(r.Color))) SafeDelete(old.Element.Id);
+                // Pisos anteriores: os que saírem iguais (mesma chave) são mantidos; os demais são apagados no fim.
+                var pool = oldFloors.Where(r => !locked.Contains(r.Color)).Select(r => (Floor)r.Element).ToList();
+                _reuse = new Dictionary<string, Floor>();
+                foreach (var f in pool)
+                    if (FloorSignature.ReadKey(f) is { } k) _reuse.TryAdd(k, f);
                 existing.RemoveAll(r => r.Element is Floor && !locked.Contains(r.Color));
                 foreach (var r in oldFloors.Where(r => locked.Contains(r.Color)))
                 {
@@ -497,7 +505,7 @@ public sealed class MarkingService
                 var failed = new List<MarkingPiece>();
                 string? reason = null;
                 foreach (var grp in floorPieces.Where(p => !locked.Contains(p.Color))
-                             .GroupBy(p => (p.Color, E: Math.Round(p.Elevation, 3), T: Math.Round(p.Thickness, 3), p.Layer)))
+                             .GroupBy(ElementPlan.FloorKey))
                 {
                     var parts = FloorParts(def, grp.Select(p => p.Shape), terrain, baseZ);
                     if (MarkingColors.IsPaint(grp.Key.Color) && parts.Count > 1)
@@ -509,7 +517,7 @@ public sealed class MarkingService
                             var list = byPlane.ToList();
                             var plane0 = list[0].Plane;
                             if (plane0 == null && terrain != null) { rest.AddRange(list); continue; }
-                            var multi = CreateMultiFloor(list.Select(x => x.Shape).ToList(), grp.Key.Color, grp.Key.E, grp.Key.T, plane0,
+                            var multi = CreateMultiFloor(list.Select(x => x.Shape).ToList(), grp.Key.Color, grp.Key.Elevation, grp.Key.Thickness, plane0,
                                 baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(grp.Key.Color), ref reason);
                             if (multi == null) { rest.AddRange(list); continue; }
                             try { multi.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set($"SV {info.Code}"); } catch { /* opcional */ }
@@ -521,7 +529,7 @@ public sealed class MarkingService
                     }
                     foreach (var (shape, plane) in parts)
                     {
-                        var piece = new MarkingPiece(shape, grp.Key.Color) { Elevation = grp.Key.E, Thickness = grp.Key.T, Layer = grp.Key.Layer };
+                        var piece = new MarkingPiece(shape, grp.Key.Color) { Elevation = grp.Key.Elevation, Thickness = grp.Key.Thickness, Layer = grp.Key.Layer };
                         var floors = CreateFloors(piece, baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(grp.Key.Color), ref reason, terrain, plane);
                         if (floors.Count == 0) { failed.Add(piece); continue; }
                         foreach (var f in floors)
@@ -533,6 +541,10 @@ public sealed class MarkingService
                         }
                     }
                 }
+                foreach (var f in pool) if (f.IsValidObject && !keep.Contains(f.Id)) SafeDelete(f.Id);
+                _reuse = null;
+                // Inclinação e edição de forma de todos os pisos da marca de uma vez (uma regeneração, não uma por piso).
+                FlushShapeEdits();
                 if (failed.Count > 0)
                     result.Warnings.Add($"{info.Code}: {failed.Count} parte(s) não puderam virar Piso do Revit e foram geradas como forma direta" +
                                         (reason != null ? $" ({reason})." : "."));
@@ -553,6 +565,41 @@ public sealed class MarkingService
             {
                 sampler = new SurfaceSampler(_doc, def.Output.SurfaceIds, _interactive);
                 if (!sampler.IsAvailable) result.Warnings.Add("Nenhuma vista 3D disponível para projetar sobre a superfície – marca gerada plana.");
+            }
+
+            if (ElementPlan.SingleElement(def) && groups.Count > 0)
+            {
+                // Placa: poste, chapa, orla, fundo e legenda num elemento só (cada sólido com o seu material) – seleciona-se e
+                // gira-se a placa inteira.
+                var all = new List<GeometryObject>();
+                foreach (var g in groups)
+                    all.AddRange(BuildSolids(g, baseZ + def.Output.ElevationOffset, thickness, sampler, Styles.Material(g.Key), result.Warnings, def.Output.ElevationOffset));
+                if (all.Count > 0)
+                {
+                    var ds = existing.FirstOrDefault(r => r.Element is DirectShape && !IsBore(r.Element))?.Element as DirectShape;
+                    if (ds == null)
+                    {
+                        ds = DirectShape.CreateElement(_doc, new ElementId(BuiltInCategory.OST_GenericModel));
+                        ds.ApplicationId = "SinalizacaoViaria";
+                        ds.ApplicationDataId = def.Id;
+                    }
+                    try
+                    {
+                        ds.SetShape(all);
+                        try { ds.SetName($"SV {info.Code}"); } catch { /* nome é opcional */ }
+                        Tag(ds, def, info, groups[0].Key, materialName, groups.Sum(g => g.Sum(p => p.Shape.Area)), geo, primary);
+                        if (SignFrameStore.Of(all, Styles.Material(MarkingColor.Metal)) is { } frame) SignFrameStore.Write(ds, frame);
+                        keep.Add(ds.Id);
+                        primary = false;
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error($"SetShape {info.Code}", ex);
+                        result.Warnings.Add($"{info.Code}: o Revit recusou a geometria ({ex.Message}).");
+                        if (ds.IsValidObject && !existing.Any(r => r.Element.Id == ds.Id)) SafeDelete(ds.Id);
+                    }
+                }
+                groups.Clear();
             }
 
             foreach (var g in groups)
@@ -725,6 +772,25 @@ public sealed class MarkingService
         if (delta.Length < 0.001) return;
         def.Translate(delta, 0);
         placed.DrawnAnchor = drawn + delta;
+    }
+
+    /// <summary>
+    /// Compara a referência da placa gravada na geração com a medida na geometria atual: se a placa foi girada ou movida no
+    /// Revit (inteira, como corpo rígido), o giro e o deslocamento passam para a definição.
+    /// </summary>
+    private void FollowSignMove(SignDefinition sign, List<StoredMarking> existing)
+    {
+        try
+        {
+            var ds = existing.Select(r => r.Element).OfType<DirectShape>().FirstOrDefault(e => !IsBore(e));
+            if (ds == null || SignFrameStore.Read(ds) is not { } stored) return;
+            if (SignFrameStore.Of(ds, Styles.Material(MarkingColor.Metal)) is not { } now) return;
+            SignFrame.Follow(sign, stored, now, minMove: 0.002, minAngle: 0.0005);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Giro manual da placa", ex);
+        }
     }
 
     private void Ungroup(IEnumerable<StoredMarking> existing)
@@ -1080,40 +1146,39 @@ public sealed class MarkingService
         return loop;
     }
 
-    /// <summary>
-    /// Contorno pronto para o Revit: união (remove auto-toques), arestas menores que 1 cm e vértices colineares removidos.
-    /// Curvas discretizadas e recortes oblíquos geram arestas submilimétricas que o Revit recusa.
-    /// </summary>
-    private static Polygon2 Prepare(Polygon2 poly)
-    {
-        try
-        {
-            var u = PolygonOps.Union(new[] { poly }).OrderByDescending(p => p.Area).FirstOrDefault();
-            var simplified = (u ?? poly).Simplified(0.01, 1e-4);
-            return simplified ?? u ?? poly;
-        }
-        catch
-        {
-            return poly.Simplified(0.01, 1e-4) ?? poly;
-        }
-    }
+    /// <summary>Contorno pronto para o Revit (ver <see cref="ElementPlan.Prepare"/>).</summary>
+    private static Polygon2 Prepare(Polygon2 poly) => ElementPlan.Prepare(poly);
 
     private IList<CurveLoop> ToCurveLoops(Polygon2 poly, double zFt, bool raw = false)
     {
         if (!raw) poly = Prepare(poly);
         var loops = new List<CurveLoop>();
-        var outer = ToCurveLoop(poly.Outer, zFt);
+        var outer = ToCurveLoop(poly.Outer, zFt, raw);
         if (outer == null) return loops;
         loops.Add(outer);
         foreach (var h in poly.Holes)
         {
-            var hl = ToCurveLoop(h, zFt);
+            var hl = ToCurveLoop(h, zFt, raw);
             if (hl != null) loops.Add(hl);
+        }
+        // Arcos de anéis vizinhos não podem se tocar: se o ajuste fez um furo encostar no contorno, volta às retas.
+        if (!raw && BoundaryTolerance > 0 && loops.Count > 1 && !BoundaryValidation.IsValidHorizontalBoundary(loops))
+        {
+            loops.Clear();
+            var o2 = ToCurveLoopLines(poly.Outer, zFt);
+            if (o2 == null) return loops;
+            loops.Add(o2);
+            foreach (var h in poly.Holes) if (ToCurveLoopLines(h, zFt) is { } hl) loops.Add(hl);
         }
         return loops;
     }
 
-    private CurveLoop? ToCurveLoop(IReadOnlyList<Vec2> ring, double zFt)
+    /// <summary>
+    /// Contorno do Revit com linhas e arcos inteiros (ver <see cref="BoundaryFit"/>): cada reta vira uma linha só e cada
+    /// curva vira arcos – o esboço do piso fica limpo e leve. <paramref name="raw"/>: vértices mantidos um a um (pontos de
+    /// apoio da edição de forma sobre o terreno).
+    /// </summary>
+    private CurveLoop? ToCurveLoop(IReadOnlyList<Vec2> ring, double zFt, bool raw = false)
     {
         var tol = _doc.Application.ShortCurveTolerance * 1.5;
         var pts = new List<XYZ>();
@@ -1125,10 +1190,47 @@ public sealed class MarkingService
         while (pts.Count > 2 && pts[0].DistanceTo(pts[^1]) <= tol) pts.RemoveAt(pts.Count - 1);
         pts = Sanitize(pts, tol);
         if (pts.Count < 3) return null;
+        if (!raw && BoundaryTolerance > 0)
+        {
+            try
+            {
+                var fitted = FittedLoop(pts.Select(p => new Vec2(UnitConv.M(p.X), UnitConv.M(p.Y))).ToList(), zFt, tol);
+                if (fitted != null) return fitted;
+            }
+            catch (Exception ex) { Log.Error("Contorno com arcos", ex); }
+        }
         var loop = new CurveLoop();
         for (int i = 0; i < pts.Count; i++)
             loop.Append(Line.CreateBound(pts[i], pts[(i + 1) % pts.Count]));
         return loop;
+    }
+
+    private CurveLoop? ToCurveLoopLines(IReadOnlyList<Vec2> ring, double zFt) => ToCurveLoop(ring, zFt, raw: true);
+
+    /// <summary>Desvio máximo do contorno ajustado (m) – configurável em Configurações (0 = retas uma a uma, como antes).</summary>
+    private static double BoundaryTolerance => Math.Max(0, PluginContext.Settings.BoundaryTolerance);
+
+    private static CurveLoop? FittedLoop(List<Vec2> ring, double zFt, double shortFt)
+    {
+        var segs = BoundaryFit.Fit(ring, BoundaryTolerance, UnitConv.M(shortFt));
+        if (segs.Count < 2 || segs.Count == 2 && !segs.Any(x => x.IsArc)) return null;
+        XYZ P(Vec2 v) => new(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), zFt);
+        var loop = new CurveLoop();
+        foreach (var s in segs)
+        {
+            var a = P(s.Start);
+            var b = P(s.End);
+            if (a.DistanceTo(b) <= shortFt) return null;
+            Curve c;
+            if (s.Mid is { } m)
+            {
+                try { c = Arc.Create(a, b, P(m)); }
+                catch { c = Line.CreateBound(a, b); }
+            }
+            else c = Line.CreateBound(a, b);
+            loop.Append(c);
+        }
+        return loop.IsOpen() ? null : loop;
     }
 
     private static readonly string[] OverlayCodes = { "CIC-LD", "CIC-LC", "FCA-BD", "MCC", "SIC", "CIC-SETA", "SPE", "LCA" };
@@ -1145,14 +1247,9 @@ public sealed class MarkingService
 
     // ------------------------------------------------------------------ pisos
 
-    /// <summary>Marca de sinalização horizontal (pintura) – vira piso quando a opção está ligada.</summary>
-    private static bool PaintDefinition(MarkingDefinition def) =>
-        def is LinearMarkingDefinition l && !Core.Automation.RoadSectionInference.IsPhysical(l.Code)
-        || def is HatchMarkingDefinition or SymbolMarkingDefinition or TextMarkingDefinition or ParkingMarkingDefinition or RepeatedMarkingDefinition
-            or RecessMarkingDefinition or ChannelizationDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition;
+    private static bool PaintDefinition(MarkingDefinition def) => ElementPlan.PaintDefinition(def);
 
-    private static bool PaintFloorEligible(MarkingPiece p) =>
-        p.Solid == null && p.Profile == null && MarkingColors.IsPaint(p.Color) && p.Shape.Area > 0.0004 && p.Thickness >= 0.0015;
+    private static bool PaintFloorEligible(MarkingPiece p) => ElementPlan.PaintFloorEligible(p);
 
     /// <summary>
     /// Um piso com vários contornos (pintura de uma cor): topo na cota da pintura; no greide, inclinado no plano dado.
@@ -1183,10 +1280,13 @@ public sealed class MarkingService
         try
         {
             if (!BoundaryValidation.IsValidHorizontalBoundary(loops)) { reason = "contornos da pintura inválidos para um único piso"; return null; }
+            var key = FloorSignature.Key(loops, typeId, level.Id, topFt, PlaneKey(plane));
+            if (Reuse(key) is { } same) return same;
             f = Floor.Create(_doc, loops, typeId, level.Id, false, null, 0.0);
             f.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)?.Set(topFt - level.ProjectElevation);
             FloorSignature.Write(f, loops);
-            if (plane is { IsLevel: false } pp) TiltFloor(f, pp, groundFt!.Value);
+            FloorSignature.WriteKey(f, key);
+            if (plane is { IsLevel: false } pp) _shapeEdits.Add(new ShapeEdit(f, pp, null, null, groundFt!.Value));
             return f;
         }
         catch (Exception ex)
@@ -1198,11 +1298,7 @@ public sealed class MarkingService
         }
     }
 
-    private static bool FloorEligible(MarkingDefinition def, MarkingPiece p) =>
-        p.Solid == null && p.Profile == null && p.Thickness >= 0.005 && p.Shape.Area > 0.01
-        && p.Color is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto or MarkingColor.Concreto or MarkingColor.Grama
-        && def is RoadPavementDefinition or LinearMarkingDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition
-            or SidewalkAreaDefinition or CurbExtensionDefinition or PlanterDefinition;
+    private static bool FloorEligible(MarkingDefinition def, MarkingPiece p) => ElementPlan.FloorEligible(def, p);
 
     private readonly Dictionary<(MarkingColor, int), ElementId> _floorTypes = new();
     private List<Level>? _levels;
@@ -1337,11 +1433,16 @@ public sealed class MarkingService
                 try
                 {
                     if (!BoundaryValidation.IsValidHorizontalBoundary(loops)) { ok = false; reason = "contorno inválido para o esboço do piso"; break; }
+                    // Piso que acompanha o terreno (edição de forma com a malha do terreno) é sempre refeito; os demais com a
+                    // mesma chave (contorno, tipo, nível, cota e plano) ficam como estão.
+                    var key = plane == null && groundFt != null && terrain != null ? null : FloorSignature.Key(loops, typeId, level.Id, topFt, PlaneKey(plane));
+                    if (key != null && Reuse(key) is { } same) { created.Add(same); continue; }
                     var f = Floor.Create(_doc, loops, typeId, level.Id, false, null, 0.0);
                     f.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)?.Set(topFt - level.ProjectElevation);
                     FloorSignature.Write(f, loops);
-                    if (plane is { } pp) { if (!pp.IsLevel) TiltFloor(f, pp, groundFt!.Value); }
-                    else if (groundFt != null && terrain != null) DrapeFloor(f, shape, terrain, groundFt.Value);
+                    if (key != null) FloorSignature.WriteKey(f, key);
+                    if (plane is { } pp) { if (!pp.IsLevel) _shapeEdits.Add(new ShapeEdit(f, pp, null, null, groundFt!.Value)); }
+                    else if (groundFt != null && terrain != null) _shapeEdits.Add(new ShapeEdit(f, null, shape, terrain, groundFt.Value));
                     created.Add(f);
                 }
                 catch (Exception ex)
@@ -1436,27 +1537,67 @@ public sealed class MarkingService
         };
     }
 
-    /// <summary>
-    /// Inclina o piso para o plano dado: só os vértices do contorno, cada um exatamente no plano – o topo continua uma face
-    /// plana única (nenhum vinco), só que inclinada como o greide/abaulamento naquele trecho.
-    /// </summary>
-    private void TiltFloor(Floor f, Plane3 plane, double groundFt)
+    private sealed record ShapeEdit(Floor Floor, Plane3? Plane, Polygon2? Shape, ISurface? Terrain, double GroundFt);
+
+    private readonly List<ShapeEdit> _shapeEdits = new();
+    private Dictionary<string, Floor>? _reuse;
+
+    private static string PlaneKey(Plane3? p) =>
+        p is not { } pl || pl.IsLevel ? "plano" : FormattableString.Invariant($"{pl.A:0.00000}|{pl.B:0.000000}|{pl.C:0.000000}");
+
+    /// <summary>Piso anterior da marca com a mesma chave (mantido em vez de apagado e recriado).</summary>
+    private Floor? Reuse(string key)
     {
-        try
+        if (_reuse == null || !_reuse.Remove(key, out var f) || !f.IsValidObject) return null;
+        return f;
+    }
+
+    /// <summary>
+    /// Edição de forma dos pisos da marca em lote: liga os editores de todos, regenera UMA vez, acrescenta os pontos da
+    /// malha do terreno (mais uma regeneração, só se houver) e ajusta as cotas. Antes era uma regeneração por piso.
+    /// Inclinação (plano): só os vértices do contorno, cada um no plano – o topo continua uma face plana única.
+    /// </summary>
+    private void FlushShapeEdits()
+    {
+        if (_shapeEdits.Count == 0) return;
+        var edits = _shapeEdits.Where(e => e.Floor.IsValidObject).ToList();
+        _shapeEdits.Clear();
+        var ready = new List<(ShapeEdit E, SlabShapeEditor Ed)>();
+        foreach (var e in edits)
         {
-            var ed = f.GetSlabShapeEditor();
-            ed.Enable();
-            _doc.Regenerate();
-            foreach (SlabShapeVertex v in ed.SlabShapeVertices)
+            try
             {
-                var p = v.Position;
-                var off = UnitConv.Ft(plane.Z(new Vec2(UnitConv.M(p.X), UnitConv.M(p.Y)))) - groundFt;
-                if (Math.Abs(off) > 1e-5) ed.ModifySubElement(v, off);
+                var ed = e.Floor.GetSlabShapeEditor();
+                ed.Enable();
+                ready.Add((e, ed));
             }
+            catch (Exception ex) { Log.Error("Edição de forma do piso", ex); }
         }
-        catch (Exception ex)
+        if (ready.Count == 0) return;
+        _doc.Regenerate();
+        var added = false;
+        foreach (var (e, ed) in ready)
         {
-            Log.Error("TiltFloor", ex);
+            if (e.Terrain == null || e.Shape == null) continue;
+            try { added |= AddDrapePoints(e.Floor, ed, e.Shape, e.Terrain, e.GroundFt); }
+            catch (Exception ex) { Log.Error("DrapeFloor (pontos)", ex); }
+        }
+        if (added) _doc.Regenerate();
+        foreach (var (e, ed) in ready)
+        {
+            try
+            {
+                foreach (SlabShapeVertex v in ed.SlabShapeVertices)
+                {
+                    var p = v.Position;
+                    double off;
+                    if (e.Plane is { } plane) off = UnitConv.Ft(plane.Z(new Vec2(UnitConv.M(p.X), UnitConv.M(p.Y)))) - e.GroundFt;
+                    else if (e.Terrain != null && e.Terrain.TrySample(p.X, p.Y, e.GroundFt, out var z, out _)) off = z - e.GroundFt;
+                    else continue;
+                    if (Math.Abs(off) > 1e-5) ed.ModifySubElement(v, off);
+                }
+            }
+            catch (Exception ex) { Log.Error("Edição de forma do piso (cotas)", ex); }
         }
     }
 
@@ -1467,59 +1608,38 @@ public sealed class MarkingService
     }
 
     /// <summary>
-    /// Deforma o piso para acompanhar o terreno: edição de forma do Revit com os vértices do contorno e uma malha interna
-    /// de pontos (4 m), cada um na cota da superfície. O piso continua editável com as ferramentas nativas.
+    /// Pontos internos da edição de forma para o piso acompanhar o terreno: no greide, linhas paralelas ao eixo (inclui a
+    /// crista do abaulamento); no terreno, malha regular (4 m). O piso continua editável com as ferramentas nativas.
     /// </summary>
-    private void DrapeFloor(Floor f, Polygon2 shape, ISurface terrain, double groundFt)
+    private bool AddDrapePoints(Floor f, SlabShapeEditor ed, Polygon2 shape, ISurface terrain, double groundFt)
     {
-        try
+        var top = f.get_BoundingBox(null)?.Max.Z ?? groundFt;
+        var inner = new List<XYZ>();
+        if (terrain is GradeSampler gs)
+            inner.AddRange(GradeFloors.Supports(shape, gs.Surface, gs.Grid).Select(v => new XYZ(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), top)));
+        else
         {
-            var ed = f.GetSlabShapeEditor();
-            ed.Enable();
-            _doc.Regenerate();
-            var top = f.get_BoundingBox(null)?.Max.Z ?? groundFt;
-            // Pontos internos: no greide, linhas paralelas ao eixo (inclui a crista do abaulamento); no terreno, malha regular.
-            var inner = new List<XYZ>();
-            if (terrain is GradeSampler gs)
-                inner.AddRange(GradeFloors.Supports(shape, gs.Surface, gs.Grid).Select(v => new XYZ(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), top)));
-            else
-            {
-                var (mn, mx) = shape.Bounds;
-                // Nó (concordância torcida): malha fina e regular de 1,5 m; terreno: 3 m.
-                var step = Math.Max(terrain is NodeSampler ? 1.5 : 3.0, Math.Sqrt(Math.Max(1, shape.Area) / 1200));
-                var edge = PolygonOps.Offset(new[] { shape }, -0.4);
-                for (var x = mn.X + step / 2; x < mx.X; x += step)
-                    for (var y = mn.Y + step / 2; y < mx.Y; y += step)
-                    {
-                        var v = new Vec2(x, y);
-                        if (inner.Count < 1500 && edge.Any(e => e.Contains(v))) inner.Add(new XYZ(UnitConv.Ft(x), UnitConv.Ft(y), top));
-                    }
-            }
-            if (inner.Count > 0)
-            {
-                try { ed.AddPoints(inner); }
-                catch (Exception ex)
+            var (mn, mx) = shape.Bounds;
+            // Nó (concordância torcida): malha fina e regular de 1,5 m; terreno: 3 m.
+            var step = Math.Max(terrain is NodeSampler ? 1.5 : 3.0, Math.Sqrt(Math.Max(1, shape.Area) / 1200));
+            var edge = PolygonOps.Offset(new[] { shape }, -0.4);
+            for (var x = mn.X + step / 2; x < mx.X; x += step)
+                for (var y = mn.Y + step / 2; y < mx.Y; y += step)
                 {
-                    Log.Error("SlabShape.AddPoints", ex);
-                    foreach (var q in inner) try { ed.AddPoint(q); } catch { /* ponto repetido ou na borda */ }
+                    var v = new Vec2(x, y);
+                    if (inner.Count < 1500 && edge.Any(e => e.Contains(v))) inner.Add(new XYZ(UnitConv.Ft(x), UnitConv.Ft(y), top));
                 }
-                _doc.Regenerate();
-            }
-            foreach (SlabShapeVertex v in ed.SlabShapeVertices)
-            {
-                var p = v.Position;
-                if (!terrain.TrySample(p.X, p.Y, groundFt, out var z, out _)) continue;
-                var off = z - groundFt;
-                if (Math.Abs(off) > 1e-4) ed.ModifySubElement(v, off);
-            }
         }
+        if (inner.Count == 0) return false;
+        try { ed.AddPoints(inner); }
         catch (Exception ex)
         {
-            Log.Error("DrapeFloor", ex);
+            Log.Error("SlabShape.AddPoints", ex);
+            foreach (var q in inner) try { ed.AddPoint(q); } catch { /* ponto repetido ou na borda */ }
         }
+        return true;
     }
 
-    /// <summary>O contorno do piso foi alterado (ou o piso foi movido) pelo usuário depois de gerado?</summary>
     private bool FloorEdited(Floor f)
     {
         try

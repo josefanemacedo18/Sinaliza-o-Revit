@@ -16,7 +16,7 @@ public class Y36RoundaboutTests
     private static readonly Catalogo Cat = CatalogService.LoadDefault();
 
     /// <summary>Vias pelos pontos e uma rotatória no nó (como o plugin: ramos lidos das vias, recortes pela regra da rotatória).</summary>
-    private static (Y34TipTests.World W, RoundaboutDefinition D, RoundaboutLayout L) Make(TipoRotatoria type, params (int Tpl, Vec2[] Pts)[] roads)
+    public static (Y34TipTests.World W, RoundaboutDefinition D, RoundaboutLayout L) Make(TipoRotatoria type, params (int Tpl, Vec2[] Pts)[] roads)
     {
         var w = new Y34TipTests.World();
         foreach (var (tpl, pts) in roads)

@@ -220,6 +220,10 @@ public static class SignGenerator
         return geo;
     }
 
+    /// <summary>Quadrado de meio-lado <paramref name="half"/> alinhado à placa (gira junto com ela).</summary>
+    private static Polygon2 Square(Vec2 c, Vec2 right, Vec2 f, double half) =>
+        new(new[] { c - right * half - f * half, c + right * half - f * half, c + right * half + f * half, c - right * half + f * half });
+
     /// <summary>
     /// Suportes aéreos (MBST Vol. I/III; DER/SP): a coluna fica em <c>Position</c> (bordo da pista) e a viga/braço avança
     /// na direção da placa (deslocamento lateral) até o vão informado; no pórtico há uma segunda coluna no fim do vão.
@@ -253,7 +257,7 @@ public static class SignGenerator
             {
                 var at = start + extrude * (len * i / n);
                 foreach (var sg in new[] { 1.0, -1.0 })
-                    geo.Pieces.Add(new MarkingPiece(Polygon2.Rectangle(at + f * (sg * depth / 2) - right * 0.03 - f * 0.03, at + f * (sg * depth / 2) + right * 0.03 + f * 0.03), MarkingColor.Metal)
+                    geo.Pieces.Add(new MarkingPiece(Square(at + f * (sg * depth / 2), right, f, 0.03), MarkingColor.Metal)
                     { Elevation = top - beamH + chord, Thickness = beamH - 2 * chord });
             }
         }
@@ -261,7 +265,7 @@ public static class SignGenerator
         var plateCenter = d.Position + right * d.LateralOffset;
         var w = d.Width ?? 1.0;
         foreach (var sg in new[] { -0.35, 0.35 })
-            geo.Pieces.Add(new MarkingPiece(Polygon2.Rectangle(plateCenter + right * (sg * w) - right * 0.03 - f * 0.03, plateCenter + right * (sg * w) + right * 0.03 + f * 0.03), MarkingColor.Metal)
+            geo.Pieces.Add(new MarkingPiece(Square(plateCenter + right * (sg * w), right, f, 0.03), MarkingColor.Metal)
             { Elevation = d.MountHeight + plateH, Thickness = 0.10 + 1e-3 });
     }
 }

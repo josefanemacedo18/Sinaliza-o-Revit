@@ -32,6 +32,11 @@ public sealed class PluginSettings
     public bool PhysicalAsFloors { get; set; } = true;
     /// <summary>Sinalização horizontal (pintura) gerada como Piso do Revit fino sobre o pavimento – editável como os demais pisos.</summary>
     public bool PaintAsFloors { get; set; } = true;
+    /// <summary>
+    /// Desvio máximo (m) do contorno dos pisos e formas ao trocar a poligonal das curvas por linhas e arcos inteiros
+    /// (esboço limpo e modelo leve). 0 = uma reta por vértice, como nas versões anteriores.
+    /// </summary>
+    public double BoundaryTolerance { get; set; } = Geometry.BoundaryFit.DefaultTolerance;
     public Automation.TipoConexao LastConnection { get; set; } = Automation.TipoConexao.Intersecao;
     public Automation.FimLivre LastFreeEnds { get; set; } = Automation.FimLivre.Nenhum;
     public double LastCurveRadius { get; set; } = 30;

@@ -70,4 +70,61 @@ public static class FloorSignature
         return Math.Abs(now[0] - stored[0]) > 0.5 || Math.Abs(now[1] - stored[1]) > 0.01
             || Math.Abs(now[2] - stored[2]) > tol || Math.Abs(now[3] - stored[3]) > tol;
     }
+
+    // ------------------------------------------------------------------ chave de reaproveitamento
+
+    private static readonly Guid KeySchemaGuid = new("9B1F3E2A-6C47-4D85-B2E0-5A7C13D94F61");
+    private const string KeyField = "Key";
+
+    private static Schema KeySchema()
+    {
+        var s = Schema.Lookup(KeySchemaGuid);
+        if (s != null) return s;
+        var b = new SchemaBuilder(KeySchemaGuid);
+        b.SetSchemaName("SinalizaBIMFloorKey");
+        b.SetReadAccessLevel(AccessLevel.Public);
+        b.SetWriteAccessLevel(AccessLevel.Public);
+        b.AddSimpleField(KeyField, typeof(string));
+        return b.Finish();
+    }
+
+    /// <summary>
+    /// Chave do piso gerado: contorno (nº de curvas, perímetro, pontos médios), tipo, nível, cota do topo e plano de
+    /// inclinação. Na regeneração, um piso com a mesma chave é mantido em vez de apagado e recriado.
+    /// </summary>
+    public static string Key(IEnumerable<CurveLoop> loops, ElementId typeId, ElementId levelId, double topFt, string plane)
+    {
+        var v = Compute(loops);
+        return string.Join("|", v.Select(x => Math.Round(x, 4).ToString("R", CultureInfo.InvariantCulture)))
+               + $"|{typeId.Value}|{levelId.Value}|{Math.Round(topFt, 5).ToString("R", CultureInfo.InvariantCulture)}|{plane}";
+    }
+
+    public static void WriteKey(Element e, string key)
+    {
+        try
+        {
+            var entity = new Entity(KeySchema());
+            entity.Set(KeyField, key);
+            e.SetEntity(entity);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("FloorSignature.WriteKey", ex);
+        }
+    }
+
+    public static string? ReadKey(Element e)
+    {
+        try
+        {
+            var schema = Schema.Lookup(KeySchemaGuid);
+            if (schema == null) return null;
+            var entity = e.GetEntity(schema);
+            return entity != null && entity.IsValid() ? entity.Get<string>(KeyField) : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

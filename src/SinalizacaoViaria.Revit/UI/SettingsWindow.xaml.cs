@@ -41,6 +41,7 @@ public partial class SettingsWindow : Window
         CkAutoCrosswalks.IsChecked = s.AutoCrosswalks;
         CkFloors.IsChecked = s.PhysicalAsFloors;
         CkPaintFloors.IsChecked = s.PaintAsFloors;
+        TbBoundaryTol.Text = UiHelpers.F(s.BoundaryTolerance * 1000, "0.##");
         CkBoundary.IsChecked = s.VisibleBoundary2D;
         TbCatalog.Text = PluginContext.UserCatalogPath;
         UpdateStatus();
@@ -107,6 +108,7 @@ public partial class SettingsWindow : Window
             s.AutoCrosswalks = CkAutoCrosswalks.IsChecked == true;
             s.PhysicalAsFloors = CkFloors.IsChecked == true;
             s.PaintAsFloors = CkPaintFloors.IsChecked == true;
+            s.BoundaryTolerance = UiHelpers.Parse(TbBoundaryTol, 5, "Desvio máximo dos contornos", 0, 50) / 1000;
             s.VisibleBoundary2D = CkBoundary.IsChecked == true;
             s.UserCatalogPath = string.Equals(TbCatalog.Text, PluginPaths.DefaultUserCatalog, StringComparison.OrdinalIgnoreCase) ? null : TbCatalog.Text;
             PluginContext.SaveSettings();
