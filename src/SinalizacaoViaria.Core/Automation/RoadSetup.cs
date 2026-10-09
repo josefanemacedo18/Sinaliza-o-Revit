@@ -108,6 +108,23 @@ public sealed class ElementoSecao
     /// <summary>Linha central amarela em ciclofaixas bidirecionais.</summary>
     public bool LinhaCentral { get; set; } = true;
 
+    // ---- Ciclofaixa nas interseções e acessos
+    /// <summary>
+    /// Pintura colorida no cruzamento rodocicloviário (entre as linhas de quadrados da MCC). Falso (padrão) = só os quadrados.
+    /// </summary>
+    public bool CruzamentoColorido { get; set; }
+    /// <summary>Cor da pintura do cruzamento. Nulo = vermelha (a cor da ciclofaixa no catálogo, MBST Vol. IV).</summary>
+    public MarkingColor? CorCruzamento { get; set; }
+    /// <summary>
+    /// Comprimento (m) em que a linha de delimitação fica seccionada antes do cruzamento, onde os veículos que convertem
+    /// cruzam a ciclofaixa. Nulo = 20 m [a confirmar]; 0 = linha contínua até o cruzamento.
+    /// </summary>
+    public double? ZonaConflito { get; set; }
+
+    /// <summary>Comprimento efetivo da zona de conflito (m).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public double ZonaConflitoEfetiva => Math.Clamp(ZonaConflito ?? 20, 0, 200);
+
     // ---- Calçada
     /// <summary>Largura da sarjeta junto ao meio-fio, dentro da pista (m). 0 = sem sarjeta.</summary>
     public double Sarjeta { get; set; } = 0.30;
@@ -369,6 +386,25 @@ public sealed partial class RoadSetup
     }
 
     private double MedianHalf => TwoWay && Center == CenterTreatment.Canteiro ? MedianWidth / 2 : 0;
+
+    /// <summary>
+    /// Elementos de um lado com as distâncias ao eixo da borda interna (A) e da externa (B), como a geração os posiciona
+    /// (meio canteiro central e sarjetas somadas incluídos).
+    /// </summary>
+    public List<(ElementoSecao E, double A, double B)> Intervalos(bool left)
+    {
+        var side = left ? Left : Right;
+        var res = new List<(ElementoSecao, double, double)>();
+        double a = MedianHalf;
+        for (int i = 0; i < side.Count; i++)
+        {
+            a += AddedGutter(side, i);
+            var w = Math.Max(0.05, side[i].Largura);
+            res.Add((side[i], a, a + w));
+            a += w;
+        }
+        return res;
+    }
 
     /// <summary>Largura de um lado, do eixo (sem o canteiro central) ao alinhamento: elementos + sarjetas somadas.</summary>
     public double SideWidth(IEnumerable<ElementoSecao> side)

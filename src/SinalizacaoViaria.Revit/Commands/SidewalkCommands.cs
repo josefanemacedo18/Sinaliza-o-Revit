@@ -735,7 +735,7 @@ public sealed class CmdCulDeSac : CommandBase
         {
             var template = IntersectionService.AutoTemplate();
             template.Output = newPav.Output.Clone();
-            var rb = UiHelpers.Remembered<RoundaboutDefinition>("Rotatoria") ?? new RoundaboutDefinition();
+            var rb = UiHelpers.Remembered<RoundaboutDefinition>("Rotatoria") ?? RoundaboutDefinition.Nova();
             try
             {
                 results.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões da rua sem saída",

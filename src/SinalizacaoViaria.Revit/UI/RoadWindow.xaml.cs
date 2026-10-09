@@ -210,7 +210,10 @@ public partial class RoadWindow : Window
         CbCorCaminhada.Items.Add(new Option<MarkingColor>("Verde", MarkingColor.Verde));
         foreach (var (n, c) in new[] { ("Vermelha", MarkingColor.Vermelha), ("Azul", MarkingColor.Azul), ("Verde", MarkingColor.Verde),
                      ("Amarela", MarkingColor.Amarela), ("Laranja", MarkingColor.Laranja), ("Marrom", MarkingColor.Marrom) })
+        {
             CbCorOnibus.Items.Add(new Option<MarkingColor>(n, c));
+            CbCorCruz.Items.Add(new Option<MarkingColor>(n, c));
+        }
 
         foreach (var t in _cat.LinearesDoGrupo(GrupoMarca.Longitudinal).Where(t => t.Codigo.StartsWith("LMS") || t.Codigo.StartsWith("LCO")))
             CbDivider.Items.Add(t.Codigo);
@@ -702,7 +705,8 @@ public partial class RoadWindow : Window
             Show(true, LblAltura, TbAltura);
             Show(t == TipoElementoSecao.FaixaCaminhada, LblCorCaminhada, CbCorCaminhada, LblEsp, TbEspacamento);
             if (bus || bike) Show(true, LblEsp, TbEspacamento);
-            Show(bike, LblLarguraLinha, TbLarguraLinha, CkSeccionada, LblTraco, PanelTraco, LblSimbolo, PanelSimbolo, LblDistSeta, TbDistSeta, CkLinhaCentral);
+            Show(bike, LblLarguraLinha, TbLarguraLinha, CkSeccionada, LblTraco, PanelTraco, LblSimbolo, PanelSimbolo, LblDistSeta, TbDistSeta, CkLinhaCentral,
+                CkCruzColorido, LblCorCruz, CbCorCruz, LblZona, TbZona);
             if (parking && e.SoDelimitado) Show(true, LblLarguraLinha, TbLarguraLinha, LblTraco, PanelTraco);
             CkSoDelimitado.IsChecked = e.SoDelimitado;
 
@@ -730,6 +734,9 @@ public partial class RoadWindow : Window
             TbTamSeta.Text = UiHelpers.F(e.TamanhoSeta);
             TbDistSeta.Text = UiHelpers.F(e.DistanciaSeta);
             CkLinhaCentral.IsChecked = e.LinhaCentral;
+            CkCruzColorido.IsChecked = e.CruzamentoColorido;
+            Select(CbCorCruz, e.CorCruzamento ?? MarkingColor.Vermelha);
+            TbZona.Text = UiHelpers.F(e.ZonaConflitoEfetiva, "0.#");
             TbAltura.Text = UiHelpers.F(e.AlturaEfetiva);
             TbVegetacao.Text = e.AlturaVegetacao is { } av ? UiHelpers.F(av) : "";
         }
@@ -778,6 +785,12 @@ public partial class RoadWindow : Window
         el.TamanhoSeta = Num(TbTamSeta, el.TamanhoSeta);
         el.DistanciaSeta = Num(TbDistSeta, el.DistanciaSeta);
         el.LinhaCentral = CkLinhaCentral.IsChecked == true;
+        if (el.Tipo == TipoElementoSecao.Ciclofaixa)
+        {
+            el.CruzamentoColorido = CkCruzColorido.IsChecked == true;
+            if (CbCorCruz.SelectedItem is Option<MarkingColor> cz) el.CorCruzamento = cz.Value == MarkingColor.Vermelha && el.CorCruzamento == null ? null : cz.Value;
+            if (sender == TbZona && UiHelpers.ParseOpt(TbZona.Text) is { } zc and >= 0 and <= 200) el.ZonaConflito = Math.Abs(zc - 20) < 1e-9 && el.ZonaConflito == null ? null : zc;
+        }
         if (sender == TbAltura) _selected.AlturaTexto = TbAltura.Text;
         el.AlturaVegetacao = UiHelpers.ParseOpt(TbVegetacao.Text) is { } veg and >= -2 and <= 5 ? veg : null;
         if (sender == CkSoDelimitado) ShowDetails(_selected);

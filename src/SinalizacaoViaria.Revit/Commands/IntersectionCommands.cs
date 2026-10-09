@@ -195,6 +195,13 @@ internal static class IntersectionForms
              "Ex.: PARE também na via principal (parada em todas as aproximações) ou nenhum controle num ramo de saída.")
          .Choice("Ilha separadora (via secundária) / bolsão (via principal)", triState, () => cur().Treatment, v => cur().Treatment = v,
              "Via secundária: ilha gota (tipo II, física se a geral estiver em \"Nenhuma\"). Via principal: bolsão de conversão à esquerda (tipo IV).")
+         .Choice("Conversão livre à direita nesta esquina (tipo III)", new (string, TipoIlha?)[]
+             {
+                 (geral, null), ("Ilha triangular física", TipoIlha.Fisica), ("Zebrado de canalização (ilha pintada)", TipoIlha.Pintada), ("Nenhuma", TipoIlha.Nenhuma),
+             }, () => cur().RightTurnChannel, v => cur().RightTurnChannel = v,
+             "Faixa de conversão livre na esquina à direita de quem chega por este ramo.")
+         .Number("Raio da faixa de conversão desta esquina (m) – 0 = geral", () => cur().RightTurnRadius ?? 0,
+             v => cur().RightTurnRadius = v < 0.5 ? null : Math.Max(5, v), 0, 300)
          .Choice("Extensão de calçada nesta esquina", triState, () => cur().CurbExtension, v => cur().CurbExtension = v,
              "Avanço da calçada sobre a faixa de estacionamento na esquina à direita de quem chega por este ramo.")
          .Number("Avanço da extensão de calçada ao longo deste ramo (m) – −1 = geral, 0 = sem extensão de calçada deste lado", () => cur().CurbExtensionLength ?? -1,
@@ -581,7 +588,7 @@ public sealed class CmdRotatoria : CommandBase
         var near = nodes.OrderBy(n => n.Node.DistanceTo(center)).FirstOrDefault();
         if (near.Roads != null && near.Node.DistanceTo(center) < 8) center = near.Node;
 
-        var d = UiHelpers.Remembered<RoundaboutDefinition>("Rotatoria") ?? new RoundaboutDefinition();
+        var d = UiHelpers.Remembered<RoundaboutDefinition>("Rotatoria") ?? RoundaboutDefinition.Nova();
         d = (RoundaboutDefinition)d.CloneWithNewId();
         d.ChildIds.Clear();
         d.Center = center;

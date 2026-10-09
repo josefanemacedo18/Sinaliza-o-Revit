@@ -168,6 +168,7 @@ public sealed class IntersectionService
                     {
                         RoadId = x.RoadId, Sign = x.Sign, CornerRadius = x.CornerRadius, Crosswalk = x.Crosswalk, CrosswalkWidth = x.CrosswalkWidth,
                         CrosswalkSetback = x.CrosswalkSetback, Ramps = x.Ramps, Control = x.Control, Treatment = x.Treatment,
+                        RightTurnChannel = x.RightTurnChannel, RightTurnRadius = x.RightTurnRadius,
                     }).ToList();
                 if (template.MainRoadId != null && near != null) it.MainRoadId = template.MainRoadId;
             }
@@ -207,7 +208,8 @@ public sealed class IntersectionService
                 it.Z = roads[ids[0]].Def.Path?.Z ?? 0;
                 it.ChildIds.Clear();
                 it.RoadIds.Clear();
-                it.MainRoadId = null;
+                // Principal pedida pelo modelo (ex.: acesso aberto numa via existente) só se a via está neste nó.
+                it.MainRoadId = template.MainRoadId != null && ids.Any(i => roads[i].Def.Id == template.MainRoadId) ? template.MainRoadId : null;
                 it.Output = roads[ids[0]].Def.Output.Clone();
                 if (radiusByHierarchy) it.CornerRadius = Hierarquia.NodeRadius(ids.Select(i => roads[i].Def));
             }

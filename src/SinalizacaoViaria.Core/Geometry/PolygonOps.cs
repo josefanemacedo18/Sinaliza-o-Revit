@@ -29,9 +29,10 @@ public static class PolygonOps
     }
 
     /// <summary>Deslocamento de polígonos (positivo expande, negativo contrai).</summary>
-    public static List<Polygon2> Offset(IEnumerable<Polygon2> polys, double delta, bool round = false)
+    /// <param name="arcTolerance">Afastamento máximo (m) das cordas em relação ao arco nas juntas arredondadas. 0 = o padrão do Clipper (0,2 % do deslocamento).</param>
+    public static List<Polygon2> Offset(IEnumerable<Polygon2> polys, double delta, bool round = false, double arcTolerance = 0)
     {
-        var res = Clipper.InflatePaths(ToPaths(polys), delta, round ? JoinType.Round : JoinType.Miter, EndType.Polygon, 4.0, Precision);
+        var res = Clipper.InflatePaths(ToPaths(polys), delta, round ? JoinType.Round : JoinType.Miter, EndType.Polygon, 4.0, Precision, arcTolerance);
         return ToPolygons(res);
     }
 

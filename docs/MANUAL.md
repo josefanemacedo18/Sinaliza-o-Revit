@@ -878,6 +878,42 @@ linha contínua ou seccionada (traço/espaço), tamanho do símbolo da bicicleta
 entre eles, espaçamento das inscrições, pintura vermelha, bidirecional com linha central amarela e
 segregação física.
 
+### 15.1 Ciclofaixa presa à via (lado + afastamento) e nos cruzamentos
+
+**Presa à via.** Na ferramenta **Ciclovia / Faixa de caminhada**, marque *Prender a uma via existente* e clique sobre a via,
+do lado em que a faixa deve ficar. A ciclofaixa entra **na seção transversal** da via (não é mais um desenho à parte):
+acompanha as curvas e as mudanças de largura, e é refeita com a via, as interseções, o piso tátil, a sinalização, o
+simulador, as seções e as pranchas.
+* **Afastamento do meio-fio**: da face do meio-fio até a borda externa da ciclofaixa. O que couber nele junto ao meio-fio
+  (ex.: estacionamento de 2,20 m) fica por fora; a diferença vira **faixa de segurança zebrada** (ex.: 2,70 m = vagas +
+  0,50 m zebrado, fora da zona de abertura das portas).
+* *A faixa de rolamento vizinha cede a largura*: o meio-fio fica no lugar enquanto a faixa ficar com pelo menos 2,70 m
+  [a confirmar]; senão (ou desmarcado) a pista alarga.
+
+**Larguras variáveis.** Em *Alterar Largura por Trecho* (pista) e nos levantamentos, quem absorve a variação é a faixa de
+pista junto ao meio-fio: a **ciclofaixa, a faixa de caminhada e a faixa de segurança mantêm a largura** e acompanham o
+meio-fio. Antes, a ciclofaixa junto ao meio-fio era a que alargava.
+
+**Nas interseções e acessos** (gerado com a interseção, a partir da seção de cada via):
+* **Lado sem boca** (lado contínuo de um T, esquinas): a ciclofaixa segue **contínua** pela área do cruzamento, com a
+  linha de delimitação e o fundo – só a faixa de pedestres e a área da retenção ficam livres.
+* **Onde atravessa a pista de outra via** (boca da transversal, miolo do cruzamento): **marcação de cruzamento
+  rodocicloviário (MCC – MBST Vol. IV)**, uma linha de quadrados de 0,40 m em cada borda (0,50 m nas ciclofaixas de
+  2,20 m ou mais). **Pintura colorida** entre os quadrados é opcional, com a cor escolhida (padrão vermelho, a cor da
+  ciclofaixa no catálogo).
+* **Via que termina no nó** (haste do T): a ciclofaixa atravessa a via que segue até a ciclofaixa do outro lado dela
+  (quando existe), abrindo a linha de delimitação onde chega.
+* **Zona de conflito**: nas aproximações em que os veículos que convertem cruzam a ciclofaixa (há uma via do lado dela), a
+  linha de delimitação fica **seccionada** (1 × 1 m) do cruzamento até 20 m [a confirmar] além do fim da área do cruzamento
+  (editável; 0 = contínua). Onde não há conversão (lado sem boca) a linha segue contínua.
+* **Ciclofaixas que se cruzam** formam a interseção entre elas: os quadrados de cada uma param na borda da outra e a área
+  comum é pintada uma vez.
+* As travessias de ciclistas interrompem as linhas da via atravessada (como a faixa de pedestres).
+
+Na janela da via, selecione a ciclofaixa para ajustar *Cruzamentos: pintura colorida*, a *cor* e a *zona de conflito*. Projetos
+gravados antes leem esses campos com os padrões (sem pintura no cruzamento, vermelho, 20 m); ao regenerar uma via com
+ciclofaixa, as interseções passam a ter a MCC e o trecho seccionado.
+
 ## 16. Detalhamento (pranchas de sinalização)
 
 Todos os comandos trabalham na **vista ativa** (planta de piso/implantação ou vista de desenho). As
@@ -1360,6 +1396,28 @@ para o lado do clique), o **comprimento** e o **raio das esquinas**. O eixo sai 
 via nova é ligada por **interseção** (meio-fio, calçada e canteiro central da via existente abertos na boca). A via nova e a
 interseção são editáveis como qualquer outra.
 
+**Acessos com medidas digitadas e pré-visualização.** A janela mostra, ao vivo, o trecho da via em volta do clique com o
+acesso – a mesma geração usada ao criar – e os avisos (ex.: raio pequeno para a ilha). A via existente é sempre a principal
+da interseção criada.
+* **Retorno com faixa de acumulação e taper**: em *Abertura com bolsão*, digite a **faixa de acumulação** (m), o **taper**
+  (m) e a **largura do bolsão** (m). O bolsão é recortado do canteiro na metade de quem retorna, deixando pelo menos 0,60 m de
+  canteiro; LMS-1 na acumulação e LMS-2 no taper, na borda original do canteiro. Vazio = automático (2 veículos de
+  acumulação; taper = largura × 8 até 60 km/h ou × 15, mínimo 10 m [a confirmar]).
+* **Nova via com conversão livre à direita e ilha triangular**: a esquina de quem sai da via existente para a nova
+  (conversão à direita) recebe a faixa de conversão com o **raio** (face externa) e a **largura** digitados (mínimo 3,50 m) e a
+  ilha triangular física entre ela e o cruzamento.
+* **Nova via com bolsão de conversão à esquerda**: a via existente recebe o bolsão só no ramo de quem converte à esquerda
+  para a nova via – **faixa de acumulação**, **taper** e **largura** digitados (padrões 30 m, 20 m e 3,00 m [a confirmar]), com
+  **zebrado amarelo** no taper e a seta de conversão.
+* **Nova via saindo em curva**: a nova via sai no **ângulo** digitado e a esquina de quem sai é uma curva de **raio**
+  digitado, com **zebrado de canalização** (ilha pintada) na separação dos fluxos. A separação só existe se o raio for
+  grande o bastante para o ângulo: a pré-visualização avisa *"use pelo menos N m"* (ex.: ~78 m para 60° com faixa de 4,50 m).
+  [a confirmar com a imagem de referência, que não foi recebida.]
+
+Ajustes da esquina também na interseção: **Ajustes por esquina** ganhou *Conversão livre à direita nesta esquina* (ilha física,
+zebrado ou nenhuma) e o *raio da faixa de conversão desta esquina*. As curvas das faixas de conversão ficam a até 1 cm do raio
+pedido (antes, até 5 cm nos raios grandes).
+
 ## 20. Rotatórias
 
 **Continuidade das vias existentes (várias sinalizações ao mesmo tempo).** A rotatória recorta das vias ligadas só o
@@ -1414,10 +1472,22 @@ a **faixa de pedestres** vai de calçada a calçada atravessando também as faix
 duas pontas, os **refúgios** são recortados no nível da pista dentro das ilhas separadoras, o zebrado do "nariz" da ilha
 foi retirado (a ilha já é física) e a LFO-3 da aproximação começa junto à ilha.
 
-**Rampas das travessias da rotatória.** Ficam perpendiculares ao meio-fio e inteiras fora da curva de entrada/saída do
-ramo: se a travessia na distância pedida cairia na curva, ela é recuada até as rampas caberem (até 8 m); junto ao meio-fio
-curvo do by-pass, as rampas ficam sem abas (com aviso). A faixa de pedestres termina dentro da pista mesmo quando o meio-fio
+**Rampas das travessias da rotatória.** Ficam perpendiculares ao meio-fio. A travessia fica a **cerca de um veículo da
+entrada** (distância pedida, ≈ 5–6 m da linha "dê a preferência"): para as rampas caberem no meio-fio reto ela só se afasta até
+1,50 m [a confirmar]; se ainda assim a rampa cairia na curva de entrada/saída, ela fica **sem abas**, perpendicular ao meio-fio
+curvo, com aviso para proteger as laterais (antes a travessia era empurrada até 8 m, ficando a dois ou três veículos da entrada). A faixa de pedestres termina dentro da pista mesmo quando o meio-fio
 na ponta é curvo, e a ilha separadora que continua o canteiro da via recorta o canteiro dela (sem sobreposição).
+
+**Rotatória completa por padrão (como a referência).** Ao escolher o tipo (ou numa rotatória nova sem modelo lembrado), a
+rotatória vem com: ilha central com **faixa galgável**; **ilhas separadoras** alinhadas a cada ramo (físicas ou pintadas – linha
+de canalização e zebrado amarelo entre fluxos opostos); **linha "dê a preferência" (LDP) com o símbolo** em todas as entradas,
+acompanhando a borda do anel (reta, ela entrava no anel nas entradas largas); **faixa de pedestres** a cerca de um veículo da
+entrada; **setas IMC** no anel após cada entrada (uma por faixa); **linhas de bordo** interna e externa; **R-33** em cada entrada
+(com **R-24a** na ilha quando ela tem 12 m de raio ou mais) e **A-12** com "A … m" antes de cada entrada, à distância de
+desaceleração. Tudo continua editável; rotatórias já gravadas mantêm a sinalização que tinham. Códigos e cores conforme o
+catálogo (MBST); a posição do R-33 no suporte do R-2, junto à entrada, difere da referência americana (placa na ilha) –
+[a confirmar]. Testado com 3 a 6 ramos de larguras e ângulos diferentes (ilhas físicas e pintadas), sem falhas de modelagem.
+Num ramo com canteiro central e ilha pintada, o zebrado termina onde o canteiro da via recomeça.
 
 ### 20.1 Integração com as vias – só a rotatória, sem refazer o cruzamento
 

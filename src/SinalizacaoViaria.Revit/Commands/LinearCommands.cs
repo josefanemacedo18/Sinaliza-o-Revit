@@ -134,11 +134,24 @@ public sealed class CmdCiclovia : CommandBase
             .Number("Tamanho da seta (m)", () => s.ArrowLength, v => s.ArrowLength = v, 0.3, 4)
             .Choice("Segregação física", new[] { ("Nenhuma", (string?)null), ("Tartarugas (segregador)", "SEG-CIC"), ("Balizadores flexíveis", "BAL-FLEX"), ("Tachões", "TACHAO-SEG") },
                 () => s.Segregation, v => s.Segregation = v)
+            .Section("Presa à via e cruzamentos")
+            .Check("Prender a uma via existente: entra na seção da via clicada (lado + afastamento do meio-fio)", () => s.OnRoad, v => s.OnRoad = v,
+                tooltip: "A faixa passa a fazer parte da seção transversal: acompanha curvas e mudanças de largura e é refeita com a via, as interseções e as pranchas. Clique na via do lado em que ela deve ficar.")
+            .Number("Afastamento do meio-fio (m)", () => s.CurbOffset, v => s.CurbOffset = v, 0, 10,
+                tooltip: "Da face do meio-fio à borda externa da ciclofaixa. Estacionamento que caiba nele fica por fora; a diferença vira faixa de segurança zebrada.")
+            .Check("A faixa de rolamento vizinha cede a largura (meio-fio no lugar)", () => s.TakeLane, v => s.TakeLane = v,
+                tooltip: "Desmarcado (ou se a faixa ficar com menos de 2,70 m [a confirmar]): a pista alarga e o meio-fio se afasta.")
+            .Check("Cruzamentos: pintura colorida entre os quadrados da MCC", () => s.CrossingColor, v => s.CrossingColor = v)
+            .Choice("Cor da pintura do cruzamento", new[] { ("Vermelha", Core.Model.MarkingColor.Vermelha), ("Verde", Core.Model.MarkingColor.Verde), ("Azul", Core.Model.MarkingColor.Azul) },
+                () => s.CrossingColorValue, v => s.CrossingColorValue = v)
+            .Number("Zona de conflito antes do cruzamento – linha seccionada (m)", () => s.ConflictZone, v => s.ConflictZone = v, 0, 200,
+                tooltip: "Onde os veículos que convertem cruzam a ciclofaixa a linha de delimitação fica seccionada (padrão 20 m [a confirmar]; 0 = contínua).")
             .Modes(("Selecionar linhas existentes (eixo da faixa)", PathMode.Linhas), ("Desenhar o eixo por pontos", PathMode.Desenhar));
         if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
         s.Justify = holder.Justify;
         st.Set("ciclo:ultima", System.Text.Json.JsonSerializer.Serialize(s));
         PluginContext.SaveSettings();
+        if (s.OnRoad) return OnRoad(uidoc, s);
         EnsureDetailView(uidoc, holder.Output);
 
         s.Justify = holder.Justify;
@@ -154,6 +167,31 @@ public sealed class CmdCiclovia : CommandBase
         var defs = s.Build(path, holder.Output);
         s.Justify = justify;
         Report("Ciclovia", MarkingCreator.Commit(uidoc, defs, "SV - Ciclovia"));
+        return Result.Succeeded;
+    }
+
+    /// <summary>Ciclofaixa presa à via: entra na seção da via clicada (lado do clique + afastamento) e a via é refeita.</summary>
+    private static Result OnRoad(UIDocument uidoc, BikeLaneSetup s)
+    {
+        var pt = Picking.PickPoint(uidoc, "Ciclofaixa na via: clique sobre a via, do lado em que a faixa deve ficar");
+        if (pt == null) return Result.Cancelled;
+        var p = UnitConv.ToVec2(pt);
+        if (RoadExtensionCommand.RoadAt(uidoc, p) is not { } road)
+            throw new UserMessageException("Nenhuma via do plugin junto ao ponto clicado.");
+        var pav = road.Def;
+        var setup = RoadTemplates.FromJson(pav.SetupJson)
+                    ?? throw new UserMessageException("Esta via não guardou a seção transversal (versão anterior ou Pista): use Editar → A via inteira uma vez e depois insira a ciclofaixa.");
+        var left = road.Axis.Project(p).Signed > 0;
+        var msgs = setup.InserirCiclofaixa(left, s.ToElemento(), s.CurbOffset, s.TakeLane);
+        var results = new List<RenderResult>();
+        using (var tg = new Autodesk.Revit.DB.TransactionGroup(uidoc.Document, "SV - Ciclofaixa na via"))
+        {
+            tg.Start();
+            results.AddRange(RoadAccessCommand.Regenerate(uidoc, pav, setup));
+            tg.Assimilate();
+        }
+        ReportResults("Ciclofaixa na via", results);
+        if (msgs.Count > 0) TaskDialog.Show(AppTitle, string.Join("\n", msgs));
         return Result.Succeeded;
     }
 }

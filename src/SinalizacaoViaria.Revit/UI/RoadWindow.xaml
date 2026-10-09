@@ -123,9 +123,17 @@
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <TextBlock x:Name="LblVaga" Text="Tipo de vaga" Style="{StaticResource FieldLabel}"/>
+                            <CheckBox x:Name="CkCruzColorido" Grid.Row="24" Grid.ColumnSpan="2" Content="Cruzamentos: pintura colorida entre os quadrados da MCC"
+                                      Checked="DetailChanged" Unchecked="DetailChanged"
+                                      ToolTip="Nas interseções e acessos a ciclofaixa segue com a marcação de cruzamento rodocicloviário (MCC – MBST Vol. IV). Marque para pintar o piso entre as linhas de quadrados."/>
+                            <TextBlock x:Name="LblCorCruz" Grid.Row="25" Text="Cor da pintura do cruzamento" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="CbCorCruz" Grid.Row="25" Grid.Column="1" SelectionChanged="DetailChanged"/>
+                            <TextBlock x:Name="LblZona" Grid.Row="26" Text="Zona de conflito – linha seccionada (m)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TbZona" Grid.Row="26" Grid.Column="1" TextChanged="DetailChanged"
+                                     ToolTip="Antes de cada cruzamento em que os veículos convertem cruzando a ciclofaixa, a linha de delimitação fica seccionada neste comprimento (padrão 20 m [a confirmar]; 0 = contínua)."/>
                             <ComboBox x:Name="CbVaga" Grid.Column="1" SelectionChanged="DetailChanged"/>
                             <CheckBox x:Name="CkSoDelimitado" Grid.Row="23" Grid.ColumnSpan="2" Content="Só delimitado: linha tracejada na divisa com a pista, sem divisórias entre vagas"
                                       Checked="DetailChanged" Unchecked="DetailChanged"

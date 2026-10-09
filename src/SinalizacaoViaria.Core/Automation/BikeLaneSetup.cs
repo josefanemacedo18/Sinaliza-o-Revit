@@ -21,7 +21,7 @@ public enum LadoLinha { Direita, Esquerda, Ambos, Nenhum }
 /// Ciclofaixa, ciclovia ou faixa de caminhada completa ao longo do eixo da faixa: fundo colorido contínuo, linhas de
 /// delimitação (contínuas por padrão), linha central, símbolos e setas espaçados e segregação física opcional.
 /// </summary>
-public sealed class BikeLaneSetup
+public sealed partial class BikeLaneSetup
 {
     public TipoCiclo Type { get; set; } = TipoCiclo.CiclofaixaUnidirecional;
     public double Width { get; set; } = 1.50;
@@ -47,6 +47,19 @@ public sealed class BikeLaneSetup
     public double Speed { get; set; } = 30;
     public double StartSetback { get; set; }
     public double EndSetback { get; set; }
+
+    // ---- Presa à via (entra na seção transversal da via clicada)
+    /// <summary>Inserir na seção de uma via existente (lado + afastamento do meio-fio) em vez de desenhar um eixo próprio.</summary>
+    public bool OnRoad { get; set; }
+    /// <summary>Distância da face do meio-fio à borda externa da ciclofaixa (m).</summary>
+    public double CurbOffset { get; set; }
+    /// <summary>A faixa de rolamento vizinha cede a largura (o meio-fio fica no lugar).</summary>
+    public bool TakeLane { get; set; } = true;
+    /// <summary>Pintura colorida nos cruzamentos (entre os quadrados da MCC).</summary>
+    public bool CrossingColor { get; set; }
+    public MarkingColor CrossingColorValue { get; set; } = MarkingColor.Vermelha;
+    /// <summary>Zona de conflito antes dos cruzamentos: linha de delimitação seccionada (m) [a confirmar].</summary>
+    public double ConflictZone { get; set; } = 20;
 
     public static double DefaultWidth(TipoCiclo t) => t switch
     {

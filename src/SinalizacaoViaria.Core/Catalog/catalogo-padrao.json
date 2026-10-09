@@ -962,6 +962,26 @@
               "padrao": [0.5, 0.5]
             }
           ]
+        },
+        {
+          "nome": "Linha de quadrados 0,40 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.4,
+              "padrao": [0.4, 0.4]
+            }
+          ]
+        },
+        {
+          "nome": "Linha de quadrados 0,50 m",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.5,
+              "padrao": [0.5, 0.5]
+            }
+          ]
         }
       ]
     },

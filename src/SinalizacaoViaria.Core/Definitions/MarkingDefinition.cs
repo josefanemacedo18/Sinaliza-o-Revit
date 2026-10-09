@@ -1710,6 +1710,13 @@ public sealed class IntersectionLegSettings
     public ControleIntersecao? Control { get; set; }
     /// <summary>Ilha separadora (via secundária) ou bolsão de conversão à esquerda (via principal) neste ramo.</summary>
     public bool? Treatment { get; set; }
+    /// <summary>
+    /// Faixa de conversão livre à direita na esquina à direita de quem chega pelo ramo: ilha física (triangular), pintada
+    /// (zebrado de canalização) ou nenhuma. Nulo = a regra geral da interseção (Tipo III).
+    /// </summary>
+    public TipoIlha? RightTurnChannel { get; set; }
+    /// <summary>Raio da face externa da faixa de conversão desta esquina (m). Nulo = o geral.</summary>
+    public double? RightTurnRadius { get; set; }
     /// <summary>Orelha na esquina à direita de quem chega pelo ramo.</summary>
     public bool? CurbExtension { get; set; }
     /// <summary>Avanço da orelha desta esquina ao longo deste ramo (m).</summary>
@@ -1745,7 +1752,8 @@ public sealed class IntersectionLegSettings
                            && CurbExtensionLengthOther == null && CurbExtensionToParking == null && CurbExtensionDepth == null
                            && CurbExtensionEnds == null && CurbExtensionEndRadius == null && CurbExtensionRamp == null && CurbExtensionTactile == null
                            && OppositeExtension == null && OppositeExtensionDepth == null && OppositeExtensionBefore == null && OppositeExtensionAfter == null
-                           && OppositeExtensionEnds == null && OppositeExtensionEndRadius == null && OppositeExtensionRamp == null && OppositeExtensionTactile == null;
+                           && OppositeExtensionEnds == null && OppositeExtensionEndRadius == null && OppositeExtensionRamp == null && OppositeExtensionTactile == null
+                           && RightTurnChannel == null && RightTurnRadius == null;
 }
 
 /// <summary>Uso da linha de continuidade (LCO) na boca das vias secundárias.</summary>
@@ -2046,6 +2054,29 @@ public sealed class RoundaboutDefinition : MarkingDefinition
                 IslandRadius = 10; ApronWidth = 1.5; Lanes = 1; LaneWidth = 5.5; EntryRadius = 15; ExitRadius = 20;
                 Bypass = true; BypassWidth = 4.5; BypassRadius = 30; SplitterIslands = true; SplitterLength = 15; SplitterWidth = 2.5; break;
         }
+        SinalizacaoCompleta();
+    }
+
+    /// <summary>
+    /// Sinalização completa da rotatória: setas no anel após cada entrada, R-33 em todas as entradas (e R-24a na ilha quando
+    /// ela é grande, ≥ 12 m de raio), A-12 com "A ... m" antes de cada entrada e as linhas de bordo.
+    /// </summary>
+    public void SinalizacaoCompleta()
+    {
+        RingArrows = true;
+        AdvanceWarning = true;
+        OuterEdgeLine = true;
+        InnerEdgeLine = true;
+        DirectionSigns = IslandType != TipoIlhaCentral.Pintada && IslandRadius * Math.Max(1, Elongation) >= 12
+            ? PlacaSentidoRotatoria.Ambas : PlacaSentidoRotatoria.R33NasEntradas;
+    }
+
+    /// <summary>Rotatória nova (sem modelo lembrado): medidas padrão com a sinalização completa.</summary>
+    public static RoundaboutDefinition Nova()
+    {
+        var d = new RoundaboutDefinition();
+        d.SinalizacaoCompleta();
+        return d;
     }
     public override double? PointZ => Z;
     public override void Translate(Vec2 delta, double dz) { Center += delta; Z += dz; }

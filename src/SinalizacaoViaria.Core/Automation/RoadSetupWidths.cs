@@ -353,23 +353,31 @@ public sealed partial class RoadSetup
         var lot = sw >= 0 ? iv[sw].B : curb;
         int LastLane() { for (int j = nc - 1; j >= 0; j--) if (ElementoSecao.EhFaixaDeTrafego(iv[j].E.Tipo)) return j; return -1; }
         (double, double) Of(int j) => j < 0 ? (curb, curb) : (iv[j].A, iv[j].B);
+        // Elemento junto ao bordo que absorve a variação: ciclofaixa, faixa de caminhada e faixa de segurança ficam presas à via
+        // com a largura própria (acompanham o meio-fio) – absorve o elemento de pista mais próximo do meio-fio antes delas.
+        int Edge()
+        {
+            for (int j = nc - 1; j >= 0; j--)
+                if (iv[j].E.Tipo is not (TipoElementoSecao.Ciclofaixa or TipoElementoSecao.FaixaCaminhada or TipoElementoSecao.FaixaSeguranca)) return j;
+            return nc - 1;
+        }
         (double A0, double A1) abs;
         switch (Absorcao)
         {
-            case AbsorcaoLargura.UltimaFaixaDeTrafego: abs = Of(LastLane() >= 0 ? LastLane() : nc - 1); break;
+            case AbsorcaoLargura.UltimaFaixaDeTrafego: abs = Of(LastLane() >= 0 ? LastLane() : Edge()); break;
             case AbsorcaoLargura.TodasAsFaixas:
             {
                 var lanes = Enumerable.Range(0, nc).Where(j => ElementoSecao.EhFaixaDeTrafego(iv[j].E.Tipo)).ToList();
-                abs = lanes.Count == 0 ? Of(nc - 1) : (iv[lanes[0]].A, iv[lanes[^1]].B);
+                abs = lanes.Count == 0 ? Of(Edge()) : (iv[lanes[0]].A, iv[lanes[^1]].B);
                 break;
             }
             case AbsorcaoLargura.Estacionamento:
             {
                 var pk = Enumerable.Range(0, nc).LastOrDefault(j => iv[j].E.Tipo == TipoElementoSecao.Estacionamento, -1);
-                abs = Of(pk >= 0 ? pk : nc - 1);
+                abs = Of(pk >= 0 ? pk : Edge());
                 break;
             }
-            default: abs = Of(nc - 1); break;
+            default: abs = Of(Edge()); break;
         }
         double f0 = curb, f1 = curb;
         double gutter = 0;

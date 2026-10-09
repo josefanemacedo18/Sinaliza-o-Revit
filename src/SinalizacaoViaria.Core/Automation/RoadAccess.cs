@@ -44,6 +44,10 @@ public sealed class RetornoVia
     public TipoRetorno Tipo { get; set; } = TipoRetorno.AberturaCanteiro;
     /// <summary>Comprimento de espera do bolsão (m). Nulo = pelo veículo (2 veículos).</summary>
     public double? Espera { get; set; }
+    /// <summary>Bolsão no canteiro: comprimento do taper de entrada (m). Nulo = largura × 8 (até 60 km/h) ou × 15, mínimo 10 m [a confirmar].</summary>
+    public double? Taper { get; set; }
+    /// <summary>Bolsão no canteiro: largura da faixa de acumulação (m). Nulo = a faixa junto ao canteiro (deixando 1,00 m de canteiro).</summary>
+    public double? LarguraBolsao { get; set; }
     /// <summary>Setas, placas (R-3, R-5a, R-6a) e linhas do retorno.</summary>
     public bool Sinalizacao { get; set; } = true;
 
@@ -122,9 +126,13 @@ public sealed partial class RoadSetup
         MedianOpening? opening = null;
         var recesses = new List<RecuoVia>();
         var pocketW = 0.0;
-        if (mode == TipoRetorno.Bolsao && median && MedianWidth >= Math.Min(3.0, lane) + 1.0)
+        // Largura do bolsão no canteiro: a pedida (deixando ao menos 0,60 m de canteiro com os meios-fios) ou a da faixa.
+        var askedW = r.LarguraBolsao is { } lb ? Math.Clamp(lb, 2.5, Math.Max(2.5, MedianWidth - 0.6)) : (double?)null;
+        if (r.LarguraBolsao is { } lb0 && askedW is { } aw && Math.Abs(aw - lb0) > 0.005)
+            warn.Add($"bolsão de {lb0:0.00} m não cabe no canteiro de {MedianWidth:0.00} m – usado {aw:0.00} m");
+        if (mode == TipoRetorno.Bolsao && median && MedianWidth >= (askedW ?? Math.Min(3.0, lane)) + (askedW != null ? 0.6 : 1.0))
         {
-            pocketW = Math.Min(lane, MedianWidth - 1.0);
+            pocketW = askedW ?? Math.Min(lane, MedianWidth - 1.0);
             laneU = -half + pocketW / 2;
         }
         else if (mode == TipoRetorno.Bolsao)
@@ -176,7 +184,7 @@ public sealed partial class RoadSetup
             opening = new MedianOpening { Start = Sta(r, a), End = Sta(r, tHi), Source = r.Id };
             if (pocketW > 0)
             {
-                var taper = Math.Max(10, Math.Round(pocketW * ratio));
+                var taper = r.Taper is { } tp and > 0.5 ? tp : Math.Max(10, Math.Round(pocketW * ratio));
                 opening.PocketWidth = pocketW;
                 opening.PocketSide = r.SentidoDoEixo ? -1 : 1;
                 opening.PocketFull = Sta(r, a - wait);
@@ -298,7 +306,7 @@ public sealed partial class RoadSetup
 }
 
 /// <summary>Nova via menor saindo de um ponto de uma via existente (acesso em T).</summary>
-public static class AcessoVia
+public static partial class AcessoVia
 {
     /// <summary>
     /// Eixo da nova via: do eixo da via existente (projeção do ponto clicado) para o lado do clique, com o ângulo pedido em

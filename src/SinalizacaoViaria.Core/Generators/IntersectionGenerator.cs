@@ -118,6 +118,10 @@ public sealed class IntersectionLayout
     public bool ThroughMain { get; set; }
     /// <summary>Por via: áreas onde a sinalização pintada é removida (miolo + aproximações até a retenção).</summary>
     public Dictionary<int, List<Polygon2>> PaintCuts { get; } = new();
+    /// <summary>Por via: pista da interseção fora da própria via (bocas das outras vias e o leito delas no miolo).</summary>
+    public Dictionary<int, List<Polygon2>> Mouths { get; } = new();
+    /// <summary>Ciclofaixas no nó (calculadas uma vez, sob demanda).</summary>
+    internal CyclePlan? CyclePlanCache { get; set; }
     /// <summary>Faixas além do bordo dos lados retos (sem esquina): nada de outra via entra nelas.</summary>
     public List<Polygon2> StraightSides { get; } = new();
     /// <summary>Ramos cuja travessia sobre o canteiro ficou rebaixada porque as rampas não cabem junto à ponta do canteiro.</summary>
@@ -621,8 +625,11 @@ public static partial class IntersectionGenerator
 
     // ------------------------------------------------------------------ layout
 
-    private static List<Polygon2> Close(IEnumerable<Polygon2> p, double r) =>
-        r > 0.05 ? PolygonOps.Offset(PolygonOps.Offset(p, r, true), -r, true) : p.ToList();
+    private static List<Polygon2> Close(IEnumerable<Polygon2> p, double r, double arcTolerance = 0) =>
+        r > 0.05 ? PolygonOps.Offset(PolygonOps.Offset(p, r, true, arcTolerance), -r, true, arcTolerance) : p.ToList();
+
+    /// <summary>Tolerância das curvas das faixas de conversão (m): o meio-fio fica a até 1 cm do raio pedido.</summary>
+    private const double ChannelArcTolerance = 0.01;
 
     /// <summary>Raio máximo do nariz do canteiro central (m) – [a confirmar].</summary>
     public const double MaxNoseRadius = 1.50;
@@ -1292,8 +1299,12 @@ public static partial class IntersectionGenerator
         var radii = d.LegSettings.Where(x => x.CornerRadius != null).Select(x => Math.Max(0, x.CornerRadius!.Value)).Append(rc).ToList();
         var rMin = radii.Min();
         var rMax = radii.Max();
-        var channels = d.RightTurnIslands != TipoIlha.Nenhuma;
-        var rs = channels ? Math.Max(d.RightTurnRadius, rMax + 3) : rMax;
+        // Faixas de conversão livre (Tipo III): a regra geral ou a de cada esquina (ajuste por ramo – esquina à direita de quem chega).
+        var legChannels = d.LegSettings.Where(x => x.RightTurnChannel is TipoIlha.Fisica or TipoIlha.Pintada).ToList();
+        var channels = d.RightTurnIslands != TipoIlha.Nenhuma || legChannels.Count > 0;
+        var rsAll = legChannels.Select(x => x.RightTurnRadius ?? d.RightTurnRadius).ToList();
+        if (d.RightTurnIslands != TipoIlha.Nenhuma) rsAll.Add(d.RightTurnRadius);
+        var rs = channels ? Math.Max(rsAll.Max(), rMax + 3) : rMax;
         var maxHalf = input.Max(r => Math.Max(r.Def.TotalLeft, r.Def.TotalRight));
         foreach (var r in input) L.Roads.Add(r with { Axis = ExtendTo(r.Axis, node, maxHalf + 3) });
         L.PavementColor = L.Roads[0].Def.Color;
@@ -1439,43 +1450,56 @@ public static partial class IntersectionGenerator
             // Raio por esquina: a tangente da curva (R·cot(θ/2)) não passa do raio pedido – esquinas agudas ficam com
             // raio menor, sem estender a faixa de conversão por dezenas de metros ao longo da via.
             var sorted = legs0.Select(l => (Leg: l, A: AngleOf(l.Dir))).OrderBy(x => x.A).ToList();
-            var corners = new List<(double From, double Span, double R)>();
+            var corners = new List<(double From, double Span, double R, TipoIlha Type)>();
             for (int k = 0; k < sorted.Count && sorted.Count > 1; k++)
             {
                 var a = sorted[k].A;
                 var span = Ccw(a, sorted[(k + 1) % sorted.Count].A);
-                var ok = d.RightTurnCorners switch
+                var legSet = LegSet(d, L, sorted[k].Leg);
+                var type = legSet?.RightTurnChannel ?? d.RightTurnIslands;
+                var ok = legSet?.RightTurnChannel != null || d.RightTurnCorners switch
                 {
                     EsquinasCanalizadas.Agudas => span < 75,
                     EsquinasCanalizadas.Obtusas => span > 105,
                     _ => true,
                 };
-                if (!ok || span >= 170) continue;
-                var R = Math.Min(rs, rs * Math.Tan(span * Math.PI / 360));
-                if (R > rc + 1) corners.Add((a, span, Math.Round(R, 1)));
+                if (type == TipoIlha.Nenhuma || !ok || span >= 170) continue;
+                var rk = Math.Max(legSet?.RightTurnRadius ?? d.RightTurnRadius, rMax + 3);
+                var R = Math.Min(rk, rk * Math.Tan(span * Math.PI / 360));
+                if (R > rc + 1) corners.Add((a, span, Math.Round(R, 1), type));
             }
             var keep = new List<Polygon2>();
+            var keepType = new List<TipoIlha>();
             foreach (var grp in corners.GroupBy(c => c.R))
             {
-                var pavB = PolygonOps.Intersect(Close(U, grp.Key), clip);
+                var pavB = PolygonOps.Intersect(Close(U, grp.Key, ChannelArcTolerance), clip);
                 foreach (var lobe in PolygonOps.Difference(pavB, pavS).Where(p => p.Area > 1.0))
                 {
                     var v = lobe.Centroid - node;
                     if (v.Length > reach) continue;
                     var phi = AngleOf(v);
-                    if (grp.Any(c => Ccw(c.From, phi) <= c.Span)) keep.Add(lobe);
+                    var c = grp.Where(c => Ccw(c.From, phi) <= c.Span).Select(c => (TipoIlha?)c.Type).FirstOrDefault();
+                    if (c == null) continue;
+                    keep.Add(lobe);
+                    keepType.Add(c.Value);
                 }
             }
             if (keep.Count > 0)
             {
                 pav = PolygonOps.Union(pavS.Concat(keep));
                 var lane = Math.Max(3.5, d.RightTurnLaneWidth);
-                var core = PolygonOps.Difference(PolygonOps.Intersect(PolygonOps.Offset(pav, -lane), PolygonOps.Offset(keep, 0.05)),
-                    PolygonOps.Offset(U, 0.6));
-                var isl = Open(core, 0.6).Where(p => p.Area >= (d.RightTurnIslands == TipoIlha.Fisica ? 5.0 : 8.0)).ToList();
-                if (isl.Count == 0) L.Warnings.Add("Esquinas sem espaço para a ilha de canalização: aumente o raio da faixa de conversão ou reduza a largura da faixa.");
-                if (d.RightTurnIslands == TipoIlha.Fisica) islands.AddRange(isl);
-                else paintedIslands.AddRange(isl);
+                var inner = PolygonOps.Offset(pav, -lane);
+                var any = false;
+                foreach (var type in keepType.Distinct())
+                {
+                    var lobes = keep.Where((_, i) => keepType[i] == type).ToList();
+                    var core = PolygonOps.Difference(PolygonOps.Intersect(inner, PolygonOps.Offset(lobes, 0.05)), PolygonOps.Offset(U, 0.6));
+                    var isl = Open(core, 0.6).Where(p => p.Area >= (type == TipoIlha.Fisica ? 5.0 : 8.0)).ToList();
+                    any |= isl.Count > 0;
+                    if (type == TipoIlha.Fisica) islands.AddRange(isl);
+                    else paintedIslands.AddRange(isl);
+                }
+                if (!any) L.Warnings.Add("Esquinas sem espaço para a ilha de canalização: aumente o raio da faixa de conversão ou reduza a largura da faixa.");
             }
         }
 
@@ -1851,10 +1875,11 @@ public static partial class IntersectionGenerator
                           && d.Control != ControleIntersecao.Semaforo && !L.Features.Any(f => f.Leg.Road == i)
                           // Ramo da principal com controle próprio (PARE em todas, semáforo): as linhas param na retenção.
                           && L.Legs.Where(l => l.Road == i).All(l => LegSet(d, L, l)?.Control is null or ControleIntersecao.Nenhum);
+            var mouth = PolygonOps.Difference(PolygonOps.Intersect(pav, core0), own[i]);
+            L.Mouths[i] = mouth;
             if (through)
             {
                 L.ThroughMain = true;
-                var mouth = PolygonOps.Difference(PolygonOps.Intersect(pav, core0), own[i]);
                 // Entra na pista o bastante para cortar o bordo (inclusive com acostamento), sem chegar ao eixo.
                 var reachIn = Math.Max(0.8, 0.45 * Math.Min(r.Def.RightWidth, r.Def.LeftWidth));
                 paint.AddRange(PolygonOps.Offset(mouth, reachIn, true));
@@ -1922,8 +1947,11 @@ public static partial class IntersectionGenerator
             return phys;
         if (member is ParkingMarkingDefinition || member is LinearMarkingDefinition { Code: RoadSetup.ParkingLineCode })
             return L.ParkingCuts.GetValueOrDefault(road) ?? new();
-        if (member is DeviceMarkingDefinition) return PolygonOps.Union(phys.Concat(L.PaintCuts.GetValueOrDefault(road) ?? new()));
+        // Ciclofaixas no nó: MCC na própria ciclofaixa, travessias de ciclistas sobre as outras vias e zonas de conflito.
+        var cycle = CycleCuts(member, road, L);
+        if (member is DeviceMarkingDefinition) return PolygonOps.Union(phys.Concat(L.PaintCuts.GetValueOrDefault(road) ?? new()).Concat(cycle));
         var paint = L.PaintCuts.GetValueOrDefault(road) ?? new();
+        if (cycle.Count > 0) paint = PolygonOps.Union(paint.Concat(cycle));
         // Eixo e divisórias de faixa: miolo da principal (LCO) e aproximações (linha contínua) – MBST Vol. IV.
         if (member is LinearMarkingDefinition lin && road < L.Roads.Count && LineRuleFor(L, road, lin) is { Cut.Count: > 0 } rule)
         {
@@ -2765,6 +2793,10 @@ public static partial class IntersectionGenerator
         // principal e entra na secundária (ou vice-versa) cruza a linha (MBST Vol. IV).
         if (UseContinuityLine(d, L))
             foreach (var lco in ContinuityLines(d, L, z, roadMembers != null && L.Main < roadMembers.Count ? roadMembers[L.Main] : null)) Add(lco);
+
+        // Ciclofaixas pelo cruzamento (MBST Vol. IV – MCC): as travessias de ciclistas interrompem as linhas da interseção.
+        CutByCycleCrossings(L, res);
+        foreach (var c in CycleChildren(L, z, roadMembers)) Add(c);
 
         // Orelhas das esquinas: recortam a pintura da interseção e são recortadas pelas rampas (que ficam na borda delas).
         if (L.Ears.Count > 0)

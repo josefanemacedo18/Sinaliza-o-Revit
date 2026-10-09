@@ -143,7 +143,7 @@ public class CmdSinalizarVia : CommandBase
             template.CornerRadius = w.CornerRadius ?? template.CornerRadius;
             template.Ramps = w.Ramps;
             template.Output = w.Output.Clone();
-            var rb = UiHelpers.Remembered<RoundaboutDefinition>("Rotatoria") ?? new RoundaboutDefinition();
+            var rb = UiHelpers.Remembered<RoundaboutDefinition>("Rotatoria") ?? RoundaboutDefinition.Nova();
             var cds = UiHelpers.Remembered<CulDeSacDefinition>(nameof(CulDeSacDefinition)) ?? new CulDeSacDefinition();
             try
             {

@@ -187,7 +187,7 @@ internal static class InterchangeBuilder
             }
             foreach (var (center, radius, z) in plan.Roundabouts)
             {
-                var rt = (RoundaboutDefinition)(UiHelpers.Remembered<RoundaboutDefinition>("Rotatoria") ?? new RoundaboutDefinition()).CloneWithNewId();
+                var rt = (RoundaboutDefinition)(UiHelpers.Remembered<RoundaboutDefinition>("Rotatoria") ?? RoundaboutDefinition.Nova()).CloneWithNewId();
                 rt.Lanes = d.Type == TipoNoViario.RotatoriaElevada ? 2 : 1;
                 rt.LaneWidth = 5.0;
                 rt.SidewalkWidth = 0;

@@ -291,6 +291,9 @@ public static class RoundaboutGenerator
                     if (med > 0) { t1 = Math.Max(t1, Ray(L.Zone, c, u) + 0.3); tipW = Math.Min(med, w0); }
                     var tri = new Polygon2(new[] { c + u * t0 - n * (w0 / 2), c + u * t1 - n * (tipW / 2), c + u * t1 + n * (tipW / 2), c + u * t0 + n * (w0 / 2) });
                     sp = PolygonOps.Offset(PolygonOps.Offset(new[] { tri }, -0.25, true), 0.25, true).OrderByDescending(p => p.Area).FirstOrDefault();
+                    // Pintada num ramo com canteiro: termina onde o canteiro da via recomeça (a física emenda nele por cima).
+                    if (sp != null && med > 0 && mode == IlhaSeparadora.Pintada)
+                        sp = PolygonOps.Intersect(new[] { sp }, PolygonOps.Offset(new[] { L.Zone }, -0.10)).OrderByDescending(p => p.Area).FirstOrDefault();
                 }
                 else L.Warnings.Add($"Ramo a {leg.AngleDeg:0}°: pista estreita para ilha separadora (mínimo ~7 m).");
             }
@@ -436,6 +439,9 @@ public static class RoundaboutGenerator
     /// Estaca da travessia (a partir de <paramref name="t0"/>, até 8 m além) em que as duas rampas ficam inteiras fora da
     /// pista, perpendiculares ao meio-fio; se com abas não couber (meio-fio curvo do by-pass), rampas sem abas.
     /// </summary>
+    /// <summary>Quanto a travessia pode se afastar da posição pedida para as rampas caberem no meio-fio reto (m) [a confirmar].</summary>
+    public const double MaxCrosswalkShift = 1.5;
+
     private static (double T, TipoRampa Type, (Vec2, Vec2)? Hi, (Vec2, Vec2)? Lo, bool Ok) FitRamps(RoundaboutDefinition d, RoundaboutLegGeometry g, Vec2 c,
         IReadOnlyList<Polygon2> full, double t0)
     {
@@ -445,7 +451,9 @@ public static class RoundaboutGenerator
             var rp = RampOf(d, type);
             var (_, len, _) = RampGenerator.Dimensions(rp);
             var ext = IntersectionGenerator.RampHalfExtent(rp);
-            for (var t = t0; t < t0 + 8; t += 0.25)
+            // A travessia fica a cerca de um veículo da entrada: as rampas só a afastam até MaxCrosswalkShift; além disso
+            // ficam sem abas, perpendiculares ao meio-fio curvo, na posição pedida (com aviso).
+            for (var t = t0; t <= t0 + MaxCrosswalkShift + 1e-9; t += 0.25)
             {
                 var hi = RampFrame(full, g, c, t, 1);
                 var lo = RampFrame(full, g, c, t, -1);
@@ -850,15 +858,18 @@ public static class RoundaboutGenerator
                 var o1 = Math.Min(hw - 0.3, 0.8 * rou);
                 if (o1 < o0 + 1) o1 = o0 + 1;
                 double T(double o) => L.ToOuter(c + g.Left * o, g.Dir) + 0.4;
+                // A linha acompanha a borda do anel (reta entre as pontas, ela entrava no anel nas entradas largas).
+                var nEdge = Math.Max(1, (int)Math.Ceiling((o1 - o0) / 0.5));
+                var edgePts = Enumerable.Range(0, nEdge + 1).Select(i => o1 - (o1 - o0) * i / nEdge).Select(o => g.At(c, T(o), o)).ToList();
                 if (control == ControleRamo.Pare)
                 {
                     // Parada obrigatória: linha de retenção + legenda PARE (≥ 1,60 m antes) + R-1.
-                    Add(new LinearMarkingDefinition { Code = "LRE", Variant = "0,40 m", PathRef = PathReference.FromPoints(new[] { g.At(c, T(o1), o1), g.At(c, T(o0), o0) }, z) });
+                    Add(new LinearMarkingDefinition { Code = "LRE", Variant = "0,40 m", PathRef = PathReference.FromPoints(edgePts, z) });
                     Add(new TextMarkingDefinition { Text = "PARE", Height = DesignRules.LegendHeight(v), Position = g.At(c, rou + 2.4 + DesignRules.LegendHeight(v) / 2, (o0 + o1) / 2), Direction = -g.Dir, Z = z });
                 }
                 else
                 {
-                    Add(new LinearMarkingDefinition { Code = "LDP", Variant = "0,40 m (0,60 × 0,60 m)", PathRef = PathReference.FromPoints(new[] { g.At(c, T(o1), o1), g.At(c, T(o0), o0) }, z) });
+                    Add(new LinearMarkingDefinition { Code = "LDP", Variant = "0,40 m (0,60 × 0,60 m)", PathRef = PathReference.FromPoints(edgePts, z) });
                     var sym = DesignRules.YieldSymbolLength(v);
                     Add(new SymbolMarkingDefinition { Code = "SDP", Length = sym, Position = g.At(c, rou + 1.6 + sym / 2, (o0 + o1) / 2), Direction = -g.Dir, Z = z });
                 }

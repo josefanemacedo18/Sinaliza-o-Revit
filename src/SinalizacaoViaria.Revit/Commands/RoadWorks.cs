@@ -187,7 +187,7 @@ internal static class RoadWorks
     /// já com o greide. Devolve o pavimento (nulo se falhar).
     /// </summary>
     public static (RoadPavementDefinition? Pavement, List<RenderResult> Results) CreateRoad(UIDocument uidoc, RoadSetup setup, PathReference path, RoadGrade? grade,
-        bool connect = true, string name = "Via")
+        bool connect = true, string name = "Via", IntersectionDefinition? intersectionTemplate = null)
     {
         var output = PluginContext.Settings.NewOutput();
         output.Mode = OutputMode.Modelo3D;
@@ -203,7 +203,7 @@ internal static class RoadWorks
         {
             try
             {
-                var template = IntersectionService.AutoTemplate();
+                var template = intersectionTemplate ?? IntersectionService.AutoTemplate();
                 results.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões da via", sv =>
                     sv.Connect(pav, TipoConexao.Intersecao, FimLivre.Nenhum, template, new RoundaboutDefinition(), new CulDeSacDefinition(), radiusByHierarchy: true)));
             }
