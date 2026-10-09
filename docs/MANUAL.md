@@ -990,15 +990,21 @@ automaticamente. A interseção:
 
 * torna o pavimento contínuo no miolo e arredonda as **esquinas** com o **raio** informado (na face do
   meio-fio), com **meio-fio curvo** – qualquer raio a partir de 0,5 m gera a curva inteira (a área refeita
-  acompanha cada ramo até o fim da curva, sem cortar o asfalto da esquina);
+  acompanha cada ramo até o fim da curva, sem cortar o asfalto da esquina). Em **esquina aguda** (< 90°) o raio é
+  reduzido para R·tan(θ/2) – a curva não avança mais que o raio pedido ao longo das vias (com o raio cheio, a 30° a
+  curva avançaria 3,7 R e o asfalto engoliria a esquina) – e o relatório avisa (*Esquina aguda (30°): raio reduzido de
+  6,0 m para 1,61 m*);
 * refaz as **calçadas** junto à esquina – **contornando a curva** com a largura da calçada – e as **pontas
-  dos canteiros centrais** (nariz com meio-fio,
-  terminando 1 m antes da pista transversal; a travessia corta o canteiro formando **refúgio** no nível da
-  pista);
+  dos canteiros centrais** (nariz arredondado com meio-fio, terminando 1 m antes da pista transversal – § 19.1.5);
+  a travessia atravessa o canteiro por **rampas com patamar** (canteiro largo) ou por uma **passagem rebaixada** no
+  nível da pista com piso tátil de alerta (canteiro estreito);
 * interrompe a sinalização horizontal das vias no cruzamento e na aproximação (até depois da linha de
   retenção) e remove as **vagas a 5 m da esquina**; os demais trechos das vias ficam intactos, qualquer
   que seja o ângulo;
-* cria em cada ramo **faixa de pedestres** e **rebaixamentos de calçada** nas duas pontas da travessia.
+* cria em cada ramo **faixa de pedestres** e **rebaixamentos de calçada** nas duas pontas da travessia. A borda da
+  faixa junto à esquina fica no **fim da curva** do meio-fio (ponto de tangência), com a rampa no meio-fio reto; o
+  campo **Recuo da faixa** (padrão **0**) soma um afastamento a partir desse ponto. Um recuo maior só acontece quando a
+  rampa ou a orelha exige, e sempre com aviso. Projetos salvos guardam o recuo que tinham (o padrão antigo era 1 m).
 
 Funciona para **qualquer geometria**: cruzamentos ortogonais ou oblíquos, entroncamentos em **T** e em
 **Y**, vias curvas e nós com vários ramos. Em ângulos agudos as esquinas continuam arredondadas.
@@ -1148,6 +1154,32 @@ dela são recortados; as vagas depois da orelha encostam nela (a sobra fica na o
 interseção: **refeitas sempre que ela é atualizada/editada**; **Editar** sobre uma delas abre os ajustes daquela esquina e
 as medidas gerais das orelhas.
 
+### 19.1.5 Canteiro central: nariz, canteiro contínuo e travessia sobre o canteiro
+
+Bloco **Canteiro central** da janela da interseção:
+
+* **Nariz arredondado.** O canteiro termina 1 m antes da pista da outra via com a ponta arredondada: raio = metade da
+  largura do canteiro (semicírculo) até **1,50 m** – em canteiros mais largos os dois cantos são arredondados com 1,50 m
+  e a frente fica reta (valor de projeto [a confirmar] na norma). Se a ponta é estreita (bolsão de conversão recortado
+  do canteiro), o raio cai até caber, sem apagar a ponta. Os cantos junto às travessias e aos bolsões continuam retos.
+* **Abertura só onde precisa.** Uma via sem canteiro que encontra uma via com canteiro abre o canteiro **só na boca dela**
+  (pista da outra via + 1 m de cada lado); a outra via não é alargada nem deformada.
+* **Canteiro contínuo** (opção, desligada por padrão): o canteiro não abre para as vias sem canteiro – só conversões à
+  direita (entra e sai pela direita). A via sem canteiro termina no meio-fio do canteiro.
+* **Travessia sobre o canteiro** (vale para todas as travessias da interseção):
+
+| Opção | O que é gerado |
+|---|---|
+| **Automática** (padrão) | rampas e patamar quando o canteiro comporta (largura ≥ 2 × comprimento da rampa + 1,20 m de patamar – 4,80 m com meio-fio de 15 cm a 8,33 %); senão, passagem rebaixada |
+| **Passagem rebaixada no nível da pista** | o canteiro é cortado na largura da faixa (refúgio no nível da pista) e recebe **faixa de piso tátil de alerta** (2 placas de 0,25 m) junto às duas bordas, em toda a largura da faixa |
+| **Rampas dos dois lados e patamar** | o canteiro fica; uma rampa (8,33 %, abas de 10 %, piso tátil de alerta) sobe em cada face e as duas se encontram no meio – o patamar é o que sobra (metade do canteiro − rampa); o meio-fio e a grama do canteiro saem sob as rampas e a pintura da faixa não passa sobre o canteiro |
+
+Avisos: **canteiro mais estreito que 1,20 m** (largura mínima do refúgio usada pelo plugin – NBR 9050, item [a confirmar]):
+o pedestre não tem onde esperar; **rampas pedidas que não cabem** (canteiro estreito): fica a passagem rebaixada; **rampas
+junto à ponta do canteiro** (esquina aguda, a abertura oblíqua passa perto da travessia): a travessia daquele ramo fica
+rebaixada – as rampas e as abas precisam ficar inteiras sobre o canteiro. Projetos salvos passam a ter a travessia
+automática (com piso tátil) quando a interseção é atualizada.
+
 ### 19.2 Tipos de interseção (MBST / DNIT)
 
 Os tipos podem ser combinados na mesma interseção:
@@ -1190,6 +1222,32 @@ sem falhas, com larguras, ângulos e seções diferentes (local × arterial, com
 Critérios conferidos nos testes automáticos: pavimento contínuo sem furos nem sobreposição, meio-fio e calçada fechando nas
 esquinas, nenhum piso menor que 0,01 m² nem com autointerseção, pintura dentro da pista.
 
+### 19.2.2 Interseções em qualquer combinação (matriz de testes)
+
+Os testes automáticos geram **252 interseções**: seções {mão única de 1 faixa, local, coletora, avenida com canteiro
+central de 3 m, avenida com canteiro de 8 m} combinadas em 7 pares (com e sem canteiro, larguras diferentes) × ângulos de
+**30° a 150°** (a cada 15°) × **cruz, T, Y e 5 ramos**. Em cada uma são conferidos:
+
+* nenhuma falha de modelagem: furos, sobreposições, pisos < 0,01 m², bordo da pista sem meio-fio, sarjeta solta, pintura
+  fora da pista e **vãos entre pisos**;
+* nenhum piso de pista, calçada ou canteiro com ângulo interno < 15° (pontas) – as sarjetas, faixas estreitas junto ao
+  meio-fio, não entram nessa conta;
+* **raio medido** = pedido (ou o reduzido da esquina aguda, com aviso) ± 2 cm;
+* borda da faixa de pedestres a até **0,30 m do fim da curva**, ou recuo maior com aviso; nunca dentro da curva;
+* canteiro sem sobreposição com a pista, as rampas e a pintura da faixa; todo canteiro atravessado com rampas (com piso
+  tátil) ou passagem rebaixada com faixa de alerta.
+
+**Casos que ainda não fecham** (conferidos para não piorar):
+
+* **Y com tronco de mão única estreito e ramo de avenida com canteiro a 30° e 45°**: a ponta reta da pista larga (fim do
+  eixo no nó) sai além do bordo do ramo estreito e sobra um trecho de bordo sem meio-fio (≈ 3 m) e, a 45°, uma sarjeta
+  solta de 0,14 m².
+* **Pontas < 15° na calçada** em 29 combinações (37 pisos): esquinas muito agudas (30°/150°) com canteiro largo, e
+  ramos de mão única (T e Y) – a calçada da esquina encontra a calçada reta da via num ângulo fechado.
+* **Raio fora de ± 2 cm** em 39 combinações (40 esquinas): Y (transição de largura em S entre o tronco e os ramos), 5 ramos
+  e mão única (esquina entre bordos de vias diferentes) e T coletora × canteiro a 30°/150°. A esquina continua
+  arredondada; o que muda é que a curva não é um arco único com o raio pedido.
+
 ### 19.3 Atualização
 
 Tudo é regenerado quando um eixo é movido, ao editar a interseção (**Editar**) e com **Atualizar Todas**.
@@ -1197,7 +1255,7 @@ Travessias, retenções, placas, zebrados e linhas deslocadas da interseção s�
 (ajustes manuais neles são perdidos). A ferramenta **Interseção** com *Todos os cruzamentos* aplica os
 tipos e o controle escolhidos a todas as interseções do projeto.
 
-### 19.4 Abrir acesso numa via existente (retorno em U ou nova via em T)
+### 19.4 Abrir acesso numa via existente (retorno em U, nova via em T ou travessia no canteiro)
 
 **Conexões → Trocar Conexão → "Abrir acesso numa via"**: clique na via, no ponto do acesso, do lado de quem vai retornar (ou
 do lado da nova via). Tudo é feito numa **só operação** (um *Desfazer* volta tudo).
@@ -1225,6 +1283,15 @@ contramão ao cruzar), **R-5a** para o sentido oposto (o giro foi dimensionado p
 bolsões; as linhas junto ao canteiro são interrompidas no vão. O retorno fica gravado **na seção da via**: **Editar** sobre a
 via (opção *Retornos em U desta via*), sobre a seta ou as placas do retorno altera a estaca, a forma, o veículo, os raios ou
 remove o retorno – a via é refeita com ele.
+
+**Travessia de pedestres sobre o canteiro** (meio da quadra; a via precisa ter canteiro central físico): a faixa de
+pedestres cruza a via na estaca clicada. Escolha o **tipo** (automática / passagem rebaixada / rampas e patamar – as mesmas
+regras do § 19.1.5), a **largura da faixa** e se a **faixa é pintada** de bordo a bordo (desmarque se ela já foi desenhada).
+O canteiro abre com **pontas retas** na largura da faixa (passagem rebaixada, com faixa de alerta junto às duas bordas) ou na
+largura das rampas com as abas (as rampas e o patamar ocupam a abertura de face a face); os elementos do canteiro são
+interrompidos nesse trecho e refeitos com meio-fio contínuo. As linhas pintadas da via são interrompidas na faixa e as vagas
+a 5 m de cada lado dela (distância [a confirmar]). As **rampas das calçadas** nas duas pontas são feitas com a ferramenta
+**Rampa**. A travessia fica gravada na seção da via e é refeita com ela.
 
 **Nova via menor (T)**: escolha a **seção** (modelo de via), o **ângulo** com a via existente (90° = perpendicular, medido
 para o lado do clique), o **comprimento** e o **raio das esquinas**. O eixo sai do eixo da via existente no ponto clicado e a

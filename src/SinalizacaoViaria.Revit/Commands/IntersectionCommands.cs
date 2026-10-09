@@ -107,7 +107,7 @@ internal static class IntersectionForms
          .Check("Linhas de retenção / dê a preferência", () => d.StopLines, v => d.StopLines = v)
          .Check("Faixas de pedestres em cada ramo", () => d.Crosswalks, v => d.Crosswalks = v)
          .Number("Largura da faixa de pedestres (m)", () => d.CrosswalkWidth, v => d.CrosswalkWidth = v, 3, 10)
-         .Number("Recuo da faixa em relação à esquina (m)", () => d.CrosswalkSetback, v => d.CrosswalkSetback = v, 0, 20)
+         .Number("Recuo da faixa a partir do fim da curva (m)", () => d.CrosswalkSetback, v => d.CrosswalkSetback = v, 0, 20)
          .Check("Esquinas com a mesma composição das calçadas das vias (meio-fio + faixa gramada + passeio)", () => d.MatchRoadSection, v => d.MatchRoadSection = v,
              "Repete nas esquinas a faixa de serviço gramada definida na seção das vias que se cruzam, alinhando o desenho com as vias.");
 
@@ -142,6 +142,14 @@ internal static class IntersectionForms
          .Number("Comprimento de armazenamento (m)", () => d.PocketLength, v => d.PocketLength = v, 5, 120)
          .Number("Comprimento do teiper (m)", () => d.PocketTaper, v => d.PocketTaper = v, 5, 80)
          .Number("Largura do bolsão (m)", () => d.PocketWidth, v => d.PocketWidth = v, 2.5, 5);
+        w.Section("Canteiro central", "Nariz arredondado junto à outra via. A travessia de pedestres sobre o canteiro tem sempre piso tátil de alerta.")
+         .Check("Canteiro contínuo (não abre para as vias sem canteiro – só conversões à direita)", () => d.MedianContinuous, v => d.MedianContinuous = v)
+         .Choice("Travessia sobre o canteiro", new[]
+             {
+                 ("Automática (rampas e patamar se o canteiro comportar, senão no nível da pista)", SinalizacaoViaria.Core.Automation.TipoTravessiaCanteiro.Automatica),
+                 ("Passagem rebaixada no nível da pista", SinalizacaoViaria.Core.Automation.TipoTravessiaCanteiro.NivelDaPista),
+                 ("Rampas dos dois lados e patamar", SinalizacaoViaria.Core.Automation.TipoTravessiaCanteiro.Rampas),
+             }, () => d.MedianCrossing, v => d.MedianCrossing = v);
         if (real == null)
             w.Section("Pré-visualização")
              .Choice("Exemplo", new[] { ("Cruzamento ortogonal", 0), ("Entroncamento em T", 1), ("Cruzamento oblíquo (60°)", 2), ("Entroncamento em Y (45°)", 3) },
@@ -174,7 +182,7 @@ internal static class IntersectionForms
              tooltip: "Face do meio-fio. Só esta esquina muda; as demais seguem o raio geral.")
          .Choice("Faixa de pedestres neste ramo", triState, () => cur().Crosswalk, v => cur().Crosswalk = v)
          .Number("Largura da faixa (m) – 0 = geral", () => cur().CrosswalkWidth ?? 0, v => cur().CrosswalkWidth = v < 0.05 ? null : Math.Max(2.0, v), 0, 12)
-         .Number("Recuo da faixa em relação à esquina (m) – −1 = geral", () => cur().CrosswalkSetback ?? -1, v => cur().CrosswalkSetback = v < -0.5 ? null : Math.Max(0, v), -1, 20)
+         .Number("Recuo da faixa a partir do fim da curva (m) – −1 = geral", () => cur().CrosswalkSetback ?? -1, v => cur().CrosswalkSetback = v < -0.5 ? null : Math.Max(0, v), -1, 20)
          .Choice("Rampas nesta travessia", triState, () => cur().Ramps, v => cur().Ramps = v)
          .Choice("Controle desta aproximação", new (string, ControleIntersecao?)[]
              {

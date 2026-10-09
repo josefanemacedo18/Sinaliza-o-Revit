@@ -524,6 +524,8 @@ public sealed partial class RoadSetup
                 case RecessMarkingDefinition rc: rc.Reverse = rc.Left && TwoWay; d.SetPath(Clone(path)); break;
                 case SymbolMarkingDefinition sm: sm.Z = path.Z; break;
                 case LinearMarkingDefinition { PathRef.Points.Count: >= 2 }: break;
+                case TactileRouteDefinition { PathRef.Points.Count: >= 2 }: break;
+                case RampDefinition { PathRef.Points.Count: >= 2 }: break;
                 default: d.SetPath(Clone(path)); break;
             }
             res.Add(d);
@@ -532,6 +534,8 @@ public sealed partial class RoadSetup
         ApplyVariation(res, axis, new Dictionary<MarkingDefinition, (int, double, double)>(), AddVar);
         // Retornos em U: abertura do canteiro, vagas e linhas interrompidas e a sinalização.
         ApplyRetornos(res, pavement, retornos, axis ?? (path.Points.Count >= 2 ? new Polyline2(path.Points) : null), AddVar);
+        // Travessias de pedestres sobre o canteiro (meio da quadra): passagem rebaixada ou rampas, piso tátil e faixa.
+        ApplyTravessias(res, pavement, axis ?? (path.Points.Count >= 2 ? new Polyline2(path.Points) : null), path.Z, AddVar);
         Recuos.RemoveAll(derived.Contains);
         return res;
 
@@ -552,7 +556,11 @@ public sealed partial class RoadSetup
             {
                 var e = side[i];
                 // Sarjeta somada: a pista cresce até a face do meio-fio e a faixa mantém a largura útil.
-                a += AddedGutter(side, i);
+                var added = AddedGutter(side, i);
+                a += added;
+                // Lado que começa direto na calçada (mão única de 1 faixa, lado sem faixas): a sarjeta somada não tinha peça –
+                // sobrava uma tira de 0,30 m sem pista nem sarjeta entre o eixo e o meio-fio.
+                if (i == 0 && added > 0.01) Physical("SARJETA", sigma * (a - added / 2), added);
                 var w = Math.Max(0.05, e.Largura);
                 var b = a + w;
                 var c = (a + b) / 2;
@@ -799,6 +807,7 @@ public sealed partial class RoadSetup
         c.LargurasVariaveis = LargurasVariaveis.Select(p => p.Clone()).ToList();
         c.Recuos = Recuos.Select(r => r.Clone()).ToList();
         c.Retornos = Retornos.Select(r => r.Clone()).ToList();
+        c.TravessiasCanteiro = TravessiasCanteiro.Select(t => t.Clone()).ToList();
         return c;
     }
 }

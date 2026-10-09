@@ -118,6 +118,10 @@ public sealed class IntersectionLayout
     public bool ThroughMain { get; set; }
     /// <summary>Por via: áreas onde a sinalização pintada é removida (miolo + aproximações até a retenção).</summary>
     public Dictionary<int, List<Polygon2>> PaintCuts { get; } = new();
+    /// <summary>Faixas além do bordo dos lados retos (sem esquina): nada de outra via entra nelas.</summary>
+    public List<Polygon2> StraightSides { get; } = new();
+    /// <summary>Ramos cuja travessia sobre o canteiro ficou rebaixada porque as rampas não cabem junto à ponta do canteiro.</summary>
+    public HashSet<(int Road, int Sign)> MedianRampsBlocked { get; } = new();
     /// <summary>Por via: áreas onde as vagas são removidas (pintura + 5 m antes da esquina, CTB art. 181).</summary>
     public Dictionary<int, List<Polygon2>> ParkingCuts { get; } = new();
     /// <summary>Por via: áreas onde os elementos físicos (pavimento, meio-fio, calçada, canteiro) são refeitos pela interseção.</summary>
@@ -125,6 +129,11 @@ public sealed class IntersectionLayout
     public List<string> Warnings { get; } = new();
     /// <summary>Rampas planejadas de cada travessia (via, sentido do ramo) – medidas da interseção já ajustadas.</summary>
     public Dictionary<(int Road, int Sign), RampPlan> RampPlans { get; } = new();
+    /// <summary>
+    /// Por ramo (via, sentido): distância do nó ao fim da curva da esquina (ponto de tangência do meio-fio com o trecho
+    /// reto), o maior dos dois lados. A faixa de pedestres começa nele.
+    /// </summary>
+    public Dictionary<(int Road, int Sign), double> TangentT { get; } = new();
     /// <summary>Orelhas (avanços de calçada) das esquinas geradas com a interseção.</summary>
     public List<EarPlan> Ears { get; } = new();
     /// <summary>Trecho de cada lado de ramo (via, sentido, +1 alto / −1 baixo) coberto por orelha.</summary>
@@ -615,6 +624,40 @@ public static partial class IntersectionGenerator
     private static List<Polygon2> Close(IEnumerable<Polygon2> p, double r) =>
         r > 0.05 ? PolygonOps.Offset(PolygonOps.Offset(p, r, true), -r, true) : p.ToList();
 
+    /// <summary>Raio máximo do nariz do canteiro central (m) – [a confirmar].</summary>
+    public const double MaxNoseRadius = 1.50;
+
+    /// <summary>
+    /// Nariz do canteiro central arredondado: os cantos da ponta junto à outra via (<paramref name="ends"/>) com raio de até
+    /// metade da largura (semicírculo no canteiro estreito), limitado a <paramref name="rMax"/>. O raio cai (até 0,35 m) se a
+    /// ponta é estreita (bolsão) e o arredondamento a apagaria; os outros cantos (travessias, bolsões) ficam como estão.
+    /// </summary>
+    internal static List<Polygon2> RoundNoses(List<Polygon2> med, List<Polygon2> ends, double rMax)
+    {
+        if (ends.Count == 0 || rMax <= 0.35) return med;
+        var touch = PolygonOps.Offset(ends, 0.05);
+        static double Area(List<Polygon2> a) => a.Sum(x => x.Area);
+        var res = new List<Polygon2>();
+        foreach (var p in med)
+        {
+            var one = new List<Polygon2> { p };
+            if (Area(PolygonOps.Intersect(one, touch)) < 1e-4) { res.Add(p); continue; }
+            List<Polygon2>? done = null;
+            for (var r = rMax; r > 0.35 && done == null; r *= 0.8)
+            {
+                // Só os cantos de verdade (as lascas numéricas do abre/fecha ao longo dos lados retos ficam).
+                var loss = PolygonOps.Difference(one, Open(one, r)).Where(x => x.Area > 1e-3 && Area(PolygonOps.Intersect(new[] { x }, touch)) > 1e-5).ToList();
+                if (loss.Count == 0) { done = one; break; }
+                // Abre 2 cm: sem agulhas de área nula onde dois cantos tirados se tocam.
+                var q = Open(PolygonOps.Difference(one, loss), 0.02).Where(x => x.Area > 1e-3).ToList();
+                // A ponta continua junto à outra via (o nariz não recua) e o canteiro não se divide.
+                if (q.Count == 1 && Area(PolygonOps.Intersect(PolygonOps.Offset(q, 0.06), ends)) > 1e-4) done = q;
+            }
+            res.AddRange(done ?? one);
+        }
+        return res;
+    }
+
     private static List<Polygon2> Open(IEnumerable<Polygon2> p, double r) =>
         r > 0.01 ? PolygonOps.Offset(PolygonOps.Offset(p, -r, true), r, true) : p.ToList();
 
@@ -654,8 +697,13 @@ public static partial class IntersectionGenerator
             {
                 var avail = sign > 0 ? r.Axis.Length - sn : sn;
                 if (avail < 3) continue;
+                // O ramo fica livre depois do ÚLTIMO corte transversal que ainda toca as outras vias (e as esquinas): num
+                // cruzamento oblíquo o corte junto ao nó cai inteiro dentro da própria pista (a outra via passa por dentro
+                // dela) e parecia livre logo em t = 0 – a travessia ia parar dentro da outra via.
                 double clear = -1;
-                for (var t = 0.0; t <= Math.Min(avail, reach); t += 0.25)
+                var lastHit = -1.0;
+                var tMax = Math.Min(avail, reach);
+                for (var t = 0.0; t <= tMax; t += 0.25)
                 {
                     var s = sn + sign * t;
                     var p = r.Axis.PointAt(s);
@@ -668,8 +716,10 @@ public static partial class IntersectionGenerator
                         if (Math.Max(a.X, b.X) < mn.X || Math.Min(a.X, b.X) > mx.X || Math.Max(a.Y, b.Y) < mn.Y || Math.Min(a.Y, b.Y) > mx.Y) return false;
                         return DetailGenerator.SegmentIntervals(o, a, b).Sum(iv => iv.T1 - iv.T0) * a.DistanceTo(b) > 0.02;
                     });
-                    if (!hit) { clear = t; break; }
+                    if (hit) lastHit = t;
                 }
+                if (lastHit < 0) clear = 0;
+                else if (lastHit + 0.25 <= tMax) clear = lastHit + 0.25;
                 if (clear < 0)
                 {
                     if (warn) L.Warnings.Add("Um dos ramos é curto demais para a esquina – confira o raio.");
@@ -690,7 +740,7 @@ public static partial class IntersectionGenerator
 
     /// <summary>Distância livre das travessias/retenção a partir do fim da esquina.</summary>
     private static double StopFar(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
-        CrosswalkOn(d, L, leg) ? SetbackOf(d, L, leg) + CrosswalkWidthOf(d, L, leg) + (d.StopLines ? 1.6 + 0.4 : 0) + 0.3 : (d.StopLines ? 1.5 : 0.3);
+        CrosswalkOn(d, L, leg) ? TangentGap(L, leg) + SetbackOf(d, L, leg) + CrosswalkWidthOf(d, L, leg) + (d.StopLines ? 1.6 + 0.4 : 0) + 0.3 : (d.StopLines ? 1.5 : 0.3);
 
     // ------------------------------------------------------------------ ajustes por ramo e rampas das travessias
 
@@ -762,9 +812,52 @@ public static partial class IntersectionGenerator
     public static double SetbackOf(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
         Math.Max(0, LegSet(d, L, leg)?.CrosswalkSetback ?? d.CrosswalkSetback) + RampPlanOf(d, L, leg).Shift;
 
+    /// <summary>
+    /// Do ponto livre do ramo (<see cref="IntersectionLeg.Clear"/>) ao fim da curva da esquina: o recuo da faixa é medido a
+    /// partir do ponto de tangência – a faixa fica toda no trecho reto do meio-fio, o mais perto possível da esquina.
+    /// </summary>
+    public static double TangentGap(IntersectionLayout L, IntersectionLeg leg) =>
+        L.TangentT.TryGetValue((leg.Road, leg.Sign), out var t) ? Math.Max(0, t - leg.Clear) : 0;
+
     /// <summary>Distância do nó ao eixo da faixa de pedestres do ramo.</summary>
     public static double CrosswalkT(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
-        leg.Clear + SetbackOf(d, L, leg) + CrosswalkWidthOf(d, L, leg) / 2;
+        leg.Clear + TangentGap(L, leg) + SetbackOf(d, L, leg) + CrosswalkWidthOf(d, L, leg) / 2;
+
+    /// <summary>Distância do nó à borda da faixa de pedestres junto à esquina (fim da curva + recuo).</summary>
+    public static double CrosswalkNearT(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
+        leg.Clear + TangentGap(L, leg) + SetbackOf(d, L, leg);
+
+    /// <summary>Canteiro central atravessado pela faixa do ramo: faces (referencial do ramo), tipo da travessia e rampa-modelo.</summary>
+    public sealed record MedianPass(double Lo, double Hi, Automation.TipoTravessiaCanteiro Mode, RampDefinition Template)
+    {
+        public double Width => Hi - Lo;
+    }
+
+    /// <summary>
+    /// Canteiros centrais que a faixa de pedestres do ramo atravessa (os laterais terminam antes da travessia). Rampas e
+    /// patamar quando o canteiro comporta (e a interseção tem rampas); senão, passagem rebaixada no nível da pista.
+    /// </summary>
+    public static List<MedianPass> MedianPassesOf(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg)
+    {
+        var res = new List<MedianPass>();
+        if (leg.Road >= L.Roads.Count || !CrosswalkOn(d, L, leg)) return res;
+        var r = L.Roads[leg.Road].Def;
+        var tpl = RampTemplate(d, r, CrosswalkWidthOf(d, L, leg));
+        // Rampas do canteiro: com abas (o rebaixamento total é da calçada), na altura do meio-fio do canteiro.
+        tpl.Type = tpl.Type == TipoRampa.RebaixamentoSemAbas ? TipoRampa.RebaixamentoSemAbas : TipoRampa.RebaixamentoComAbas;
+        tpl.Height = Math.Clamp(L.CurbHeight, 0.02, 0.40);
+        tpl.CutSidewalk = false;
+        var ramps = RampsOn(d, L, leg);
+        foreach (var g in r.Gaps.Where(g => g.Median && Math.Abs(g.Offset) <= g.Width / 2 + 0.1 && g.Width > 0.05))
+        {
+            var a = leg.Sign * (g.Offset - g.Width / 2);
+            var b = leg.Sign * (g.Offset + g.Width / 2);
+            var mode = ramps && !L.MedianRampsBlocked.Contains((leg.Road, leg.Sign))
+                ? Automation.MedianCrossing.Resolve(g.Width, tpl, d.MedianCrossing) : Automation.TipoTravessiaCanteiro.NivelDaPista;
+            res.Add(new MedianPass(Math.Min(a, b), Math.Max(a, b), mode, tpl));
+        }
+        return res;
+    }
 
     /// <summary>Rampas planejadas para a travessia do ramo (calculadas uma vez por arranjo).</summary>
     public static RampPlan RampPlanOf(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg)
@@ -834,6 +927,54 @@ public static partial class IntersectionGenerator
                 if (k < 0) notes.Add((n, 1));
                 else notes[k] = (n, notes[k].Count + 1);
             }
+        }
+        // Esquinas muito agudas: as rampas das duas travessias da esquina se encontram – as duas recuam juntas (passo de
+        // 10 cm, até 6 m) até ficarem separadas por 0,30 m.
+        List<Polygon2> Bodies(IntersectionLeg leg)
+        {
+            var res = new List<Polygon2>();
+            var p = RampPlanOf(d, L, leg);
+            var tc = CrosswalkT(d, L, leg);
+            foreach (var (sgn, rp) in new[] { (1.0, p.Hi), (-1.0, p.Lo) })
+            {
+                if (rp == null) continue;
+                // Contorno real da rampa (o mesmo que os filhos geram), com folga de 0,15 m.
+                var w = (sgn > 0 ? L.HiEdge(leg, tc) : L.LoEdge(leg, tc)) - EarInset(L, leg, (int)sgn, tc);
+                var curb = L.At(leg, tc, sgn * w);
+                var up = (L.At(leg, tc, sgn * (w + 1)) - curb).Normalized();
+                var path = new Polyline2(new[] { curb, curb + up });
+                var probe = (RampDefinition)rp.CloneWithNewId();
+                probe.PathRef = PathReference.FromPoints(path.Points, 0);
+                res.AddRange(PolygonOps.Offset(new[] { RampGenerator.Footprint(probe, path) }, 0.15));
+            }
+            return res;
+        }
+        var clashMoved = new HashSet<IntersectionLeg>();
+        for (int guard = 0; guard < 100; guard++)
+        {
+            var bodies = L.Legs.ToDictionary(l => l, Bodies);
+            var clash = false;
+            for (int i = 0; i < L.Legs.Count && !clash; i++)
+                for (int j = i + 1; j < L.Legs.Count && !clash; j++)
+                {
+                    var (a, b) = (L.Legs[i], L.Legs[j]);
+                    if (bodies[a].Count == 0 || bodies[b].Count == 0) continue;
+                    if (PolygonOps.TotalArea(PolygonOps.Intersect(bodies[a], bodies[b])) < 1e-3) continue;
+                    clash = true;
+                    foreach (var leg in new[] { a, b })
+                    {
+                        var p = RampPlanOf(d, L, leg);
+                        L.RampPlans[(leg.Road, leg.Sign)] = p with { Shift = p.Shift + 0.10 };
+                        clashMoved.Add(leg);
+                    }
+                }
+            if (!clash) break;
+        }
+        if (clashMoved.Count > 0)
+        {
+            var moved = clashMoved.Select(l => RampPlanOf(d, L, l).Shift).ToList();
+            L.Warnings.Add($"Rampas: esquina aguda – {clashMoved.Count} travessias recuadas até {moved.Max():0.00} m para as rampas das duas vias não se encontrarem.");
+            foreach (var l in clashMoved) if (!shifts.Contains(RampPlanOf(d, L, l).Shift)) shifts.Add(RampPlanOf(d, L, l).Shift);
         }
         foreach (var (n, c) in notes) L.Warnings.Add($"Rampas: {n}{(c > 1 ? $" ({c} travessias)" : "")}.");
         if (shifts.Count > 0)
@@ -1157,38 +1298,80 @@ public static partial class IntersectionGenerator
             .SelectMany(g => RoadGenerator.Band(r.Axis, g.Offset - g.Width / 2, g.Offset + g.Width / 2))), new[] { big })).ToList();
 
         // Pista com o raio de cada esquina: o menor em toda a pista + a curva maior só no setor da esquina que a pede.
-        List<Polygon2> Corners(List<Polygon2> u, IReadOnlyList<IntersectionLeg> lg)
+        // Esquina aguda: o raio é reduzido para a curva não avançar mais que o raio pedido ao longo das vias (a tangente de
+        // um arco de raio R num canto de θ é R·cot(θ/2): 2,4 R a 45°, 3,7 R a 30° – o asfalto engolia a esquina).
+        List<Polygon2> Corners(List<Polygon2> u, IReadOnlyList<IntersectionLeg> lg, bool warn = false)
         {
-            var basis = PolygonOps.Intersect(Close(u, rMin), clip);
-            if (rMax - rMin < 0.05 || lg.Count < 2) return basis;
+            if (lg.Count < 2) return PolygonOps.Intersect(Close(u, rMin), clip);
             var sorted = lg.Select(l => (Leg: l, A: AngleOf(l.Dir))).OrderBy(x => x.A).ToList();
-            var extra = new List<Polygon2>();
-            var cache = new Dictionary<double, List<Polygon2>>();
+            var cs = new List<(double From, double Span, double R)>();
             for (int k = 0; k < sorted.Count; k++)
             {
                 var (la, aa) = sorted[k];
                 var (lb, ab) = sorted[(k + 1) % sorted.Count];
                 var span = Ccw(aa, ab);
                 if (Straight(la, lb, span)) continue;
-                var R = Math.Round(Math.Max(0, LegSet(d, L, la)?.CornerRadius ?? rc), 2);
-                if (R - rMin < 0.05) continue;
+                var R = Math.Max(0, LegSet(d, L, la)?.CornerRadius ?? rc);
+                var eff = span < 90 ? R * Math.Tan(span * Math.PI / 360) : R;
+                eff = Math.Round(eff, 2);
+                if (warn && R - eff >= 0.05)
+                    L.Warnings.Add($"Esquina aguda ({span:0}°): raio reduzido de {R:0.0#} m para {eff:0.0#} m – a curva não avança mais que o raio pedido ao longo das vias.");
+                if (warn) NoteTangent(la, lb, span, eff);
+                cs.Add((aa, span, eff));
+            }
+            if (cs.Count == 0) return PolygonOps.Intersect(Close(u, rMin), clip);
+            var rb = cs.Min(c => c.R);
+            var basis = PolygonOps.Intersect(Close(u, rb), clip);
+            var extra = new List<Polygon2>();
+            var cache = new Dictionary<double, List<Polygon2>>();
+            foreach (var (from, span, R) in cs)
+            {
+                if (R - rb < 0.05) continue;
                 if (!cache.TryGetValue(R, out var closed)) cache[R] = closed = PolygonOps.Difference(PolygonOps.Intersect(Close(u, R), clip), basis);
                 foreach (var lobe in closed.Where(p => p.Area > 0.05))
                 {
                     var v = lobe.Centroid - node;
-                    if (v.Length < reach && Ccw(aa, AngleOf(v)) <= span) extra.Add(lobe);
+                    if (v.Length < reach && Ccw(from, AngleOf(v)) <= span) extra.Add(lobe);
                 }
             }
             return extra.Count == 0 ? basis : PolygonOps.Union(basis.Concat(extra));
+        }
+
+        // Fim da curva de cada lado da esquina: os bordos retos dos dois ramos se encontram em V; a curva de raio r é tangente a
+        // eles a r·cot(θ/2) de V.
+        void NoteTangent(IntersectionLeg la, IntersectionLeg lb, double span, double r)
+        {
+            if (span >= 179 || r <= 0.01) return;
+            const double far = 30;
+            var a0 = L.At(la, far, L.HiEdge(la, far));
+            var a1 = L.At(la, far - 1, L.HiEdge(la, far - 1));
+            var b0 = L.At(lb, far, -L.LoEdge(lb, far));
+            var b1 = L.At(lb, far - 1, -L.LoEdge(lb, far - 1));
+            var ua = (a0 - a1).Normalized();
+            var ub = (b0 - b1).Normalized();
+            var den = ua.X * ub.Y - ua.Y * ub.X;
+            if (Math.Abs(den) < 1e-6) return;
+            var w0 = b0 - a0;
+            var V = a0 + ua * ((w0.X * ub.Y - w0.Y * ub.X) / den);
+            var T = r / Math.Tan(span * Math.PI / 360);
+            void Keep(IntersectionLeg leg, Vec2 p)
+            {
+                var t = (p - node).Dot(leg.Dir);
+                var key = (leg.Road, leg.Sign);
+                L.TangentT[key] = L.TangentT.TryGetValue(key, out var old) ? Math.Max(old, t) : t;
+            }
+            Keep(la, V + ua * T);
+            Keep(lb, V + ub * T);
         }
 
         // 1ª passada: esquinas simples → ramos, via principal e tratamentos dos ramos.
         var u0 = PolygonOps.Union(cn.SelectMany(x => x));
         var pav0 = PolygonOps.Intersect(Close(u0, rMin), clip);
         var legs0 = ComputeLegs(L, pav0, cn, reach, false);
-        if (rMax - rMin >= 0.05)
+        var pav1 = Corners(u0, legs0);
+        if (PolygonOps.TotalArea(PolygonOps.Difference(pav0, pav1)) + PolygonOps.TotalArea(PolygonOps.Difference(pav1, pav0)) > 0.05)
         {
-            pav0 = Corners(u0, legs0);
+            pav0 = pav1;
             legs0 = ComputeLegs(L, pav0, cn, reach, false);
         }
         L.Main = MainRoad(d, L.Roads, legs0);
@@ -1220,7 +1403,7 @@ public static partial class IntersectionGenerator
 
         // 2ª passada: pista final com esquinas (raio simples ou faixa de conversão livre).
         var U = PolygonOps.Union(own.SelectMany(x => x));
-        var pavS = Corners(U, legs0);
+        var pavS = Corners(U, legs0, warn: true);
         var pav = pavS;
         var islands = new List<Polygon2>();
         var paintedIslands = new List<Polygon2>();
@@ -1276,7 +1459,8 @@ public static partial class IntersectionGenerator
         var medT = L.Roads.Select((_, i) =>
         {
             if (medBands[i].Count == 0) return new List<Polygon2>();
-            var others = PolygonOps.Offset(own.Where((_, j) => j != i).SelectMany(x => x), 1.0);
+            // Canteiro contínuo (opção): não abre para as vias sem canteiro – só conversões à direita.
+            var others = PolygonOps.Offset(own.Where((_, j) => j != i && (!d.MedianContinuous || medBands[j].Count > 0)).SelectMany(x => x), 1.0);
             var band = PolygonOps.Difference(PolygonOps.Difference(medBands[i], others), pockets[i]);
             var r = L.Roads[i];
             var lateral = r.Def.Gaps.Where(g => g.Median && Math.Abs(g.Offset) > g.Width / 2 + 0.1).ToList();
@@ -1286,7 +1470,7 @@ public static partial class IntersectionGenerator
                 var stopAt = new List<Polygon2>();
                 foreach (var leg in legs0.Where(l => l.Road == i))
                 {
-                    var tEnd = leg.Clear + (CrosswalkOn(d, L, leg) ? SetbackOf(d, L, leg) + CrosswalkWidthOf(d, L, leg) + 0.8 : 1.0);
+                    var tEnd = leg.Clear + (CrosswalkOn(d, L, leg) ? TangentGap(L, leg) + SetbackOf(d, L, leg) + CrosswalkWidthOf(d, L, leg) + 0.8 : 1.0);
                     var wide = Math.Max(r.Def.TotalLeft, r.Def.TotalRight) + 2;
                     stopAt.AddRange(L.LegPoly(leg, -maxHalf, tEnd, _ => -wide, _ => wide));
                 }
@@ -1298,7 +1482,8 @@ public static partial class IntersectionGenerator
                     band = PolygonOps.Difference(band, cutLat);
                 }
             }
-            return Open(band, 0.3).Where(p => p.Area > 0.5).ToList();
+            var noseR = Math.Min(MaxNoseRadius, r.Def.Gaps.Where(g => g.Median).Select(g => g.Width).DefaultIfEmpty(0).Max() / 2 - 0.01);
+            return RoundNoses(Open(band, 0.3).Where(p => p.Area > 0.5).ToList(), others, noseR);
         }).ToList();
 
         // Ilhas gota.
@@ -1403,8 +1588,27 @@ public static partial class IntersectionGenerator
             var (la, aa) = byAngle[k];
             var (lb, ab) = byAngle[(k + 1) % byAngle.Count];
             if (Straight(la, lb, Ccw(aa, ab))) continue;
-            var tri = new Polygon2(new[] { node, L.At(la, reachT[la], HiTot(la)), L.At(lb, reachT[lb], -LoTot(lb)) });
+            var pa = L.At(la, reachT[la], HiTot(la));
+            var pb = L.At(lb, reachT[lb], -LoTot(lb));
+            var tri = new Polygon2(new[] { node, pa, pb });
             if (tri.Area < 0.01) continue;
+            // Canto da quadra (encontro dos alinhamentos das duas vias) além da corda PA–PB (esquina obtusa, ramo que começa
+            // no nó): a zona vai até ele – senão sobrava um vão sem calçada nem meio-fio atrás da ponta do ramo.
+            var da = (pa - L.At(la, Math.Max(0, reachT[la] - 1), HiTot(la))).Normalized();
+            var db = (pb - L.At(lb, Math.Max(0, reachT[lb] - 1), -LoTot(lb))).Normalized();
+            var den = da.X * db.Y - da.Y * db.X;
+            if (Math.Abs(den) > 0.05)
+            {
+                var w0 = pb - pa;
+                var sA = (w0.X * db.Y - w0.Y * db.X) / den;
+                var X = pa + da * sA;
+                var chord = pb - pa;
+                double Side(Vec2 q) => chord.X * (q.Y - pa.Y) - chord.Y * (q.X - pa.X);
+                // Só quando o canto não fica mais longe do nó que PA ou PB (ramos quase paralelos dariam um canto dezenas de
+                // metros adiante).
+                if (Side(X) * Side(node) < 0 && X.DistanceTo(node) <= Math.Max(pa.DistanceTo(node), pb.DistanceTo(node)))
+                    tri = new Polygon2(new[] { node, pa, X, pb });
+            }
             var fixedTri = PolygonOps.Union(new[] { tri });
             zoneParts.AddRange(fixedTri);
             foreach (var ft in fixedTri)
@@ -1416,6 +1620,31 @@ public static partial class IntersectionGenerator
         }
         if (zoneParts.Count == 0) zoneParts.Add(Circle(node, maxHalf + rc));
         var zoneU = PolygonOps.Union(zoneParts);
+        // Lados sem esquina (via que segue reta): a zona não passa do bordo da pista. A ponta do ramo oblíquo (corte
+        // transversal em t = 0) atravessava a outra via e entalhava o meio-fio e a calçada do lado reto em "V".
+        var zoneTrimmed = false;
+        var keepOut = new List<Polygon2>();
+        var keepOutOf = L.Roads.Select(_ => new List<Polygon2>()).ToList();
+        foreach (var leg in L.Legs)
+        {
+            var ko = new List<Polygon2>();
+            if (!loCorner.Contains(leg)) ko.AddRange(L.LegPoly(leg, 0, reachT[leg], _ => -LoTot(leg) - maxHalf, t => -L.LoEdge(leg, t), 0.5));
+            if (!hiCorner.Contains(leg)) ko.AddRange(L.LegPoly(leg, 0, reachT[leg], t => L.HiEdge(leg, t), _ => HiTot(leg) + maxHalf, 0.5));
+            keepOut.AddRange(ko);
+            keepOutOf[leg.Road].AddRange(ko);
+        }
+        if (keepOut.Count > 0 && byAngle.Count > 2)
+        {
+            var trimmed = PolygonOps.Difference(zoneU, keepOut).Where(p => p.Area > 0.05).ToList();
+            if (trimmed.Count > 0)
+            {
+                zoneU = trimmed;
+                zoneTrimmed = true;
+                L.StraightSides.AddRange(PolygonOps.Union(keepOut));
+                // A ponta da pista do ramo oblíquo também não passa do bordo reto da outra via.
+                pav = PolygonOps.Difference(pav, keepOut).Where(p => p.Area > 0.05).ToList();
+            }
+        }
         L.Zone = zoneU.OrderByDescending(p => p.Area).First();
         L.Radius = zoneU.SelectMany(p => p.Outer).Max(v => v.DistanceTo(node));
         var core0 = zoneU;
@@ -1432,13 +1661,41 @@ public static partial class IntersectionGenerator
                 var tc = CrosswalkT(d, L, leg);
                 var hw = CrosswalkWidthOf(d, L, leg) / 2 - 0.1;
                 var band = L.LegPoly(leg, tc - hw, tc + hw, t => -L.LoEdge(leg, t), t => L.HiEdge(leg, t));
+                // Canteiro largo com rampas e patamar: a faixa não corta o canteiro (as rampas sobem nas duas faces).
+                var passes = MedianPassesOf(d, L, leg);
+                foreach (var m in passes)
+                    foreach (var msg in MedianCrossing.Warnings(m.Width, m.Template, d.MedianCrossing))
+                        if (!L.Warnings.Contains($"Travessia sobre o canteiro: {msg}.")) L.Warnings.Add($"Travessia sobre o canteiro: {msg}.");
+                var kept = passes.Where(m => m.Mode == TipoTravessiaCanteiro.Rampas).ToList();
+                if (kept.Count > 0)
+                {
+                    // As rampas e as abas precisam ficar inteiras sobre o canteiro: junto à ponta (esquina aguda) a travessia
+                    // fica rebaixada no nível da pista.
+                    var he = RampHalfExtent(kept[0].Template) + 0.1;
+                    if (kept.Any(m => PolygonOps.Difference(L.LegPoly(leg, tc - he, tc + he, _ => m.Lo + 0.02, _ => m.Hi - 0.02), medT[leg.Road]).Sum(p => p.Area) > 0.02))
+                    {
+                        L.MedianRampsBlocked.Add((leg.Road, leg.Sign));
+                        const string near = "Travessia sobre o canteiro rebaixada no nível da pista: perto da ponta do canteiro as rampas não cabem inteiras.";
+                        if (!L.Warnings.Contains(near)) L.Warnings.Add(near);
+                        kept.Clear();
+                    }
+                }
+                var rampReach = kept.Count > 0 ? RampHalfExtent(kept[0].Template) + 0.3 : 0;
+                foreach (var m in kept)
+                    band = PolygonOps.Difference(band, L.LegPoly(leg, tc - rampReach - 1, tc + rampReach + 1, _ => m.Lo, _ => m.Hi));
                 bands.AddRange(band);
                 // Refúgio: o canteiro central da própria via é cortado no nível da pista na travessia (também fora do nó). O corte
                 // da via começa 0,30 m antes, do lado do nó: com a faixa logo além do limite da zona sobrava uma tira de 5 cm do
                 // canteiro da via (lascas de meio-fio < 0,01 m²); o canteiro da interseção cresce até o refúgio.
                 if (medBands[leg.Road].Count > 0)
-                    refuges[leg.Road].AddRange(PolygonOps.Intersect(L.LegPoly(leg, tc - hw - 0.3, tc + hw, t => -L.LoEdge(leg, t), t => L.HiEdge(leg, t)),
+                {
+                    // Com a faixa no fim da curva o refúgio pode ficar até ~1 m além do fim da zona: o corte vai até a zona.
+                    var t0 = tc - Math.Max(hw, rampReach) - 0.3;
+                    if (reachT.TryGetValue(leg, out var rz) && t0 > rz - 0.1 && t0 - rz < 1.0) t0 = rz - 0.1;
+                    // Com rampas o canteiro sob as rampas e as abas é refeito pela interseção (recortado pelas rampas).
+                    refuges[leg.Road].AddRange(PolygonOps.Intersect(L.LegPoly(leg, t0, tc + Math.Max(hw, rampReach), t => -L.LoEdge(leg, t), t => L.HiEdge(leg, t)),
                         medBands[leg.Road]).Where(p => p.Area > 0.2));
+                }
             }
             if (bands.Count > 0)
             {
@@ -1455,8 +1712,21 @@ public static partial class IntersectionGenerator
         foreach (var f in L.Features)
             ext[f.Leg.Road].AddRange(L.LegPoly(f.Leg, 0, f.TEnd + 0.5, _ => f.ExtLo, _ => f.ExtHi, 1.0));
         for (int i = 0; i < L.Roads.Count; i++) ext[i].AddRange(refuges[i]);
+        // Rampa que começa logo depois do fim da zona (travessia no fim da curva): a parte refeita entra 0,2 m sob a rampa –
+        // senão sobrava uma lasca da grama/calçada da via entre a zona e a aba.
+        foreach (var leg in L.Legs)
+        {
+            if (!CrosswalkOn(d, L, leg) || RampPlanOf(d, L, leg) is not { } rpl || rpl.Hi == null && rpl.Lo == null) continue;
+            var near = CrosswalkT(d, L, leg) - new[] { rpl.Hi, rpl.Lo }.Where(x => x != null).Max(x => RampHalfExtent(x!));
+            // Só lasca (< 0,20 m entre a zona e a aba); uma faixa maior fica com a via.
+            if (near > reachT[leg] - 0.2 && near - reachT[leg] < 0.2)
+                ext[leg.Road].AddRange(L.LegPoly(leg, reachT[leg] - 0.1, near + 0.2, _ => -LoTot(leg), _ => HiTot(leg), 0.5));
+        }
         for (int i = 0; i < L.Roads.Count; i++) ext[i].AddRange(latCuts[i].Select(p => PolygonOps.Offset(new[] { p }, 0.05)).SelectMany(x => x));
-        for (int i = 0; i < L.Roads.Count; i++) L.PhysicalCuts[i] = PolygonOps.Union(core0.Concat(ext[i]).Concat(Stubs(L, i)));
+        // A ponta (calçada, meio-fio, tampa) de um ramo oblíquo também não entra no lado reto das outras vias.
+        for (int i = 0; i < L.Roads.Count; i++)
+            L.PhysicalCuts[i] = PolygonOps.Union(core0.Concat(ext[i]).Concat(Stubs(L, i))
+                .Concat(zoneTrimmed ? keepOutOf.Where((_, j) => j != i).SelectMany(x => x) : Enumerable.Empty<Polygon2>()));
         var rebuild = PolygonOps.Union(core0.Concat(ext.SelectMany(x => x)));
         L.Rebuild.AddRange(rebuild);
 
@@ -1491,10 +1761,28 @@ public static partial class IntersectionGenerator
             var rb = L.Roads[lb.Road].Def;
             var swA = la.Sign > 0 ? ra.LeftSidewalk : ra.RightSidewalk;
             var swB = lb.Sign > 0 ? rb.RightSidewalk : rb.LeftSidewalk;
+            // Com calçadas de larguras diferentes (ou o meio-fio da interseção mais para dentro que o da via), o arco da curva
+            // passava do alinhamento da via mais estreita e entrava no lote – o corte da zona deixava um dente: sai a parte
+            // além dos DOIS alinhamentos (o lote da quadra).
+            // Alinhamento real (HiTot/LoTot têm 0,2 m de folga para a zona cobrir os elementos da via). Esquina aguda (< 60°):
+            // a ponta da quadra fica longe, no fim das faixas – o corte ali deixava cunhas soltas; fica como era.
+            var acute = Ccw(AngleOf(la.Dir), AngleOf(lb.Dir)) < 60;
+            // Semiplanos além de cada alinhamento (retas pelo alinhamento no fim do ramo; o lote pode ficar antes do nó
+            // na direção de um dos ramos).
+            Polygon2 Beyond(IntersectionLeg leg, double off)
+            {
+                var p0 = L.At(leg, reachT[leg], off);
+                var p1 = L.At(leg, Math.Max(0, reachT[leg] - 1), off);
+                var dir = (p0 - p1).Normalized();
+                var outward = (L.At(leg, reachT[leg], off + Math.Sign(off)) - p0).Normalized();
+                return new Polygon2(new[] { p0 - dir * 200, p0 + dir * 200, p0 + dir * 200 + outward * 200, p0 - dir * 200 + outward * 200 });
+            }
+            var lot = acute ? new List<Polygon2>() : PolygonOps.Intersect(new[] { Beyond(la, HiTot(la) - 0.2) }, new[] { Beyond(lb, -(LoTot(lb) - 0.2)) });
+            List<Polygon2> NoLot(List<Polygon2> a) => lot.Count > 0 ? PolygonOps.Difference(a, lot).Where(p => p.Area > 0.01).ToList() : a;
             if (swA > 0.01 || swB > 0.01)
-                L.SidewalkMax.AddRange(PolygonOps.Difference(PolygonOps.Intersect(PolygonOps.Offset(pav, Math.Max(swA, swB), true), new[] { tri }), pav));
+                L.SidewalkMax.AddRange(NoLot(PolygonOps.Difference(PolygonOps.Intersect(PolygonOps.Offset(pav, Math.Max(swA, swB), true), new[] { tri }), pav)));
             if (swA <= 0.01 || swB <= 0.01) continue;
-            sideParts.AddRange(PolygonOps.Intersect(PolygonOps.Offset(pav, Math.Min(swA, swB), true), new[] { tri }));
+            sideParts.AddRange(NoLot(PolygonOps.Intersect(PolygonOps.Offset(pav, Math.Min(swA, swB), true), new[] { tri })));
         }
         var sides = PolygonOps.Difference(PolygonOps.Union(sideParts), pav);
         var curbRing = PolygonOps.Difference(PolygonOps.Offset(pav, cw, true), pav);
@@ -1507,9 +1795,11 @@ public static partial class IntersectionGenerator
             if (sec.HasGutter) L.Gutter.AddRange(Automation.SectionMatch.GutterBand(pav, L.Curb, sec.Gutter));
         }
 
-        var medParts = PolygonOps.Intersect(medT.SelectMany(x => x), core0).ToList();
+        // Canteiro de cada via numa interseção só (zona + trechos tratados dela): sem emenda entre as duas partes – a junção
+        // deixava uma agulha de área nula no meio-fio do nariz arredondado.
+        var medParts = new List<Polygon2>();
         for (int i = 0; i < L.Roads.Count; i++)
-            if (ext[i].Count > 0) medParts.AddRange(PolygonOps.Intersect(medT[i], ext[i]));
+            if (medT[i].Count > 0) medParts.AddRange(PolygonOps.Intersect(medT[i], ext[i].Count > 0 ? PolygonOps.Union(core0.Concat(ext[i])) : core0));
         var medZ = PolygonOps.Union(medParts);
         if (medZ.Count > 0)
         {
@@ -1568,6 +1858,8 @@ public static partial class IntersectionGenerator
                 paint.AddRange(band);
                 parking.AddRange(band);
             }
+            if (zoneTrimmed)
+                foreach (var ko in keepOutOf.Where((_, j) => j != i)) { paint.AddRange(ko); parking.AddRange(ko); }
             L.PaintCuts[i] = PolygonOps.Union(paint);
             L.ParkingCuts[i] = PolygonOps.Union(parking);
         }
@@ -1681,7 +1973,7 @@ public static partial class IntersectionGenerator
         // 1. Miolo da principal que atravessa o nó.
         if (through)
         {
-            var box = legs.Select(l => l.StationAt(l.Clear + (CrosswalkOn(d, L, l) ? Math.Max(0, SetbackOf(d, L, l) - 0.4) : 0))).ToList();
+            var box = legs.Select(l => l.StationAt(l.Clear + (CrosswalkOn(d, L, l) ? Math.Max(0, TangentGap(L, l) + SetbackOf(d, L, l) - 0.4) : 0))).ToList();
             var (s0, s1) = (box.Min(), box.Max());
             if (s1 - s0 > 1)
             {
@@ -1814,6 +2106,11 @@ public static partial class IntersectionGenerator
                 var cb = Cut(L.Curb, ramps, 0.01);
                 var sv = Cut(L.SidewalkService, ramps, 0.01);
                 var sm = Cut(L.SidewalkMax, ramps, 0.01);
+                // Rampas do canteiro central (travessia com patamar): o meio-fio e a grama do canteiro saem sob elas.
+                var mc = Cut(L.MedianCurb, ramps, 0.01);
+                var mo = Cut(L.MedianCore, ramps, 0.01);
+                L.MedianCurb.Clear(); L.MedianCurb.AddRange(mc);
+                L.MedianCore.Clear(); L.MedianCore.AddRange(mo);
                 L.Sidewalk.Clear(); L.Sidewalk.AddRange(sw);
                 L.Curb.Clear(); L.Curb.AddRange(cb);
                 L.SidewalkService.Clear(); L.SidewalkService.AddRange(sv);
@@ -1838,24 +2135,37 @@ public static partial class IntersectionGenerator
             inside.AddRange(KeptGutters(L));
             // Sem lascas nem "espinhos" (diferença pista − sarjetas de vias em ângulo): abre/fecha 5 mm e descarta pisos < 0,01 m².
             if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
-                Raised(Sound(NoEars(inside.Count > 0 ? PolygonOps.Difference(L.Pavement, inside) : L.Pavement)), L.PavementColor, L.PavementThickness, -L.PavementThickness);
+            {
+                var pv = NoEars(inside.Count > 0 ? PolygonOps.Difference(L.Pavement, inside) : L.Pavement);
+                var good = SoundPavement(pv);
+                // Cunhas tiradas da pista entre a sarjeta e a linha do meio-fio passam para a sarjeta vizinha (sem vão); as
+                // que não encostam em sarjeta voltam para a pista (sem furo).
+                var slivers = PolygonOps.Difference(pv, good).Where(x => x.Area > 1e-4).ToList();
+                pieces = AbsorbSlivers(pieces, slivers, out var left);
+                if (left.Count > 0) good = Sound(PolygonOps.Union(good.Concat(left)));
+                Raised(good, L.PavementColor, L.PavementThickness, -L.PavementThickness);
+            }
             AddPieces(geo, pieces.SelectMany(p => Sound(new[] { p.Shape }).Select(x => p with { Shape = x })));
         }
         else
         {
             if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
-                Raised(Sound(NoEars(L.Gutter.Count > 0 ? PolygonOps.Difference(L.Pavement, L.Gutter) : L.Pavement)), L.PavementColor, L.PavementThickness, -L.PavementThickness);
+                Raised(SoundPavement(NoEars(L.Gutter.Count > 0 ? PolygonOps.Difference(L.Pavement, L.Gutter) : L.Pavement)), L.PavementColor, L.PavementThickness, -L.PavementThickness);
             AddPieces(geo, NoEars(L.Curb).Select(c => new MarkingPiece(c, MarkingColor.Concreto) { Thickness = L.CurbHeight, Layer = "MEIO-FIO" }));
             Raised(NoEars(L.Gutter), MarkingColor.Concreto, 0.005);
             if (L.SidewalkService.Count > 0)
             {
-                Raised(PolygonOps.Difference(L.Sidewalk, L.SidewalkService), MarkingColor.Concreto, L.CurbHeight);
-                Raised(L.SidewalkService, MarkingColor.Grama, L.CurbHeight);
+                // Sobras da faixa gramada menores que 0,15 m² (junto à aba da rampa) ficam no passeio.
+                var service = L.SidewalkService.Where(p => p.Area >= 0.15).ToList();
+                Raised(PolygonOps.Difference(L.Sidewalk, service), MarkingColor.Concreto, L.CurbHeight);
+                Raised(service, MarkingColor.Grama, L.CurbHeight);
             }
             else Raised(L.Sidewalk, MarkingColor.Concreto, L.CurbHeight);
         }
-        Raised(L.MedianCurb, MarkingColor.Concreto, L.CurbHeight);
-        Raised(L.MedianCore, MarkingColor.Grama, L.CurbHeight);
+        // Miolo de canteiro menor que um piso (ponta estreita do nariz): vira meio-fio junto com a borda, sem lasca de grama.
+        var tinyCore = L.MedianCore.Where(p => p.Area < MinFloorArea).ToList();
+        Raised(tinyCore.Count > 0 ? PolygonOps.Union(L.MedianCurb.Concat(tinyCore)) : L.MedianCurb, MarkingColor.Concreto, L.CurbHeight);
+        Raised(L.MedianCore.Where(p => p.Area >= MinFloorArea), MarkingColor.Grama, L.CurbHeight);
         foreach (var isl in L.Islands)
         {
             var core = PolygonOps.Offset(new[] { isl }, -L.CurbWidth);
@@ -1926,7 +2236,13 @@ public static partial class IntersectionGenerator
             // Sobras nos trechos retos (fora da curva): continuam com a faixa externa da via daquele lado.
             var outerA = a.Where(x => !x.Inside).OrderBy(x => x.D1).LastOrDefault();
             var outerB = b.Where(x => !x.Inside).OrderBy(x => x.D1).LastOrDefault();
-            var left = PolygonOps.Difference(PolygonOps.Difference(new[] { comp }, PolygonOps.Offset(covered, 0.01)), PolygonOps.Offset(new[] { c.Tri }, 0.5));
+            var free = PolygonOps.Difference(new[] { comp }, PolygonOps.Offset(covered, 0.01));
+            var triNear = PolygonOps.Offset(new[] { c.Tri }, 0.5);
+            var left = PolygonOps.Difference(free, triNear);
+            // Atrás das rampas (a rampa corta o meio-fio e a cadeia da curva para nela): a faixa livre que sobra na esquina,
+            // longe do bordo, também é passeio – antes ficava um vão entre a rampa e o alinhamento.
+            var behind = PolygonOps.Difference(PolygonOps.Difference(PolygonOps.Intersect(new[] { comp }, triNear), covered), PolygonOps.Offset(L.Pavement, 0.6, true));
+            left.AddRange(behind);
             foreach (var sh in left.Where(x => x.Area > 0.05))
             {
                 var nearA = sh.Centroid.DistanceTo(c.PA) < sh.Centroid.DistanceTo(c.PB);
@@ -1953,7 +2269,33 @@ public static partial class IntersectionGenerator
             }
             inside.AddRange((skip.Count > 0 ? PolygonOps.Difference(ins, skip) : ins).Where(x => x.Area > 1e-3));
         }
-        return (pieces, PolygonOps.Union(inside));
+        // Sobras pequenas da calçada da interseção que nenhuma faixa cobriu (junto ao limite da zona, entre a curva e o trecho
+        // reto): passam para a peça vizinha com que mais encostam – antes ficavam vãos de 0,1–0,4 m entre os pisos.
+        if (pieces.Count > 0)
+        {
+            var coveredAll = PolygonOps.Union(pieces.Select(p => p.Shape).Concat(inside));
+            var holes = PolygonOps.Difference(PolygonOps.Difference(full, coveredAll), L.Pavement).Where(x => x.Area > 1e-3 && x.Area < 0.5).ToList();
+            foreach (var hole in holes)
+            {
+                var grown = PolygonOps.Offset(new[] { hole }, 0.02);
+                var best = pieces.Where(p => p.Elevation >= -1e-6 && p.Layer != "SARJETA")
+                    .Select(p => (P: p, A: PolygonOps.TotalArea(PolygonOps.Intersect(new[] { p.Shape }, grown))))
+                    .Where(x => x.A > 1e-5).OrderByDescending(x => x.A).Select(x => x.P).FirstOrDefault();
+                if (best != null) pieces.Add(best with { Shape = hole });
+            }
+        }
+        // Sobras de faixa gramada menores que 0,15 m² (entre a curva e a aba da rampa, no limite da zona) viram passeio.
+        var walkAttr = pieces.FirstOrDefault(p => p.Layer == "CALCADA");
+        if (walkAttr != null)
+            for (int i = 0; i < pieces.Count; i++)
+                if (pieces[i].Layer == "GRAMADO" && pieces[i].Shape.Area < 0.15)
+                    pieces[i] = walkAttr with { Shape = pieces[i].Shape };
+        // Peças iguais (mesmo material, altura e camada) e encostadas viram uma só: as costuras internas, simplificadas
+        // separadamente, abriam vãos de 1–4 cm entre os pisos.
+        var merged = pieces.GroupBy(p => (p.Color, Math.Round(p.Thickness, 4), Math.Round(p.Elevation, 4), p.Layer))
+            .SelectMany(g => g.Count() == 1 ? g.ToList() : PolygonOps.Union(g.Select(p => p.Shape)).Where(x => x.Area > 1e-3).Select(x => g.First() with { Shape = x }).ToList())
+            .ToList();
+        return (merged, PolygonOps.Union(inside));
     }
 
     /// <summary>
@@ -1997,6 +2339,24 @@ public static partial class IntersectionGenerator
                 }
             }
         if (best == null || best.Count < 3) return null;
+        // Sem "espinhos" de largura zero no bordo (a curva maior da esquina encontra a reta da via e o contorno vai e volta
+        // sobre ela): a cadeia que ia e voltava dobrava as faixas e a calçada da esquina sumia.
+        for (var again = true; again && best.Count >= 3;)
+        {
+            again = false;
+            for (int i = 1; i + 1 < best.Count; i++)
+            {
+                var u0 = best[i] - best[i - 1];
+                var u1 = best[i + 1] - best[i];
+                if (u0.Length < 1e-6 || u1.Length < 1e-6 || u0.Dot(u1) < -0.5 * u0.Length * u1.Length)
+                {
+                    best.RemoveAt(i);
+                    again = true;
+                    break;
+                }
+            }
+        }
+        if (best.Count < 3) return null;
         if (best[0].DistanceTo(pa) > best[^1].DistanceTo(pa)) best.Reverse();
         // Prolonga as pontas 1 m na tangente (as faixas chegam inteiras até o limite da zona).
         var e0 = (best[0] - best[1]).Normalized();
@@ -2082,6 +2442,36 @@ public static partial class IntersectionGenerator
     /// </summary>
     internal static List<Polygon2> Sound(IEnumerable<Polygon2> polys) =>
         PolygonOps.Clean(polys, 0.005).Where(p => p.Area >= MinFloorArea).ToList();
+
+    /// <summary>Cada lasca vai para a peça baixa (sarjeta) que encosta nela; sem vizinha, volta a ser pista.</summary>
+    private static List<MarkingPiece> AbsorbSlivers(List<MarkingPiece> pieces, List<Polygon2> slivers, out List<Polygon2> left)
+    {
+        left = new List<Polygon2>();
+        if (slivers.Count == 0) return pieces;
+        var res = pieces.ToList();
+        foreach (var sl in slivers)
+        {
+            var grown = PolygonOps.Offset(new[] { sl }, 0.01);
+            var k = res.FindIndex(p => p.Layer == "SARJETA" && PolygonOps.TotalArea(PolygonOps.Intersect(new[] { p.Shape }, grown)) > 1e-5);
+            if (k < 0) { left.Add(sl); continue; }
+            var merged = PolygonOps.Union(new[] { res[k].Shape, sl }).OrderByDescending(x => x.Area).ToList();
+            res[k] = res[k] with { Shape = merged[0] };
+            foreach (var extra in merged.Skip(1).Where(x => x.Area > 1e-3)) res.Add(res[k] with { Shape = extra });
+        }
+        return res;
+    }
+
+    /// <summary>
+    /// Pavimento sem cunhas: as sobras entre a sarjeta recortada e a linha do meio-fio na transição da esquina (cunhas de
+    /// 3–5° com 0,5–1 m e poucos centímetros de largura) saem – nenhum trecho de pista com menos de 6 cm de largura.
+    /// </summary>
+    internal static List<Polygon2> SoundPavement(IEnumerable<Polygon2> polys)
+    {
+        // Só tira (abertura): o fechamento do Clean preenchia reentrâncias estreitas da pista – o asfalto avançava sob o
+        // meio-fio e o nariz do canteiro.
+        var src = polys.ToList();
+        return PolygonOps.Intersect(PolygonOps.Clean(src, 0.03), src).Where(p => p.Area >= MinFloorArea).ToList();
+    }
 
     /// <summary>Acrescenta peças já prontas (simplificadas, sem lascas).</summary>
     internal static void AddPieces(MarkingGeometry geo, IEnumerable<MarkingPiece> pieces)
@@ -2169,7 +2559,7 @@ public static partial class IntersectionGenerator
             var cwW = CrosswalkWidthOf(d, L, leg);
             var tc = CrosswalkT(d, L, leg);
             var stopFar = StopFar(d, L, leg);
-            var tStop = crosswalk ? leg.Clear + SetbackOf(d, L, leg) + cwW + 1.6 + 0.2 : leg.Clear + 1.0;
+            var tStop = crosswalk ? leg.Clear + TangentGap(L, leg) + SetbackOf(d, L, leg) + cwW + 1.6 + 0.2 : leg.Clear + 1.0;
             if (tStop > max - 1) continue;
 
             // Travessia de pedestres e rebaixamentos.
@@ -2197,6 +2587,17 @@ public static partial class IntersectionGenerator
                     var ramp = (RampDefinition)tpl.CloneWithNewId();
                     ramp.PathRef = PathReference.FromPoints(new[] { curb, curb + side }, z);
                     Add(ramp);
+                }
+                // Canteiro central atravessado: rampas nas duas faces com patamar no meio, ou passagem rebaixada no nível da
+                // pista com faixa de alerta junto a cada borda (NBR 9050 / NBR 16537 – itens a confirmar).
+                var hwc = cwW / 2 - 0.1;
+                foreach (var mp in MedianPassesOf(d, L, leg))
+                {
+                    Vec2 At(double t, double o) => L.At(leg, t, o);
+                    if (mp.Mode == TipoTravessiaCanteiro.Rampas)
+                        foreach (var rp in MedianCrossing.Ramps(At, tc, mp.Lo, mp.Hi, z, mp.Template, null)) Add(rp);
+                    else
+                        foreach (var tr in MedianCrossing.AlertStrips(At, tc - hwc, tc + hwc, mp.Lo, mp.Hi, z, null)) Add(tr);
                 }
             }
 
@@ -2417,7 +2818,7 @@ public static partial class IntersectionGenerator
             for (var s = s0; s <= s1 + 1e-6; s += 0.25)
             {
                 var p = axis.PointAt(s) + axis.TangentAt(s).PerpLeft * off;
-                var inside = mouths.Any(m => m.Contains(p));
+                var inside = mouths.Any(m => m.Contains(p)) && !L.StraightSides.Any(k => k.Contains(p));
                 if (inside && start == null) start = s;
                 if ((!inside || s + 0.25 > s1) && start is { } a) { runs.Add((a, s)); start = null; }
             }

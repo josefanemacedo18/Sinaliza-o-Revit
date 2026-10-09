@@ -162,8 +162,8 @@ public static class RoadGenerator
                         : VariableBand(axis, p0 - (pocketAtA ? 0 : 0.02), p1, _ => lo - 0.02, s => lo + Wd(s), samples));
                 }
                 var kept = PolygonOps.Difference(band, remove);
-                // Pontas do canteiro em semicírculo voltadas para o vão.
-                foreach (var (e, atA) in new[] { (a, true), (b, false) })
+                // Pontas do canteiro em semicírculo voltadas para o vão (travessia de pedestres: pontas retas).
+                foreach (var (e, atA) in op.Pedestrian ? Array.Empty<(double, bool)>() : new[] { (a, true), (b, false) })
                 {
                     var (k0, k1) = KeptAt(atA);
                     var r = (k1 - k0) / 2;

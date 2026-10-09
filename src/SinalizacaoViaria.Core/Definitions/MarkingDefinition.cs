@@ -319,6 +319,8 @@ public sealed class MedianOpening
     public double PocketFull { get; set; }
     /// <summary>Retorno que criou a abertura.</summary>
     public string? Source { get; set; }
+    /// <summary>Passagem de pedestres no nível da pista (travessia no meio da quadra): pontas retas, sem nariz semicircular.</summary>
+    public bool Pedestrian { get; set; }
 }
 
 public sealed class StationRange
@@ -1506,8 +1508,12 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public double CornerRadius { get; set; } = 6.0;
     public bool Crosswalks { get; set; } = true;
     public double CrosswalkWidth { get; set; } = 4.0;
-    /// <summary>Recuo da faixa de pedestres em relação ao fim da curva da esquina (m).</summary>
-    public double CrosswalkSetback { get; set; } = 1.0;
+    /// <summary>
+    /// Recuo da faixa de pedestres em relação ao fim da curva da esquina (ponto de tangência do meio-fio), em m. Padrão 0: a
+    /// borda da faixa junto à esquina fica no fim da curva e a rampa no meio-fio reto; recuo maior só quando a rampa ou a
+    /// orelha exige (com aviso). Projetos salvos guardam o valor que tinham.
+    /// </summary>
+    public double CrosswalkSetback { get; set; } = 0.0;
     public bool StopLines { get; set; } = true;
     public bool Ramps { get; set; } = true;
     /// <summary>Esquinas com a mesma composição da calçada das vias (meio-fio + faixa de serviço gramada + passeio).</summary>
@@ -1568,6 +1574,18 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public double PocketTaper { get; set; } = 20.0;
     public double PocketWidth { get; set; } = 3.0;
 
+    /// <summary>
+    /// Canteiro central contínuo: o canteiro de uma via não abre para as vias sem canteiro (só conversões à direita). Falso
+    /// (padrão) = o canteiro abre só na boca da outra via (+ 1 m de cada lado), com nariz arredondado.
+    /// </summary>
+    public bool MedianContinuous { get; set; }
+
+    /// <summary>
+    /// Travessia de pedestres sobre o canteiro central: automática (rampas e patamar quando o canteiro comporta, senão
+    /// passagem rebaixada no nível da pista), sempre com piso tátil.
+    /// </summary>
+    public Automation.TipoTravessiaCanteiro MedianCrossing { get; set; } = Automation.TipoTravessiaCanteiro.Automatica;
+
     // Rampas das travessias (NBR 9050): as mesmas medidas em todas as travessias, ajustadas quando não cabem.
     /// <summary>Tipo das rampas das travessias (com abas, sem abas ou rebaixamento total).</summary>
     public TipoRampa RampType { get; set; } = TipoRampa.RebaixamentoComAbas;
@@ -1597,6 +1615,7 @@ public sealed class IntersectionDefinition : MarkingDefinition
         RampTactile = o.RampTactile;
         RampDirectional = o.RampDirectional;
         RampCurbHeight = o.RampCurbHeight;
+        MedianCrossing = o.MedianCrossing;
         CurbExtensions = o.CurbExtensions;
         CurbExtensionLength = o.CurbExtensionLength;
         CurbExtensionDepth = o.CurbExtensionDepth;

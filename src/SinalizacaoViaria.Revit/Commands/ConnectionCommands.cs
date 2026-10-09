@@ -66,7 +66,7 @@ public sealed class CmdConexao : CommandBase
             .Choice("Aplicar em", new[]
                 {
                     ("Uma conexão (clicar no encontro de vias, rotatória ou ponta de via)", 0), ("Todas as interseções do projeto", 1),
-                    ("Abrir acesso numa via (retorno em U ou nova via em T)", 2),
+                    ("Abrir acesso numa via (retorno em U, nova via em T ou travessia no canteiro)", 2),
                 }, () => scope, v => scope = v);
         if (UiHelpers.ShowModal(w0) != true) return Result.Cancelled;
         PluginContext.Settings.Set("conexao:escopo", scope == 1 ? "todas" : scope == 2 ? "acesso" : "uma");
@@ -275,7 +275,7 @@ internal sealed class RoadElementFilter : Autodesk.Revit.UI.Selection.ISelection
 /// </summary>
 internal static class RoadAccessCommand
 {
-    private enum Acesso { Retorno, NovaVia }
+    private enum Acesso { Retorno, NovaVia, Travessia }
     private enum FormaRetorno { Abertura, Bolsao, Alargamento, Rotatoria }
 
     private static readonly (string, VeiculoProjeto)[] Vehicles =
@@ -295,7 +295,8 @@ internal static class RoadAccessCommand
         var pav = road.Def;
         var (st, signed) = road.Axis.Project(pt);
 
-        var kind = PluginContext.Settings.Get("acesso:tipo") == "via" ? Acesso.NovaVia : Acesso.Retorno;
+        var kind = PluginContext.Settings.Get("acesso:tipo") switch { "via" => Acesso.NovaVia, "travessia" => Acesso.Travessia, _ => Acesso.Retorno };
+        var tv = new TravessiaCanteiro { Estaca = Math.Round(st, 1) };
         var r = new RetornoVia { Estaca = Math.Round(st, 1), SentidoDoEixo = signed < 0 };
         var forma = FormaRetorno.Abertura;
         var raioExt = 0.0;
@@ -305,12 +306,15 @@ internal static class RoadAccessCommand
         var angle = 90.0;
         var length = 40.0;
         var radius = pav.CornerRadius ?? 6.0;
-        var w = new FormWindow("Abrir acesso na via", "Retorno em U ou nova via em T",
+        var w = new FormWindow("Abrir acesso na via", "Retorno em U, nova via em T ou travessia de pedestres no canteiro",
                 $"Via clicada: pista de {UiHelpers.F(pav.LeftWidth + pav.RightWidth, "0.00")} m{(pav.Gaps.Any(g => g.Median) ? ", canteiro central" : "")}, estaca {UiHelpers.F(st, "0.0")} m. " +
                 "Retorno: o veículo de projeto (DNIT) define o raio de giro; o canteiro abre onde a faixa varrida passa e a pista oposta é alargada " +
-                "se o giro não couber. Nova via: sai do ponto clicado, para o lado do clique, e é ligada por interseção.",
+                "se o giro não couber. Nova via: sai do ponto clicado, para o lado do clique, e é ligada por interseção. Travessia: a faixa de " +
+                "pedestres cruza o canteiro central na estaca clicada – rampas e patamar quando o canteiro comporta, senão passagem rebaixada " +
+                "no nível da pista, sempre com piso tátil de alerta.",
                 null, null, false, "Criar", 700, 640)
-            .Choice("Acesso", new[] { ("Retorno em U", Acesso.Retorno), ("Nova via menor (T)", Acesso.NovaVia) }, () => kind, v => kind = v)
+            .Choice("Acesso", new[] { ("Retorno em U", Acesso.Retorno), ("Nova via menor (T)", Acesso.NovaVia), ("Travessia de pedestres sobre o canteiro", Acesso.Travessia) },
+                () => kind, v => kind = v)
             .Section("Retorno em U")
             .Choice("Forma", new[]
                 {
@@ -331,13 +335,23 @@ internal static class RoadAccessCommand
             .Number("Ângulo com a via existente (°)", () => angle, v => angle = Math.Clamp(v, 30, 150), 30, 150, "0",
                 "90° = perpendicular. Medido a partir do sentido do eixo existente, para o lado do clique.")
             .Number("Comprimento da nova via (m)", () => length, v => length = Math.Max(10, v), 10, 2000, "0.0")
-            .Number("Raio das esquinas (m)", () => radius, v => radius = Math.Max(0, v), 0, 60);
+            .Number("Raio das esquinas (m)", () => radius, v => radius = Math.Max(0, v), 0, 60)
+            .Section("Travessia de pedestres sobre o canteiro")
+            .Choice("Tipo", new[]
+                {
+                    ("Automática (rampas e patamar se o canteiro comportar, senão no nível da pista)", TipoTravessiaCanteiro.Automatica),
+                    ("Passagem rebaixada no nível da pista, com piso tátil de alerta nas bordas", TipoTravessiaCanteiro.NivelDaPista),
+                    ("Rampas dos dois lados e patamar no canteiro", TipoTravessiaCanteiro.Rampas),
+                }, () => tv.Tipo, v => tv.Tipo = v)
+            .Number("Largura da faixa de pedestres (m)", () => tv.Largura, v => tv.Largura = Math.Clamp(v, 1.0, 10.0), 1.0, 10.0, "0.00")
+            .Check("Pintar a faixa de pedestres de bordo a bordo", () => tv.Faixa, v => tv.Faixa = v,
+                "Desmarque se a faixa já foi desenhada. As rampas das calçadas são feitas com a ferramenta Rampa.");
         if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
-        PluginContext.Settings.Set("acesso:tipo", kind == Acesso.NovaVia ? "via" : "retorno");
+        PluginContext.Settings.Set("acesso:tipo", kind switch { Acesso.NovaVia => "via", Acesso.Travessia => "travessia", _ => "retorno" });
         PluginContext.SaveSettings();
 
         var results = new List<RenderResult>();
-        using var tg = new TransactionGroup(doc, kind == Acesso.Retorno ? "SV - Abrir acesso: retorno" : "SV - Abrir acesso: nova via");
+        using var tg = new TransactionGroup(doc, kind switch { Acesso.Retorno => "SV - Abrir acesso: retorno", Acesso.Travessia => "SV - Abrir acesso: travessia", _ => "SV - Abrir acesso: nova via" });
         tg.Start();
         if (kind == Acesso.Retorno && forma == FormaRetorno.Rotatoria)
         {
@@ -355,6 +369,15 @@ internal static class RoadAccessCommand
             r.RaioInterno = raioInt > 0.5 ? raioInt : null;
             r.Espera = espera > 0.5 ? espera : null;
             setup.Retornos.Add(r);
+            results.AddRange(Regenerate(uidoc, pav, setup));
+        }
+        else if (kind == Acesso.Travessia)
+        {
+            var setup = RoadTemplates.FromJson(pav.SetupJson)
+                        ?? throw new UserMessageException("Esta via não guardou a seção transversal (versão anterior ou Pista): use Editar → A via inteira uma vez e depois abra o acesso.");
+            if (!(setup.TwoWay && setup.Center == CenterTreatment.Canteiro && setup.MedianType == TipoCanteiro.Fisico))
+                throw new UserMessageException("A via clicada não tem canteiro central físico: desenhe a faixa de pedestres com a ferramenta Faixa de pedestres.");
+            setup.TravessiasCanteiro.Add(tv);
             results.AddRange(Regenerate(uidoc, pav, setup));
         }
         else
@@ -376,7 +399,7 @@ internal static class RoadAccessCommand
             results.AddRange(created);
         }
         tg.Assimilate();
-        CommandBase.ReportResults(kind == Acesso.Retorno ? "Retorno" : "Nova via", results);
+        CommandBase.ReportResults(kind switch { Acesso.Retorno => "Retorno", Acesso.Travessia => "Travessia sobre o canteiro", _ => "Nova via" }, results);
         return Result.Succeeded;
     }
 

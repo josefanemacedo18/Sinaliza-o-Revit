@@ -186,14 +186,30 @@ public static class EdgeProfile
                 for (int i = 0; i < n; i++) acc[i] += bd.WidthA * (1 - weights[i]) + bd.WidthB * weights[i];
                 if (acc.Zip(d0, (x, y) => x - y).Max() < 0.01) continue;
                 var sg = inside ? -1 : 1;
-                var ring = new List<Vec2>();
-                for (int i = 0; i < n; i++) ring.Add(chain[i] + normals[i] * (sg * d0[i]));
-                for (int i = n - 1; i >= 0; i--) ring.Add(chain[i] + normals[i] * (sg * acc[i]));
-                foreach (var pg in PolygonOps.Union(new[] { new Polygon2(ring) }).Where(pg => pg.Area > 1e-3))
+                // Faixa = área varrida até a borda externa menos a varrida até a interna. Num raio menor que o afastamento
+                // (esquina aguda com raio reduzido) a borda externa dá uma volta sobre si mesma: o anel "interna → externa"
+                // se cruzava e as faixas (meio-fio, grama, passeio) se sobrepunham.
+                var band = d0.Max() < 1e-6 ? Swept(chain, normals, acc, sg) : PolygonOps.Difference(Swept(chain, normals, acc, sg), Swept(chain, normals, d0, sg));
+                foreach (var pg in band.Where(pg => pg.Area > 1e-3))
                     res.Add((pg, bd.Attr, inside));
             }
         }
         return res;
+    }
+
+    /// <summary>Área entre a linha e o afastamento <paramref name="d"/> (por ponto) do lado <paramref name="sg"/> da normal.</summary>
+    private static List<Polygon2> Swept(IReadOnlyList<Vec2> chain, IReadOnlyList<Vec2> normals, IReadOnlyList<double> d, int sg)
+    {
+        var quads = new List<Polygon2>();
+        for (int i = 0; i + 1 < chain.Count; i++)
+        {
+            if (d[i] < 1e-6 && d[i + 1] < 1e-6) continue;
+            var a = chain[i];
+            var b = chain[i + 1];
+            var q = new[] { a, b, b + normals[i + 1] * (sg * d[i + 1]), a + normals[i] * (sg * d[i]) };
+            if (Math.Abs(Polygon2.SignedArea(q)) > 1e-8) quads.Add(new Polygon2(q));
+        }
+        return PolygonOps.Union(quads);
     }
 
     /// <summary>Alinhamento (maior subsequência comum pelo código) de duas listas de faixas.</summary>
