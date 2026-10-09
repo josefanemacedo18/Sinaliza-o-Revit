@@ -128,6 +128,25 @@ public sealed partial class RoadSetup
     /// <summary>Travessias de pedestres sobre o canteiro central no meio da quadra – geradas com a via.</summary>
     public List<TravessiaCanteiro> TravessiasCanteiro { get; set; } = new();
 
+    /// <summary>
+    /// Travessias das extensões de calçada: linhas pintadas da via interrompidas na faixa e vagas a 5 m de cada lado dela
+    /// (distância [a confirmar]). Estacas no eixo: acompanham a via.
+    /// </summary>
+    private void ExtensionBreaks(List<MarkingDefinition> res, RoadPavementDefinition pav)
+    {
+        var roadPts = pav.PathRef.Points;
+        bool OnRoadPath(PathReference pr) => pr.Points.Count == roadPts.Count && pr.Points.Count > 0 && pr.Points[0].DistanceTo(roadPts[0]) < 1e-6;
+        foreach (var e in ExtensoesCalcada.Where(e => e.Travessia))
+        {
+            var sc = e.EstacaTravessia;
+            var hw = Math.Max(1.0, e.LarguraFaixa) / 2;
+            foreach (var l in res.OfType<LinearMarkingDefinition>().Where(l => !IntersectionGenerator.IsPhysical(l) && OnRoadPath(l.PathRef)))
+                l.Breaks.Add(new StationRange { Start = sc - hw, End = sc + hw });
+            foreach (var pk in res.OfType<ParkingMarkingDefinition>().Where(p => OnRoadPath(p.PathRef)))
+                pk.Breaks.Add(new StationRange { Start = sc - hw - 5, End = sc + hw + 5 });
+        }
+    }
+
     /// <summary>Rampa-modelo das travessias sobre o canteiro (NBR 9050: 8,33 %, abas de 10 %, piso tátil de alerta).</summary>
     private RampDefinition MedianRampTemplate(double width) => new()
     {
@@ -146,9 +165,9 @@ public sealed partial class RoadSetup
     /// sob as rampas, interrupção dos elementos físicos do canteiro no trecho refeito, piso tátil, rampas e a faixa.
     /// </summary>
     private void ApplyTravessias(List<MarkingDefinition> res, RoadPavementDefinition? pav, Polyline2? axis, double z,
-        Func<MarkingDefinition, MarkingDefinition> add)
+        Func<MarkingDefinition, MarkingDefinition> add, List<TravessiaCanteiro> crossings)
     {
-        if (TravessiasCanteiro.Count == 0 || axis == null || axis.Length < 1) return;
+        if (crossings.Count == 0 || axis == null || axis.Length < 1) return;
         if (!(TwoWay && Center == CenterTreatment.Canteiro && MedianType == TipoCanteiro.Fisico && MedianWidth > 0.3))
         {
             Warnings.Add("Travessia sobre o canteiro: a via não tem canteiro central físico – travessia ignorada.");
@@ -160,7 +179,7 @@ public sealed partial class RoadSetup
             var ss = Math.Clamp(s, 0, axis.Length);
             return axis.PointAt(ss) + axis.TangentAt(ss).PerpLeft * o;
         }
-        foreach (var tv in TravessiasCanteiro)
+        foreach (var tv in crossings)
         {
             var s = Math.Clamp(tv.Estaca, 0, axis.Length);
             var w = Math.Max(1.0, tv.Largura);
@@ -169,6 +188,7 @@ public sealed partial class RoadSetup
             var tag = $"Travessia na estaca {PontoLargura.FormatEstaca(s)}";
             foreach (var msg in MedianCrossing.Warnings(MedianWidth, tpl, tv.Tipo)) Warnings.Add($"{tag}: {msg}.");
             var mode = MedianCrossing.Resolve(MedianWidth, tpl, tv.Tipo);
+            if (!tv.Faixa && pav != null && ExtensoesCalcada.Any(e => e.Id == tv.Id && !e.Rampa)) mode = TipoTravessiaCanteiro.NivelDaPista;
             // Trecho do canteiro refeito: a faixa (passagem rebaixada) ou as rampas com as abas.
             var half = mode == TipoTravessiaCanteiro.Rampas ? IntersectionGenerator.RampHalfExtent(tpl) : hw - 0.1;
             if (s - half < 0.5 || s + half > axis.Length - 0.5) { Warnings.Add($"{tag}: fora do trecho da via – ignorada."); continue; }

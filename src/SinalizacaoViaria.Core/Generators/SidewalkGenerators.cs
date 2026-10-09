@@ -70,7 +70,7 @@ public static class SidewalkGenerator
             case TipoTransicao.Chanfro:
             {
                 var lt = Math.Max(0.05, radius);
-                if (lt > avail) { lt = avail; warnings?.Add("Orelha curta para o chanfro: transição reduzida."); }
+                if (lt > avail) { lt = avail; warnings?.Add("Extensão de calçada curta para o chanfro: transição reduzida."); }
                 half.Add(new Vec2(0, 0));
                 half.Add(new Vec2(lt, D));
                 return half;
@@ -85,7 +85,7 @@ public static class SidewalkGenerator
                     var L = 2 * avail;
                     R = D <= L / 2 ? (L * L / 4 + D * D) / (4 * D) : L / 4;
                     lt = Math.Min(Lt(R), avail);
-                    warnings?.Add($"Orelha curta para o raio pedido: raio de transição reduzido para {R:0.00} m.");
+                    warnings?.Add($"Extensão de calçada curta para o raio pedido: raio de transição reduzido para {R:0.00} m.");
                 }
                 var theta = D <= 2 * R ? Math.Acos(1 - D / (2 * R)) : Math.PI / 2;
                 const int n = 10;
@@ -237,10 +237,10 @@ public static class SidewalkGenerator
     public static MarkingGeometry CurbExtension(CurbExtensionDefinition d, Polyline2 path, BuildContext ctx)
     {
         var L = path.Length;
-        if (L < 1.0) return Fail("Trecho da orelha muito curto (mínimo 1 m ao longo do meio-fio).");
+        if (L < 1.0) return Fail("Trecho da extensão de calçada muito curto (mínimo 1 m ao longo do meio-fio).");
         var geo = new MarkingGeometry();
         var fp = EarFootprint(d, path);
-        if (fp == null) return Fail("Não foi possível montar o contorno da orelha.");
+        if (fp == null) return Fail("Não foi possível montar o contorno da extensão de calçada.");
         EarProfile(d, L, geo.Warnings);
         var sign = d.SidewalkOnLeft ? -1.0 : 1.0;
         var cw = Math.Max(0.05, d.CurbWidth);
@@ -248,7 +248,10 @@ public static class SidewalkGenerator
         // Meio-fio na FACE EXTERNA da orelha (voltado para a pista), de uma ponta à outra; atrás da face original o meio-fio
         // antigo sai (ver EarCutZone) e o lugar dele vira piso: a orelha é um avanço da calçada, no mesmo nível dela.
         var outer = EarOuterEdge(d, path);
-        var curb = PolygonOps.Intersect(new[] { fp }, PolygonOps.Strip(outer, 2 * cw, roundJoins: true)).Where(p => p.Area >= 0.005).ToList();
+        // Meio-fio já simplificado: o piso é recortado por ele e as duas peças ficam com a mesma borda (na face curva, simplificar
+        // cada peça por si deixava frestas de milímetros entre elas).
+        var curb = PolygonOps.Intersect(new[] { fp }, PolygonOps.Strip(outer, 2 * cw, roundJoins: true)).Where(p => p.Area >= 0.005)
+            .Select(p => p.Simplified()).Where(p => p is { Area: >= 1e-4 }).Cast<Polygon2>().ToList();
         var back = EarBackFill(d, path, fp);
 
         var planter = new List<Polygon2>();
@@ -260,25 +263,43 @@ public static class SidewalkGenerator
             var x1 = L - lt - d.PlanterMargin;
             var o1 = d.Depth - cw - d.PlanterMargin;
             var o0 = Math.Max(0.6, o1 - d.PlanterWidth);
-            if (x1 - x0 > 0.3 && o1 - o0 > 0.2)
+            // Trechos do canteiro: a parte com o avanço inteiro, ou só os trechos indicados (fora da travessia e do mobiliário).
+            var ranges = d.PlanterRanges is { Count: > 0 } pr
+                ? pr.Select(r => (Math.Max(x0, Math.Min(r.Start, r.End)), Math.Min(x1, Math.Max(r.Start, r.End)))).Where(r => r.Item2 - r.Item1 > 0.3).ToList()
+                : x1 - x0 > 0.3 ? new List<(double, double)> { (x0, x1) } : new List<(double, double)>();
+            if (ranges.Count > 0 && o1 - o0 > 0.2)
             {
-                // Faixa paralela à face do meio-fio (contorna a esquina com juntas arredondadas).
-                var axis = new Polyline2(path.SubPoints(x0, x1)).Offset(sign * (o0 + o1) / 2);
-                planter = PolygonOps.Intersect(PolygonOps.Strip(axis.Points, o1 - o0, roundJoins: true), PolygonOps.Offset(new[] { fp }, -(cw + d.PlanterMargin)));
-                if (d.Trees > 0 && axis.Length > 0.1)
+                var axes = new List<Polyline2>();
+                foreach (var (r0, r1) in ranges)
+                {
+                    // Faixa paralela à face do meio-fio (contorna a esquina com juntas arredondadas).
+                    var axis = new Polyline2(path.SubPoints(r0, r1)).Offset(sign * (o0 + o1) / 2);
+                    planter.AddRange(PolygonOps.Intersect(PolygonOps.Strip(axis.Points, o1 - o0, roundJoins: true), PolygonOps.Offset(new[] { fp }, -(cw + d.PlanterMargin))));
+                    if (axis.Length > 0.1) axes.Add(axis);
+                }
+                // Árvores distribuídas pelos trechos, proporcionais ao comprimento de cada um.
+                var total = axes.Sum(a => a.Length);
+                if (d.Trees > 0 && total > 0.1)
                     AddTrees(geo, ctx.Catalog, Enumerable.Range(0, d.Trees).Select(i =>
                     {
-                        var s = axis.Length * (i + 0.5) / d.Trees;
-                        return (axis.PointAt(s), axis.TangentAt(s));
+                        var s = total * (i + 0.5) / d.Trees;
+                        foreach (var a in axes)
+                        {
+                            if (s <= a.Length + 1e-9) return (a.PointAt(s), a.TangentAt(s));
+                            s -= a.Length;
+                        }
+                        return (axes[^1].PointAt(axes[^1].Length), axes[^1].TangentAt(axes[^1].Length));
                     }), d.Height);
             }
-            else geo.Warnings.Add("Orelha pequena demais para o canteiro com as margens indicadas.");
+            else geo.Warnings.Add("Extensão de calçada pequena demais para o canteiro com as margens indicadas.");
         }
 
-        var platform = PolygonOps.Difference(PolygonOps.Union(back.Append(fp)), curb.Concat(planter));
+        // Extensão + faixa do meio-fio antigo: na emenda curva a união deixava furos de milímetros (arredondamento) – saem.
+        var whole = PolygonOps.Union(back.Append(fp))
+            .Select(p => new Polygon2(p.Outer, p.Holes.Where(h => Math.Abs(Polygon2.SignedArea(h)) >= 1e-4))).ToList();
+        var platform = PolygonOps.Difference(whole, curb.Concat(planter));
         AddRaised(geo, platform, MarkingColor.Concreto, d.Height);
-        foreach (var c in curb)
-            if (c.Simplified() is { Area: >= 1e-4 } cs) geo.Pieces.Add(new MarkingPiece(cs, MarkingColor.Concreto) { Thickness = Math.Max(0.001, d.Height), Layer = "MEIO-FIO" });
+        foreach (var c in curb) geo.Pieces.Add(new MarkingPiece(c, MarkingColor.Concreto) { Thickness = Math.Max(0.001, d.Height), Layer = "MEIO-FIO" });
         AddRaised(geo, planter, MarkingColor.Grama, d.Height);
         geo.PathLength = L;
         geo.PaintedLength = L;

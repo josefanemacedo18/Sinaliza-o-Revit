@@ -1,5 +1,6 @@
 using Autodesk.Revit.DB;
 using SinalizacaoViaria.Revit.Infrastructure;
+using SinalizacaoViaria.Core.Definitions;
 
 namespace SinalizacaoViaria.Revit.Updater;
 
@@ -110,6 +111,12 @@ public sealed class MarkingUpdater : IUpdater
                 catch (Exception ex) { Log.Error($"Updater {def.DisplayCode}", ex); }
             }
             var inter = new IntersectionService(doc, service);
+            // Extensões de calçada, travessias no meio da quadra e piso tátil das vias cujo eixo mudou: refeitos no lugar.
+            foreach (var pv in affected.OfType<RoadPavementDefinition>().ToList())
+            {
+                try { inter.RefreshRoadFeatures(pv); }
+                catch (Exception ex) { Log.Error("Updater – extensões da via", ex); }
+            }
             var processed = new HashSet<string>();
             if (PluginContext.Settings.AutoIntersect)
             {

@@ -82,7 +82,7 @@ internal static class InfraForms
         if (!types.Any(t => t.Item2 == d.Type)) { d.Type = types[0].Item2; d.ApplyDefaults(); }
         var w = new FormWindow(edit ? "Editar drenagem" : inlets ? "Boca de lobo / PV" : "Grelha de drenagem",
             inlets ? "Bocas de lobo e poços de visita" : "Grelhas e canaletas de drenagem",
-            "Clique junto ao MEIO-FIO (de uma via, interseção, rotatória, orelha ou meio-fio avulso): o dispositivo encaixa na face da guia, " +
+            "Clique junto ao MEIO-FIO (de uma via, interseção, rotatória, extensão de calçada ou meio-fio avulso): o dispositivo encaixa na face da guia, " +
             "adota a altura dela e SUBSTITUI o trecho de pavimento, sarjeta, meio-fio e calçada que ocupa (rebaixo, guia chapéu, laje e tampa). " +
             "Em série: clique o início e o fim no mesmo meio-fio e os dispositivos saem a cada espaçamento. Grelhas com barras transversais ao fluxo são seguras para ciclistas.",
             d, () =>
@@ -848,7 +848,7 @@ internal static class DrainageCommand
     }
 
     private const string NoCurb = "Nenhum meio-fio encontrado perto do clique. Clique junto à face de uma guia do plugin " +
-        "(via com calçada, interseção, rotatória, orelha ou meio-fio avulso) – ou use o tipo livre (grelha de piso / PV).";
+        "(via com calçada, interseção, rotatória, extensão de calçada ou meio-fio avulso) – ou use o tipo livre (grelha de piso / PV).";
 
     /// <summary>
     /// Dispositivos do clique: livres (PV, grelha de piso) no ponto, alinhados à via mais próxima; os demais encaixados no

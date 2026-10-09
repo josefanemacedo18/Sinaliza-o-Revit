@@ -448,10 +448,10 @@ internal sealed partial class AutoTestRunner
                 Commit(s, new[] { d }, "rampa");
                 s.Note($"Calçada/meio-fio recortados em {RampCutter.Apply(_uidoc, d)} elemento(s).");
             });
-        Step("Calçadas", "Orelha (avanço de calçada sobre o estacionamento)", s =>
+        Step("Calçadas", "Extensão de calçada (avanço sobre o estacionamento)", s =>
         {
             var d = new CurbExtensionDefinition { Output = Out(), PathRef = Pts((500, Y0 - face), (485, Y0 - face)) };
-            Commit(s, new[] { d }, "orelha");
+            Commit(s, new[] { d }, "extensão de calçada");
             FootprintCutter.ApplyFor(_uidoc, d);
         });
         foreach (var v in Enum.GetValues<TipoAreaCalcada>())

@@ -865,8 +865,13 @@ public sealed class CurbExtensionDefinition : MarkingDefinition
     public bool CutRoadMarkings { get; set; } = true;
     /// <summary>Raio mínimo do meio-fio da orelha nas esquinas (0 = acompanha a esquina com raio igual ao avanço).</summary>
     public double CornerRadius { get; set; }
+    /// <summary>
+    /// Trechos (distância ao longo da face do meio-fio) com canteiro – deixa livres a travessia e o mobiliário. Nulo = o
+    /// canteiro ocupa toda a parte com o avanço inteiro.
+    /// </summary>
+    public List<StationRange>? PlanterRanges { get; set; }
 
-    public override string KindName => "Orelha de calçada";
+    public override string KindName => "Extensão de calçada";
     public override string DisplayCode => "ORELHA";
     public override PathReference? Path => PathRef;
     public override void SetPath(PathReference path) => PathRef = path;
@@ -1622,6 +1627,7 @@ public sealed class IntersectionDefinition : MarkingDefinition
         CurbExtensionEnds = o.CurbExtensionEnds;
         CurbExtensionEndRadius = o.CurbExtensionEndRadius;
         CurbExtensionToParking = o.CurbExtensionToParking;
+        CurbExtensionsOpposite = o.CurbExtensionsOpposite;
     }
 
     // Orelhas de calçada nas esquinas (avanço sobre a faixa de estacionamento): a travessia e as rampas vão para a borda da orelha.
@@ -1637,6 +1643,11 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public double CurbExtensionEndRadius { get; set; } = 1.5;
     /// <summary>A orelha vai até onde começa o estacionamento (fim da área sem vagas junto ao cruzamento).</summary>
     public bool CurbExtensionToParking { get; set; }
+    /// <summary>
+    /// Com as extensões das esquinas ligadas, o lado da travessia que não é esquina (lado contínuo de um T) também recebe uma
+    /// extensão, com a rampa no eixo da faixa. Falso (padrão dos projetos salvos) = só as esquinas.
+    /// </summary>
+    public bool CurbExtensionsOpposite { get; set; }
 
     /// <summary>Ajustes por ramo (raio da esquina, faixa, rampas, controle, ilha/bolsão). Sem ajuste = o geral.</summary>
     public List<IntersectionLegSettings> LegSettings { get; set; } = new();
@@ -1681,11 +1692,34 @@ public sealed class IntersectionLegSettings
     public double? CurbExtensionLengthOther { get; set; }
     /// <summary>A orelha desta esquina vai até onde começa o estacionamento.</summary>
     public bool? CurbExtensionToParking { get; set; }
+    /// <summary>Extensão da esquina: avanço (m), forma e raio das pontas, rampa e piso tátil (nulo = geral da interseção).</summary>
+    public double? CurbExtensionDepth { get; set; }
+    public TipoTransicao? CurbExtensionEnds { get; set; }
+    public double? CurbExtensionEndRadius { get; set; }
+    public bool? CurbExtensionRamp { get; set; }
+    public bool? CurbExtensionTactile { get; set; }
+
+    /// <summary>
+    /// Extensão no lado oposto da travessia deste ramo quando ele não é esquina (lado contínuo de um T). Nulo = a opção geral
+    /// (extensões das esquinas com o lado contínuo ligado).
+    /// </summary>
+    public bool? OppositeExtension { get; set; }
+    public double? OppositeExtensionDepth { get; set; }
+    /// <summary>Comprimento a mais (m) além da faixa e das rampas, do lado do nó e do lado de fora.</summary>
+    public double? OppositeExtensionBefore { get; set; }
+    public double? OppositeExtensionAfter { get; set; }
+    public TipoTransicao? OppositeExtensionEnds { get; set; }
+    public double? OppositeExtensionEndRadius { get; set; }
+    public bool? OppositeExtensionRamp { get; set; }
+    public bool? OppositeExtensionTactile { get; set; }
 
     [JsonIgnore]
     public bool IsEmpty => CornerRadius == null && Crosswalk == null && CrosswalkWidth == null && CrosswalkSetback == null
                            && Ramps == null && Control == null && Treatment == null && CurbExtension == null && CurbExtensionLength == null
-                           && CurbExtensionLengthOther == null && CurbExtensionToParking == null;
+                           && CurbExtensionLengthOther == null && CurbExtensionToParking == null && CurbExtensionDepth == null
+                           && CurbExtensionEnds == null && CurbExtensionEndRadius == null && CurbExtensionRamp == null && CurbExtensionTactile == null
+                           && OppositeExtension == null && OppositeExtensionDepth == null && OppositeExtensionBefore == null && OppositeExtensionAfter == null
+                           && OppositeExtensionEnds == null && OppositeExtensionEndRadius == null && OppositeExtensionRamp == null && OppositeExtensionTactile == null;
 }
 
 /// <summary>Uso da linha de continuidade (LCO) na boca das vias secundárias.</summary>
@@ -2014,6 +2048,18 @@ public sealed class TactileRouteDefinition : MarkingDefinition
     public bool Relief { get; set; } = true;
     /// <summary>Nível do piso onde as placas são assentadas (m acima da pista – topo da calçada).</summary>
     public double Elevation { get; set; } = 0.15;
+    /// <summary>
+    /// Ramais da rota (pontos em planta), além do caminho principal: cada ramal que começa ou termina sobre outro trecho
+    /// forma uma junção (área de alerta). Nulo = só o caminho.
+    /// </summary>
+    public List<List<Vec2>>? Branches { get; set; }
+
+    public override void Translate(Vec2 delta, double dz)
+    {
+        if (Branches == null) return;
+        foreach (var b in Branches)
+            for (int i = 0; i < b.Count; i++) b[i] += delta;
+    }
 
     public override string KindName => "Rota tátil";
     public override string DisplayCode => AlertOnly ? "PTA" : "ROTA-TATIL";

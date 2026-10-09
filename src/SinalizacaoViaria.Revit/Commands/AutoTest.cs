@@ -40,7 +40,7 @@ public sealed class CmdAutoteste : CommandBase
             .Check("Vias e conexões (interseções, rotatórias, cul-de-sac)", () => o.Roads, v => { o.Roads = v; o.Connections = v; })
             .Check("Sinalização horizontal", () => o.Horizontal, v => o.Horizontal = v)
             .Check("Sinalização vertical, dispositivos e mobiliário urbano", () => o.Vertical, v => o.Vertical = v)
-            .Check("Calçadas: rampas, orelha, áreas, canteiros, moderação, piso tátil, ferrovia, drenagem", () => o.Sidewalks, v => o.Sidewalks = v)
+            .Check("Calçadas: rampas, extensão de calçada, áreas, canteiros, moderação, piso tátil, ferrovia, drenagem", () => o.Sidewalks, v => o.Sidewalks = v)
             .Check("Topografia e Perfil da Via (pesado)", () => o.Terrain, v => o.Terrain = v)
             .Check("Obras: viaduto, ponte, túnel, trincheira, muros, taludes, nó viário (pesado)", () => o.Works, v => o.Works = v)
             .Check("Edição e detalhamento", () => o.Editing, v => { o.Editing = v; o.Detailing = v; })

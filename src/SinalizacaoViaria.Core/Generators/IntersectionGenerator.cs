@@ -782,6 +782,19 @@ public static partial class IntersectionGenerator
             s.CurbExtensionLength = copy.CurbExtensionLength;
             s.CurbExtensionLengthOther = copy.CurbExtensionLengthOther;
             s.CurbExtensionToParking = copy.CurbExtensionToParking;
+            s.CurbExtensionDepth = src.CurbExtensionDepth;
+            s.CurbExtensionEnds = src.CurbExtensionEnds;
+            s.CurbExtensionEndRadius = src.CurbExtensionEndRadius;
+            s.CurbExtensionRamp = src.CurbExtensionRamp;
+            s.CurbExtensionTactile = src.CurbExtensionTactile;
+            s.OppositeExtension = src.OppositeExtension;
+            s.OppositeExtensionDepth = src.OppositeExtensionDepth;
+            s.OppositeExtensionBefore = src.OppositeExtensionBefore;
+            s.OppositeExtensionAfter = src.OppositeExtensionAfter;
+            s.OppositeExtensionEnds = src.OppositeExtensionEnds;
+            s.OppositeExtensionEndRadius = src.OppositeExtensionEndRadius;
+            s.OppositeExtensionRamp = src.OppositeExtensionRamp;
+            s.OppositeExtensionTactile = src.OppositeExtensionTactile;
         }
         d.LegSettings.RemoveAll(x => x.IsEmpty);
     }
@@ -866,6 +879,20 @@ public static partial class IntersectionGenerator
         if (L.RampPlans.TryGetValue((leg.Road, leg.Sign), out var p)) return p;
         p = PlanRamps(d, L.Roads[leg.Road].Def, leg.Sign, CrosswalkWidthOf(d, L, leg),
             Math.Max(0, LegSet(d, L, leg)?.CrosswalkSetback ?? d.CrosswalkSetback), CrosswalkInset(L, leg, 1), CrosswalkInset(L, leg, -1));
+        // Ajustes de cada extensão: sem rampa naquele lado, ou piso tátil próprio.
+        RampDefinition? Ear(RampDefinition? rp, int side)
+        {
+            if (rp == null || !L.EarSides.TryGetValue((leg.Road, leg.Sign, side), out var e)) return rp;
+            if (!e.Ramp) return null;
+            if (e.Tactile is { } t && t != rp.Tactile)
+            {
+                var c = (RampDefinition)rp.ShallowCopy();
+                c.Tactile = t;
+                return c;
+            }
+            return rp;
+        }
+        p = p with { Hi = Ear(p.Hi, 1), Lo = Ear(p.Lo, -1) };
         L.RampPlans[(leg.Road, leg.Sign)] = p;
         return p;
     }
@@ -1528,7 +1555,7 @@ public static partial class IntersectionGenerator
         L.Legs.AddRange(legs);
         var warn0 = L.Warnings.Count;
         FinishRampPlans(d, L, pav);
-        if (EarCorners(d, L).Any())
+        if (EarCorners(d, L).Any() || StraightEarSides(d, L).Any())
         {
             // Orelhas nas esquinas: planejadas com folga, as rampas refeitas na borda delas (a travessia fica sobre a orelha)
             // e o plano final com a posição definitiva das travessias.
@@ -1889,6 +1916,10 @@ public static partial class IntersectionGenerator
             return outside.Count == 0 ? new() : PolygonOps.Intersect(phys, PolygonOps.Offset(outside, 0.6, true));
         }
         if (member is RoadPavementDefinition || IsPhysical(member)) return phys;
+        // Elementos derivados da via (extensões de calçada, piso tátil, rampas e mobiliário das travessias – ids "via:..."):
+        // saem só onde a interseção refaz a calçada, não na área de pintura das aproximações.
+        if (member is CurbExtensionDefinition or TactileRouteDefinition || member is RampDefinition or UrbanElementDefinition && member.Id.Contains(':'))
+            return phys;
         if (member is ParkingMarkingDefinition) return L.ParkingCuts.GetValueOrDefault(road) ?? new();
         if (member is DeviceMarkingDefinition) return PolygonOps.Union(phys.Concat(L.PaintCuts.GetValueOrDefault(road) ?? new()));
         var paint = L.PaintCuts.GetValueOrDefault(road) ?? new();
@@ -2761,6 +2792,18 @@ public static partial class IntersectionGenerator
                     Add(g);
                 }
             }
+        }
+        // Piso tátil nas calçadas (opção das vias): a rede segue pelas esquinas e liga cada rampa das travessias (as do canteiro
+        // central ficam de fora).
+        if (TactileNetworkOn(L))
+        {
+            hierarchy = L.Roads[L.Main].Def.Hierarchy;
+            var sideRamps = res.OfType<RampDefinition>().Where(r =>
+            {
+                var f = RampGenerator.FrameOf(new Polyline2(r.PathRef.Points));
+                return !L.Obstacles.Any(o => o.Contains(f.P(0, 0.3)));
+            }).ToList();
+            foreach (var t in TactileNetwork(L, z, sideRamps)) Add(t);
         }
         return res;
     }

@@ -99,7 +99,7 @@ public sealed class CmdConexao : CommandBase
         {
             case Acao.Intersecao:
             {
-                var d = UiHelpers.Remembered<IntersectionDefinition>("Intersecao") ?? new IntersectionDefinition();
+                var d = UiHelpers.Remembered<IntersectionDefinition>("Intersecao") ?? new IntersectionDefinition { CurbExtensionsOpposite = true };
                 // Interseção existente: a janela mostra as vias reais e permite ajustar cada esquina e cada ramo.
                 IReadOnlyList<IntersectionForms.RoadOption>? roadOptions = null;
                 IntersectionForms.RealScene? real = null;

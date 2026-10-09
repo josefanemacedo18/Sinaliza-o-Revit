@@ -50,7 +50,7 @@ public static class RibbonBuilder
         Split(via, "SvCalcadas", "Calçadas",
             Data(typeof(CmdCalcadas), "Meio-fio, Calçada e Sarjeta", "calcada",
                 "Meios-fios, sarjetas, sarjetões, calçadas, grama e faixas de caminhada ao longo de linhas – ou 'Junto ao bordo de uma via', empilhando a partir do bordo (fazem parte da via e das conexões)."),
-            Data(typeof(CmdOrelha), "Orelha de Calçada", "orelha",
+            Data(typeof(CmdOrelha), "Extensão de Calçada", "orelha",
                 "Avanço de calçada sobre o estacionamento, com cada ponta em curva, chanfro ou acompanhando a calçada; meio-fio, canteiro e árvores."),
             Data(typeof(CmdAreaCalcada), "Área de Calçada", "areacalcada",
                 "Contorno livre (esquinas, ilhas, parklets, ciclovia no nível da calçada, faixa de serviço) com meio-fio e cantos arredondados."),

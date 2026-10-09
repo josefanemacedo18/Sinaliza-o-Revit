@@ -108,6 +108,8 @@ public partial class RoadWindow : Window
     private bool _loading = true;
     private bool _loadingDetails;
     private bool _editing;
+    /// <summary>Seção carregada na edição: retornos, travessias e extensões de calçada passam para a seção nova.</summary>
+    private RoadSetup? _loaded;
 
     public RoadSetup? Setup { get; private set; }
     public TipoConexao Connection { get; private set; } = TipoConexao.Intersecao;
@@ -251,6 +253,7 @@ public partial class RoadWindow : Window
     public void LoadForEdit(RoadSetup s)
     {
         _editing = true;
+        _loaded = s.Clone();
         Title = "Editar via – seção transversal";
         LoadSetup(s);
         if (CbTemplate.Items.Count > 0) CbTemplate.SelectedIndex = -1;
@@ -268,6 +271,7 @@ public partial class RoadWindow : Window
         var was = _loading;
         _loading = true;
         Select(CbHierarchy, s.Hierarchy);
+        CkTactile.IsChecked = s.PisoTatil;
         TbCornerRadius.Text = s.CornerRadius is { } cr ? UiHelpers.F(cr) : "";
         RbTwoWay.IsChecked = s.TwoWay;
         RbOneWay.IsChecked = !s.TwoWay;
@@ -353,6 +357,14 @@ public partial class RoadWindow : Window
         if (s.Right.Count == 0 && s.Left.Count == 0) throw new FormatException("Adicione ao menos um elemento à seção.");
         s.LargurasVariaveis = _widths.Select(w => w.P.Clone()).OrderBy(p => p.Estaca).ToList();
         s.Recuos = _recesses.Select(r => r.R.Clone()).ToList();
+        s.PisoTatil = CkTactile.IsChecked == true;
+        if (_loaded != null)
+        {
+            // O que fica gravado na via e não aparece nesta janela segue com ela.
+            s.Retornos = _loaded.Retornos.Select(r => r.Clone()).ToList();
+            s.TravessiasCanteiro = _loaded.TravessiasCanteiro.Select(t => t.Clone()).ToList();
+            s.ExtensoesCalcada = _loaded.ExtensoesCalcada.Select(e => e.Clone()).ToList();
+        }
         s.Absorcao = Selected<AbsorcaoLargura>(CbAbsorb);
         s.TransicaoSuave = CkSmoothWidth.IsChecked == true;
         if (CkStuds.IsChecked == true && CbStuds.SelectedItem is string st)

@@ -276,7 +276,8 @@ public static class MarkingBuilder
         NorthArrowDefinition na => DetailGenerator.NorthArrow(na, ctx),
         RoadPavementDefinition rp2 => path == null ? Missing("Eixo da via não encontrado.") : RoadGenerator.Pavement(rp2, path),
         IntersectionDefinition it => IntersectionGenerator.Build(it, ctx),
-        TactileRouteDefinition tr => path == null ? Missing("Caminho da rota tátil não encontrado.") : TactileGenerator.Route(tr, new[] { path }, tr.Elevation),
+        TactileRouteDefinition tr => path == null ? Missing("Caminho da rota tátil não encontrado.")
+            : TactileGenerator.Route(tr, new[] { path }.Concat((tr.Branches ?? new()).Where(b => b.Count >= 2).Select(b => new Polyline2(b))).ToList(), tr.Elevation),
         RoundaboutDefinition rb => RoundaboutGenerator.Build(rb, ctx),
         CurbExtensionDefinition ce => path == null ? Missing("Linha da face do meio-fio não encontrada.") : SidewalkGenerator.CurbExtension(ce, path, ctx),
         SidewalkAreaDefinition sa => path == null ? Missing("Contorno da área não encontrado.") : SidewalkGenerator.Area(sa, path),
@@ -887,7 +888,7 @@ public static class MarkingBuilder
                 return new MarkingInfo("INTERSECAO", "Interseção – esquinas, meio-fio e calçadas do cruzamento", GrupoMarca.Urbanizacao,
                     "Projeto geométrico viário (raios de esquina)", "un");
             case CurbExtensionDefinition:
-                return new MarkingInfo("ORELHA", "Orelha (avanço) de calçada", GrupoMarca.Urbanizacao, "Projeto urbano – desenho de calçadas / NBR 9050", "un");
+                return new MarkingInfo("ORELHA", "Extensão de calçada (avanço)", GrupoMarca.Urbanizacao, "Projeto urbano – desenho de calçadas / NBR 9050", "un");
             case SidewalkAreaDefinition sa:
                 return new MarkingInfo(sa.DisplayCode, sa.Type switch
                 {

@@ -98,6 +98,9 @@ public sealed class CmdEditar : CommandBase
             var members = MarkingStorage.Definitions(uidoc.Document).Where(d => d.GroupId == gid).ToList();
             var pavement = members.OfType<RoadPavementDefinition>().FirstOrDefault();
             var hasRetornos = RoadTemplates.FromJson(pavement?.SetupJson)?.Retornos.Count > 0;
+            // Extensão de calçada da via (ou a travessia, rampas, mobiliário e piso tátil dela): edita a extensão.
+            if (pavement != null && RoadExtensionCommand.ExtensionIdOf(stored.Definition, pavement) is { } xid)
+                return RoadExtensionCommand.Edit(uidoc, pavement, xid);
             // Seta ou placa de um retorno em U: edita o retorno (a via é refeita com ele).
             if (pavement != null && hasRetornos && stored.Definition is SymbolMarkingDefinition { Code: "PEM-RE" } or SignDefinition { Code: "R-3" or "R-5a" or "R-6a" })
                 return RoadAccessCommand.EditRetornos(uidoc, pavement, stored.Definition switch

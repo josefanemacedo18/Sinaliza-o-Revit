@@ -17,7 +17,7 @@ Convenções usadas em todo o plugin:
 
 | Painel | Ferramentas |
 |---|---|
-| **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Orelha · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
+| **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Extensão de Calçada · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
 | **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (piso tátil · ciclovia · quebra-mola · cruzamento rodoferroviário) |
 | **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive **tachas e tachões** e guard rail) |
 | **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
@@ -553,7 +553,7 @@ fluxos de mesmo sentido e amarelo entre fluxos opostos (com a opção *dois lado
 Painel **Representação no Revit** (em todas as janelas):
 
 * **Pisos do Revit**: pavimento da pista (asfalto, bloquete, concreto), **calçadas, meios-fios, sarjetas e
-  grama** – das vias, interseções, rotatórias, cul-de-sacs, orelhas, áreas de calçada e canteiros – são
+  grama** – das vias, interseções, rotatórias, cul-de-sacs, extensões de calçada, áreas de calçada e canteiros – são
   criados como **Piso** (tipos *SV - {material} {espessura}*, com o material da sinalização), editáveis com
   as ferramentas nativas (**Editar contorno**, tipo, material, estrutura). Peças vizinhas do mesmo material
   viram um piso só. Se você trocar o tipo de um piso, a troca é mantida quando a via é regenerada.
@@ -659,7 +659,7 @@ criada 400 m à direita de tudo o que existe no projeto:
 | Conexões | interseção em cruz, T, esconsa, avenida × local; controles (PARE, preferência, semáforo), ilhas físicas/pintadas, ilhas de conversão, bolsões, raios pequeno/grande; conversão em rotatória; rotatórias de todos os tipos; cul-de-sac de todos os tipos e automático |
 | Horizontal | todas as linhas do catálogo com todas as variantes, zebrados (área, faixa, com furo), setas, legendas, vagas, inscrições, MAC, canalização, ciclovias, faixas de pedestres sobre a via, cruzamento rodoferroviário |
 | Vertical | dispositivos, placas (catálogo completo ou amostra), tipos de suporte, mobiliário (ponto e linha), famílias classificadas |
-| Calçadas | rampas (todos os tipos, com recorte), orelha, áreas de calçada, canteiros, moderação, piso tátil, via férrea, drenagem (todos os tipos e em série) |
+| Calçadas | rampas (todos os tipos, com recorte), extensão de calçada, áreas de calçada, canteiros, moderação, piso tátil, via férrea, drenagem (todos os tipos e em série) |
 | Largura e recuos / Segurança | via com largura variável e estreitamento do lote, baia de ônibus + faixas de desaceleração e aceleração, calçada com inclinação e níveis do alinhamento, arterial × coletora com LCO, sonorizadores (todos os tipos) e área de escape; via nova emendada na ponta de outra em ângulo (emenda concordada); várias linhas selecionadas virando uma malha de vias com T e cruz; recuo (baia) acrescentado numa via já criada; **via reconhecida em pisos comuns** (T feito com dois pisos, pista já modelada) |
 | Topografia | Toposolid de teste com encosta, dois morros e um vale; vias acompanhando o terreno e suavizadas; cruzamentos no relevo; Perfil da Via em todos os modos e aplicado com obras automáticas |
 | Obras | viaduto sobre outra via, ponte no vale, passarela, túnel, trincheira, muros (todos), taludes, nós viários, terraplenagem (simulação, aplicação, mapa) |
@@ -920,21 +920,38 @@ centro do balão para criar uma **rua sem saída** saindo dela: o ramal recebe u
 linhas, sarjeta, meio-fio, grama, calçada), a interseção em T é feita automaticamente e o balão usa o mesmo perfil de
 calçada. Com ESC, o balão é posicionado livremente por dois cliques.
 
-* **Orelha de Calçada – rápida, na esquina de uma interseção**: ao abrir a ferramenta, **clique na esquina** (perto do
-  meio-fio da via em que a orelha vai avançar) e informe **quanto ela avança pela calçada a partir da esquina** nessa via
-  (X m) e, se quiser, na outra via da esquina (Y m; 0 = só na via clicada) – ou marque **Terminar no início do
-  estacionamento**. Não é preciso desenhar linhas: a orelha fica ligada à interseção (ajuste da esquina) e é refeita com
-  ela; veja 19.1.4. Com **ESC** no clique, a ferramenta segue no modo livre abaixo.
-* **Orelha de Calçada – modo livre**: desenhe (ou clique dois pontos) na **face do meio-fio** existente, no trecho
-  do avanço – em linha reta (meio de quadra) ou **contornando a esquina** (selecione as linhas/arco da
-  esquina ou desenhe os pontos em volta dela; o meio-fio da orelha acompanha a esquina com raio =
-  raio da esquina + avanço, ou com o *raio mínimo na esquina* informado), com a calçada à esquerda do sentido do desenho (ou desmarque a opção). Parâmetros:
-  avanço sobre a pista (largura do estacionamento, ex.: 2,20 m), e **cada ponta com sua transição**:
-  **curvas reversas** (raio), **chanfro** ou **reta** – ponta perpendicular que acompanha a calçada / a
-  travessia, como nas orelhas de esquina –, altura e largura do meio-fio, **canteiro** gramado com margens e árvores.
-  As vagas e linhas da pista sob a orelha são recortadas automaticamente (e restauradas se a orelha
-  for apagada + **Atualizar Todas**). Se o trecho for curto para o raio, o raio é reduzido e um aviso
-  é mostrado.
+**Extensão de calçada** (antes chamada *orelha*; o nome mudou só na interface – projetos salvos abrem iguais). A ferramenta
+**Calçadas → Extensão de Calçada** começa com um clique:
+
+* **Clique junto ao meio-fio de qualquer via do plugin – reta ou curva – em qualquer ponto da quadra.** A extensão encaixa na
+  **face do meio-fio daquele lado** (o lado é o do clique) e é **parte da via**: fica guardada na seção dela e é refeita a
+  partir do **eixo** sempre que a via é editada ou o eixo é movido (sem geometria solta que possa ficar fora do lugar).
+  * **Trecho por dois cliques** (início e fim, junto ao mesmo meio-fio) ou **um clique + comprimento**: no segundo clique,
+    **ESC** abre a janela com o comprimento e a opção *o ponto clicado é o centro / o início (no sentido do eixo)*.
+  * **Profundidade**: 0 = a **largura da faixa de estacionamento lida da seção** (com a sarjeta). Lado sem estacionamento
+    pede a profundidade (aviso). A sarjeta da via continua na frente da extensão: a face avança *profundidade − sarjeta*.
+  * **Pontas** (cada uma com a sua): **curvas reversas** (raio), **chanfro** (comprimento) ou **reta**.
+  * **Travessia no meio da quadra** (opcional): faixa de pedestres no centro da extensão, de face a face, com **rampas** e
+    **piso tátil de alerta**. Se o outro lado tem estacionamento, ele recebe uma **extensão espelhada, alinhada** com a
+    primeira (a travessia fica com o menor comprimento possível); sem estacionamento, a rampa vai no meio-fio da via
+    (com **rebaixamento total** quando a calçada é estreita para a rampa + 1,20 m livres – aviso). As linhas pintadas são
+    interrompidas na faixa e as vagas param antes dela; com canteiro central, a travessia o atravessa (19.1.5). A extensão
+    é alongada (com aviso) quando a faixa + rampas + transições não cabem no comprimento pedido.
+  * **Mobiliário** fora da zona da travessia: **canteiro gramado** (com as árvores dentro), **árvores**, **paraciclos** e
+    **bancos** – os mesmos elementos urbanos do plugin.
+  * Com **faixa de serviço gramada**, a rota da rampa até a faixa livre ganha uma **passagem pavimentada** na largura da
+    rampa (a grama é recortada ali).
+  * **Pré-visualização** antes de confirmar (a via real, com a extensão, a travessia e os recortes).
+  * **Meio-fio e sarjeta contornam a face externa** da extensão; pavimento, pintura e vagas por baixo são recortados.
+  * **Editar** sobre a extensão (ou a rampa/faixa dela) reabre a mesma janela – inclusive com **Remover esta extensão**.
+* **Clique na esquina de uma interseção**: abre a extensão daquela esquina (ligada à interseção, refeita com ela; veja 19.1.4):
+  informe **quanto ela avança a partir da esquina** em cada via ou marque **Terminar no início do estacionamento**.
+* **ESC no primeiro clique – modo livre**: desenhe (ou clique dois pontos) na **face do meio-fio** existente – em linha reta ou
+  **contornando a esquina** (o meio-fio acompanha a esquina com raio = raio da esquina + avanço, ou com o *raio mínimo na
+  esquina* informado), com a calçada à esquerda do sentido do desenho (ou desmarque a opção). Parâmetros: avanço sobre a
+  pista, **cada ponta com sua transição** (curvas reversas, chanfro ou reta), altura e largura do meio-fio, **canteiro**
+  gramado com margens e árvores. As vagas e linhas da pista sob a extensão são recortadas automaticamente (e restauradas se
+  ela for apagada + **Atualizar Todas**). Se o trecho for curto para o raio, o raio é reduzido e um aviso é mostrado.
 * **Área de Calçada**: contorno fechado livre (esquinas com avanço, ilhas, alargamentos). Tipos:
   calçada/avanço em concreto, canteiro gramado, **ciclovia no nível da calçada** (pintura vermelha),
   **parklet/deck**, faixa de serviço ajardinada e pavimento. Meio-fio opcional no contorno e
@@ -1004,7 +1021,7 @@ automaticamente. A interseção:
 * cria em cada ramo **faixa de pedestres** e **rebaixamentos de calçada** nas duas pontas da travessia. A borda da
   faixa junto à esquina fica no **fim da curva** do meio-fio (ponto de tangência), com a rampa no meio-fio reto; o
   campo **Recuo da faixa** (padrão **0**) soma um afastamento a partir desse ponto. Um recuo maior só acontece quando a
-  rampa ou a orelha exige, e sempre com aviso. Projetos salvos guardam o recuo que tinham (o padrão antigo era 1 m).
+  rampa ou a extensão de calçada exige, e sempre com aviso. Projetos salvos guardam o recuo que tinham (o padrão antigo era 1 m).
 
 Funciona para **qualquer geometria**: cruzamentos ortogonais ou oblíquos, entroncamentos em **T** e em
 **Y**, vias curvas e nós com vários ramos. Em ângulos agudos as esquinas continuam arredondadas.
@@ -1097,7 +1114,7 @@ não cabe, ela é ajustada e o **relatório avisa**:
    automática pela largura da calçada (profundidade da rampa a 8,33 % + patamar + 1,20 m livres); o tipo aparece no rótulo
    da rampa na pré-visualização e no relatório (*feito o rebaixamento total...*);
 2. **Calçada larga**: rampa comum, com **patamar** até a faixa de passeio – a **faixa livre de 1,20 m** fica sempre atrás da
-   rampa, também quando a rampa está numa orelha (o patamar atravessa a orelha e a faixa de serviço/grama até o passeio);
+   rampa, também quando a rampa está numa extensão de calçada (o patamar atravessa a extensão e a faixa de serviço/grama até o passeio);
 3. **Rampa que invadiria a curva da esquina**: a travessia (com a rampa centrada nela) é **recuada** para o trecho reto,
    até 2 m além do recuo pedido;
 4. ainda não cabe: a **largura automática é reduzida** (mínimo 1,50 m) e, por fim, a rampa fica **sem abas**;
@@ -1122,37 +1139,45 @@ ramo. Campos em branco, 0 ou *Geral da interseção* seguem os valores gerais:
 (ou todos) ao geral. Os ajustes ficam gravados na interseção e são mantidos quando as vias mudam; a janela *Interseção →
 Todos os cruzamentos* não os apaga.
 
-### 19.1.4 Orelhas nas esquinas
+### 19.1.4 Extensões de calçada nas esquinas e no lado contínuo
 
-O bloco **Orelhas nas esquinas** da janela da interseção gera, junto com ela, o **avanço da calçada sobre a faixa de
-estacionamento** em cada esquina (encurta a travessia, melhora a visibilidade e impede o estacionamento junto à esquina –
-CTB art. 181):
+O bloco **Extensões de calçada nas esquinas** da janela da interseção gera, junto com ela, o **avanço da calçada sobre a
+faixa de estacionamento** em cada esquina (encurta a travessia, melhora a visibilidade e impede o estacionamento junto à
+esquina – CTB art. 181):
 
 * **Avanço ao longo de cada via a partir da esquina** (ex.: 5 m) – medido na **face do meio-fio** a partir do fim da curva
-  da esquina; a orelha contorna a curva (meio-fio com raio = raio da esquina + avanço);
+  da esquina; a extensão contorna a curva (meio-fio com raio = raio da esquina + avanço);
 * **Largura do avanço** – 0 = a **largura da faixa de estacionamento** (com a sarjeta) lida da seção de cada via; esquina
-  sem faixa de estacionamento não recebe orelha (a não ser com a largura informada – aviso);
+  sem faixa de estacionamento não recebe extensão (a não ser com a largura informada – aviso). A sarjeta continua na
+  frente: a face avança *largura − sarjeta*;
 * **Forma das pontas** – curvas reversas (raio), chanfro ou reta (acompanha a calçada);
-* **Terminar onde começa o estacionamento** – a orelha vai até a primeira vaga (fim do trecho sem vagas junto ao
-  cruzamento: travessia/retenção + 5 m).
+* **Terminar onde começa o estacionamento** – a extensão vai até a primeira vaga (fim do trecho sem vagas junto ao
+  cruzamento: travessia/retenção + 5 m);
+* **Também no lado contínuo (T)** – quando o outro lado da travessia **não é esquina** (o lado contínuo de um T), gera ali
+  uma extensão **ao longo do meio-fio reto**, cobrindo a faixa e as rampas, com a **rampa no eixo da faixa**: a travessia
+  encurta **dos dois lados** (2 × o avanço da face). Vem marcada quando a janela ainda não tem uma escolha lembrada (depois
+  ela lembra a última); interseções de projetos salvos continuam sem ela até que a opção seja ligada.
 
-Por esquina (bloco *Ajustes por esquina*, a esquina à direita de quem chega pelo ramo): **orelha sim/não**, **avanço neste
-ramo** e **na outra via** (−1 = geral; 0 = sem orelha daquele lado, a orelha não contorna a esquina) e **terminar no
-estacionamento**. *Aplicar a todas* copia também esses valores.
+**Personalização por extensão** (bloco *Ajustes por esquina*, a esquina à direita de quem chega pelo ramo): **extensão
+sim/não**, **avanço neste ramo** e **na outra via** (−1 = geral; 0 = sem extensão daquele lado), **terminar no
+estacionamento**, **profundidade**, **forma e raio das pontas**, **rampa sim/não** e **piso tátil sim/não**. Para o **lado
+contínuo da travessia do ramo**: **extensão sim/não/geral**, **profundidade**, **comprimento a mais do lado do nó** e **do
+lado de fora**, **forma e raio das pontas**, **rampa sim/não** e **piso tátil sim/não** (sem rampa, a faixa encosta na face
+da extensão). *Aplicar a todas* copia também esses valores.
 
-**A orelha é a própria calçada avançada.** Calçada e orelha formam **um piso só, no nível da calçada**: o meio-fio antigo
-(e a sarjeta) atrás da orelha saem e o lugar deles vira piso; o **meio-fio e a sarjeta passam a contornar a face externa da
-orelha**, voltados para a pista, e voltam ao alinhamento da via nas pontas. Cada orelha é **um único polígono** com bordas
-retas paralelas à via, curva com o raio da esquina + avanço e pontas conforme a forma escolhida – sem lóbulos, dentes,
+**A extensão é a própria calçada avançada.** Calçada e extensão formam **um piso só, no nível da calçada**: o meio-fio antigo
+(e a sarjeta) atrás dela saem e o lugar deles vira piso; o **meio-fio e a sarjeta passam a contornar a face externa da
+extensão**, voltados para a pista, e voltam ao alinhamento da via nas pontas. Cada extensão é **um único polígono** com
+bordas paralelas à via, curva com o raio da esquina + avanço e pontas conforme a forma escolhida – sem lóbulos, dentes,
 autointerseções ou pedaços soltos, e sem ficar sob faixas de pedestres ou rampas (as rampas encaixam na borda dela). O mesmo
-vale para a **orelha avulsa** (clique na esquina) e para a ferramenta **Orelha** fora das interseções.
+vale para a **extensão avulsa** (clique na esquina) e para as **extensões no meio da quadra** (seção 17).
 
-Regras aplicadas: com travessia no ramo, a **faixa de pedestres e as rampas vão para a borda da orelha** (a orelha é
-estendida além da faixa e das rampas quando o avanço pedido é menor – aviso) e a rampa usa a profundidade da calçada + a
-orelha; a orelha é recortada pelas rampas, e **pavimento, sarjeta, pintura (linhas, zebrados, setas) e vagas** por baixo
-dela são recortados; as vagas depois da orelha encostam nela (a sobra fica na outra ponta do trecho). Esquinas canalizadas (faixa de conversão livre) não recebem orelha. As orelhas são marcas da
-interseção: **refeitas sempre que ela é atualizada/editada**; **Editar** sobre uma delas abre os ajustes daquela esquina e
-as medidas gerais das orelhas.
+Regras aplicadas: com travessia no ramo, a **faixa de pedestres e as rampas vão para a borda da extensão** (ela é estendida
+além da faixa e das rampas quando o avanço pedido é menor – aviso) e a rampa usa a profundidade da calçada + a extensão; a
+extensão é recortada pelas rampas, e **pavimento, sarjeta, pintura (linhas, zebrados, setas) e vagas** por baixo dela são
+recortados; as vagas depois da extensão encostam nela (a sobra fica na outra ponta do trecho). Esquinas canalizadas (faixa
+de conversão livre) não recebem extensão. As extensões são marcas da interseção: **refeitas sempre que ela é
+atualizada/editada**; **Editar** sobre uma delas abre os ajustes daquela esquina e as medidas gerais.
 
 ### 19.1.5 Canteiro central: nariz, canteiro contínuo e travessia sobre o canteiro
 
@@ -1413,6 +1438,25 @@ rotatória); também pode ser criada direto na conexão (**Via → Rotatória** 
 Os rebaixamentos (rampas) também usam placas com relevo acompanhando a inclinação. Confira dimensões e
 distribuição com a ABNT NBR 16537 vigente.
 
+### 21.1 Piso tátil nas calçadas da via, ligado às rampas
+
+Na janela da **Via**, a opção **Piso tátil nas calçadas (faixa direcional ligada às rampas)** gera a rede tátil das calçadas
+junto com a via – e a refaz a partir do **eixo** sempre que a via é editada ou movida:
+
+* **faixa direcional** no **meio da faixa livre** de cada calçada, ao longo da via;
+* em cada **rampa** da via (travessias no meio da quadra, seção 17), **faixa de alerta no topo da rampa**, na largura dela,
+  e um **ramal direcional perpendicular** do alerta até a faixa principal;
+* **alerta nas junções** (ramal × faixa principal) e nas **mudanças de direção** (giro ≥ 20°, como no gerador de piso tátil);
+* com faixa de serviço gramada, o ramal passa por uma **passagem pavimentada** (a grama é recortada na largura da rampa);
+* **nas interseções**, a rede contorna **cada esquina** (no meio da faixa livre, acompanhando a curva) e segue reta nos
+  **lados contínuos**, emendando na faixa de cada via; cada rampa das travessias recebe o alerta no topo e o ramal até a
+  rede. As rampas sobre o **canteiro central** têm a sinalização própria delas (19.1.5);
+* o piso tátil **não passa** sobre rampas, meio-fio, grama nem mobiliário (bancos, paraciclos, árvores, canteiros).
+
+Dimensões usadas: placas de **0,25 m** com relevo, como no gerador de piso tátil (domos de base 22–30 mm – NBR 16537);
+**profundidade do alerta no topo da rampa: 0,50 m (2 placas) [a confirmar]**; posição da faixa direcional no meio da faixa
+livre e ramal perpendicular até a rampa **[a confirmar]** com a ABNT NBR 16537 vigente (itens não conferidos no repositório).
+
 ## 22.1 Famílias do Revit como elementos urbanos
 
 **Via → Elementos Urbanos → Famílias do Revit**: use **suas próprias famílias de componente** (mobiliário,
@@ -1497,7 +1541,7 @@ quantitativo (categorias *9. Drenagem* e *10. Obras de arte, contenções e terr
   **combinada** e **poço de visita**. **Grelha de Drenagem**: grelha de sarjeta, **grelha de piso** (calçadas, praças) e
   **canaleta com grelha contínua**.
 * **Encaixe real na via**: clique junto ao **meio-fio** de qualquer elemento do plugin – via com calçada, interseção,
-  rotatória, orelha ou meio-fio avulso. O dispositivo encaixa na **face da guia**, adota a **altura e a largura do meio-fio**
+  rotatória, extensão de calçada ou meio-fio avulso. O dispositivo encaixa na **face da guia**, adota a **altura e a largura do meio-fio**
   clicado e **substitui** o trecho de pavimento, sarjeta, meio-fio, calçada e pinturas que ocupa (os pisos do Revit ganham o
   recorte): **rebaixo da sarjeta** com transições, **meio-fio refeito** descendo até o rebaixo, **guia chapéu** com a boca
   aberta e soleira, **caixa de captação oca** (paredes, fundo, lâmina d'água), **laje e tampa rentes à calçada** (tampa de

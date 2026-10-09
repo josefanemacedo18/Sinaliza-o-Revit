@@ -269,7 +269,7 @@ public static class TrafficDiagnostics
                     var perDir = Math.Max(r.LanesForward, r.LanesBackward);
                     if ((perDir >= 3 || w > 10.5) && !r.Median)
                         Add(Gravidade.Atencao, "Pedestres", $"{r.Name}: travessia longa sem refúgio ({w:0.0} m)",
-                            "Travessias de mais de 3 faixas (ou 10,5 m) sem canteiro central deixam o pedestre exposto.", "Crie refúgio central (ilha) ou avanço de calçada (orelhas).",
+                            "Travessias de mais de 3 faixas (ou 10,5 m) sem canteiro central deixam o pedestre exposto.", "Crie refúgio central (ilha) ou extensão de calçada.",
                             l.Path.PointAt(at), link: l.Index, ids: RoadIds(r));
                 }
             }

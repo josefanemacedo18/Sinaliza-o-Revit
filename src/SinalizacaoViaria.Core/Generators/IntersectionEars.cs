@@ -18,10 +18,18 @@ public sealed record EarPlan(IntersectionLeg LegA, IntersectionLeg LegB, bool Si
     public List<Polygon2> CutZone { get; init; } = new();
     /// <summary>Eixo da sarjeta nova, na frente da face da orelha (nulo sem sarjeta).</summary>
     public Polyline2? GutterPath { get; init; }
+    /// <summary>Extensão no lado contínuo (não esquina) da travessia do ramo A: só ao longo dele.</summary>
+    public bool Straight { get; init; }
 }
 
 /// <summary>Trecho de um lado de ramo coberto por orelha: avanço e estacas (t) onde a orelha tem a largura toda.</summary>
-public sealed record EarSide(double Depth, double TFullStart, double TFullEnd, double TStart, double TEnd);
+public sealed record EarSide(double Depth, double TFullStart, double TFullEnd, double TStart, double TEnd)
+{
+    /// <summary>Rampa da travessia na borda da extensão (falso = sem rampa deste lado).</summary>
+    public bool Ramp { get; init; } = true;
+    /// <summary>Piso tátil de alerta na rampa (nulo = o geral da interseção).</summary>
+    public bool? Tactile { get; init; }
+}
 
 public static partial class IntersectionGenerator
 {
@@ -119,7 +127,7 @@ public static partial class IntersectionGenerator
         {
             if (d.RightTurnIslands != TipoIlha.Nenhuma)
             {
-                notes.Add("esquinas canalizadas (faixa de conversão livre) não recebem orelha");
+                notes.Add("esquinas canalizadas (faixa de conversão livre) não recebem extensão de calçada");
                 break;
             }
             var ls = LegSet(d, L, la);
@@ -128,7 +136,7 @@ public static partial class IntersectionGenerator
             // Lado alto do ramo A e lado baixo do ramo B (a esquerda da via para Sign > 0 é o lado alto).
             var parkA = ParkingDepth(ra, la.Sign > 0);
             var parkB = ParkingDepth(rb, lb.Sign < 0);
-            var explicitDepth = d.CurbExtensionDepth is > 0.1 ? d.CurbExtensionDepth : null;
+            var explicitDepth = ls?.CurbExtensionDepth is > 0.1 ? ls.CurbExtensionDepth : d.CurbExtensionDepth is > 0.1 ? d.CurbExtensionDepth : null;
             var sideA = parkA != null || explicitDepth != null && (la.Sign > 0 ? ra.LeftSidewalk : ra.RightSidewalk) > 0.5;
             var sideB = parkB != null || explicitDepth != null && (lb.Sign > 0 ? rb.RightSidewalk : rb.LeftSidewalk) > 0.5;
             // Avanço 0 informado num lado: a orelha fica só ao longo da outra via (não contorna a esquina).
@@ -136,7 +144,7 @@ public static partial class IntersectionGenerator
             if (ls?.CurbExtensionLengthOther is < 0.05) sideB = false;
             if (!sideA && !sideB)
             {
-                notes.Add("esquina sem faixa de estacionamento junto ao meio-fio não recebe orelha (informe a largura do avanço para forçar)");
+                notes.Add("esquina sem faixa de estacionamento junto ao meio-fio não recebe extensão de calçada (informe a largura do avanço para forçar)");
                 continue;
             }
             var depth = explicitDepth ?? new[] { sideA ? parkA : null, sideB ? parkB : null }.Where(x => x != null).Min()!.Value;
@@ -147,7 +155,9 @@ public static partial class IntersectionGenerator
             if (depth - gutter < 0.6) gutter = 0;
             var face = depth - gutter;
             var toParking = ls?.CurbExtensionToParking ?? d.CurbExtensionToParking;
-            var lt = EarTransition(d.CurbExtensionEnds, d.CurbExtensionEndRadius, face);
+            var ends = ls?.CurbExtensionEnds ?? d.CurbExtensionEnds;
+            var endR = ls?.CurbExtensionEndRadius ?? d.CurbExtensionEndRadius;
+            var lt = EarTransition(ends, endR, face);
             double Length(IntersectionLeg leg, double? requested, int side)
             {
                 var len = toParking ? StopFar(d, L, leg) + 5.0 : Math.Max(0.5, requested is > 0.05 ? requested.Value : d.CurbExtensionLength);
@@ -160,7 +170,7 @@ public static partial class IntersectionGenerator
                     var need = CrosswalkT(d, L, leg) - leg.Clear + ext + lt + 0.3 + (provisional ? 2.5 : 0);
                     if (len < need - 1e-6)
                     {
-                        if (!provisional) notes.Add($"orelha estendida para {need:0.00} m ao longo da via para a travessia e as rampas ficarem sobre ela");
+                        if (!provisional) notes.Add($"extensão de calçada estendida para {need:0.00} m ao longo da via para a travessia e as rampas ficarem sobre ela");
                         len = need;
                     }
                 }
@@ -171,13 +181,13 @@ public static partial class IntersectionGenerator
             var path = CornerPath(L, pav, la, lb, sideA ? lenA : 0, sideB ? lenB : 0, sideA && sideB);
             if (path == null || path.Length < 1)
             {
-                notes.Add("não foi possível seguir o meio-fio de uma esquina para a orelha");
+                notes.Add("não foi possível seguir o meio-fio de uma esquina para a extensão de calçada");
                 continue;
             }
             var tpl = new CurbExtensionDefinition
             {
-                Depth = face, Transition = d.CurbExtensionEnds, EndTransition = d.CurbExtensionEnds,
-                Radius = d.CurbExtensionEndRadius, EndRadius = d.CurbExtensionEndRadius, SidewalkOnLeft = false,
+                Depth = face, Transition = ends, EndTransition = ends,
+                Radius = endR, EndRadius = endR, SidewalkOnLeft = false,
                 Height = L.CurbHeight, CurbWidth = L.CurbWidth, CutRoadMarkings = true,
             };
             var fp = SidewalkGenerator.EarFootprint(tpl, path);
@@ -196,17 +206,112 @@ public static partial class IntersectionGenerator
                 Gutter = gutter, GutterPath = gutterPath, CutZone = cut,
             });
             // Trechos de cada lado com a largura toda (a ponta da curva da esquina fica cheia quando a orelha contorna a esquina).
+            var ramp = ls?.CurbExtensionRamp ?? true;
+            var tactile = ls?.CurbExtensionTactile;
             if (sideA)
-                L.EarSides[(la.Road, la.Sign, 1)] = sideB
+                L.EarSides[(la.Road, la.Sign, 1)] = (sideB
                     ? new EarSide(face, 0, la.Clear + lenA - lt, 0, la.Clear + lenA)
-                    : new EarSide(face, la.Clear + lt, la.Clear + lenA - lt, la.Clear, la.Clear + lenA);
+                    : new EarSide(face, la.Clear + lt, la.Clear + lenA - lt, la.Clear, la.Clear + lenA)) with { Ramp = ramp, Tactile = tactile };
             if (sideB)
-                L.EarSides[(lb.Road, lb.Sign, -1)] = sideA
+                L.EarSides[(lb.Road, lb.Sign, -1)] = (sideA
                     ? new EarSide(face, 0, lb.Clear + lenB - lt, 0, lb.Clear + lenB)
-                    : new EarSide(face, lb.Clear + lt, lb.Clear + lenB - lt, lb.Clear, lb.Clear + lenB);
+                    : new EarSide(face, lb.Clear + lt, lb.Clear + lenB - lt, lb.Clear, lb.Clear + lenB)) with { Ramp = ramp, Tactile = tactile };
         }
+        PlanStraightEars(d, L, notes, provisional);
         if (!provisional)
-            foreach (var n in notes.Distinct()) L.Warnings.Add($"Orelhas: {n}.");
+            foreach (var n in notes.Distinct()) L.Warnings.Add($"Extensões de calçada: {n}.");
+    }
+
+    /// <summary>Lados de ramo voltados para um lado contínuo (dois ramos alinhados, sem esquina entre eles): (ramo, lado).</summary>
+    public static IEnumerable<(IntersectionLeg Leg, int Side)> StraightSides(IntersectionLayout L)
+    {
+        if (L.IsBend || L.Legs.Count < 3) yield break;
+        var sorted = L.Legs.Select(l => (Leg: l, A: AngleOf(l.Dir))).OrderBy(x => x.A).ToList();
+        for (int k = 0; k < sorted.Count; k++)
+        {
+            var (la, aa) = sorted[k];
+            var (lb, ab) = sorted[(k + 1) % sorted.Count];
+            if (!Straight(la, lb, Ccw(aa, ab))) continue;
+            yield return (la, 1);
+            yield return (lb, -1);
+        }
+    }
+
+    /// <summary>Extensões pedidas nos lados contínuos das travessias (opção geral ou ajuste do ramo).</summary>
+    private static IEnumerable<(IntersectionLeg Leg, int Side)> StraightEarSides(IntersectionDefinition d, IntersectionLayout L) =>
+        StraightSides(L).Where(x => CrosswalkOn(d, L, x.Leg) && (LegSet(d, L, x.Leg)?.OppositeExtension ?? (d.CurbExtensions && d.CurbExtensionsOpposite)));
+
+    /// <summary>
+    /// Extensão no lado contínuo de uma travessia (ex.: lado oposto de um T): ao longo do meio-fio reto, cobrindo a faixa e as
+    /// rampas (+ as pontas e o comprimento a mais pedido); a travessia e a rampa daquele lado vão para a borda dela.
+    /// </summary>
+    private static void PlanStraightEars(IntersectionDefinition d, IntersectionLayout L, List<string> notes, bool provisional)
+    {
+        if (d.RightTurnIslands != TipoIlha.Nenhuma) return;
+        foreach (var (leg, side) in StraightEarSides(d, L).ToList())
+        {
+            var ls = LegSet(d, L, leg);
+            var r = L.Roads[leg.Road].Def;
+            var left = side > 0 ? leg.Sign > 0 : leg.Sign < 0;
+            if ((left ? r.LeftSidewalk : r.RightSidewalk) <= 0.5) continue;
+            var park = ParkingDepth(r, left);
+            var explicitDepth = ls?.OppositeExtensionDepth is > 0.1 ? ls.OppositeExtensionDepth : d.CurbExtensionDepth is > 0.1 ? d.CurbExtensionDepth : null;
+            if (park == null && explicitDepth == null)
+            {
+                notes.Add("lado contínuo sem faixa de estacionamento junto ao meio-fio não recebe extensão (informe a largura do avanço para forçar)");
+                continue;
+            }
+            var depth = Math.Clamp(explicitDepth ?? park!.Value, 0.3, 10);
+            var gutter = park != null ? ParkingGutter(r, left) : 0;
+            if (depth - gutter < 0.6) gutter = 0;
+            var face = depth - gutter;
+            var ends = ls?.OppositeExtensionEnds ?? d.CurbExtensionEnds;
+            var endR = ls?.OppositeExtensionEndRadius ?? d.CurbExtensionEndRadius;
+            var lt = EarTransition(ends, endR, face);
+            var tc = CrosswalkT(d, L, leg);
+            var plan = RampPlanOf(d, L, leg);
+            var rp = side > 0 ? plan.Hi : plan.Lo;
+            var half = Math.Max(CrosswalkWidthOf(d, L, leg) / 2, rp == null ? 0 : RampHalfExtent(rp)) + 0.3 + (provisional ? 1.0 : 0);
+            var t0 = Math.Max(0.5, tc - half - lt - Math.Max(0, ls?.OppositeExtensionBefore ?? 0));
+            var t1 = Math.Min(MaxT(L, leg) - 2, tc + half + lt + Math.Max(0, ls?.OppositeExtensionAfter ?? 0));
+            if (t1 - t0 < 2 * lt + 1)
+            {
+                notes.Add("ramo curto para a extensão do lado contínuo");
+                continue;
+            }
+            var pts = new List<Vec2>();
+            var n = Math.Max(2, (int)Math.Ceiling((t1 - t0) / 0.5));
+            for (int k = 0; k <= n; k++)
+            {
+                var t = t0 + (t1 - t0) * k / (double)n;
+                pts.Add(L.At(leg, t, side > 0 ? L.HiEdge(leg, t) : -L.LoEdge(leg, t)));
+            }
+            var path = new Polyline2(CleanFacePath(pts));
+            // Lado alto (+o) fica à esquerda de quem segue o ramo para fora do nó.
+            var tpl = new CurbExtensionDefinition
+            {
+                Depth = face, Transition = ends, EndTransition = ends, Radius = endR, EndRadius = endR, SidewalkOnLeft = side > 0,
+                Height = L.CurbHeight, CurbWidth = L.CurbWidth, CutRoadMarkings = true,
+            };
+            var fp = SidewalkGenerator.EarFootprint(tpl, path);
+            if (fp == null) continue;
+            Polyline2? gutterPath = null;
+            if (gutter > 0.01)
+            {
+                var edge = new Polyline2(CleanFacePath(SidewalkGenerator.EarOuterEdge(tpl, path)));
+                if (edge.Length > 1) gutterPath = edge.Offset(side > 0 ? -gutter / 2 : gutter / 2);
+            }
+            var cut = SidewalkGenerator.EarCutZone(tpl, path);
+            if (gutterPath != null) cut = PolygonOps.Union(cut.Concat(PolygonOps.Strip(gutterPath.Points, gutter, roundJoins: true)));
+            L.Ears.Add(new EarPlan(leg, leg, side > 0, side < 0, t1 - t0, 0, depth, path, fp, tpl)
+            {
+                Gutter = gutter, GutterPath = gutterPath, CutZone = cut, Straight = true,
+            });
+            L.EarSides[(leg.Road, leg.Sign, side)] = new EarSide(face, t0 + lt, t1 - lt, t0, t1)
+            {
+                Ramp = ls?.OppositeExtensionRamp ?? true, Tactile = ls?.OppositeExtensionTactile,
+            };
+        }
     }
 
     /// <summary>

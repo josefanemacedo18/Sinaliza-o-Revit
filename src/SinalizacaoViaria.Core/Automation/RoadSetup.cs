@@ -534,8 +534,25 @@ public sealed partial class RoadSetup
         ApplyVariation(res, axis, new Dictionary<MarkingDefinition, (int, double, double)>(), AddVar);
         // Retornos em U: abertura do canteiro, vagas e linhas interrompidas e a sinalização.
         ApplyRetornos(res, pavement, retornos, axis ?? (path.Points.Count >= 2 ? new Polyline2(path.Points) : null), AddVar);
-        // Travessias de pedestres sobre o canteiro (meio da quadra): passagem rebaixada ou rampas, piso tátil e faixa.
-        ApplyTravessias(res, pavement, axis ?? (path.Points.Count >= 2 ? new Polyline2(path.Points) : null), path.Z, AddVar);
+        // Travessias de pedestres sobre o canteiro (meio da quadra): passagem rebaixada ou rampas, piso tátil e faixa. As
+        // travessias das extensões de calçada também atravessam o canteiro (a faixa é pintada com a extensão).
+        var axisLine = axis ?? (path.Points.Count >= 2 ? new Polyline2(path.Points) : null);
+        var crossings = TravessiasCanteiro.ToList();
+        if (TwoWay && Center == CenterTreatment.Canteiro && MedianType == TipoCanteiro.Fisico && MedianWidth > 0.3)
+            crossings.AddRange(ExtensoesCalcada.Where(e => e.Travessia).Select(e => new TravessiaCanteiro
+            {
+                Id = e.Id, Estaca = e.EstacaTravessia, Largura = e.LarguraFaixa, Faixa = false,
+            }));
+        ApplyTravessias(res, pavement, axisLine, path.Z, AddVar, crossings);
+        // Extensões de calçada, travessias no meio da quadra, mobiliário e piso tátil: refeitos a partir do eixo.
+        if (axisLine != null && pavement != null && RoadFeatures.HasAny(this))
+        {
+            ExtensionBreaks(res, pavement);
+            var fs = RoadFeatures.Build(this, pavement, axisLine, path.Z, output, groupId, catalog);
+            Warnings.AddRange(fs.Warnings);
+            RoadFeatures.ApplyCuts(fs, res);
+            res.AddRange(fs.Children);
+        }
         Recuos.RemoveAll(derived.Contains);
         return res;
 
@@ -808,6 +825,7 @@ public sealed partial class RoadSetup
         c.Recuos = Recuos.Select(r => r.Clone()).ToList();
         c.Retornos = Retornos.Select(r => r.Clone()).ToList();
         c.TravessiasCanteiro = TravessiasCanteiro.Select(t => t.Clone()).ToList();
+        c.ExtensoesCalcada = ExtensoesCalcada.Select(e => e.Clone()).ToList();
         return c;
     }
 }

@@ -188,7 +188,7 @@
                 <GroupBox Header="Linhas e opções">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Text="Velocidade regulamentada (km/h)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Column="1" x:Name="TbSpeed" Text="60" TextChanged="AnyChanged"/>
                         <TextBlock Grid.Row="1" Text="Entre faixas de mesmo sentido" Style="{StaticResource FieldLabel}"/>
@@ -209,6 +209,8 @@
                         <CheckBox Grid.Row="7" Grid.ColumnSpan="2" x:Name="CkPhysical" Content="Gerar calçadas, meios-fios e canteiros físicos (3D)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
                         <CheckBox Grid.Row="8" Grid.ColumnSpan="2" x:Name="CkGutterAdds" Content="Somar a sarjeta à largura da pista (as faixas mantêm a largura útil)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
                                   ToolTip="Marcado: pista entre meios-fios = faixas + sarjetas (ex.: 3,50 + 0,30 = 3,80 m até a face da guia). Desmarcado: a sarjeta ocupa a borda da última faixa (vias criadas antes desta versão)."/>
+                        <CheckBox Grid.Row="9" Grid.ColumnSpan="2" x:Name="CkTactile" Content="Piso tátil nas calçadas (faixa direcional ligada às rampas)" Checked="AnyChanged" Unchecked="AnyChanged"
+                                  ToolTip="Faixa direcional no meio da faixa livre de cada calçada, ligada a cada rampa por um ramal perpendicular, com alerta no topo da rampa e nas junções (NBR 16537). Acompanha a via quando ela é editada."/>
                     </Grid>
                 </GroupBox>
 

@@ -277,6 +277,33 @@ public sealed class IntersectionService
     }
 
     /// <summary>Recalcula uma interseção: geometria, recortes das vias e travessias.</summary>
+    /// <summary>
+    /// Refaz os elementos derivados da seção de uma via (extensões de calçada, travessias no meio da quadra, mobiliário e piso
+    /// tátil) a partir do eixo atual, com os recortes deles nas marcas da via – chamado quando o eixo muda.
+    /// </summary>
+    public List<RenderResult> RefreshRoadFeatures(RoadPavementDefinition pav)
+    {
+        var results = new List<RenderResult>();
+        var setup = RoadTemplates.FromJson(pav.SetupJson);
+        if (setup == null || !RoadFeatures.HasAny(setup)) return results;
+        var axis = PathResolver.Resolve(_doc, pav.Path)?.Main;
+        if (axis == null || axis.Points.Count < 2) return results;
+        var members = MarkingStorage.Definitions(_doc).Where(d => d.GroupId != null && d.GroupId == pav.GroupId).ToList();
+        var fs = RoadFeatures.Build(setup, pav, axis, pav.PathRef.Z, pav.Output, pav.GroupId, PluginContext.Catalog);
+        var keep = fs.Children.Select(c => c.Id).ToHashSet();
+        foreach (var old in members.Where(m => m.Id.StartsWith(fs.Prefix) && !keep.Contains(m.Id))) _service.Delete(old.Id);
+        foreach (var c in fs.Children) results.Add(_service.Render(c));
+        _service.Invalidate();
+        var plain = members.Where(m => !m.Id.StartsWith(fs.Prefix)).ToList();
+        RoadFeatures.ApplyCuts(fs, plain);
+        foreach (var m in plain)
+        {
+            try { results.Add(_service.Render(m)); }
+            catch (Exception ex) { Log.Error($"Extensões da via – {m.DisplayCode}", ex); }
+        }
+        return results;
+    }
+
     public List<RenderResult> Refresh(IntersectionDefinition it)
     {
         var results = new List<RenderResult>();

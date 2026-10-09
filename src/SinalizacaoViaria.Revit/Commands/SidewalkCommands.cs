@@ -206,10 +206,10 @@ internal static class SidewalkForms
     public static FormWindow? CurbExtension(CurbExtensionDefinition d, bool edit)
     {
         var corner = false;
-        var w = new FormWindow(edit ? "Editar orelha de calçada" : "Orelha de calçada", "Orelha / avanço de calçada",
+        var w = new FormWindow(edit ? "Editar extensão de calçada" : "Extensão de calçada", "Extensão de calçada (avanço)",
             "Desenhe ou selecione a FACE DO MEIO-FIO existente no trecho do avanço – em linha reta (meio de quadra) ou contornando a " +
             "ESQUINA (selecione as linhas/arco da esquina ou desenhe os pontos em volta dela). A calçada fica à esquerda do sentido do " +
-            "desenho (ou desmarque a opção). A orelha avança sobre o estacionamento, encurta a travessia e recebe meio-fio novo.",
+            "desenho (ou desmarque a opção). A extensão de calçada avança sobre o estacionamento, encurta a travessia e recebe meio-fio novo.",
             d, () =>
             {
                 var path = corner ? CornerCurb() : Straight;
@@ -222,7 +222,7 @@ internal static class SidewalkForms
                 geo.Merge(Build(c, path));
                 return new FormPreview(geo, new[] { Polygon2.Rectangle(new Vec2(-20, -9), new Vec2(9, 20)) }, new[] { path.Points });
             }, okText: edit ? "Aplicar" : "Inserir");
-        w.Check("Prévia: orelha de esquina", () => corner, v => corner = v)
+        w.Check("Prévia: extensão de calçada de esquina", () => corner, v => corner = v)
          .Number("Avanço sobre a pista (m)", () => d.Depth, v => d.Depth = v, 0.3, 10, tooltip: "Normalmente a largura da faixa de estacionamento (2,00–2,50 m).")
          .Choice("Ponta inicial", Kinds, () => d.Transition, v => d.Transition = v,
              tooltip: "Curva / chanfro: volta ao meio-fio junto ao estacionamento. Reta: ponta perpendicular, acompanhando a calçada ou a travessia.")
@@ -230,16 +230,16 @@ internal static class SidewalkForms
          .Choice("Ponta final", Kinds, () => d.EndTransition ?? d.Transition, v => d.EndTransition = v)
          .Number("Raio / comprimento da ponta final (m)", () => d.EndRadius ?? d.Radius, v => d.EndRadius = v, 0.1, 20)
          .Number("Raio mínimo na esquina (m)", () => d.CornerRadius, v => d.CornerRadius = v, 0, 40,
-             tooltip: "0 = acompanha a esquina (raio da esquina + avanço). Valores maiores suavizam o meio-fio da orelha.")
+             tooltip: "0 = acompanha a esquina (raio da esquina + avanço). Valores maiores suavizam o meio-fio da extensão de calçada.")
          .Number("Altura do meio-fio (m)", () => d.Height, v => d.Height = v, 0.02, 0.5)
          .Number("Largura do meio-fio (m)", () => d.CurbWidth, v => d.CurbWidth = v, 0.05, 0.5)
          .Check("Calçada existente à esquerda do sentido do desenho", () => d.SidewalkOnLeft, v => d.SidewalkOnLeft = v)
-         .Section("Canteiro na orelha")
+         .Section("Canteiro na extensão de calçada")
          .Check("Incluir canteiro gramado", () => d.Planter, v => d.Planter = v)
          .Number("Largura do canteiro (m)", () => d.PlanterWidth, v => d.PlanterWidth = v, 0.2, 10)
          .Number("Margem ao meio-fio e às transições (m)", () => d.PlanterMargin, v => d.PlanterMargin = v, 0, 5)
          .Integer("Árvores no canteiro", () => d.Trees, v => d.Trees = v, 0, 20)
-         .Check("Recortar vagas e linhas da pista sob a orelha", () => d.CutRoadMarkings, v => d.CutRoadMarkings = v);
+         .Check("Recortar vagas e linhas da pista sob a extensão de calçada", () => d.CutRoadMarkings, v => d.CutRoadMarkings = v);
         if (!edit) w.Modes(("Selecionar as linhas da face do meio-fio (reta, esquina ou arco)", PathMode.Linhas),
             ("Desenhar a face do meio-fio por pontos (contornando a esquina)", PathMode.Desenhar),
             ("Dois cliques na face do meio-fio (trecho reto)", PathMode.DoisPontos));
@@ -483,15 +483,20 @@ public sealed class CmdOrelha : CommandBase
 {
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
-        // Rápido: clique na esquina de uma interseção e informe quanto a orelha avança (sem desenhar linhas). ESC: modo livre.
-        if (MarkingStorage.Definitions(uidoc.Document).OfType<IntersectionDefinition>().Any())
+        // Rápido: clique na esquina de uma interseção (extensão da esquina, ligada a ela) ou junto ao meio-fio de qualquer via
+        // (extensão gravada na via, reta ou curva). ESC: modo livre (desenhar/selecionar a face do meio-fio).
+        var pick = Picking.PickPoint(uidoc, "Extensão de calçada: clique junto ao MEIO-FIO de uma via ou na ESQUINA de uma interseção – ESC: desenhar/selecionar a face do meio-fio");
+        if (pick != null)
         {
-            var pick = Picking.PickPoint(uidoc, "Orelha: clique na ESQUINA de uma interseção (perto do meio-fio da via em que ela avança) – ESC: desenhar/selecionar a face do meio-fio");
-            if (pick != null)
+            var p = UnitConv.ToVec2(pick);
+            if (MarkingStorage.Definitions(uidoc.Document).OfType<IntersectionDefinition>().Any())
             {
-                var r = IntersectionEarEdit.AtCorner(uidoc, UnitConv.ToVec2(pick));
+                var r = IntersectionEarEdit.AtCorner(uidoc, p);
                 if (r != null) return r.Value;
             }
+            var rr = RoadExtensionCommand.AtRoad(uidoc, p);
+            if (rr != null) return rr.Value;
+            TaskDialog.Show(AppTitle, "Nenhuma via do plugin junto ao ponto clicado: desenhe ou selecione a face do meio-fio (modo livre).");
         }
         return SidewalkCommandRunner.Run(uidoc, SidewalkCommandRunner.Last<CurbExtensionDefinition>(), d => SidewalkForms.CurbExtension((CurbExtensionDefinition)d, false));
     }
@@ -524,7 +529,7 @@ internal static class IntersectionEarEdit
                 if (only == null && !L.Zone.Contains(p) && L.Zone.Outer.Min(v => v.DistanceTo(p)) > 15) continue;
                 return (it, L);
             }
-            catch (Exception ex) { Log.Error("Orelha na esquina", ex); }
+            catch (Exception ex) { Log.Error("Extensão de calçada na esquina", ex); }
         }
         return null;
     }
@@ -534,21 +539,21 @@ internal static class IntersectionEarEdit
     {
         if (Find(uidoc, p) is not { } f || IntersectionGenerator.CornerAt(f.L, p) is not { } c) return null;
         var work = (IntersectionDefinition)MarkingDefinition.FromJson(f.It.ToJson())!;
-        var fw = new FormWindow("Orelha na esquina", "Orelha na esquina da interseção",
-            $"Esquina entre {IntersectionGenerator.LegLabel(f.L, c.A)} e {IntersectionGenerator.LegLabel(f.L, c.B)}. A orelha avança sobre a faixa de " +
+        var fw = new FormWindow("Extensão de calçada na esquina", "Extensão de calçada na esquina da interseção",
+            $"Esquina entre {IntersectionGenerator.LegLabel(f.L, c.A)} e {IntersectionGenerator.LegLabel(f.L, c.B)}. A extensão de calçada avança sobre a faixa de " +
             "estacionamento, contorna a curva da esquina e fica ligada à interseção (refeita quando ela é editada). A largura e as pontas valem para " +
-            "todas as orelhas desta interseção.", null, null, false, "Aplicar", 640, 560);
+            "todas as extensões de calçada desta interseção.", null, null, false, "Aplicar", 640, 560);
         fw.Section("Avanço")
           .Number("Avança pela calçada a partir da esquina, na via clicada (m)", () => _along, v => _along = Math.Max(0.5, v), 0.5, 60,
               tooltip: "Medido na face do meio-fio a partir do fim da curva da esquina.")
           .Number("Avanço ao longo da outra via da esquina (m) – 0 = só na via clicada", () => _other, v => _other = v < 0.05 ? 0 : Math.Max(0.5, v), 0, 60)
           .Check("Terminar no início do estacionamento", () => _toParking, v => _toParking = v,
-              "Lê a faixa de estacionamento de cada via: a orelha vai até a primeira vaga (5 m depois da travessia/retenção – CTB art. 181).");
+              "Lê a faixa de estacionamento de cada via: a extensão de calçada vai até a primeira vaga (5 m depois da travessia/retenção – CTB art. 181).");
         EarShape(fw, work);
         if (UiHelpers.ShowModal(fw) != true) return Result.Cancelled;
         CopyShape(f.It, work);
         IntersectionGenerator.SetCornerEar(f.It, f.L, c.A, c.NearA, _along, _other, _toParking);
-        CommandBase.ReportResults("Orelha", IntersectionRunner.Run(uidoc, "SV - Orelha na esquina", s => s.Refresh(f.It)).Where(r => r.Warnings.Count > 0).ToList());
+        CommandBase.ReportResults("Extensão de calçada", IntersectionRunner.Run(uidoc, "SV - Extensão de calçada na esquina", s => s.Refresh(f.It)).Where(r => r.Warnings.Count > 0).ToList());
         return Result.Succeeded;
     }
 
@@ -564,14 +569,14 @@ internal static class IntersectionEarEdit
         var lenA = set?.CurbExtensionLength ?? -1;
         var lenB = set?.CurbExtensionLengthOther ?? -1;
         bool? toParking = set?.CurbExtensionToParking;
-        var fw = new FormWindow("Orelha da interseção", "Orelha gerada pela interseção",
-            "Esta orelha é da interseção: as medidas abaixo ficam nela e a orelha é refeita a cada atualização (travessia e rampas na borda dela).",
+        var fw = new FormWindow("Extensão de calçada da interseção", "Extensão de calçada gerada pela interseção",
+            "Esta extensão de calçada é da interseção: as medidas abaixo ficam nela e a extensão de calçada é refeita a cada atualização (travessia e rampas na borda dela).",
             null, null, false, "Aplicar", 640, 600);
         if (corner != null)
             fw.Section("Esta esquina")
-              .Check("Remover a orelha desta esquina", () => remove, v => remove = v)
-              .Number("Avanço ao longo do ramo dono da esquina (m) – −1 = geral, 0 = sem orelha deste lado", () => lenA, v => lenA = v, -1, 60)
-              .Number("Avanço ao longo da outra via (m) – −1 = o mesmo, 0 = sem orelha nela", () => lenB, v => lenB = v, -1, 60)
+              .Check("Remover a extensão de calçada desta esquina", () => remove, v => remove = v)
+              .Number("Avanço ao longo do ramo dono da esquina (m) – −1 = geral, 0 = sem extensão de calçada deste lado", () => lenA, v => lenA = v, -1, 60)
+              .Number("Avanço ao longo da outra via (m) – −1 = o mesmo, 0 = sem extensão de calçada nela", () => lenB, v => lenB = v, -1, 60)
               .Choice("Terminar no início do estacionamento", new (string, bool?)[] { ("Geral da interseção", null), ("Sim", true), ("Não", false) },
                   () => toParking, v => toParking = v);
         IntersectionForms.EarSection(fw, work);
@@ -589,13 +594,13 @@ internal static class IntersectionEarEdit
             s.CurbExtensionToParking = toParking;
             parent.LegSettings.RemoveAll(x => x.IsEmpty);
         }
-        CommandBase.ReportResults("Orelha", IntersectionRunner.Run(uidoc, "SV - Orelha da interseção", sv => sv.Refresh(parent)).Where(r => r.Warnings.Count > 0).ToList());
+        CommandBase.ReportResults("Extensão de calçada", IntersectionRunner.Run(uidoc, "SV - Extensão de calçada da interseção", sv => sv.Refresh(parent)).Where(r => r.Warnings.Count > 0).ToList());
         return Result.Succeeded;
     }
 
     private static void EarShape(FormWindow fw, IntersectionDefinition d)
     {
-        fw.Section("Forma (todas as orelhas desta interseção)")
+        fw.Section("Forma (todas as extensões de calçada desta interseção)")
           .Number("Largura do avanço (m) – 0 = a da faixa de estacionamento", () => d.CurbExtensionDepth ?? 0,
               v => d.CurbExtensionDepth = v < 0.05 ? null : Math.Clamp(v, 0.3, 10), 0, 10)
           .Choice("Forma das pontas", new[]
