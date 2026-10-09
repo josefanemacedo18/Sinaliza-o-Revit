@@ -17,7 +17,7 @@ Convenções usadas em todo o plugin:
 
 | Painel | Ferramentas |
 |---|---|
-| **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Extensão de Calçada · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
+| **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão · Alterar Largura por Trecho · Recuo na Via) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Extensão de Calçada · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
 | **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (piso tátil · ciclovia · quebra-mola · cruzamento rodoferroviário) |
 | **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive **tachas e tachões** e guard rail) |
 | **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
@@ -86,7 +86,13 @@ centros, mais próximo).
    personalizado ★** e clique *Aplicar* – ou monte a seção do zero. **Salvar como modelo…** guarda a seção
    atual com um nome (use o mesmo nome para substituir); **Excluir modelo** remove um personalizado. A
    janela reabre sempre com a **última seção usada**.
-2. **Mão dupla** (o eixo divide os sentidos) ou **mão única** (todas as faixas no sentido do eixo).
+2. **Mão dupla** (o eixo divide os sentidos) ou **mão única** (todas as faixas no sentido do eixo). Na **mão única** nunca há
+   linha amarela: com **uma faixa**, só as linhas de bordo (se o modelo tiver) – inclusive a do lado do eixo, quando a faixa
+   fica só de um lado – e as **setas de sentido**; com **duas ou mais**, divisórias **brancas de mesmo sentido** entre as
+   faixas (*Entre faixas de mesmo sentido*: LMS-2 seccionada, padrão, ou LMS-1 contínua), bordos e setas. As setas
+   "siga em frente" (PEM-F) vão no meio de cada faixa de rolamento, a cada 50 m (espaçamento [a confirmar] no MBST Vol. IV),
+   com a opção *Mão única: setas de sentido* (ligada nas vias novas). Pontes, viadutos, túneis e trincheiras também têm a
+   opção **Mão dupla**: desmarcada, a obra fica sem eixo amarelo; com uma faixa, ela é uma só (sem divisória no meio).
 3. **Eixo / canteiro central**: LFO-1/2/3/4, sem marca ou canteiro central **físico** (meios-fios +
    grama) ou **pintado** (zebrado amarelo), com dispositivo opcional sobre o eixo (ex.: New Jersey,
    balizadores).
@@ -99,7 +105,7 @@ centros, mais próximo).
 | Faixa exclusiva (ônibus) | Linha MFE contínua na divisa com as faixas comuns + legenda repetida (ÔNIBUS). Opcional: **pintura colorida de fundo** em toda a faixa (vermelha, azul, verde, amarela, laranja ou marrom – como na ciclofaixa e na faixa de caminhada), entre as linhas de bordo (código ONI-FD). |
 | Faixa preferencial (ônibus) | Linha MFE seccionada + legenda repetida; mesma opção de fundo colorido. |
 | Ciclofaixa | Linha CIC-LD, pintura vermelha, bicicletas e setas repetidas; segregação física opcional. |
-| Faixa de estacionamento | Vagas do tipo escolhido (paralelas, em ângulo, PcD, carga e descarga...) com linha de fundo no lado da pista. |
+| Faixa de estacionamento | Vagas do tipo escolhido (paralelas, em ângulo, PcD, carga e descarga...) com linha de fundo no lado da pista. Opção **Só delimitado**: em vez das vagas, só a **linha tracejada** que delimita a faixa na divisa com a pista (código **MER-L**, sem divisórias entre vagas), com **largura, traço e espaço** ajustáveis (padrão 0,10 m, 1 × 1 m – código e padrão [a confirmar] no MBST Vol. IV); a linha para 5 m antes das travessias e na interseção, como as vagas. |
 | Acostamento | LBO no bordo da faixa. |
 | Faixa de segurança / transição | Zebrado com linhas de canalização (buffer entre fluxos, ciclofaixa etc.). |
 | Canteiro lateral físico / pintado | Meios-fios + grama (0,15 m) ou zebrado. |
@@ -139,6 +145,18 @@ tem o seu nível, medido do topo do pavimento: vazio/padrão = calçada e cantei
    tachões, New Jersey...).
 6. **Linhas e opções**: velocidade (define largura e tracejado), divisórias, bordos, recuos, tachas no
    eixo, inscrições repetidas e elementos físicos.
+7. **Sinalização vertical automática** (grupos ligados nas vias novas; cada um pode ser desligado):
+   * **R-19** com a velocidade da via (a da hierarquia – CTB art. 61 – ou a informada) a 20 m do início de cada sentido;
+   * **R-24a** (sentido de circulação) no início das vias de mão única, nos dois lados da pista;
+   * **A-32b** (passagem sinalizada de pedestres) antecipada – 50 m até 40 km/h, 80 m até 60 km/h, como nas soluções do
+     simulador – e junto a cada travessia da via (extensões de calçada e travessias no canteiro);
+   * as placas ficam na calçada à direita de quem trafega, 0,45 m além da face do meio-fio (sem calçada: 1,0 m do bordo),
+     como as placas das interseções. Posições e afastamentos [a confirmar] no MBST Vol. I e II;
+   * **R-1/R-2 + linha de retenção (LRE/LDP) + legenda PARE/símbolo** nas aproximações controladas vêm da **interseção**
+     (só nas secundárias – ou onde o ajuste do ramo pedir);
+   * tudo é refeito a partir do eixo ao editar a via (ids fixos: nada duplica). Uma placa automática **editada à mão**
+     (Editar: posição, legenda, tamanho...) passa a ficar como está – as regenerações não a refazem nem põem outra igual a
+     menos de 3 m. Uma placa automática **apagada** volta na próxima regeneração (desligue o grupo para não tê-la).
 
 Todos os elementos são associados ao eixo e pertencem ao mesmo **grupo**: mover o eixo atualiza a via
 inteira; **Selecionar Conjunto → Todo o grupo** seleciona tudo. Cada elemento pode ser ajustado
@@ -158,6 +176,16 @@ ponto B 10,50 m; um muro antigo avança sobre a calçada. No quadro **Largura va
 * **Quem absorve a variação na pista**: a faixa junto ao meio-fio (as outras mantêm a largura), todas as faixas
   proporcionalmente, ou o acostamento/estacionamento. A linha de bordo, a sarjeta, o meio-fio e as calçadas
   acompanham o bordo; o alinhamento estreita (ou alarga) a **faixa livre** – aviso se ela ficar abaixo de 1,20 m (NBR 9050).
+* **Alterar largura por trecho (A–B)**: a ferramenta **Conexões ▾ → Alterar Largura por Trecho** (ou o botão no quadro, com as
+  estacas digitadas) muda a largura de **um elemento** – calçada esquerda/direita, pista, estacionamento esquerdo/direito
+  ou canteiro central – entre o **início (A)** e o **fim (B)**, com uma **transição antes de A e outra depois de B**
+  (comprimentos livres, retas ou em curva S). Os outros elementos mantêm a largura (a via alarga ou estreita): na calçada o
+  meio-fio fica e o alinhamento se desloca; na pista, metade para cada lado (absorvida como em *Quem absorve*); no canteiro
+  os dois lados se afastam. Na planta: clique **A** e **B** sobre a via (ESC no segundo clique = digitar as estacas); a
+  janela mostra um desenho com **Início (A)** e **Fim (B)** e a cota da largura nova; antes de confirmar, a planta mostra
+  **setas e cotas** provisórias em A e B. O trecho fica gravado na seção da via (refeito a partir do eixo); outro trecho do
+  mesmo elemento sobre o mesmo intervalo o substitui, e há a opção de só remover. Substitui a antiga medida "entre
+  meios-fios na estaca". Aviso se a faixa livre da calçada ficar abaixo de 1,20 m (NBR 9050).
 * **Ler do desenho**: marque *Depois de indicar o eixo, ler do desenho os meios-fios e muros existentes* e, depois do
   eixo, clique as linhas do levantamento (meio-fio direito, esquerdo, alinhamento direito, esquerdo – **ESC** pula o
   lado). O plugin mede a distância a cada 5 m e cria os pontos sozinho (remove os colineares).
@@ -329,9 +357,15 @@ para *Cul-de-sac* ou *Sem tratamento*. A geometria e a sinalização das vias s�
 
 ## 2.3 Pista – montagem da via passo a passo
 
-**Via ▾ → Pista** cria só a **parte dos veículos** (asfalto, bloquete ou concreto) com a hierarquia, as
+**Via ▾ → Pista** cria só a **parte dos veículos** (asfalto, bloquete, concreto ou terra) com a hierarquia, as
 larguras à direita e à esquerda do eixo, mão dupla/única e, opcionalmente, linha de eixo e linhas de
-bordo – já **conectada** às vias existentes (interseção simples). Depois monte o restante elemento por
+bordo – já **conectada** às vias existentes (interseção simples).
+
+**Conteúdo → Só pavimento (pista vazia)**: gera **apenas a superfície**, com largura fixa ou variável (*Largura variável:
+ler os bordos do desenho* ou, depois, **Alterar Largura por Trecho**) – sem pintura, meio-fio ou calçada, e as conexões
+com as outras pistas vazias também ficam só no pavimento (sem travessias, retenção, placas ou linhas). A seção (faixas de
+até 3,50 m na largura desenhada) fica guardada no pavimento: os elementos entram depois por **Sinalizar Via** sobre o mesmo
+eixo (a pista vazia recebe a seção escolhida, sem duplicar o pavimento) ou por **Editar → A via inteira**. Depois monte o restante elemento por
 elemento com **Calçadas ▾ → Meio-fio, Calçada e Sarjeta** no caminho **Junto ao bordo de uma via**:
 clique ao lado da via, no lado desejado, e o elemento é colocado encostado no bordo:
 
@@ -973,8 +1007,11 @@ o elemento é regenerado (com os recortes atualizados).
 ## 18. Pavimento da via
 
 O **Sinalizar Via** gera o **pavimento da pista** (grupo *Pavimento e interseções* da janela):
-**asfalto (CBUQ)**, **bloquete / pavimento intertravado** ou **concreto**, com espessura padrão de
-0,05 / 0,08 / 0,15 m (indicativa – confira o dimensionamento do pavimento). O topo do pavimento fica no
+**asfalto (CBUQ)**, **bloquete / pavimento intertravado**, **concreto** ou **terra** (leito natural / revestimento
+primário), com espessura padrão de 0,05 / 0,08 / 0,15 / 0,15 m (indicativa – confira o dimensionamento do pavimento).
+A **terra** tem material e cor próprios (*SV - Pavimento de terra*), entra no quantitativo em **m²** (código PAV-TER) e
+**não recebe pintura automática** (linhas, travessias, legendas e vagas da via e das interseções sobre ela); pintar à mão
+sobre uma pista de terra gera um aviso (a tinta não adere ao leito natural – prefira a sinalização vertical). O topo do pavimento fica no
 nível do eixo; a sinalização fica por cima e as calçadas/meios-fios 0,15 m acima. Canteiros físicos e
 sarjetas ficam sem pavimento. O pavimento também **registra a seção da via** (larguras da pista e das
 calçadas), usada pelas interseções e rotatórias – por isso "Nenhum" desativa o ajuste automático.

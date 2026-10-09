@@ -213,6 +213,12 @@ public abstract class MarkingDefinition
     /// </summary>
     public bool Overlay { get; set; }
 
+    /// <summary>
+    /// Sinalização automática (da via ou da interseção) alterada à mão pelo usuário: as regenerações a mantêm como está e não
+    /// criam outra igual no lugar. Falso (padrão) = gerada e refeita automaticamente.
+    /// </summary>
+    public bool EditadoManualmente { get; set; }
+
     [JsonIgnore]
     public abstract string KindName { get; }
 
@@ -1333,6 +1339,8 @@ public enum TipoPavimento
     /// <summary>Pavimento intertravado (bloquete / paver).</summary>
     Bloquete,
     Concreto,
+    /// <summary>Terra (leito natural / revestimento primário): sem pintura automática.</summary>
+    Terra,
 }
 
 /// <summary>Faixa (offset do eixo e largura) sem pavimento – canteiros elevados e sarjetas.</summary>
@@ -1472,7 +1480,7 @@ public sealed class RoadPavementDefinition : MarkingDefinition
         return p.IsEmpty ? null : p;
     }
 
-    public double DefaultThickness => Material switch { TipoPavimento.Bloquete => 0.08, TipoPavimento.Concreto => 0.15, _ => 0.05 };
+    public double DefaultThickness => Material switch { TipoPavimento.Bloquete => 0.08, TipoPavimento.Concreto => 0.15, TipoPavimento.Terra => 0.15, _ => 0.05 };
     public double ActualThickness => Thickness is > 0 ? Thickness.Value : DefaultThickness;
     public double TotalRight => RightWidth + RightSidewalk;
     public double TotalLeft => LeftWidth + LeftSidewalk;
@@ -1481,6 +1489,7 @@ public sealed class RoadPavementDefinition : MarkingDefinition
     {
         TipoPavimento.Bloquete => MarkingColor.Bloquete,
         TipoPavimento.Concreto => MarkingColor.PavimentoConcreto,
+        TipoPavimento.Terra => MarkingColor.PavimentoTerra,
         _ => MarkingColor.Asfalto,
     };
 
@@ -1489,6 +1498,7 @@ public sealed class RoadPavementDefinition : MarkingDefinition
     {
         TipoPavimento.Bloquete => "PAV-BLQ",
         TipoPavimento.Concreto => "PAV-CON",
+        TipoPavimento.Terra => "PAV-TER",
         _ => "PAV-ASF",
     };
     public override PathReference? Path => PathRef;
@@ -1610,6 +1620,22 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public double? RampCurbHeight { get; set; }
 
     /// <summary>Copia as medidas das rampas e das orelhas de outra interseção (janela lembrada, alterar todas de uma vez).</summary>
+    /// <summary>
+    /// Interseção só de pavimento (pistas vazias): sem controle, travessias, rampas, retenção, placas nem linhas – a sinalização
+    /// entra depois, quando as vias recebem os elementos.
+    /// </summary>
+    public IntersectionDefinition SemSinalizacao()
+    {
+        Control = ControleIntersecao.Nenhum;
+        Crosswalks = false;
+        Ramps = false;
+        StopLines = false;
+        Signs = false;
+        ApproachLines = false;
+        BoxContinuity = false;
+        return this;
+    }
+
     public void CopyRampSettingsFrom(IntersectionDefinition o)
     {
         RampType = o.RampType;

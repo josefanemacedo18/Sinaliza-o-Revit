@@ -24,7 +24,7 @@ public static class ElementPlan
     /// <summary>Pavimento, calçada, meio-fio, sarjeta e grama: viram Piso do Revit.</summary>
     public static bool FloorEligible(MarkingDefinition def, MarkingPiece p) =>
         p.Solid == null && p.Profile == null && p.Thickness >= 0.005 && p.Shape.Area > 0.01
-        && p.Color is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto or MarkingColor.Concreto or MarkingColor.Grama
+        && p.Color is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto or MarkingColor.PavimentoTerra or MarkingColor.Concreto or MarkingColor.Grama
         && def is RoadPavementDefinition or LinearMarkingDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition
             or SidewalkAreaDefinition or CurbExtensionDefinition or PlanterDefinition;
 

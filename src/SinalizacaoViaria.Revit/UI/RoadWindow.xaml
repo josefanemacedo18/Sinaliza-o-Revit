@@ -123,9 +123,13 @@
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <TextBlock x:Name="LblVaga" Text="Tipo de vaga" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="CbVaga" Grid.Column="1" SelectionChanged="DetailChanged"/>
+                            <CheckBox x:Name="CkSoDelimitado" Grid.Row="23" Grid.ColumnSpan="2" Content="Só delimitado: linha tracejada na divisa com a pista, sem divisórias entre vagas"
+                                      Checked="DetailChanged" Unchecked="DetailChanged"
+                                      ToolTip="Marca delimitadora de estacionamento (MER) só com a linha longitudinal – código, traço e espaço [a confirmar] no MBST Vol. IV. Ajuste largura, traço e espaço abaixo."/>
                             <TextBlock x:Name="LblLegenda" Grid.Row="1" Text="Legenda repetida" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="TbLegenda" Grid.Row="1" Grid.Column="1" TextChanged="DetailChanged" CharacterCasing="Upper" ToolTip="Vazio = sem legenda"/>
                             <TextBlock x:Name="LblEsp" Grid.Row="2" Text="Repetir a cada (m)" Style="{StaticResource FieldLabel}"/>
@@ -188,7 +192,7 @@
                 <GroupBox Header="Linhas e opções">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Text="Velocidade regulamentada (km/h)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Column="1" x:Name="TbSpeed" Text="60" TextChanged="AnyChanged"/>
                         <TextBlock Grid.Row="1" Text="Entre faixas de mesmo sentido" Style="{StaticResource FieldLabel}"/>
@@ -211,6 +215,14 @@
                                   ToolTip="Marcado: pista entre meios-fios = faixas + sarjetas (ex.: 3,50 + 0,30 = 3,80 m até a face da guia). Desmarcado: a sarjeta ocupa a borda da última faixa (vias criadas antes desta versão)."/>
                         <CheckBox Grid.Row="9" Grid.ColumnSpan="2" x:Name="CkTactile" Content="Piso tátil nas calçadas (faixa direcional ligada às rampas)" Checked="AnyChanged" Unchecked="AnyChanged"
                                   ToolTip="Faixa direcional no meio da faixa livre de cada calçada, ligada a cada rampa por um ramal perpendicular, com alerta no topo da rampa e nas junções (NBR 16537). Acompanha a via quando ela é editada."/>
+                        <CheckBox Grid.Row="10" Grid.ColumnSpan="2" x:Name="CkArrows" Content="Mão única: setas de sentido no meio de cada faixa" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
+                                  ToolTip="Seta &quot;siga em frente&quot; (PEM-F) repetida a cada 50 m (espaçamento [a confirmar] no MBST Vol. IV) em cada faixa de rolamento, no sentido do eixo. Precisa das legendas e símbolos ligados."/>
+                        <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Text="Sinalização vertical automática (refeita ao editar a via; o que for editado à mão fica):" Style="{StaticResource FieldLabel}"/>
+                        <CheckBox Grid.Row="12" Grid.ColumnSpan="2" x:Name="CkAutoSpeed" Content="R-19 – velocidade máxima da via no início de cada sentido" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
+                                  ToolTip="Legenda = velocidade regulamentada (pela hierarquia – CTB art. 61). A 20 m do início de cada sentido, na calçada à direita de quem trafega (posição [a confirmar] no MBST Vol. I)."/>
+                        <CheckBox Grid.Row="13" Grid.ColumnSpan="2" x:Name="CkAutoOneWay" Content="R-24a – sentido de circulação (vias de mão única)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="14" Grid.ColumnSpan="2" x:Name="CkAutoCrossing" Content="A-32b – passagem sinalizada de pedestres nas travessias da via (antecipada e na travessia)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
+                                  ToolTip="Nas travessias no meio da quadra (extensões de calçada e canteiro). R-1/R-2, retenção e legenda das aproximações controladas vêm da interseção."/>
                     </Grid>
                 </GroupBox>
 
@@ -232,15 +244,13 @@
                             <Button Content="Remover" Click="RemoveWidthClick"/>
                             <Button Content="Limpar" Click="ClearWidthsClick"/>
                         </StackPanel>
-                        <Grid Margin="0,6,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="70"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="Entre meios-fios (m)" Style="{StaticResource FieldLabel}"/>
-                            <TextBox Grid.Column="1" x:Name="TbQuickTotal" ToolTip="Largura medida de meio-fio a meio-fio nesta estaca"/>
-                            <TextBlock Grid.Column="2" Text=" na estaca" Style="{StaticResource FieldLabel}"/>
-                            <TextBox Grid.Column="3" x:Name="TbQuickStation"/>
-                            <ComboBox Grid.Column="4" x:Name="CbQuickSplit" Width="150" Margin="6,3,0,3"/>
-                        </Grid>
-                        <Button Content="Adicionar medida entre meios-fios" HorizontalAlignment="Left" Margin="0,2,0,0" Click="AddQuickClick"/>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0" Text="Mudar a largura de um elemento num trecho (calçada, pista, estacionamento ou canteiro), do início (A) ao fim (B), com transição em cada ponta:"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <Button Content="Alterar largura por trecho (A–B)…" Click="AddStretchClick" Margin="0"
+                                    ToolTip="Mesma janela da ferramenta Alterar Largura por Trecho (na planta, os pontos A e B são clicados no eixo)."/>
+                            <Button Content="Remover trechos" Click="ClearStretchesClick"/>
+                        </StackPanel>
+                        <TextBlock x:Name="TxtStretches" Style="{StaticResource Hint}"/>
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
                             <TextBlock Text="Quem absorve a variação na pista" Style="{StaticResource FieldLabel}"/>

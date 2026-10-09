@@ -1511,7 +1511,7 @@ public sealed class MarkingService
             if (terrain != null)
             {
                 var tiles = new List<(Polygon2, Plane3, double)>();
-                foreach (var grp in g.Pieces.Where(p => FloorEligible(src, p) && p.Color is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto)
+                foreach (var grp in g.Pieces.Where(p => FloorEligible(src, p) && p.Color is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto or MarkingColor.PavimentoTerra)
                              .GroupBy(p => (p.Color, E: Math.Round(p.Elevation, 3), T: Math.Round(p.Thickness, 3), p.Layer)))
                     foreach (var (shape, plane) in FloorParts(src, grp.Select(p => p.Shape), terrain, b))
                         if (plane is { } pl) tiles.Add((shape, pl, grp.Key.E + grp.Key.T));

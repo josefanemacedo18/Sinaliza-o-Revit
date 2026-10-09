@@ -58,6 +58,7 @@ public static partial class DetailGenerator
         {
             MarkingColor.Bloquete => "Pavimento em blocos de concreto",
             MarkingColor.PavimentoConcreto => "Pavimento de concreto",
+            MarkingColor.PavimentoTerra => "Pista de terra (leito natural / revestimento primário)",
             _ => "Revestimento asfáltico (CBUQ)",
         },
         LinearMarkingDefinition l => l.Code.ToUpperInvariant() switch

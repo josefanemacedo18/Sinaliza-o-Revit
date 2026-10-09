@@ -19,6 +19,9 @@ internal static class RoadRegen
     {
         var doc = uidoc.Document;
             var defs = setup.Build(pav.PathRef, output, PluginContext.Catalog, pav.GroupId, pav.Id, axis);   // Build clona o caminho por marca
+            // Sinalização automática editada à mão: fica como está e não é gerada outra igual no lugar.
+            var manual = members.Where(m => m.Id != pav.Id && m.EditadoManualmente).ToList();
+            defs = Core.Automation.AutoSignage.Preserve(defs, manual);
             var newPav = defs.OfType<RoadPavementDefinition>().FirstOrDefault();
             if (newPav != null)
             {
@@ -44,7 +47,7 @@ internal static class RoadRegen
             {
                 t.Start();
                 var service = new MarkingService(doc, uidoc.ActiveView);
-                foreach (var m in members.Where(m => m.Id != pav.Id)) service.Delete(m.Id);
+                foreach (var m in members.Where(m => m.Id != pav.Id && !manual.Contains(m))) service.Delete(m.Id);
                 if (newPav == null) service.Delete(pav.Id);
                 t.Commit();
             }

@@ -148,7 +148,7 @@ public static class EarthworksGenerator
                 SolidSweep.Along(geo, path, s => SolidSweep.Rect(Math.Min(a, b), Math.Max(a, b), prof.Z(s) - Infra.Wearing, prof.Z(s) + Math.Max(0.1, d.WalkwayHeight)),
                     MarkingColor.Concreto, 0, L, 8, "PASSEIO");
             }
-        if (!hosted) Infra.LaneMarkings(geo, path, prof, -half, half, Math.Max(1, d.Lanes), 0, L, true);
+        if (!hosted) Infra.LaneMarkings(geo, path, prof, -half, half, Math.Max(1, d.Lanes), 0, L, d.IsTwoWay);
         // Iluminação contínua (luminárias a cada 8 m nas duas laterais da abóbada).
         if (d.Lighting)
             for (var s = 4.0; s < L; s += 8)
@@ -399,7 +399,7 @@ public static class EarthworksGenerator
         var t = Math.Max(0.2, d.WallThickness);
         if (!hosted) Infra.Pavement(geo, path, prof, -half, half, 0, L);
         Infra.Base(geo, path, prof, -half, half, 0, L);
-        if (!hosted) Infra.LaneMarkings(geo, path, prof, -half, half, Math.Max(1, d.Lanes), 0, L, true);
+        if (!hosted) Infra.LaneMarkings(geo, path, prof, -half, half, Math.Max(1, d.Lanes), 0, L, d.IsTwoWay);
         double Depth(double s) => topProf.Z(s) - prof.Z(s);
         var walled = SolidSweep.Stations(path, 0, L, 1).Where(s => Depth(s) > 0.5).ToList();
         var ws0 = walled.Count > 0 ? walled.First() : L / 2;

@@ -184,6 +184,8 @@ internal static class InfraForms
             }, () => d.System, v => d.System = v)
          .Section("Tabuleiro")
          .Integer("Faixas de rolamento", () => d.Lanes, v => d.Lanes = v, 0, 8, "0 = passarela.")
+         .Check("Mão dupla (eixo amarelo) – desmarcado: mão única, só divisórias brancas", () => d.IsTwoWay, v => d.TwoWay = v,
+             tooltip: "Mão dupla só com 2 ou mais faixas. Mão única: nunca linha amarela; divisórias brancas de mesmo sentido entre as faixas.")
          .Number("Largura da faixa (m)", () => d.LaneWidth, v => d.LaneWidth = v, 1.2, 4.5, "0.00", "Passarela: largura livre.")
          .Number("Faixa de segurança / acostamento (m)", () => d.ShoulderWidth, v => d.ShoulderWidth = v, 0, 3.5)
          .Number("Passeio de cada lado (m)", () => d.SidewalkWidth, v => d.SidewalkWidth = v, 0, 5)
@@ -283,6 +285,8 @@ internal static class InfraForms
         w.Choice("Seção", new[] { ("Ferradura (NATM)", SecaoTunel.Ferradura), ("Circular (TBM)", SecaoTunel.Circular), ("Retangular (vala coberta)", SecaoTunel.Retangular) },
                 () => d.Section, v => d.Section = v)
          .Integer("Faixas", () => d.Lanes, v => d.Lanes = v, 1, 6)
+         .Check("Mão dupla (eixo amarelo) – desmarcado: mão única, só divisórias brancas", () => d.IsTwoWay, v => d.TwoWay = v,
+             tooltip: "Mão dupla só com 2 ou mais faixas. Mão única: nunca linha amarela; divisórias brancas de mesmo sentido entre as faixas.")
          .Number("Largura da faixa (m)", () => d.LaneWidth, v => d.LaneWidth = v, 2.5, 4.5)
          .Number("Acostamento/faixa de segurança (m)", () => d.ShoulderWidth, v => d.ShoulderWidth = v, 0, 3)
          .Number("Passeio de serviço (m)", () => d.WalkwayWidth, v => d.WalkwayWidth = v, 0, 2)
@@ -322,6 +326,8 @@ internal static class InfraForms
                 return new FormPreview(g, null, null, Info(g, $"Exemplo com {len:0} m de eixo."));
             }, false, edit ? "Aplicar" : "Inserir", 1080, 740);
         w.Integer("Faixas", () => d.Lanes, v => d.Lanes = v, 1, 6)
+         .Check("Mão dupla (eixo amarelo) – desmarcado: mão única, só divisórias brancas", () => d.IsTwoWay, v => d.TwoWay = v,
+             tooltip: "Mão dupla só com 2 ou mais faixas. Mão única: nunca linha amarela; divisórias brancas de mesmo sentido entre as faixas.")
          .Number("Largura da faixa (m)", () => d.LaneWidth, v => d.LaneWidth = v, 2.5, 4.5)
          .Number("Faixa de segurança (m)", () => d.ShoulderWidth, v => d.ShoulderWidth = v, 0, 3)
          .Number("Rebaixo da pista (m)", () => d.Depth, v => d.Depth = v, 1, 20, "0.00", "Gabarito 5,50 m + laje de travessia ≈ 6,5 m.")

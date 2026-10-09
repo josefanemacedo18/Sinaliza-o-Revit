@@ -29,6 +29,7 @@ public sealed class StyleService
         MarkingColor.Grama => "Grama",
         MarkingColor.Metal => "Metal",
         MarkingColor.PavimentoConcreto => "Pavimento de concreto",
+        MarkingColor.PavimentoTerra => "Pavimento de terra",
         MarkingColor.RelevoTatil => "Relevo tátil",
         MarkingColor.Brita => "Brita (lastro)",
         MarkingColor.Terra => "Solo compactado",
@@ -72,7 +73,7 @@ public sealed class StyleService
                 MarkingColor.Brita => "Pedra",
                 MarkingColor.Terra => "Terra",
                 MarkingColor.Agua => "Líquido",
-                MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto => "Pavimento",
+                MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto or MarkingColor.PavimentoTerra => "Pavimento",
                 _ => "Concreto",
             };
             if (color == MarkingColor.Vidro) mat.Transparency = 60;

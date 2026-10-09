@@ -68,6 +68,7 @@ public sealed class QuantityRow
     public string ColorLabel => IsFamily ? "—" : Color switch
     {
         MarkingColor.PavimentoConcreto => "Pav. concreto",
+        MarkingColor.PavimentoTerra => "Terra",
         MarkingColor.RelevoTatil => "Relevo tátil",
         _ => Color.ToString(),
     };

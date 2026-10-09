@@ -96,7 +96,7 @@ public static class BridgeGenerator
             RoadHalf = roadHalf, SidewalkWidth = pedestrian ? 0 : b.SidewalkWidth, Lanes = pedestrian ? 0 : b.Lanes, DeckThickness = b.DeckThickness,
             GirderDepth = b.GirderDepth, GirderSpacing = b.GirderSpacing, System = b.System, PierType = b.PierType, PierSize = b.PierSize,
             SpanLength = b.SpanLength, MainSpan = b.MainSpan, Barrier = pedestrian ? TipoGuarda.GuardaCorpoMetalico : b.Barrier,
-            Lighting = b.Lighting, LightSpacing = b.LightSpacing, Markings = b.LaneMarkings && !pedestrian, Pedestrian = pedestrian,
+            Lighting = b.Lighting, LightSpacing = b.LightSpacing, Markings = b.LaneMarkings && !pedestrian, Pedestrian = pedestrian, TwoWay = b.IsTwoWay,
             CrossSlope = b.CrossSlope, Continuous = b.Continuous, VariableDepth = b.VariableDepth, RailingStyle = b.RailingStyle, Pylon = b.Pylon,
             Stays = b.Stays, ArchRise = b.ArchRise, WingWalls = b.WingWalls, Drains = b.Drains, Native = native,
         };

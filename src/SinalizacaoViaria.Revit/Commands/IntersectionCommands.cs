@@ -492,7 +492,7 @@ internal static class RoundaboutForms
          .Number("Largura da faixa de by-pass (m)", () => d.BypassWidth, v => d.BypassWidth = v, 3, 8)
          .Number("Raio do by-pass (m)", () => d.BypassRadius, v => d.BypassRadius = v, 10, 150)
          .Number("Calçada em volta (m)", () => d.SidewalkWidth, v => d.SidewalkWidth = v, 0, 20)
-         .Choice("Pavimento", new[] { ("Asfalto", TipoPavimento.Asfalto), ("Bloquete", TipoPavimento.Bloquete), ("Concreto", TipoPavimento.Concreto), ("Nenhum", TipoPavimento.Nenhum) },
+         .Choice("Pavimento", new[] { ("Asfalto", TipoPavimento.Asfalto), ("Bloquete", TipoPavimento.Bloquete), ("Concreto", TipoPavimento.Concreto), ("Terra", TipoPavimento.Terra), ("Nenhum", TipoPavimento.Nenhum) },
              () => d.Pavement, v => d.Pavement = v);
         if (!hasRoads)
             w.Text("Ângulos dos ramos (°)", () => angles, v => angles = v, tooltip: "Ex.: 0; 90; 180; 270")

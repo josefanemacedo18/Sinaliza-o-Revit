@@ -531,8 +531,8 @@ public static class RoundaboutGenerator
                 L.SidewalkService.Clear(); L.SidewalkService.AddRange(sv);
             }
         }
-        var pavColor = d.Pavement switch { TipoPavimento.Bloquete => MarkingColor.Bloquete, TipoPavimento.Concreto => MarkingColor.PavimentoConcreto, _ => MarkingColor.Asfalto };
-        var pt = d.Pavement switch { TipoPavimento.Bloquete => 0.08, TipoPavimento.Concreto => 0.15, _ => 0.05 };
+        var pavColor = d.Pavement switch { TipoPavimento.Bloquete => MarkingColor.Bloquete, TipoPavimento.Concreto => MarkingColor.PavimentoConcreto, TipoPavimento.Terra => MarkingColor.PavimentoTerra, _ => MarkingColor.Asfalto };
+        var pt = d.Pavement switch { TipoPavimento.Bloquete => 0.08, TipoPavimento.Concreto => 0.15, TipoPavimento.Terra => 0.15, _ => 0.05 };
         // Rotatória elevada (platô): a pista giratória sobe 'hp' em relação às vias; rampas nos ramos.
         var hp = d.Raised ? Math.Clamp(d.RaisedHeight, 0.03, 0.30) : 0;
         if (d.Pavement != TipoPavimento.Nenhum)

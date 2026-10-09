@@ -59,6 +59,15 @@ public sealed class ElementoSecao
     /// <summary>Estacionamento: código da vaga do catálogo.</summary>
     public string Vaga { get; set; } = "MER-0";
 
+    /// <summary>
+    /// Estacionamento só delimitado: em vez das vagas, só a linha tracejada (MER-L) na divisa com a pista, sem divisórias entre
+    /// vagas. Traço e espaço: os da linha de delimitação (<see cref="TracoLinha"/>, <see cref="EspacoLinha"/>); largura em
+    /// <see cref="LarguraDelimitacao"/>. Falso (padrão) = vagas demarcadas.
+    /// </summary>
+    public bool SoDelimitado { get; set; }
+    /// <summary>Largura da linha do estacionamento só delimitado (m). Nulo = 0,10 m.</summary>
+    public double? LarguraDelimitacao { get; set; }
+
     /// <summary>Faixas exclusivas/preferenciais: legenda repetida (vazio = sem legenda).</summary>
     public string Legenda { get; set; } = "ÔNIBUS";
 
@@ -214,6 +223,33 @@ public sealed partial class RoadSetup
 
     /// <summary>Mão dupla (eixo = divisão de sentidos) ou mão única (todas as faixas no sentido do eixo).</summary>
     public bool TwoWay { get; set; } = true;
+
+    /// <summary>
+    /// Mão única de uma faixa centrada no eixo (metade de cada lado, como nas obras de arte): as duas metades são a mesma faixa –
+    /// sem divisória sobre o eixo e com uma seta só.
+    /// </summary>
+    public bool FaixaUnicaCentrada { get; set; }
+
+    /// <summary>
+    /// Mão única: setas de sentido (PEM-F) repetidas no meio de cada faixa de rolamento (com as inscrições). Nulo = não, como nas vias
+    /// salvas antes desta opção; a janela da via marca a opção nas vias novas.
+    /// </summary>
+    public bool? SetasSentido { get; set; }
+
+    /// <summary>Mão única: espaçamento entre as setas de sentido (m) – [a confirmar] no MBST Vol. IV.</summary>
+    public double EspacamentoSetas { get; set; } = 50;
+
+    /// <summary>
+    /// Pista vazia: só o pavimento (largura fixa ou variável), sem pintura, meio-fio ou calçada. A seção fica guardada no pavimento e
+    /// os elementos entram depois pela edição da seção (ou Sinalizar via sobre o mesmo eixo).
+    /// </summary>
+    public bool SoPavimento { get; set; }
+
+    /// <summary>
+    /// Sinalização vertical automática da via (R-19, R-24a, A-32b nas travessias), refeita a partir do eixo. Nulo = desligada (vias
+    /// salvas antes desta opção); a janela da via liga nas vias novas.
+    /// </summary>
+    public SinalizacaoAutomatica? Sinalizacao { get; set; }
 
     /// <summary>Raio das esquinas nas conexões desta via (nulo = pela hierarquia).</summary>
     public double? CornerRadius { get; set; }
@@ -467,6 +503,12 @@ public sealed partial class RoadSetup
             if (existingPavementId != null) pav.Id = existingPavementId;
             pavement = pav;
         }
+        if (SoPavimento)
+        {
+            // Pista vazia: só a superfície – a largura variável vale para ela; nada mais é gerado.
+            if (pavement != null) ApplyVariation(res, axis, new Dictionary<MarkingDefinition, (int, double, double)>(), AddVar);
+            return res;
+        }
         // Retornos: alargamentos e bolsões laterais entram como recuos derivados (só nesta geração – a seção gravada guarda o retorno).
         var retornos = RetornoPlans();
         var derived = retornos.SelectMany(p => p.Recesses).ToList();
@@ -503,14 +545,11 @@ public sealed partial class RoadSetup
             if (!string.IsNullOrWhiteSpace(CenterStudsCode) && Center is not (CenterTreatment.Canteiro or CenterTreatment.Nenhum))
                 Line(CenterStudsCode!, 0, variant: string.IsNullOrWhiteSpace(CenterStudsVariant) ? null : CenterStudsVariant);
         }
-        else if (IsLane(Left, 0) && IsLane(Right, 0))
-        {
-            // Mão única: divisão entre as faixas adjacentes ao eixo.
-            BoundaryLine(Left[0], Right[0], 0, 0);
-        }
+        else OneWayAxis();
 
         BuildSide(Right, -1, reverseTraffic: false);
         BuildSide(Left, +1, reverseTraffic: TwoWay);
+        if (!TwoWay) OneWayArrows();
         // Largura variável (levantamento) e recuos (baias, faixas de aceleração/desaceleração).
         MarkingDefinition AddVar(MarkingDefinition d)
         {
@@ -554,6 +593,8 @@ public sealed partial class RoadSetup
             res.AddRange(fs.Children);
         }
         Recuos.RemoveAll(derived.Contains);
+        // Pista de terra: sem pintura automática (só pavimento, elementos físicos, dispositivos e placas).
+        if (Pavement == TipoPavimento.Terra && res.RemoveAll(TerraPaint.IsPaint) > 0) Warnings.Add(TerraPaint.AvisoVia);
         return res;
 
         // ------------------------------------------------ lados
@@ -657,6 +698,17 @@ public sealed partial class RoadSetup
 
                     case TipoElementoSecao.Estacionamento:
                     {
+                        if (e.SoDelimitado)
+                        {
+                            // Só a linha tracejada que delimita a faixa (lado da pista), sem divisórias entre vagas.
+                            var lw = Math.Clamp(e.LarguraDelimitacao ?? 0.10, 0.05, 0.30);
+                            Add(new LinearMarkingDefinition
+                            {
+                                Code = ParkingLineCode, Offset = sigma * (a + lw / 2), WidthOverride = lw, StartSetback = StartSetback, EndSetback = EndSetback,
+                                PatternOverride = new[] { Math.Max(0.1, e.TracoLinha), Math.Max(0, e.EspacoLinha) },
+                            });
+                            break;
+                        }
                         var preset = catalog?.Vaga(e.Vaga);
                         var parallel = preset == null || preset.Angulo < 1;
                         var depth = preset == null ? w : parallel ? preset.Largura : preset.Comprimento * Math.Sin(preset.Angulo * Math.PI / 180) + preset.Largura * Math.Cos(preset.Angulo * Math.PI / 180);
@@ -754,6 +806,62 @@ public sealed partial class RoadSetup
             else if (lo && EdgeLike(ti)) Line(EdgeCode, sigma * (at + EdgeInset));
         }
 
+        // Mão única: nunca amarelo. Entre as faixas junto ao eixo, divisória branca de mesmo sentido (exceto a faixa única centrada no
+        // eixo); com faixa só de um lado, o eixo é a borda da pista e recebe o bordo (e a sarjeta) daquele lado.
+        void OneWayAxis()
+        {
+            var rl = IsLane(Right, 0);
+            var ll = IsLane(Left, 0);
+            if (rl && ll)
+            {
+                if (!FaixaUnicaCentrada) BoundaryLine(Left[0], Right[0], 0, 0);
+                return;
+            }
+            if (!rl && !ll) return;
+            var laneSide = rl ? -1 : 1;
+            var lane = rl ? Right[0] : Left[0];
+            var other = rl ? Left : Right;
+            if (other.Count == 0)
+            {
+                if (EdgeLines) Line(EdgeCode, laneSide * EdgeInset);
+                return;
+            }
+            if (AddedGutter(other, 0) > 0.01)
+            {
+                // Sarjeta somada: já feita junto com a calçada do outro lado – só o bordo, na borda da faixa.
+                if (EdgeLines && other[0].Tipo is TipoElementoSecao.Acostamento or TipoElementoSecao.CanteiroFisico or TipoElementoSecao.Calcada)
+                    Line(EdgeCode, laneSide * EdgeInset);
+                return;
+            }
+            BoundaryLine(lane, other[0], 0, -laneSide);
+        }
+
+        // Mão única: setas de sentido (no sentido do eixo) repetidas no meio de cada faixa de rolamento.
+        void OneWayArrows()
+        {
+            if (!Inscriptions || SetasSentido != true) return;
+            var centers = new List<double>();
+            var split = FaixaUnicaCentrada && IsLane(Left, 0) && IsLane(Right, 0);
+            foreach (var (side, sigma) in new[] { (Right, -1), (Left, 1) })
+            {
+                double a = 0;
+                for (int i = 0; i < side.Count; i++)
+                {
+                    a += AddedGutter(side, i);
+                    var w = Math.Max(0.05, side[i].Largura);
+                    if (side[i].Tipo == TipoElementoSecao.FaixaRolamento && !(split && i == 0)) centers.Add(sigma * (a + w / 2));
+                    a += w;
+                }
+            }
+            if (split) centers.Add((Left[0].Largura - Right[0].Largura) / 2);
+            foreach (var c in centers)
+                Add(new RepeatedMarkingDefinition
+                {
+                    SymbolCode = "PEM-F", Length = Speed > 60 ? 7.5 : 5.0, Offset = c, Spacing = Math.Max(10, EspacamentoSetas), Reverse = false,
+                    StartOffset = Math.Max(15, StartSetback + 15), EndSetback = EndSetback + 15,
+                });
+        }
+
         void PhysicalMedian(double centerOffset, double width, double top, double vegetation)
         {
             // Meios-fios com o topo no nível do canteiro; num canteiro rebaixado (jardim de chuva) a guia fica 0,10 m acima da pista.
@@ -816,6 +924,30 @@ public sealed partial class RoadSetup
         return res;
     }
 
+    /// <summary>
+    /// Seção de uma pista vazia (ferramenta Pista, modo "só pavimento"): faixas de rolamento de até 3,5 m em cada lado, para a
+    /// edição posterior da seção partir da pista desenhada.
+    /// </summary>
+    /// <summary>Código da linha que delimita um estacionamento sem vagas demarcadas (MBST Vol. IV – MER; código [a confirmar]).</summary>
+    public const string ParkingLineCode = "MER-L";
+
+    public static RoadSetup PistaVazia(double right, double left, bool twoWay, TipoPavimento material, HierarquiaViaria h, double? cornerRadius = null)
+    {
+        var s = new RoadSetup
+        {
+            SoPavimento = true, TwoWay = twoWay, Pavement = material == TipoPavimento.Nenhum ? TipoPavimento.Asfalto : material, Hierarchy = h,
+            Speed = Hierarquia.DefaultSpeed(h), CornerRadius = cornerRadius, SarjetaSomada = true,
+            Center = twoWay ? CenterTreatment.LFO2 : CenterTreatment.Nenhum,
+        };
+        foreach (var (side, w) in new[] { (s.Right, right), (s.Left, left) })
+        {
+            if (w < 0.05) continue;
+            var n = Math.Max(1, (int)Math.Ceiling(w / 3.5 - 0.05));
+            for (int i = 0; i < n; i++) side.Add(new ElementoSecao { Tipo = TipoElementoSecao.FaixaRolamento, Largura = Math.Round(w / n, 3) });
+        }
+        return s;
+    }
+
     public RoadSetup Clone()
     {
         var c = (RoadSetup)MemberwiseClone();
@@ -826,6 +958,8 @@ public sealed partial class RoadSetup
         c.Retornos = Retornos.Select(r => r.Clone()).ToList();
         c.TravessiasCanteiro = TravessiasCanteiro.Select(t => t.Clone()).ToList();
         c.ExtensoesCalcada = ExtensoesCalcada.Select(e => e.Clone()).ToList();
+        c.TrechosLargura = TrechosLargura.Select(t => t.Clone()).ToList();
+        c.Sinalizacao = Sinalizacao?.Clone();
         return c;
     }
 }

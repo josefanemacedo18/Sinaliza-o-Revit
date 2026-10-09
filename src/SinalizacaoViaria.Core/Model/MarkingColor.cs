@@ -40,6 +40,8 @@ public enum MarkingColor
     Terra,
     /// <summary>Lâmina d'água (rios sob pontes) – referência visual semitransparente.</summary>
     Agua,
+    /// <summary>Pista de terra (leito natural / revestimento primário) – pavimento sem pintura.</summary>
+    PavimentoTerra,
 }
 
 public readonly record struct Rgb(byte R, byte G, byte B)
@@ -66,10 +68,10 @@ public static class MarkingColors
     public static bool IsPaint(MarkingColor c) =>
         c is not (MarkingColor.Concreto or MarkingColor.Grama or MarkingColor.Metal or MarkingColor.Asfalto or MarkingColor.Bloquete
             or MarkingColor.PavimentoConcreto or MarkingColor.Folhagem or MarkingColor.Vidro or MarkingColor.Madeira or MarkingColor.RelevoTatil
-            or MarkingColor.Brita or MarkingColor.Terra or MarkingColor.Agua);
+            or MarkingColor.Brita or MarkingColor.Terra or MarkingColor.Agua or MarkingColor.PavimentoTerra);
 
     /// <summary>Materiais de pavimento da pista.</summary>
-    public static bool IsPavement(MarkingColor c) => c is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto;
+    public static bool IsPavement(MarkingColor c) => c is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto or MarkingColor.PavimentoTerra;
 
     /// <summary>Cor RGB aproximada para exibição no Revit (materiais e regiões preenchidas).</summary>
     public static Rgb Display(MarkingColor c) => c switch
@@ -95,6 +97,7 @@ public static class MarkingColors
         MarkingColor.Brita => new Rgb(126, 124, 118),
         MarkingColor.Terra => new Rgb(150, 118, 84),
         MarkingColor.Agua => new Rgb(86, 150, 196),
+        MarkingColor.PavimentoTerra => new Rgb(181, 140, 96),
         _ => new Rgb(128, 128, 128),
     };
 
@@ -122,6 +125,7 @@ public static class MarkingColors
         MarkingColor.Brita => "Lastro de brita da via férrea.",
         MarkingColor.Terra => "Sublastro, aterros e solo compactado.",
         MarkingColor.Agua => "Lâmina d'água (referência sob pontes).",
+        MarkingColor.PavimentoTerra => "Pista de terra (leito natural / revestimento primário) – sem pintura.",
         _ => "",
     };
 

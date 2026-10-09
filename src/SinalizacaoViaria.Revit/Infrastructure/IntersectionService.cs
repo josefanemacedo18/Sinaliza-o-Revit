@@ -290,9 +290,12 @@ public sealed class IntersectionService
         if (axis == null || axis.Points.Count < 2) return results;
         var members = MarkingStorage.Definitions(_doc).Where(d => d.GroupId != null && d.GroupId == pav.GroupId).ToList();
         var fs = RoadFeatures.Build(setup, pav, axis, pav.PathRef.Z, pav.Output, pav.GroupId, PluginContext.Catalog);
-        var keep = fs.Children.Select(c => c.Id).ToHashSet();
+        // O que o usuário editou à mão fica como está (e não é gerado outro igual no lugar).
+        var manual = members.Where(m => m.Id.StartsWith(fs.Prefix) && m.EditadoManualmente).ToList();
+        var children = AutoSignage.Preserve(fs.Children, manual);
+        var keep = children.Select(c => c.Id).Concat(manual.Select(m => m.Id)).ToHashSet();
         foreach (var old in members.Where(m => m.Id.StartsWith(fs.Prefix) && !keep.Contains(m.Id))) _service.Delete(old.Id);
-        foreach (var c in fs.Children) results.Add(_service.Render(c));
+        foreach (var c in children) results.Add(_service.Render(c));
         _service.Invalidate();
         var plain = members.Where(m => !m.Id.StartsWith(fs.Prefix)).ToList();
         RoadFeatures.ApplyCuts(fs, plain);
@@ -349,16 +352,19 @@ public sealed class IntersectionService
 
         // 2. Travessias e rampas (recriadas).
         var oldIds = it.ChildIds.ToHashSet();
-        foreach (var old in it.ChildIds) _service.Delete(old);
+        // Filhos editados à mão (placa movida, legenda trocada...) ficam como estão; os outros são refeitos.
+        var manual = all.Where(d => oldIds.Contains(d.Id) && d.EditadoManualmente).ToList();
+        foreach (var old in it.ChildIds.Where(id => manual.All(m => m.Id != id))) _service.Delete(old);
         var z = it.Z;
         var members = roads.Select(r => (IReadOnlyCollection<MarkingDefinition>)all.Where(d => d.GroupId != null && d.GroupId == r.Def.GroupId).ToList()).ToList();
         var children = layout.Pavement.Count > 0 ? IntersectionGenerator.Children(it, layout, it.Output, z, members) : new List<MarkingDefinition>();
+        children = AutoSignage.Preserve(children, manual);
         foreach (var c in children) results.Add(_service.Render(c));
-        it.ChildIds = children.Select(c => c.Id).ToList();
+        it.ChildIds = children.Select(c => c.Id).Concat(manual.Select(m => m.Id)).ToList();
         results.Add(_service.Render(it));   // grava a lista de filhos
 
         // 3. Recortes nas marcas de cada via (e rampas nas calçadas).
-        var ramps = children.OfType<RampDefinition>()
+        var ramps = children.OfType<RampDefinition>().Concat(manual.OfType<RampDefinition>())
             .Select(r => (r.Id, Fp: RampGenerator.Footprint(r, new Polyline2(r.PathRef.Points)))).ToList();
         _service.Invalidate();
         for (int k = 0; k < roads.Count; k++)

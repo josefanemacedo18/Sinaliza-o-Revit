@@ -879,6 +879,7 @@ public static class MarkingBuilder
                 {
                     TipoPavimento.Bloquete => "Pavimento intertravado (bloquete)",
                     TipoPavimento.Concreto => "Pavimento de concreto",
+                    TipoPavimento.Terra => "Pista de terra (leito natural / revestimento primário)",
                     _ => "Pavimento asfáltico (CBUQ)",
                 } + $" – e = {pv.ActualThickness * 100:0} cm", GrupoMarca.Urbanizacao, "Projeto de pavimentação (espessura indicativa – conferir dimensionamento)", "m²");
             case RoundaboutDefinition rb:

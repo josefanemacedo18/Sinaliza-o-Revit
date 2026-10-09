@@ -606,6 +606,28 @@
       ]
     },
     {
+      "codigo": "MER-L",
+      "nome": "Marca delimitadora de estacionamento regulamentado – só a linha de delimitação (sem divisórias entre vagas)",
+      "grupo": "Estacionamento",
+      "cor": "Branca",
+      "descricao": "Linha tracejada na divisa entre a faixa de estacionamento e a pista, sem demarcar as vagas uma a uma. Traço, espaço e largura ajustáveis na seção da via.",
+      "referencia": "MBST Vol. IV – Marca delimitadora de estacionamento regulamentado (MER); código, traço e espaço [a confirmar]",
+      "larguraMin": 0.1,
+      "larguraMax": 0.2,
+      "variantes": [
+        {
+          "nome": "Seccionada 0,10 m (1 × 1 m) [a confirmar]",
+          "faixas": [
+            {
+              "deslocamento": 0,
+              "largura": 0.1,
+              "padrao": [1.0, 1.0]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "codigo": "MVE",
       "nome": "Marca delimitadora de parada de veículos específicos",
       "grupo": "Estacionamento",

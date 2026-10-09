@@ -188,6 +188,9 @@ public sealed class CmdEditar : CommandBase
         if (edited == null) return Result.Cancelled;
         PluginContext.SaveSettings();
         edited.Id = stored.MarkingId;
+        // Sinalização automática (da via ou da interseção) alterada à mão: as regenerações passam a mantê-la como está.
+        edited.GroupId ??= stored.Definition.GroupId;
+        if (IsAutomatic(uidoc.Document, stored.Definition)) edited.EditadoManualmente = true;
         EnsureDetailView(uidoc, edited.Output, keepExistingView: true);
         var results = MarkingCreator.Commit(uidoc, new[] { edited }, $"SV - Editar {edited.DisplayCode}");
         if (edited is RampDefinition ramp) RampCutter.Apply(uidoc, ramp);
@@ -210,7 +213,8 @@ public sealed class CmdEditar : CommandBase
         var fw = new FormWindow("Editar pavimento da via", "Pavimento da via",
                 "Material, espessura, hierarquia e raio das esquinas. As interseções desta via são refeitas com o novo raio.",
                 null, null, false, "Aplicar", 600, 380)
-            .Choice("Pavimento", new[] { ("Asfalto (CBUQ)", TipoPavimento.Asfalto), ("Bloquete / intertravado", TipoPavimento.Bloquete), ("Concreto", TipoPavimento.Concreto) },
+            .Choice("Pavimento", new[] { ("Asfalto (CBUQ)", TipoPavimento.Asfalto), ("Bloquete / intertravado", TipoPavimento.Bloquete), ("Concreto", TipoPavimento.Concreto),
+                ("Terra (leito natural – sem pintura)", TipoPavimento.Terra) },
                 () => work.Material, v => work.Material = v)
             .Number("Espessura (m)", () => thick, v => thick = v, 0.01, 1)
             .Choice("Hierarquia viária (CTB art. 60)", Hierarquia.Definidas.Select(x => (Hierarquia.Label(x), x)), () => h, v => h = v)
@@ -289,6 +293,11 @@ public sealed class CmdEditar : CommandBase
         Report("Via", results);
         return Result.Succeeded;
     }
+
+    /// <summary>Marca gerada automaticamente: placa automática da via ou filho de uma interseção/rotatória.</summary>
+    private static bool IsAutomatic(Document doc, MarkingDefinition d) =>
+        d.Id.Contains(":sv:") || d.EditadoManualmente
+        || d.GroupId != null && MarkingStorage.Definitions(doc).Any(x => x.Id == d.GroupId && x is IntersectionDefinition or RoundaboutDefinition);
 
     private static double DetailScale(UIDocument uidoc, MarkingDefinition d) =>
         (!string.IsNullOrEmpty(d.Output.ViewId) ? uidoc.Document.GetElement(d.Output.ViewId) as View : null)?.Scale ?? uidoc.ActiveView.Scale;

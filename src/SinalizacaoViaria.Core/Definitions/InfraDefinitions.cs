@@ -327,6 +327,10 @@ public sealed class BridgeDefinition : MarkingDefinition, ITerrainAware, IHosted
     public TipoObraDeArte Kind { get; set; } = TipoObraDeArte.Viaduto;
     public SistemaEstrutural System { get; set; } = SistemaEstrutural.VigasPreMoldadas;
     public int Lanes { get; set; } = 2;
+    /// <summary>Mão dupla (eixo amarelo) ou única (só divisórias brancas). Nulo = pelas faixas: 2 ou mais = mão dupla (projetos antigos).</summary>
+    public bool? TwoWay { get; set; }
+    /// <summary>Sentido efetivo: mão dupla só com 2 ou mais faixas e sem pedido de mão única.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsTwoWay => Lanes >= 2 && (TwoWay ?? true);
     public double LaneWidth { get; set; } = 3.50;
     /// <summary>Faixa de segurança / acostamento junto a cada barreira (m).</summary>
     public double ShoulderWidth { get; set; } = 1.00;
@@ -438,6 +442,10 @@ public sealed class TunnelDefinition : MarkingDefinition, ITerrainAware, IHosted
     public bool StraightAxis { get; set; }
     public SecaoTunel Section { get; set; } = SecaoTunel.Ferradura;
     public int Lanes { get; set; } = 2;
+    /// <summary>Mão dupla (eixo amarelo) ou única (só divisórias brancas). Nulo = pelas faixas: 2 ou mais = mão dupla (projetos antigos).</summary>
+    public bool? TwoWay { get; set; }
+    /// <summary>Sentido efetivo: mão dupla só com 2 ou mais faixas e sem pedido de mão única.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsTwoWay => Lanes >= 2 && (TwoWay ?? true);
     public double LaneWidth { get; set; } = 3.50;
     public double ShoulderWidth { get; set; } = 0.50;
     /// <summary>Passeio de serviço elevado de cada lado (m).</summary>
@@ -487,6 +495,10 @@ public sealed class TrenchDefinition : MarkingDefinition, ITerrainAware, IHosted
     /// <summary>Só os muros: o greide da via (já rebaixado pelo Perfil da via) é mantido.</summary>
     public bool KeepRoadGrade { get; set; }
     public int Lanes { get; set; } = 2;
+    /// <summary>Mão dupla (eixo amarelo) ou única (só divisórias brancas). Nulo = pelas faixas: 2 ou mais = mão dupla (projetos antigos).</summary>
+    public bool? TwoWay { get; set; }
+    /// <summary>Sentido efetivo: mão dupla só com 2 ou mais faixas e sem pedido de mão única.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsTwoWay => Lanes >= 2 && (TwoWay ?? true);
     public double LaneWidth { get; set; } = 3.50;
     public double ShoulderWidth { get; set; } = 0.60;
     /// <summary>Rebaixo da pista no trecho central (m).</summary>

@@ -45,6 +45,27 @@ public static class MarkingCreator
             Log.Error("RenderDependents", ex);
         }
         t.Commit();
+        // Pintura sobre pista de terra: avisa (a tinta não adere ao leito natural).
+        try
+        {
+            var paint = ordered.Where(Core.Automation.TerraPaint.IsPaint).ToList();
+            if (paint.Count > 0 && MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>().Any(p => p.Material == TipoPavimento.Terra))
+            {
+                var roads = new IntersectionService(doc, service).Roads();
+                var warn = Core.Automation.TerraPaint.Warnings(paint, roads,
+                    d => (d.Path != null ? PathResolver.Resolve(doc, d.Path)?.Main : null) ?? Core.Automation.TerraPaint.StoredPath(d));
+                if (warn.Count > 0)
+                {
+                    var r = new RenderResult();
+                    r.Warnings.AddRange(warn);
+                    results.Insert(0, r);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Pintura sobre terra", ex);
+        }
         var ids = results.SelectMany(r => r.Elements).Where(id => doc.GetElement(id) != null).ToList();
         if (ids.Count > 0) uidoc.Selection.SetElementIds(ids);
         return results;

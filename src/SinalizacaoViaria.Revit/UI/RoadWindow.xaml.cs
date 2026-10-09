@@ -186,9 +186,6 @@ public partial class RoadWindow : Window
                      ("Todas as faixas (proporcional)", AbsorcaoLargura.TodasAsFaixas), ("Faixa de estacionamento", AbsorcaoLargura.Estacionamento) })
             CbAbsorb.Items.Add(new Option<AbsorcaoLargura>(l, v));
         CbAbsorb.SelectedIndex = 0;
-        foreach (var (l, v) in new[] { ("dividida igualmente", 0), ("toda no lado direito", 1), ("toda no lado esquerdo", 2) })
-            CbQuickSplit.Items.Add(new Option<int>(l, v));
-        CbQuickSplit.SelectedIndex = 0;
         foreach (var t in Enum.GetValues<TipoRecuo>()) CbRecessType.Items.Add(new Option<TipoRecuo>(RecuoVia.Rotulo(t), t));
         CbRecessType.SelectedIndex = 0;
 
@@ -226,6 +223,7 @@ public partial class RoadWindow : Window
         CbPavement.Items.Add(new PavementOption("Asfalto (CBUQ)", TipoPavimento.Asfalto));
         CbPavement.Items.Add(new PavementOption("Bloquete / pavimento intertravado", TipoPavimento.Bloquete));
         CbPavement.Items.Add(new PavementOption("Concreto", TipoPavimento.Concreto));
+        CbPavement.Items.Add(new PavementOption("Terra (leito natural – sem pintura)", TipoPavimento.Terra));
         CbPavement.Items.Add(new PavementOption("Nenhum (pista já modelada)", TipoPavimento.Nenhum));
         CbPavement.SelectedIndex = 0;
 
@@ -272,6 +270,13 @@ public partial class RoadWindow : Window
         _loading = true;
         Select(CbHierarchy, s.Hierarchy);
         CkTactile.IsChecked = s.PisoTatil;
+        // Via existente sem a opção: mantém (sem setas); via nova: com setas na mão única.
+        CkArrows.IsChecked = s.SetasSentido ?? !_editing;
+        // Sinalização automática: via nova com os três grupos; via existente sem a opção, desligada.
+        var sv = s.Sinalizacao ?? (_editing ? null : new SinalizacaoAutomatica());
+        CkAutoSpeed.IsChecked = sv?.Velocidade == true;
+        CkAutoOneWay.IsChecked = sv?.Sentido == true;
+        CkAutoCrossing.IsChecked = sv?.Travessias == true;
         TbCornerRadius.Text = s.CornerRadius is { } cr ? UiHelpers.F(cr) : "";
         RbTwoWay.IsChecked = s.TwoWay;
         RbOneWay.IsChecked = !s.TwoWay;
@@ -298,6 +303,9 @@ public partial class RoadWindow : Window
         foreach (var e in s.Left) Attach(_left, e.Clone());
         _widths.Clear();
         foreach (var p in s.LargurasVariaveis.OrderBy(p => p.Estaca)) _widths.Add(new WidthRow(p.Clone()));
+        _stretches.Clear();
+        _stretches.AddRange(s.TrechosLargura.Select(t => t.Clone()));
+        UpdateStretchText();
         _recesses.Clear();
         foreach (var r in s.Recuos) _recesses.Add(new RecessRow(r.Clone()));
         Select(CbAbsorb, s.Absorcao);
@@ -358,12 +366,21 @@ public partial class RoadWindow : Window
         s.LargurasVariaveis = _widths.Select(w => w.P.Clone()).OrderBy(p => p.Estaca).ToList();
         s.Recuos = _recesses.Select(r => r.R.Clone()).ToList();
         s.PisoTatil = CkTactile.IsChecked == true;
+        s.SetasSentido = CkArrows.IsChecked == true;
+        var auto = new SinalizacaoAutomatica
+        {
+            Velocidade = CkAutoSpeed.IsChecked == true, Sentido = CkAutoOneWay.IsChecked == true, Travessias = CkAutoCrossing.IsChecked == true,
+        };
+        s.Sinalizacao = auto.Empty ? null : auto;
+        s.TrechosLargura = _stretches.Select(t => t.Clone()).ToList();
         if (_loaded != null)
         {
             // O que fica gravado na via e não aparece nesta janela segue com ela.
             s.Retornos = _loaded.Retornos.Select(r => r.Clone()).ToList();
             s.TravessiasCanteiro = _loaded.TravessiasCanteiro.Select(t => t.Clone()).ToList();
             s.ExtensoesCalcada = _loaded.ExtensoesCalcada.Select(e => e.Clone()).ToList();
+            s.FaixaUnicaCentrada = _loaded.FaixaUnicaCentrada && !s.TwoWay;
+            s.EspacamentoSetas = _loaded.EspacamentoSetas;
         }
         s.Absorcao = Selected<AbsorcaoLargura>(CbAbsorb);
         s.TransicaoSuave = CkSmoothWidth.IsChecked == true;
@@ -402,28 +419,39 @@ public partial class RoadWindow : Window
     }
 
     /// <summary>Medida "de meio-fio a meio-fio" numa estaca, repartida entre os lados.</summary>
-    private void AddQuickClick(object sender, RoutedEventArgs e)
+    /// <summary>Trechos com outra largura (mesma janela da ferramenta Alterar Largura por Trecho, com as estacas digitadas).</summary>
+    private readonly List<TrechoLargura> _stretches = new();
+
+    private void AddStretchClick(object sender, RoutedEventArgs e)
     {
         try
         {
             var s = BuildSetup();
-            var total = UiHelpers.Parse(TbQuickTotal, 0, "Largura entre meios-fios", 1, 200);
-            var st = PontoLargura.ParseEstaca(TbQuickStation.Text) ?? throw new FormatException("Informe a estaca da medida.");
-            var (bl, _, _) = s.Nominal(true);
-            var (br, _, _) = s.Nominal(false);
-            var diff = total - (bl + br);
-            var split = Selected<int>(CbQuickSplit);
-            var row = _widths.FirstOrDefault(w => Math.Abs(w.P.Estaca - st) < 0.01);
-            if (row == null) { row = new WidthRow(new PontoLargura { Estaca = st }); _widths.Add(row); }
-            row.P.BordoEsquerdo = split == 1 ? bl : split == 2 ? bl + diff : bl + diff / 2;
-            row.P.BordoDireito = split == 2 ? br : split == 1 ? br + diff : br + diff / 2;
-            var sorted = _widths.OrderBy(w => w.P.Estaca).ToList();
-            _widths.Clear();
-            foreach (var w in sorted) _widths.Add(w);
-            GridWidths.Items.Refresh();
+            var start = _stretches.Count == 0 ? 20 : _stretches.Max(x => x.Fim) + 20;
+            var t = new TrechoLargura { EstacaA = start + 10, EstacaB = start + 40 };
+            if (!Commands.WidthStretchForm.Show(s, t, "Alterar largura por trecho")) return;
+            _stretches.RemoveAll(x => x.Elemento == t.Elemento && x.Fim >= t.Inicio && x.Inicio <= t.Fim);
+            _stretches.Add(t);
+            UpdateStretchText();
             SchedulePreview();
         }
         catch (FormatException ex) { UiHelpers.Error(ex.Message); }
+        catch (UserMessageException ex) { UiHelpers.Error(ex.Message); }
+    }
+
+    private void ClearStretchesClick(object sender, RoutedEventArgs e)
+    {
+        _stretches.Clear();
+        UpdateStretchText();
+        SchedulePreview();
+    }
+
+    private void UpdateStretchText()
+    {
+        if (TxtStretches == null) return;
+        TxtStretches.Text = _stretches.Count == 0 ? "Nenhum trecho com largura alterada." : string.Join("\n", _stretches.OrderBy(x => x.A).Select(x =>
+            $"• {TrechoLargura.Rotulo(x.Elemento)}: {UiHelpers.F(x.NovaLargura)} m de {PontoLargura.FormatEstaca(x.A)} (A) a {PontoLargura.FormatEstaca(x.B)} (B), " +
+            $"transições {UiHelpers.F(x.TransicaoA)} / {UiHelpers.F(x.TransicaoB)} m"));
     }
 
     private void AddRecessClick(object sender, RoutedEventArgs e)
@@ -660,7 +688,8 @@ public partial class RoadWindow : Window
             bool bus = t is TipoElementoSecao.FaixaExclusiva or TipoElementoSecao.FaixaPreferencial;
             bool bike = t == TipoElementoSecao.Ciclofaixa;
             bool walk = t == TipoElementoSecao.Calcada;
-            Show(parking, LblVaga, CbVaga);
+            Show(parking && !e.SoDelimitado, LblVaga, CbVaga);
+            Show(parking, CkSoDelimitado);
             Show(bus, LblLegenda, TbLegenda);
             Show(bus || bike, LblEsp, TbEspacamento);
             Show(walk, LblServico, TbServico, LblAcesso, TbAcesso, CkGramado);
@@ -674,6 +703,8 @@ public partial class RoadWindow : Window
             Show(t == TipoElementoSecao.FaixaCaminhada, LblCorCaminhada, CbCorCaminhada, LblEsp, TbEspacamento);
             if (bus || bike) Show(true, LblEsp, TbEspacamento);
             Show(bike, LblLarguraLinha, TbLarguraLinha, CkSeccionada, LblTraco, PanelTraco, LblSimbolo, PanelSimbolo, LblDistSeta, TbDistSeta, CkLinhaCentral);
+            if (parking && e.SoDelimitado) Show(true, LblLarguraLinha, TbLarguraLinha, LblTraco, PanelTraco);
+            CkSoDelimitado.IsChecked = e.SoDelimitado;
 
             Select(CbVaga, e.Vaga);
             TbLegenda.Text = e.Legenda;
@@ -691,7 +722,7 @@ public partial class RoadWindow : Window
             TbInclinacao.Text = UiHelpers.F(e.InclinacaoTransversal, "0.##");
             TbNiveis.Text = NivelAlinhamento.Format(e.NiveisAlinhamento);
             Select(CbCorCaminhada, e.CorCaminhada);
-            TbLarguraLinha.Text = UiHelpers.F(e.LarguraLinha);
+            TbLarguraLinha.Text = UiHelpers.F(parking ? e.LarguraDelimitacao ?? 0.10 : e.LarguraLinha);
             CkSeccionada.IsChecked = e.LinhaSeccionada;
             TbTraco.Text = UiHelpers.F(e.TracoLinha);
             TbEspacoLinha.Text = UiHelpers.F(e.EspacoLinha);
@@ -734,7 +765,12 @@ public partial class RoadWindow : Window
         el.InclinacaoTransversal = UiHelpers.ParseOpt(TbInclinacao.Text) is { } inc and >= -8 and <= 8 ? inc : el.InclinacaoTransversal;
         if (sender == TbNiveis) el.NiveisAlinhamento = NivelAlinhamento.Parse(TbNiveis.Text);
         if (CbCorCaminhada.SelectedItem is Option<MarkingColor> cc) el.CorCaminhada = cc.Value;
-        el.LarguraLinha = Num(TbLarguraLinha, el.LarguraLinha, 0.02);
+        if (el.Tipo == TipoElementoSecao.Estacionamento)
+        {
+            el.SoDelimitado = CkSoDelimitado.IsChecked == true;
+            el.LarguraDelimitacao = Num(TbLarguraLinha, el.LarguraDelimitacao ?? 0.10, 0.02);
+        }
+        else el.LarguraLinha = Num(TbLarguraLinha, el.LarguraLinha, 0.02);
         el.LinhaSeccionada = CkSeccionada.IsChecked == true;
         el.TracoLinha = Num(TbTraco, el.TracoLinha, 0.05);
         el.EspacoLinha = Num(TbEspacoLinha, el.EspacoLinha);
@@ -744,6 +780,7 @@ public partial class RoadWindow : Window
         el.LinhaCentral = CkLinhaCentral.IsChecked == true;
         if (sender == TbAltura) _selected.AlturaTexto = TbAltura.Text;
         el.AlturaVegetacao = UiHelpers.ParseOpt(TbVegetacao.Text) is { } veg and >= -2 and <= 5 ? veg : null;
+        if (sender == CkSoDelimitado) ShowDetails(_selected);
         SchedulePreview();
     }
 

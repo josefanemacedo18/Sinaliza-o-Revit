@@ -1920,7 +1920,8 @@ public static partial class IntersectionGenerator
         // saem só onde a interseção refaz a calçada, não na área de pintura das aproximações.
         if (member is CurbExtensionDefinition or TactileRouteDefinition || member is RampDefinition or UrbanElementDefinition && member.Id.Contains(':'))
             return phys;
-        if (member is ParkingMarkingDefinition) return L.ParkingCuts.GetValueOrDefault(road) ?? new();
+        if (member is ParkingMarkingDefinition || member is LinearMarkingDefinition { Code: RoadSetup.ParkingLineCode })
+            return L.ParkingCuts.GetValueOrDefault(road) ?? new();
         if (member is DeviceMarkingDefinition) return PolygonOps.Union(phys.Concat(L.PaintCuts.GetValueOrDefault(road) ?? new()));
         var paint = L.PaintCuts.GetValueOrDefault(road) ?? new();
         // Eixo e divisórias de faixa: miolo da principal (LCO) e aproximações (linha contínua) – MBST Vol. IV.
@@ -2805,6 +2806,9 @@ public static partial class IntersectionGenerator
             }).ToList();
             foreach (var t in TactileNetwork(L, z, sideRamps)) Add(t);
         }
+        // Pista de terra: nada de pintura automática sobre ela (travessias, retenção, legendas e linhas ficam nas pistas pavimentadas).
+        if (L.Roads.Any(r => r.Def.Material == TipoPavimento.Terra))
+            foreach (var p in TerraPaint.OnTerra(res, L.Roads, TerraPaint.StoredPath)) res.Remove(p);
         return res;
     }
 

@@ -58,7 +58,7 @@ public static class TrafficBackdrop
 
     public static CamadaMapa LayerOf(MarkingPiece pc) => pc.Color switch
     {
-        MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto => CamadaMapa.Pavimento,
+        MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto or MarkingColor.PavimentoTerra => CamadaMapa.Pavimento,
         MarkingColor.Concreto when pc.Thickness > 0.35 => CamadaMapa.Fisico,   // barreiras, muretas (pela altura da peça, não pela cota)
         MarkingColor.Concreto => CamadaMapa.Calcada,
         MarkingColor.Grama or MarkingColor.Folhagem => CamadaMapa.Canteiro,
@@ -72,6 +72,7 @@ public static class TrafficBackdrop
         MarkingColor.Asfalto => new Rgb(0x44, 0x48, 0x4E),
         MarkingColor.Bloquete => new Rgb(0x8A, 0x80, 0x76),
         MarkingColor.PavimentoConcreto => new Rgb(0xA6, 0xA6, 0xA2),
+        MarkingColor.PavimentoTerra => new Rgb(0xB0, 0x8C, 0x62),
         MarkingColor.Concreto => pc.Layer is { } l && l.Contains("MEIO", StringComparison.OrdinalIgnoreCase) ? new Rgb(0xE4, 0xE1, 0xDA) : new Rgb(0xCF, 0xCB, 0xC2),
         MarkingColor.Grama => new Rgb(0x6F, 0xA0, 0x55),
         MarkingColor.Folhagem => new Rgb(0x4E, 0x80, 0x3E),

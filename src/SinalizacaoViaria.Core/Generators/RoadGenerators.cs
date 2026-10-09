@@ -102,9 +102,9 @@ public static class RoadGenerator
         {
             if (g.Lateral is { IsEmpty: false } gl)
             {
-                var (sh, _, br) = gl.For(axis);
+                var (sh, wd, br) = gl.For(axis);
                 var gs = samples.Concat(LateralProfile.Samples(br, axis.Length, sh, gl.Smooth)).Distinct().ToList();
-                gaps.AddRange(VariableBand(axis, s0, s1, s => g.Offset - g.Width / 2 + sh(s), s => g.Offset + g.Width / 2 + sh(s), gs));
+                gaps.AddRange(VariableBand(axis, s0, s1, s => g.Offset - (g.Width + wd(s)) / 2 + sh(s), s => g.Offset + (g.Width + wd(s)) / 2 + sh(s), gs));
             }
             else gaps.AddRange(VariableBand(axis, s0, s1, _ => g.Offset - g.Width / 2, _ => g.Offset + g.Width / 2, samples));
         }

@@ -77,6 +77,21 @@ public class CmdSinalizarVia : CommandBase
                 var survey = WidthSurvey.Read(uidoc, axis);
                 if (survey.Count > 0) w.Setup.LargurasVariaveis = survey;
             }
+            // Pista vazia no mesmo eixo: recebe a seção (a pista é refeita com os elementos, sem duplicar o pavimento).
+            if (floorRoads == null && EmptyRoadway(doc, path) is { } emptyPav)
+            {
+                var fill = w.Setup.Clone();
+                fill.SoPavimento = false;
+                if (fill.LargurasVariaveis.Count == 0 && RoadTemplates.FromJson(emptyPav.SetupJson) is { } old) fill.LargurasVariaveis = old.LargurasVariaveis;
+                try { results.AddRange(RoadAccessCommand.Regenerate(uidoc, emptyPav, fill)); }
+                catch (Exception ex)
+                {
+                    Log.Error("Via sobre pista vazia", ex);
+                    results.Add(new RenderResult());
+                    results[^1].Warnings.Add("A pista vazia não pôde receber a seção: " + ex.Message);
+                }
+                continue;
+            }
             List<MarkingDefinition> defs;
             if (floorRoads != null && floorRoads.TryGetValue(path, out var fr))
             {
@@ -97,6 +112,14 @@ public class CmdSinalizarVia : CommandBase
             results[0].Warnings.Insert(0, "Conexões: " + string.Join("; ", snapped.Distinct()) + ".");
         Report("Via", results);
         return Result.Succeeded;
+    }
+
+    /// <summary>Pista vazia (ferramenta Pista, só pavimento) sobre o mesmo eixo, se houver.</summary>
+    private static RoadPavementDefinition? EmptyRoadway(Document doc, PathReference path)
+    {
+        var key = RoadSectionInference.PathKey(path);
+        return MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>()
+            .FirstOrDefault(p => RoadSectionInference.PathKey(p.PathRef) == key && RoadTemplates.FromJson(p.SetupJson)?.SoPavimento == true);
     }
 
     /// <summary>Opções da criação de uma via (as mesmas da janela Via).</summary>
@@ -383,6 +406,7 @@ public sealed class CmdPista : CommandBase
         var connect = st.Get("pista:conectar") != "0";
         var crosswalks = st.AutoCrosswalks;
         var survey = false;
+        var empty = st.Get("pista:vazia") == "1";
         var w = new FormWindow("Pista", "Pista (parte dos veículos)",
                 "Cria só o pavimento da pista, já ligado às vias existentes. Depois monte a via elemento por elemento com " +
                 "Meio-fio e Sarjeta / Calçadas no modo \"Junto ao bordo de uma via\" – eles passam a fazer parte da via e das conexões.",
@@ -393,12 +417,22 @@ public sealed class CmdPista : CommandBase
                     var axis = new Core.Geometry.Polyline2(new[] { new Core.Geometry.Vec2(0, 0), new Core.Geometry.Vec2(40, 0) });
                     var ctx = new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs };
                     var geo = new Core.Model.MarkingGeometry();
-                    foreach (var m in RoadConnection.BuildCarriageway(c, PathReference.FromPoints(axis.Points, 0), new OutputSettings(), center == "-" ? null : center, edges, Hierarquia.DefaultSpeed(h)))
-                        geo.Merge(MarkingBuilder.Build(m, axis, ctx));
+                    var sample = PathReference.FromPoints(axis.Points, 0);
+                    var defs = empty
+                        ? EmptySetup(c, h).Build(sample, new OutputSettings(), PluginContext.Catalog, axis: axis)
+                        : RoadConnection.BuildCarriageway(c, sample, new OutputSettings(), center == "-" ? null : center, edges, Hierarquia.DefaultSpeed(h));
+                    foreach (var m in defs) geo.Merge(MarkingBuilder.Build(m, axis, ctx));
                     return new FormPreview(geo, null, new[] { axis.Points }, $"Largura da pista: {UiHelpers.F(c.LeftWidth + c.RightWidth)} m");
                 }, true, "Criar", 1000, 700)
+            .Choice("Conteúdo", new[]
+                {
+                    ("Só pavimento – pista vazia (sem pintura, meio-fio ou calçada)", true),
+                    ("Pavimento + linhas de eixo e de bordo", false),
+                }, () => empty, v => empty = v,
+                tooltip: "Só pavimento: a superfície com largura fixa ou variável. Os elementos entram depois – Sinalizar Via sobre o mesmo eixo ou Editar a seção da via.")
             .Choice("Hierarquia viária (CTB art. 60)", Hierarquia.Definidas.Select(x => (Hierarquia.Label(x), x)), () => h, v => h = v)
-            .Choice("Pavimento", new[] { ("Asfalto (CBUQ)", TipoPavimento.Asfalto), ("Bloquete / intertravado", TipoPavimento.Bloquete), ("Concreto", TipoPavimento.Concreto) },
+            .Choice("Pavimento", new[] { ("Asfalto (CBUQ)", TipoPavimento.Asfalto), ("Bloquete / intertravado", TipoPavimento.Bloquete), ("Concreto", TipoPavimento.Concreto),
+                    ("Terra (leito natural – sem pintura)", TipoPavimento.Terra) },
                 () => d.Material, v => d.Material = v)
             .Number("Largura à direita do eixo (m)", () => d.RightWidth, v => d.RightWidth = v, 1, 30)
             .Number("Largura à esquerda do eixo (m)", () => d.LeftWidth, v => d.LeftWidth = v, 0, 30)
@@ -420,6 +454,7 @@ public sealed class CmdPista : CommandBase
         st.Set("pista:eixo", center);
         st.Set("pista:bordos", edges ? "1" : "0");
         st.Set("pista:conectar", connect ? "1" : "0");
+        st.Set("pista:vazia", empty ? "1" : "0");
         st.LastDrawRoad = draw;
         st.LastCurveRadius = radius;
         PluginContext.SaveSettings();
@@ -432,17 +467,34 @@ public sealed class CmdPista : CommandBase
         var results = new List<RenderResult>();
         foreach (var path in paths)
         {
-            var defs = RoadConnection.BuildCarriageway(d, path, output, center == "-" ? null : center, edges, Hierarquia.DefaultSpeed(h));
-            if (survey && paths.Count == 1 && PathResolver.Resolve(uidoc.Document, path)?.Main is { } axis)
+            List<MarkingDefinition> defs;
+            if (empty)
             {
-                var pts = WidthSurvey.Read(uidoc, axis);
-                if (pts.Count > 0) RoadConnection.ApplySurvey(defs, pts, axis, smooth: false);
+                // Pista vazia: a seção (faixas da largura desenhada) fica guardada no pavimento para a edição posterior.
+                var setup = EmptySetup(d, h);
+                var main = PathResolver.Resolve(uidoc.Document, path)?.Main;
+                if (survey && paths.Count == 1 && main != null)
+                {
+                    var pts = WidthSurvey.Read(uidoc, main);
+                    if (pts.Count > 0) setup.LargurasVariaveis = pts;
+                }
+                defs = setup.Build(path, output, PluginContext.Catalog, axis: main);
+            }
+            else
+            {
+                defs = RoadConnection.BuildCarriageway(d, path, output, center == "-" ? null : center, edges, Hierarquia.DefaultSpeed(h));
+                if (survey && paths.Count == 1 && PathResolver.Resolve(uidoc.Document, path)?.Main is { } axis)
+                {
+                    var pts = WidthSurvey.Read(uidoc, axis);
+                    if (pts.Count > 0) RoadConnection.ApplySurvey(defs, pts, axis, smooth: false);
+                }
             }
             RoadSetup.ApplyAxisRadius(defs, radius);
             results.AddRange(MarkingCreator.Commit(uidoc, defs, "SV - Pista"));
             if (connect && defs.OfType<RoadPavementDefinition>().FirstOrDefault() is { } pav)
             {
-                var template = IntersectionService.AutoTemplate(crosswalks);
+                var template = IntersectionService.AutoTemplate(crosswalks && !empty);
+                if (empty) template.SemSinalizacao();
                 results.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões da pista", sv =>
                     sv.Connect(pav, TipoConexao.Intersecao, FimLivre.Nenhum, template, new RoundaboutDefinition(), new CulDeSacDefinition(), radiusByHierarchy: true))
                     .Where(r => r.Warnings.Count > 0));
@@ -450,6 +502,14 @@ public sealed class CmdPista : CommandBase
         }
         Report("Pista", results.Where(r => r.Warnings.Count > 0).ToList());
         return Result.Succeeded;
+    }
+
+    /// <summary>Seção da pista vazia com as medidas da janela.</summary>
+    private static RoadSetup EmptySetup(RoadPavementDefinition d, HierarquiaViaria h)
+    {
+        var s = RoadSetup.PistaVazia(d.RightWidth, d.LeftWidth, d.TwoWay, d.Material, h, d.CornerRadius);
+        s.PavementThickness = d.Thickness;
+        return s;
     }
 }
 

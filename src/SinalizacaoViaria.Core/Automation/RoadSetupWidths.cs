@@ -54,6 +54,68 @@ public enum AbsorcaoLargura
     Estacionamento,
 }
 
+/// <summary>Elemento da seção cuja largura muda num trecho (ferramenta Alterar Largura por Trecho).</summary>
+public enum ElementoTrecho
+{
+    /// <summary>Pista entre os meios-fios (sem o canteiro central): a variação vai para quem absorve a largura na pista.</summary>
+    Pista,
+    CalcadaEsquerda,
+    CalcadaDireita,
+    EstacionamentoEsquerdo,
+    EstacionamentoDireito,
+    /// <summary>Canteiro central (vias de mão dupla com canteiro).</summary>
+    CanteiroCentral,
+}
+
+/// <summary>
+/// Trecho com outra largura de um elemento: entre o início (A) e o fim (B) o elemento tem a nova largura; antes de A e depois
+/// de B, transições do comprimento pedido levam de volta à largura da seção. Os outros elementos mantêm a largura (a via se
+/// alarga ou estreita); tudo é refeito a partir do eixo.
+/// </summary>
+public sealed class TrechoLargura
+{
+    public ElementoTrecho Elemento { get; set; } = ElementoTrecho.Pista;
+    /// <summary>Estaca do início (A) do trecho com a nova largura (m).</summary>
+    public double EstacaA { get; set; }
+    /// <summary>Estaca do fim (B) do trecho com a nova largura (m).</summary>
+    public double EstacaB { get; set; }
+    /// <summary>Largura do elemento entre A e B (m).</summary>
+    public double NovaLargura { get; set; }
+    /// <summary>Comprimento da transição antes de A (m).</summary>
+    public double TransicaoA { get; set; } = 10;
+    /// <summary>Comprimento da transição depois de B (m).</summary>
+    public double TransicaoB { get; set; } = 10;
+    /// <summary>Transições em curva S (suave); falso = retas.</summary>
+    public bool CurvaS { get; set; }
+
+    public TrechoLargura Clone() => (TrechoLargura)MemberwiseClone();
+
+    [JsonIgnore] public double A => Math.Min(EstacaA, EstacaB);
+    [JsonIgnore] public double B => Math.Max(EstacaA, EstacaB);
+    [JsonIgnore] public double Inicio => A - Math.Max(0, TransicaoA);
+    [JsonIgnore] public double Fim => B + Math.Max(0, TransicaoB);
+
+    /// <summary>Fração da mudança na estaca: 0 fora do trecho e das transições, 1 entre A e B.</summary>
+    public double Fator(double s)
+    {
+        double U(double u) => CurvaS ? u * u * (3 - 2 * u) : u;
+        if (s < Inicio - 1e-9 || s > Fim + 1e-9) return 0;
+        if (s < A) return TransicaoA < 1e-6 ? 1 : U((s - Inicio) / TransicaoA);
+        if (s <= B) return 1;
+        return TransicaoB < 1e-6 ? 1 : U(1 - (s - B) / TransicaoB);
+    }
+
+    public static string Rotulo(ElementoTrecho e) => e switch
+    {
+        ElementoTrecho.Pista => "Pista (entre os meios-fios)",
+        ElementoTrecho.CalcadaEsquerda => "Calçada esquerda",
+        ElementoTrecho.CalcadaDireita => "Calçada direita",
+        ElementoTrecho.EstacionamentoEsquerdo => "Estacionamento esquerdo",
+        ElementoTrecho.EstacionamentoDireito => "Estacionamento direito",
+        _ => "Canteiro central",
+    };
+}
+
 /// <summary>Tipo de recuo do meio-fio num trecho da via.</summary>
 public enum TipoRecuo
 {
@@ -146,8 +208,120 @@ public sealed partial class RoadSetup
     /// <summary>Recuos do meio-fio (baias de ônibus, faixas de aceleração/desaceleração, embarque).</summary>
     public List<RecuoVia> Recuos { get; set; } = new();
 
+    /// <summary>Trechos com outra largura de um elemento (ferramenta Alterar Largura por Trecho). Vazio = nenhum.</summary>
+    public List<TrechoLargura> TrechosLargura { get; set; } = new();
+
     [JsonIgnore]
-    public bool HasVariableWidth => LargurasVariaveis.Count > 0 || Recuos.Count > 0;
+    public bool HasVariableWidth => LargurasVariaveis.Count > 0 || Recuos.Count > 0 || TrechosLargura.Count > 0;
+
+    /// <summary>Largura atual (da seção) de um elemento; nulo quando a via não tem o elemento.</summary>
+    public double? LarguraAtual(ElementoTrecho e)
+    {
+        switch (e)
+        {
+            case ElementoTrecho.Pista:
+            {
+                var w = Nominal(true).Bordo + Nominal(false).Bordo - 2 * MedianHalf;
+                return w > 0.1 ? w : null;
+            }
+            case ElementoTrecho.CalcadaEsquerda or ElementoTrecho.CalcadaDireita:
+            {
+                var (b, a, walk) = Nominal(e == ElementoTrecho.CalcadaEsquerda);
+                return walk ? a - b : null;
+            }
+            case ElementoTrecho.EstacionamentoEsquerdo or ElementoTrecho.EstacionamentoDireito:
+                return (e == ElementoTrecho.EstacionamentoEsquerdo ? Left : Right).FirstOrDefault(x => x.Tipo == TipoElementoSecao.Estacionamento)?.Largura;
+            default:
+                return MedianHalf > 0.15 ? 2 * MedianHalf : null;
+        }
+    }
+
+    /// <summary>
+    /// Faixa transversal (afastamentos com sinal, + à esquerda do eixo) ocupada pelo elemento do trecho com a nova largura, entre A
+    /// e B – para as cotas e setas da pré-visualização. Nulo se a via não tem o elemento.
+    /// </summary>
+    public (double Lo, double Hi)? TrechoSpan(TrechoLargura t)
+    {
+        if (LarguraAtual(t.Elemento) is not { } now) return null;
+        var delta = t.NovaLargura - now;
+        var (bl, al, _) = Nominal(true);
+        var (br, ar, _) = Nominal(false);
+        switch (t.Elemento)
+        {
+            case ElementoTrecho.Pista:
+            {
+                var cl = bl - MedianHalf;
+                var cr = br - MedianHalf;
+                var (sl, sr) = cl > 0.5 && cr > 0.5 ? (0.5, 0.5) : cl > 0.5 ? (1.0, 0.0) : (0.0, 1.0);
+                return (-(br + delta * sr), bl + delta * sl);
+            }
+            case ElementoTrecho.CalcadaEsquerda: return (bl, al + delta);
+            case ElementoTrecho.CalcadaDireita: return (-(ar + delta), -br);
+            case ElementoTrecho.EstacionamentoEsquerdo or ElementoTrecho.EstacionamentoDireito:
+            {
+                var left = t.Elemento == ElementoTrecho.EstacionamentoEsquerdo;
+                var side = left ? Left : Right;
+                double a = MedianHalf;
+                for (int i = 0; i < side.Count; i++)
+                {
+                    a += AddedGutter(side, i);
+                    var w = Math.Max(0.05, side[i].Largura);
+                    if (side[i].Tipo == TipoElementoSecao.Estacionamento)
+                        return left ? (a, a + w + delta) : (-(a + w + delta), -a);
+                    a += w;
+                }
+                return null;
+            }
+            default: return (-(MedianHalf + delta / 2), MedianHalf + delta / 2);
+        }
+    }
+
+    /// <summary>Elementos que esta via tem para mudar de largura por trecho.</summary>
+    public List<ElementoTrecho> ElementosTrecho() => Enum.GetValues<ElementoTrecho>().Where(e => LarguraAtual(e) != null).ToList();
+
+    /// <summary>
+    /// Zona de um lado onde o trecho muda a largura (de A0 a A1, distâncias ao eixo) e quanto (m) aquele lado se alarga; nulo
+    /// se o trecho não mexe nesse lado.
+    /// </summary>
+    private (Zone Zone, double Delta)? StretchZone(TrechoLargura t, bool left)
+    {
+        if (LarguraAtual(t.Elemento) is not { } now) return null;
+        var delta = t.NovaLargura - now;
+        if (Math.Abs(delta) < 1e-6) return null;
+        var side = left ? Left : Right;
+        var z = Zones(side);
+        Zone Z(double a0, double a1) => new(a0, Math.Max(a0 + 0.05, a1), Math.Max(a0 + 0.05, a1), Math.Max(a0 + 0.05, a1));
+        switch (t.Elemento)
+        {
+            case ElementoTrecho.Pista:
+            {
+                // Metade para cada lado da pista (lado sem pista: tudo para o outro); quem absorve é o da seção (Absorção).
+                var cl = Nominal(true).Bordo - MedianHalf;
+                var cr = Nominal(false).Bordo - MedianHalf;
+                var share = cl > 0.5 && cr > 0.5 ? 0.5 : (left ? cl : cr) > 0.5 ? 1 : 0;
+                return share == 0 ? null : (Z(z.General.A0, z.General.A1), delta * share);
+            }
+            case ElementoTrecho.CalcadaEsquerda or ElementoTrecho.CalcadaDireita:
+                // A calçada muda na faixa livre: meio-fio no lugar, o alinhamento se desloca.
+                return (t.Elemento == ElementoTrecho.CalcadaEsquerda) == left && z.Walk ? (Z(z.General.F0, z.General.F1), delta) : null;
+            case ElementoTrecho.EstacionamentoEsquerdo or ElementoTrecho.EstacionamentoDireito:
+            {
+                if ((t.Elemento == ElementoTrecho.EstacionamentoEsquerdo) != left) return null;
+                double a = MedianHalf;
+                for (int i = 0; i < side.Count; i++)
+                {
+                    a += AddedGutter(side, i);
+                    var w = Math.Max(0.05, side[i].Largura);
+                    if (side[i].Tipo == TipoElementoSecao.Estacionamento) return (Z(a, a + w), delta);
+                    a += w;
+                }
+                return null;
+            }
+            default:
+                // Canteiro central: a grama entre os meios-fios do canteiro absorve; cada lado se afasta metade.
+                return (Z(0, Math.Max(0.05, MedianHalf - CurbWidth)), delta / 2);
+        }
+    }
 
     /// <summary>Distâncias do eixo ao bordo (face do meio-fio) e ao alinhamento, conforme a seção.</summary>
     public (double Bordo, double Alinhamento, bool TemCalcada) Nominal(bool left)
@@ -281,6 +455,15 @@ public sealed partial class RoadSetup
             if (TransicaoSuave && i + 1 < pts.Count)
                 for (var s = pts[i].Estaca + 1; s < pts[i + 1].Estaca - 0.5; s += 1) st.Add(s);
         }
+        foreach (var t in TrechosLargura)
+        {
+            st.AddRange(new[] { t.Inicio, t.A, t.B, t.Fim });
+            if (t.CurvaS || TransicaoSuave)
+            {
+                for (var s = t.Inicio + 1; s < t.A - 0.5; s += 1) st.Add(s);
+                for (var s = t.B + 1; s < t.Fim - 0.5; s += 1) st.Add(s);
+            }
+        }
         foreach (var r in Recuos)
         {
             st.AddRange(new[] { r.Estaca, r.S1, r.S2, r.S3 });
@@ -302,10 +485,17 @@ public sealed partial class RoadSetup
         var side = left ? Left : Right;
         var z = Zones(side);
         var recs = Recuos.Where(r => r.LadoEsquerdo == left && r.Profundidade > 0.01).ToList();
+        var stretches = TrechosLargura.Select(t => (T: t, Z: StretchZone(t, left))).Where(x => x.Z != null)
+            .Select(x => (x.T, x.Z!.Value.Zone, x.Z.Value.Delta)).ToList();
         return (s, d) =>
         {
             var (dc, dl) = Surveyed(left, s, pts);
             var total = Warp(z.General, dc, dl, d);
+            foreach (var (t, zone, delta) in stretches)
+            {
+                var f = t.Fator(s);
+                if (f > 1e-9) total += Warp(zone, delta * f, delta * f, d);
+            }
             foreach (var r in recs)
             {
                 var dep = RecessDepth(r, s);
@@ -349,7 +539,17 @@ public sealed partial class RoadSetup
                 pav.Gaps = pav.Gaps.Select(g =>
                 {
                     var sg = Math.Sign(g.Offset);
-                    if (sg == 0) return g;
+                    if (sg == 0)
+                    {
+                        // Faixa sem pavimento sobre o eixo (canteiro central): cada borda acompanha o seu lado.
+                        var cp = new LateralProfile { Points = stations.Select(s =>
+                        {
+                            var dl = wl(s, g.Width / 2);
+                            var dr = wr(s, g.Width / 2);
+                            return new LateralPoint(s, (dl - dr) / 2, dl + dr, Anchor(s));
+                        }).ToList() };
+                        return cp.IsEmpty ? g : g with { Lateral = cp };
+                    }
                     var lp = new LateralProfile { Points = stations.Select(s => new LateralPoint(s, sg * W(sg, s, Math.Abs(g.Offset)), 0, Anchor(s))).ToList() };
                     return lp.IsEmpty ? g : g with { Lateral = lp };
                 }).ToList();
@@ -365,6 +565,21 @@ public sealed partial class RoadSetup
                 ParkingMarkingDefinition p => (p.RightSide ? 1 : -1, -p.CurbOffset, -p.CurbOffset),
                 _ => null,
             };
+            if (band is null && def is LinearMarkingDefinition { WidthOverride: > 0.25 } wide && Math.Abs(wide.Offset) < wide.WidthOverride.Value / 2)
+            {
+                // Faixa contínua que cruza o eixo (grama do canteiro central): cada borda acompanha o seu lado.
+                var lo = wide.WidthOverride.Value / 2 - wide.Offset;
+                var hi = wide.WidthOverride.Value / 2 + wide.Offset;
+                var cp = new LateralProfile();
+                foreach (var s in stations)
+                {
+                    var dl = wl(s, hi);
+                    var dr = wr(s, lo);
+                    cp.Points.Add(new LateralPoint(s, (dl - dr) / 2, dl + dr, Anchor(s)));
+                }
+                if (!cp.IsEmpty) def.Path.Lateral = cp;
+                continue;
+            }
             if (band is not { } bd || bd.Sigma == 0) continue;
             var prof = new LateralProfile();
             foreach (var s in stations)
@@ -392,6 +607,19 @@ public sealed partial class RoadSetup
                     if (free < 1.20 - 1e-6)
                         Warnings.Add($"Estaca {PontoLargura.FormatEstaca(p.Estaca)} ({(sideLeft ? "esquerda" : "direita")}): faixa livre da calçada com {Math.Max(0, free):0.00} m – a NBR 9050 exige 1,20 m.");
                 }
+            }
+        }
+
+        foreach (var t in TrechosLargura)
+        {
+            var tag = $"{TrechoLargura.Rotulo(t.Elemento)} de {PontoLargura.FormatEstaca(t.A)} a {PontoLargura.FormatEstaca(t.B)}";
+            if (LarguraAtual(t.Elemento) is not { } now) { Warnings.Add($"{tag}: a via não tem esse elemento – trecho ignorado."); continue; }
+            if (t.NovaLargura < 0.3) Warnings.Add($"{tag}: largura de {t.NovaLargura:0.00} m pequena demais.");
+            if (t.Elemento is ElementoTrecho.CalcadaEsquerda or ElementoTrecho.CalcadaDireita)
+            {
+                var z = Zones(t.Elemento == ElementoTrecho.CalcadaEsquerda ? Left : Right);
+                var free = z.General.F1 - z.General.F0 + (t.NovaLargura - now);
+                if (free < 1.20 - 1e-6) Warnings.Add($"{tag}: faixa livre da calçada com {Math.Max(0, free):0.00} m – a NBR 9050 exige 1,20 m.");
             }
         }
 

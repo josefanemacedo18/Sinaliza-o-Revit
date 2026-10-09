@@ -140,10 +140,13 @@ public sealed partial class RoadSetup
         {
             var sc = e.EstacaTravessia;
             var hw = Math.Max(1.0, e.LarguraFaixa) / 2;
-            foreach (var l in res.OfType<LinearMarkingDefinition>().Where(l => !IntersectionGenerator.IsPhysical(l) && OnRoadPath(l.PathRef)))
+            foreach (var l in res.OfType<LinearMarkingDefinition>().Where(l => !IntersectionGenerator.IsPhysical(l) && l.Code != ParkingLineCode && OnRoadPath(l.PathRef)))
                 l.Breaks.Add(new StationRange { Start = sc - hw, End = sc + hw });
             foreach (var pk in res.OfType<ParkingMarkingDefinition>().Where(p => OnRoadPath(p.PathRef)))
                 pk.Breaks.Add(new StationRange { Start = sc - hw - 5, End = sc + hw + 5 });
+            // Estacionamento só delimitado: a linha de delimitação para junto com as vagas.
+            foreach (var pl in res.OfType<LinearMarkingDefinition>().Where(l => l.Code == ParkingLineCode && OnRoadPath(l.PathRef)))
+                pl.Breaks.Add(new StationRange { Start = sc - hw - 5, End = sc + hw + 5 });
         }
     }
 
@@ -207,10 +210,13 @@ public sealed partial class RoadSetup
             // rampa da calçada – distância [a confirmar]).
             var roadPts = pav.PathRef.Points;
             bool OnRoadPath(PathReference pr) => pr.Points.Count == roadPts.Count && pr.Points.Count > 0 && pr.Points[0].DistanceTo(roadPts[0]) < 1e-6;
-            foreach (var l in res.OfType<LinearMarkingDefinition>().Where(l => !IntersectionGenerator.IsPhysical(l) && OnRoadPath(l.PathRef)))
+            foreach (var l in res.OfType<LinearMarkingDefinition>().Where(l => !IntersectionGenerator.IsPhysical(l) && l.Code != ParkingLineCode && OnRoadPath(l.PathRef)))
                 l.Breaks.Add(new StationRange { Start = s - hw, End = s + hw });
             foreach (var pk in res.OfType<ParkingMarkingDefinition>().Where(p => OnRoadPath(p.PathRef)))
                 pk.Breaks.Add(new StationRange { Start = s - hw - 5, End = s + hw + 5 });
+            // Estacionamento só delimitado: a linha de delimitação para junto com as vagas.
+            foreach (var pl in res.OfType<LinearMarkingDefinition>().Where(l => l.Code == ParkingLineCode && OnRoadPath(l.PathRef)))
+                pl.Breaks.Add(new StationRange { Start = s - hw - 5, End = s + hw + 5 });
             var cw = new CrosswalkSetup { CrosswalkWidth = w, StopLines = false, EdgeSetback = 0.3 }
                 .Build(At(s, -pav.RightWidth), At(s, pav.LeftWidth), z, new OutputSettings(), w, 0.40);
             var medRect = new[] { At(s - hw - 0.5, lo), At(s + hw + 0.5, lo), At(s + hw + 0.5, hi), At(s - hw - 0.5, hi) }.ToList();

@@ -19,7 +19,7 @@ public sealed record CurbSource(MarkingGeometry Geometry, double BaseZ, string? 
 /// </summary>
 public static class CurbFinder
 {
-    private static readonly MarkingColor[] RoadColors = { MarkingColor.Asfalto, MarkingColor.Bloquete, MarkingColor.PavimentoConcreto };
+    private static readonly MarkingColor[] RoadColors = { MarkingColor.Asfalto, MarkingColor.Bloquete, MarkingColor.PavimentoConcreto, MarkingColor.PavimentoTerra };
 
     public static bool IsCurbPiece(MarkingPiece p) => p.Layer is "MEIO-FIO" && p.Solid == null && p.Profile == null;
 

@@ -128,7 +128,7 @@ public static class RoadFeatures
     /// <summary>Profundidade do alerta no topo das rampas (2 placas de 0,25 m) – [a confirmar].</summary>
     public const double RampTopAlert = 0.50;
 
-    public static bool HasAny(RoadSetup s) => s.ExtensoesCalcada.Count > 0 || s.PisoTatil;
+    public static bool HasAny(RoadSetup s) => s.ExtensoesCalcada.Count > 0 || s.PisoTatil || s.Sinalizacao is { Empty: false };
 
     /// <summary>Prefixo dos ids dos elementos derivados de uma via.</summary>
     public static string PrefixOf(RoadPavementDefinition pav) => pav.Id + ":";
@@ -289,6 +289,14 @@ public static class RoadFeatures
         if (s.PisoTatil)
             foreach (var lado in new[] { left, right }.Where(l => l.HasSidewalk && l.Free >= 0.6))
                 Tatil(s, lado, axis, z, rampsBySide[lado.Sigma], res, AddD);
+
+        // 7. Sinalização vertical automática da via (R-19, R-24a, A-32b nas travessias) – refeita com o eixo, ids fixos.
+        if (s.Sinalizacao is { Empty: false })
+        {
+            var crossings = planos.Where(p => p.Spec.Travessia).Select(p => p.Spec.EstacaTravessia)
+                .Concat(s.TravessiasCanteiro.Where(t => t.Faixa).Select(t => t.Estaca)).Distinct().ToList();
+            foreach (var (sign, role) in AutoSignage.RoadSigns(s, axis, z, crossings)) Add(sign, role);
+        }
         return res;
     }
 

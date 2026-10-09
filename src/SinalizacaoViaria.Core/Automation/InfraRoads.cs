@@ -14,10 +14,12 @@ public static class InfraRoads
     private static ElementoSecao E(TipoElementoSecao t, double w) => new() { Tipo = t, Largura = w };
 
     /// <summary>Seção de via equivalente às faixas, acostamentos e passeios informados no formulário da obra.</summary>
-    public static RoadSetup Setup(int lanes, double laneWidth, double shoulder, double sidewalk, HierarquiaViaria h = HierarquiaViaria.Arterial, double speed = 60)
+    public static RoadSetup Setup(int lanes, double laneWidth, double shoulder, double sidewalk, HierarquiaViaria h = HierarquiaViaria.Arterial, double speed = 60,
+        bool? oneWayOrTwo = null)
     {
         lanes = Math.Max(1, lanes);
-        var twoWay = lanes >= 2;
+        // Mão dupla só com 2 ou mais faixas; nulo = como antes (2 ou mais faixas = mão dupla).
+        var twoWay = lanes >= 2 && (oneWayOrTwo ?? true);
         var s = new RoadSetup
         {
             Hierarchy = h, Speed = speed, TwoWay = twoWay, Center = twoWay ? (lanes >= 4 ? CenterTreatment.LFO3 : CenterTreatment.LFO2) : CenterTreatment.Nenhum,
@@ -34,7 +36,13 @@ public static class InfraRoads
             var r = (lanes + 1) / 2;
             for (int i = 0; i < r; i++) s.Right.Add(E(TipoElementoSecao.FaixaRolamento, laneWidth));
             for (int i = r; i < lanes; i++) s.Left.Add(E(TipoElementoSecao.FaixaRolamento, laneWidth));
-            if (s.Left.Count == 0) { s.Right[0].Largura = laneWidth / 2; s.Left.Add(E(TipoElementoSecao.FaixaRolamento, laneWidth / 2)); }
+            if (s.Left.Count == 0)
+            {
+                // Faixa única centrada no eixo: as duas metades são a mesma faixa (sem divisória no meio dela).
+                s.Right[0].Largura = laneWidth / 2;
+                s.Left.Add(E(TipoElementoSecao.FaixaRolamento, laneWidth / 2));
+                s.FaixaUnicaCentrada = true;
+            }
         }
         foreach (var side in new[] { s.Right, s.Left })
         {
@@ -46,10 +54,10 @@ public static class InfraRoads
 
     public static RoadSetup Setup(BridgeDefinition b) => b.Kind == TipoObraDeArte.Passarela
         ? PedestrianSetup(Math.Max(1.5, b.LaneWidth))
-        : Setup(b.Lanes, b.LaneWidth, b.ShoulderWidth, b.SidewalkWidth, b.Hierarchy ?? HierarquiaViaria.Arterial);
+        : Setup(b.Lanes, b.LaneWidth, b.ShoulderWidth, b.SidewalkWidth, b.Hierarchy ?? HierarquiaViaria.Arterial, oneWayOrTwo: b.TwoWay);
 
-    public static RoadSetup Setup(TunnelDefinition t) => Setup(t.Lanes, t.LaneWidth, t.ShoulderWidth, t.WalkwayWidth, t.Hierarchy ?? HierarquiaViaria.Arterial);
-    public static RoadSetup Setup(TrenchDefinition t) => Setup(t.Lanes, t.LaneWidth, t.ShoulderWidth, 0, t.Hierarchy ?? HierarquiaViaria.Arterial);
+    public static RoadSetup Setup(TunnelDefinition t) => Setup(t.Lanes, t.LaneWidth, t.ShoulderWidth, t.WalkwayWidth, t.Hierarchy ?? HierarquiaViaria.Arterial, oneWayOrTwo: t.TwoWay);
+    public static RoadSetup Setup(TrenchDefinition t) => Setup(t.Lanes, t.LaneWidth, t.ShoulderWidth, 0, t.Hierarchy ?? HierarquiaViaria.Arterial, oneWayOrTwo: t.TwoWay);
 
     /// <summary>Passarela: piso de concreto contínuo, sem faixas de veículos.</summary>
     public static RoadSetup PedestrianSetup(double width)
