@@ -274,6 +274,7 @@ public static class MarkingBuilder
         QuantityTableDefinition qt => DetailGenerator.QuantityTable(qt, ctx),
         NotesDefinition nt => DetailGenerator.Notes(nt, ctx),
         NorthArrowDefinition na => DetailGenerator.NorthArrow(na, ctx),
+        SheetSegmentDefinition ss => DetailGenerator.SheetSegment(ss, ctx),
         RoadPavementDefinition rp2 => path == null ? Missing("Eixo da via não encontrado.") : RoadGenerator.Pavement(rp2, path),
         IntersectionDefinition it => IntersectionGenerator.Build(it, ctx),
         TactileRouteDefinition tr => path == null ? Missing("Caminho da rota tátil não encontrado.")

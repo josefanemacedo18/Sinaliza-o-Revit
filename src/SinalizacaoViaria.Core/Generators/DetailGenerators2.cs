@@ -650,6 +650,11 @@ public static partial class DetailGenerator
     {
         var geo = new MarkingGeometry();
         var all = (ctx.AllDefinitions?.Invoke() ?? Array.Empty<MarkingDefinition>()).ToList();
+        // Quadro de uma prancha: só o que está dentro da região do trecho (marcas recortadas pelo contorno).
+        var region = SheetRegion(qt.SheetSegmentId, ctx);
+        if (region != null) all = all.Where(d => d is not SignDefinition s || region.Contains(s.Position)).ToList();
+        MarkingGeometry? GeoOf(MarkingDefinition d) =>
+            ctx.GeometryOf?.Invoke(d) is { } g ? region == null ? g : ClipToRegion(g, region, Automation.AutoSignage.AnchorOf(d)) : null;
         var rowH = ctx.Mm(qt.RowMm);
         var th = qt.TextMm;
         var pad = ctx.Mm(1.5);
@@ -684,7 +689,7 @@ public static partial class DetailGenerator
         {
             headers = new[] { "ITEM", "CÓDIGO", "DESCRIÇÃO", "UN.", "QUANTIDADE" };
             aligns = new[] { TextAlign.Center, TextAlign.Center, TextAlign.Left, TextAlign.Center, TextAlign.Right };
-            var items = all.Where(d => d is not IAnnotationDefinition).Select(d => (d, ctx.GeometryOf?.Invoke(d))).Where(i => i.Item2 != null)
+            var items = all.Where(d => d is not IAnnotationDefinition).Select(d => (d, GeoOf(d))).Where(i => i.Item2 != null)
                 .Select(i => (i.d, i.Item2!)).ToList();
             var qrows = QuantityCalculator.Compute(items, ctx.Catalog);
             if (!string.IsNullOrEmpty(qt.Category) && Enum.TryParse<CategoriaQuantitativo>(qt.Category, out var cat))

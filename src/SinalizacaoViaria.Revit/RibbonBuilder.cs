@@ -126,6 +126,13 @@ public static class RibbonBuilder
             Data(typeof(CmdQuadroQuantitativos), "Quadro de Quantitativos", "quadroqtd", "Tabela de quantidades desenhada na prancha."),
             Data(typeof(CmdNotas), "Notas Gerais", "notas", "Bloco de notas numeradas do projeto."),
             Data(typeof(CmdNorte), "Norte", "norte", "Indicação de norte."));
+        Large(det, typeof(CmdPranchas), "Pranchas", "pranchas",
+            "Com a folha (carimbo carregado no projeto) e a escala escolhidas, divide o eixo da via em trechos que cabem na folha – com sobreposição e " +
+            "linhas de corte \"continua na prancha X\" – ou usa trechos por estacas ou cortes clicados; cria uma vista girada por trecho e monta as " +
+            "folhas com a legenda de placas e o quadro de quantidades. Editar um trecho atualiza a prancha.");
+        Large(det, typeof(CmdMemorial), "Memorial Descritivo", "memorial",
+            "Gera o memorial descritivo (.docx) do modelo: objetivo e normas, vias, interseções, sinalização horizontal e vertical por código com as " +
+            "quantidades do quantitativo, acessibilidade, drenagem e obras – com nome do projeto, responsável técnico e ART em branco para preencher.");
         Large(det, typeof(CmdQuantitativos), "Quantitativos", "quantitativos",
             "Quantidades por categoria e hierarquia viária (m², m, un, consumo), exportação CSV e tabelas do Revit.");
 

@@ -268,6 +268,7 @@ internal static class DetailForms
             QuantityTableDefinition qt => Table(qt, scale, MarkingStorage.Definitions(doc), new MarkingService(doc, uidoc.ActiveView).BuildGeometryOrNull, true),
             NotesDefinition nt => Notes(nt, scale, true),
             NorthArrowDefinition na => North(na, scale, true),
+            SheetSegmentDefinition ss => SheetForms.Edit(ss),
             _ => null,
         };
         return w == null ? null : (w, working);

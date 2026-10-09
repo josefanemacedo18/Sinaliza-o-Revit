@@ -408,6 +408,8 @@ public sealed class MarkingService
 
         // Detalhe movido à mão (ou o grupo dele): a nova posição passa a valer antes de regenerar.
         if (def is IPlacedAnnotation placed) FollowManualMove(def, placed, existing);
+        // Trecho de prancha: escala, região de corte girada e posição na folha acompanham o eixo atual.
+        if (def is SheetSegmentDefinition sheetSeg && view != null) SheetBuilder.Sync(_doc, sheetSeg, view, result);
         // Placa girada/movida com as ferramentas do Revit: o giro vai para a definição antes de regenerar.
         if (def is SignDefinition sign) FollowSignMove(sign, existing);
         // Grupo de detalhes: desfeito para trocar os elementos e refeito no fim.

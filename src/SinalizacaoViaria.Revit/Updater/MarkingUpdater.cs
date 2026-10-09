@@ -208,6 +208,8 @@ public sealed class MarkingUpdater : IUpdater
     /// </summary>
     private static void Rescale(Document doc, IEnumerable<View> views)
     {
+        // Escala trocada pelo próprio plugin (ao gerar uma prancha): a geração já usou a escala nova.
+        if (MarkingService.IsRendering) return;
         var defs = MarkingStorage.Definitions(doc);
         foreach (var v in views)
         {
@@ -217,6 +219,8 @@ public sealed class MarkingUpdater : IUpdater
             var service = new MarkingService(doc, v, interactive: false);
             foreach (var d in list)
             {
+                // Trecho de prancha: a escala mudada à mão na vista passa a ser a do trecho.
+                if (d is Core.Definitions.SheetSegmentDefinition ss) ss.Scale = v.Scale;
                 try { service.Render(d); }
                 catch (Exception ex) { Log.Error($"Escala da vista – {d.DisplayCode}", ex); }
             }

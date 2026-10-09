@@ -140,6 +140,26 @@ public static class IconFactory
                 dc.DrawLine(new Pen(B(White), 1.2) { DashStyle = DashStyles.Dash }, new Point(16, 7), new Point(16, 25));
                 dc.DrawLine(P(White, 1.5), new Point(8, 1), new Point(8, 31));
                 break;
+            case "memorial":
+            {
+                // Folha com linhas de texto e uma tabela.
+                dc.DrawRectangle(B(White), P(Muted, 1.2), new Rect(6, 2, 20, 28));
+                dc.DrawLine(P(Blue, 2), new Point(9, 7), new Point(23, 7));
+                for (var y = 11.0; y <= 17; y += 3) dc.DrawLine(P(Muted, 1), new Point(9, y), new Point(23, y));
+                dc.DrawRectangle(null, P(Muted, 1), new Rect(9, 20, 14, 7));
+                dc.DrawLine(P(Muted, 0.8), new Point(9, 23.5), new Point(23, 23.5));
+                dc.DrawLine(P(Muted, 0.8), new Point(15, 20), new Point(15, 27));
+                break;
+            }
+            case "pranchas":
+            {
+                // Folha com carimbo e o eixo cortado em trechos.
+                dc.DrawRectangle(B(White), P(Muted, 1.2), new Rect(2, 5, 28, 22));
+                dc.DrawRectangle(null, P(Muted, 1), new Rect(21, 19, 9, 8));
+                dc.DrawGeometry(null, P(Asphalt, 3), Poly(new Point(4, 20), new Point(10, 12), new Point(18, 10)));
+                dc.DrawLine(new Pen(B(Red), 1.2) { DashStyle = DashStyles.Dash }, new Point(13, 6), new Point(15, 17));
+                break;
+            }
             case "distancia":
             case "movervia":
             {

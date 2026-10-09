@@ -215,6 +215,9 @@ public static partial class DetailGenerator
     {
         var geo = new MarkingGeometry();
         var all = ctx.AllDefinitions?.Invoke() ?? Array.Empty<MarkingDefinition>();
+        // Legenda de uma prancha: só as placas dentro da região do trecho.
+        if (SheetRegion(lg.SheetSegmentId, ctx) is { } region)
+            all = all.Where(d => d is not SignDefinition s || region.Contains(s.Position)).ToList();
         var rows = all.Where(d => Include(d, lg))
             .GroupBy(RowKey).Select(g => g.First())
             .Select(d => (Def: d, Info: MarkingBuilder.Describe(d, ctx.Catalog)))

@@ -20,7 +20,7 @@ Convenções usadas em todo o plugin:
 | **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão · **Distância entre Vias** · **Mover Via** · Alterar Largura por Trecho · Recuo na Via) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Extensão de Calçada · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
 | **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (piso tátil · ciclovia · quebra-mola · cruzamento rodoferroviário) |
 | **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive **tachas e tachões** e guard rail) |
-| **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
+| **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · **Pranchas** · **Memorial Descritivo** · Quantitativos |
 | **Tráfego** | **Simulador de Tráfego** (capacidade, nível de serviço, microssimulação animada e diagnóstico do projeto – seção 26) |
 | **Editar** | Editar · Apagar Trecho · Atualizar Todas · Selecionar Conjunto · Alternar 2D/3D · Configurações · Catálogo · Normas |
 
@@ -1035,6 +1035,49 @@ criadas, editadas ou quando os eixos mudam (e com **Atualizar Todas**). Todos po
 Dica: para pranchas, combine a sinalização em 3D (vista de planta com os sólidos) com os detalhes
 de placas e o quadro de legenda – ou converta a sinalização horizontal para 2D (**Alternar 2D/3D**)
 em uma vista dedicada.
+
+### 16.1 Pranchas
+
+**Detalhamento → Pranchas** monta as folhas de uma via. Antes, carregue no projeto a família de folha (carimbo) do
+escritório (*Inserir → Carregar família → Anotações / Folhas de título*); sem nenhum carimbo carregado o comando avisa e
+para. Abra a **vista em planta** que servirá de base (as vistas dos trechos são cópias dela, sem os detalhes 2D) e clique
+sobre a via.
+
+* **Folha e escala**: escolha o carimbo e a escala (1:100 a 1:2000). A área da planta é a folha menos a margem e a
+  **coluna da direita** (legenda, quadro e carimbo – 190 mm por padrão); a **faixa lateral** é quanto mostrar de cada
+  lado do eixo.
+* **Trechos**: *automático* – cada folha leva o maior trecho do eixo que cabe na área da planta (curvas incluídas), e a
+  seguinte começa a **sobreposição** pedida antes do fim da anterior; *por estacas* – digite os trechos (`0-200;
+  9+0,00 a 20+0,00`, estacas de 20 m ou metros); *por cortes clicados* – clique no eixo onde cada folha termina (a
+  sobreposição fica dividida dos dois lados do clique).
+* **Uma vista por trecho**: cópia da planta, na escala escolhida, com a **região de corte girada ao longo do trecho**
+  (a via aparece deitada na folha; o ângulo fica entre −90° e 90° para os textos ficarem legíveis), colocada na área
+  da planta de uma folha nova (P01, P02…).
+* **Linhas de corte**: no meio de cada sobreposição, uma linha traço longo–curto atravessa a faixa da via com
+  "CONTINUA NA PRANCHA X" e a estaca; o título do trecho (prancha, estacas e escala) fica no canto da vista.
+* **Legenda e quadro**: na coluna da direita, a **legenda de placas** e o **quadro de quantidades** – só do que está
+  dentro do trecho (marcas recortadas pela região da vista; extensões e unidades na proporção da área que ficou dentro)
+  ou do projeto inteiro.
+* **Cada trecho é editável**: **Editar** sobre o título ou a linha de corte de um trecho muda início/fim, escala, giro
+  (ao longo do trecho ou ângulo fixo), faixa lateral e conteúdo; a vista, a folha, as linhas de corte das pranchas
+  vizinhas, a legenda e o quadro são refeitos. Mudar a escala da vista no Revit também passa a valer para o trecho.
+  Como os trechos são estacas do eixo, editar a via move as vistas junto.
+
+### 16.2 Memorial descritivo
+
+**Detalhamento → Memorial Descritivo** grava um **.docx** (Word) gerado do modelo:
+
+1. Identificação – **nome do projeto, responsável técnico, ART** e local em branco (campos para preencher no Word);
+2. Objetivo; 3. Normas e referências (as citadas pelo plugin; edições [a confirmar] com o órgão);
+4. Vias – hierarquia (CTB art. 60), seção transversal elemento a elemento, largura, extensão do eixo, pavimento e operação;
+5. Interseções (tipo I a IV, controle, raio das esquinas, faixas e rampas) e rotatórias;
+6. Sinalização horizontal por código, cor e material (área, extensão, unidades e consumo);
+7. Sinalização vertical por código (quantidade) e dispositivos auxiliares;
+8. Acessibilidade – rebaixamentos (inclinação máxima e largura mínima do modelo), guias rebaixadas, extensões de calçada
+   e piso tátil; 9. Drenagem e obras; 10. Resumo do quantitativo por categoria; 11. Responsabilidade técnica (campos e
+   assinatura).
+
+As quantidades são as do **quadro de Quantitativos** (o mesmo das tabelas do Revit), somadas por código.
 
 ## 17. Calçadas
 

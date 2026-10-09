@@ -180,6 +180,7 @@ public enum Justificacao
 [JsonDerivedType(typeof(RecessMarkingDefinition), "recuo")]
 [JsonDerivedType(typeof(RumbleStripDefinition), "sonorizador")]
 [JsonDerivedType(typeof(EscapeRampDefinition), "area-escape")]
+[JsonDerivedType(typeof(SheetSegmentDefinition), "trecho-prancha")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;
@@ -1214,6 +1215,8 @@ public sealed class LegendDefinition : MarkingDefinition, IProjectWideAnnotation
     public bool Horizontal { get; set; } = true;
     public bool Vertical { get; set; } = true;
     public bool Physical { get; set; } = true;
+    /// <summary>Só as placas dentro do trecho de prancha indicado (nulo = o projeto inteiro).</summary>
+    public string? SheetSegmentId { get; set; }
 
     public string? TargetId => null;
     public Vec2? DrawnAnchor { get; set; }
@@ -1325,6 +1328,8 @@ public sealed class QuantityTableDefinition : MarkingDefinition, IProjectWideAnn
     public bool SignsOnly { get; set; }
     public double RowMm { get; set; } = 6;
     public double TextMm { get; set; } = 2.0;
+    /// <summary>Só as quantidades dentro do trecho de prancha indicado (nulo = o projeto inteiro).</summary>
+    public string? SheetSegmentId { get; set; }
 
     public string? TargetId => null;
     public Vec2? DrawnAnchor { get; set; }

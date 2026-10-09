@@ -154,6 +154,13 @@ public sealed class CmdEditar : CommandBase
             }
             EnsureDetailView(uidoc, def.Output, keepExistingView: true);
             var r = MarkingCreator.Commit(uidoc, new[] { def }, $"SV - Editar {def.DisplayCode}");
+            if (def is SheetSegmentDefinition sheetSeg)
+            {
+                // Trecho de prancha: vizinhas, legenda e quadro acompanham a edição.
+                r.AddRange(SheetBuilder.AfterEdit(uidoc, sheetSeg));
+                Report("Prancha", r.Where(x => x.Warnings.Count > 0).ToList());
+                return Result.Succeeded;
+            }
             FootprintCutter.ApplyFor(uidoc, def);
             if (def is IHostedStructure { HostRoad: { } hostGid })
             {

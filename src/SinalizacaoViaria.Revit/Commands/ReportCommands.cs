@@ -31,7 +31,25 @@ public sealed class CmdQuantitativos : CommandBase
             TaskDialog.Show(AppTitle, "Nenhuma marca de sinalização encontrada neste projeto.");
             return Result.Cancelled;
         }
-        var service = new MarkingService(doc, uidoc.ActiveView);
+        var (items, rows) = Collect(doc, uidoc.ActiveView, defs, families);
+        // Miniaturas da própria sinalização (face da placa, trecho da linha, unidade do dispositivo, amostra de material).
+        var thumbs = QuantityThumbnails.Build(items);
+        var w = new QuantitiesWindow(rows, doc.Title, thumbs);
+        if (UiHelpers.ShowModal(w) == true && (w.CreateSchedule || w.SchedulesByCategory))
+            CreateSchedules(uidoc, rows, thumbs, w.CreateSchedule, w.SchedulesByCategory ? w.Categories : Array.Empty<CategoriaQuantitativo>());
+        return Result.Succeeded;
+    }
+
+    /// <summary>
+    /// Itens e quadro de quantidades do projeto (marcas do plugin, pisos com hierarquia e famílias classificadas) – o mesmo
+    /// quadro da janela, das tabelas do Revit, do memorial descritivo e das pranchas.
+    /// </summary>
+    internal static (List<(MarkingDefinition Def, MarkingGeometry Geo)> Items, List<QuantityRow> Rows) Collect(Document doc, View? view,
+        IReadOnlyList<MarkingDefinition>? defs = null, List<FamilyItem>? families = null)
+    {
+        defs ??= MarkingStorage.Definitions(doc);
+        families ??= FamilyClassifier.Collect(doc);
+        var service = new MarkingService(doc, view);
         var items = new List<(MarkingDefinition, MarkingGeometry)>();
         foreach (var d in defs)
         {
@@ -52,12 +70,7 @@ public sealed class CmdQuantitativos : CommandBase
         var rows = QuantityCalculator.Compute(items, PluginContext.Catalog, PluginContext.Settings.DefaultMaterial);
         // Famílias do Revit do usuário classificadas como elementos urbanos (Elementos Urbanos → Famílias do Revit).
         if (families.Count > 0) rows = QuantityCalculator.AddFamilies(rows, families);
-        // Miniaturas da própria sinalização (face da placa, trecho da linha, unidade do dispositivo, amostra de material).
-        var thumbs = QuantityThumbnails.Build(items);
-        var w = new QuantitiesWindow(rows, doc.Title, thumbs);
-        if (UiHelpers.ShowModal(w) == true && (w.CreateSchedule || w.SchedulesByCategory))
-            CreateSchedules(uidoc, rows, thumbs, w.CreateSchedule, w.SchedulesByCategory ? w.Categories : Array.Empty<CategoriaQuantitativo>());
-        return Result.Succeeded;
+        return (items, rows);
     }
 
     private static void CreateSchedules(UIDocument uidoc, IReadOnlyList<QuantityRow> rows, IReadOnlyDictionary<string, System.Windows.Media.Imaging.BitmapSource> thumbs,
