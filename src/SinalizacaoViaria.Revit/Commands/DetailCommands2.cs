@@ -163,6 +163,87 @@ internal static class DetailForms
             .Number("Tamanho (mm)", () => d.SizeMm, v => d.SizeMm = v, 4, 100, "0")
             .Number("Ângulo do norte (°, anti-horário)", () => d.AngleDeg, v => d.AngleDeg = v, -360, 360, "0.#");
 
+    private sealed class ItemRow
+    {
+        public string Key = "";
+        public string Name = "";
+        public string Rgb = "";
+        public Hachura? Hatch;
+        public string Width = "";
+    }
+
+    /// <summary>Paleta da janela de elementos ("" = a cor do material).</summary>
+    private static readonly (string Label, string Hex)[] Palette =
+    {
+        ("Cor do material", ""), ("Cinza-asfalto", "#484A4E"), ("Grafite", "#3C3C3C"), ("Cinza-concreto", "#BCBAB4"), ("Cinza-claro", "#D9D9D9"),
+        ("Areia", "#D2B48C"), ("Ocre", "#C8A050"), ("Terracota", "#C0603A"), ("Vermelho (ciclovia)", "#C41E24"), ("Laranja", "#F07814"),
+        ("Amarelo", "#FFB81C"), ("Verde-grama", "#629E4A"), ("Verde-escuro", "#2F6B3A"), ("Azul", "#1F5FA8"), ("Azul-claro", "#7FB2DD"),
+        ("Branco", "#F5F5F5"),
+    };
+
+    private static readonly (string, Hachura?)[] Hatches =
+    {
+        ("Do material", null), ("Sem hachura", Hachura.Nenhuma), ("Diagonal (concreto)", Hachura.Diagonal), ("Diagonal densa (meio-fio)", Hachura.DiagonalDensa),
+        ("Cruzada (blocos)", Hachura.Cruzada), ("Pontilhado (asfalto, brita)", Hachura.Pontos), ("Grama", Hachura.Grama),
+    };
+
+    /// <summary>
+    /// Elementos da seção: renomear e trocar a cor e a hachura de cada um, com o perfil em pré-visualização. Devolve uma
+    /// escolha por elemento (vazia = voltar ao padrão) ou nulo se cancelado.
+    /// </summary>
+    public static List<SectionItemStyle>? SectionItemsWindow(string title, IReadOnlyList<DetailGenerator.SectionItem> items,
+        IReadOnlyList<SectionItemStyle>? current, Func<List<SectionItemStyle>, FormPreview?> preview, string okText)
+    {
+        var rows = items.Select(it =>
+        {
+            var st = current?.FirstOrDefault(x => x.Key == it.Key);
+            return new ItemRow { Key = it.Key, Name = it.Name, Rgb = st?.Rgb ?? "", Hatch = st?.Hatch, Width = it.WidthText };
+        }).ToList();
+        List<SectionItemStyle> Raw() => rows.Select(r => new SectionItemStyle
+        {
+            Key = r.Key,
+            Name = string.IsNullOrWhiteSpace(r.Name) || r.Name.Trim() == r.Key ? null : r.Name.Trim(),
+            Rgb = Core.Model.Rgb.TryParse(r.Rgb, out var c) ? c.Hex : null,
+            Hatch = r.Hatch,
+        }).ToList();
+        var w = new FormWindow(title, "Elementos da seção – nomes, cores e hachuras",
+            "Os nomes aparecem no perfil, na legenda e nas cotas da planta; a cor e a hachura, nas camadas do perfil e na amostra da legenda. " +
+            "As escolhas ficam guardadas neste projeto para as próximas seções.",
+            null, () => preview(SectionItemStyle.Merge(current, Raw())), false, okText, 1100, 720);
+        foreach (var r in rows)
+        {
+            var options = Palette.ToList();
+            if (r.Rgb.Length > 0 && options.All(o => !string.Equals(o.Hex, r.Rgb, StringComparison.OrdinalIgnoreCase)))
+                options.Add(($"Personalizada {r.Rgb}", r.Rgb));
+            w.Section($"{r.Key} – {r.Width}")
+             .Text("Nome", () => r.Name, v => r.Name = v ?? "")
+             .Choice("Cor", options.Select(o => (o.Label, o.Hex)), () => options.FirstOrDefault(o => string.Equals(o.Hex, r.Rgb, StringComparison.OrdinalIgnoreCase)).Hex ?? "", v => r.Rgb = v)
+             .Choice("Hachura", Hatches, () => r.Hatch, v => r.Hatch = v);
+        }
+        return UiHelpers.ShowModal(w) == true ? Raw() : null;
+    }
+
+    /// <summary>Janela de elementos de uma seção existente (edição da cota ou do perfil): grava no projeto e na definição.</summary>
+    private static void EditItems(UIDocument uidoc, View? view, SectionDimensionDefinition? sd, Func<List<SectionItemStyle>?> get, Action<List<SectionItemStyle>?> set)
+    {
+        if (sd == null) { UiHelpers.Error("Cota de seção de origem não encontrada."); return; }
+        var doc = uidoc.Document;
+        var ctx = new MarkingService(doc, view ?? uidoc.ActiveView).ProjectContext(view ?? uidoc.ActiveView);
+        var items = DetailGenerator.SectionItems(sd, ctx, get());
+        if (items.Count == 0) { UiHelpers.Error("Nenhum elemento cortado pela linha de seção."); return; }
+        var raw = SectionItemsWindow("Elementos da seção", items, get(), st =>
+        {
+            var c = SectionProfileDefinition.From(sd, Vec2.Zero);
+            c.DesenhoVersao = SectionDimensionDefinition.DesenhoAtual;
+            c.ItemStyles = st;
+            return new FormPreview(DetailGenerator.SectionProfileDrawing(c, ctx), Paper: true, ViewScale: ctx.ViewScale);
+        }, "OK");
+        if (raw == null) return;
+        var merged = SectionItemStyle.Merge(get(), raw);
+        set(merged.Count > 0 ? merged : null);
+        SectionStyleStore.Remember(doc, raw);
+    }
+
     /// <summary>Formulário de edição para os detalhes desta família (null se não for daqui).</summary>
     public static (FormWindow Window, MarkingDefinition Working)? ForEdit(UIDocument uidoc, MarkingDefinition def)
     {
@@ -172,8 +253,17 @@ internal static class DetailForms
         var scale = (view ?? uidoc.ActiveView).Scale;
         FormWindow? w = working switch
         {
-            SectionDimensionDefinition sd => Section(sd, true),
-            SectionProfileDefinition sp => Profile(sp, MarkingStorage.ById(doc, sp.SectionId).FirstOrDefault()?.Definition as SectionDimensionDefinition),
+            SectionDimensionDefinition sd => Section(sd, true)
+                .Section("Elementos da seção")
+                .Check("Perfil desenhado por elemento (cores, hachuras, meio-fio com perfil e legenda dos elementos)",
+                    () => sd.DesenhoVersao >= 2, v => sd.DesenhoVersao = v ? SectionDimensionDefinition.DesenhoAtual : 0)
+                .Button("Nomes, cores e hachuras dos elementos…", () => EditItems(uidoc, view, sd, () => sd.ItemStyles, v => sd.ItemStyles = v)),
+            SectionProfileDefinition sp => Profile(sp, MarkingStorage.ById(doc, sp.SectionId).FirstOrDefault()?.Definition as SectionDimensionDefinition)
+                .Section("Elementos da seção")
+                .Check("Desenho por elemento (cores, hachuras, meio-fio com perfil e legenda dos elementos)",
+                    () => sp.DesenhoVersao >= 2, v => sp.DesenhoVersao = v ? SectionDimensionDefinition.DesenhoAtual : 0)
+                .Button("Nomes, cores e hachuras dos elementos…", () => EditItems(uidoc, view,
+                    MarkingStorage.ById(doc, sp.SectionId).FirstOrDefault()?.Definition as SectionDimensionDefinition, () => sp.ItemStyles, v => sp.ItemStyles = v)),
             TypicalDetailDefinition td when MarkingStorage.ById(doc, td.MarkingTargetId).FirstOrDefault()?.Definition is { } t => Typical(td, t, scale, true),
             QuantityTableDefinition qt => Table(qt, scale, MarkingStorage.Definitions(doc), new MarkingService(doc, uidoc.ActiveView).BuildGeometryOrNull, true),
             NotesDefinition nt => Notes(nt, scale, true),
@@ -242,9 +332,16 @@ public sealed class CmdCotarSecao : CommandBase
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
         var view = DetailHelpers.RequireDetailView(uidoc);
+        var doc = uidoc.Document;
         var template = UiHelpers.Remembered<SectionDimensionDefinition>("CotaSecao") ?? new SectionDimensionDefinition();
-        if (UiHelpers.ShowModal(DetailForms.Section(template, false)) != true) return Result.Cancelled;
+        var st = PluginContext.Settings;
+        var review = st.Get("secao:revisar") != "0";
+        var form = DetailForms.Section(template, false)
+            .Section("Elementos da seção")
+            .Check("Revisar nomes, cores e hachuras dos elementos antes de colocar cada perfil (ficam guardados no projeto)", () => review, v => review = v);
+        if (UiHelpers.ShowModal(form) != true) return Result.Cancelled;
         UiHelpers.Remember("CotaSecao", template);
+        st.Set("secao:revisar", review ? "1" : "0");
         PluginContext.SaveSettings();
         var results = new List<RenderResult>();
         var letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -275,6 +372,10 @@ public sealed class CmdCotarSecao : CommandBase
             var d = (SectionDimensionDefinition)template.CloneWithNewId();
             d.Start = start;
             d.End = end;
+            // Desenho por elemento, com os nomes/cores já escolhidos neste projeto.
+            d.DesenhoVersao = SectionDimensionDefinition.DesenhoAtual;
+            var projectStyles = SectionStyleStore.Load(doc);
+            d.ItemStyles = projectStyles.Count > 0 ? projectStyles : null;
             // Letra seguinte livre (A, B, C...) quando a do modelo já foi usada.
             if (!string.IsNullOrEmpty(d.SectionLetter) && used.Contains(d.SectionLetter))
                 d.SectionLetter = letters.Select(ch => ch.ToString()).FirstOrDefault(x => !used.Contains(x)) ?? d.SectionLetter;
@@ -287,6 +388,27 @@ public sealed class CmdCotarSecao : CommandBase
             //    junto) e ligado à seção – acompanha as mudanças da via.
             if (d.Profile)
             {
+                // Antes de colocar: nomes, cores e hachuras dos elementos desta seção (prévia do perfil ao vivo).
+                if (review)
+                {
+                    var ctx = new MarkingService(doc, view).ProjectContext(view);
+                    var items = DetailGenerator.SectionItems(d, ctx, d.ItemStyles);
+                    if (items.Count > 0)
+                    {
+                        var raw = DetailForms.SectionItemsWindow($"Perfil transversal {d.SectionLetter}–{d.SectionLetter}", items, d.ItemStyles, styles =>
+                        {
+                            var c = SectionProfileDefinition.From(d, Vec2.Zero);
+                            c.ItemStyles = styles;
+                            return new FormPreview(DetailGenerator.SectionProfileDrawing(c, ctx), Paper: true, ViewScale: view.Scale);
+                        }, "Colocar o perfil");
+                        if (raw == null) continue;   // cancelado: seção sem perfil
+                        var merged = SectionItemStyle.Merge(d.ItemStyles, raw);
+                        d.ItemStyles = merged.Count > 0 ? merged : null;
+                        SectionStyleStore.Remember(doc, raw);
+                        // Os nomes valem também para a cadeia de cotas da planta.
+                        if (raw.Any(x => x.Name != null)) results.AddRange(MarkingCreator.Commit(uidoc, new[] { d }, "SV - Cotar seção"));
+                    }
+                }
                 var at = Picking.PickPoint(uidoc, $"Clique onde colocar o PERFIL TRANSVERSAL {d.SectionLetter}–{d.SectionLetter} (canto superior esquerdo) – ESC = sem perfil");
                 if (at != null)
                 {

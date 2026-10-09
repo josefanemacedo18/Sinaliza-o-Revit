@@ -1087,6 +1087,13 @@ public sealed class SectionProfileDefinition : MarkingDefinition, IProjectWideAn
     public Vec2? DrawnAnchor { get; set; }
     /// <summary>Letra do corte na última geração (nome do grupo).</summary>
     public string Letter { get; set; } = "A";
+    /// <summary>
+    /// Desenho do perfil: 0 = original (camadas na cor do material, legenda de materiais); 2 = camadas com cor e hachura por
+    /// elemento, meio-fio com perfil e legenda dos elementos (amostra, nome e largura).
+    /// </summary>
+    public int DesenhoVersao { get; set; }
+    /// <summary>Nomes, cores e hachuras escolhidos para os elementos da seção (nulo = os padrões).</summary>
+    public List<SectionItemStyle>? ItemStyles { get; set; }
 
     public string? TargetId => SectionId;
     public string GroupName => $"SV - Perfil transversal {Letter}-{Letter}";
@@ -1100,8 +1107,37 @@ public sealed class SectionProfileDefinition : MarkingDefinition, IProjectWideAn
         SectionId = sd.Id, Position = position, ProfileScale = sd.ProfileScale, VerticalExaggeration = sd.VerticalExaggeration,
         CrossSlopePct = sd.CrossSlopePct, DrawSlopes = sd.DrawSlopes, SidewalkSlopePct = sd.SidewalkSlopePct, ProfileLevels = sd.ProfileLevels, ProfileHeights = sd.ProfileHeights, ProfileLegend = sd.ProfileLegend,
         TextMm = sd.TextMm, Decimals = sd.Decimals, Terminal = sd.Terminal, Letter = string.IsNullOrWhiteSpace(sd.SectionLetter) ? "A" : sd.SectionLetter,
-        Output = sd.Output.Clone(),
+        Output = sd.Output.Clone(), DesenhoVersao = sd.DesenhoVersao, ItemStyles = sd.ItemStyles?.Select(x => x.Clone()).ToList(),
     };
+}
+
+/// <summary>Nome, cor e hachura de um elemento da seção transversal (chave = nome padrão: "Calçada", "Faixa de rolamento"...).</summary>
+public sealed class SectionItemStyle
+{
+    public string Key { get; set; } = "";
+    /// <summary>Nome exibido (nulo = o padrão).</summary>
+    public string? Name { get; set; }
+    /// <summary>Cor "#RRGGBB" (nula = a do material).</summary>
+    public string? Rgb { get; set; }
+    /// <summary>Hachura (nula = a do material).</summary>
+    public Hachura? Hatch { get; set; }
+
+    public SectionItemStyle Clone() => (SectionItemStyle)MemberwiseClone();
+
+    [JsonIgnore]
+    public bool IsEmpty => string.IsNullOrWhiteSpace(Name) && string.IsNullOrWhiteSpace(Rgb) && Hatch == null;
+
+    /// <summary>Junta as escolhas de <paramref name="over"/> por cima de <paramref name="baseList"/> (por chave).</summary>
+    public static List<SectionItemStyle> Merge(IEnumerable<SectionItemStyle>? baseList, IEnumerable<SectionItemStyle>? over)
+    {
+        var res = (baseList ?? Enumerable.Empty<SectionItemStyle>()).Select(x => x.Clone()).ToList();
+        foreach (var o in over ?? Enumerable.Empty<SectionItemStyle>())
+        {
+            res.RemoveAll(x => x.Key == o.Key);
+            if (!o.IsEmpty) res.Add(o.Clone());
+        }
+        return res;
+    }
 }
 
 /// <summary>
@@ -1187,7 +1223,7 @@ public sealed class LegendDefinition : MarkingDefinition, IProjectWideAnnotation
 }
 
 /// <summary>Cotagem automática da seção transversal: mede faixas, linhas, canteiros e calçadas cortados pela linha.</summary>
-public sealed class SectionDimensionDefinition : MarkingDefinition, IProjectWideAnnotation
+public sealed class SectionDimensionDefinition : MarkingDefinition, IProjectWideAnnotation, IGroupedAnnotation
 {
     public Vec2 Start { get; set; }
     public Vec2 End { get; set; }
@@ -1237,6 +1273,14 @@ public sealed class SectionDimensionDefinition : MarkingDefinition, IProjectWide
     public bool PerpendicularToRoad { get; set; } = true;
     /// <summary>Folga além das calçadas no corte perpendicular (m).</summary>
     public double RoadMargin { get; set; } = 0.5;
+    /// <summary>Desenho do perfil (ver <see cref="SectionProfileDefinition.DesenhoVersao"/>): 0 = original.</summary>
+    public int DesenhoVersao { get; set; }
+    /// <summary>Nomes, cores e hachuras escolhidos para os elementos da seção (nulo = os padrões).</summary>
+    public List<SectionItemStyle>? ItemStyles { get; set; }
+    /// <summary>Versão atual do desenho do perfil (seções criadas pela ferramenta).</summary>
+    public const int DesenhoAtual = 2;
+    /// <summary>Linha de corte, marcas e cadeia de cotas da planta formam um grupo (movem-se juntas).</summary>
+    public string GroupName => string.IsNullOrWhiteSpace(SectionLetter) ? "SV - Cotas da seção" : $"SV - Cotas da seção {SectionLetter}-{SectionLetter}";
 
     public string? TargetId => null;
     public override void Translate(Vec2 delta, double dz)

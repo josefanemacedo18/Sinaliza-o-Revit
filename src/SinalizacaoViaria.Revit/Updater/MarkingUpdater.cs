@@ -34,6 +34,9 @@ public sealed class MarkingUpdater : IUpdater
             new ElementClassFilter(typeof(TextNote)), new ElementClassFilter(typeof(CurveElement)), new ElementClassFilter(typeof(Floor)),
         });
         UpdaterRegistry.AddTrigger(updater.GetUpdaterId(), markingClasses, Element.GetChangeTypeElementAddition());
+        // Escala da vista alterada: os detalhes dela (mm de papel × escala) são refeitos na nova escala.
+        foreach (var bip in new[] { BuiltInParameter.VIEW_SCALE, BuiltInParameter.VIEW_SCALE_PULLDOWN_METRIC, BuiltInParameter.VIEW_SCALE_PULLDOWN_IMPERIAL })
+            UpdaterRegistry.AddTrigger(updater.GetUpdaterId(), new ElementClassFilter(typeof(View)), Element.GetChangeTypeParameter(new ElementId(bip)));
         // Placa/marca apagada: remove os detalhes e anotações que apontavam para ela.
         UpdaterRegistry.AddTrigger(updater.GetUpdaterId(), new ElementClassFilter(typeof(DirectShape)), Element.GetChangeTypeElementDeletion());
         UpdaterRegistry.AddTrigger(updater.GetUpdaterId(), new ElementClassFilter(typeof(FilledRegion)), Element.GetChangeTypeElementDeletion());
@@ -45,8 +48,22 @@ public sealed class MarkingUpdater : IUpdater
         if (UpdaterRegistry.IsUpdaterRegistered(id)) UpdaterRegistry.UnregisterUpdater(id);
     }
 
+    /// <summary>
+    /// Desliga o atualizador enquanto um comando faz a regeneração por conta própria (ex.: Mover via), para não refazer
+    /// tudo de novo no fim da transação. Use com "using".
+    /// </summary>
+    public static IDisposable Pause() => new PauseScope();
+    private static int _paused;
+
+    private sealed class PauseScope : IDisposable
+    {
+        public PauseScope() => _paused++;
+        public void Dispose() => _paused--;
+    }
+
     public void Execute(UpdaterData data)
     {
+        if (_paused > 0) return;
         var doc = data.GetDocument();
         try
         {
@@ -71,6 +88,13 @@ public sealed class MarkingUpdater : IUpdater
         try
         {
             var modified = data.GetModifiedElementIds().Select(id => doc.GetElement(id)).Where(e => e != null).ToList();
+            var views = modified.OfType<View>().ToList();
+            if (views.Count > 0)
+            {
+                Rescale(doc, views);
+                modified.RemoveAll(e => e is View);
+                if (modified.Count == 0) return;
+            }
             // Pisos/paredes editados só interessam se alguma marca usa uma borda deles (evita varrer o projeto à toa).
             if (!modified.Any(e => e is CurveElement))
             {
@@ -84,9 +108,26 @@ public sealed class MarkingUpdater : IUpdater
                 .Where(d => d.Path?.ElementIds.Any(id => changed.Contains(Core.Definitions.PathReference.OwnerOf(id))) == true)
                 .ToList();
             if (affected.Count == 0) return;
+            Regenerate(doc, affected, PluginContext.Settings.AutoConnect && !MarkingService.IsRendering);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("MarkingUpdater", ex);
+        }
+    }
 
+    /// <summary>
+    /// Regenera as marcas cujo eixo mudou (<paramref name="affected"/>) e tudo o que depende delas: ímã e vias ligadas
+    /// (<paramref name="connect"/>), extensões de calçada e piso tátil, interseções (novas e existentes), rotatórias,
+    /// balões e detalhes. <paramref name="beforeIntersections"/> roda depois das vias e antes das interseções (ex.: levar os
+    /// nós para o novo cruzamento). Exige transação aberta.
+    /// </summary>
+    public static void Regenerate(Document doc, List<MarkingDefinition> affected, bool connect, Action<IntersectionService>? beforeIntersections = null)
+    {
+        try
+        {
             var service = new MarkingService(doc, null, interactive: false);
-            if (PluginContext.Settings.AutoConnect && !MarkingService.IsRendering)
+            if (connect)
             {
                 // Ímã de conexão (InfraWorks): ponta solta sobre outra via encaixa no eixo dela; vias ligadas a uma
                 // via movida acompanham. Os eixos alterados entram na regeneração.
@@ -116,6 +157,11 @@ public sealed class MarkingUpdater : IUpdater
             {
                 try { inter.RefreshRoadFeatures(pv); }
                 catch (Exception ex) { Log.Error("Updater – extensões da via", ex); }
+            }
+            if (beforeIntersections != null)
+            {
+                service.Invalidate();
+                beforeIntersections(inter);
             }
             var processed = new HashSet<string>();
             if (PluginContext.Settings.AutoIntersect)
@@ -152,7 +198,28 @@ public sealed class MarkingUpdater : IUpdater
         }
         catch (Exception ex)
         {
-            Log.Error("MarkingUpdater", ex);
+            Log.Error("MarkingUpdater – regeneração", ex);
+        }
+    }
+
+    /// <summary>
+    /// Escala da vista mudou: cotas de seção, perfis, detalhes de placa, legendas, quadros, notas e norte da vista são refeitos
+    /// com a nova escala – textos e símbolos mantêm o tamanho no papel, em volta do mesmo ponto de inserção.
+    /// </summary>
+    private static void Rescale(Document doc, IEnumerable<View> views)
+    {
+        var defs = MarkingStorage.Definitions(doc);
+        foreach (var v in views)
+        {
+            var list = Core.Definitions.AnnotationScale.ToRescale(defs, v.UniqueId);
+            if (list.Count == 0) continue;
+            using var scope = MarkingService.RenderScope();
+            var service = new MarkingService(doc, v, interactive: false);
+            foreach (var d in list)
+            {
+                try { service.Render(d); }
+                catch (Exception ex) { Log.Error($"Escala da vista – {d.DisplayCode}", ex); }
+            }
         }
     }
 

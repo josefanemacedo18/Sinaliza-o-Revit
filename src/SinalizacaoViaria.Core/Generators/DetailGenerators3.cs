@@ -89,6 +89,88 @@ public static partial class DetailGenerator
         _ => s.Paint ? "Pintura de demarcação viária" : "Elemento físico",
     };
 
+    /// <summary>Elemento da seção (agregado pelo nome padrão): nome exibido, larguras dos trechos, cor e hachura da amostra.</summary>
+    public sealed record SectionItem(string Key, string Name, IReadOnlyList<double> Widths, MarkingColor Color, string? Rgb, Hachura Hatch)
+    {
+        /// <summary>"3,50 m", "2 × 3,50 m" ou "3,50 + 3,20 m".</summary>
+        public string WidthText
+        {
+            get
+            {
+                if (Widths.Count == 0) return "";
+                var r = Widths.Select(w => Math.Round(w, 2)).ToList();
+                if (r.Count == 1) return $"{r[0].ToString("0.00", Pt)} m";
+                if (r.All(w => Math.Abs(w - r[0]) < 0.005)) return $"{r.Count} × {r[0].ToString("0.00", Pt)} m";
+                return string.Join(" + ", r.Select(w => w.ToString("0.00", Pt))) + " m";
+            }
+        }
+    }
+
+    /// <summary>Nome exibido de um elemento (o escolhido pelo usuário ou o padrão).</summary>
+    public static string ItemName(IReadOnlyList<SectionItemStyle>? styles, string key) =>
+        styles?.FirstOrDefault(x => x.Key == key)?.Name is { Length: > 0 } n ? n : key;
+
+    /// <summary>Hachura padrão de cada material no perfil.</summary>
+    public static Hachura DefaultHatch(MarkingColor c, MarkingDefinition? def = null)
+    {
+        if (def is LinearMarkingDefinition l && (l.Code.StartsWith("MEIO-FIO", StringComparison.OrdinalIgnoreCase) || l.Code.StartsWith("SARJETA", StringComparison.OrdinalIgnoreCase)))
+            return Hachura.DiagonalDensa;
+        return c switch
+        {
+            MarkingColor.Asfalto or MarkingColor.Brita or MarkingColor.Terra or MarkingColor.PavimentoTerra => Hachura.Pontos,
+            MarkingColor.Bloquete => Hachura.Cruzada,
+            MarkingColor.Concreto or MarkingColor.PavimentoConcreto => Hachura.Diagonal,
+            MarkingColor.Grama => Hachura.Grama,
+            _ => Hachura.Nenhuma,
+        };
+    }
+
+    /// <summary>Trecho da seção entre duas estações da cadeia: nome padrão, largura e a camada de cima (que leva a cor do elemento).</summary>
+    private sealed record Stretch(double S0, double S1, string Key, ProfileSegment Top);
+
+    private static List<Stretch> Stretches(IReadOnlyList<(MarkingDefinition Def, MarkingGeometry Geo)> withGeo, IReadOnlyList<ProfileSegment> segs,
+        IReadOnlyList<double> stations, Vec2 a, Vec2 b)
+    {
+        var L = a.DistanceTo(b);
+        var res = new List<Stretch>();
+        for (int i = 0; i + 1 < stations.Count; i++)
+        {
+            var s0 = stations[i];
+            var s1 = stations[i + 1];
+            var mid = (s0 + s1) / 2;
+            var key = SectionLabel(withGeo, a + (b - a) * (mid / Math.Max(1e-9, L)), s1 - s0);
+            if (key == null) continue;
+            var top = segs.Where(x => x.S0 <= mid + 1e-6 && x.S1 >= mid - 1e-6 && x.Z0 < 0.5)
+                .OrderByDescending(x => x.Paint && !(x.Def is LinearMarkingDefinition pl && pl.Code.StartsWith("L", StringComparison.Ordinal) && x.S1 - x.S0 < 0.5))
+                .ThenByDescending(x => x.Z1).FirstOrDefault();
+            if (top == null) continue;
+            res.Add(new Stretch(s0, s1, key, top));
+        }
+        return res;
+    }
+
+    /// <summary>
+    /// Elementos cortados pela seção, na ordem do corte, agregados pelo nome: larguras de cada trecho, cor e hachura (as do
+    /// material ou as escolhidas em <paramref name="styles"/>). É a lista da janela (renomear e trocar cores) e da legenda.
+    /// </summary>
+    public static List<SectionItem> SectionItems(SectionDimensionDefinition sd, BuildContext ctx, IReadOnlyList<SectionItemStyle>? styles = null)
+    {
+        var res = new List<SectionItem>();
+        if (sd.Start.DistanceTo(sd.End) < 0.2) return res;
+        var (withGeo, st, _) = SectionData(sd, ctx);
+        if (st.Count < 2) return res;
+        var segs = ProfileSegments(sd.Start, sd.End, withGeo);
+        foreach (var g in Stretches(withGeo, segs, st, sd.Start, sd.End).GroupBy(x => x.Key))
+        {
+            var first = g.First();
+            var style = styles?.FirstOrDefault(x => x.Key == g.Key);
+            var rgb = style?.Rgb is { } hex && Rgb.TryParse(hex, out var parsed) ? parsed.Hex : null;
+            res.Add(new SectionItem(g.Key, ItemName(styles, g.Key), g.Select(x => x.S1 - x.S0).ToList(), first.Top.Color, rgb,
+                style?.Hatch ?? (first.Top.Paint ? Hachura.Nenhuma : DefaultHatch(first.Top.Color, first.Top.Def))));
+        }
+        return res;
+    }
+
     /// <summary>Eixo de via cruzado pela seção: estação no corte, pavimento, seno do ângulo, lado esquerdo (+1/−1) e estaca no eixo.</summary>
     public sealed record SectionAxis(double S, RoadPavementDefinition Pav, double Sin, double LeftSign, double Station, Polyline2 Path);
 
@@ -186,13 +268,46 @@ public static partial class DetailGenerator
             segs = split;
         }
         const double Eps = 0.004;
+        var v2 = pd.DesenhoVersao >= 2;
+        var styles = pd.ItemStyles;
+        // Desenho por elemento: as camadas são quebradas nas estações da cadeia (cada pedaço pertence a um elemento).
+        var stretches = new List<Stretch>();
+        if (v2)
+        {
+            var split = new List<ProfileSegment>();
+            foreach (var sg in segs)
+            {
+                var pts = planStations.Where(c => c > sg.S0 + 0.01 && c < sg.S1 - 0.01).OrderBy(c => c).ToList();
+                var s0 = sg.S0;
+                foreach (var c in pts) { split.Add(sg with { S0 = s0, S1 = c }); s0 = c; }
+                split.Add(sg with { S0 = s0 });
+            }
+            segs = split;
+            stretches = Stretches(withGeo, segs, planStations, a, b);
+        }
+        // Cor e hachura de cada pedaço: o de cima de cada trecho leva as do elemento (escolhidas ou do material).
+        (string? Rgb, Hachura Hatch) Look(ProfileSegment sg)
+        {
+            var mid = (sg.S0 + sg.S1) / 2;
+            var def = sg.Paint ? Hachura.Nenhuma : DefaultHatch(sg.Color, sg.Def);
+            var tr = stretches.FirstOrDefault(x => x.S0 <= mid + 1e-6 && x.S1 >= mid - 1e-6);
+            if (tr == null || tr.Top.Color != sg.Color || tr.Top.Paint != sg.Paint || !ReferenceEquals(tr.Top.Def, sg.Def)) return (null, def);
+            var style = styles?.FirstOrDefault(x => x.Key == tr.Key);
+            var rgb = style?.Rgb is { } hex && Rgb.TryParse(hex, out var parsed) ? parsed.Hex : null;
+            return (rgb, style?.Hatch ?? def);
+        }
+        static bool IsCurb(ProfileSegment x) => !x.Paint && x.Def is LinearMarkingDefinition l && l.Code.StartsWith("MEIO-FIO", StringComparison.OrdinalIgnoreCase);
+        // Meio-fio com perfil, nas proporções do pré-moldado das notas de urbanização do plugin (100 × 15 × 13 × 30 cm): face
+        // do lado da pista inclinada na parte aparente (base 15 → topo 13) e embutido abaixo do pavimento numa profundidade
+        // igual à altura aparente (15 + 15 = 30 cm).
+        double CurbBottom(ProfileSegment x) => x.Z0 - Math.Max(0.05, x.Z1 - x.Z0);
 
         var mag = ctx.ViewScale / Math.Max(1, pd.ProfileScale);
         var vex = Math.Clamp(pd.VerticalExaggeration, 1, 10);
         var vmag = mag * vex;
         var paintMin = ctx.Mm(0.35) / vmag;           // pintura: faixa fina visível no papel
         var zMax = segs.Max(x => (x.Paint ? x.Z1 + paintMin : x.Z1) + Math.Max(Dz(x.S0 + Eps), Dz(x.S1 - Eps)));
-        var zMin = Math.Min(segs.Min(x => x.Z0 + Math.Min(Dz(x.S0 + Eps), Dz(x.S1 - Eps))), 0);
+        var zMin = Math.Min(segs.Min(x => (v2 && IsCurb(x) ? CurbBottom(x) : x.Z0) + Math.Min(Dz(x.S0 + Eps), Dz(x.S1 - Eps))), 0);
         var tMm = pd.TextMm;
         var fmt = pd.Decimals <= 0 ? "0" : "0." + new string('0', Math.Clamp(pd.Decimals, 0, 3));
 
@@ -211,8 +326,25 @@ public static partial class DetailGenerator
             var z1 = sg.Paint ? sg.Z1 + paintMin : sg.Z1;
             var d0 = Dz(sg.S0 + Eps);
             var d1 = Dz(sg.S1 - Eps);
-            var quad = new[] { P(sg.S0, sg.Z0 + d0), P(sg.S1, sg.Z0 + d1), P(sg.S1, z1 + d1), P(sg.S0, z1 + d0) };
-            geo.Pieces.Add(new MarkingPiece(new Polygon2(quad), sg.Color));
+            Vec2[] quad;
+            if (v2 && IsCurb(sg))
+            {
+                // Lado da pista = o mais baixo; a face desse lado inclina de 2/15 da largura entre o pavimento e o topo.
+                var others = segs.Where(x => !IsCurb(x)).ToList();
+                var streetAtStart = (SurfaceTop(others, sg.S0 - 0.05) ?? -1) <= (SurfaceTop(others, sg.S1 + 0.05) ?? -1);
+                var bat = (sg.S1 - sg.S0) * 2.0 / 15.0;
+                var zb = CurbBottom(sg);
+                quad = streetAtStart
+                    ? new[] { P(sg.S0, zb + d0), P(sg.S1, zb + d1), P(sg.S1, z1 + d1), P(sg.S0 + bat, z1 + d0), P(sg.S0, sg.Z0 + d0) }
+                    : new[] { P(sg.S0, zb + d0), P(sg.S1, zb + d1), P(sg.S1, sg.Z0 + d1), P(sg.S1 - bat, z1 + d1), P(sg.S0, z1 + d0) };
+            }
+            else quad = new[] { P(sg.S0, sg.Z0 + d0), P(sg.S1, sg.Z0 + d1), P(sg.S1, z1 + d1), P(sg.S0, z1 + d0) };
+            if (v2)
+            {
+                var (rgb, hatch) = Look(sg);
+                geo.Pieces.Add(new MarkingPiece(new Polygon2(quad), sg.Color) { Rgb = rgb, Hatch = hatch });
+            }
+            else geo.Pieces.Add(new MarkingPiece(new Polygon2(quad), sg.Color));
             if (!sg.Paint)
                 geo.Annotations.Add(new AnnotationLine(quad.Append(quad[0]).ToList(), MarkingColor.Preta));
         }
@@ -241,7 +373,8 @@ public static partial class DetailGenerator
             if (top0 == null) { lastLevel = null; continue; }
             double? top = top0.Value + Dz(mid);
             var w = len * mag;
-            var name = SectionLabel(withGeo, a + (b - a) * (mid / L), len);
+            var key = SectionLabel(withGeo, a + (b - a) * (mid / L), len);
+            var name = key == null ? null : ItemName(styles, key);
             if (name != null)
             {
                 var nm = tMm * 0.8;
@@ -272,8 +405,8 @@ public static partial class DetailGenerator
             }
             // Caimento transversal (pista e calçada): seta para o lado mais baixo com a inclinação real do trecho.
             var slopeHere = len > 0.05 ? (Dz(s1 - Eps) - Dz(s0 + Eps)) / len : 0;
-            var isRoad = name is "Faixa de rolamento" or "Pista" or "Faixa de ônibus" or "Ciclofaixa" or "Estacionamento";
-            var isWalk = name is "Calçada";
+            var isRoad = key is "Faixa de rolamento" or "Pista" or "Faixa de ônibus" or "Ciclofaixa" or "Estacionamento";
+            var isWalk = key is "Calçada";
             var pct = Math.Abs(slopeHere) * 100;
             if (pd.CrossSlopePct > 0 && (isRoad || isWalk) && w > ctx.Mm(isWalk ? 10 : 14) && (pct > 0.05 || !pd.DrawSlopes))
             {
@@ -357,8 +490,11 @@ public static partial class DetailGenerator
         geo.Annotations.Add(new AnnotationText(new Vec2(X(L / 2), uy - ctx.Mm(1.2)), scale, tMm * 0.75));
         if (sub.Length > 0) geo.Annotations.Add(new AnnotationText(new Vec2(X(L / 2), uy - ctx.Mm(1.2 + tMm * 0.75 * 1.6)), sub, tMm * 0.75));
 
+        // Legenda dos elementos (desenho por elemento): amostra com a cor e a hachura, nome e largura, numa tabela.
+        if (pd.ProfileLegend && v2)
+            ItemLegend(geo, ctx, stretches, styles, segs, new Vec2(X(L) + ctx.Mm(12), yTop + ctx.Mm(2)), tMm);
         // Legenda dos materiais cortados (amostra + nome + espessura).
-        if (pd.ProfileLegend)
+        else if (pd.ProfileLegend)
         {
             var layers = segs.Where(x => !x.Paint || segs.All(y => y.Paint)).GroupBy(LayerName)
                 .Select(g => (Name: g.Key, g.First().Color, Thick: g.Max(x => x.Z1 - x.Z0))).ToList();
@@ -391,5 +527,60 @@ public static partial class DetailGenerator
             }
         }
         if (vex > 1.001) geo.Warnings.Add($"Perfil com exagero vertical de {vex:0.#}× (as alturas estão ampliadas em relação às larguras).");
+    }
+
+    /// <summary>
+    /// Tabela "ELEMENTOS DA SEÇÃO": amostra (cor e hachura do elemento), nome e largura de cada elemento cortado, na ordem do
+    /// corte. Canto superior esquerdo em <paramref name="at"/>.
+    /// </summary>
+    private static void ItemLegend(MarkingGeometry geo, BuildContext ctx, IReadOnlyList<Stretch> stretches, IReadOnlyList<SectionItemStyle>? styles,
+        IReadOnlyList<ProfileSegment> segs, Vec2 at, double tMm)
+    {
+        var rows = stretches.GroupBy(x => x.Key).Select(g =>
+        {
+            var top = g.First().Top;
+            var style = styles?.FirstOrDefault(x => x.Key == g.Key);
+            var rgb = style?.Rgb is { } hex && Rgb.TryParse(hex, out var parsed) ? parsed.Hex : null;
+            var hatch = style?.Hatch ?? (top.Paint ? Hachura.Nenhuma : DefaultHatch(top.Color, top.Def));
+            return new SectionItem(g.Key, ItemName(styles, g.Key), g.Select(x => x.S1 - x.S0).ToList(), top.Color, rgb, hatch);
+        }).ToList();
+        if (rows.Count == 0) return;
+        var lm = tMm * 0.8;
+        var rowH = ctx.Mm(Math.Max(5.0, lm * 2.2));
+        var sw = ctx.Mm(9);
+        var pad = ctx.Mm(1.5);
+        var nameW = Math.Max(ctx.Mm(28), rows.Max(r => TextWidth(r.Name, lm, ctx)) + 2 * pad);
+        var widthW = Math.Max(ctx.Mm(20), rows.Max(r => TextWidth(r.WidthText, lm, ctx)) + 2 * pad);
+        var totalW = sw + 2 * pad + nameW + widthW;
+        var headH = ctx.Mm(tMm * 2.2);
+        var x0 = at.X;
+        var y = at.Y;
+        // Título e cabeçalho.
+        geo.Annotations.Add(new AnnotationText(new Vec2(x0 + totalW / 2, y), "ELEMENTOS DA SEÇÃO", tMm, TextAlign.Center));
+        y -= headH;
+        var top = y;
+        geo.Annotations.Add(new AnnotationText(new Vec2(x0 + sw / 2 + pad, y - ctx.Mm(1.2)), "COR", lm * 0.85, TextAlign.Center));
+        geo.Annotations.Add(new AnnotationText(new Vec2(x0 + sw + 2 * pad + pad, y - ctx.Mm(1.2)), "ELEMENTO", lm * 0.85, TextAlign.Left));
+        geo.Annotations.Add(new AnnotationText(new Vec2(x0 + totalW - pad, y - ctx.Mm(1.2)), "LARGURA", lm * 0.85, TextAlign.Right));
+        y -= ctx.Mm(lm * 0.85 * 1.6 + 2.2);
+        geo.Annotations.Add(new AnnotationLine(new[] { new Vec2(x0, y), new Vec2(x0 + totalW, y) }, MarkingColor.Preta));
+        foreach (var r in rows)
+        {
+            var cy = y - rowH / 2;
+            var box = Polygon2.Rectangle(new Vec2(x0 + pad, cy - rowH * 0.32), new Vec2(x0 + pad + sw, cy + rowH * 0.32));
+            geo.Pieces.Add(new MarkingPiece(box, r.Color) { Rgb = r.Rgb, Hatch = r.Hatch });
+            geo.Annotations.Add(new AnnotationLine(box.Outer.Append(box.Outer[0]).ToList(), MarkingColor.Preta));
+            var ty = cy + ctx.Mm(lm) / 2;
+            geo.Annotations.Add(new AnnotationText(new Vec2(x0 + sw + 3 * pad, ty), r.Name, lm, TextAlign.Left));
+            geo.Annotations.Add(new AnnotationText(new Vec2(x0 + totalW - pad, ty), r.WidthText, lm, TextAlign.Right));
+            y -= rowH;
+            geo.Annotations.Add(new AnnotationLine(new[] { new Vec2(x0, y), new Vec2(x0 + totalW, y) }, MarkingColor.Preta));
+        }
+        // Moldura e divisórias das colunas.
+        Frame(geo, new Vec2(x0, y), new Vec2(x0 + totalW, top));
+        foreach (var cx in new[] { x0 + sw + 2 * pad, x0 + totalW - widthW })
+            geo.Annotations.Add(new AnnotationLine(new[] { new Vec2(cx, y), new Vec2(cx, top) }, MarkingColor.Preta));
+        // Linha grossa sob o título.
+        geo.Annotations.Add(new AnnotationLine(new[] { new Vec2(x0, top), new Vec2(x0 + totalW, top) }, MarkingColor.Preta));
     }
 }

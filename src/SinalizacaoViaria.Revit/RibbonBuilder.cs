@@ -45,6 +45,11 @@ public static class RibbonBuilder
                 "Cria/atualiza a interseção do cruzamento clicado ou todas as do projeto (tipos I a IV, PARE / dê a preferência / semáforo)."),
             Data(typeof(CmdConexao), "Trocar Conexão", "conexao",
                 "Clique num encontro de vias, rotatória ou ponta livre e troque o tratamento: interseção, rotatória, cul-de-sac ou nenhum."),
+            Data(typeof(CmdDistanciaVias), "Distância entre Vias", "distancia",
+                "Clique a via A (fica) e a via B (move): mostra a distância entre eixos, meios-fios e bordos e aceita a nova – a via B se move inteira " +
+                "e as interseções são refeitas, numa única operação desfazível."),
+            Data(typeof(CmdMoverVia), "Mover Via", "movervia",
+                "Desloca uma via inteira (eixo, sinalização, calçadas, extensões, piso tátil e elementos sobre ela) por ΔX/ΔY digitados ou dois cliques, refazendo as interseções."),
             Data(typeof(CmdLarguraTrecho), "Alterar Largura por Trecho", "recuo",
                 "Clique o início (A) e o fim (B) no eixo – ou digite as estacas – e mude a largura da calçada, da pista, do estacionamento ou do canteiro, com transição em cada ponta. Setas e cotas na planta antes de confirmar."),
             Data(typeof(CmdRecuoVia), "Recuo na Via (baia / faixa auxiliar)", "recuo",

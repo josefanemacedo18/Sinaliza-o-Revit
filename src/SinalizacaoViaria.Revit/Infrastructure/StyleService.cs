@@ -118,6 +118,118 @@ public sealed class StyleService
         return frt.Id;
     }
 
+    private readonly Dictionary<(MarkingColor, string?, Hachura), ElementId> _styledRegionTypes = new();
+    private readonly Dictionary<Hachura, ElementId> _hatchPatterns = new();
+
+    /// <summary>
+    /// Tipo de região do detalhamento com cor própria (<paramref name="rgb"/> "#RRGGBB", nula = a da cor) e hachura por cima
+    /// (fundo sólido na cor + padrão de linhas cinza-escuro). Sem cor própria nem hachura = o tipo sólido de sempre.
+    /// </summary>
+    public ElementId FilledRegionType(MarkingColor color, string? rgb, Hachura hatch)
+    {
+        Rgb? custom = Rgb.TryParse(rgb, out var parsed) ? parsed : null;
+        if (custom == null && hatch == Hachura.Nenhuma) return FilledRegionType(color);
+        var key = (color, custom?.Hex, hatch);
+        if (_styledRegionTypes.TryGetValue(key, out var id)) return id;
+        var c = custom ?? MarkingColors.Display(color);
+        var name = $"{Prefix}{(custom != null ? c.Hex : ColorName(color))}{(hatch == Hachura.Nenhuma ? "" : " – " + HatchName(hatch))}";
+        var types = new FilteredElementCollector(_doc).OfClass(typeof(FilledRegionType)).Cast<FilledRegionType>().ToList();
+        var frt = types.FirstOrDefault(t => t.Name == name);
+        if (frt == null)
+        {
+            var baseType = types.FirstOrDefault() ?? throw new InvalidOperationException("O projeto não possui nenhum tipo de região preenchida para duplicar.");
+            frt = (FilledRegionType)baseType.Duplicate(name);
+            var solid = SolidFillPattern();
+            var fill = new Color(c.R, c.G, c.B);
+            if (hatch == Hachura.Nenhuma)
+            {
+                if (solid != ElementId.InvalidElementId) { frt.ForegroundPatternId = solid; frt.ForegroundPatternColor = fill; }
+                try { frt.BackgroundPatternId = ElementId.InvalidElementId; } catch { /* algumas versões exigem padrão válido */ }
+            }
+            else
+            {
+                // Fundo: a cor; frente: a hachura em cinza-escuro (legível sobre cores claras e escuras).
+                if (solid != ElementId.InvalidElementId) { frt.BackgroundPatternId = solid; frt.BackgroundPatternColor = fill; }
+                var pat = HatchPattern(hatch);
+                if (pat != ElementId.InvalidElementId)
+                {
+                    frt.ForegroundPatternId = pat;
+                    var lum = 0.299 * c.R + 0.587 * c.G + 0.114 * c.B;
+                    frt.ForegroundPatternColor = lum < 90 ? new Color(205, 205, 205) : new Color(55, 55, 55);
+                }
+            }
+            frt.IsMasking = false;
+            try { frt.LineWeight = 1; } catch { /* opcional */ }
+        }
+        _styledRegionTypes[key] = frt.Id;
+        return frt.Id;
+    }
+
+    public static string HatchName(Hachura h) => h switch
+    {
+        Hachura.Diagonal => "Hachura diagonal",
+        Hachura.DiagonalDensa => "Hachura diagonal densa",
+        Hachura.Cruzada => "Hachura cruzada",
+        Hachura.Pontos => "Pontilhado",
+        Hachura.Grama => "Grama",
+        _ => "Sem hachura",
+    };
+
+    /// <summary>Padrão de desenho (escala de papel, orientado à vista) de cada hachura – criado no projeto na primeira vez.</summary>
+    public ElementId HatchPattern(Hachura h)
+    {
+        if (h == Hachura.Nenhuma) return ElementId.InvalidElementId;
+        if (_hatchPatterns.TryGetValue(h, out var id)) return id;
+        var name = $"{Prefix}{HatchName(h)}";
+        var fpe = FillPatternElement.GetFillPatternElementByName(_doc, FillPatternTarget.Drafting, name);
+        if (fpe == null)
+        {
+            const double mm = 1 / 304.8;   // pés por milímetro de papel
+            FillPattern fp;
+            switch (h)
+            {
+                case Hachura.Cruzada:
+                    fp = new FillPattern(name, FillPatternTarget.Drafting, FillPatternHostOrientation.ToView, Math.PI / 4, 1.6 * mm, 1.6 * mm);
+                    break;
+                case Hachura.Pontos:
+                {
+                    // Pontos: traços curtíssimos numa grade deslocada.
+                    fp = new FillPattern(name, FillPatternTarget.Drafting, FillPatternHostOrientation.ToView);
+                    var g1 = new FillGrid { Angle = 0, Origin = new UV(0, 0), Offset = 1.2 * mm, Shift = 0.6 * mm };
+                    g1.SetSegments(new List<double> { 0.12 * mm, 1.08 * mm });
+                    fp.SetFillGrids(new List<FillGrid> { g1 });
+                    break;
+                }
+                case Hachura.Grama:
+                {
+                    // Tufos: traços verticais curtos alternados.
+                    fp = new FillPattern(name, FillPatternTarget.Drafting, FillPatternHostOrientation.ToView);
+                    var g1 = new FillGrid { Angle = Math.PI / 2, Origin = new UV(0, 0), Offset = 1.5 * mm, Shift = 1.0 * mm };
+                    g1.SetSegments(new List<double> { 0.7 * mm, 1.3 * mm });
+                    var g2 = new FillGrid { Angle = Math.PI / 3, Origin = new UV(0.25 * mm, 0), Offset = 1.5 * mm, Shift = 1.0 * mm };
+                    g2.SetSegments(new List<double> { 0.5 * mm, 1.5 * mm });
+                    fp.SetFillGrids(new List<FillGrid> { g1, g2 });
+                    break;
+                }
+                case Hachura.DiagonalDensa:
+                    fp = new FillPattern(name, FillPatternTarget.Drafting, FillPatternHostOrientation.ToView, Math.PI / 4, 0.8 * mm);
+                    break;
+                default:
+                    fp = new FillPattern(name, FillPatternTarget.Drafting, FillPatternHostOrientation.ToView, Math.PI / 4, 1.8 * mm);
+                    break;
+            }
+            try { fpe = FillPatternElement.Create(_doc, fp); }
+            catch (Exception ex)
+            {
+                Log.Error($"Padrão de hachura {name}", ex);
+                _hatchPatterns[h] = ElementId.InvalidElementId;
+                return ElementId.InvalidElementId;
+            }
+        }
+        _hatchPatterns[h] = fpe.Id;
+        return fpe.Id;
+    }
+
     /// <summary>Estilo de linha para eixos/caminhos de referência (tracejado magenta, fácil de ocultar).</summary>
     public GraphicsStyle AxisLineStyle()
     {

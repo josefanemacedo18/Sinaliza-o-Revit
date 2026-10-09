@@ -227,8 +227,9 @@ public static partial class DetailGenerator
             Dimension(geo, ctx, P(st[i]), P(st[i + 1]), n, off, text, sd.TextMm, fits || !stagger ? 0 : sd.TextMm * 1.4, terminal: sd.Terminal);
             if (!sd.Labels) continue;
             // Nome do trecho entre a linha de seção e a linha de cota (só quando cabe).
-            var name = SectionLabel(withGeo, P((st[i] + st[i + 1]) / 2), len);
-            if (name == null) continue;
+            var key = SectionLabel(withGeo, P((st[i] + st[i + 1]) / 2), len);
+            if (key == null) continue;
+            var name = ItemName(sd.ItemStyles, key);
             var lines = TextWidth(name, labelMm, ctx) < len * 0.92 ? name
                 : name.Contains(' ') && name.Split(' ').Max(w => TextWidth(w, labelMm, ctx)) < len * 0.92 ? WrapToWidth(name, len * 0.92, labelMm, ctx) : null;
             if (lines == null) continue;

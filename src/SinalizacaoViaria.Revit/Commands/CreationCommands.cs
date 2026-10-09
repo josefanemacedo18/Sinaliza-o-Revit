@@ -49,7 +49,7 @@ public class CmdSinalizarVia : CommandBase
             paths = found.Select(x => x.Path).ToList();
             if (floorWarnings.Count > 0) { var rr = new RenderResult(); rr.Warnings.AddRange(floorWarnings); results0.Add(rr); }
         }
-        else paths = RoadAxisInput.GetMany(uidoc, w.DrawPath, w.Snap, axisRadius, snapped);
+        else paths = RoadAxisInput.GetMany(uidoc, w.DrawPath, w.Snap, axisRadius, snapped, (pr, ax) => w.BuildDefinitions(pr, ax));
         if (paths == null || paths.Count == 0) return Result.Cancelled;
         var opt = new RoadCreation(w.AutoIntersect, w.Connection, w.FreeEnds, w.IntersectionCrosswalks, w.CornerRadius, w.IntersectionRamps && w.IntersectionCrosswalks,
             w.Relief, w.OutputSettings);
@@ -318,11 +318,12 @@ internal static class RoadAxisInput
     /// Eixos de uma ou várias vias: as linhas selecionadas são separadas em vias (encontros em T/cruz, ruas que seguem
     /// retas nos nós, curvas entre duas linhas) – cada grupo vira uma via e as interseções nascem nos encontros.
     /// </summary>
-    public static List<PathReference>? GetMany(UIDocument uidoc, bool draw, bool snap, double curveRadius, List<string> snapped)
+    public static List<PathReference>? GetMany(UIDocument uidoc, bool draw, bool snap, double curveRadius, List<string> snapped,
+        Func<PathReference, Polyline2, IEnumerable<MarkingDefinition>>? generate = null)
     {
         if (draw)
         {
-            var one = Get(uidoc, true, snap, curveRadius, snapped);
+            var one = Get(uidoc, true, snap, curveRadius, snapped, generate);
             return one == null ? null : new List<PathReference> { one };
         }
         var doc = uidoc.Document;
@@ -344,7 +345,12 @@ internal static class RoadAxisInput
         return groups.Where(g => g.Count > 0).Select(g => PathReference.FromElements(g.Select(i => curves[i].UniqueId))).ToList();
     }
 
-    public static PathReference? Get(UIDocument uidoc, bool draw, bool snap, double curveRadius, List<string> snapped)
+    /// <summary>
+    /// Eixo de uma via: linhas selecionadas ou desenho por pontos. Com <paramref name="generate"/> (a geração da via do comando),
+    /// a via aparece em pré-visualização enquanto os pontos são clicados.
+    /// </summary>
+    public static PathReference? Get(UIDocument uidoc, bool draw, bool snap, double curveRadius, List<string> snapped,
+        Func<PathReference, Polyline2, IEnumerable<MarkingDefinition>>? generate = null)
     {
         var doc = uidoc.Document;
         if (!draw)
@@ -370,7 +376,13 @@ internal static class RoadAxisInput
             var sn = RoadConnection.SnapPoint(UnitConv.ToVec2(p), existing, 4.0, rbs);
             return sn.Kind == TipoEncaixe.Livre ? (p, null) : (new XYZ(UnitConv.Ft(sn.Point.X), UnitConv.Ft(sn.Point.Y), p.Z), sn.Describe);
         }
-        var picked = Picking.PickRoadAxis(uidoc, Snap);
+        Func<IReadOnlyList<Vec2>, PreviaVia?>? preview = null;
+        if (generate != null)
+        {
+            var ctx = new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs };
+            preview = pts => RoadPreview.Build(pts, curveRadius, generate, ctx);
+        }
+        var picked = Picking.PickRoadAxis(uidoc, Snap, preview);
         if (picked == null) return null;
         var (pts, info) = picked.Value;
         snapped.AddRange(info.Where(i => i != null)!);
@@ -462,7 +474,9 @@ public sealed class CmdPista : CommandBase
         EnsureDetailView(uidoc, output);
 
         var snapped = new List<string>();
-        var paths = RoadAxisInput.GetMany(uidoc, draw, snap, Math.Max(radius, RoadSetup.MinAxisRadius(Math.Max(d.LeftWidth, d.RightWidth))), snapped);
+        var paths = RoadAxisInput.GetMany(uidoc, draw, snap, Math.Max(radius, RoadSetup.MinAxisRadius(Math.Max(d.LeftWidth, d.RightWidth))), snapped,
+            (pr, ax) => empty ? EmptySetup(d, h).Build(pr, new OutputSettings(), PluginContext.Catalog, axis: ax)
+                              : RoadConnection.BuildCarriageway(d, pr, new OutputSettings(), center == "-" ? null : center, edges, Hierarquia.DefaultSpeed(h)));
         if (paths == null || paths.Count == 0) return Result.Cancelled;
         var results = new List<RenderResult>();
         foreach (var path in paths)

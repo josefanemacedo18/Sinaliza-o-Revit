@@ -47,6 +47,33 @@ public enum MarkingColor
 public readonly record struct Rgb(byte R, byte G, byte B)
 {
     public string Hex => $"#{R:X2}{G:X2}{B:X2}";
+
+    /// <summary>Lê "#RRGGBB" (ou "RRGGBB"); falso se o texto não for uma cor.</summary>
+    public static bool TryParse(string? s, out Rgb rgb)
+    {
+        rgb = default;
+        if (string.IsNullOrWhiteSpace(s)) return false;
+        var t = s.Trim().TrimStart('#');
+        if (t.Length != 6 || !int.TryParse(t, System.Globalization.NumberStyles.HexNumber, null, out var v)) return false;
+        rgb = new Rgb((byte)(v >> 16), (byte)((v >> 8) & 0xFF), (byte)(v & 0xFF));
+        return true;
+    }
+}
+
+/// <summary>Hachura desenhada sobre a cor das regiões do detalhamento 2D (perfis e legendas).</summary>
+public enum Hachura
+{
+    Nenhuma,
+    /// <summary>Linhas a 45° (concreto, passeio).</summary>
+    Diagonal,
+    /// <summary>Linhas a 45° próximas (meio-fio, sarjeta – peças pré-moldadas).</summary>
+    DiagonalDensa,
+    /// <summary>Linhas cruzadas (blocos intertravados).</summary>
+    Cruzada,
+    /// <summary>Pontilhado (revestimento asfáltico, brita, solo).</summary>
+    Pontos,
+    /// <summary>Tufos verticais (grama, vegetação).</summary>
+    Grama,
 }
 
 public static class MarkingColors

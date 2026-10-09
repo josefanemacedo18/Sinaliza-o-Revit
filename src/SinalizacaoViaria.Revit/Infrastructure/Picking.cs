@@ -170,9 +170,11 @@ public static class Picking
     /// <summary>
     /// Desenha o eixo de uma via nova por cliques: cada ponto passa por <paramref name="snap"/> (encaixe nas vias
     /// existentes) e as linhas provisórias mostram o traçado. ESC conclui. Devolve os pontos (pés) e a descrição do
-    /// encaixe de cada um; nada fica no modelo.
+    /// encaixe de cada um; nada fica no modelo. Com <paramref name="preview"/>, a via inteira até o último clique (pista,
+    /// meio-fio, calçadas, canteiro e linhas) aparece em gráficos temporários, refeita a cada clique e apagada no fim.
     /// </summary>
-    public static (List<XYZ> Points, List<string?> Info)? PickRoadAxis(UIDocument uidoc, Func<XYZ, (XYZ Point, string? Info)>? snap)
+    public static (List<XYZ> Points, List<string?> Info)? PickRoadAxis(UIDocument uidoc, Func<XYZ, (XYZ Point, string? Info)>? snap,
+        Func<IReadOnlyList<Vec2>, Core.Automation.PreviaVia?>? preview = null)
     {
         var doc = uidoc.Document;
         var view = uidoc.ActiveView;
@@ -205,6 +207,7 @@ public static class Picking
                 }
                 pts.Add(p);
                 info.Add(what);
+                if (preview != null) ShowPreview(uidoc, pts, preview);
             }
             group.RollBack();
             return pts.Count < 2 ? null : (pts, info);
@@ -214,6 +217,23 @@ public static class Picking
             if (group.HasStarted() && !group.HasEnded()) group.RollBack();
             throw;
         }
+        finally
+        {
+            if (preview != null) RoadPreviewServer.Clear(uidoc);
+        }
+    }
+
+    /// <summary>Prévia da via pelos pontos clicados (um erro na prévia nunca interrompe o desenho).</summary>
+    private static void ShowPreview(UIDocument uidoc, List<XYZ> pts, Func<IReadOnlyList<Vec2>, Core.Automation.PreviaVia?> preview)
+    {
+        var core = pts.Select(UnitConv.ToVec2).ToList();
+        Core.Automation.PreviaVia? previa = null;
+        if (core.Count >= 2)
+        {
+            try { previa = preview(core); }
+            catch (Exception ex) { Log.Error("Pré-visualização da via – geração", ex); }
+        }
+        RoadPreviewServer.Show(uidoc, previa, core, pts[0].Z);
     }
 
     /// <summary>Cria o eixo definitivo (retas e arcos de concordância) como linhas de modelo no estilo de eixo.</summary>

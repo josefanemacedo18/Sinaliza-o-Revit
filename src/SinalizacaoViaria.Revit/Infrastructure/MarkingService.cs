@@ -91,6 +91,10 @@ public sealed class MarkingService
     /// <summary>Geometria sem detalhes (null para detalhes ou em caso de erro) – prévias de quadros.</summary>
     public MarkingGeometry? BuildGeometryOrNull(MarkingDefinition d) => OtherGeometry(d);
 
+    /// <summary>Contexto de geração com o projeto inteiro (marcas, geometrias e eixos) – listas e prévias dos detalhes.</summary>
+    public BuildContext ProjectContext(View? view) => PluginContext.BuildContext(false, view?.Scale ?? 100,
+        id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList(), OtherGeometry, d => PathResolver.Resolve(_doc, d.Path)?.Main);
+
     /// <summary>Geometria das demais marcas (cotas de seção, quadros de quantitativos) – sem detalhes, para não haver recursão.</summary>
     private MarkingGeometry? OtherGeometry(MarkingDefinition d)
     {
@@ -652,15 +656,17 @@ public sealed class MarkingService
             existing.RemoveAll(r => r.Element is not DirectShape);
 
             foreach (var g in groups)
-            {
-                var regions = CreateRegions(view!, g.Key, g.Select(p => p.Shape).ToList(), z, result.Warnings);
-                foreach (var fr in regions)
+                // Detalhamento: cor própria e hachura por elemento (perfis, legendas) viram tipos de região próprios.
+                foreach (var sub in g.GroupBy(p => (p.Rgb, p.Hatch)))
                 {
-                    Tag(fr, def, info, g.Key, materialName, fr == regions[0] ? g.Sum(p => p.Shape.Area) : 0, geo, primary);
-                    keep.Add(fr.Id);
-                    primary = false;
+                    var regions = CreateRegions(view!, g.Key, sub.Select(p => p.Shape).ToList(), z, result.Warnings, sub.Key.Rgb, sub.Key.Hatch);
+                    foreach (var fr in regions)
+                    {
+                        Tag(fr, def, info, g.Key, materialName, fr == regions[0] ? sub.Sum(p => p.Shape.Area) : 0, geo, primary);
+                        keep.Add(fr.Id);
+                        primary = false;
+                    }
                 }
-            }
             foreach (var e in CreateAnnotations(view!, geo.Annotations, z, result.Warnings))
             {
                 if (primary)
@@ -1669,10 +1675,11 @@ public sealed class MarkingService
 
     // ------------------------------------------------------------------ 2D
 
-    private List<FilledRegion> CreateRegions(View view, MarkingColor color, List<Polygon2> shapes, double zFt, List<string> warnings)
+    private List<FilledRegion> CreateRegions(View view, MarkingColor color, List<Polygon2> shapes, double zFt, List<string> warnings,
+        string? rgb = null, Hachura hatch = Hachura.Nenhuma)
     {
         var res = new List<FilledRegion>();
-        var typeId = Styles.FilledRegionType(color);
+        var typeId = Styles.FilledRegionType(color, rgb, hatch);
         ElementId? lineStyle = PluginContext.Settings.VisibleBoundary2D ? null : Styles.InvisibleLineStyle();
 
         // Em planta as peças empilhadas/sobrepostas da mesma cor são unidas (regiões não podem se sobrepor).

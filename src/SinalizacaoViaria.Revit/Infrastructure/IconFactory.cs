@@ -140,6 +140,27 @@ public static class IconFactory
                 dc.DrawLine(new Pen(B(White), 1.2) { DashStyle = DashStyles.Dash }, new Point(16, 7), new Point(16, 25));
                 dc.DrawLine(P(White, 1.5), new Point(8, 1), new Point(8, 31));
                 break;
+            case "distancia":
+            case "movervia":
+            {
+                // Duas vias paralelas; distância cotada entre elas ou seta de deslocamento.
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 3, 30, 7));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 22, 30, 7));
+                dc.DrawLine(new Pen(B(White), 1) { DashStyle = DashStyles.Dash }, new Point(1, 6.5), new Point(31, 6.5));
+                dc.DrawLine(new Pen(B(White), 1) { DashStyle = DashStyles.Dash }, new Point(1, 25.5), new Point(31, 25.5));
+                if (key == "distancia")
+                {
+                    dc.DrawLine(P(Yellow, 1.5), new Point(16, 7), new Point(16, 25));
+                    dc.DrawLine(P(Yellow, 1.5), new Point(12, 7), new Point(20, 7));
+                    dc.DrawLine(P(Yellow, 1.5), new Point(12, 25), new Point(20, 25));
+                }
+                else
+                {
+                    dc.DrawLine(P(Blue, 2), new Point(16, 11), new Point(16, 20));
+                    dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(11.5, 17), new Point(20.5, 17), new Point(16, 22))));
+                }
+                break;
+            }
             case "sonorizador":
                 dc.DrawRectangle(B(Asphalt), null, new Rect(1, 1, 30, 30));
                 dc.DrawLine(P(White, 2), new Point(12, 1), new Point(12, 31));

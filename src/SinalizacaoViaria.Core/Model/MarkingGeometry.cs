@@ -34,6 +34,12 @@ public sealed record MarkingPiece(Polygon2 Shape, MarkingColor Color)
     /// <see cref="Solid"/> guarda a aproximação poliédrica (prévias, quantitativos e plano B se o Revit recusar).
     /// </summary>
     public RoundSolid? Round { get; init; }
+
+    /// <summary>Detalhamento 2D: cor própria "#RRGGBB" escolhida pelo usuário (nula = a de <see cref="MarkingPiece.Color"/>).</summary>
+    public string? Rgb { get; init; }
+
+    /// <summary>Detalhamento 2D: hachura desenhada sobre a cor da região.</summary>
+    public Hachura Hatch { get; init; }
 }
 
 /// <summary>

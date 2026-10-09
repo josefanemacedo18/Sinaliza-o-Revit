@@ -17,7 +17,7 @@ Convenções usadas em todo o plugin:
 
 | Painel | Ferramentas |
 |---|---|
-| **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão · Alterar Largura por Trecho · Recuo na Via) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Extensão de Calçada · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
+| **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão · **Distância entre Vias** · **Mover Via** · Alterar Largura por Trecho · Recuo na Via) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Extensão de Calçada · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
 | **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (piso tátil · ciclovia · quebra-mola · cruzamento rodoferroviário) |
 | **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive **tachas e tachões** e guard rail) |
 | **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · Quantitativos |
@@ -348,8 +348,39 @@ eixo, como no InfraWorks, e o sistema viário se ajusta sozinho:
 * **Continuações**: duas vias emendadas em linha reta ficam simplesmente contínuas; emendadas em ângulo,
   a curva do meio-fio é arredondada, sem faixas, retenções ou placas.
 
+* **Pré-visualização enquanto desenha**: a cada clique a tela mostra a **via inteira já desenhada** até o último
+  ponto – pista, meio-fio (com a sarjeta), calçadas, canteiro e linhas principais, com as cores do projeto – e o
+  eixo concordado (magenta) como será criado. São gráficos temporários (*DirectContext3D*): nada é gravado no
+  modelo e tudo some ao concluir (ESC) ou cancelar. A prévia é a **mesma geração** da via (mesmo raio das curvas,
+  mesma seção da janela Via ou Pista), não um desenho à parte. Ela é refeita **a cada clique** – o Revit não permite
+  acompanhar o cursor continuamente: durante a escolha de pontos (*PickPoint*) a API fica bloqueada (sem eventos de
+  ociosidade e sem chamadas de outra thread) e os gráficos temporários só são redesenhados quando a vista é redesenhada.
+
 Depois de criada, a via continua ligada: mover ou editar o eixo refaz interseções, rotatórias
 (que acompanham o nó e ganham/perdem ramos) e cul-de-sacs.
+
+### 2.2.1 Distância entre vias e Mover via
+
+**Conexões → Distância entre Vias**: clique a **via A** (fica parada) e a **via B** (vai se mover), no trecho onde quer
+medir. A janela mostra a distância atual medida na seção perpendicular ao eixo de A, no ponto clicado em B:
+
+* **entre eixos**;
+* **entre meios-fios** (face a face, dos lados que se olham);
+* **entre bordos externos** (limite das calçadas / alinhamento).
+
+Escolha a referência, digite a **nova distância** e confirme: a via B se move **inteira** ao longo da normal de A – eixo,
+sinalização, calçadas, extensões de calçada, piso tátil, ciclofaixas, elementos do grupo da via e elementos avulsos
+posicionados sobre ela (placas, mobiliário, drenagem) –, as vias ligadas a ela acompanham (ímã de conexão) e as
+**interseções vão para o novo cruzamento** mantendo as personalizações de cada uma (tipo, controle, esquinas, ramos).
+Com vias não paralelas, as larguras de B são medidas ao longo da normal de A (divididas pelo cosseno do ângulo entre os
+eixos) e a distância vale no ponto clicado; acima de 75° as vias se cruzam e a ferramenta pede **Mover Via**.
+
+**Conexões → Mover Via**: clique a via e informe o deslocamento **ΔX / ΔY** (m) ou marque *Indicar por dois cliques* (de /
+para). O resto é igual: a via inteira, as vias ligadas e as interseções.
+
+As duas ferramentas são **uma única operação** – um **Ctrl+Z** desfaz tudo. O eixo continua sendo a fonte única: as
+linhas do eixo são movidas e a via, as extensões, o piso tátil, a sinalização e as interseções são refeitos a partir
+dele (o eixo não pode ser a borda de outro elemento nem estar fixado).
 
 **Via → Conexão** muda o tratamento de uma conexão existente: clique num **encontro de vias** ou numa
 **rotatória** para escolher *Interseção*, *Rotatória* ou *Sem tratamento*, ou na **ponta livre** de uma via
@@ -917,8 +948,12 @@ ciclofaixa, as interseções passam a ter a MCC e o trecho seccionado.
 ## 16. Detalhamento (pranchas de sinalização)
 
 Todos os comandos trabalham na **vista ativa** (planta de piso/implantação ou vista de desenho). As
-medidas são em **milímetros de papel**: o desenho acompanha a escala da vista (12 mm a 1:200 =
-2,40 m no modelo). Os elementos (regiões, textos "SV - Texto x mm" e linhas "SV - Chamada") ficam
+medidas são em **milímetros de papel** × escala da vista (12 mm a 1:200 = 2,40 m no modelo; texto de 2,5 mm a 1:500 =
+1,25 m). Os textos são **notas de texto nativas** do Revit ("SV - Texto x mm"), que já seguem a escala; símbolos,
+quadros, cotas e perfis são linhas e regiões de detalhe. **Mudando a escala da vista**, cotas de seção, perfis,
+detalhes de placa, legendas, quadros, notas, norte e chamadas daquela vista **se refazem sozinhos** na nova escala, em
+volta do mesmo ponto de inserção (canto do quadro/perfil, suporte da placa, linha de corte) – no papel ficam do mesmo
+tamanho em 1:100, 1:500 ou 1:1000 (com *Atualização automática* ligada em Configurações). Os elementos ficam
 ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la remove o detalhe.
 
 * **Detalhar Placas**: escolha as placas (selecionadas, visíveis na vista ou todas), a largura do
@@ -952,6 +987,24 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   valor de cada trecho e as cotas verticais medem o degrau real do meio-fio. O título traz a **via e a estaca do corte**
   (ex.: *V01 – coletora – estaca 5+10,00 (110,00 m)*), também na planta; em vias de largura variável o corte usa a
   largura daquela estaca.
+  **Desenho por elemento** (seções criadas a partir desta versão): cada elemento cortado tem **cor e hachura** próprias
+  (pontilhado no asfalto, cruzada no bloquete, diagonal no concreto e no passeio, diagonal densa no meio-fio e na
+  sarjeta, tufos na grama – padrões *SV - Hachura…* criados no projeto); o **meio-fio é desenhado com o perfil** do
+  pré-moldado das notas de urbanização do plugin (100 × 15 × 13 × 30 cm: face do lado da pista inclinada na parte
+  aparente e embutido abaixo do pavimento tanto quanto aparece – 15 + 15 = 30 cm) [perfil indicativo – a confirmar
+  com o padrão do órgão], com as alturas em proporção (ou com o exagero vertical escolhido). A legenda passa a ser a
+  tabela **ELEMENTOS DA SEÇÃO**: **amostra** (cor e hachura), **nome** e **largura** de cada elemento (ex.: *Faixa de
+  rolamento – 2 × 3,50 m*), emoldurada. Perfis gravados antes continuam com o desenho e a legenda de materiais de
+  antes; para passar ao novo desenho, **Editar** o perfil (ou a cota) → *Desenho por elemento*.
+  **Nomes e cores**: antes de colocar cada perfil abre-se a janela **Elementos da seção** com a lista do que foi
+  cortado (nome padrão e larguras): **renomeie** (ex.: *Calçada* → *Passeio público*), troque a **cor** (paleta) e a
+  **hachura** de cada um, com o perfil em pré-visualização. Os nomes valem no perfil, na legenda e na cadeia de cotas
+  da planta. As escolhas ficam **guardadas no projeto** (Informações do projeto) e as próximas seções já começam com
+  elas; *Cancelar* deixa a seção sem perfil. A revisão pode ser desligada na janela do Cotar Seção e refeita depois em
+  **Editar** (perfil ou cota) → *Nomes, cores e hachuras dos elementos…*.
+  **Grupos**: o perfil – camadas, cotas, níveis, legenda e título – é um grupo (*SV - Perfil transversal A-A*) e a
+  parte da planta – linha de corte, marcas e cadeia de cotas – outro (*SV - Cotas da seção A-A*): selecionar e mover
+  leva as cotas junto.
 * **Cotar Seção** (cadeia em planta): cadeia de cotas com **nome de cada trecho** (calçada, meio-fio, faixa de
   rolamento, ciclofaixa, faixa de ônibus, faixa de caminhada, canteiro, estacionamento, zebrado),
   **eixo da via** em traço-ponto com a inscrição EIXO (opcionalmente dividindo as cotas em
