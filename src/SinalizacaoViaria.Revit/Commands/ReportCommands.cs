@@ -36,7 +36,12 @@ public sealed class CmdQuantitativos : CommandBase
         var thumbs = QuantityThumbnails.Build(items);
         var w = new QuantitiesWindow(rows, doc.Title, thumbs);
         if (UiHelpers.ShowModal(w) == true && (w.CreateSchedule || w.SchedulesByCategory))
-            CreateSchedules(uidoc, rows, thumbs, w.CreateSchedule, w.SchedulesByCategory ? w.Categories : Array.Empty<CategoriaQuantitativo>());
+        {
+            // Tabela nativa: roda com qualquer vista ativa (inclusive folha) e vai direto para a folha escolhida.
+            var place = TablePlacementWindow.Ask(doc, uidoc.ActiveView, "tabela", ScheduleName, schedule: true);
+            if (place == null) return Result.Cancelled;
+            CreateSchedules(uidoc, rows, thumbs, w.CreateSchedule, w.SchedulesByCategory ? w.Categories : Array.Empty<CategoriaQuantitativo>(), place);
+        }
         return Result.Succeeded;
     }
 
@@ -74,9 +79,23 @@ public sealed class CmdQuantitativos : CommandBase
     }
 
     private static void CreateSchedules(UIDocument uidoc, IReadOnlyList<QuantityRow> rows, IReadOnlyDictionary<string, System.Windows.Media.Imaging.BitmapSource> thumbs,
-        bool general, IEnumerable<CategoriaQuantitativo> categories)
+        bool general, IEnumerable<CategoriaQuantitativo> categories, TablePlacement place)
     {
         var doc = uidoc.Document;
+        var target = place.SheetId != null ? doc.GetElement(place.SheetId) as ViewSheet : null;
+        XYZ? at = null;
+        if (place.PickOnSheet && target != null && uidoc.ActiveView.Id == target.Id)
+        {
+            try
+            {
+                at = Picking.PickPoint(uidoc, "Clique na folha o canto superior esquerdo da tabela");
+                if (at == null) return;
+            }
+            catch (UserMessageException)
+            {
+                // Folha sem plano para o clique: lugar livre no alto à direita.
+            }
+        }
         var created = new List<ViewSchedule>();
         var errors = new List<string>();
         var notes = new List<string>();
@@ -105,7 +124,6 @@ public sealed class CmdQuantitativos : CommandBase
                 using var t = new Transaction(doc, "SV - Tabela de quantitativos");
                 t.Start();
                 var v = QuantitySchedule.Create(doc, c, notes);
-                if (c == null) sheet = QuantitySchedule.PlaceOnSheet(doc, v, notes);
                 t.Commit();
                 created.Add(v);
             }
@@ -117,9 +135,27 @@ public sealed class CmdQuantitativos : CommandBase
         }
         if (general) Try(null);
         foreach (var c in categories) Try(c);
+        // 3) Na folha escolhida (ou numa nova): cada tabela num lugar livre, a primeira no ponto clicado.
+        if (place.OnSheet && created.Count > 0)
+        {
+            try
+            {
+                using var t = new Transaction(doc, "SV - Tabela na folha");
+                t.Start();
+                sheet = target ?? ProjectTableHost.NewSheet(doc, "SV-Q01", "Quantitativos de sinalização");
+                for (int i = 0; i < created.Count; i++) ProjectTableHost.Place(doc, created[i], sheet, i == 0 ? at : null, notes);
+                t.Commit();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Tabela na folha", ex);
+                notes.Add("folha: " + ex.Message);
+                sheet = null;
+            }
+        }
         if (created.Count > 0)
         {
-            try { uidoc.ActiveView = created[0]; }
+            try { if (sheet == null) uidoc.ActiveView = created[0]; else if (uidoc.ActiveView.Id != sheet.Id) uidoc.ActiveView = sheet; }
             catch (Exception ex) { Log.Error("Abrir tabela", ex); }
         }
         var lines = created.Select(v => $"• {v.Name} – {QuantitySchedule.Rows(v)} linha(s)").ToList();

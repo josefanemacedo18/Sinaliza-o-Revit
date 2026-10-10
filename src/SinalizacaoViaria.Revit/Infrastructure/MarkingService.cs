@@ -35,6 +35,8 @@ public sealed class MarkingService
         _doc = doc;
         _activeView = activeView;
         _interactive = interactive;
+        // Placas personalizadas guardadas no projeto entram no catálogo antes de gerar.
+        CustomSignStore.Apply(doc);
     }
 
     private StyleService Styles => _styles ??= new StyleService(_doc);
@@ -457,6 +459,7 @@ public sealed class MarkingService
 
         var keep = new HashSet<ElementId>();
         var primary = true;
+        _arcCenters = geo.ArcCenters;
         var solidPieces = geo.Pieces;
 
         // Sinalização horizontal como Piso do Revit: peças de pintura com a espessura do material, sobre o pavimento.
@@ -1218,9 +1221,12 @@ public sealed class MarkingService
     /// <summary>Desvio máximo do contorno ajustado (m) – configurável em Configurações (0 = retas uma a uma, como antes).</summary>
     private static double BoundaryTolerance => Math.Max(0, PluginContext.Settings.BoundaryTolerance);
 
-    private static CurveLoop? FittedLoop(List<Vec2> ring, double zFt, double shortFt)
+    /// <summary>Centros exatos das curvas da marca em criação (ver <see cref="MarkingGeometry.ArcCenters"/>).</summary>
+    private IReadOnlyList<Vec2> _arcCenters = Array.Empty<Vec2>();
+
+    private CurveLoop? FittedLoop(List<Vec2> ring, double zFt, double shortFt)
     {
-        var segs = BoundaryFit.Fit(ring, BoundaryTolerance, UnitConv.M(shortFt));
+        var segs = BoundaryFit.Fit(ring, BoundaryTolerance, UnitConv.M(shortFt), _arcCenters);
         if (segs.Count < 2 || segs.Count == 2 && !segs.Any(x => x.IsArc)) return null;
         XYZ P(Vec2 v) => new(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), zFt);
         var loop = new CurveLoop();

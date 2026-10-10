@@ -324,6 +324,8 @@ public sealed class PlacaDef
     public List<PictoItem>? Pictograma { get; set; }
     /// <summary>Tarja diagonal vermelha de proibição sobre o pictograma (R-4a, R-9...).</summary>
     public bool Proibicao { get; set; }
+    /// <summary>Placa criada pelo usuário e guardada no projeto (fora do catálogo normativo).</summary>
+    public bool Personalizada { get; set; }
     public override string ToString() => $"{Codigo} – {Nome}";
 }
 

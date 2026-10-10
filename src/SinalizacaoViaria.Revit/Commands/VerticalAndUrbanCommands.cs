@@ -15,8 +15,12 @@ public sealed class CmdPlacas : CommandBase
 {
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
+        // Placas personalizadas do projeto entram na lista; as criadas na janela ficam guardadas no projeto.
+        CustomSignStore.Apply(uidoc.Document);
         var w = new SignWindow();
-        if (UiHelpers.ShowModal(w) != true || w.Result == null) return Result.Cancelled;
+        var ok = UiHelpers.ShowModal(w) == true;
+        if (w.NewCustomSigns.Count > 0) CustomSignStore.Save(uidoc.Document, w.NewCustomSigns);
+        if (!ok || w.Result == null) return Result.Cancelled;
         PluginContext.SaveSettings();
         var template = w.Result;
         EnsureDetailView(uidoc, template.Output);

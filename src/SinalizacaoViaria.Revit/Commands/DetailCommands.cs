@@ -262,11 +262,16 @@ public sealed class CmdQuadroLegenda : CommandBase
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
         var doc = uidoc.Document;
-        var view = DetailHelpers.RequireDetailView(uidoc);
+        var active = uidoc.ActiveView;
         var all = MarkingStorage.Definitions(doc);
-        var w = new LegendWindow(view.Scale, all);
+        var w = new LegendWindow(MarkingService.SupportsDetail(active) ? active.Scale : ProjectTableViews.Scale, all);
         if (UiHelpers.ShowModal(w) != true || w.Result == null) return Result.Cancelled;
         PluginContext.SaveSettings();
+        // Vista própria (Legenda do Revit) por padrão: roda com qualquer vista ativa, inclusive uma folha.
+        var place = TablePlacementWindow.Ask(doc, active, "quadro de legenda", ProjectTableViews.ViewName(w.Result));
+        if (place == null) return Result.Cancelled;
+        if (place.OwnView) return ProjectTableCommand.Run(uidoc, w.Result, place, "SV - Quadro de legenda", "Quadro de legenda");
+        var view = DetailHelpers.RequireDetailView(uidoc);
         var at = Picking.PickPoint(uidoc, "Clique o canto superior esquerdo do quadro de legenda");
         if (at == null) return Result.Cancelled;
         var d = (LegendDefinition)w.Result.CloneWithNewId();

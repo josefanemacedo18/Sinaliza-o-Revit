@@ -77,7 +77,11 @@ public sealed class MarkingUpdater : IUpdater
 
         try
         {
-            if (data.GetDeletedElementIds().Count > 0 && !MarkingService.IsRendering) RemoveOrphanDetails(doc);
+            if (data.GetDeletedElementIds().Count > 0 && !MarkingService.IsRendering)
+            {
+                RemoveOrphanDetails(doc);
+                if (PluginContext.Settings.AutoUpdate) RefreshProjectTables(doc);
+            }
         }
         catch (Exception ex)
         {
@@ -267,6 +271,17 @@ public sealed class MarkingUpdater : IUpdater
             try { service.Render(d); }
             catch (Exception ex) { Log.Error($"Recortes órfãos {d.DisplayCode}", ex); }
         }
+    }
+
+    /// <summary>
+    /// Marca apagada: legenda de placas e quadros (que leem o projeto inteiro) refeitos sem ela – na vista própria deles
+    /// (Legenda/desenho) ou na planta onde foram desenhados.
+    /// </summary>
+    private static void RefreshProjectTables(Document doc)
+    {
+        if (!MarkingStorage.Definitions(doc).Any(d => d is Core.Definitions.IProjectWideAnnotation { TargetId: null })) return;
+        try { new MarkingService(doc, null, interactive: false).RenderDependents(Array.Empty<string>(), includeLegends: true); }
+        catch (Exception ex) { Log.Error("Quadros após apagar marcas", ex); }
     }
 
     public UpdaterId GetUpdaterId() => _id;

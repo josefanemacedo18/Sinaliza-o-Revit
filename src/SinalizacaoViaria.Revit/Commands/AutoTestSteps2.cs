@@ -394,6 +394,30 @@ internal sealed partial class AutoTestRunner
         });
         Step("Detalhamento", "Quadro de quantitativos", s => Commit(s, new[] { Prep(new QuantityTableDefinition { Position = P(-400, 1300) }) }, "quadro"));
         Step("Detalhamento", "Quadro de placas", s => Commit(s, new[] { Prep(new QuantityTableDefinition { Position = P(-600, 1300), SignsOnly = true }) }, "quadro de placas"));
+        Step("Detalhamento", "Legenda e quadro de placas em vista própria, numa folha", s =>
+        {
+            // Sem depender da planta: vista própria (Legenda, ou desenho se o projeto não tiver Legenda) e folha nova.
+            var notes = new List<string>();
+            var own = new MarkingDefinition[] { ProjectTableViews.ForOwnView(new LegendDefinition()), ProjectTableViews.ForOwnView(new QuantityTableDefinition { SignsOnly = true }) };
+            var views = new List<View>();
+            using (var t = new Transaction(_doc, "SV Autoteste - vistas dos quadros"))
+            {
+                t.Start();
+                foreach (var d in own) views.Add(ProjectTableHost.EnsureView(_doc, d, "SV Autoteste - " + d.KindName, notes));
+                t.Commit();
+            }
+            Commit(s, own, "quadros em vista própria");
+            using (var t = new Transaction(_doc, "SV Autoteste - quadros na folha"))
+            {
+                t.Start();
+                var sheet = ProjectTableHost.NewSheet(_doc, "SV-AT-Q", "Autoteste – legenda e quadro");
+                foreach (var v in views)
+                    if (!ProjectTableHost.Place(_doc, v, sheet, null, notes)) s.Error($"\"{v.Name}\" não foi para a folha {sheet.SheetNumber}.");
+                t.Commit();
+                s.Note($"Folha {sheet.SheetNumber}: " + string.Join(", ", views.Select(v => $"{v.Name} ({v.ViewType})")));
+            }
+            foreach (var n in notes.Distinct()) s.Warn(n);
+        });
         Step("Detalhamento", "Notas gerais", s => Commit(s, new[] { Prep(new NotesDefinition { Position = P(-200, 900) }) }, "notas"));
         Step("Detalhamento", "Norte", s => Commit(s, new[] { Prep(new NorthArrowDefinition { Position = P(-100, 900) }) }, "norte"));
         Step("Detalhamento", "Mostrar/ocultar eixos na planta", s =>

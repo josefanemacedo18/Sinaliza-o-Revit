@@ -137,43 +137,78 @@ public static class SignGenerator
         }
 
         var text = legend ?? p.Legenda;
+        var hasText = !string.IsNullOrWhiteSpace(text) && text != "-";
         if ((p.Pictograma is { Count: > 0 } || p.Proibicao) && inner.Count > 0)
         {
+            // Placa personalizada com pictograma do catálogo e linhas de texto: o pictograma num quadrado à esquerda (placa
+            // larga) ou em cima, e o texto no resto. Pictogramas que já escrevem a legenda (valor editável) ficam como no catálogo.
+            if (p.Personalizada && hasText && p.Pictograma is { Count: > 0 } pic && !pic.Any(i => i.Editavel))
+            {
+                var (mn, mx) = inner[0].Bounds;
+                var (iw, ih) = (mx.X - mn.X, mx.Y - mn.Y);
+                Polygon2 area;
+                (Vec2 Min, Vec2 Max) box;
+                if (iw >= ih * 1.3)
+                {
+                    area = Polygon2.Rectangle(mn, new Vec2(mn.X + ih, mx.Y));
+                    box = (new Vec2(mn.X + ih, mn.Y), mx);
+                }
+                else
+                {
+                    var ph = ih * 0.58;
+                    area = Polygon2.Rectangle(new Vec2(mn.X, mx.Y - ph), mx);
+                    box = (mn, new Vec2(mx.X, mx.Y - ph));
+                }
+                var square = new PlacaDef
+                {
+                    Forma = FormaPlaca.Retangulo, CorFundo = p.CorFundo, CorOrla = p.CorOrla, CorLegenda = p.CorLegenda,
+                    Pictograma = pic, Proibicao = p.Proibicao, Orla = p.Orla, Largura = p.Largura, Altura = p.Altura,
+                };
+                var region = PolygonOps.Intersect(new[] { area }, inner).OrderByDescending(a => a.Area).FirstOrDefault() ?? area;
+                res.AddRange(PictogramRenderer.Render(square, region, text, glyphs, border));
+                LegendText(res, text!, box.Min, box.Max, (box.Min.X + box.Max.X) / 2, Math.Min(box.Max.X - box.Min.X, box.Max.Y - box.Min.Y), p, glyphs);
+                return res;
+            }
             res.AddRange(PictogramRenderer.Render(p, inner[0], text, glyphs, border));
             return res;
         }
-        if (!string.IsNullOrWhiteSpace(text) && text != "-" && inner.Count > 0)
+        if (hasText && inner.Count > 0)
         {
             var (mn, mx) = inner[0].Bounds;
-            var availW = (mx.X - mn.X) * (p.Forma is FormaPlaca.Losango or FormaPlaca.TrianguloInvertido ? 0.5 : 0.8);
-            var availH = (mx.Y - mn.Y) * 0.8;
-            var lines = text.Split('\n').Length;
-            var th = Math.Min(availH / lines * 0.75, p.Forma == FormaPlaca.Octogono ? w * 0.28 : w * 0.40);
-            var cy = p.Forma == FormaPlaca.TrianguloInvertido ? mn.Y + (mx.Y - mn.Y) * 0.62 : (mn.Y + mx.Y) / 2;
-            for (int attempt = 0; attempt < 6; attempt++)
-            {
-                var total = lines * th + (lines - 1) * th * 0.4;
-                var frame = new LocalFrame(new Vec2(0, cy - total / 2), Vec2.UnitY);
-                var g = TextGenerator.Generate(text, new TextOptions { Height = th, WidthFactor = 0.62, LetterSpacing = th * 0.08, LineSpacing = th * 0.4, BottomToTop = false }, frame, p.CorLegenda, glyphs);
-                var b = g.Bounds;
-                if (b == null) break;
-                if (b.Value.Max.X - b.Value.Min.X <= availW || attempt == 5)
-                {
-                    foreach (var piece in g.Pieces) res.Add((piece.Shape, piece.Color, 2));
-                    break;
-                }
-                th *= availW / (b.Value.Max.X - b.Value.Min.X) * 0.98;
-            }
+            LegendText(res, text!, mn, mx, 0, w, p, glyphs);
         }
         return res;
     }
 
-    public static MarkingGeometry Generate(SignDefinition d, PlacaDef p, IGlyphOutlineProvider glyphs)
+    /// <summary>Linhas da legenda centradas em <paramref name="cx"/>, reduzidas até caber na largura disponível.</summary>
+    private static void LegendText(List<(Polygon2, MarkingColor, int)> res, string text, Vec2 mn, Vec2 mx, double cx, double w, PlacaDef p,
+        IGlyphOutlineProvider glyphs)
+    {
+        var availW = (mx.X - mn.X) * (p.Forma is FormaPlaca.Losango or FormaPlaca.TrianguloInvertido ? 0.5 : 0.8);
+        var availH = (mx.Y - mn.Y) * 0.8;
+        var lines = text.Split('\n').Length;
+        var th = Math.Min(availH / lines * 0.75, p.Forma == FormaPlaca.Octogono ? w * 0.28 : w * 0.40);
+        var cy = p.Forma == FormaPlaca.TrianguloInvertido ? mn.Y + (mx.Y - mn.Y) * 0.62 : (mn.Y + mx.Y) / 2;
+        for (int attempt = 0; attempt < 6; attempt++)
+        {
+            var total = lines * th + (lines - 1) * th * 0.4;
+            var frame = new LocalFrame(new Vec2(cx, cy - total / 2), Vec2.UnitY);
+            var g = TextGenerator.Generate(text, new TextOptions { Height = th, WidthFactor = 0.62, LetterSpacing = th * 0.08, LineSpacing = th * 0.4, BottomToTop = false }, frame, p.CorLegenda, glyphs);
+            var b = g.Bounds;
+            if (b == null) break;
+            if (b.Value.Max.X - b.Value.Min.X <= availW || attempt == 5)
+            {
+                foreach (var piece in g.Pieces) res.Add((piece.Shape, piece.Color, 2));
+                break;
+            }
+            th *= availW / (b.Value.Max.X - b.Value.Min.X) * 0.98;
+        }
+    }
+
+    public static MarkingGeometry Generate(SignDefinition d, PlacaDef p, IGlyphOutlineProvider glyphs, Catalogo? catalog = null)
     {
         var geo = new MarkingGeometry();
         var w = d.Width ?? p.Largura;
-        var h = d.Height ?? p.Altura;
-        var plateH = PlateHeight(p.Forma, w, h);
         var f = d.Direction.Length < 1e-9 ? Vec2.UnitY : d.Direction.Normalized();
         var right = f.PerpRight;            // direita do condutor = eixo X da face
         var toDriver = -f;                  // a face aponta para quem chega
@@ -181,16 +216,25 @@ public static class SignGenerator
         var center = d.Position + right * d.LateralOffset;
         var backPlane = center + toDriver * (postR + 0.002);
         var bottom = d.MountHeight;
+        // Placas do suporte (a principal e as empilhadas abaixo dela); a altura livre vale sob a mais baixa.
+        var plates = d.Stack is { Count: > 0 } && catalog != null
+            ? SignStack.Layout(d, catalog, geo.Warnings)
+            : new List<SignStack.Plate> { new(p, w, d.Height ?? p.Altura, d.Legend, bottom, PlateHeight(p.Forma, w, d.Height ?? p.Altura)) };
+        if (plates.Count == 0) plates.Add(new SignStack.Plate(p, w, d.Height ?? p.Altura, d.Legend, bottom, PlateHeight(p.Forma, w, d.Height ?? p.Altura)));
 
-        foreach (var (shape, color, layer) in Face(p, w, h, bottom, d.Legend, glyphs))
-        {
-            // Camadas do pictograma empilhadas (0,5 mm cada) para não haver faces coincidentes.
-            var offset = layer switch { 0 => 0.0, 1 => PlateThickness, _ => PlateThickness + 0.002 + (layer - 2) * 0.0005 };
-            var depth = layer == 0 ? PlateThickness : layer == 1 ? 0.002 : 0.0005;
-            var origin = backPlane + toDriver * offset;
-            geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(origin, right, shape, toDriver, depth), color));
-        }
+        foreach (var pl in plates)
+            foreach (var (shape, color, layer) in Face(pl.Def, pl.Width, pl.Height, pl.Bottom, pl.Legend, glyphs))
+            {
+                // Camadas do pictograma empilhadas (0,5 mm cada) para não haver faces coincidentes.
+                var offset = layer switch { 0 => 0.0, 1 => PlateThickness, _ => PlateThickness + 0.002 + (layer - 2) * 0.0005 };
+                var depth = layer == 0 ? PlateThickness : layer == 1 ? 0.002 : 0.0005;
+                var origin = backPlane + toDriver * offset;
+                geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(origin, right, shape, toDriver, depth), color));
+            }
 
+        // Altura do conjunto de placas (da base da mais baixa ao topo da mais alta).
+        var plateH = plates[0].Bottom + plates[0].PlateHeight - bottom;
+        w = plates.Max(x => x.Width);
         var postTop = bottom + plateH;
         void Post(Vec2 at) => geo.Pieces.Add(new MarkingPiece(new Polygon2(CurveTools.Circle(at, d.PostDiameter / 2, 0.002)), MarkingColor.Metal)
         {

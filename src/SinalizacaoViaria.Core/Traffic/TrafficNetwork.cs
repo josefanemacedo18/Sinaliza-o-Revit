@@ -463,7 +463,8 @@ public static class TrafficNetworkBuilder
         }
 
         // ------------------------------------------------------------ demais elementos
-        foreach (var sg in defs.OfType<SignDefinition>().GroupBy(d => d.Id).Select(g => g.First()))
+        // Cada placa do suporte vale (também as empilhadas abaixo da principal, ex.: velocidade sob outra placa).
+        foreach (var sg in defs.OfType<SignDefinition>().GroupBy(d => d.Id).Select(g => g.First()).SelectMany(SignStack.Plates))
             net.Signs.Add(new TrafficSign(sg.Id, sg.Code, sg.Position, sg.Direction, sg.Legend));
         foreach (var l in defs.OfType<LinearMarkingDefinition>().Where(l => l.Code.StartsWith("FTP", StringComparison.OrdinalIgnoreCase)).GroupBy(d => d.Id).Select(g => g.First()))
             if (axisOf(l) is { } a) net.Crosswalks.Add((l.Id, l.Code, a.Axis));

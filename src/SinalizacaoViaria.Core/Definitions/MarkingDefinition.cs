@@ -626,11 +626,78 @@ public sealed class SignDefinition : MarkingDefinition
     public double LateralOffset { get; set; }
     /// <summary>Nível do terreno onde o suporte é fincado, acima do ponto clicado (0,15 m = topo da calçada).</summary>
     public double BaseElevation { get; set; } = 0.15;
+    /// <summary>
+    /// Placas adicionais no mesmo suporte, de cima para baixo, abaixo da principal (ex.: R-1 com placa complementar). Nulo ou
+    /// vazio = placa única. A altura livre (<see cref="MountHeight"/>) passa a valer sob a placa mais baixa.
+    /// </summary>
+    public List<StackedSign>? Stack { get; set; }
+    /// <summary>Espaço vertical entre as placas empilhadas (m).</summary>
+    public double StackGap { get; set; } = 0.05;
 
     public override string KindName => "Placa";
     public override string DisplayCode => Code;
     public override double? PointZ => Z;
     public override void Translate(Vec2 delta, double dz) { Position += delta; Z += dz; }
+}
+
+/// <summary>Placa adicional fixada no mesmo suporte de uma <see cref="SignDefinition"/> (código do catálogo ou personalizada).</summary>
+public sealed class StackedSign
+{
+    public string Code { get; set; } = "";
+    public double? Width { get; set; }
+    public double? Height { get; set; }
+    /// <summary>Legenda substituta (vazio = a do catálogo; "-" = sem legenda).</summary>
+    public string? Legend { get; set; }
+}
+
+/// <summary>Placas de um suporte: a principal e as empilhadas, com a posição vertical de cada uma.</summary>
+public static class SignStack
+{
+    /// <summary>Uma placa do conjunto: definição no catálogo, dimensões, legenda, base (m acima do apoio) e altura da chapa.</summary>
+    public sealed record Plate(PlacaDef Def, double Width, double Height, string? Legend, double Bottom, double PlateHeight);
+
+    /// <summary>
+    /// Cada placa do suporte como uma placa avulsa (mesmo Id, posição e hierarquia da principal), de cima para baixo – para
+    /// legenda, quadro de placas e quantitativos contarem cada uma.
+    /// </summary>
+    public static IEnumerable<SignDefinition> Plates(SignDefinition d)
+    {
+        yield return d;
+        if (d.Stack is not { Count: > 0 }) yield break;
+        foreach (var s in d.Stack.Where(s => !string.IsNullOrWhiteSpace(s.Code)))
+        {
+            var c = (SignDefinition)MarkingDefinition.FromJson(d.ToJson())!;
+            c.Code = s.Code;
+            c.Width = s.Width;
+            c.Height = s.Height;
+            c.Legend = s.Legend;
+            c.Stack = null;
+            yield return c;
+        }
+    }
+
+    /// <summary>Placas que o catálogo conhece, de cima para baixo, com a base de cada uma (a mais baixa na altura livre).</summary>
+    public static List<Plate> Layout(SignDefinition d, Catalogo cat, List<string>? warnings = null)
+    {
+        var res = new List<(PlacaDef P, double W, double H, string? L)>();
+        foreach (var s in Plates(d))
+        {
+            var p = cat.Placa(s.Code);
+            if (p == null) { warnings?.Add($"Placa {s.Code} não existe no catálogo."); continue; }
+            res.Add((p, s.Width ?? p.Largura, s.Height ?? p.Altura, s.Legend));
+        }
+        var gap = Math.Max(0, d.StackGap);
+        var plates = new List<Plate>();
+        var z = d.MountHeight;
+        for (int i = res.Count - 1; i >= 0; i--)
+        {
+            var (p, w, h, l) = res[i];
+            var ph = Generators.SignGenerator.PlateHeight(p.Forma, w, h);
+            plates.Insert(0, new Plate(p, w, h, l, z, ph));
+            z += ph + gap;
+        }
+        return plates;
+    }
 }
 
 /// <summary>Elemento urbanístico viário (banco, poste, árvore, abrigo...), por ponto ou distribuído ao longo de um caminho.</summary>
@@ -877,6 +944,17 @@ public sealed class CurbExtensionDefinition : MarkingDefinition
     /// canteiro ocupa toda a parte com o avanço inteiro.
     /// </summary>
     public List<StationRange>? PlanterRanges { get; set; }
+    /// <summary>
+    /// Face nova do meio-fio informada ponto a ponto, do início ao fim do caminho (no lugar do avanço constante com as
+    /// transições): extensão de um lado só da esquina, que nasce da curva da esquina com o mesmo raio. Nulo = face pelo avanço.
+    /// </summary>
+    public List<Vec2>? OuterFace { get; set; }
+
+    /// <summary>
+    /// Centros exatos das curvas que a extensão segue (curva da esquina, pelo eixo): os arcos do contorno dos pisos usam esses
+    /// centros. Nulo = arcos ajustados pelos pontos (como antes).
+    /// </summary>
+    public List<Vec2>? ArcCenters { get; set; }
 
     public override string KindName => "Extensão de calçada";
     public override string DisplayCode => "ORELHA";

@@ -608,18 +608,19 @@ public static partial class DetailGenerator
     private static void SignElevation(SignDefinition sg, PlacaDef p, BuildContext ctx, MarkingGeometry local,
         List<(Vec2, Vec2, Vec2, double, string)> dims, List<string> notes)
     {
-        var w = sg.Width ?? p.Largura;
-        var h = sg.Height ?? p.Altura;
         var bottom = sg.MountHeight;
-        var ph = SignGenerator.PlateHeight(p.Forma, w, h);
-        foreach (var (shape, color) in FlatFace(p, w, h, sg.Legend, ctx.Glyphs))
+        // Placas do suporte, de cima para baixo (as empilhadas abaixo da principal); a altura livre vale sob a mais baixa.
+        var plates = SignStack.Layout(sg, ctx.Catalog);
+        if (plates.Count == 0) plates.Add(new SignStack.Plate(p, sg.Width ?? p.Largura, sg.Height ?? p.Altura, sg.Legend, bottom,
+            SignGenerator.PlateHeight(p.Forma, sg.Width ?? p.Largura, sg.Height ?? p.Altura)));
+        foreach (var pl in plates)
         {
-            var (fmn, _) = shape.Bounds;
-            local.Pieces.Add(new MarkingPiece(shape, color));
+            // FlatFace desenha a partir de y = 0: sobe cada placa até a base dela.
+            foreach (var (shape, color) in FlatFace(pl.Def, pl.Width, pl.Height, pl.Legend, ctx.Glyphs))
+                local.Pieces.Add(new MarkingPiece(shape.Transform(v => v + new Vec2(0, pl.Bottom)), color));
         }
-        // FlatFace desenha a partir de y = 0: sobe a placa até a altura livre.
-        for (int i = 0; i < local.Pieces.Count; i++)
-            local.Pieces[i] = local.Pieces[i] with { Shape = local.Pieces[i].Shape.Transform(v => v + new Vec2(0, bottom)) };
+        var w = plates.Max(x => x.Width);
+        var ph = plates[0].Bottom + plates[0].PlateHeight - bottom;
         var postW = Math.Max(0.04, sg.PostDiameter);
         void Post(double x) => local.Pieces.Insert(0, new MarkingPiece(Polygon2.Rectangle(new Vec2(x - postW / 2, 0), new Vec2(x + postW / 2, bottom + ph * 0.95)), MarkingColor.Metal));
         switch (sg.Support)
@@ -633,11 +634,19 @@ public static partial class DetailGenerator
             local.Annotations.Add(new AnnotationLine(new[] { new Vec2(x, 0), new Vec2(x - 0.08, -0.08) }, MarkingColor.Preta));
 
         dims.Add((new Vec2(-w / 2, bottom + ph), new Vec2(w / 2, bottom + ph), Vec2.UnitY, 6, F(w)));
-        if (p.Forma is FormaPlaca.Retangulo or FormaPlaca.TrianguloInvertido or FormaPlaca.Losango or FormaPlaca.CruzSantoAndre)
-            dims.Add((new Vec2(w / 2, bottom), new Vec2(w / 2, bottom + ph), Vec2.UnitX, 6, F(ph)));
+        // Altura de cada placa e os espaços entre elas, do lado direito.
+        foreach (var pl in plates)
+            if (plates.Count > 1 || pl.Def.Forma is FormaPlaca.Retangulo or FormaPlaca.TrianguloInvertido or FormaPlaca.Losango or FormaPlaca.CruzSantoAndre)
+                dims.Add((new Vec2(w / 2, pl.Bottom), new Vec2(w / 2, pl.Bottom + pl.PlateHeight), Vec2.UnitX, 6, F(pl.PlateHeight)));
+        for (int i = 0; i + 1 < plates.Count; i++)
+            if (plates[i].Bottom - (plates[i + 1].Bottom + plates[i + 1].PlateHeight) > 1e-3)
+                dims.Add((new Vec2(w / 2, plates[i + 1].Bottom + plates[i + 1].PlateHeight), new Vec2(w / 2, plates[i].Bottom), Vec2.UnitX, 6,
+                    F(plates[i].Bottom - plates[i + 1].Bottom - plates[i + 1].PlateHeight)));
         dims.Add((new Vec2(-w / 2, 0), new Vec2(-w / 2, bottom), -Vec2.UnitX, 6, F(bottom)));
         dims.Add((new Vec2(-w / 2, 0), new Vec2(-w / 2, bottom + ph), -Vec2.UnitX, 16, F(bottom + ph)));
-        notes.Add($"{p.Codigo} – {p.Nome}. Altura livre sob a placa: {F(bottom)} m.");
+        notes.Add($"{p.Codigo} – {p.Nome}. Altura livre sob a placa{(plates.Count > 1 ? " mais baixa" : "")}: {F(bottom)} m.");
+        foreach (var pl in plates.Skip(1))
+            notes.Add($"No mesmo suporte: {pl.Def.Codigo} – {pl.Def.Nome} ({F(pl.Width)} m).");
         notes.Add($"Suporte: {(sg.Support == TipoSuporte.Duplo ? "duas colunas" : sg.Support == TipoSuporte.Nenhum ? "fixação em estrutura existente" : "coluna simples")} Ø {F(sg.PostDiameter * 1000, "0")} mm; afastamento lateral mínimo de 0,30 m do meio-fio.");
         if (!string.IsNullOrWhiteSpace(p.Descricao)) notes.Add(p.Descricao);
     }
@@ -669,7 +678,8 @@ public static partial class DetailGenerator
             headers = new[] { "SÍMBOLO", "Nº", "CÓDIGO", "DESCRIÇÃO", "DIMENSÕES (m)", "QTD" };
             aligns = new[] { TextAlign.Center, TextAlign.Center, TextAlign.Center, TextAlign.Left, TextAlign.Center, TextAlign.Center };
             var details = all.OfType<SignPlanDetailDefinition>().Where(d => !string.IsNullOrWhiteSpace(d.Number)).ToList();
-            foreach (var g in all.OfType<SignDefinition>().GroupBy(s => (s.Code, W: s.Width, H: s.Height)).OrderBy(g => g.Key.Code, StringComparer.OrdinalIgnoreCase))
+            // Cada placa conta, também as empilhadas no mesmo suporte (com o número do detalhe do suporte).
+            foreach (var g in all.OfType<SignDefinition>().SelectMany(SignStack.Plates).GroupBy(s => (s.Code, W: s.Width, H: s.Height)).OrderBy(g => g.Key.Code, StringComparer.OrdinalIgnoreCase))
             {
                 var p = ctx.Catalog.Placa(g.Key.Code);
                 var w = g.Key.W ?? p?.Largura ?? 0;

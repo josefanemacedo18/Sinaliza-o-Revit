@@ -179,6 +179,20 @@ public static class QuantityCalculator
         foreach (var (def, geo) in items)
         {
             if (def is IAnnotationDefinition) continue;
+            // Placas empilhadas no mesmo suporte: cada uma conta como uma unidade do seu código (o suporte é da principal).
+            if (def is SignDefinition { Stack.Count: > 0 } stacked)
+                foreach (var plate in SignStack.Plates(stacked).Skip(1))
+                {
+                    var pi = MarkingBuilder.Describe(plate, catalog);
+                    var pk = (pi.Code, MarkingColor.Preta, "", def.Hierarchy);
+                    if (!rows.TryGetValue(pk, out var pr))
+                        rows[pk] = pr = new QuantityRow
+                        {
+                            Code = pi.Code, Name = pi.Name, Group = pi.Group, Color = MarkingColor.Preta, Memorial = true,
+                            Category = QuantityRow.Categorize(plate, pi.Group), Hierarchy = def.Hierarchy, Unit = pi.Unit, Reference = pi.Reference,
+                        };
+                    pr.Units += 1;
+                }
             var info = MarkingBuilder.Describe(def, catalog);
             var matName = def.Output.Material ?? defaultMaterial ?? catalog.Materiais.FirstOrDefault()?.Nome ?? "";
             var mat = catalog.Material(matName);

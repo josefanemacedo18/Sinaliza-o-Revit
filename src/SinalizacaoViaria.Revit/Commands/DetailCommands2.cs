@@ -474,7 +474,7 @@ internal static class TableCommand
     public static Result Run(UIDocument uidoc, bool signsOnly)
     {
         var doc = uidoc.Document;
-        var view = DetailHelpers.RequireDetailView(uidoc);
+        var active = uidoc.ActiveView;
         var key = signsOnly ? "QuadroPlacas" : "QuadroQtd";
         var d = UiHelpers.Remembered<QuantityTableDefinition>(key) ?? new QuantityTableDefinition
         {
@@ -483,20 +483,89 @@ internal static class TableCommand
             RowMm = signsOnly ? 8 : 6,
         };
         var all = MarkingStorage.Definitions(doc);
-        var service = new MarkingService(doc, uidoc.ActiveView);
-        if (UiHelpers.ShowModal(DetailForms.Table(d, view.Scale, all, service.BuildGeometryOrNull, false)) != true) return Result.Cancelled;
+        var service = new MarkingService(doc, active);
+        var scale = MarkingService.SupportsDetail(active) ? active.Scale : ProjectTableViews.Scale;
+        if (UiHelpers.ShowModal(DetailForms.Table(d, scale, all, service.BuildGeometryOrNull, false)) != true) return Result.Cancelled;
         UiHelpers.Remember(key, d);
         PluginContext.SaveSettings();
+        var what = signsOnly ? "quadro de placas" : "quadro de quantitativos";
+        var place = TablePlacementWindow.Ask(doc, active, what, ProjectTableViews.ViewName(d));
+        if (place == null) return Result.Cancelled;
+        var label = signsOnly ? "Quadro de placas" : "Quadro de quantitativos";
+        if (place.OwnView) return ProjectTableCommand.Run(uidoc, d, place, "SV - " + label, label);
+
+        var view = DetailHelpers.RequireDetailView(uidoc);
         var at = Picking.PickPoint(uidoc, "Clique o canto superior esquerdo do quadro");
         if (at == null) return Result.Cancelled;
         var def = (QuantityTableDefinition)d.CloneWithNewId();
         def.Position = DetailHelpers.ToCore(at);
         DetailHelpers.PrepareOutput(def, view);
-        CommandBase_Report(MarkingCreator.Commit(uidoc, new[] { def }, signsOnly ? "SV - Quadro de placas" : "SV - Quadro de quantitativos"));
+        ProjectTableCommand.Warnings(MarkingCreator.Commit(uidoc, new[] { def }, "SV - " + label));
+        return Result.Succeeded;
+    }
+}
+
+/// <summary>
+/// Legenda e quadros na vista própria (Legenda do Revit, independente da vista ativa – roda até numa folha), colocados
+/// direto na folha escolhida. O conteúdo continua acompanhando o projeto (atualização automática e Atualizar).
+/// </summary>
+internal static class ProjectTableCommand
+{
+    public static Result Run(UIDocument uidoc, MarkingDefinition template, TablePlacement place, string transaction, string label)
+    {
+        var doc = uidoc.Document;
+        var notes = new List<string>();
+        var sheet = place.SheetId != null ? doc.GetElement(place.SheetId) as ViewSheet : null;
+        XYZ? at = null;
+        if (place.PickOnSheet && sheet != null && uidoc.ActiveView.Id == sheet.Id)
+        {
+            try
+            {
+                at = Picking.PickPoint(uidoc, "Clique na folha o canto superior esquerdo do quadro");
+                if (at == null) return Result.Cancelled;
+            }
+            catch (UserMessageException)
+            {
+                notes.Add("a folha não aceitou o clique: o quadro foi para um lugar livre no alto à direita.");
+            }
+        }
+
+        var d = ProjectTableViews.ForOwnView(template);
+        List<RenderResult> results;
+        View view;
+        var placed = false;
+        using (var tg = new TransactionGroup(doc, transaction))
+        {
+            tg.Start();
+            using (var t = new Transaction(doc, transaction + " – vista"))
+            {
+                t.Start();
+                view = ProjectTableHost.EnsureView(doc, d, place.ViewName, notes);
+                t.Commit();
+            }
+            results = MarkingCreator.Commit(uidoc, new[] { d }, transaction);
+            if (place.OnSheet && results.SelectMany(r => r.Elements).Any())
+            {
+                using var t = new Transaction(doc, transaction + " – folha");
+                t.Start();
+                sheet ??= ProjectTableHost.NewSheet(doc, d is LegendDefinition ? "SV-L01" : "SV-Q01", label);
+                placed = ProjectTableHost.Place(doc, view, sheet, at, notes);
+                t.Commit();
+            }
+            tg.Assimilate();
+        }
+
+        var kind = view.ViewType == ViewType.Legend ? "Legenda" : "vista de desenho";
+        var msg = $"{label} gerado na vista \"{view.Name}\" ({kind}) – Navegador de projeto → {(view.ViewType == ViewType.Legend ? "Legendas" : "Vistas (Desenho)")}." +
+                  (placed && sheet != null ? $"\nColocado na folha {sheet.SheetNumber} – {sheet.Name}." : "") +
+                  "\nO conteúdo lê o projeto inteiro e se atualiza quando as marcas mudam.";
+        var warn = results.SelectMany(r => r.Warnings).Concat(notes).Distinct().Take(15).ToList();
+        if (warn.Count > 0) msg += "\n\nObservações:\n" + string.Join("\n", warn.Select(x => "• " + x));
+        TaskDialog.Show(CommandBase.AppTitle, msg);
         return Result.Succeeded;
     }
 
-    private static void CommandBase_Report(List<RenderResult> results)
+    public static void Warnings(List<RenderResult> results)
     {
         var w = results.SelectMany(r => r.Warnings).Distinct().ToList();
         if (w.Count > 0) TaskDialog.Show(CommandBase.AppTitle, string.Join("\n", w.Take(15).Select(x => "• " + x)));

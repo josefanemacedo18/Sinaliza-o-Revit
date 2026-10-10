@@ -17,6 +17,8 @@ public partial class SignWindow : Window
     private bool _loading = true;
 
     public SignDefinition? Result { get; private set; }
+    /// <summary>Placas personalizadas criadas nesta janela (o comando as guarda no projeto).</summary>
+    public List<PlacaDef> NewCustomSigns { get; } = new();
     public bool FixedAngle { get; private set; }
     public double AngleDeg { get; private set; }
     public bool PickSurfaces => Output.PickSurfaces;
@@ -74,6 +76,8 @@ public partial class SignWindow : Window
             TbSpan.Text = UiHelpers.F(existing.StructureSpan, "0.##");
             TbColumn.Text = UiHelpers.F(existing.StructureColumn, "0.###");
             TbBeam.Text = UiHelpers.F(existing.StructureBeam, "0.##");
+            TbStack.Text = string.Join("; ", existing.Stack?.Select(x => x.Code) ?? Enumerable.Empty<string>());
+            TbStackGap.Text = UiHelpers.F(existing.StackGap, "0.###");
             ShowStructureFields();
             Output.Load(existing.Output);
         }
@@ -170,6 +174,13 @@ public partial class SignWindow : Window
         d.PostDiameter = UiHelpers.Parse(TbPost, 0.063, "Diâmetro da coluna", 0.02, 0.5);
         d.LateralOffset = UiHelpers.Parse(TbLateral, 0, "Deslocamento", -10, 10);
         d.BaseElevation = UiHelpers.Parse(TbBase, 0.15, "Nível da base", -5, 50);
+        // Placas no mesmo suporte (de cima para baixo), mantendo tamanho/legenda das que já estavam.
+        var codes = (TbStack.Text ?? "").Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var c in codes)
+            if (_cat.Placa(c) == null) throw new FormatException($"Placa {c} (no mesmo suporte) não existe no catálogo.");
+        d.Stack = codes.Length == 0 ? null : codes.Select(c => d.Stack?.FirstOrDefault(x => string.Equals(x.Code, c, StringComparison.OrdinalIgnoreCase))
+            ?? new StackedSign { Code = _cat.Placa(c)!.Codigo }).ToList();
+        d.StackGap = UiHelpers.Parse(TbStackGap, 0.05, "Espaço entre placas", 0, 1);
         d.Output = Output.Save(d.Output);
         return d;
     }
@@ -184,9 +195,12 @@ public partial class SignWindow : Window
             var w = d.Width ?? p.Largura;
             var h = d.Height ?? p.Altura;
             var geo = new MarkingGeometry();
-            foreach (var (shape, color, _) in SignGenerator.Face(p, w, h, d.MountHeight, d.Legend, PluginContext.Glyphs))
-                geo.Pieces.Add(new MarkingPiece(shape, color));
-            var top = d.MountHeight + SignGenerator.PlateHeight(p.Forma, w, h);
+            // Todas as placas do suporte (a principal e as empilhadas abaixo dela).
+            var plates = SignStack.Layout(d, _cat);
+            foreach (var pl in plates)
+                foreach (var (shape, color, _) in SignGenerator.Face(pl.Def, pl.Width, pl.Height, pl.Bottom, pl.Legend, PluginContext.Glyphs))
+                    geo.Pieces.Add(new MarkingPiece(shape, color));
+            var top = plates.Count > 0 ? plates[0].Bottom + plates[0].PlateHeight : d.MountHeight + SignGenerator.PlateHeight(p.Forma, w, h);
             var post = d.PostDiameter;
             void Post(double x) => geo.Pieces.Insert(0, new MarkingPiece(Polygon2.Rectangle(new Vec2(x - post / 2, 0), new Vec2(x + post / 2, top)), MarkingColor.Metal));
             if (d.Support == TipoSuporte.Simples) Post(-d.LateralOffset);
@@ -217,6 +231,20 @@ public partial class SignWindow : Window
         {
             TxtWarnings.Text = ex.Message;
         }
+    }
+
+    private void NewCustomClick(object sender, RoutedEventArgs e)
+    {
+        var w = new CustomSignWindow(_cat) { Owner = this };
+        if (w.ShowDialog() != true || w.Result == null) return;
+        CustomSigns.Apply(_cat, new[] { w.Result });
+        NewCustomSigns.RemoveAll(x => string.Equals(x.Codigo, w.Result.Codigo, StringComparison.OrdinalIgnoreCase));
+        NewCustomSigns.Add(w.Result);
+        CbCategory.SelectedIndex = 0;
+        TbSearch.Text = "";
+        CategoryChanged(this, null!);
+        LbTypes.SelectedItem = _cat.Placa(w.Result.Codigo);
+        LbTypes.ScrollIntoView(LbTypes.SelectedItem);
     }
 
     private void OkClick(object sender, RoutedEventArgs e)

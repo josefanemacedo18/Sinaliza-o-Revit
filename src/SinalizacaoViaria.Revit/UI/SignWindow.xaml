@@ -23,6 +23,8 @@
             <TextBlock DockPanel.Dock="Top" Text="Placa" Style="{StaticResource Title}"/>
             <ComboBox DockPanel.Dock="Top" x:Name="CbCategory" SelectionChanged="CategoryChanged"/>
             <TextBox DockPanel.Dock="Top" x:Name="TbSearch" Margin="0,4,0,0" TextChanged="SearchChanged" ToolTip="Pesquisar por código ou nome (ex.: R-6, bicicleta, curva)"/>
+            <Button DockPanel.Dock="Bottom" Content="Nova placa personalizada…" Margin="0,6,0,0" Click="NewCustomClick"
+                    ToolTip="Cria uma placa com código, nome, forma, tamanho, cores e legenda próprios – guardada neste projeto."/>
             <Border DockPanel.Dock="Bottom" Background="{StaticResource Panel}" Padding="8" Margin="0,6,0,0">
                 <StackPanel>
                     <TextBlock x:Name="TxtDescription" TextWrapping="Wrap"/>
@@ -76,6 +78,19 @@
                         <TextBox Grid.Row="6" Grid.Column="1" x:Name="TbColumn" Text="0,30" TextChanged="AnyChanged" Visibility="Collapsed"/>
                         <TextBlock Grid.Row="7" x:Name="LblBeam" Text="Altura da viga (m)" Style="{StaticResource FieldLabel}" Visibility="Collapsed"/>
                         <TextBox Grid.Row="7" Grid.Column="1" x:Name="TbBeam" Text="0,60" TextChanged="AnyChanged" Visibility="Collapsed"/>
+                    </Grid>
+                </GroupBox>
+                <GroupBox Header="Placas no mesmo suporte">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Abaixo da principal" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Column="1" x:Name="TbStack" TextChanged="AnyChanged" CharacterCasing="Upper"
+                                 ToolTip="Códigos de cima para baixo, separados por ponto e vírgula (ex.: R-19; A-32b). Cada placa conta na legenda, no quadro e nos quantitativos."/>
+                        <TextBlock Grid.Row="1" Text="Espaço entre placas (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbStackGap" Text="0,05" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Style="{StaticResource Hint}" TextWrapping="Wrap"
+                                   Text="A altura livre passa a valer sob a placa mais baixa."/>
                     </Grid>
                 </GroupBox>
                 <GroupBox x:Name="GbPlacement" Header="Inserção">

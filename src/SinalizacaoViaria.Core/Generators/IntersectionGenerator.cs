@@ -59,6 +59,9 @@ public sealed class LegFeature
     public double PocketWidth { get; init; }
 }
 
+/// <summary>Esquina pelos bordos retos: vértice V, direções dos bordos a partir dele (ramo dono A, ramo seguinte B), raio e ângulo.</summary>
+public sealed record CornerFillet(Vec2 V, Vec2 Ua, Vec2 Ub, double R, double Span);
+
 /// <summary>Resultado geométrico de uma interseção.</summary>
 /// <summary>Esquina da interseção: via A (lado alto do ramo) → via B (lado baixo do ramo seguinte).</summary>
 public sealed record IntersectionCorner(Polygon2 Tri, int RoadA, bool LeftA, int RoadB, bool LeftB, Vec2 PA, Vec2 PB);
@@ -138,6 +141,21 @@ public sealed class IntersectionLayout
     /// reto), o maior dos dois lados. A faixa de pedestres começa nele.
     /// </summary>
     public Dictionary<(int Road, int Sign), double> TangentT { get; } = new();
+    /// <summary>Fim da curva de cada lado de ramo com esquina (via, sentido, +1 alto / −1 baixo); <see cref="TangentT"/> é o maior dos dois.</summary>
+    public Dictionary<(int Road, int Sign, int Side), double> SideTangentT { get; } = new();
+    /// <summary>
+    /// Esquina de cada ramo dono (via, sentido – lado alto dele): vértice V dos bordos retos, direções dos dois bordos a partir
+    /// de V (do ramo dono e do seguinte), raio da curva e ângulo entre os ramos.
+    /// </summary>
+    public Dictionary<(int Road, int Sign), CornerFillet> CornerFillets { get; } = new();
+    /// <summary>Fim da curva de cada lado antes das extensões de um lado só (que deslocam a curva da esquina).</summary>
+    public Dictionary<(int Road, int Sign, int Side), double> BaseSideTangentT { get; } = new();
+    /// <summary>
+    /// Ramos em que a curva da esquina foi deslocada por uma extensão de um lado só: o trecho entre o novo fim da curva e o
+    /// fim do ramo calculado pela pista antiga (<see cref="IntersectionLeg.Clear"/>) virou calçada – a travessia pode
+    /// começar no novo fim da curva.
+    /// </summary>
+    public Dictionary<(int Road, int Sign), double> ClearCap { get; } = new();
     /// <summary>Orelhas (avanços de calçada) das esquinas geradas com a interseção.</summary>
     public List<EarPlan> Ears { get; } = new();
     /// <summary>Trecho de cada lado de ramo (via, sentido, +1 alto / −1 baixo) coberto por orelha.</summary>
@@ -836,8 +854,11 @@ public static partial class IntersectionGenerator
     /// Do ponto livre do ramo (<see cref="IntersectionLeg.Clear"/>) ao fim da curva da esquina: o recuo da faixa é medido a
     /// partir do ponto de tangência – a faixa fica toda no trecho reto do meio-fio, o mais perto possível da esquina.
     /// </summary>
-    public static double TangentGap(IntersectionLayout L, IntersectionLeg leg) =>
-        L.TangentT.TryGetValue((leg.Road, leg.Sign), out var t) ? Math.Max(0, t - leg.Clear) : 0;
+    public static double TangentGap(IntersectionLayout L, IntersectionLeg leg)
+    {
+        var start = L.ClearCap.TryGetValue((leg.Road, leg.Sign), out var cap) ? Math.Min(leg.Clear, cap) : leg.Clear;
+        return (L.TangentT.TryGetValue((leg.Road, leg.Sign), out var t) ? Math.Max(start, t) : start) - leg.Clear;
+    }
 
     /// <summary>Distância do nó ao eixo da faixa de pedestres do ramo.</summary>
     public static double CrosswalkT(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
@@ -1392,14 +1413,16 @@ public static partial class IntersectionGenerator
             var w0 = b0 - a0;
             var V = a0 + ua * ((w0.X * ub.Y - w0.Y * ub.X) / den);
             var T = r / Math.Tan(span * Math.PI / 360);
-            void Keep(IntersectionLeg leg, Vec2 p)
+            void Keep(IntersectionLeg leg, int side, Vec2 p)
             {
                 var t = (p - node).Dot(leg.Dir);
                 var key = (leg.Road, leg.Sign);
                 L.TangentT[key] = L.TangentT.TryGetValue(key, out var old) ? Math.Max(old, t) : t;
+                L.SideTangentT[(leg.Road, leg.Sign, side)] = t;
             }
-            Keep(la, V + ua * T);
-            Keep(lb, V + ub * T);
+            Keep(la, 1, V + ua * T);
+            Keep(lb, -1, V + ub * T);
+            L.CornerFillets[(la.Road, la.Sign)] = new CornerFillet(V, ua, ub, r, span);
         }
 
         // 1ª passada: esquinas simples → ramos, via principal e tratamentos dos ramos.
@@ -1442,6 +1465,7 @@ public static partial class IntersectionGenerator
         // 2ª passada: pista final com esquinas (raio simples ou faixa de conversão livre).
         var U = PolygonOps.Union(own.SelectMany(x => x));
         var pavS = Corners(U, legs0, warn: true);
+        RefineTangents(L, legs0, pavS);
         var pav = pavS;
         var islands = new List<Polygon2>();
         var paintedIslands = new List<Polygon2>();
@@ -2191,6 +2215,7 @@ public static partial class IntersectionGenerator
                 pieces = pieces.SelectMany(p => PolygonOps.Difference(new[] { p.Shape }, rampBodies).Where(x => x.Area >= 0.01).Select(x => p with { Shape = x })).ToList();
             if (earFp.Count > 0)
                 pieces = pieces.SelectMany(p => NoEars(new List<Polygon2> { p.Shape }).Select(x => p with { Shape = x })).ToList();
+            pieces = TrimGrassSpikes(CornerGrass(L, pieces));
             // Sarjetas que as vias mantêm dentro da zona (junto ao meio-fio delas) também saem do pavimento da interseção.
             inside.AddRange(KeptGutters(L));
             // Sem lascas nem "espinhos" (diferença pista − sarjetas de vias em ângulo): abre/fecha 5 mm e descarta pisos < 0,01 m².
@@ -2205,7 +2230,7 @@ public static partial class IntersectionGenerator
                 if (left.Count > 0) good = Sound(PolygonOps.Union(good.Concat(left)));
                 Raised(good, L.PavementColor, L.PavementThickness, -L.PavementThickness);
             }
-            AddPieces(geo, pieces.SelectMany(p => Sound(new[] { p.Shape }).Select(x => p with { Shape = x })));
+            AddPieces(geo, HealWalk(pieces.SelectMany(p => Sound(new[] { p.Shape }).Select(x => p with { Shape = x })).ToList()));
         }
         else
         {
@@ -2215,8 +2240,10 @@ public static partial class IntersectionGenerator
             Raised(NoEars(L.Gutter), MarkingColor.Concreto, 0.005);
             if (L.SidewalkService.Count > 0)
             {
-                // Sobras da faixa gramada menores que 0,15 m² (junto à aba da rampa) ficam no passeio.
-                var service = L.SidewalkService.Where(p => p.Area >= 0.15).ToList();
+                // Sobras da faixa gramada menores que 0,15 m² (junto à aba da rampa) ficam no passeio; na curva da esquina a
+                // faixa fica inteira (concêntrica ao meio-fio) ou sai.
+                var service = CornerGrass(L, L.SidewalkService.Select(p => new MarkingPiece(p, MarkingColor.Grama) { Layer = "GRAMADO" }).ToList(), drop: true)
+                    .Select(p => p.Shape).Where(p => p.Area >= 0.15).ToList();
                 Raised(PolygonOps.Difference(L.Sidewalk, service), MarkingColor.Concreto, L.CurbHeight);
                 Raised(service, MarkingColor.Grama, L.CurbHeight);
             }
@@ -2235,7 +2262,179 @@ public static partial class IntersectionGenerator
         }
         geo.UnitCount = 1;
         geo.PathLength = L.Legs.Count;
+        // Centros exatos das curvas das esquinas (pelo eixo) e das curvas novas das extensões de um lado só: os contornos dos
+        // pisos usam esses centros nos arcos.
+        foreach (var f in L.CornerFillets.Values.Where(f => f.Span < 179 && f.R > 0.01))
+        {
+            var half = f.Span * Math.PI / 360;
+            geo.ArcCenters.Add(f.V + (f.Ua + f.Ub).Normalized() * (f.R / Math.Sin(half)));
+        }
+        foreach (var e in L.Ears.Where(e => e.Template.ArcCenters != null))
+            geo.ArcCenters.AddRange(e.Template.ArcCenters!.Where(c => geo.ArcCenters.All(x => x.DistanceTo(c) > 1e-6)));
         return geo;
+    }
+
+    /// <summary>
+    /// Setor da curva de uma esquina: do centro do arco do meio-fio, entre os raios que passam pelos dois fins da curva, até
+    /// bem além da calçada. Sem o arco calculado, o triângulo do nó pelos pontos da esquina.
+    /// </summary>
+    /// <summary>
+    /// Setor da curva de uma esquina: do centro do arco, entre os raios que passam pelos fins da curva, até pouco além do
+    /// meio-fio (a calçada da curva fica toda dentro do círculo; a pista, os canteiros e as outras esquinas, fora).
+    /// </summary>
+    private static (Polygon2 Poly, Vec2 Center) CurveSector(CornerFillet f)
+    {
+        var half = f.Span * Math.PI / 360;
+        var cc = f.V + (f.Ua + f.Ub).Normalized() * (f.R / Math.Sin(half));
+        var T = f.R / Math.Tan(half);
+        var ta = f.V + f.Ua * T;
+        var tb = f.V + f.Ub * T;
+        var a0 = Math.Atan2(ta.Y - cc.Y, ta.X - cc.X);
+        var a1 = Math.Atan2(tb.Y - cc.Y, tb.X - cc.X);
+        var da = a1 - a0;
+        while (da > Math.PI) da -= 2 * Math.PI;
+        while (da < -Math.PI) da += 2 * Math.PI;
+        var reach = (f.R + 0.3) / Math.Cos(Math.Abs(da) / 64);
+        var pts = new List<Vec2> { cc };
+        for (int i = 0; i <= 32; i++) pts.Add(cc + Vec2.FromAngle(a0 + da * i / 32) * reach);
+        return (new Polygon2(pts), cc);
+    }
+
+    /// <summary>
+    /// Faixa gramada na curva de cada esquina: fica só se ocupar inteira a faixa concêntrica ao meio-fio entre os fins da
+    /// curva (do raio de dentro ao de fora). Cortada pela quina do lote (raio grande para a largura da calçada), por uma rampa
+    /// junto à curva ou com largura variável, a esquina fica sem grama – passeio; a grama das vias termina nos raios dos fins
+    /// da curva, perpendicular ao meio-fio.
+    /// </summary>
+    private static List<MarkingPiece> CornerGrass(IntersectionLayout L, List<MarkingPiece> pieces, bool drop = false)
+    {
+        if (!pieces.Any(p => p.Layer == "GRAMADO")) return pieces;
+        var walk = pieces.FirstOrDefault(p => p.Layer == "CALCADA");
+        if (walk == null && !drop) return pieces;
+        var res = pieces;
+        foreach (var f in L.CornerFillets.Values.Where(f => f.Span < 179 && f.R > 0.01))
+        {
+            var (sector, cc) = CurveSector(f);
+            var grass = res.Where(p => p.Layer == "GRAMADO").ToList();
+            var inSec = PolygonOps.Intersect(grass.Select(p => p.Shape), new[] { sector }).Where(p => p.Area > 0.01).ToList();
+            if (inSec.Count == 0) continue;
+            var ds = inSec.SelectMany(p => p.Outer).Select(v => v.DistanceTo(cc)).Where(x => x > 0.2).ToList();
+            if (ds.Count == 0) continue;
+            var (r0, r1) = (ds.Min(), ds.Max());
+            var ring = PolygonOps.Intersect(PolygonOps.Difference(new[] { new Polygon2(CurveTools.Circle(cc, r1, 0.002)) },
+                new[] { new Polygon2(CurveTools.Circle(cc, r0, 0.002)) }), new[] { sector });
+            var gap = PolygonOps.TotalArea(ring) - PolygonOps.TotalArea(inSec);
+            if (gap <= Math.Max(0.05, 0.02 * PolygonOps.TotalArea(ring))) continue;
+            var next = new List<MarkingPiece>();
+            var freed = new List<Polygon2>();
+            foreach (var p in res)
+            {
+                if (p.Layer != "GRAMADO") { next.Add(p); continue; }
+                // Sobras finas fora do setor ficam como grama: a limpeza das pontas (TrimGrassSpikes) as passa ao passeio.
+                next.AddRange(PolygonOps.Difference(new[] { p.Shape }, new[] { sector }).Where(x => x.Area > 1e-6).Select(x => p with { Shape = x }));
+                if (!drop) freed.AddRange(PolygonOps.Intersect(new[] { p.Shape }, new[] { sector }).Where(x => x.Area > 1e-6));
+            }
+            if (!drop) MergeWalk(next, freed, walk!);
+            res = next;
+        }
+        return res;
+    }
+
+    /// <summary>
+    /// Passa ao passeio as áreas que eram grama: cada uma se funde às peças de passeio que toca (mesmo piso) – o corte sobre a
+    /// divisa grama/passeio cai a décimos de milímetro do bordo do passeio e a união das duas peças ficaria com uma fresta
+    /// (ponta de 0°), que sai sem mexer no resto do contorno.
+    /// </summary>
+    private static void MergeWalk(List<MarkingPiece> pieces, IEnumerable<Polygon2> freed, MarkingPiece walk)
+    {
+        foreach (var x in freed)
+        {
+            var near = PolygonOps.Offset(new[] { x }, 0.01);
+            var touch = pieces.Where(q => q.Layer == "CALCADA" && PolygonOps.TotalArea(PolygonOps.Intersect(new[] { q.Shape }, near)) > 1e-7).ToList();
+            var attr = touch.FirstOrDefault() ?? walk;
+            var key = Model.ElementPlan.FloorKey(attr);
+            touch = touch.Where(q => Model.ElementPlan.FloorKey(q).Equals(key)).ToList();
+            foreach (var q in touch) pieces.Remove(q);
+            var merged = PolygonOps.Union(touch.Select(q => q.Shape).Append(x)).Select(Despur);
+            pieces.AddRange(merged.Where(m => m.Area > 1e-6).Select(m => attr with { Shape = m }));
+        }
+    }
+
+    /// <summary>
+    /// Passeio sem frestas: as peças de passeio do mesmo piso viram um piso só no Revit; onde duas se encontram com bordos
+    /// quase coincidentes (fresta de 0°, junto a uma rampa ou a um corte), o piso unido sai sem a fresta. As demais peças
+    /// ficam como estão.
+    /// </summary>
+    private static List<MarkingPiece> HealWalk(List<MarkingPiece> pieces)
+    {
+        bool Flat(MarkingPiece p) => p.Layer == "CALCADA" && p.Solid == null && p.Profile == null && p.Round == null;
+        var res = pieces.Where(p => !Flat(p)).ToList();
+        foreach (var g in pieces.Where(Flat).GroupBy(Model.ElementPlan.FloorKey))
+        {
+            var group = g.ToList();
+            foreach (var u in PolygonOps.Union(group.Select(p => p.Shape)))
+            {
+                var mine = group.Where(p => PolygonOps.TotalArea(PolygonOps.Intersect(new[] { p.Shape }, new[] { u })) > 1e-6).ToList();
+                var d = Despur(u);
+                if (d.Outer.Count == u.Outer.Count && d.Holes.Count == u.Holes.Count && d.Holes.Zip(u.Holes).All(h => h.First.Count == h.Second.Count)) { res.AddRange(mine); continue; }
+                res.Add(mine[0] with { Shape = d });
+            }
+        }
+        return res;
+    }
+
+    /// <summary>Tira do contorno os vértices de ida e volta (ângulo interno &lt; 2°: fresta ou espinho de largura nula).</summary>
+    private static Polygon2 Despur(Polygon2 p)
+    {
+        static List<Vec2> Ring(IReadOnlyList<Vec2> r)
+        {
+            var v = r.ToList();
+            for (var changed = true; changed && v.Count > 3;)
+            {
+                changed = false;
+                for (int i = 0; i < v.Count && v.Count > 3; i++)
+                {
+                    var a = v[(i - 1 + v.Count) % v.Count];
+                    var b = v[i];
+                    var c = v[(i + 1) % v.Count];
+                    var (u, w) = (a - b, c - b);
+                    if (u.Length < 1e-9 || w.Length < 1e-9 || Math.Acos(Math.Clamp(u.Normalized().Dot(w.Normalized()), -1, 1)) < 2 * Math.PI / 180)
+                    {
+                        v.RemoveAt(i);
+                        changed = true;
+                        i--;
+                    }
+                }
+            }
+            return v;
+        }
+        return new Polygon2(Ring(p.Outer), p.Holes.Select(h => (IEnumerable<Vec2>)Ring(h)).Where(h => h.Count() >= 3));
+    }
+
+    /// <summary>
+    /// Faixa gramada sem pontas: onde uma rampa junto ao fim da curva (ou a face de uma extensão) corta a grama de viés, a
+    /// ponta fina (menos de 16 cm de largura) passa para o passeio vizinho; sobras menores que 0,15 m² também.
+    /// </summary>
+    private static List<MarkingPiece> TrimGrassSpikes(List<MarkingPiece> pieces)
+    {
+        var walk = pieces.FirstOrDefault(p => p.Layer == "CALCADA");
+        if (walk == null) return pieces;
+        var res = new List<MarkingPiece>();
+        var freed = new List<Polygon2>();
+        foreach (var p in pieces)
+        {
+            if (p.Layer != "GRAMADO") { res.Add(p); continue; }
+            // Sobra de grama menor que 0,15 m² (entre o fim da curva e a aba da rampa) fica no passeio, como sem o perfil das vias.
+            if (p.Shape.Area < 0.15) { freed.Add(p.Shape); continue; }
+            var opened = PolygonOps.Offset(PolygonOps.Offset(new[] { p.Shape }, -0.08, true), 0.08, true)
+                .Select(x => PolygonOps.Intersect(new[] { x }, new[] { p.Shape })).SelectMany(x => x).Where(x => x.Area > 1e-3).ToList();
+            var lost = PolygonOps.Difference(new[] { p.Shape }, opened).Where(x => x.Area > 1e-6).ToList();
+            if (PolygonOps.TotalArea(lost) < 1e-4) { res.Add(p); continue; }
+            res.AddRange(opened.Select(x => p with { Shape = x }));
+            freed.AddRange(lost);
+        }
+        MergeWalk(res, freed, walk);
+        return res;
     }
 
     /// <summary>
@@ -2557,6 +2756,77 @@ public static partial class IntersectionGenerator
     }
 
     // ------------------------------------------------------------------ sinalização da interseção
+
+    /// <summary>
+    /// Confere o fim da curva de cada esquina na pista já com as esquinas. O cálculo pelo vértice V supõe os bordos retos até
+    /// V, o que não vale quando um ramo começa no nó (T oblíquo com via de mão única: a tampa do ramo muda o canto que o arco
+    /// arredonda e o fim da curva ficava 0,4 m longe do real). Medido onde o bordo deixa a reta; com diferença acima de 5 cm
+    /// vale a medida.
+    /// </summary>
+    private static void RefineTangents(IntersectionLayout L, IReadOnlyList<IntersectionLeg> legs, List<Polygon2> pav)
+    {
+        var changed = false;
+        foreach (var ((road, sign, side), t0) in L.SideTangentT.ToList())
+        {
+            var leg = legs.FirstOrDefault(l => l.Road == road && l.Sign == sign);
+            if (leg == null || MeasuredTangent(L, leg, side, pav, t0) is not { } t || Math.Abs(t - t0) < 0.05) continue;
+            L.SideTangentT[(road, sign, side)] = t;
+            changed = true;
+        }
+        if (!changed) return;
+        foreach (var g in L.SideTangentT.GroupBy(x => (x.Key.Road, x.Key.Sign)))
+            L.TangentT[g.Key] = g.Max(x => x.Value);
+    }
+
+    /// <summary>
+    /// Fim da curva medido num lado do ramo: a partir do trecho reto, indo para o nó, o afastamento δ do bordo cresce como
+    /// Δ²/2R; ajuste linear de √δ (0,06 a 0,60 m – abaixo disso pesa a tesselação do arco) e o zero da reta. Nulo quando o
+    /// bordo não é reto junto à estimativa ou os pontos não formam um arco.
+    /// </summary>
+    private static double? MeasuredTangent(IntersectionLayout L, IntersectionLeg leg, int side, List<Polygon2> pav, double tGuess)
+    {
+        double Edge(double t)
+        {
+            var e = side > 0 ? L.HiEdge(leg, t) : L.LoEdge(leg, t);
+            var back = (side > 0 ? L.LoEdge(leg, t) : L.HiEdge(leg, t)) / 2;
+            var a = L.At(leg, t, side * (e + 3));
+            var b = L.At(leg, t, -side * back);
+            var best = double.NaN;
+            foreach (var p in pav)
+                foreach (var iv in DetailGenerator.SegmentIntervals(p, a, b))
+                    if (double.IsNaN(best) || iv.T0 < best) best = iv.T0;
+            return double.IsNaN(best) ? double.NaN : (e + 3 + back) * (1 - best) - back;
+        }
+        // Referência no trecho reto: a partir de 2 m além da estimativa, avançando de metro em metro até o bordo ficar reto
+        // (a estimativa pelo vértice pode ficar no meio da curva).
+        var tRef = tGuess + 2.0;
+        var o0 = Edge(tRef);
+        var max = MaxT(L, leg) - 2;
+        while (tRef < Math.Min(tGuess + 15, max) && (double.IsNaN(o0) || Math.Abs(Edge(tRef + 1.0) - o0) > 0.003))
+        {
+            tRef += 1.0;
+            o0 = Edge(tRef);
+        }
+        if (double.IsNaN(o0) || Math.Abs(Edge(tRef + 1.0) - o0) > 0.003) return null;
+        var xs = new List<double>();
+        var ys = new List<double>();
+        for (var t = tRef; t > Math.Max(-6, tGuess - 8); t -= 0.02)
+        {
+            var o = Edge(t);
+            if (double.IsNaN(o)) continue;
+            var dlt = Math.Abs(o - o0);
+            if (dlt > 0.60) break;
+            if (dlt > 0.06) { xs.Add(t); ys.Add(Math.Sqrt(dlt)); }
+        }
+        if (xs.Count < 6) return null;
+        var mx = xs.Average();
+        var my = ys.Average();
+        var sxx = xs.Sum(x => (x - mx) * (x - mx));
+        var k = xs.Zip(ys, (x, y) => (x - mx) * (y - my)).Sum() / sxx;
+        if (k > -1e-6) return null;
+        var res = xs.Zip(ys, (x, y) => Math.Abs(my + k * (x - mx) - y)).Max();
+        return res > 0.03 ? null : mx - my / k;
+    }
 
     private static readonly string[] NotShifted = { "FTP-1", "FTP-2", "LRE", "LDP", "MCC", "LRV" };
 

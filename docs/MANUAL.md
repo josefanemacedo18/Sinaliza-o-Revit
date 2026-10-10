@@ -632,6 +632,12 @@ Painel **Representação no Revit** (em todas as janelas):
   corda antiga se afastava dela. Polígonos de verdade (octógono da placa, chanfros) continuam com cantos: só viram arco
   as sequências em que cada corda gira até 12°. Pisos que acompanham o terreno por edição de forma mantêm os vértices
   (são os pontos de apoio da deformação).
+  **Uma curva = um arco, com o centro e o raio da geração**: as esquinas das interseções, as curvas das extensões de
+  calçada (inclusive a curva nova da extensão de um lado só) e as demais curvas cujo centro o gerador conhece entram no
+  contorno com **esse centro e esse raio** (± 1 mm), **tangentes às retas vizinhas** e sem segmentos menores que a
+  tolerância de curva do Revit (*ShortCurveTolerance* × 1,5). Uma curva não é mais quebrada em vários arcos do mesmo
+  círculo. Onde o centro não vem da geração (contorno livre, piso desenhado à mão), o arco é reconstruído dos pontos por
+  **mínimos quadrados** (sem o viés dos 3 pontos), dentro do desvio configurado; spline só onde nenhum arco cabe.
   **Regeneração mais rápida**: ao atualizar a via, os pisos que saem iguais (mesmo contorno, tipo, nível, cota e
   inclinação) são **mantidos**, sem apagar e recriar; a inclinação dos pisos no greide é feita para todos de uma vez (uma
   regeneração do Revit por marca, não uma por piso).
@@ -747,7 +753,16 @@ amostra do material (pavimento, concreto, grama). A coluna de cor foi retirada d
 
 **Tabela no Revit.** *Criar tabela no Revit* e *Tabelas por categoria* abrem a tabela criada e mostram um resumo com o
 nome e o número de linhas de cada uma (Navegador de projeto → Tabelas/Quantidades); se algo impedir a criação, o motivo
-aparece na mensagem.
+aparece na mensagem. O comando roda com **qualquer vista ativa, inclusive uma folha**, e pergunta **em que folha colocar**:
+*Nova folha* (como antes, SV-Q01), **uma folha existente** (a ativa vem marcada, com a opção de **clicar a posição**) ou
+*Não colocar agora*. Na folha, cada tabela vai para um **lugar livre no alto à direita** (sem cobrir vistas, outras
+tabelas nem o canto do carimbo). A Tabela é do próprio Revit: **atualiza-se sozinha** e pode ser arrastada do Navegador de
+projeto para outras folhas.
+
+**Placas empilhadas.** Na janela de quantitativos, no memorial, no quadro de placas e na legenda **cada placa conta**
+(R-1 com uma R-19 embaixo = 1 R-1 + 1 R-19). Na **Tabela nativa do Revit**, que conta elementos, um suporte com placas
+empilhadas aparece como **um item com o código da placa principal** – use o *Quadro de Placas* (seção 16) quando precisar
+da contagem placa a placa na folha.
 
 **Exportação Excel (.xlsx).** Botão principal da janela: planilha formatada como a janela – título e dados do projeto,
 um bloco por categoria com as subcategorias, **miniatura de cada item**, colunas fixas e alinhadas (item, código,
@@ -849,6 +864,22 @@ coluna) ou mova com **Mover**: na próxima atualização (Atualizar, edição da
 na placa – ele **não é desfeito**. Placas de projetos anteriores (uma forma por cor) viram um elemento só na primeira
 atualização; o giro passa a ser lido a partir daí.
 
+**Placa personalizada (guardada no projeto).** Na janela de placas, **Nova placa personalizada…** cria uma placa com
+**código** e **nome** próprios, **categoria**, **forma** (retângulo, quadrado, círculo, losango, octógono, triângulo
+invertido), **largura e altura**, **cor de fundo, da orla e da legenda**, **linhas de texto** (uma por linha) e
+**pictograma** de qualquer placa do catálogo – ou *(nenhum)*. Com pictograma e texto, o pictograma vai num quadrado à
+esquerda (placa larga) ou em cima, e as linhas de texto no resto; a janela mostra a prévia da face. A placa fica
+**guardada no projeto** (Informações do projeto) e aparece na lista da categoria escolhida para reutilizar – também ao
+editar placas. O código não pode ser o de uma placa do catálogo normativo. Ela entra na legenda, no detalhe, no quadro
+de placas, no memorial e nos quantitativos como qualquer placa.
+
+**Placas no mesmo suporte (empilhadas).** No bloco **Placas no mesmo suporte**, digite os códigos das placas que vão
+**abaixo da principal**, de cima para baixo, separados por ponto e vírgula (ex.: `R-19; PP-1`), e o **espaço entre
+placas** (padrão 0,05 m [a confirmar]). O suporte é um só; a **altura livre** passa a valer **sob a placa mais baixa** e a
+coluna vai até o topo da mais alta. **Editar** a placa refaz o conjunto. Cada placa conta na legenda, no **Detalhar
+Placa** (todas desenhadas, com as cotas de cada uma, do espaço entre elas e a nota *No mesmo suporte: …*), no quadro de
+placas e nos quantitativos. Placas de projetos salvos (sem pilha) continuam iguais.
+
 Os pictogramas são esquemáticos e reconhecíveis; para o desenho oficial exato, confira a edição
 vigente do manual. O catálogo pode ser alterado (seção `placas`, campo `pictograma` – ver
 [CATALOGO.md](CATALOGO.md)).
@@ -947,7 +978,9 @@ ciclofaixa, as interseções passam a ter a MCC e o trecho seccionado.
 
 ## 16. Detalhamento (pranchas de sinalização)
 
-Todos os comandos trabalham na **vista ativa** (planta de piso/implantação ou vista de desenho). As
+Os comandos de detalhe trabalham na **vista ativa** (planta de piso/implantação ou vista de desenho) – exceto a
+**legenda de placas, o quadro de placas e o quadro de quantitativos**, que por padrão vão para uma **vista própria**
+(seção 16.0) e rodam com qualquer vista ativa, inclusive uma folha. As
 medidas são em **milímetros de papel** × escala da vista (12 mm a 1:200 = 2,40 m no modelo; texto de 2,5 mm a 1:500 =
 1,25 m). Os textos são **notas de texto nativas** do Revit ("SV - Texto x mm"), que já seguem a escala; símbolos,
 quadros, cotas e perfis são linhas e regiões de detalhe. **Mudando a escala da vista**, cotas de seção, perfis,
@@ -1015,7 +1048,7 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   de exemplo.
 * **Detalhe Típico**: terminal das cotas (traço/seta/ponto), título sublinhado e moldura opcional.
 * **Quadro de Quantitativos**: coluna **ITEM** numerada por categoria (1.1, 1.2… 7.3), como em
-  planilha orçamentária.
+  planilha orçamentária. Vai para uma vista própria (seção 16.0) ou para a vista ativa.
 * **Notas Gerais**: **modelos de notas** prontos – geral, sinalização horizontal (tintas, microesferas
   NBR 16184, retrorrefletância), sinalização vertical (NBR 14644, suportes, altura livre), acessibilidade
   (NBR 9050/16537), obras (MBST Vol. VII) e urbanização – editáveis.
@@ -1024,9 +1057,10 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   texto deve ficar. O texto automático traz código e nome e, opcionalmente, detalhes (variante/
   largura da linha, barras e espaçamento do zebrado, dimensões da vaga, espaçamento dos
   dispositivos, inclinação da rampa...). Um texto livre pode substituir o automático.
-* **Quadro de Legenda**: clique o canto superior esquerdo. Lista **somente as placas** (sinalização
-  vertical) do projeto – uma linha por tipo de placa, com o desenho e a descrição, em ordem:
-  regulamentação, advertência, indicação e demais. Atualiza-se quando placas são criadas ou removidas.
+* **Quadro de Legenda**: lista **somente as placas** (sinalização vertical) do projeto – uma linha por tipo de placa
+  (as empilhadas também), com o desenho e a descrição, em ordem: regulamentação, advertência, indicação e demais. Vai
+  para uma vista própria (seção 16.0) ou, escolhendo *Na vista ativa*, para o canto clicado na planta. Atualiza-se quando
+  placas são criadas, editadas ou **apagadas**.
 
 Legenda, quadros e cotas de seção acompanham o projeto: são regenerados quando as marcas são
 criadas, editadas ou quando os eixos mudam (e com **Atualizar Todas**). Todos podem ser editados com
@@ -1035,6 +1069,35 @@ criadas, editadas ou quando os eixos mudam (e com **Atualizar Todas**). Todos po
 Dica: para pranchas, combine a sinalização em 3D (vista de planta com os sólidos) com os detalhes
 de placas e o quadro de legenda – ou converta a sinalização horizontal para 2D (**Alternar 2D/3D**)
 em uma vista dedicada.
+
+### 16.0 Legenda e quadros em vista própria (independentes da vista)
+
+**Quadro de Legenda**, **Quadro de Placas** e **Quadro de Quantitativos** leem o **projeto inteiro** e não dependem de
+nenhuma planta: depois das opções do quadro, a janela **Onde gerar** oferece
+
+* **Vista própria – Legenda do Revit** (padrão), com o nome da vista (ex.: *SV - Legenda de placas*, *SV - Quadro de
+  placas*, *SV - Quadro de quantitativos – Sinalização vertical*), ou *Na vista ativa* (o comportamento antigo – só numa
+  planta ou vista de desenho);
+* **Colocar na folha**: *Não colocar agora*, *Nova folha* ou **qualquer folha do projeto**. Se a folha escolhida é a
+  ativa, dá para **clicar o canto** do quadro; senão ele vai para um **lugar livre no alto à direita**, sem cobrir as
+  vistas, as tabelas e o canto do carimbo (reserva aproximada de 185 × 60 mm – arraste se o seu carimbo for outro).
+
+**Por que vista de Legenda.** A **Legenda** do Revit não pertence a nível nem região de corte, **pode ir para várias folhas
+ao mesmo tempo** (plantas e vistas de desenho vão para uma só) e aceita as linhas, regiões e textos que desenham a face
+de cada placa – o que a **Tabela** do Revit não faz (ela só mostra imagens, e só na folha). Para quantidades que o
+próprio Revit calcula, continua a **Tabela nativa** (seção 10), que também vai para a folha escolhida. A API do Revit
+**não cria uma Legenda do zero**: o plugin duplica uma Legenda que já exista no projeto. Sem nenhuma, o quadro vai para
+uma **vista de desenho** (uma folha por vez) e a mensagem explica: crie uma vez *Vista → Legendas → Legenda* (pode ficar
+vazia) e gere o quadro de novo.
+
+**Mesmo conteúdo em qualquer escala.** O conteúdo (linhas, placas, códigos, descrições e quantidades) é o mesmo da
+planta, em qualquer escala: o tamanho é em mm de papel e as amostras das placas são montadas no tamanho real antes de
+irem para o quadro (antes, a precisão das operações dependia da escala e o mesmo quadro saía com peças diferentes em
+1:100 e 1:250). A vista própria usa 1:100; mudar a escala dela refaz o quadro do mesmo tamanho no papel.
+
+**Sempre atualizado.** O quadro se refaz quando marcas são criadas, editadas, movidas pela via ou **apagadas**, e com
+**Atualizar Todas**. Na folha, ele cresce a partir do canto superior esquerdo. Para pôr a mesma Legenda em outra folha,
+arraste-a do Navegador de projeto (*Legendas*). **Editar** um quadro: abra a vista dele, selecione e use **Editar**.
 
 ### 16.1 Pranchas
 
@@ -1181,7 +1244,10 @@ automaticamente. A interseção:
   curva avançaria 3,7 R e o asfalto engoliria a esquina) – e o relatório avisa (*Esquina aguda (30°): raio reduzido de
   6,0 m para 1,61 m*);
 * refaz as **calçadas** junto à esquina – **contornando a curva** com a largura da calçada – e as **pontas
-  dos canteiros centrais** (nariz arredondado com meio-fio, terminando 1 m antes da pista transversal – § 19.1.5);
+  dos canteiros centrais** (nariz arredondado com meio-fio, terminando 1 m antes da pista transversal – § 19.1.5).
+  A quina do lote continua reta; a **faixa de serviço/gramada** acompanha a curva **concêntrica ao meio-fio** ou, onde não
+  caberia inteira (quina do lote cortando a faixa num raio grande, rampa junto à curva, largura variável), **sai da
+  esquina** e ali fica passeio – a grama das vias termina nos raios dos fins da curva, sem pontas finas;
   a travessia atravessa o canteiro por **rampas com patamar** (canteiro largo) ou por uma **passagem rebaixada** no
   nível da pista com piso tátil de alerta (canteiro estreito);
 * interrompe a sinalização horizontal das vias no cruzamento e na aproximação (até depois da linha de
@@ -1191,6 +1257,15 @@ automaticamente. A interseção:
   faixa junto à esquina fica no **fim da curva** do meio-fio (ponto de tangência), com a rampa no meio-fio reto; o
   campo **Recuo da faixa** (padrão **0**) soma um afastamento a partir desse ponto. Um recuo maior só acontece quando a
   rampa ou a extensão de calçada exige, e sempre com aviso. Projetos salvos guardam o recuo que tinham (o padrão antigo era 1 m).
+  **Na ponta da esquina, em qualquer interseção** (T, cruz, oblíqua, com canteiro central, com extensões, ramos de
+  larguras diferentes): sem rampas, a borda da faixa fica a até **0,30 m do fim da curva**; com rampas, a rampa tem a
+  largura da faixa, fica **inteira no meio-fio reto** e a ponta dela (aba ou rampa lateral) termina **junto ao fim da curva
+  (até 0,30 m)** – quando as abas não cabem antes da curva, a faixa recua só o necessário para isso. Logo atrás vêm a
+  **linha de retenção** (1,60 m livres da faixa), o **PARE** pintado (1,60 m antes da retenção) e a **placa R-1** na
+  calçada da esquina, alinhada com a retenção – o motorista para o mais perto possível da esquina, com visão das vias
+  transversais. O fim da curva é o **medido na pista gerada** (em T oblíquo com via de mão única o cálculo pelo vértice
+  dos bordos ficava até 0,4 m longe); com **canteiro central**, a faixa nunca fica antes do ponto em que o ramo deixa a
+  pista da outra via; com **extensão de um lado só**, a travessia acompanha o novo fim da curva (§ 19.1.4).
 
 Funciona para **qualquer geometria**: cruzamentos ortogonais ou oblíquos, entroncamentos em **T** e em
 **Y**, vias curvas e nós com vários ramos. Em ângulos agudos as esquinas continuam arredondadas.
@@ -1326,6 +1401,13 @@ esquina – CTB art. 181):
   uma extensão **ao longo do meio-fio reto**, cobrindo a faixa e as rampas, com a **rampa no eixo da faixa**: a travessia
   encurta **dos dois lados** (2 × o avanço da face). Vem marcada quando a janela ainda não tem uma escolha lembrada (depois
   ela lembra a última); interseções de projetos salvos continuam sem ela até que a opção seja ligada.
+
+**Extensão de um lado só.** Quando a extensão existe só num dos lados da esquina (a outra via sem estacionamento, ou
+avanço 0 naquele lado), ela **nasce da curva da esquina**: a curva, com o mesmo raio, passa a ser tangente ao meio-fio da
+outra via e à **face da extensão**, e a extensão segue paralela à via até a ponta, onde volta ao alinhamento normal com a
+transição escolhida (curva reversa com raio ou chanfro) – sem degrau nem bico. Faixa de pedestres, rampas e piso tátil
+acompanham o **novo fim da curva** dos dois ramos; o meio-fio e a sarjeta contornam a face nova, e o contorno do piso
+usa os arcos com os centros exatos (a curva da esquina e a nova).
 
 **Personalização por extensão** (bloco *Ajustes por esquina*, a esquina à direita de quem chega pelo ramo): **extensão
 sim/não**, **avanço neste ramo** e **na outra via** (−1 = geral; 0 = sem extensão daquele lado), **terminar no

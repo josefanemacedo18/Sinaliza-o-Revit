@@ -106,8 +106,8 @@ public static class RibbonBuilder
             Data(typeof(CmdPlacas), "Placas", "placa", "Placas de regulamentação, advertência, indicação, educativas, turísticas e de obras, com suporte – em 3D."),
             Data(typeof(CmdDetalharPlacas), "Detalhar Placas", "detalheplaca", "Placa ampliada ao lado do suporte, com chamada (reta, cotovelo ou livre), código/nome e número em balão."),
             Data(typeof(CmdMoverChamadaPlaca), "Mover Chamada de Placa", "detalheplaca", "Leve o símbolo detalhado para onde quiser e desenhe a linha de chamada clicando os vértices – ou mude a ponta da chamada."),
-            Data(typeof(CmdQuadroPlacas), "Quadro de Placas", "quadroplacas", "Símbolo, numeração, código, descrição, dimensões e quantidade de cada placa."),
-            Data(typeof(CmdQuadroLegenda), "Quadro de Legenda", "quadrolegenda", "Legenda das placas do projeto, com desenho e descrição."));
+            Data(typeof(CmdQuadroPlacas), "Quadro de Placas", "quadroplacas", "Símbolo, numeração, código, descrição, dimensões e quantidade de cada placa – numa Legenda própria (qualquer vista ativa, inclusive folha) ou na vista ativa."),
+            Data(typeof(CmdQuadroLegenda), "Quadro de Legenda", "quadrolegenda", "Legenda das placas do projeto, com desenho e descrição – numa Legenda própria que vai para várias folhas e se atualiza sozinha."));
         Split(vert, "SvBloqueios", "Bloqueios Físicos",
             Data(typeof(CmdDispositivos), "Bloqueios Físicos", "bloqueio",
                 "Todos os dispositivos físicos numa só ferramenta: tachas e tachões refletivos, segregadores, balizadores, pilaretes e frades, New Jersey, " +
@@ -123,7 +123,7 @@ public static class RibbonBuilder
             Data(typeof(CmdAnotar), "Anotar", "anotar", "Chamada com texto automático para qualquer sinalização."),
             Data(typeof(CmdCotarSecao), "Cotar Seção", "cotasecao", "Um clique sobre a via: perfil transversal em corte (camadas, níveis, caimento, cotas horizontais e verticais, materiais) + cotas e marcas do corte na planta."),
             Data(typeof(CmdDetalheTipico), "Detalhe Típico", "detalhetipico", "Detalhe ampliado e cotado de uma marca ou placa."),
-            Data(typeof(CmdQuadroQuantitativos), "Quadro de Quantitativos", "quadroqtd", "Tabela de quantidades desenhada na prancha."),
+            Data(typeof(CmdQuadroQuantitativos), "Quadro de Quantitativos", "quadroqtd", "Quadro de quantidades do projeto – numa Legenda própria (colocada direto na folha escolhida) ou na vista ativa."),
             Data(typeof(CmdNotas), "Notas Gerais", "notas", "Bloco de notas numeradas do projeto."),
             Data(typeof(CmdNorte), "Norte", "norte", "Indicação de norte."));
         Large(det, typeof(CmdPranchas), "Pranchas", "pranchas",

@@ -264,6 +264,12 @@ public sealed class MarkingGeometry
     public List<GradePad> Pads { get; } = new();
 
     /// <summary>
+    /// Centros exatos das curvas do traçado (curvas das esquinas, dados pelo eixo): no contorno do piso, o arco ajustado
+    /// perto de um deles usa esse centro (ver <see cref="Geometry.BoundaryFit.Fit"/>). Só em memória – não é gravado.
+    /// </summary>
+    public List<Vec2> ArcCenters { get; } = new();
+
+    /// <summary>
     /// Acabamentos do terreno nativo (grama de taludes, ilhas, canteiros): viram subdivisões do Toposolid com o material da
     /// cor indicada – em vez de sólidos sobre o terreno.
     /// </summary>
@@ -275,6 +281,7 @@ public sealed class MarkingGeometry
         Annotations.AddRange(other.Annotations);
         Corridors.AddRange(other.Corridors);
         Pads.AddRange(other.Pads);
+        ArcCenters.AddRange(other.ArcCenters);
         TerrainFinishes.AddRange(other.TerrainFinishes);
         PaintedLength += other.PaintedLength;
         UnitCount += other.UnitCount;

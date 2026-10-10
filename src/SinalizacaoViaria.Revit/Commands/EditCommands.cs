@@ -181,7 +181,7 @@ public sealed class CmdEditar : CommandBase
             ParkingMarkingDefinition p => Show(new ParkingWindow(p), w => w.Result),
             RepeatedMarkingDefinition r => Show(new RepeatedWindow(r), w => w.Result),
             DeviceMarkingDefinition dv => Show(new DeviceWindow(dv), w => w.Result),
-            SignDefinition sg => Show(new SignWindow(sg), w => w.Result),
+            SignDefinition sg => EditSign(uidoc.Document, sg),
             UrbanElementDefinition ue => Show(new UrbanWindow(ue), w => w.Result),
             RampDefinition rp => Show(new RampWindow(rp), w => w.Result),
             TrafficCalmingDefinition tc => Show(new CalmingWindow(tc), w => w.Result),
@@ -308,6 +308,16 @@ public sealed class CmdEditar : CommandBase
 
     private static double DetailScale(UIDocument uidoc, MarkingDefinition d) =>
         (!string.IsNullOrEmpty(d.Output.ViewId) ? uidoc.Document.GetElement(d.Output.ViewId) as View : null)?.Scale ?? uidoc.ActiveView.Scale;
+
+    /// <summary>Edição da placa: as placas personalizadas do projeto entram na lista e as criadas na janela ficam guardadas.</summary>
+    private static SignDefinition? EditSign(Document doc, SignDefinition sg)
+    {
+        CustomSignStore.Apply(doc);
+        var w = new SignWindow(sg);
+        var ok = UiHelpers.ShowModal(w) == true;
+        if (w.NewCustomSigns.Count > 0) CustomSignStore.Save(doc, w.NewCustomSigns);
+        return ok ? w.Result : null;
+    }
 
     private static MarkingDefinition? Show<TW>(TW w, Func<TW, MarkingDefinition?> result) where TW : System.Windows.Window =>
         UiHelpers.ShowModal(w) == true ? result(w) : null;

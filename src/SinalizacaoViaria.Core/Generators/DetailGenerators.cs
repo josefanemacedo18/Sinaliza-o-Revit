@@ -169,7 +169,8 @@ public static partial class DetailGenerator
             DeviceMarkingDefinition dv when cat.Dispositivo(dv.Code) is { } t =>
                 (dv.Spacing ?? t.Espacamento) <= 0 ? "contínuo" : $"a cada {F(dv.Spacing ?? t.Espacamento)} m",
             SignDefinition sg when cat.Placa(sg.Code) is { } t =>
-                $"{F(sg.Width ?? t.Largura)} m – altura livre {F(sg.MountHeight)} m",
+                $"{F(sg.Width ?? t.Largura)} m – altura livre {F(sg.MountHeight)} m"
+                + (sg.Stack is { Count: > 0 } st ? $"\n+ {string.Join(", ", st.Select(x => x.Code))} no mesmo suporte" : ""),
             RampDefinition r => $"largura {F(r.Width)} m – i = {F(r.Slope * 100, "0.##")} %",
             TrafficCalmingDefinition tc =>
                 $"{F(tc.Length ?? TrafficCalmingGenerator.Defaults(tc.Type).Length)} × {F(tc.Height ?? TrafficCalmingGenerator.Defaults(tc.Type).Height)} m",
@@ -218,6 +219,8 @@ public static partial class DetailGenerator
         // Legenda de uma prancha: só as placas dentro da região do trecho.
         if (SheetRegion(lg.SheetSegmentId, ctx) is { } region)
             all = all.Where(d => d is not SignDefinition s || region.Contains(s.Position)).ToList();
+        // Placas empilhadas no mesmo suporte entram como placas avulsas.
+        all = all.SelectMany(d => d is SignDefinition sg ? SignStack.Plates(sg).Cast<MarkingDefinition>() : new[] { d }).ToList();
         var rows = all.Where(d => Include(d, lg))
             .GroupBy(RowKey).Select(g => g.First())
             .Select(d => (Def: d, Info: MarkingBuilder.Describe(d, ctx.Catalog)))
@@ -371,17 +374,19 @@ public static partial class DetailGenerator
         var s = Math.Min(bw / Math.Max(1e-6, mx.X - mn.X), bh / Math.Max(1e-6, mx.Y - mn.Y));
         var c = (mn + mx) / 2;
         var bc = (boxMin + boxMax) / 2;
-        var placed = sample.Pieces.Select(p => new MarkingPiece(p.Shape.Transform(v => bc + (v - c) * s), p.Color)).ToList();
+        // União e fundo calculados no tamanho real da amostra e só depois levados ao quadro: a precisão fixa das operações
+        // (0,1 mm) não pode depender da escala da vista – senão o mesmo quadro sai com peças diferentes em 1:100 e 1:250.
+        Polygon2 Place(Polygon2 p) => p.Transform(v => bc + (v - c) * s);
         if (paintBackground)
         {
-            var box = Polygon2.Rectangle(boxMin, boxMax);
-            foreach (var bg in PolygonOps.Difference(new[] { box }, placed.Select(p => p.Shape)))
-                target.Pieces.Add(new MarkingPiece(bg, MarkingColor.Asfalto));
+            var box = Polygon2.Rectangle(c + (boxMin - bc) / s, c + (boxMax - bc) / s);
+            foreach (var bg in PolygonOps.Difference(new[] { box }, sample.Pieces.Select(p => p.Shape)))
+                target.Pieces.Add(new MarkingPiece(Place(bg), MarkingColor.Asfalto));
         }
         // Peças da mesma cor unidas (regiões 2D não podem se sobrepor).
-        foreach (var group in placed.GroupBy(p => p.Color))
+        foreach (var group in sample.Pieces.GroupBy(p => p.Color))
             foreach (var u in PolygonOps.Union(group.Select(g => g.Shape)))
-                target.Pieces.Add(new MarkingPiece(u, group.Key));
+                target.Pieces.Add(new MarkingPiece(Place(u), group.Key));
     }
 
     internal static (Vec2 Min, Vec2 Max) Bounds(IEnumerable<Polygon2> polys)

@@ -31,18 +31,19 @@ public class Z1EarTests
     private static List<Y34TipTests.Part> Parts(Y34TipTests.World w) => Y34TipTests.Geometry(w);
 
     /// <summary>Maior distância (ao longo do ramo, a partir do fim da curva) em que a orelha toca a face do meio-fio.</summary>
-    private static double ReachAlong(IntersectionLayout L, IntersectionLeg leg, int side, Polygon2 fp)
+    private static double ReachAlong(IntersectionLayout L, IntersectionLeg leg, int side, Polygon2 fp, double? from = null)
     {
         var axis = L.Roads[leg.Road].Axis;
+        var start = from ?? leg.Clear;
         var best = 0.0;
         foreach (var v in fp.Outer)
         {
             var (st, signed) = axis.Project(v);
             var t = (st - leg.NodeStation) * leg.Sign;
             var o = signed * leg.Sign;
-            if (t < leg.Clear - 0.01) continue;
+            if (t < start - 0.01) continue;
             var face = side > 0 ? L.HiEdge(leg, t) : -L.LoEdge(leg, t);
-            if (Math.Abs(o - face) < 0.005) best = Math.Max(best, t - leg.Clear);
+            if (Math.Abs(o - face) < 0.005) best = Math.Max(best, t - start);
         }
         return best;
     }
@@ -170,7 +171,9 @@ public class Z1EarTests
         Assert.True(clicked.Dir.X > 0.9, "a via clicada é a leste-oeste");
         Assert.Equal(x, ReachAlong(L, clicked, cs, e.Footprint), 2);
         if (y > 0) Assert.Equal(y, ReachAlong(L, other, os, e.Footprint), 2);
-        else Assert.True(ReachAlong(L, other, os, e.Footprint) < 0.01, "Y = 0: a orelha não avança pela outra via");
+        // Y = 0: a orelha não avança pela outra via além da esquina. Rodada AI (item 6): a extensão de um lado só nasce da curva
+        // da esquina e o meio-fio da outra via segue reto até a curva nova – mede-se a partir do fim da curva antiga.
+        else Assert.True(ReachAlong(L, other, os, e.Footprint, L.BaseSideTangentT[(other.Road, other.Sign, os)]) < 0.01, "Y = 0: a orelha não avança pela outra via");
         var f = Y34TipTests.Faults(w);
         Assert.True(f.Count == 0, string.Join("\n", f.Take(12)));
     }

@@ -663,7 +663,7 @@ public static class MarkingBuilder
     public static MarkingGeometry BuildSign(SignDefinition d, BuildContext ctx)
     {
         var p = ctx.Catalog.Placa(d.Code);
-        return p == null ? Missing($"Placa {d.Code} não existe no catálogo.") : Lift(SignGenerator.Generate(d, p, ctx.Glyphs), d.BaseElevation);
+        return p == null ? Missing($"Placa {d.Code} não existe no catálogo.") : Lift(SignGenerator.Generate(d, p, ctx.Glyphs, ctx.Catalog), d.BaseElevation);
     }
 
     public static MarkingGeometry BuildUrban(UrbanElementDefinition d, Polyline2? path, BuildContext ctx)

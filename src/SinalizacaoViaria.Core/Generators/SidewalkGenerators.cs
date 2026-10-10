@@ -135,6 +135,8 @@ public static class SidewalkGenerator
     /// </summary>
     public static List<Vec2> EarOuterEdge(CurbExtensionDefinition d, Polyline2 path, List<string>? warnings = null)
     {
+        // Face informada ponto a ponto (extensão de um lado só nascendo da curva da esquina).
+        if (d.OuterFace is { Count: >= 2 } face) return face.ToList();
         var pts = path.Points;
         var L = path.Length;
         var profile = EarProfile(d, L, warnings);
@@ -239,6 +241,7 @@ public static class SidewalkGenerator
         var L = path.Length;
         if (L < 1.0) return Fail("Trecho da extensão de calçada muito curto (mínimo 1 m ao longo do meio-fio).");
         var geo = new MarkingGeometry();
+        if (d.ArcCenters != null) geo.ArcCenters.AddRange(d.ArcCenters);
         var fp = EarFootprint(d, path);
         if (fp == null) return Fail("Não foi possível montar o contorno da extensão de calçada.");
         EarProfile(d, L, geo.Warnings);
@@ -248,11 +251,14 @@ public static class SidewalkGenerator
         // Meio-fio na FACE EXTERNA da orelha (voltado para a pista), de uma ponta à outra; atrás da face original o meio-fio
         // antigo sai (ver EarCutZone) e o lugar dele vira piso: a orelha é um avanço da calçada, no mesmo nível dela.
         var outer = EarOuterEdge(d, path);
-        // Meio-fio já simplificado: o piso é recortado por ele e as duas peças ficam com a mesma borda (na face curva, simplificar
-        // cada peça por si deixava frestas de milímetros entre elas).
-        var curb = PolygonOps.Intersect(new[] { fp }, PolygonOps.Strip(outer, 2 * cw, roundJoins: true)).Where(p => p.Area >= 0.005)
-            .Select(p => p.Simplified()).Where(p => p is { Area: >= 1e-4 }).Cast<Polygon2>().ToList();
         var back = EarBackFill(d, path, fp);
+        // Meio-fio já simplificado: o piso é recortado por ele e as duas peças ficam com a mesma borda (na face curva, simplificar
+        // cada peça por si deixava frestas de milímetros entre elas). Na extensão que nasce da curva da esquina (face informada),
+        // a faixa do meio-fio vai até a largura dele atrás da face nova, também onde estava o meio-fio antigo: na ponta, onde a
+        // extensão afina até zero, o meio-fio novo continua o antigo com a largura toda (sem cunha de poucos graus).
+        var born = d.OuterFace is { Count: >= 2 };
+        var curb = PolygonOps.Intersect(PolygonOps.Union(back.Append(fp)), PolygonOps.Strip(outer, 2 * cw, roundJoins: true)).Where(p => p.Area >= 0.005)
+            .Select(p => p.Simplified()).Where(p => p is { Area: >= 1e-4 }).Cast<Polygon2>().ToList();
 
         var planter = new List<Polygon2>();
         if (d.Planter)
@@ -298,6 +304,20 @@ public static class SidewalkGenerator
         var whole = PolygonOps.Union(back.Append(fp))
             .Select(p => new Polygon2(p.Outer, p.Holes.Where(h => Math.Abs(Polygon2.SignedArea(h)) >= 1e-4))).ToList();
         var platform = PolygonOps.Difference(whole, curb.Concat(planter));
+        // Nas pontas, onde a extensão afina até zero, o piso entre o meio-fio novo e o antigo virava uma cunha de poucos graus:
+        // a ponta fina que encosta no meio-fio passa para ele (abertura morfológica do piso, com cantos vivos – os cantos retos
+        // do piso ficam). Na extensão que nasce da curva, o que tem menos de 8 cm; nas demais, onde a face volta tangente ao
+        // alinhamento, só a ponta com menos de 2 cm (o meio-fio continua junto da face).
+        var open = born ? 0.04 : 0.01;
+        var opened = PolygonOps.Offset(PolygonOps.Offset(platform, -open), open).Where(p => p.Area >= 0.01).ToList();
+        var thin = PolygonOps.Difference(platform, opened)
+            .Where(x => PolygonOps.TotalArea(PolygonOps.Intersect(PolygonOps.Offset(new[] { x }, 0.005), curb)) > 1e-6).ToList();
+        if (PolygonOps.TotalArea(thin) > 1e-5)
+        {
+            // União sem simplificar (o piso é refeito pela diferença, com a mesma borda; simplificar a união podia cruzar o anel).
+            curb = PolygonOps.Union(curb.Concat(thin)).Where(p => p.Area >= 0.005).ToList();
+            platform = PolygonOps.Difference(whole, curb.Concat(planter));
+        }
         AddRaised(geo, platform, MarkingColor.Concreto, d.Height);
         foreach (var c in curb) geo.Pieces.Add(new MarkingPiece(c, MarkingColor.Concreto) { Thickness = Math.Max(0.001, d.Height), Layer = "MEIO-FIO" });
         AddRaised(geo, planter, MarkingColor.Grama, d.Height);
