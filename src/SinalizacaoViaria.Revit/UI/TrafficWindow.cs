@@ -630,6 +630,9 @@ public sealed class TrafficWindow : Window
         rg.Children.Add(_regList);
         _tabs.Items.Add(new TabItem { Header = $"Sinalização ({_net.Regulations.Count(x => x.Applied)})", Content = rg });
 
+        // Rede lida: de onde veio cada via e o que não foi interpretado.
+        _tabs.Items.Add(new TabItem { Header = $"Rede lida{(_net.Uninterpreted.Count > 0 ? $" ({_net.Uninterpreted.Count} não interpretado(s))" : "")}", Content = NetworkSourcesPanel() });
+
         // Cenários: comparação
         var cg = new DockPanel();
         var cbar = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
@@ -866,6 +869,73 @@ public sealed class TrafficWindow : Window
         // Semáforo pedido pelo clique no mapa (cruzamento que acabou de virar semaforizado) ou escolhido no projeto.
         if (_pendingSelect is { } ps) { _pendingSelect = null; Dispatcher.BeginInvoke(() => OnMapSelection(ps, null)); }
         if (PickedPoint is { } pp && !_pickHandled) { _pickHandled = true; Dispatcher.BeginInvoke(() => HandlePick(pp)); }
+    }
+
+    /// <summary>
+    /// Vias por origem (do plugin, inferidas de pisos, de linhas de eixo, ambíguas) com o que foi lido de cada uma, e a lista do
+    /// que o simulador não conseguiu interpretar – pisos sem forma de pista, linhas e setas fora das pistas, sinalização sem
+    /// trecho –, com o motivo. Duplo clique = ver no mapa.
+    /// </summary>
+    private UIElement NetworkSourcesPanel()
+    {
+        var list = new ListBox();
+        ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
+        void Header(string text) => list.Items.Add(new ListBoxItem
+        {
+            Content = new TextBlock { Text = text, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 6, 0, 2) }, IsEnabled = false,
+        });
+        void Row(Color color, string title, string detail, object? tag)
+        {
+            var row = new DockPanel { Margin = new Thickness(0, 2, 0, 2) };
+            var bar = new Border { Width = 5, Background = new SolidColorBrush(color), Margin = new Thickness(0, 0, 8, 0), CornerRadius = new CornerRadius(2) };
+            DockPanel.SetDock(bar, Dock.Left);
+            row.Children.Add(bar);
+            var txt = new StackPanel();
+            txt.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+            if (!string.IsNullOrWhiteSpace(detail))
+                txt.Children.Add(new TextBlock { Text = detail, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x3A, 0x44, 0x52)) });
+            row.Children.Add(txt);
+            list.Items.Add(new ListBoxItem { Content = row, Tag = tag, HorizontalContentAlignment = HorizontalAlignment.Stretch });
+        }
+        var counts = _net.Roads.GroupBy(r => r.Origin).ToDictionary(g => g.Key, g => g.Count());
+        int C(OrigemTrecho o) => counts.GetValueOrDefault(o);
+        Header($"Vias: {C(OrigemTrecho.Plugin)} do plugin · {C(OrigemTrecho.Piso)} inferida(s) de pisos · {C(OrigemTrecho.LinhaDeEixo)} de linhas de eixo · {C(OrigemTrecho.Ambiguo)} ambígua(s)");
+        foreach (var r in _net.Roads.OrderBy(r => r.Origin).ThenBy(r => r.Name))
+        {
+            var lanes = r.TwoWay ? $"mão dupla, {r.LanesForward}+{r.LanesBackward} faixa(s)" : $"mão única, {r.LanesForward} faixa(s)";
+            Row(TrafficMap.OriginColor(r.Origin), $"{r.Name} – {TrafficMap.OriginLabel(r.Origin)} ({lanes})",
+                r.Origin == OrigemTrecho.Plugin ? "seção gravada na via do plugin" : r.OriginNote ?? "", r);
+        }
+        var notApplied = _net.Regulations.Where(x => !x.Applied && x.Kind != TipoRegra.Informativa).ToList();
+        Header($"Não interpretado: {_net.Uninterpreted.Count + notApplied.Count}");
+        foreach (var u in _net.Uninterpreted)
+            Row(Color.FromRgb(0xC6, 0x28, 0x28), u.What, u.Why, u);
+        foreach (var r in notApplied)
+            Row(Color.FromRgb(0xC6, 0x28, 0x28), $"{r.Source} – {TrafficRegulation.KindLabel(r.Kind)}", r.Effect, r);
+        if (_net.Uninterpreted.Count + notApplied.Count == 0)
+            list.Items.Add(new ListBoxItem { Content = "Tudo o que foi encontrado no projeto foi interpretado.", IsEnabled = false });
+        list.MouseDoubleClick += (_, _) =>
+        {
+            switch ((list.SelectedItem as ListBoxItem)?.Tag)
+            {
+                case TrafficRoad r: _map.ZoomTo(r.Axis.PointAt(r.Axis.Length / 2), Math.Max(60, r.Axis.Length * 0.6)); break;
+                case Uninterpreted u: _map.ZoomTo(u.Where, 60); break;
+                case TrafficRegulation g: _map.ZoomTo(g.Position, 60); break;
+            }
+        };
+        var dock = new DockPanel();
+        var hint = new TextBlock
+        {
+            Text = "O simulador junta num só grafo as vias do plugin, os pisos de pavimento do Revit (asfalto, bloquete, concreto, terra – ou os " +
+                   "selecionados antes de abrir) e as linhas de modelo selecionadas como eixo. Faixas e sentidos saem da sinalização pintada sobre " +
+                   "elas (linha amarela, divisórias, bordos, setas); PARE, preferência e semáforos dão o controle; faixas de pedestres, as travessias. " +
+                   "No mapa, as vias que não são do plugin têm contorno tracejado na cor da origem.",
+            TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)), Margin = new Thickness(0, 4, 0, 4),
+        };
+        DockPanel.SetDock(hint, Dock.Top);
+        dock.Children.Add(hint);
+        dock.Children.Add(list);
+        return dock;
     }
 
     private void FillRegulations()

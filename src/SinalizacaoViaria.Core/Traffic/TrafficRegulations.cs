@@ -511,8 +511,10 @@ public static class TrafficRegulations
             // Cones, cavaletes, tambores ou barreiras dentro de uma faixa: faixa fechada (obra/interdição).
             if ((work || barrier || delineator) && along > 0.3)
             {
+                // A linha do dispositivo é a extensão interditada: cones e cavaletes espaçados, cada um com a sua peça, deixavam
+                // vãos entre as peças e a faixa não chegava a fechar (o trecho fechado precisa de 3 m seguidos).
                 var poly = geometryOf?.Invoke(dv)?.Pieces.Select(p => p.Shape).ToList() ?? new List<Polygon2>();
-                if (poly.Count == 0) poly.AddRange(RoadGenerator_Band(line, 0.6));
+                poly.AddRange(RoadGenerator_Band(line, 0.6));
                 var n0 = ClosePolygons(net, PolygonOps.Union(poly.Select(p => PolygonOps.Offset(new[] { p }, 1.0, true)).SelectMany(x => x)), $"{dv.Code} na faixa");
                 if (n0 > 0)
                 {

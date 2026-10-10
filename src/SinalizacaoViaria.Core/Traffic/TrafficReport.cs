@@ -51,6 +51,15 @@ public static class TrafficReport
         _ => "sem tráfego",
     };
 
+    /// <summary>De onde veio a via (relatório e mapa).</summary>
+    public static string OriginLabel(OrigemTrecho o) => o switch
+    {
+        OrigemTrecho.Piso => "inferida de piso do Revit",
+        OrigemTrecho.LinhaDeEixo => "inferida de linha de eixo",
+        OrigemTrecho.Ambiguo => "inferida com suposições (ambígua)",
+        _ => "via do plugin",
+    };
+
     public static string Build(TrafficResult r, SimResult? sim = null, string? project = null)
     {
         var net = r.Network;
@@ -100,10 +109,16 @@ public static class TrafficReport
         foreach (var rd in net.Roads)
             L($"  • {rd.Name}: {Hierarquia.Label(rd.Hierarchy)}, {(rd.TwoWay ? $"mão dupla ({rd.LanesForward} + {rd.LanesBackward} faixas)" : $"mão única ({rd.LanesForward} faixa(s))")}, " +
               $"{F(rd.SpeedKmh)} km/h, pista de {F(rd.CarriageWidth, "0.00")} m, {F(rd.Axis.Length)} m" +
-              (rd.ParkingForward || rd.ParkingBackward ? ", com estacionamento" : "") + (rd.BikeLane ? ", com ciclovia" : "") + (rd.Median ? ", com canteiro central" : ""));
+              (rd.ParkingForward || rd.ParkingBackward ? ", com estacionamento" : "") + (rd.BikeLane ? ", com ciclovia" : "") + (rd.Median ? ", com canteiro central" : "") +
+              (rd.Origin == OrigemTrecho.Plugin ? "" : $" – {OriginLabel(rd.Origin)}: {rd.OriginNote}"));
         foreach (var nd in net.Nodes.Where(n => n.Kind != TipoNo.Continuacao))
             L($"  • {nd.Label}: {KindLabel(nd.Kind)}{(nd.IsZone ? "" : " – " + ControlLabel(nd.Control))} em ({F(nd.Pos.X, "0.0")}; {F(nd.Pos.Y, "0.0")})");
         foreach (var n in net.Notes) L($"  ℹ {n}");
+        if (net.Uninterpreted.Count > 0)
+        {
+            L($"  Não interpretado ({net.Uninterpreted.Count}):");
+            foreach (var u in net.Uninterpreted) L($"    ✗ {u.What}: {u.Why}");
+        }
 
         // ------------------------------------------------------------------ sinalização
         if (net.Regulations.Count > 0)

@@ -258,7 +258,7 @@ internal static class FloorRoadInput
     }
 
     /// <summary>Anéis do contorno do piso (m): do esboço (exato) ou das faces superiores.</summary>
-    private static List<List<Vec2>> Outline(Document doc, Element e)
+    internal static List<List<Vec2>> Outline(Document doc, Element e)
     {
         var loops = new List<List<Vec2>>();
         try
@@ -298,7 +298,7 @@ internal static class FloorRoadInput
     }
 
     /// <summary>Anéis → polígonos: o anel contido em outro é furo dele (canteiros, ilhas).</summary>
-    private static List<Polygon2> Classify(List<List<Vec2>> loops)
+    internal static List<Polygon2> Classify(List<List<Vec2>> loops)
     {
         var ordered = loops.OrderByDescending(l => Math.Abs(Polygon2.SignedArea(l))).ToList();
         var outers = new List<(List<Vec2> Outer, List<List<Vec2>> Holes)>();

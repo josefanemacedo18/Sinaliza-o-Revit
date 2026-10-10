@@ -285,6 +285,9 @@ sinalização, interseções, rotatórias, recuos, cotas, quantitativos e o **Si
 
 > Confira o **sentido** do eixo (vias de mão única) e a hierarquia; pistas muito irregulares podem pedir um ajuste manual
 > das linhas de eixo criadas – depois use Editar na via.
+>
+> Para só **simular** uma pista de piso não é preciso convertê-la: o Simulador de Tráfego lê o piso e a sinalização sobre
+> ele direto (§26.14).
 
 ## 2.1 Hierarquia viária (CTB art. 60)
 
@@ -2056,7 +2059,8 @@ ciclofaixa, canteiro central, largura entre meios-fios, velocidade e **hierarqui
 **balões** (cul-de-sac), cruzamentos de eixos sem interseção (preferência de quem vem pela direita – CTB art. 29, III –
 ou **em desnível** quando uma via passa sobre a outra), **placas** (R-1, R-2, R-19, A-14...), **faixas de pedestres**,
 **rampas**, **vagas** e **moderação** (lombadas, platôs). As pontas livres das vias e os balões são as **entradas e
-saídas** do tráfego.
+saídas** do tráfego. Vias feitas **fora do plugin** – pisos do Revit e linhas de modelo – também entram, com a
+sinalização do plugin sobre elas (seção 26.14).
 
 **Cenário (painel da esquerda).**
 
@@ -2418,3 +2422,43 @@ segura a faixa direta).
 (502 × 748 veh/h com 600 veh/h circulando): o fluxo que circula chega em pelotões, e o anel de duas faixas é simulado como
 um único trajeto circular. No semáforo com conversão à esquerda permitida em faixa compartilhada, o atraso simulado fica
 acima do HCM. Por isso a recomendação de uma solução exige melhora **na microssimulação** – é conservadora.
+
+### 26.14 Vias feitas com pisos do Revit e linhas de eixo – o simulador reconhece tudo
+
+Antes o simulador só lia as vias criadas pelo plugin (**Nova Via / Pista**): uma pista modelada com **Piso** do Revit, mesmo
+com toda a sinalização do plugin por cima (linhas, setas, PARE, faixas de pedestres), era descartada – o simulador dizia
+que não havia vias. Agora tudo vai para **um só grafo**:
+
+1. **Vias do plugin** – como antes, com a seção gravada.
+2. **Pisos de pavimento** do Revit (os que não são do plugin): entram os que têm no nome do tipo ou dos materiais
+   *asfalto, CBUQ, bloquete, paver, intertravado, paralelepípedo, pavimento, pista, rua, terra, cascalho*; os de
+   **concreto** (pode ser laje) e os de nome qualquer entram quando têm **sinalização viária sobre eles**; *calçada,
+   passeio, meio-fio, canteiro, grama, laje* ficam de fora (com aviso, se houver sinalização em cima). **Pisos
+   selecionados antes de abrir o simulador entram sempre.** O eixo sai do **eixo medial** do contorno (o mesmo de §2.0.7),
+   com as pontas retas até a borda do piso e o eixo reto através dos encontros; a largura, da borda do piso.
+3. **Linhas de modelo selecionadas** antes de abrir o simulador viram **eixos de via** (linhas emendadas pela ponta são
+   um eixo só); a largura sai dos pisos sob elas ou das linhas de bordo pintadas.
+4. **Toda a sinalização do plugin, onde quer que esteja**:
+   * **divisórias** (LMS, LCO) e **bordos** (LBO, ou a borda do piso) definem as **faixas**; a **linha amarela** (LFO)
+     define a **mão dupla** e de que lado fica cada sentido; sem ela, as **setas** dão o sentido (mão única) ou os dois
+     sentidos; só divisórias brancas, sem setas, = mão única no sentido do traçado (marcada como *ambígua*);
+   * **setas** por faixa restringem as **conversões**; **PARE**, **R-1**, **LRE**, **Dê a preferência** e **semáforos**
+     dão o **controle** do cruzamento; sem nenhuma, o cruzamento fica com a preferência de quem vem pela direita;
+   * **faixas de pedestres** são as **travessias** do cruzamento;
+   * **estacionamento** (vagas pintadas ou a linha delimitadora com o bordo) e **ciclofaixas** saem das faixas de
+     tráfego; **bloqueios**, cones e cavaletes **fecham faixas**, como nas vias do plugin.
+   O que já é via do plugin fica com a via do plugin (o piso ou a linha por baixo dela não duplica nada); uma rua de piso
+   que chega a uma via do plugin forma o cruzamento com ela.
+
+**Origem de cada trecho.** No mapa, as vias que não são do plugin têm **contorno tracejado** na cor da origem – azul =
+*inferida de piso*, roxo = *inferida de linha de eixo*, laranja = *ambígua* (faixas ou sentido sem sinalização que os
+defina: a suposição feita aparece no trecho) – e a legenda mostra as cores. A aba **Rede lida** lista as vias por origem
+com o que foi lido de cada uma (ex.: *mão dupla pela linha amarela, 2+2 faixas, pista de 13,60 m*) e **o que não foi
+interpretado, com o motivo**: pisos sem forma de pista (mais estreitos que 2,50 m), linhas e setas fora de qualquer pista,
+pisos com nome de calçada e sinalização em cima, e a sinalização que não achou trecho ou cruzamento. O relatório traz o
+mesmo. Velocidade das vias inferidas: 50 km/h, ou a da placa R-19 sobre elas [a confirmar].
+
+> Avenida com canteiro feita com dois pisos (uma pista de cada lado): cada pista vira uma via; com **setas** (ou só
+> divisórias brancas) ela é de mão única no sentido certo – sem nada que diga o sentido, fica como *ambígua*. Pisos com
+> forma muito irregular podem pedir as linhas de eixo selecionadas, ou a conversão em via do plugin (§2.0.7).
+

@@ -53,6 +53,16 @@ public sealed class TrafficRoad
     public double? NarrowestAt { get; init; }
 
     public double Z(double s) => BaseZ + (Grade?.Z(Math.Clamp(s, 0, Axis.Length)) ?? 0);
+
+    /// <summary>De onde veio a via: do plugin, inferida de um piso nativo, de uma linha de eixo, ou inferida com suposições.</summary>
+    public OrigemTrecho Origin { get; init; } = OrigemTrecho.Plugin;
+    /// <summary>Como a via foi lida (faixas, sentido, largura) e as suposições feitas – vias inferidas.</summary>
+    public string? OriginNote { get; init; }
+    /// <summary>Elementos do Revit de onde a via foi inferida (pisos, linhas).</summary>
+    public List<string> SourceIds { get; init; } = new();
+    /// <summary>Via inferida com a ponta cortada num encontro (é prolongada até o eixo da via em que chega).</summary>
+    public bool TrimmedStart { get; init; }
+    public bool TrimmedEnd { get; init; }
 }
 
 /// <summary>Nó da rede: interseção, rotatória, extremidade (entrada/saída do tráfego), balão, emenda.</summary>
@@ -285,6 +295,8 @@ public sealed class TrafficNetwork
     /// <summary>Tudo o que a sinalização do projeto significa para o tráfego (lido e aplicado, ou não associado).</summary>
     public List<TrafficRegulation> Regulations { get; } = new();
     public List<string> Notes { get; } = new();
+    /// <summary>O que não foi interpretado (pisos sem eixo, linhas e setas fora das pistas…), com o motivo.</summary>
+    public List<Uninterpreted> Uninterpreted { get; } = new();
     /// <summary>Planta real do projeto (pavimento, calçadas, canteiros e pintura) para o mapa; vazia sem geometria.</summary>
     public List<MapShape> Backdrop { get; } = new();
 
@@ -306,8 +318,10 @@ public static class TrafficNetworkBuilder
 {
     /// <param name="axisOf">Eixo resolvido (m) e cota base de uma marca com caminho; nulo se não resolvido.</param>
     /// <param name="geometryOf">Geometria de uma marca (zebrados e canalizações que fecham faixas); opcional.</param>
+    /// <param name="sources">Pisos nativos de pavimento e linhas de eixo (fora do plugin): viram vias inferidas, com as faixas e
+    /// os sentidos lidos da sinalização sobre eles. Nulo = só as vias do plugin.</param>
     public static TrafficNetwork Build(IReadOnlyCollection<MarkingDefinition> defs, Func<MarkingDefinition, (Polyline2 Axis, double Z)?> axisOf,
-        Func<MarkingDefinition, Model.MarkingGeometry?>? geometryOf = null)
+        Func<MarkingDefinition, Model.MarkingGeometry?>? geometryOf = null, NetworkSources? sources = null)
     {
         var net = new TrafficNetwork();
         // Geometria calculada uma vez por marca (a leitura da sinalização e a planta do mapa usam as mesmas peças).
@@ -326,9 +340,25 @@ public static class TrafficNetworkBuilder
             if (ax is not { } a || a.Axis.Length < 5) continue;
             net.Roads.Add(RoadFrom(pav, a.Axis, a.Z, ++n));
         }
+        var pavById = pavs.ToDictionary(p => p.Id);
+        // Pisos nativos e linhas de eixo: vias inferidas (as que já são vias do plugin ficam com a via do plugin).
+        if (sources != null)
+        {
+            var inferred = InferredRoads.Read(sources, defs, axisOf, geometryOf, net.Roads.ToList(), net);
+            foreach (var ir in inferred)
+            {
+                net.Roads.Add(ir.Road);
+                pavById[ir.Road.Id] = ir.Pav;
+            }
+            if (geometryOf != null)
+                foreach (var f in sources.Floors.Where(f => inferred.Any(r => r.Road.SourceIds.Contains(f.Id))))
+                    net.Backdrop.Add(new MapShape(f.Shape, CamadaMapa.Pavimento, new Model.Rgb(0x44, 0x48, 0x4E), f.Z, f.Id));
+        }
         if (net.Roads.Count == 0)
         {
-            net.Notes.Add("Nenhuma via do plugin (Via / Pista) no projeto: crie as vias para simular o tráfego.");
+            net.Notes.Add(sources == null
+                ? "Nenhuma via do plugin (Via / Pista) no projeto: crie as vias para simular o tráfego."
+                : "Nenhuma via reconhecida: nem via do plugin, nem piso de pavimento com forma de pista, nem linha de eixo escolhida.");
             return net;
         }
 
@@ -398,7 +428,7 @@ public static class TrafficNetworkBuilder
         }
 
         // ------------------------------------------------------------ cruzamentos sem interseção (e desníveis)
-        var iroads = net.Roads.Select(r => new IntersectionRoad(pavs.First(p => p.Id == r.Id), r.Axis)).ToList();
+        var iroads = net.Roads.Select(r => new IntersectionRoad(pavById[r.Id], r.Axis)).ToList();
         foreach (var (p, ids) in IntersectionGenerator.FindNodes(iroads))
         {
             if (net.Nodes.Any(x => x.Pos.DistanceTo(p) < Math.Max(12, x.RoundaboutRadius + 6))) continue;
@@ -495,6 +525,12 @@ public static class TrafficNetworkBuilder
         // Antes: as travessias só entravam nos trechos depois da leitura da sinalização, e o grupo focal de uma travessia no
         // meio da quadra ficava "longe de faixas de pedestres" – o semáforo de pedestres do projeto era ignorado.
         AssignCrosswalks(net);
+        // Cruzamento sem interseção do plugin (pisos, linhas de eixo, vias que se cruzam): as faixas de pedestres pintadas nas
+        // aproximações são as travessias dele.
+        foreach (var nd in net.Nodes.Where(x => x.Kind == TipoNo.CruzamentoSemControle && !x.Crosswalks))
+            if (net.Crosswalks.Any(c => c.Path.Length > 1 && c.Path.PointAt(c.Path.Length / 2).DistanceTo(nd.Pos) < 30
+                    && nd.In.Concat(nd.Out).Any(li => Crossings(net.Links[li].Path, c.Path).Count > 0)))
+                nd.Crosswalks = true;
         TrafficRegulations.Read(net, defs, axisOf, geometryOf);
         if (geometryOf != null) TrafficBackdrop.Read(net, defs, geometryOf);
 

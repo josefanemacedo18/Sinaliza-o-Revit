@@ -22,10 +22,14 @@ public sealed class CmdSimuladorTrafego : CommandBase
     internal static Result Open(UIDocument uidoc, string? tab)
     {
         var doc = uidoc.Document;
-        var net = BuildNetwork(doc);
+        // Seleção ao abrir: pisos escolhidos entram como pista e linhas de modelo como eixos de via (mantida ao reabrir).
+        var selected = uidoc.Selection.GetElementIds().ToList();
+        var net = BuildNetwork(doc, selected);
         if (net.Roads.Count == 0)
-            throw new UserMessageException("Nenhuma via do SinalizaBIM foi encontrada no projeto.\n\nO Simulador de Tráfego lê as vias criadas com Nova Via / Pista " +
-                                           "(pavimento com a seção), as interseções, rotatórias e balões. Crie as vias e rode o simulador de novo.");
+            throw new UserMessageException("Nenhuma via foi reconhecida no projeto.\n\nO Simulador de Tráfego lê as vias do SinalizaBIM (Nova Via / Pista), os pisos " +
+                                           "de pavimento do Revit (asfalto, bloquete, concreto, terra – ou os pisos selecionados antes de abrir) com a sinalização " +
+                                           "sobre eles e as linhas de modelo selecionadas como eixo." +
+                                           (net.Uninterpreted.Count > 0 ? "\n\nNão interpretado:\n" + string.Join("\n", net.Uninterpreted.Take(8).Select(u => $"• {u.What}: {u.Why}")) : ""));
         var w = new TrafficWindow(net, doc.Title, new TrafficHost(uidoc)) { InitialTab = tab };
         var shown = UiHelpers.ShowModal(w);
         // Depois de gravar planos/controles no projeto, a janela pede para reler a rede e reabre no mesmo cenário.
@@ -34,7 +38,7 @@ public sealed class CmdSimuladorTrafego : CommandBase
             var sc = w.ReopenWith;
             Vec2? picked = null;
             if (w.PickSignalRequested) picked = PickSignalPoint(uidoc);
-            net = BuildNetwork(doc);
+            net = BuildNetwork(doc, selected);
             w = new TrafficWindow(net, doc.Title, new TrafficHost(uidoc)) { InitialScenario = sc, PickedPoint = picked, InitialTab = picked != null ? "semaforos" : tab };
             shown = UiHelpers.ShowModal(w);
         }
@@ -76,8 +80,11 @@ public sealed class CmdSimuladorTrafego : CommandBase
         catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return null; }
     }
 
-    /// <summary>Rede viária a partir das definições guardadas no projeto.</summary>
-    internal static TrafficNetwork BuildNetwork(Document doc)
+    /// <summary>
+    /// Rede viária a partir das definições guardadas no projeto, dos pisos nativos de pavimento e das linhas de modelo
+    /// escolhidas como eixo (<paramref name="selected"/>: elementos selecionados ao abrir o simulador).
+    /// </summary>
+    internal static TrafficNetwork BuildNetwork(Document doc, ICollection<ElementId>? selected = null)
     {
         var defs = MarkingStorage.Definitions(doc);
         var cache = new Dictionary<string, (Polyline2, double)?>();
@@ -106,7 +113,83 @@ public sealed class CmdSimuladorTrafego : CommandBase
             try { return service.BuildGeometryOrNull(d); }
             catch (Exception ex) { Log.Error("Simulador de Tráfego – geometria", ex); return null; }
         }
-        return TrafficNetworkBuilder.Build(defs, AxisOf, GeomOf);
+        return TrafficNetworkBuilder.Build(defs, AxisOf, GeomOf, NativeSources(doc, selected));
+    }
+
+    /// <summary>
+    /// Pisos nativos do Revit (os que não são do plugin) com o nome do tipo e dos materiais – o Core decide quais são pista
+    /// (nome de pavimento, sinalização sobre eles ou escolhidos) – e as linhas de modelo selecionadas como eixos de via.
+    /// </summary>
+    internal static NetworkSources NativeSources(Document doc, ICollection<ElementId>? selected)
+    {
+        var src = new NetworkSources();
+        var sel = selected?.ToHashSet() ?? new HashSet<ElementId>();
+        foreach (var f in new FilteredElementCollector(doc).OfClass(typeof(Floor)).Cast<Floor>())
+        {
+            try
+            {
+                if (MarkingStorage.IsMarking(f)) continue;
+                var loops = FloorRoadInput.Outline(doc, f);
+                if (loops.Count == 0) continue;
+                var z = f.get_BoundingBox(null) is { } bb ? UnitConv.M(bb.Max.Z) : 0;
+                var name = FloorName(doc, f);
+                foreach (var poly in FloorRoadInput.Classify(loops))
+                    src.Floors.Add(new NativeFloor(f.UniqueId, poly, z, name, sel.Contains(f.Id)));
+            }
+            catch (Exception ex) { Log.Error("Simulador de Tráfego – piso nativo", ex); }
+        }
+        // Linhas escolhidas: as emendadas pela ponta (mesma via desenhada em vários trechos) viram um eixo só.
+        var curves = sel.Select(doc.GetElement).OfType<CurveElement>().Where(c => c.GeometryCurve != null && !MarkingStorage.IsMarking(c))
+            .Select(c => (Id: c.UniqueId, Pts: c.GeometryCurve.Tessellate().Select(UnitConv.ToVec2).ToList(), Z: UnitConv.M(c.GeometryCurve.GetEndPoint(0).Z)))
+            .Where(c => c.Pts.Count >= 2).ToList();
+        foreach (var chain in Chains(curves.Select(c => (c.Id, c.Pts)).ToList()))
+            src.AxisLines.Add(new AxisLine(string.Join("+", chain.Ids), new Polyline2(chain.Pts), curves.First(c => c.Id == chain.Ids[0]).Z));
+        return src;
+    }
+
+    /// <summary>Nome do piso para reconhecer o pavimento: tipo, materiais das camadas e a hierarquia viária (se definida no piso).</summary>
+    private static string FloorName(Document doc, Floor f)
+    {
+        var parts = new List<string> { f.FloorType?.Name ?? f.Name };
+        try
+        {
+            if (f.FloorType?.GetCompoundStructure() is { } cs)
+                parts.AddRange(cs.GetLayers().Select(l => doc.GetElement(l.MaterialId)?.Name).Where(n => !string.IsNullOrWhiteSpace(n))!);
+        }
+        catch { /* sem estrutura */ }
+        if (!string.IsNullOrWhiteSpace(f.get_Parameter(SharedParameters.Hierarquia.Guid)?.AsString())) parts.Add("pavimento da via");
+        return string.Join(" / ", parts.Distinct());
+    }
+
+    /// <summary>Linhas emendadas pela ponta (até 5 cm, seguindo sem dobrar mais de 35°) juntas numa polilinha.</summary>
+    private static List<(List<string> Ids, List<Vec2> Pts)> Chains(List<(string Id, List<Vec2> Pts)> lines)
+    {
+        var res = lines.Select(l => (Ids: new List<string> { l.Id }, Pts: l.Pts.ToList())).ToList();
+        bool Joined()
+        {
+            for (int i = 0; i < res.Count; i++)
+                for (int j = 0; j < res.Count; j++)
+                {
+                    if (i == j) continue;
+                    var a = res[i].Pts;
+                    var b = res[j].Pts;
+                    foreach (var (ra, rb) in new[] { (false, false), (false, true), (true, false), (true, true) })
+                    {
+                        var pa = ra ? Enumerable.Reverse(a).ToList() : a;
+                        var pb = rb ? Enumerable.Reverse(b).ToList() : b;
+                        if (pa[^1].DistanceTo(pb[0]) > 0.05) continue;
+                        var da = (pa[^1] - pa[^2]).Normalized();
+                        var db = (pb[1] - pb[0]).Normalized();
+                        if (da.Dot(db) < Math.Cos(35 * Math.PI / 180)) continue;
+                        res[i] = (res[i].Ids.Concat(res[j].Ids).ToList(), pa.Concat(pb.Skip(1)).ToList());
+                        res.RemoveAt(j);
+                        return true;
+                    }
+                }
+            return false;
+        }
+        while (Joined()) { }
+        return res;
     }
 }
 

@@ -30,6 +30,8 @@ public sealed class TrafficMap : FrameworkElement
     public double SimTime { get; set; } = double.NaN;
     public bool ShowVehicles { get; set; } = true;
     public bool ShowLabels { get; set; } = true;
+    /// <summary>Contorno das vias que não são do plugin (inferidas de piso, de linha de eixo, ambíguas).</summary>
+    public bool ShowOrigins { get; set; } = true;
     /// <summary>Veículos coloridos pela velocidade (senão, cores reais de carros, ônibus e caminhões).</summary>
     public bool ColorBySpeed { get; set; }
     /// <summary>Mostra os ícones da sinalização lida (PARE, dê a preferência, velocidade, bloqueios).</summary>
@@ -582,6 +584,7 @@ public sealed class TrafficMap : FrameworkElement
             dc.DrawEllipse(null, P(Colors.White, 1), p, 22, 22);
         }
 
+        DrawOrigins(dc);
         DrawScaleBar(dc);
         DrawLegend(dc);
         if (!double.IsNaN(SimTime))
@@ -876,7 +879,11 @@ public sealed class TrafficMap : FrameworkElement
                 MapaCor.Volume => new List<(Color, string)> { (Ramp(0), "baixo"), (Ramp(0.5), "médio"), (Ramp(1), "maior volume da rede") },
                 _ => new List<(Color, string)> { (Ramp(0), "velocidade livre"), (Ramp(0.5), "metade da livre"), (Ramp(1), "parado") },
             };
-        var w = 190.0;
+        // Origem das vias: só aparece quando a rede tem vias que não são do plugin.
+        if (ShowOrigins && _res != null)
+            foreach (var o in new[] { OrigemTrecho.Piso, OrigemTrecho.LinhaDeEixo, OrigemTrecho.Ambiguo })
+                if (_res.Network.Roads.Any(r => r.Origin == o)) items.Add((OriginColor(o), "- - " + OriginLabel(o)));
+        var w = 210.0;
         var h = 12 + items.Count * 18;
         var x = ActualWidth - w - 10;
         var y = ActualHeight - h - 10;
@@ -885,6 +892,45 @@ public sealed class TrafficMap : FrameworkElement
         {
             dc.DrawRoundedRectangle(B(items[i].Item1), null, new Rect(x + 8, y + 7 + i * 18, 22, 11), 2, 2);
             Text(dc, items[i].Item2, new Point(x + 36, y + 4 + i * 18), 11, Color.FromRgb(0x22, 0x2A, 0x33), false);
+        }
+    }
+
+    public static string OriginLabel(OrigemTrecho o) => TrafficReport.OriginLabel(o);
+
+    public static Color OriginColor(OrigemTrecho o) => o switch
+    {
+        OrigemTrecho.Piso => Color.FromRgb(0x1F, 0x8F, 0xD0),
+        OrigemTrecho.LinhaDeEixo => Color.FromRgb(0x7B, 0x4F, 0xC9),
+        OrigemTrecho.Ambiguo => Color.FromRgb(0xE0, 0x8A, 0x00),
+        _ => Color.FromRgb(0x6B, 0x75, 0x82),
+    };
+
+    /// <summary>Vias que não são do plugin: contorno tracejado na cor da origem e o rótulo junto à via.</summary>
+    private void DrawOrigins(DrawingContext dc)
+    {
+        if (!ShowOrigins || _res == null) return;
+        foreach (var r in _res.Network.Roads.Where(x => x.Origin != OrigemTrecho.Plugin && x.Axis.Length > 1))
+        {
+            var c = OriginColor(r.Origin);
+            var pen = new Pen(B(c, 235), 2) { DashStyle = new DashStyle(new double[] { 4, 3 }, 0) };
+            pen.Freeze();
+            foreach (var edge in new[] { r.Axis.Offset(r.LeftWidth + 0.3), r.Axis.Offset(-(r.RightWidth + 0.3)) })
+            {
+                if (edge.Points.Count < 2) continue;
+                var g = new StreamGeometry();
+                using (var ctx = g.Open())
+                {
+                    ctx.BeginFigure(S(edge.Points[0]), false, false);
+                    ctx.PolyLineTo(edge.Points.Skip(1).Select(S).ToList(), true, true);
+                }
+                g.Freeze();
+                dc.DrawGeometry(null, pen, g);
+            }
+            if (ShowLabels)
+            {
+                var at = r.Axis.PointAt(r.Axis.Length / 2) + r.Axis.TangentAt(r.Axis.Length / 2).PerpLeft * (r.LeftWidth + 2.5);
+                Text(dc, $"{r.Name.Split('–')[0].Trim()} · {OriginLabel(r.Origin)}", S(at), 10.5, c, false);
+            }
         }
     }
 
