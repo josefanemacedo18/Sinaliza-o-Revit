@@ -1177,7 +1177,8 @@ calçada. Com ESC, o balão é posicionado livremente por dois cliques.
   * **Meio-fio e sarjeta contornam a face externa** da extensão; pavimento, pintura e vagas por baixo são recortados.
   * **Editar** sobre a extensão (ou a rampa/faixa dela) reabre a mesma janela – inclusive com **Remover esta extensão**.
 * **Clique na esquina de uma interseção**: abre a extensão daquela esquina (ligada à interseção, refeita com ela; veja 19.1.4):
-  informe **quanto ela avança a partir da esquina** em cada via ou marque **Terminar no início do estacionamento**.
+  informe **quanto ela avança a partir da esquina** em cada via ou marque **Terminar no início do estacionamento**; o bloco
+  **Forma desta esquina** ajusta largura e transição de cada lado, o raio da curva e o **contorno livre** (pontos clicados).
 * **ESC no primeiro clique – modo livre**: desenhe (ou clique dois pontos) na **face do meio-fio** existente – em linha reta ou
   **contornando a esquina** (o meio-fio acompanha a esquina com raio = raio da esquina + avanço, ou com o *raio mínimo na
   esquina* informado), com a calçada à esquerda do sentido do desenho (ou desmarque a opção). Parâmetros: avanço sobre a
@@ -1393,11 +1394,21 @@ faixa de estacionamento** em cada esquina (encurta a travessia, melhora a visibi
 esquina – CTB art. 181):
 
 * **Avanço ao longo de cada via a partir da esquina** (ex.: 5 m) – medido na **face do meio-fio** a partir do fim da curva
-  da esquina; a extensão contorna a curva (meio-fio com raio = raio da esquina + avanço);
-* **Largura do avanço** – 0 = a **largura da faixa de estacionamento** (com a sarjeta) lida da seção de cada via; esquina
-  sem faixa de estacionamento não recebe extensão (a não ser com a largura informada – aviso). A sarjeta continua na
-  frente: a face avança *largura − sarjeta*;
-* **Forma das pontas** – curvas reversas (raio), chanfro ou reta (acompanha a calçada);
+  da esquina, até a ponta da transição; com travessia, a extensão vai sempre além da faixa e das rampas, e a largura toda vai
+  pelo menos **1,50 m além do prolongamento do alinhamento predial** da outra via (5 pés – NACTO [a confirmar]);
+* **Largura do avanço** – 0 = a **largura da faixa de estacionamento** (com a sarjeta) lida da seção de cada via. A extensão
+  **nunca avança sobre faixa de rolamento**: a largura pedida fica limitada à faixa junto ao meio-fio sem tráfego
+  (estacionamento, acostamento, faixa de segurança, canteiro pintado) e o lado sem nenhuma delas não recebe extensão
+  (aviso). A sarjeta continua na frente: a face avança *largura − sarjeta*;
+* **Forma das pontas** – curvas reversas, chanfro ou reta (acompanha a calçada);
+* **Comprimento da transição das pontas** – da largura toda de volta ao meio-fio, medido ao longo dele. **0 = automático:
+  2 × a largura do avanço** [a confirmar] (curva reversa tangente ao meio-fio e à face, ~53° no meio – a ponta "natural" das
+  referências). Com chanfro, é o comprimento do chanfro. Projetos salvos passam a usar o automático (o antigo "raio das
+  pontas" geral deixa de ser usado; o raio informado numa esquina continua valendo para ela);
+* **Raio da curva da esquina na extensão** – 0 = o **raio da esquina** (veículo de projeto). A face da extensão contorna a
+  esquina com esse raio, tangente às faces deslocadas dos dois lados (não mais raio da esquina + avanço). Raio que faria a
+  curva entrar na calçada é reduzido (aviso);
+* **Folga além da faixa de pedestres e das rampas** – padrão 0,30 m;
 * **Terminar onde começa o estacionamento** – a extensão vai até a primeira vaga (fim do trecho sem vagas junto ao
   cruzamento: travessia/retenção + 5 m);
 * **Também no lado contínuo (T)** – quando o outro lado da travessia **não é esquina** (o lado contínuo de um T), gera ali
@@ -1405,24 +1416,58 @@ esquina – CTB art. 181):
   encurta **dos dois lados** (2 × o avanço da face). Vem marcada quando a janela ainda não tem uma escolha lembrada (depois
   ela lembra a última); interseções de projetos salvos continuam sem ela até que a opção seja ligada.
 
+**Forma da extensão (as quatro partes das referências).** Cada esquina com extensão tem: (1) a **curva da esquina** com o
+raio do veículo de projeto, tangente às faces deslocadas; (2) o **trecho reto com a largura toda**, paralelo à via, cobrindo a
+faixa de pedestres e as rampas e indo pelo menos 1,50 m além do prolongamento do alinhamento predial; (3) a **transição**
+suave de volta ao meio-fio (curva reversa tangente nas duas pontas, 2 × a largura); e (4) a **largura** da faixa junto ao
+meio-fio (estacionamento). Esquema (planta, via na horizontal, calçada em cima):
+
+```
+   lote ─────────┐
+                 │  calçada
+   ──────╮       │                       ╭──────────── meio-fio da via (alinhamento normal)
+         │ curva │  trecho reto          │ transição
+         │ (raio)╰────────────────────────╯ (curva reversa, 2 × largura)
+         │        ← largura toda: travessia + rampas + ≥ 1,50 m além do alinhamento →
+         │                                      ↕ largura = faixa de estacionamento
+   ──────┘  pista
+```
+
+Vale para qualquer hierarquia e número de faixas: local, coletora ou arterial, mão única ou dupla, de 1 a 4 faixas – a
+extensão só ocupa a faixa junto ao meio-fio sem tráfego.
+
 **Extensão de um lado só.** Quando a extensão existe só num dos lados da esquina (a outra via sem estacionamento, ou
 avanço 0 naquele lado), ela **nasce da curva da esquina**: a curva, com o mesmo raio, passa a ser tangente ao meio-fio da
 outra via e à **face da extensão**, e a extensão segue paralela à via até a ponta, onde volta ao alinhamento normal com a
-transição escolhida (curva reversa com raio ou chanfro) – sem degrau nem bico. Faixa de pedestres, rampas e piso tátil
-acompanham o **novo fim da curva** dos dois ramos; o meio-fio e a sarjeta contornam a face nova, e o contorno do piso
-usa os arcos com os centros exatos (a curva da esquina e a nova).
+transição suave – sem degrau nem bico. Com extensão **dos dois lados**, a curva liga as duas faces deslocadas (cada lado
+com a sua largura). Faixa de pedestres, rampas e piso tátil acompanham o **novo fim da curva** dos dois ramos (a travessia
+fica mais curta e mais perto do cruzamento); o meio-fio e a sarjeta contornam a face nova, e o contorno do piso usa os arcos
+com os centros exatos (a curva da esquina e a nova).
 
-**Personalização por extensão** (bloco *Ajustes por esquina*, a esquina à direita de quem chega pelo ramo): **extensão
-sim/não**, **avanço neste ramo** e **na outra via** (−1 = geral; 0 = sem extensão daquele lado), **terminar no
-estacionamento**, **profundidade**, **forma e raio das pontas**, **rampa sim/não** e **piso tátil sim/não**. Para o **lado
-contínuo da travessia do ramo**: **extensão sim/não/geral**, **profundidade**, **comprimento a mais do lado do nó** e **do
-lado de fora**, **forma e raio das pontas**, **rampa sim/não** e **piso tátil sim/não** (sem rampa, a faixa encosta na face
-da extensão). *Aplicar a todas* copia também esses valores.
+**Personalização por esquina e por lado** (bloco *Ajustes por esquina*, a esquina à direita de quem chega pelo ramo; também
+na janela do clique na esquina e no **Editar** de uma extensão): **extensão sim/não**, **avanço neste ramo** e **na outra
+via** (−1 = geral; 0 = sem extensão daquele lado), **terminar no estacionamento**, **largura deste lado** e **da outra via**,
+**forma das pontas deste lado** e **da outra via**, **comprimento da transição deste lado** e **da outra via**, **raio da
+curva da esquina**, **folga além da faixa**, **rampa sim/não** e **piso tátil sim/não**. Com comprimento informado (ou até o
+estacionamento) curto para a transição, a transição encurta até caber (aviso). Para o **lado contínuo da travessia do
+ramo**: **extensão sim/não/geral**, **profundidade**, **comprimento a mais do lado do nó** e **do lado de fora**, **forma**
+e **comprimento da transição das pontas**, **rampa sim/não** e **piso tátil sim/não** (sem rampa, a faixa encosta na face
+da extensão). *Aplicar a todas* copia também esses valores (o contorno livre não: é de cada esquina).
+
+**Contorno livre** (extensões personalizadas, como no estudo de interseção protegida da imagem de referência): em
+*Extensão de calçada → clique na esquina* (ou **Editar** sobre uma extensão), escolha **Contorno → Contorno livre – clicar os
+pontos depois de Aplicar**. Clique a **ponta no meio-fio** de uma das vias, os **pontos da face** pelo lado da pista e a
+**ponta no meio-fio** da outra via; **ESC** termina. Os cantos são arredondados com o **raio do arredondamento** (padrão
+1,0 m). O contorno fica gravado nas coordenadas do ramo (acompanha a interseção quando ela é movida) e é conferido a cada
+atualização; é **recusado, com o motivo no relatório**, e a esquina fica com a forma padrão quando: as pontas não estão no
+meio-fio (até 1 m dele), o contorno se cruza, sai da pista (entra na calçada ou no lote) ou avança sobre faixa de rolamento.
+Com contorno livre, a travessia fica no lugar de antes (a curva da esquina não é deslocada) e as rampas vão para a borda do
+contorno. **Contorno → Forma padrão** volta às medidas.
 
 **A extensão é a própria calçada avançada.** Calçada e extensão formam **um piso só, no nível da calçada**: o meio-fio antigo
 (e a sarjeta) atrás dela saem e o lugar deles vira piso; o **meio-fio e a sarjeta passam a contornar a face externa da
 extensão**, voltados para a pista, e voltam ao alinhamento da via nas pontas. Cada extensão é **um único polígono** com
-bordas paralelas à via, curva com o raio da esquina + avanço e pontas conforme a forma escolhida – sem lóbulos, dentes,
+bordas paralelas à via, curva com o raio da esquina e pontas conforme a forma escolhida – sem lóbulos, dentes,
 autointerseções ou pedaços soltos, e sem ficar sob faixas de pedestres ou rampas (as rampas encaixam na borda dela). O mesmo
 vale para a **extensão avulsa** (clique na esquina) e para as **extensões no meio da quadra** (seção 17).
 

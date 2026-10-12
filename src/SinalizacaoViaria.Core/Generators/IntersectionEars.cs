@@ -114,15 +114,64 @@ public static partial class IntersectionGenerator
     }
 
     /// <summary>
-    /// Planeja as orelhas das esquinas: lados com estacionamento (ou avanço informado), avanço, comprimento (pedido, até o
-    /// início do estacionamento, e sempre cobrindo a travessia e as rampas daquele lado, que passam para a borda da orelha) e
-    /// o caminho na face do meio-fio. <paramref name="provisional"/>: comprimentos com folga (antes das rampas finais).
+    /// Largura junto ao meio-fio de um lado da via que não é faixa de rolamento – estacionamento, acostamento, faixa de
+    /// segurança e canteiro pintado encostados no meio-fio, com a sarjeta somada – e a sarjeta. Nulo = via sem a seção gravada
+    /// (a largura não pode ser conferida).
+    /// </summary>
+    public static (double Width, double Gutter)? CurbRoom(RoadPavementDefinition r, bool left)
+    {
+        var setup = RoadTemplates.FromJson(r.SetupJson);
+        if (setup == null) return null;
+        var side = left ? setup.Left : setup.Right;
+        var k = side.FindIndex(e => e.Tipo == TipoElementoSecao.Calcada);
+        var last = k < 0 ? side.Count - 1 : k - 1;
+        var w = 0.0;
+        for (var i = last; i >= 0 && side[i].Tipo is TipoElementoSecao.Estacionamento or TipoElementoSecao.Acostamento
+                 or TipoElementoSecao.FaixaSeguranca or TipoElementoSecao.CanteiroPintado; i--)
+            w += side[i].Largura;
+        var gutter = k >= 0 && setup.SarjetaSomada == true && setup.PhysicalElements && !(last >= 0 && side[last].Elevado) ? Math.Max(0, side[k].Sarjeta) : 0;
+        return (w + gutter, gutter);
+    }
+
+    /// <summary>Transição automática das pontas: comprimento ao longo do meio-fio = este fator × a largura do avanço [a confirmar].</summary>
+    public const double AutoTaperFactor = 2.0;
+
+    /// <summary>Folga padrão da extensão além da faixa de pedestres e das rampas (m).</summary>
+    public const double DefaultCrosswalkMargin = 0.30;
+
+    /// <summary>
+    /// Raio das curvas reversas (ou comprimento do chanfro) da ponta: pelo comprimento de transição informado, pelo raio
+    /// informado na esquina (ajuste antigo) ou automático – transição de <see cref="AutoTaperFactor"/> × a largura (curva
+    /// reversa tangente ao meio-fio e à face, ~53° no meio).
+    /// </summary>
+    public static double EndParam(TipoTransicao kind, double? taper, double? radius, double face)
+    {
+        var D = Math.Max(0.1, face);
+        if (kind == TipoTransicao.Reta) return Math.Max(0.1, radius ?? 1.0);
+        if (taper is not > 0.05 && radius is > 0.05) return radius.Value;
+        var lt = taper is > 0.05 ? taper.Value : AutoTaperFactor * D;
+        return kind == TipoTransicao.Chanfro ? lt : (lt * lt + D * D) / (4 * D);
+    }
+
+    /// <summary>Lado de uma esquina com extensão: largura (até a face), sarjeta em frente, pontas e o comprimento pedido.</summary>
+    private sealed record EarSidePlan(bool On, double Depth, double Gutter, TipoTransicao Kind, double Param, double? Requested)
+    {
+        public double Face => Depth - Gutter;
+        public double Lt => On ? EarTransition(Kind, Param, Face) : 0;
+    }
+
+    /// <summary>
+    /// Planeja as orelhas das esquinas: lados com estacionamento (ou avanço informado, até a largura junto ao meio-fio sem faixa
+    /// de rolamento), avanço de cada lado, comprimento (pedido, até o início do estacionamento, e sempre cobrindo a travessia e as
+    /// rampas daquele lado, que passam para a borda da orelha, e indo além do prolongamento do alinhamento predial) e a face:
+    /// as faces deslocadas de cada lado ligadas pela curva da esquina com o raio dela (veículo de projeto), tangente às duas, e a
+    /// transição suave de volta ao meio-fio nas pontas. <paramref name="provisional"/>: comprimentos com folga (antes das rampas finais).
     /// </summary>
     private static void PlanEars(IntersectionDefinition d, IntersectionLayout L, List<Polygon2> pav, bool provisional)
     {
         L.Ears.Clear();
         L.EarSides.Clear();
-        // Cada passada parte dos fins de curva sem as extensões de um lado só (que deslocam a curva da esquina).
+        // Cada passada parte dos fins de curva sem as extensões (que deslocam a curva da esquina).
         L.ClearCap.Clear();
         if (L.BaseSideTangentT.Count == 0)
             foreach (var kv in L.SideTangentT) L.BaseSideTangentT[kv.Key] = kv.Value;
@@ -132,6 +181,13 @@ public static partial class IntersectionGenerator
             SyncTangents(L);
         }
         var notes = new List<string>();
+        // Duas passadas: a primeira desloca as curvas de todas as esquinas (a travessia de cada ramo depende das duas esquinas
+        // dele); a segunda planeja os comprimentos com as travessias já no lugar definitivo.
+        for (var pass = 0; pass < 2; pass++)
+        {
+        L.Ears.Clear();
+        L.EarSides.Clear();
+        notes.Clear();
         foreach (var (la, lb) in EarCorners(d, L).ToList())
         {
             if (d.RightTurnIslands != TipoIlha.Nenhuma)
@@ -143,72 +199,208 @@ public static partial class IntersectionGenerator
             var ra = L.Roads[la.Road].Def;
             var rb = L.Roads[lb.Road].Def;
             // Lado alto do ramo A e lado baixo do ramo B (a esquerda da via para Sign > 0 é o lado alto).
-            var parkA = ParkingDepth(ra, la.Sign > 0);
-            var parkB = ParkingDepth(rb, lb.Sign < 0);
-            var explicitDepth = ls?.CurbExtensionDepth is > 0.1 ? ls.CurbExtensionDepth : d.CurbExtensionDepth is > 0.1 ? d.CurbExtensionDepth : null;
-            var sideA = parkA != null || explicitDepth != null && (la.Sign > 0 ? ra.LeftSidewalk : ra.RightSidewalk) > 0.5;
-            var sideB = parkB != null || explicitDepth != null && (lb.Sign > 0 ? rb.RightSidewalk : rb.LeftSidewalk) > 0.5;
-            // Avanço 0 informado num lado: a orelha fica só ao longo da outra via (não contorna a esquina).
-            if (ls?.CurbExtensionLength is < 0.05) sideA = false;
-            if (ls?.CurbExtensionLengthOther is < 0.05) sideB = false;
-            if (!sideA && !sideB)
+            var leftA = la.Sign > 0;
+            var leftB = lb.Sign < 0;
+            static double? Req(double? v) => v is > 0.1 ? v : null;
+            var reqA = Req(ls?.CurbExtensionDepth) ?? Req(d.CurbExtensionDepth);
+            var reqB = Req(ls?.CurbExtensionDepthOther) ?? reqA;
+            var parkA = ParkingDepth(ra, leftA);
+            var parkB = ParkingDepth(rb, leftB);
+            var onA = parkA != null || reqA != null && (leftA ? ra.LeftSidewalk : ra.RightSidewalk) > 0.5;
+            var onB = parkB != null || reqB != null && (leftB ? rb.LeftSidewalk : rb.RightSidewalk) > 0.5;
+            // Avanço 0 informado num lado: a orelha fica só ao longo da outra via.
+            if (ls?.CurbExtensionLength is < 0.05) onA = false;
+            if (ls?.CurbExtensionLengthOther is < 0.05) onB = false;
+            if (!onA && !onB)
             {
                 notes.Add("esquina sem faixa de estacionamento junto ao meio-fio não recebe extensão de calçada (informe a largura do avanço para forçar)");
                 continue;
             }
-            var depth = explicitDepth ?? new[] { sideA ? parkA : null, sideB ? parkB : null }.Where(x => x != null).Min()!.Value;
-            depth = Math.Clamp(depth, 0.3, 10);
-            // Sarjeta da via: continua na frente da orelha (a face do meio-fio da orelha fica a Depth − sarjeta da original).
-            var gutter = new[] { sideA && parkA != null ? ParkingGutter(ra, la.Sign > 0) : double.NaN, sideB && parkB != null ? ParkingGutter(rb, lb.Sign < 0) : double.NaN }
-                .Where(g => !double.IsNaN(g)).DefaultIfEmpty(0).Max();
-            if (depth - gutter < 0.6) gutter = 0;
-            var face = depth - gutter;
-            var toParking = ls?.CurbExtensionToParking ?? d.CurbExtensionToParking;
-            var ends = ls?.CurbExtensionEnds ?? d.CurbExtensionEnds;
-            var endR = ls?.CurbExtensionEndRadius ?? d.CurbExtensionEndRadius;
-            var lt = EarTransition(ends, endR, face);
-            // Extensão de um lado só: a curva da esquina passa a ligar o meio-fio da outra via à face da extensão (mesmo raio,
-            // tangente às duas) – a extensão nasce da curva, sem ponta nem degrau, e as travessias acompanham o novo fim da curva.
-            var shifted = sideA != sideB ? ShiftCorner(L, la, lb, sideA, face) : null;
-            double Length(IntersectionLeg leg, double? requested, int side)
+            var endsA = ls?.CurbExtensionEnds ?? d.CurbExtensionEnds;
+            var endsB = ls?.CurbExtensionEndsOther ?? endsA;
+            var taperA = ls?.CurbExtensionTaper ?? d.CurbExtensionTaper;
+            var taperB = ls?.CurbExtensionTaperOther ?? ls?.CurbExtensionTaper ?? d.CurbExtensionTaper;
+            // Largura de cada lado: a pedida ou a do estacionamento, nunca além da faixa junto ao meio-fio sem tráfego.
+            EarSidePlan Side(bool on, double? req, double? park, RoadPavementDefinition r, bool left, TipoTransicao kind, double? taper, double? requested)
             {
+                if (!on) return new EarSidePlan(false, 0, 0, kind, 0, null);
+                var room = CurbRoom(r, left);
+                var depth = req ?? park!.Value;
+                var gutter = park != null ? ParkingGutter(r, left) : room?.Gutter ?? 0;
+                if (room is { } rm)
+                {
+                    if (rm.Width - rm.Gutter < 0.3)
+                    {
+                        notes.Add("lado da esquina sem estacionamento ou acostamento junto ao meio-fio: a extensão de calçada invadiria a faixa de rolamento e não foi feita");
+                        return new EarSidePlan(false, 0, 0, kind, 0, null);
+                    }
+                    if (depth > rm.Width + 0.005)
+                    {
+                        notes.Add($"largura da extensão de calçada reduzida de {depth:0.00} m para {rm.Width:0.00} m para não invadir a faixa de rolamento");
+                        depth = rm.Width;
+                    }
+                    gutter = rm.Gutter;
+                }
+                else if (req != null && park == null)
+                    notes.Add("via sem a seção gravada: a largura informada da extensão de calçada não pôde ser conferida com as faixas de rolamento");
+                depth = Math.Clamp(depth, 0.3, 10);
+                if (depth - gutter < 0.6) gutter = 0;
+                var face = depth - gutter;
+                return new EarSidePlan(true, depth, gutter, kind, EndParam(kind, taper, ls?.CurbExtensionEndRadius, face), requested);
+            }
+            var A = Side(onA, reqA, parkA, ra, leftA, endsA, taperA, ls?.CurbExtensionLength);
+            var B = Side(onB, reqB, parkB, rb, leftB, endsB, taperB, ls?.CurbExtensionLengthOther ?? (ls?.CurbExtensionLength is > 0.05 ? ls.CurbExtensionLength : null));
+            if (!A.On && !B.On) continue;
+            // Sarjeta da via: continua na frente da orelha (a face do meio-fio da orelha fica a Depth − sarjeta da original).
+            var gutter = Math.Max(A.On ? A.Gutter : 0, B.On ? B.Gutter : 0);
+            var toParking = ls?.CurbExtensionToParking ?? d.CurbExtensionToParking;
+            var margin = Math.Max(0, ls?.CurbExtensionCrosswalkMargin ?? d.CurbExtensionCrosswalkMargin ?? DefaultCrosswalkMargin);
+            // A curva da esquina passa a ligar as faces deslocadas (a de cada lado com extensão; o meio-fio da outra via no lado
+            // sem ela), com o raio da esquina, tangente às duas: a extensão nasce da curva, sem ponta nem degrau, e as travessias
+            // acompanham o novo fim da curva.
+            var cf0 = L.CornerFillets.TryGetValue((la.Road, la.Sign), out var cfx) ? cfx : null;
+            var rx = ls?.CurbExtensionCornerRadius ?? d.CurbExtensionCornerRadius;
+            var shifted = ShiftCorner(L, pav, la, lb, A.On ? A.Face : 0, B.On ? B.Face : 0, rx is > 0.05 ? rx.Value : cf0?.R ?? 0, notes);
+            // Estação até onde a largura toda precisa ir para a travessia e as rampas deste lado ficarem sobre a extensão.
+            double? Cover(IntersectionLeg leg, int side)
+            {
+                if (!CrosswalkOn(d, L, leg)) return null;
+                var plan = RampPlanOf(d, L, leg);
+                var rp = side > 0 ? plan.Hi : plan.Lo;
+                return CrosswalkT(d, L, leg) + Math.Max(CrosswalkWidthOf(d, L, leg) / 2, rp == null ? 0 : RampHalfExtent(rp)) + margin;
+            }
+            double Length(IntersectionLeg leg, EarSidePlan sp, int side)
+            {
+                var requested = sp.Requested;
                 var len = toParking ? StopFar(d, L, leg) + 5.0 : Math.Max(0.5, requested is > 0.05 ? requested.Value : d.CurbExtensionLength);
+                // Comprimento fixo (informado ou até o estacionamento): a travessia é coberta com uma transição curta (a ponta
+                // encurta até caber, ver Fit); senão, com a transição pedida.
+                var fixedLen = requested is > 0.05 || toParking;
+                var lt = fixedLen && sp.Kind != TipoTransicao.Reta ? Math.Min(sp.Lt, sp.Face) : sp.Lt;
                 // A travessia deste lado fica sobre a orelha: a orelha vai além da faixa e das rampas (com a ponta).
                 if (CrosswalkOn(d, L, leg))
                 {
                     var plan = RampPlanOf(d, L, leg);
                     var rp = side > 0 ? plan.Hi : plan.Lo;
                     var ext = Math.Max(CrosswalkWidthOf(d, L, leg) / 2, rp == null ? 0 : RampHalfExtent(rp));
-                    var need = CrosswalkT(d, L, leg) - leg.Clear + ext + lt + 0.3 + (provisional ? 2.5 : 0);
+                    var need = CrosswalkT(d, L, leg) - leg.Clear + ext + lt + margin + (provisional ? 2.5 : 0);
                     if (len < need - 1e-6)
                     {
                         if (!provisional) notes.Add($"extensão de calçada estendida para {need:0.00} m ao longo da via para a travessia e as rampas ficarem sobre ela");
                         len = need;
                     }
                 }
+                // A largura toda vai pelo menos 1,5 m além do prolongamento do alinhamento predial da outra via [a confirmar].
+                if (PropertyLineT(L, la, lb, side > 0) is { } prop)
+                {
+                    var need = prop + MinBeyondPropertyLine - leg.Clear + lt;
+                    if (len < need - 1e-6)
+                    {
+                        if (requested is > 0.05 || toParking) { if (!provisional) notes.Add("extensão de calçada mais curta que 1,5 m além do alinhamento predial da esquina (comprimento informado mantido)"); }
+                        else len = need;
+                    }
+                }
+                // Com a curva deslocada, a face reta começa no novo fim da curva (comprimento fixo: a transição encurta).
+                if (shifted != null && !(requested is > 0.05 || toParking)) len = Math.Max(len, (side > 0 ? shifted.TA : shifted.TB) - leg.Clear + lt + 0.5);
                 return Math.Min(len, Math.Max(1.0, MaxT(L, leg) - leg.Clear - 2));
             }
-            var lenA = sideA ? Length(la, ls?.CurbExtensionLength, 1) : 0;
-            var lenB = sideB ? Length(lb, ls?.CurbExtensionLengthOther ?? (ls?.CurbExtensionLength is > 0.05 ? ls.CurbExtensionLength : null), -1) : 0;
-            var path = shifted != null ? ShiftedPath(L, pav, la, lb, sideA ? lenA : 0, sideB ? lenB : 0)
-                : CornerPath(L, pav, la, lb, sideA ? lenA : 0, sideB ? lenB : 0, sideA && sideB);
+            var lenA = A.On ? Length(la, A, 1) : 0;
+            var lenB = B.On ? Length(lb, B, -1) : 0;
+            // Comprimento fixo (informado ou até o estacionamento) curto para a transição: ela encurta até caber.
+            EarSidePlan Fit(EarSidePlan sp, IntersectionLeg leg, int side, double len, double tFull)
+            {
+                if (!sp.On || shifted == null || sp.Kind == TipoTransicao.Reta) return sp;
+                var room = leg.Clear + len - Math.Max(tFull + 0.3, Cover(leg, side) ?? double.MinValue);
+                if (sp.Lt <= room + 1e-6) return sp;
+                var lt = Math.Max(0.3, room);
+                if (!provisional) notes.Add($"transição da ponta da extensão de calçada encurtada para {lt:0.00} m para caber no comprimento informado");
+                return sp with { Param = EndParam(sp.Kind, lt, null, sp.Face) };
+            }
+            if (shifted != null)
+            {
+                A = Fit(A, la, 1, lenA, shifted.TA);
+                B = Fit(B, lb, -1, lenB, shifted.TB);
+            }
+            Polyline2? path;
+            CurbExtensionDefinition tpl;
+            if (shifted != null)
+            {
+                path = ShiftedPath(L, pav, la, lb, shifted, lenA, lenB);
+                tpl = new CurbExtensionDefinition
+                {
+                    Depth = Math.Max(A.On ? A.Face : 0, B.On ? B.Face : 0), Transition = A.On ? A.Kind : B.Kind, EndTransition = B.On ? B.Kind : A.Kind,
+                    Radius = A.On ? A.Param : B.Param, EndRadius = B.On ? B.Param : A.Param, SidewalkOnLeft = false,
+                    Height = L.CurbHeight, CurbWidth = L.CurbWidth, CutRoadMarkings = true,
+                };
+                if (path != null) tpl.OuterFace = ShiftedFace(L, la, lb, shifted, A, la.Clear + lenA, B, lb.Clear + lenB);
+            }
+            else
+            {
+                // Esquina fora do modelo dos bordos retos: a face acompanha o meio-fio (só nos dois lados), com a menor largura.
+                if (A.On != B.On)
+                {
+                    notes.Add("esquina sem curva de bordos retos: a extensão de calçada de um lado só fica ao longo da via, sem contornar a esquina");
+                }
+                var face = new[] { A.On ? A.Face : double.MaxValue, B.On ? B.Face : double.MaxValue }.Min();
+                var sp = A.On ? A : B;
+                path = CornerPath(L, pav, la, lb, lenA, lenB, A.On && B.On);
+                tpl = new CurbExtensionDefinition
+                {
+                    Depth = face, Transition = sp.Kind, EndTransition = sp.Kind,
+                    Radius = EndParam(sp.Kind, ls?.CurbExtensionTaper ?? d.CurbExtensionTaper, ls?.CurbExtensionEndRadius, face),
+                    SidewalkOnLeft = false, Height = L.CurbHeight, CurbWidth = L.CurbWidth, CutRoadMarkings = true,
+                };
+                tpl.EndRadius = tpl.Radius;
+            }
             if (path == null || path.Length < 1)
             {
                 notes.Add("não foi possível seguir o meio-fio de uma esquina para a extensão de calçada");
                 continue;
             }
-            var tpl = new CurbExtensionDefinition
-            {
-                Depth = face, Transition = ends, EndTransition = ends,
-                Radius = endR, EndRadius = endR, SidewalkOnLeft = false,
-                Height = L.CurbHeight, CurbWidth = L.CurbWidth, CutRoadMarkings = true,
-            };
-            if (shifted != null) tpl.OuterFace = ShiftedFace(L, la, lb, shifted, tpl, sideA, sideA ? la.Clear + lenA : lb.Clear + lenB, face, lt);
-            // Centros exatos das curvas que a extensão segue: a da esquina e, na de um lado só, a curva nova.
-            if (L.CornerFillets.TryGetValue((la.Road, la.Sign), out var cfe) && cfe.Span < 179 && cfe.R > 0.01)
+            // Centros exatos das curvas que a extensão segue: a da esquina e a curva nova.
+            if (cf0 is { Span: < 179, R: > 0.01 } cfe)
             {
                 tpl.ArcCenters = new List<Vec2> { cfe.V + (cfe.Ua + cfe.Ub).Normalized() * (cfe.R / Math.Sin(cfe.Span * Math.PI / 360)) };
                 if (shifted != null) tpl.ArcCenters.Add(shifted.Center);
+            }
+            // Trechos de cada lado com a largura toda.
+            var ramp = ls?.CurbExtensionRamp ?? true;
+            var tactile = ls?.CurbExtensionTactile;
+            var sides = new List<((int, int, int) Key, EarSide Side)>();
+            if (A.On)
+                sides.Add(((la.Road, la.Sign, 1), (shifted != null
+                    ? new EarSide(A.Face, shifted.TA, la.Clear + lenA - A.Lt, shifted.TA, la.Clear + lenA)
+                    : B.On ? new EarSide(tpl.Depth, 0, la.Clear + lenA - A.Lt, 0, la.Clear + lenA)
+                           : new EarSide(tpl.Depth, la.Clear + A.Lt, la.Clear + lenA - A.Lt, la.Clear, la.Clear + lenA)) with { Ramp = ramp, Tactile = tactile }));
+            if (B.On)
+                sides.Add(((lb.Road, lb.Sign, -1), (shifted != null
+                    ? new EarSide(B.Face, shifted.TB, lb.Clear + lenB - B.Lt, shifted.TB, lb.Clear + lenB)
+                    : A.On ? new EarSide(tpl.Depth, 0, lb.Clear + lenB - B.Lt, 0, lb.Clear + lenB)
+                           : new EarSide(tpl.Depth, lb.Clear + B.Lt, lb.Clear + lenB - B.Lt, lb.Clear, lb.Clear + lenB)) with { Ramp = ramp, Tactile = tactile }));
+            // Contorno livre desta esquina: substitui a face padrão quando é válido.
+            if (ls?.CurbExtensionFace is { Count: >= 2 } free)
+            {
+                var ff = FreeFace(L, pav, la, lb, free, ls.CurbExtensionFaceRadius ?? 1.0);
+                if (ff.Error != null)
+                {
+                    if (!provisional) notes.Add($"contorno livre da esquina {LegLabel(L, la)} recusado – {ff.Error}; ficou a forma padrão");
+                }
+                else
+                {
+                    // Sem curva deslocada: os fins de curva e as travessias voltam ao lugar de antes da extensão.
+                    if (shifted != null)
+                    {
+                        foreach (var kv in L.BaseSideTangentT.Where(kv => kv.Key == (la.Road, la.Sign, 1) || kv.Key == (lb.Road, lb.Sign, -1)))
+                            L.SideTangentT[kv.Key] = kv.Value;
+                        SyncTangents(L);
+                        L.ClearCap.Remove((la.Road, la.Sign));
+                        L.ClearCap.Remove((lb.Road, lb.Sign));
+                    }
+                    path = ff.Path!;
+                    tpl.OuterFace = ff.Face;
+                    if (tpl.ArcCenters is { Count: > 1 }) tpl.ArcCenters.RemoveAt(1);
+                    sides = FreeSides(L, ff.Face!, la, lb).Select(x => (x.Key, x.Side with { Ramp = ramp, Tactile = tactile })).ToList();
+                }
             }
             var fp = SidewalkGenerator.EarFootprint(tpl, path);
             if (fp == null) continue;
@@ -221,33 +413,39 @@ public static partial class IntersectionGenerator
             // A sarjeta da via sai de onde passa a sarjeta nova (nas pontas da orelha as duas se encontram sem sobrepor).
             var cut = SidewalkGenerator.EarCutZone(tpl, path);
             if (gutterPath != null) cut = PolygonOps.Union(cut.Concat(PolygonOps.Strip(gutterPath.Points, gutter, roundJoins: true)));
-            L.Ears.Add(new EarPlan(la, lb, sideA, sideB, lenA, lenB, depth, path, fp, tpl)
+            L.Ears.Add(new EarPlan(la, lb, A.On, B.On, lenA, lenB, Math.Max(A.Depth, B.Depth), path, fp, tpl)
             {
                 Gutter = gutter, GutterPath = gutterPath, CutZone = cut,
             });
-            // Trechos de cada lado com a largura toda (a ponta da curva da esquina fica cheia quando a orelha contorna a esquina).
-            var ramp = ls?.CurbExtensionRamp ?? true;
-            var tactile = ls?.CurbExtensionTactile;
-            if (sideA)
-                L.EarSides[(la.Road, la.Sign, 1)] = (sideB
-                    ? new EarSide(face, 0, la.Clear + lenA - lt, 0, la.Clear + lenA)
-                    : shifted != null
-                        ? new EarSide(face, shifted.TA, la.Clear + lenA - lt, shifted.TA, la.Clear + lenA)
-                        : new EarSide(face, la.Clear + lt, la.Clear + lenA - lt, la.Clear, la.Clear + lenA)) with { Ramp = ramp, Tactile = tactile };
-            if (sideB)
-                L.EarSides[(lb.Road, lb.Sign, -1)] = (sideA
-                    ? new EarSide(face, 0, lb.Clear + lenB - lt, 0, lb.Clear + lenB)
-                    : shifted != null
-                        ? new EarSide(face, shifted.TB, lb.Clear + lenB - lt, shifted.TB, lb.Clear + lenB)
-                        : new EarSide(face, lb.Clear + lt, lb.Clear + lenB - lt, lb.Clear, lb.Clear + lenB)) with { Ramp = ramp, Tactile = tactile };
+            foreach (var (key, es) in sides) L.EarSides[key] = es;
+        }
         }
         PlanStraightEars(d, L, notes, provisional);
         if (!provisional)
             foreach (var n in notes.Distinct()) L.Warnings.Add($"Extensões de calçada: {n}.");
     }
 
-    /// <summary>Curva da esquina deslocada por uma extensão de um lado só: face nova (da outra via, pela curva, até a face da extensão) e os novos fins da curva.</summary>
-    private sealed record ShiftedCorner(List<Vec2> Arc, double TA, double TB, double TA0, double TB0, Vec2 Center);
+    /// <summary>Distância mínima (m) da largura toda da extensão além do prolongamento do alinhamento predial (5 pés – NACTO) [a confirmar].</summary>
+    public const double MinBeyondPropertyLine = 1.5;
+
+    /// <summary>
+    /// Estação, no ramo A (<paramref name="onA"/>) ou no B, onde o prolongamento do alinhamento predial da outra via da esquina
+    /// (o fundo da calçada dela) cruza o meio-fio. Nulo = esquina sem curva de bordos retos.
+    /// </summary>
+    public static double? PropertyLineT(IntersectionLayout L, IntersectionLeg la, IntersectionLeg lb, bool onA)
+    {
+        if (!L.CornerFillets.TryGetValue((la.Road, la.Sign), out var cf) || cf.Span >= 179 || cf.Span < 1) return null;
+        var (leg, u, other) = onA ? (la, cf.Ua, lb) : (lb, cf.Ub, la);
+        var r = L.Roads[other.Road].Def;
+        // Calçada da outra via voltada para a esquina: lado baixo do ramo B ou lado alto do ramo A.
+        var walk = onA ? (lb.Sign > 0 ? r.RightSidewalk : r.LeftSidewalk) : (la.Sign > 0 ? r.LeftSidewalk : r.RightSidewalk);
+        if (walk <= 0.01) return null;
+        var p = cf.V + u * ((walk + L.CurbWidth) / Math.Sin(cf.Span * Math.PI / 180));
+        return (p - L.Node).Dot(leg.Dir);
+    }
+
+    /// <summary>Curva da esquina deslocada pelas extensões: face nova (arco), os novos fins da curva e os de antes, centro e raio.</summary>
+    private sealed record ShiftedCorner(List<Vec2> Arc, double TA, double TB, double TA0, double TB0, Vec2 Center, double R);
 
     /// <summary><see cref="IntersectionLayout.TangentT"/> = o maior dos dois lados de cada ramo.</summary>
     private static void SyncTangents(IntersectionLayout L)
@@ -257,32 +455,49 @@ public static partial class IntersectionGenerator
     }
 
     /// <summary>
-    /// Extensão de um lado só da esquina (no ramo A se <paramref name="onA"/>, senão no B): o bordo daquele lado avança
-    /// <paramref name="face"/> sobre a pista e a curva da esquina, com o mesmo raio, passa a ser tangente ao meio-fio da outra
-    /// via e à face da extensão. Atualiza os fins de curva dos dois ramos (a travessia da outra via fica mais perto do nó).
-    /// Nulo quando a esquina não segue o modelo dos bordos retos (fim da curva corrigido pela medida).
+    /// Extensões da esquina: o bordo do ramo A avança <paramref name="fA"/> sobre a pista e o do ramo B, <paramref name="fB"/>
+    /// (0 = sem extensão daquele lado) e a curva da esquina, com o raio <paramref name="r"/> (o da esquina – veículo de projeto
+    /// – por padrão), passa a ser tangente aos dois bordos deslocados. Atualiza os fins de curva dos dois ramos (as travessias
+    /// ficam mais perto do nó). Raio maior que o que cabe é reduzido (a curva nova não pode entrar na calçada nem passar do fim
+    /// da curva antiga no lado sem extensão). Nulo quando a esquina não segue o modelo dos bordos retos.
     /// </summary>
-    private static ShiftedCorner? ShiftCorner(IntersectionLayout L, IntersectionLeg la, IntersectionLeg lb, bool onA, double face)
+    private static ShiftedCorner? ShiftCorner(IntersectionLayout L, List<Polygon2> pav, IntersectionLeg la, IntersectionLeg lb, double fA, double fB, double r,
+        List<string> notes)
     {
-        if (!L.CornerFillets.TryGetValue((la.Road, la.Sign), out var cf) || cf.Span >= 179 || cf.R <= 0.01) return null;
-        var (ua, ub, V, r) = (cf.Ua, cf.Ub, cf.V, cf.R);
+        if (!L.CornerFillets.TryGetValue((la.Road, la.Sign), out var cf) || cf.Span >= 179 || cf.R <= 0.01 || r <= 0.01) return null;
+        var (ua, ub, V) = (cf.Ua, cf.Ub, cf.V);
         var half = cf.Span * Math.PI / 360;
-        var T = r / Math.Tan(half);
+        var T0 = cf.R / Math.Tan(half);
         var node = L.Node;
         // Só quando o fim da curva calculado pelo vértice vale (sem correção pela medida).
         var keyA = (la.Road, la.Sign, 1);
         var keyB = (lb.Road, lb.Sign, -1);
         if (!L.BaseSideTangentT.TryGetValue(keyA, out var tA0) || !L.BaseSideTangentT.TryGetValue(keyB, out var tB0)) return null;
-        if (Math.Abs(tA0 - (V + ua * T - node).Dot(la.Dir)) > 0.05 || Math.Abs(tB0 - (V + ub * T - node).Dot(lb.Dir)) > 0.05) return null;
-        // Normal de cada bordo para o lado da pista (fora da cunha da esquina).
+        if (Math.Abs(tA0 - (V + ua * T0 - node).Dot(la.Dir)) > 0.05 || Math.Abs(tB0 - (V + ub * T0 - node).Dot(lb.Dir)) > 0.05) return null;
+        // Normal de cada bordo para o lado da pista (fora da cunha da esquina); vértice novo a fA do bordo A e fB do B.
         var nA = -(ub - ua * ub.Dot(ua)).Normalized();
         var nB = -(ua - ub * ua.Dot(ub)).Normalized();
-        Vec2 V2;
-        if (onA) V2 = V + ub * (face * nA.Cross(ua) / ub.Cross(ua));
-        else V2 = V + ua * (face * nB.Cross(ub) / ua.Cross(ub));
+        var V2 = V + ua * (fB / ua.Dot(nB)) + ub * (fA / ub.Dot(nA));
+        var bis = (ua + ub).Normalized();
+        // Raio que cabe: no lado sem extensão a curva nova não passa do fim da curva antiga; e o arco fica na pista.
+        double TOf(double rr) => rr / Math.Tan(half);
+        var rMax = double.MaxValue;
+        if (fA < 1e-6) rMax = Math.Min(rMax, ((V + ua * T0 - node).Dot(la.Dir) - (V2 - node).Dot(la.Dir)) * Math.Tan(half) / ua.Dot(la.Dir));
+        if (fB < 1e-6) rMax = Math.Min(rMax, ((V + ub * T0 - node).Dot(lb.Dir) - (V2 - node).Dot(lb.Dir)) * Math.Tan(half) / ub.Dot(lb.Dir));
+        // Arco novo fora da calçada: o ponto do meio dele não passa do ponto do meio do arco antigo (ao longo da bissetriz).
+        var mid0 = (cf.R / Math.Sin(half) - cf.R);
+        var shift = (V2 - V).Dot(bis);
+        rMax = Math.Min(rMax, (mid0 - shift) / (1 / Math.Sin(half) - 1));
+        if (r > rMax + 1e-6)
+        {
+            if (rMax < 0.3) return null;
+            notes.Add($"raio da curva da extensão de calçada reduzido de {r:0.00} m para {rMax:0.00} m (a curva nova não pode entrar na calçada)");
+            r = rMax;
+        }
+        var T = TOf(r);
         var ta = V2 + ua * T;
         var tb = V2 + ub * T;
-        var c = V2 + (ua + ub).Normalized() * (r / Math.Sin(half));
+        var c = V2 + bis * (r / Math.Sin(half));
         // Arco novo do fim da curva no ramo A até o do ramo B (passo ≤ 1°).
         var pts = new List<Vec2>();
         var a0 = Math.Atan2(ta.Y - c.Y, ta.X - c.X);
@@ -302,22 +517,22 @@ public static partial class IntersectionGenerator
         foreach (var leg in new[] { la, lb })
             if (L.SideTangentT.ContainsKey((leg.Road, leg.Sign, 1)) && L.SideTangentT.ContainsKey((leg.Road, leg.Sign, -1)))
                 L.ClearCap[(leg.Road, leg.Sign)] = L.TangentT[(leg.Road, leg.Sign)];
-        return new ShiftedCorner(pts, tA, tB, tA0, tB0, c);
+        return new ShiftedCorner(pts, tA, tB, tA0, tB0, c, r);
     }
 
     /// <summary>
-    /// Face antiga do meio-fio de uma extensão de um lado só: do fim da extensão (ramo dela) até o fim da curva antigo,
-    /// a curva antiga inteira e 0,5 m do trecho reto da outra via (a extensão começa ali, com largura zero).
+    /// Face antiga do meio-fio das extensões da esquina: do fim da extensão no ramo A (ou, sem extensão ali, 0,5 m além do fim
+    /// da curva) até o fim da curva antigo, a curva antiga inteira e o ramo B até o fim da extensão dele (ou 0,5 m além).
     /// </summary>
-    private static Polyline2? ShiftedPath(IntersectionLayout L, List<Polygon2> pav, IntersectionLeg la, IntersectionLeg lb, double lenA, double lenB)
+    private static Polyline2? ShiftedPath(IntersectionLayout L, List<Polygon2> pav, IntersectionLeg la, IntersectionLeg lb, ShiftedCorner sc, double lenA, double lenB)
     {
-        if (!L.BaseSideTangentT.TryGetValue((la.Road, la.Sign, 1), out var tA) || !L.BaseSideTangentT.TryGetValue((lb.Road, lb.Sign, -1), out var tB)) return null;
+        var (tA, tB) = (sc.TA0, sc.TB0);
         var pts = new List<Vec2>();
         void Add(Vec2 p)
         {
             if (pts.Count == 0 || pts[^1].DistanceTo(p) > 0.01) pts.Add(p);
         }
-        var a1 = lenA > 0 ? la.Clear + lenA : tA + 0.5;
+        var a1 = lenA > 0 ? la.Clear + lenA : Math.Max(tA, sc.TA) + 0.5;
         var nA = Math.Max(2, (int)Math.Ceiling((a1 - tA) / 0.5));
         for (int k = 0; k <= nA; k++)
         {
@@ -327,7 +542,7 @@ public static partial class IntersectionGenerator
         var curve = RingPath(pav, L.At(la, tA, L.HiEdge(la, tA)), L.At(lb, tB, -L.LoEdge(lb, tB)));
         if (curve == null) return null;
         foreach (var p in curve) Add(p);
-        var b1 = lenB > 0 ? lb.Clear + lenB : tB + 0.5;
+        var b1 = lenB > 0 ? lb.Clear + lenB : Math.Max(tB, sc.TB) + 0.5;
         var nB = Math.Max(2, (int)Math.Ceiling((b1 - tB) / 0.5));
         for (int k = 0; k <= nB; k++)
         {
@@ -339,47 +554,165 @@ public static partial class IntersectionGenerator
     }
 
     /// <summary>
-    /// Face nova de uma extensão de um lado só, no sentido do caminho (<see cref="ShiftedPath"/>): na ponta longe da esquina a
-    /// transição pedida (curva reversa tangente ao meio-fio antigo e à face da extensão), a face da extensão até o novo fim da
-    /// curva, o arco novo e o meio-fio da outra via até o fim do caminho.
+    /// Face nova das extensões da esquina, no sentido do caminho (<see cref="ShiftedPath"/>): no ramo A, a transição da ponta
+    /// (curva reversa tangente ao meio-fio antigo e à face) e a face até o novo fim da curva – ou, sem extensão ali, o meio-fio
+    /// do ramo –; o arco novo; e no ramo B o mesmo, do fim da curva para fora.
     /// </summary>
-    private static List<Vec2> ShiftedFace(IntersectionLayout L, IntersectionLeg la, IntersectionLeg lb, ShiftedCorner sc, CurbExtensionDefinition tpl,
-        bool onA, double farT, double face, double lt)
+    private static List<Vec2> ShiftedFace(IntersectionLayout L, IntersectionLeg la, IntersectionLeg lb, ShiftedCorner sc,
+        EarSidePlan A, double farA, EarSidePlan B, double farB)
     {
         // Transição da ponta: perfil (x a partir da ponta, avanço) da transição pedida.
-        var std = (CurbExtensionDefinition)tpl.ShallowCopy();
-        std.OuterFace = null;
-        std.EndTransition = TipoTransicao.Reta;
-        var head = SidewalkGenerator.EarProfile(std, Math.Max(2 * lt + 2, 4)).TakeWhile(v => v.Y < face - 1e-6).ToList();
+        static List<Vec2> Head(EarSidePlan sp)
+        {
+            var std = new CurbExtensionDefinition { Depth = sp.Face, Transition = sp.Kind, EndTransition = TipoTransicao.Reta, Radius = sp.Param };
+            return SidewalkGenerator.EarProfile(std, Math.Max(2 * sp.Lt + 2, 4)).TakeWhile(v => v.Y < sp.Face - 1e-6).ToList();
+        }
         var pts = new List<Vec2>();
         void Add(Vec2 p)
         {
             if (pts.Count == 0 || pts[^1].DistanceTo(p) > 0.005) pts.Add(p);
         }
-        if (onA)
+        if (A.On)
         {
-            foreach (var v in head) Add(L.At(la, farT - v.X, L.HiEdge(la, farT - v.X) - v.Y));
-            var t0 = farT - lt;
+            foreach (var v in Head(A)) Add(L.At(la, farA - v.X, L.HiEdge(la, farA - v.X) - v.Y));
+            var t0 = farA - A.Lt;
             var n = Math.Max(1, (int)Math.Ceiling((t0 - sc.TA) / 0.5));
-            for (int k = 0; k <= n; k++) { var t = t0 - (t0 - sc.TA) * k / (double)n; Add(L.At(la, t, L.HiEdge(la, t) - face)); }
-            foreach (var p in sc.Arc) Add(p);
-            var b1 = sc.TB0 + 0.5;
-            var m = Math.Max(1, (int)Math.Ceiling((b1 - sc.TB) / 0.5));
-            for (int k = 0; k <= m; k++) { var t = sc.TB + (b1 - sc.TB) * k / (double)m; Add(L.At(lb, t, -L.LoEdge(lb, t))); }
+            for (int k = 0; k <= n; k++) { var t = t0 - (t0 - sc.TA) * k / (double)n; Add(L.At(la, t, L.HiEdge(la, t) - A.Face)); }
         }
         else
         {
-            var a1 = sc.TA0 + 0.5;
+            var a1 = Math.Max(sc.TA0, sc.TA) + 0.5;
             var m = Math.Max(1, (int)Math.Ceiling((a1 - sc.TA) / 0.5));
             for (int k = 0; k <= m; k++) { var t = a1 - (a1 - sc.TA) * k / (double)m; Add(L.At(la, t, L.HiEdge(la, t))); }
-            foreach (var p in sc.Arc) Add(p);
-            var t1 = farT - lt;
+        }
+        foreach (var p in sc.Arc) Add(p);
+        if (B.On)
+        {
+            var t1 = farB - B.Lt;
             var n = Math.Max(1, (int)Math.Ceiling((t1 - sc.TB) / 0.5));
-            for (int k = 0; k <= n; k++) { var t = sc.TB + (t1 - sc.TB) * k / (double)n; Add(L.At(lb, t, -(L.LoEdge(lb, t) - face))); }
-            foreach (var v in Enumerable.Reverse(head)) Add(L.At(lb, farT - v.X, -(L.LoEdge(lb, farT - v.X) - v.Y)));
-            Add(L.At(lb, farT, -L.LoEdge(lb, farT)));
+            for (int k = 0; k <= n; k++) { var t = sc.TB + (t1 - sc.TB) * k / (double)n; Add(L.At(lb, t, -(L.LoEdge(lb, t) - B.Face))); }
+            foreach (var v in Enumerable.Reverse(Head(B))) Add(L.At(lb, farB - v.X, -(L.LoEdge(lb, farB - v.X) - v.Y)));
+            Add(L.At(lb, farB, -L.LoEdge(lb, farB)));
+        }
+        else
+        {
+            var b1 = Math.Max(sc.TB0, sc.TB) + 0.5;
+            var m = Math.Max(1, (int)Math.Ceiling((b1 - sc.TB) / 0.5));
+            for (int k = 0; k <= m; k++) { var t = sc.TB + (b1 - sc.TB) * k / (double)m; Add(L.At(lb, t, -L.LoEdge(lb, t))); }
         }
         return pts;
+    }
+
+    /// <summary>
+    /// Faixas de rolamento das vias do arranjo: a pista menos a faixa junto a cada meio-fio sem tráfego (estacionamento,
+    /// acostamento, faixa de segurança, canteiro pintado, sarjeta somada), ao longo do eixo inteiro (inclusive no cruzamento).
+    /// Vias sem a seção gravada ficam de fora.
+    /// </summary>
+    public static List<Polygon2> TravelBands(IntersectionLayout L)
+    {
+        var res = new List<Polygon2>();
+        foreach (var r in L.Roads)
+        {
+            if (CurbRoom(r.Def, true) is not { } left || CurbRoom(r.Def, false) is not { } right) continue;
+            res.AddRange(RoadGenerator.Band(r.Axis, -(r.Def.RightWidth - right.Width), r.Def.LeftWidth - left.Width));
+        }
+        return PolygonOps.Union(res);
+    }
+
+    /// <summary>
+    /// Contorno livre da face da extensão de uma esquina: pontos de controle em coordenadas do ramo A (x ao longo dele a partir
+    /// do nó, y à esquerda), da ponta num meio-fio à ponta no outro, com os vértices arredondados pelo raio. Devolve o caminho no
+    /// meio-fio antigo entre as pontas, a face e, se o contorno não serve, o motivo (pontas fora do meio-fio, contorno cruzado,
+    /// fora da pista ou sobre faixa de rolamento).
+    /// </summary>
+    public static (Polyline2? Path, List<Vec2>? Face, string? Error) FreeFace(IntersectionLayout L, List<Polygon2> pav, IntersectionLeg la, IntersectionLeg lb,
+        IReadOnlyList<Vec2> local, double radius)
+    {
+        if (local.Count < 2) return (null, null, "informe pelo menos dois pontos");
+        var world = local.Select(v => ToWorld(L, la, v)).ToList();
+        // Meio-fio antigo inteiro da esquina: ramo A (de longe) → curva → ramo B (para longe).
+        var reachA = Math.Max(1.0, MaxT(L, la) - la.Clear - 2);
+        var reachB = Math.Max(1.0, MaxT(L, lb) - lb.Clear - 2);
+        if (CornerPath(L, pav, la, lb, reachA, reachB, true) is not { } curb) return (null, null, "não foi possível seguir o meio-fio desta esquina");
+        var (s0, d0) = curb.Project(world[0]);
+        var (s1, d1) = curb.Project(world[^1]);
+        if (Math.Abs(d0) > 1.0 || Math.Abs(d1) > 1.0) return (null, null, "as duas pontas do contorno precisam ficar no meio-fio (a até 1 m dele)");
+        if (s0 > s1)
+        {
+            world.Reverse();
+            (s0, s1) = (s1, s0);
+        }
+        if (s1 - s0 < 1.0) return (null, null, "contorno curto demais (menos de 1 m de meio-fio entre as pontas)");
+        var path = new Polyline2(CleanFacePath(curb.SubPoints(s0, s1)));
+        var raw = new List<Vec2> { path.Points[0] };
+        raw.AddRange(world.Skip(1).Take(world.Count - 2));
+        raw.Add(path.Points[^1]);
+        var face = CurveTools.FilletCorners(CleanFacePath(raw), Math.Max(0, radius));
+        // Contorno fechado (face + meio-fio antigo de volta) sem cruzar.
+        var ring = face.Concat(Enumerable.Reverse(path.Points).Skip(1).Take(path.Points.Count - 2)).ToList();
+        var signed = Math.Abs(Polygon2.SignedArea(ring));
+        var u = PolygonOps.Union(new[] { new Polygon2(ring) });
+        if (signed < 0.05 || u.Count != 1 || Math.Abs(PolygonOps.TotalArea(u) - signed) > Math.Max(0.02, 0.01 * signed))
+            return (null, null, "o contorno se cruza ou cruza o meio-fio – os pontos devem seguir de uma ponta à outra pelo lado da pista");
+        // Só sobre a pista (não entra na calçada nem no lote) e fora das faixas de rolamento.
+        var roadway = PolygonOps.Union(pav.Concat(L.Roads.SelectMany(r => RoadGenerator.Band(r.Axis, -r.Def.RightWidth, r.Def.LeftWidth))));
+        var outside = PolygonOps.TotalArea(PolygonOps.Difference(u, PolygonOps.Offset(roadway, 0.03)));
+        if (outside > 0.02) return (null, null, $"o contorno sai da pista ({outside:0.00} m² sobre a calçada ou o lote)");
+        var inv = PolygonOps.TotalArea(PolygonOps.Intersect(u, TravelBands(L)));
+        if (inv > 0.02) return (null, null, $"o contorno avança {inv:0.00} m² sobre faixa de rolamento");
+        return (path, face, null);
+    }
+
+    /// <summary>Ponto em coordenadas do ramo (x ao longo dele a partir do nó, y à esquerda) → coordenadas do projeto.</summary>
+    public static Vec2 ToWorld(IntersectionLayout L, IntersectionLeg leg, Vec2 v) => L.Node + leg.Dir * v.X + leg.Dir.PerpLeft * v.Y;
+
+    /// <summary>Ponto do projeto → coordenadas do ramo (x ao longo dele a partir do nó, y à esquerda).</summary>
+    public static Vec2 ToLeg(IntersectionLayout L, IntersectionLeg leg, Vec2 p) => new((p - L.Node).Dot(leg.Dir), (p - L.Node).Dot(leg.Dir.PerpLeft));
+
+    /// <summary>Ponto de cruzamento dos segmentos ab e cd (nulo = não se cruzam).</summary>
+    private static Vec2? Cross(Vec2 a, Vec2 b, Vec2 c, Vec2 d)
+    {
+        var r = b - a;
+        var q = d - c;
+        var den = r.Cross(q);
+        if (Math.Abs(den) < 1e-12) return null;
+        var t = (c - a).Cross(q) / den;
+        var u = (c - a).Cross(r) / den;
+        return t is >= 0 and <= 1 && u is >= 0 and <= 1 ? a + r * t : null;
+    }
+
+    /// <summary>
+    /// Trechos de cada lado cobertos por um contorno livre: avanço da face sobre o meio-fio de cada ramo (estações onde ela tem
+    /// a largura toda e onde começa/termina), para a travessia, as rampas e as placas acompanharem a borda dela.
+    /// </summary>
+    private static IEnumerable<((int, int, int) Key, EarSide Side)> FreeSides(IntersectionLayout L, List<Vec2> face, IntersectionLeg la, IntersectionLeg lb)
+    {
+        var line = new Polyline2(face);
+        foreach (var (leg, side) in new[] { (la, 1), (lb, -1) })
+        {
+            var max = MaxT(L, leg);
+            var samples = new List<(double T, double Inset)>();
+            for (var t = leg.Clear; t <= max - 0.5; t += 0.25)
+            {
+                var edge = side > 0 ? L.HiEdge(leg, t) : L.LoEdge(leg, t);
+                var a = L.At(leg, t, side * edge);
+                var b = L.At(leg, t, 0);
+                // Ponto da face na seção t: do meio-fio para o eixo.
+                var best = double.NaN;
+                for (int i = 0; i + 1 < face.Count; i++)
+                    if (Cross(a, b, face[i], face[i + 1]) is { } x)
+                    {
+                        var o = a.DistanceTo(x);
+                        if (double.IsNaN(best) || o > best) best = o;
+                    }
+                samples.Add((t, double.IsNaN(best) ? 0 : best));
+            }
+            var on = samples.Where(x => x.Inset > 0.05).ToList();
+            if (on.Count == 0) continue;
+            var depth = on.Max(x => x.Inset);
+            var full = on.Where(x => x.Inset >= depth - 0.05).ToList();
+            yield return ((leg.Road, leg.Sign, side), new EarSide(depth, full[0].T, full[^1].T, on[0].T - 0.25, on[^1].T + 0.25));
+        }
     }
 
     /// <summary>Lados de ramo voltados para um lado contínuo (dois ramos alinhados, sem esquina entre eles): (ramo, lado).</summary>
@@ -421,17 +754,34 @@ public static partial class IntersectionGenerator
                 notes.Add("lado contínuo sem faixa de estacionamento junto ao meio-fio não recebe extensão (informe a largura do avanço para forçar)");
                 continue;
             }
-            var depth = Math.Clamp(explicitDepth ?? park!.Value, 0.3, 10);
+            var depth = explicitDepth ?? park!.Value;
             var gutter = park != null ? ParkingGutter(r, left) : 0;
+            // Nunca além da faixa junto ao meio-fio sem tráfego (estacionamento, acostamento...).
+            if (CurbRoom(r, left) is { } room)
+            {
+                if (room.Width - room.Gutter < 0.3)
+                {
+                    notes.Add("lado contínuo sem estacionamento ou acostamento junto ao meio-fio: a extensão invadiria a faixa de rolamento e não foi feita");
+                    continue;
+                }
+                if (depth > room.Width + 0.005)
+                {
+                    notes.Add($"largura da extensão do lado contínuo reduzida de {depth:0.00} m para {room.Width:0.00} m para não invadir a faixa de rolamento");
+                    depth = room.Width;
+                }
+                gutter = room.Gutter;
+            }
+            depth = Math.Clamp(depth, 0.3, 10);
             if (depth - gutter < 0.6) gutter = 0;
             var face = depth - gutter;
             var ends = ls?.OppositeExtensionEnds ?? d.CurbExtensionEnds;
-            var endR = ls?.OppositeExtensionEndRadius ?? d.CurbExtensionEndRadius;
+            var endR = EndParam(ends, ls?.OppositeExtensionTaper ?? d.CurbExtensionTaper, ls?.OppositeExtensionEndRadius, face);
             var lt = EarTransition(ends, endR, face);
             var tc = CrosswalkT(d, L, leg);
             var plan = RampPlanOf(d, L, leg);
             var rp = side > 0 ? plan.Hi : plan.Lo;
-            var half = Math.Max(CrosswalkWidthOf(d, L, leg) / 2, rp == null ? 0 : RampHalfExtent(rp)) + 0.3 + (provisional ? 1.0 : 0);
+            var margin = Math.Max(0, ls?.CurbExtensionCrosswalkMargin ?? d.CurbExtensionCrosswalkMargin ?? DefaultCrosswalkMargin);
+            var half = Math.Max(CrosswalkWidthOf(d, L, leg) / 2, rp == null ? 0 : RampHalfExtent(rp)) + margin + (provisional ? 1.0 : 0);
             var t0 = Math.Max(0.5, tc - half - lt - Math.Max(0, ls?.OppositeExtensionBefore ?? 0));
             var t1 = Math.Min(MaxT(L, leg) - 2, tc + half + lt + Math.Max(0, ls?.OppositeExtensionAfter ?? 0));
             if (t1 - t0 < 2 * lt + 1)

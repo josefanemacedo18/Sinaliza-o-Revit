@@ -820,6 +820,14 @@ public static partial class IntersectionGenerator
             s.OppositeExtensionEndRadius = src.OppositeExtensionEndRadius;
             s.OppositeExtensionRamp = src.OppositeExtensionRamp;
             s.OppositeExtensionTactile = src.OppositeExtensionTactile;
+            s.OppositeExtensionTaper = src.OppositeExtensionTaper;
+            s.CurbExtensionDepthOther = src.CurbExtensionDepthOther;
+            s.CurbExtensionEndsOther = src.CurbExtensionEndsOther;
+            s.CurbExtensionTaper = src.CurbExtensionTaper;
+            s.CurbExtensionTaperOther = src.CurbExtensionTaperOther;
+            s.CurbExtensionCornerRadius = src.CurbExtensionCornerRadius;
+            s.CurbExtensionCrosswalkMargin = src.CurbExtensionCrosswalkMargin;
+            // O contorno livre é de cada esquina (coordenadas do ramo dela): não é copiado.
         }
         d.LegSettings.RemoveAll(x => x.IsEmpty);
     }
@@ -3082,8 +3090,9 @@ public static partial class IntersectionGenerator
             {
                 var ear = (CurbExtensionDefinition)e.Template.CloneWithNewId();
                 ear.PathRef = PathReference.FromPoints(e.Path.Points, z);
+                // Rampa sobre a extensão ou sobre o meio-fio dela (inclusive na ponta de largura zero que segue o meio-fio antigo).
                 foreach (var fp in rampFps)
-                    if (PolygonOps.TotalArea(PolygonOps.Intersect(new[] { fp }, new[] { e.Footprint })) > 1e-4)
+                    if (PolygonOps.TotalArea(PolygonOps.Intersect(new[] { fp }, e.CutZone.Count > 0 ? e.CutZone : new List<Polygon2> { e.Footprint })) > 1e-4)
                         ear.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = fp.Outer.ToList() });
                 Add(ear);
                 // A sarjeta da via contorna a frente da orelha, no nível da pista.

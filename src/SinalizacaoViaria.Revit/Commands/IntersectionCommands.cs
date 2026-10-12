@@ -209,9 +209,17 @@ internal static class IntersectionForms
          .Number("Avanço ao longo da outra via da esquina (m) – −1 = o mesmo, 0 = sem extensão de calçada nela", () => cur().CurbExtensionLengthOther ?? -1,
              v => cur().CurbExtensionLengthOther = v < -0.5 ? null : v < 0.05 ? 0 : Math.Max(0.5, v), -1, 60)
          .Choice("Extensão de calçada termina onde começa o estacionamento", triState, () => cur().CurbExtensionToParking, v => cur().CurbExtensionToParking = v)
-         .Number("Profundidade da extensão de calçada desta esquina (m) – 0 = geral", () => cur().CurbExtensionDepth ?? 0, v => cur().CurbExtensionDepth = v < 0.05 ? null : Math.Clamp(v, 0.3, 10), 0, 10)
-         .Choice("Pontas da extensão de calçada desta esquina", EndKinds(geral), () => cur().CurbExtensionEnds, v => cur().CurbExtensionEnds = v)
-         .Number("Raio / chanfro das pontas desta extensão de calçada (m) – 0 = geral", () => cur().CurbExtensionEndRadius ?? 0, v => cur().CurbExtensionEndRadius = v < 0.05 ? null : Math.Clamp(v, 0.1, 10), 0, 10)
+         .Number("Largura do avanço ao longo deste ramo (m) – 0 = geral", () => cur().CurbExtensionDepth ?? 0, v => cur().CurbExtensionDepth = v < 0.05 ? null : Math.Clamp(v, 0.3, 10), 0, 10,
+             tooltip: "Nunca passa da faixa junto ao meio-fio sem tráfego (estacionamento, acostamento): a extensão não invade a faixa de rolamento.")
+         .Number("Largura do avanço ao longo da outra via (m) – 0 = igual à deste ramo", () => cur().CurbExtensionDepthOther ?? 0, v => cur().CurbExtensionDepthOther = v < 0.05 ? null : Math.Clamp(v, 0.3, 10), 0, 10)
+         .Choice("Pontas da extensão de calçada – deste ramo", EndKinds(geral), () => cur().CurbExtensionEnds, v => cur().CurbExtensionEnds = v)
+         .Choice("Pontas da extensão de calçada – da outra via", EndKinds("Igual à deste ramo"), () => cur().CurbExtensionEndsOther, v => cur().CurbExtensionEndsOther = v)
+         .Number("Comprimento da transição deste ramo (m) – 0 = geral (automático: 2 × a largura)", () => cur().CurbExtensionTaper ?? 0, v => cur().CurbExtensionTaper = v < 0.05 ? null : Math.Clamp(v, 0.3, 20), 0, 20,
+             tooltip: "Da largura toda de volta ao meio-fio, medido ao longo dele. Curvas reversas: o raio sai deste comprimento; chanfro: é o comprimento do chanfro.")
+         .Number("Comprimento da transição da outra via (m) – 0 = igual à deste ramo", () => cur().CurbExtensionTaperOther ?? 0, v => cur().CurbExtensionTaperOther = v < 0.05 ? null : Math.Clamp(v, 0.3, 20), 0, 20)
+         .Number("Raio da curva da esquina na extensão (m) – 0 = geral (raio da esquina)", () => cur().CurbExtensionCornerRadius ?? 0, v => cur().CurbExtensionCornerRadius = v < 0.05 ? null : Math.Clamp(v, 0.5, 60), 0, 60,
+             tooltip: "Raio do veículo de projeto. Raio que faria a curva entrar na calçada é reduzido, com aviso.")
+         .Number("Folga além da faixa e das rampas (m) – −1 = geral", () => cur().CurbExtensionCrosswalkMargin ?? -1, v => cur().CurbExtensionCrosswalkMargin = v < -0.5 ? null : Math.Clamp(v, 0, 20), -1, 20)
          .Choice("Rampa na borda desta extensão de calçada", triState, () => cur().CurbExtensionRamp, v => cur().CurbExtensionRamp = v)
          .Choice("Piso tátil na rampa desta extensão de calçada", triState, () => cur().CurbExtensionTactile, v => cur().CurbExtensionTactile = v)
          .Choice("Extensão de calçada no lado contínuo da travessia deste ramo (quando não é esquina)", triState, () => cur().OppositeExtension, v => cur().OppositeExtension = v,
@@ -221,7 +229,7 @@ internal static class IntersectionForms
              tooltip: "Além da faixa, das rampas e das pontas.")
          .Number("Comprimento a mais do lado de fora (m)", () => cur().OppositeExtensionAfter ?? 0, v => cur().OppositeExtensionAfter = v < 0.01 ? null : v, 0, 60)
          .Choice("Pontas da extensão de calçada do lado contínuo", EndKinds(geral), () => cur().OppositeExtensionEnds, v => cur().OppositeExtensionEnds = v)
-         .Number("Raio / chanfro das pontas (m) – 0 = geral", () => cur().OppositeExtensionEndRadius ?? 0, v => cur().OppositeExtensionEndRadius = v < 0.05 ? null : Math.Clamp(v, 0.1, 10), 0, 10)
+         .Number("Comprimento da transição das pontas (m) – 0 = geral (automático)", () => cur().OppositeExtensionTaper ?? 0, v => cur().OppositeExtensionTaper = v < 0.05 ? null : Math.Clamp(v, 0.3, 20), 0, 20)
          .Choice("Rampa na extensão de calçada do lado contínuo", triState, () => cur().OppositeExtensionRamp, v => cur().OppositeExtensionRamp = v)
          .Choice("Piso tátil na rampa do lado contínuo", triState, () => cur().OppositeExtensionTactile, v => cur().OppositeExtensionTactile = v)
          .Button("Aplicar este ajuste a todas as esquinas e ramos", () =>
@@ -265,7 +273,14 @@ internal static class IntersectionForms
              {
                  ("Curvas reversas", TipoTransicao.Curva), ("Chanfro", TipoTransicao.Chanfro), ("Reta – acompanha a calçada", TipoTransicao.Reta),
              }, () => d.CurbExtensionEnds, v => d.CurbExtensionEnds = v)
-         .Number("Raio da curva / comprimento do chanfro das pontas (m)", () => d.CurbExtensionEndRadius, v => d.CurbExtensionEndRadius = Math.Clamp(v, 0.1, 10), 0.1, 10)
+         .Number("Comprimento da transição das pontas (m) – 0 = automático (2 × a largura)", () => d.CurbExtensionTaper ?? 0,
+             v => d.CurbExtensionTaper = v < 0.05 ? null : Math.Clamp(v, 0.3, 20), 0, 20,
+             tooltip: "Da largura toda de volta ao meio-fio, ao longo dele. Automático: curva reversa suave com 2 × a largura do avanço [a confirmar].")
+         .Number("Raio da curva da esquina na extensão (m) – 0 = o raio da esquina", () => d.CurbExtensionCornerRadius ?? 0,
+             v => d.CurbExtensionCornerRadius = v < 0.05 ? null : Math.Clamp(v, 0.5, 60), 0, 60,
+             tooltip: "A face da extensão contorna a esquina com este raio, tangente às faces deslocadas (padrão: o raio da esquina – veículo de projeto).")
+         .Number("Folga além da faixa de pedestres e das rampas (m)", () => d.CurbExtensionCrosswalkMargin ?? 0.30,
+             v => d.CurbExtensionCrosswalkMargin = Math.Abs(v - 0.30) < 1e-6 ? null : Math.Clamp(v, 0, 20), 0, 20)
          .Check("Terminar onde começa o estacionamento", () => d.CurbExtensionToParking, v => d.CurbExtensionToParking = v,
              "Lê a faixa de estacionamento da via: a extensão de calçada vai até a primeira vaga (fim da área proibida junto à esquina – 5 m após a travessia/retenção).");
     }

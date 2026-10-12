@@ -550,9 +550,16 @@ internal static class IntersectionEarEdit
           .Check("Terminar no início do estacionamento", () => _toParking, v => _toParking = v,
               "Lê a faixa de estacionamento de cada via: a extensão de calçada vai até a primeira vaga (5 m depois da travessia/retenção – CTB art. 181).");
         EarShape(fw, work);
+        var shape = new IntersectionLegSettings();
+        if (IntersectionGenerator.LegSet(f.It, f.L, c.A) is { } prev) CopyCorner(shape, prev);
+        var mode = shape.CurbExtensionFace != null ? 2 : 0;
+        CornerShape(fw, shape, v => mode = v, () => mode);
         if (UiHelpers.ShowModal(fw) != true) return Result.Cancelled;
         CopyShape(f.It, work);
-        IntersectionGenerator.SetCornerEar(f.It, f.L, c.A, c.NearA, _along, _other, _toParking);
+        var s = IntersectionGenerator.SetCornerEar(f.It, f.L, c.A, c.NearA, _along, _other, _toParking);
+        CopyCorner(s, shape);
+        if (mode == 1 && PickFace(uidoc, f.L, c.A) is { } face) s.CurbExtensionFace = face;
+        else if (mode == 0) s.CurbExtensionFace = null;
         CommandBase.ReportResults("Extensão de calçada", IntersectionRunner.Run(uidoc, "SV - Extensão de calçada na esquina", s => s.Refresh(f.It)).Where(r => r.Warnings.Count > 0).ToList());
         return Result.Succeeded;
     }
@@ -580,6 +587,10 @@ internal static class IntersectionEarEdit
               .Choice("Terminar no início do estacionamento", new (string, bool?)[] { ("Geral da interseção", null), ("Sim", true), ("Não", false) },
                   () => toParking, v => toParking = v);
         IntersectionForms.EarSection(fw, work);
+        var shape = new IntersectionLegSettings();
+        if (set != null) CopyCorner(shape, set);
+        var mode = shape.CurbExtensionFace != null ? 2 : 0;
+        if (corner != null) CornerShape(fw, shape, v => mode = v, () => mode);
         if (UiHelpers.ShowModal(fw) != true) return Result.Cancelled;
         CopyShape(parent, work);
         parent.CurbExtensions = work.CurbExtensions;
@@ -592,6 +603,9 @@ internal static class IntersectionEarEdit
             s.CurbExtensionLength = lenA < -0.5 ? null : lenA < 0.05 ? 0 : Math.Max(0.5, lenA);
             s.CurbExtensionLengthOther = lenB < -0.5 ? null : lenB < 0.05 ? 0 : Math.Max(0.5, lenB);
             s.CurbExtensionToParking = toParking;
+            CopyCorner(s, shape);
+            if (mode == 1 && PickFace(uidoc, fl.L, c.A) is { } face) s.CurbExtensionFace = face;
+            else if (mode == 0) s.CurbExtensionFace = null;
             parent.LegSettings.RemoveAll(x => x.IsEmpty);
         }
         CommandBase.ReportResults("Extensão de calçada", IntersectionRunner.Run(uidoc, "SV - Extensão de calçada da interseção", sv => sv.Refresh(parent)).Where(r => r.Warnings.Count > 0).ToList());
@@ -607,7 +621,46 @@ internal static class IntersectionEarEdit
               {
                   ("Curvas reversas", TipoTransicao.Curva), ("Chanfro", TipoTransicao.Chanfro), ("Reta – acompanha a calçada", TipoTransicao.Reta),
               }, () => d.CurbExtensionEnds, v => d.CurbExtensionEnds = v)
-          .Number("Raio da curva / comprimento do chanfro das pontas (m)", () => d.CurbExtensionEndRadius, v => d.CurbExtensionEndRadius = Math.Clamp(v, 0.1, 10), 0.1, 10);
+          .Number("Comprimento da transição das pontas (m) – 0 = automático (2 × a largura)", () => d.CurbExtensionTaper ?? 0,
+              v => d.CurbExtensionTaper = v < 0.05 ? null : Math.Clamp(v, 0.3, 20), 0, 20)
+          .Number("Raio da curva da esquina na extensão (m) – 0 = o raio da esquina", () => d.CurbExtensionCornerRadius ?? 0,
+              v => d.CurbExtensionCornerRadius = v < 0.05 ? null : Math.Clamp(v, 0.5, 60), 0, 60);
+    }
+
+    /// <summary>Forma desta esquina: largura e transição de cada lado e contorno livre (pontos clicados).</summary>
+    private static void CornerShape(FormWindow fw, IntersectionLegSettings s, Action<int> setMode, Func<int> mode)
+    {
+        fw.Section("Forma desta esquina", "Campos em 0 seguem a forma geral. A largura nunca passa da faixa junto ao meio-fio sem tráfego.")
+          .Number("Largura ao longo da via dona da esquina (m) – 0 = geral", () => s.CurbExtensionDepth ?? 0, v => s.CurbExtensionDepth = v < 0.05 ? null : Math.Clamp(v, 0.3, 10), 0, 10)
+          .Number("Largura ao longo da outra via (m) – 0 = igual", () => s.CurbExtensionDepthOther ?? 0, v => s.CurbExtensionDepthOther = v < 0.05 ? null : Math.Clamp(v, 0.3, 10), 0, 10)
+          .Number("Transição na via dona da esquina (m) – 0 = geral", () => s.CurbExtensionTaper ?? 0, v => s.CurbExtensionTaper = v < 0.05 ? null : Math.Clamp(v, 0.3, 20), 0, 20)
+          .Number("Transição na outra via (m) – 0 = igual", () => s.CurbExtensionTaperOther ?? 0, v => s.CurbExtensionTaperOther = v < 0.05 ? null : Math.Clamp(v, 0.3, 20), 0, 20)
+          .Choice("Pontas na outra via", new (string, TipoTransicao?)[] { ("Iguais", null), ("Curvas reversas", TipoTransicao.Curva), ("Chanfro", TipoTransicao.Chanfro), ("Reta", TipoTransicao.Reta) },
+              () => s.CurbExtensionEndsOther, v => s.CurbExtensionEndsOther = v)
+          .Number("Raio da curva da esquina (m) – 0 = geral", () => s.CurbExtensionCornerRadius ?? 0, v => s.CurbExtensionCornerRadius = v < 0.05 ? null : Math.Clamp(v, 0.5, 60), 0, 60)
+          .Choice("Contorno", new[]
+              {
+                  ("Forma padrão (pelas medidas)", 0), ("Contorno livre – clicar os pontos depois de Aplicar", 1), ("Manter o contorno livre já desenhado", 2),
+              }.Where(x => x.Item2 != 2 || s.CurbExtensionFace != null).ToList(), mode, setMode,
+              "Contorno livre: clique a ponta num meio-fio, os pontos da face pelo lado da pista e a ponta no outro meio-fio (ESC termina). " +
+              "Os cantos são arredondados. Contorno fora da pista, sobre faixa de rolamento ou cruzado é recusado com o motivo.")
+          .Number("Raio do arredondamento do contorno livre (m)", () => s.CurbExtensionFaceRadius ?? 1.0, v => s.CurbExtensionFaceRadius = Math.Abs(v - 1.0) < 1e-6 ? null : Math.Clamp(v, 0, 20), 0, 20);
+    }
+
+    /// <summary>Pontos do contorno livre clicados na vista (coordenadas do ramo dono da esquina). Nulo = cancelado.</summary>
+    private static List<Vec2>? PickFace(UIDocument uidoc, IntersectionLayout L, IntersectionLeg a)
+    {
+        var pts = new List<Vec2>();
+        while (true)
+        {
+            var prompt = pts.Count == 0 ? "Contorno livre da extensão: clique a PONTA no meio-fio de uma das vias – ESC cancela"
+                : $"Contorno livre: próximo ponto da face pelo lado da pista; o último na ponta do outro meio-fio – ESC termina ({pts.Count} ponto(s))";
+            var pick = Picking.PickPoint(uidoc, prompt);
+            if (pick == null) break;
+            pts.Add(UnitConv.ToVec2(pick));
+        }
+        if (pts.Count < 2) return null;
+        return pts.Select(p => IntersectionGenerator.ToLeg(L, a, p)).ToList();
     }
 
     private static void CopyShape(IntersectionDefinition to, IntersectionDefinition from)
@@ -615,6 +668,21 @@ internal static class IntersectionEarEdit
         to.CurbExtensionDepth = from.CurbExtensionDepth;
         to.CurbExtensionEnds = from.CurbExtensionEnds;
         to.CurbExtensionEndRadius = from.CurbExtensionEndRadius;
+        to.CurbExtensionTaper = from.CurbExtensionTaper;
+        to.CurbExtensionCornerRadius = from.CurbExtensionCornerRadius;
+    }
+
+    /// <summary>Forma da esquina (largura e transição de cada lado, raio, contorno livre) de um ajuste para outro.</summary>
+    private static void CopyCorner(IntersectionLegSettings to, IntersectionLegSettings from)
+    {
+        to.CurbExtensionDepth = from.CurbExtensionDepth;
+        to.CurbExtensionDepthOther = from.CurbExtensionDepthOther;
+        to.CurbExtensionTaper = from.CurbExtensionTaper;
+        to.CurbExtensionTaperOther = from.CurbExtensionTaperOther;
+        to.CurbExtensionEndsOther = from.CurbExtensionEndsOther;
+        to.CurbExtensionCornerRadius = from.CurbExtensionCornerRadius;
+        to.CurbExtensionFace = from.CurbExtensionFace;
+        to.CurbExtensionFaceRadius = from.CurbExtensionFaceRadius;
     }
 }
 

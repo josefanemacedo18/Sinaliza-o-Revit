@@ -308,10 +308,25 @@ public static class SidewalkGenerator
         // a ponta fina que encosta no meio-fio passa para ele (abertura morfológica do piso, com cantos vivos – os cantos retos
         // do piso ficam). Na extensão que nasce da curva, o que tem menos de 8 cm; nas demais, onde a face volta tangente ao
         // alinhamento, só a ponta com menos de 2 cm (o meio-fio continua junto da face).
-        var open = born ? 0.04 : 0.01;
-        var opened = PolygonOps.Offset(PolygonOps.Offset(platform, -open), open).Where(p => p.Area >= 0.01).ToList();
-        var thin = PolygonOps.Difference(platform, opened)
-            .Where(x => PolygonOps.TotalArea(PolygonOps.Intersect(PolygonOps.Offset(new[] { x }, 0.005), curb)) > 1e-6).ToList();
+        // Só nas pontas em que a face nova segue o meio-fio antigo (largura zero – a extensão nasce da curva); nas pontas com
+        // transição a face volta tangente ao alinhamento e vale a regra de 2 cm.
+        var bornEnds = new List<Vec2>();
+        if (born)
+        {
+            var f = d.OuterFace!;
+            bool OnPath(Vec2 v) => Math.Abs(path.Project(v).Item2) < 0.005;
+            if (f.Count >= 2 && OnPath(f[0]) && OnPath(f[1])) bornEnds.Add(f[0]);
+            if (f.Count >= 2 && OnPath(f[^1]) && OnPath(f[^2])) bornEnds.Add(f[^1]);
+        }
+        List<Polygon2> Thin(double open)
+        {
+            var opened = PolygonOps.Offset(PolygonOps.Offset(platform, -open), open).Where(p => p.Area >= 0.01).ToList();
+            return PolygonOps.Difference(platform, opened)
+                .Where(x => PolygonOps.TotalArea(PolygonOps.Intersect(PolygonOps.Offset(new[] { x }, 0.005), curb)) > 1e-6).ToList();
+        }
+        var thin = Thin(0.01);
+        if (bornEnds.Count > 0)
+            thin.AddRange(Thin(0.04).Where(x => x.Outer.Any(v => bornEnds.Any(b => b.DistanceTo(v) < 3.0))));
         if (PolygonOps.TotalArea(thin) > 1e-5)
         {
             // União sem simplificar (o piso é refeito pela diferença, com a mesma borda; simplificar a união podia cruzar o anel).

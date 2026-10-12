@@ -1781,6 +1781,9 @@ public sealed class IntersectionDefinition : MarkingDefinition
         CurbExtensionEndRadius = o.CurbExtensionEndRadius;
         CurbExtensionToParking = o.CurbExtensionToParking;
         CurbExtensionsOpposite = o.CurbExtensionsOpposite;
+        CurbExtensionTaper = o.CurbExtensionTaper;
+        CurbExtensionCornerRadius = o.CurbExtensionCornerRadius;
+        CurbExtensionCrosswalkMargin = o.CurbExtensionCrosswalkMargin;
     }
 
     // Orelhas de calçada nas esquinas (avanço sobre a faixa de estacionamento): a travessia e as rampas vão para a borda da orelha.
@@ -1801,6 +1804,15 @@ public sealed class IntersectionDefinition : MarkingDefinition
     /// extensão, com a rampa no eixo da faixa. Falso (padrão dos projetos salvos) = só as esquinas.
     /// </summary>
     public bool CurbExtensionsOpposite { get; set; }
+    /// <summary>
+    /// Comprimento (m, ao longo do meio-fio) da transição das pontas das extensões – da largura toda de volta ao meio-fio.
+    /// Nulo = automático: 2 × a largura do avanço [a confirmar] (curva reversa suave, ~53° no meio). Vale para curva e chanfro.
+    /// </summary>
+    public double? CurbExtensionTaper { get; set; }
+    /// <summary>Raio da curva da esquina na face das extensões (m). Nulo = o raio da esquina da interseção (veículo de projeto).</summary>
+    public double? CurbExtensionCornerRadius { get; set; }
+    /// <summary>Folga (m) da extensão além da faixa de pedestres e das rampas, antes da transição. Nulo = 0,30 m.</summary>
+    public double? CurbExtensionCrosswalkMargin { get; set; }
 
     /// <summary>Ajustes por ramo (raio da esquina, faixa, rampas, controle, ilha/bolsão). Sem ajuste = o geral.</summary>
     public List<IntersectionLegSettings> LegSettings { get; set; } = new();
@@ -1858,6 +1870,26 @@ public sealed class IntersectionLegSettings
     public double? CurbExtensionEndRadius { get; set; }
     public bool? CurbExtensionRamp { get; set; }
     public bool? CurbExtensionTactile { get; set; }
+    /// <summary>Largura do avanço ao longo da outra via da esquina (m). Nulo = igual à deste ramo.</summary>
+    public double? CurbExtensionDepthOther { get; set; }
+    /// <summary>Forma da ponta ao longo da outra via. Nulo = igual à deste ramo.</summary>
+    public TipoTransicao? CurbExtensionEndsOther { get; set; }
+    /// <summary>Comprimento da transição da ponta deste ramo e da outra via (m). Nulo = o geral (automático).</summary>
+    public double? CurbExtensionTaper { get; set; }
+    public double? CurbExtensionTaperOther { get; set; }
+    /// <summary>Raio da curva da esquina na face da extensão (m). Nulo = o geral (raio da esquina).</summary>
+    public double? CurbExtensionCornerRadius { get; set; }
+    /// <summary>Folga da extensão além da faixa e das rampas (m). Nulo = o geral.</summary>
+    public double? CurbExtensionCrosswalkMargin { get; set; }
+    /// <summary>
+    /// Contorno livre da face da extensão desta esquina: pontos de controle em coordenadas do ramo (x ao longo do ramo a partir
+    /// do nó, y à esquerda dele), da ponta num meio-fio à ponta no outro. Os vértices são arredondados com
+    /// <see cref="CurbExtensionFaceRadius"/>. Nulo = a forma padrão. Contorno inválido (fora da pista, sobre faixa de rolamento,
+    /// pontas fora do meio-fio, contorno cruzado) é recusado com o motivo e a esquina fica com a forma padrão.
+    /// </summary>
+    public List<Vec2>? CurbExtensionFace { get; set; }
+    /// <summary>Raio do arredondamento dos vértices do contorno livre (m). Nulo = 1,0 m.</summary>
+    public double? CurbExtensionFaceRadius { get; set; }
 
     /// <summary>
     /// Extensão no lado oposto da travessia deste ramo quando ele não é esquina (lado contínuo de um T). Nulo = a opção geral
@@ -1872,6 +1904,8 @@ public sealed class IntersectionLegSettings
     public double? OppositeExtensionEndRadius { get; set; }
     public bool? OppositeExtensionRamp { get; set; }
     public bool? OppositeExtensionTactile { get; set; }
+    /// <summary>Comprimento da transição das pontas da extensão do lado contínuo (m). Nulo = o geral (automático).</summary>
+    public double? OppositeExtensionTaper { get; set; }
 
     [JsonIgnore]
     public bool IsEmpty => CornerRadius == null && Crosswalk == null && CrosswalkWidth == null && CrosswalkSetback == null
@@ -1880,7 +1914,10 @@ public sealed class IntersectionLegSettings
                            && CurbExtensionEnds == null && CurbExtensionEndRadius == null && CurbExtensionRamp == null && CurbExtensionTactile == null
                            && OppositeExtension == null && OppositeExtensionDepth == null && OppositeExtensionBefore == null && OppositeExtensionAfter == null
                            && OppositeExtensionEnds == null && OppositeExtensionEndRadius == null && OppositeExtensionRamp == null && OppositeExtensionTactile == null
-                           && RightTurnChannel == null && RightTurnRadius == null;
+                           && RightTurnChannel == null && RightTurnRadius == null
+                           && CurbExtensionDepthOther == null && CurbExtensionEndsOther == null && CurbExtensionTaper == null
+                           && CurbExtensionTaperOther == null && CurbExtensionCornerRadius == null && CurbExtensionCrosswalkMargin == null
+                           && CurbExtensionFace == null && CurbExtensionFaceRadius == null && OppositeExtensionTaper == null;
 }
 
 /// <summary>Uso da linha de continuidade (LCO) na boca das vias secundárias.</summary>
