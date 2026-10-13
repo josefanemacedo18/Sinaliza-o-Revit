@@ -31,7 +31,7 @@ internal sealed partial class AutoTestRunner
             lot = new LoteamentoDefinition { Nome = "Autoteste", Gleba = gleba.Outer.ToList(), Z = _z0 };
             quadras = rec.Quadras.Select(r => Reconhecimento.NovaQuadra(r, lot, 12, 30)).ToList();
             Commit(s, new MarkingDefinition[] { lot }.Concat(quadras), "loteamento");
-            var expected = quadras.Sum(q => LotDivider.Divide(q, lot.Categorias).Parcelas.Count);
+            var expected = quadras.Sum(q => LotDivider.Divide(q, lot).Parcelas.Count);
             var lotId = lot.Id;
             var els = MarkingStorage.All(_doc).Where(r => r.Definition is QuadraDefinition qd && qd.LoteamentoId == lotId).ToList();
             if (els.Count != expected) s.Error($"Lotes no modelo: {els.Count} de {expected}.");
@@ -60,6 +60,45 @@ internal sealed partial class AutoTestRunner
             var nums = mine.Where(r => r.Element.get_Parameter(SharedParameters.CategoriaLote.Guid)?.AsString() == CategoriaLote.Lote)
                 .Select(r => int.TryParse(r.Element.get_Parameter(SharedParameters.Lote.Guid)?.AsString(), out var n) ? n : -1).OrderBy(n => n).ToList();
             if (!nums.SequenceEqual(Enumerable.Range(1, nums.Count))) s.Error($"Numeração da quadra {q.Nome} com falhas: {string.Join(", ", nums)}.");
+        });
+        Step("Loteamento", "Unir lotes (dois vizinhos viram um) e quadro de lotes da quadra", s =>
+        {
+            if (lot == null || quadras.Count == 0) { s.Error("Sem loteamento da etapa anterior."); return; }
+            var q = quadras.OrderByDescending(x => x.Polygon!.Area).First();
+            var t0 = q.Testadas[0].Id;
+            var (k1, k2) = ($"{t0}:4", $"{t0}:5");
+            var before = LotDivider.Divide(q, lot);
+            var a1 = before.Parcelas.FirstOrDefault(p => p.Chave == k1);
+            var a2 = before.Parcelas.FirstOrDefault(p => p.Chave == k2);
+            if (a1 == null || a2 == null) { s.Error($"Lotes {k1} e {k2} não existem na quadra {q.Nome}."); return; }
+            q.Unioes.Add(new List<string> { k1, k2 });
+            Commit(s, new MarkingDefinition[] { lot, q }, "unir lotes");
+            var mine = MarkingStorage.All(_doc).Where(r => r.Definition.Id == q.Id).ToList();
+            var merged = mine.FirstOrDefault(r => LotService.KeyOf(r.Element) == k1);
+            if (merged == null) s.Error("O lote unido não está no modelo.");
+            else
+            {
+                var area = UnitConv.M2(merged.Element.get_Parameter(SharedParameters.AreaLote.Guid)?.AsDouble() ?? 0);
+                if (Math.Abs(area - (a1.Area + a2.Area)) > 0.05) s.Error($"Lote unido com {area:0.00} m²; esperado {a1.Area + a2.Area:0.00} m².");
+                else s.Note($"Lote unido: {area:0.00} m².");
+            }
+            if (mine.Any(r => LotService.KeyOf(r.Element) == k2)) s.Error("O segundo lote da união continua no modelo.");
+            var nums = mine.Where(r => r.Element.get_Parameter(SharedParameters.CategoriaLote.Guid)?.AsString() == CategoriaLote.Lote)
+                .Select(r => int.TryParse(r.Element.get_Parameter(SharedParameters.Lote.Guid)?.AsString(), out var n) ? n : -1).OrderBy(n => n).ToList();
+            if (!nums.SequenceEqual(Enumerable.Range(1, nums.Count))) s.Error($"Numeração da quadra {q.Nome} com falhas depois da união: {string.Join(", ", nums)}.");
+            var notes = new List<string>();
+            var qd = ProjectTableViews.ForOwnView(new QuadroLoteamentoDefinition { LoteamentoId = lot.Id, Conteudo = TipoQuadroLoteamento.Lotes, Quadra = q.Nome });
+            View? v = null;
+            using (var t = new Transaction(_doc, "SV Autoteste - vista do quadro de lotes"))
+            {
+                t.Start();
+                v = ProjectTableHost.EnsureView(_doc, qd, ProjectTableViews.ViewName(qd), notes);
+                t.Commit();
+            }
+            Commit(s, new MarkingDefinition[] { qd }, "quadro de lotes da quadra");
+            var texts = new FilteredElementCollector(_doc, v.Id).OfClass(typeof(TextNote)).Count(e => MarkingStorage.Read(e)?.Definition.Id == qd.Id);
+            if (texts == 0) s.Error("O quadro de lotes da quadra não criou textos.");
+            foreach (var n in notes) s.Note(n);
         });
         Step("Loteamento", "Nome de via, detalhamento, quadro na Legenda, filtros, masterplan e memorial", s =>
         {

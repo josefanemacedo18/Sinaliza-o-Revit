@@ -43,7 +43,7 @@ public static class SharedParameters
     // Loteamento: identificação do lote (filtros por categoria, tabelas e etiquetas). Ligados a Toposolid, Pisos e Modelos genéricos.
     public static readonly Def Quadra = new("SV_Quadra", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B11"), SpecTypeId.String.Text, "Quadra do loteamento (A, B, C...).");
     public static readonly Def Lote = new("SV_Lote", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B12"), SpecTypeId.String.Text, "Número do lote na quadra (1 a N) ou da área (AV-1, AI-1...).");
-    public static readonly Def CategoriaLote = new("SV_CategoriaLote", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B13"), SpecTypeId.String.Text, "Categoria da área do loteamento: Lote, Institucional, Área verde, Sobra...");
+    public static readonly Def CategoriaLote = new("SV_CategoriaLote", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B13"), SpecTypeId.String.Text, "Categoria da área do loteamento: Lote, Institucional, Área verde...");
     public static readonly Def AreaLote = new("SV_AreaLote", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B14"), SpecTypeId.Area, "Área do lote (projeção horizontal).");
 
     public static IReadOnlyList<Def> Lotes { get; } = new[] { Quadra, Lote, CategoriaLote, AreaLote };

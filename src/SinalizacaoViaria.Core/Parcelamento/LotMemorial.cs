@@ -64,7 +64,8 @@ public static class LotMemorial
         foreach (var (q, d) in r.Quadras)
         {
             b.Add(new MemHeading(2, $"Quadra {q.Nome}"));
-            foreach (var p in d.Parcelas)
+            b.Add(QuadroLotes(r, q.Nome));
+            foreach (var p in LotReport.NaOrdem(d.Parcelas))
             {
                 var lados = LotReport.Lados(p, d, q, lot);
                 b.Add(new MemParagraph($"{LotReport.Rotulo(p)} da Quadra {q.Nome} – {LotReport.Descricao(p, lados)}"));
@@ -87,6 +88,14 @@ public static class LotMemorial
             new[] { 1, 2, 3 });
     }
 
+    /// <summary>Quadro de lotes de uma quadra (lote a lote, como o quadro desenhado, sem a coluna da quadra).</summary>
+    public static MemTable QuadroLotes(ResumoLoteamento r, string quadra)
+    {
+        var headers = LotReport.CabecalhosLotes.Skip(1).Select(h => h[..1] + h[1..].ToLowerInvariant()).ToList();
+        var rows = LotReport.LinhasLotes(r, quadra).Select(c => (IReadOnlyList<string>)c.Skip(1).ToList()).ToList();
+        return new MemTable(headers, rows, new[] { 0.6, 1.0, 1.6, 0.9, 0.9, 0.9, 0.9, 1.0, 1.6 }, new[] { 3, 4, 5, 6, 7 });
+    }
+
     public static MemTable QuadroQuadras(ResumoLoteamento r)
     {
         var (headers, rows) = LinhasQuadras(r);
@@ -101,7 +110,7 @@ public static class LotMemorial
         var rows = new List<(string, string, string, string, string)>();
         foreach (var c in r.Categorias)
         {
-            var nome = c.Nome == CategoriaLote.Lote ? "Lotes" : c.Nome == CategoriaLote.Sobra ? "Sobras" : c.Nome;
+            var nome = c.Nome == CategoriaLote.Lote ? "Lotes" : c.Nome;
             rows.Add((nome, c.Quantidade.ToString(), LotReport.M(c.Area), LotReport.P(c.Percentual), Min(c.Minimo)));
         }
         var lot = r.Loteamento;
@@ -118,7 +127,7 @@ public static class LotMemorial
     {
         var cats = r.Categorias.Select(c => c.Nome).ToList();
         var headers = new List<string> { "Quadra", "Lotes" };
-        headers.AddRange(cats.Select(c => (c == CategoriaLote.Lote ? "Lotes" : c == CategoriaLote.Sobra ? "Sobras" : c) + " (m²)"));
+        headers.AddRange(cats.Select(c => (c == CategoriaLote.Lote ? "Lotes" : c) + " (m²)"));
         headers.Add("Área da quadra (m²)");
         var rows = new List<IReadOnlyList<string>>();
         foreach (var l in r.LinhasQuadras)

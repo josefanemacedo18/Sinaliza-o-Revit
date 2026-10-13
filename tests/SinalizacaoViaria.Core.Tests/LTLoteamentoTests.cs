@@ -55,26 +55,90 @@ public class LTLoteamentoTests
     [Fact]
     public void R1_FrentePadraoAoLongoDaTestada_12x30()
     {
-        var d = Div(LTScenes.Scene("uma-testada"));
-        var lots = d.Parcelas.Where(p => p.TestadaId == "A" && !p.Sobra).ToList();
+        var q = LTScenes.Scene("uma-testada");
+        q.Miolo = ModoMiolo.AreaPropria;
+        var d = Div(q);
+        // 100 m = 8 × 12 + 4: a sobra de 4 m (menor que a frente mínima de 5 m) vai para o último lote.
+        var lots = d.Parcelas.Where(p => p.TestadaId == "A").OrderBy(p => p.Forma.Centroid.X).ToList();
         Assert.Equal(8, lots.Count);
-        Assert.All(lots, p => Assert.Equal(12, p.Frente, 6));
-        Assert.All(lots, p => Assert.Equal(360, p.Area, 2));
+        Assert.All(lots.SkipLast(1), p => Assert.Equal(12, p.Frente, 6));
+        Assert.All(lots.SkipLast(1), p => Assert.Equal(360, p.Area, 2));
+        Assert.Equal(16, lots[^1].Frente, 6);
         // Divisas perpendiculares à testada: cada lote é um retângulo 12 × 30.
-        Assert.All(lots, p => { var (mn, mx) = p.Forma.Bounds; Assert.Equal(12, mx.X - mn.X, 3); Assert.Equal(30, mx.Y - mn.Y, 3); });
+        Assert.All(lots.SkipLast(1), p => { var (mn, mx) = p.Forma.Bounds; Assert.Equal(12, mx.X - mn.X, 3); Assert.Equal(30, mx.Y - mn.Y, 3); });
+    }
+
+    /// <summary>Quadra de 102 m de testada (8 × 12 + 6) e 60 m de fundo.</summary>
+    private static QuadraDefinition Q102(double fundo = 60) =>
+        LTScenes.Q("S", new List<Vec2> { new(0, 0), new(102, 0), new(102, fundo), new(0, fundo) }, new Vec2(51, 0));
+
+    [Fact]
+    public void R1_SobraViraOUltimoLote_LoteNormal()
+    {
+        // 102 m = 8 × 12 + 6: a sobra de 6 m × 30 m = 180 m² atinge a frente (5 m) e a área (125 m²) mínimas – é o último lote,
+        // um lote comum (categoria Lote, numerado na sequência).
+        var q = Q102();
+        q.Miolo = ModoMiolo.AreaPropria;
+        var d = Div(q);
+        var sobra = Assert.Single(d.Parcelas, p => p.Sobra);
+        Assert.Equal(CategoriaLote.Lote, sobra.Categoria);
+        Assert.Equal(6, sobra.Frente, 6);
+        Assert.Equal(180, sobra.Area, 2);
+        Assert.Null(sobra.AbaixoDoMinimo);
+        var lots = d.Parcelas.Where(p => p.TestadaId == "A").OrderBy(p => p.Forma.Centroid.X).ToList();
+        Assert.Same(sobra, lots[^1]);
+        Assert.Equal(9, lots.Count);
+        Assert.Equal(Enumerable.Range(1, 9), d.Parcelas.Where(p => p.Categoria == CategoriaLote.Lote).Select(p => int.Parse(p.Numero)).OrderBy(n => n));
+        Assert.DoesNotContain(d.Parcelas, p => p.Categoria.StartsWith("Sobra"));
+    }
+
+    [Theory]
+    [InlineData(100, 60, 5, 125, "4,00 m")] // 4 m < 5 m de frente
+    [InlineData(102, 20, 5, 125, "6,00 m")] // 6 m × 20 m (quadra rasa) = 120 m² < 125 m²
+    [InlineData(102, 60, 7, 125, "6,00 m")] // frente mínima do loteamento de 7 m
+    public void R1_SobraAbaixoDosMinimos_SomadaAoUltimoLote(double testada, double fundo, double frenteMin, double areaMin, string sobra)
+    {
+        var q = LTScenes.Q("S", new List<Vec2> { new(0, 0), new(testada, 0), new(testada, fundo), new(0, fundo) }, new Vec2(testada / 2, 0));
+        q.Miolo = ModoMiolo.AreaPropria;
+        var lot = new LoteamentoDefinition { FrenteMinimaLote = frenteMin, AreaMinimaLote = areaMin };
+        q.LoteamentoId = lot.Id;
+        var d = LotDivider.Divide(q, lot);
+        Assert.DoesNotContain(d.Parcelas, p => p.Sobra);
+        var lots = d.Parcelas.Where(p => p.TestadaId == "A").OrderBy(p => p.Forma.Centroid.X).ToList();
+        Assert.Equal(12 + (testada - 12 * Math.Floor(testada / 12)), lots[^1].Frente, 6);
+        Assert.Contains(d.Avisos, a => a.Contains($"sobra de {sobra}") && a.Contains("somada ao último lote"));
+        Assert.All(lots, p => Assert.Null(p.AbaixoDoMinimo));
     }
 
     [Fact]
-    public void R1_SobraViraOUltimoLote_NaCategoriaSobra()
+    public void R1_MinimosDoLoteamento_5mE125m2_Editaveis()
     {
-        // 100 m de testada = 8 × 12 + 4: o último lote é a sobra de 4 m.
-        var d = Div(LTScenes.Scene("uma-testada"));
-        var sobra = Assert.Single(d.Parcelas, p => p.Sobra);
-        Assert.Equal(CategoriaLote.Sobra, sobra.Categoria);
-        Assert.Equal(4, sobra.Frente, 6);
-        Assert.Equal(120, sobra.Area, 2);
-        var last = d.Parcelas.Where(p => p.TestadaId == "A").OrderBy(p => p.Forma.Centroid.X).Last();
-        Assert.Same(sobra, last);
+        var lot = new LoteamentoDefinition();
+        Assert.Equal(5, lot.FrenteMinimaLote);
+        Assert.Equal(125, lot.AreaMinimaLote);
+        lot.FrenteMinimaLote = 8;
+        lot.AreaMinimaLote = 200;
+        var back = (LoteamentoDefinition)MarkingDefinition.FromJson(lot.ToJson())!;
+        Assert.Equal(8, back.FrenteMinimaLote);
+        Assert.Equal(200, back.AreaMinimaLote);
+    }
+
+    [Theory]
+    [InlineData(4.0, null, "frente 4,00 m < 5,00 m")]
+    [InlineData(null, 10.0, "área 120,00 m² < 125,00 m²")]
+    public void R1_LoteAbaixoDoMinimo_MarcadoEAvisado(double? frente, double? profundidade, string motivo)
+    {
+        var q = LTScenes.Scene("uma-testada");
+        q.Miolo = ModoMiolo.AreaPropria;
+        var aj = q.AjusteOuNovo("A:3");
+        aj.Frente = frente;
+        aj.Profundidade = profundidade;
+        var d = Div(q);
+        var p = ByKey(d, "A:3");
+        Assert.NotNull(p.AbaixoDoMinimo);
+        Assert.Contains(motivo, p.AbaixoDoMinimo);
+        Assert.Contains(d.Avisos, a => a.Contains($"lote {p.Numero}: abaixo do mínimo") && a.Contains(motivo));
+        Assert.All(d.Parcelas.Where(x => x.Chave != "A:3"), x => Assert.Null(x.AbaixoDoMinimo));
     }
 
     [Fact]
@@ -94,6 +158,7 @@ public class LTLoteamentoTests
     public void R1_LoteXPersonalizado_OsVizinhosSeReajustam()
     {
         var q = LTScenes.Scene("uma-testada");
+        q.Miolo = ModoMiolo.AreaPropria;
         var before = Div(q);
         q.AjusteOuNovo("A:3").Frente = 20;
         var d = Div(q);
@@ -103,15 +168,17 @@ public class LTLoteamentoTests
         // O lote 4 começa onde o 3 (agora com 20 m) termina; a sobra se ajusta e a área total não muda.
         Assert.Equal(l3.Forma.Bounds.Max.X, ByKey(d, "A:4").Forma.Bounds.Min.X, 3);
         Assert.Equal(before.Parcelas.Sum(p => p.Area), d.Parcelas.Sum(p => p.Area), 2);
-        // 12 + 12 + 20 + 4 × 12 = 92 m: sete lotes e a sobra de 8 m.
+        // 12 + 12 + 20 + 4 × 12 = 92 m: sete lotes e a sobra de 8 m – um lote comum (8 × 30 = 240 m²).
         Assert.Equal(7, d.Parcelas.Count(p => p.TestadaId == "A" && !p.Sobra));
         Assert.Equal(8, d.Parcelas.Single(p => p.Sobra).Frente, 6);
+        Assert.Equal(CategoriaLote.Lote, d.Parcelas.Single(p => p.Sobra).Categoria);
     }
 
     [Fact]
     public void R1_ProfundidadeEDivisaoDoLote()
     {
         var q = LTScenes.Scene("uma-testada");
+        q.Miolo = ModoMiolo.AreaPropria;
         q.AjusteOuNovo("A:2").Profundidade = 40;
         q.AjusteOuNovo("A:5").Partes = 2;
         var d = Div(q);
@@ -158,17 +225,79 @@ public class LTLoteamentoTests
         var r = 6.0;
         var corners = d.Parcelas.Where(p => p.Esquina).ToList();
         Assert.Equal(4, corners.Count);
-        // Lote de esquina 12 × 30 menos o arco de raio 6 m; os do meio, 12 × 30 exatos.
-        Assert.All(corners, p => Assert.InRange(p.Area, 360 - (1 - Math.PI / 4) * r * r - 0.2, 360 - (1 - Math.PI / 4) * r * r + 0.2));
-        Assert.All(d.Parcelas.Where(p => !p.Esquina && !p.Sobra && p.Frente == 12), p => Assert.Equal(360, p.Area, 2));
+        // Lote de esquina: frente × fundo menos o arco de raio 6 m (a frente é medida até o encontro dos alinhamentos);
+        // os do meio, 12 × 30 exatos.
+        Assert.All(corners, p => Assert.InRange(p.Area, p.Frente * p.Profundidade - (1 - Math.PI / 4) * r * r - 0.2, p.Frente * p.Profundidade - (1 - Math.PI / 4) * r * r + 0.2));
+        Assert.All(d.Parcelas.Where(p => !p.Esquina), p => Assert.Equal(p.Frente * p.Profundidade, p.Area, 2));
     }
 
     [Fact]
     public void R1_FundoNoMeioDaQuadraRasa()
     {
         var d = Div(LTScenes.Scene("rasa"));
-        Assert.All(d.Parcelas.Where(p => !p.Sobra), p => Assert.Equal(300, p.Area, 2));
+        // 50 m de fundo, testadas nos dois lados: lotes de 25 m de fundo; a sobra de 4 m vai para o último lote de cada testada.
+        Assert.All(d.Parcelas.Where(p => p.Frente == 12), p => Assert.Equal(300, p.Area, 2));
+        Assert.All(d.Parcelas.Where(p => p.Frente != 12), p => Assert.Equal(16 * 25, p.Area, 2));
         Assert.DoesNotContain(d.Parcelas, p => p.Chave.StartsWith("m:"));
+    }
+
+    [Fact]
+    public void R1_Miolo_AosLotesOuAreaPropria()
+    {
+        // Uma testada só, 60 m de fundo: o padrão leva cada lote até a divisa de fundos (12 × 60).
+        var q = LTScenes.Scene("uma-testada");
+        var d = Div(q);
+        Assert.DoesNotContain(d.Parcelas, p => p.Chave.StartsWith("m:"));
+        Assert.All(d.Parcelas.Where(p => p.Frente == 12), p => Assert.Equal(720, p.Area, 2));
+        Assert.Equal(6000, d.Parcelas.Sum(p => p.Area), 2);
+        // Área própria: o miolo vira uma área na categoria escolhida (padrão Área verde), numerada com o prefixo dela.
+        q.Miolo = ModoMiolo.AreaPropria;
+        d = Div(q);
+        var m = Assert.Single(d.Parcelas, p => p.Chave.StartsWith("m:"));
+        Assert.Equal(CategoriaLote.AreaVerde, m.Categoria);
+        Assert.Equal(3000, m.Area, 2);
+        Assert.Equal("AV-1", m.Numero);
+        q.MioloCategoria = CategoriaLote.Institucional;
+        Assert.Equal("AI-1", Div(q).Parcelas.Single(p => p.Chave.StartsWith("m:")).Numero);
+    }
+
+    [Fact]
+    public void R1_UnirLotes_UmLoteSoComAsAreasSomadas()
+    {
+        var q = LTScenes.Scene("uma-testada");
+        q.Miolo = ModoMiolo.AreaPropria;
+        var before = Div(q);
+        var n0 = before.Parcelas.Count(p => p.Categoria == CategoriaLote.Lote);
+        q.Unioes.Add(new List<string> { "A:2", "A:3" });
+        var d = Div(q);
+        var u = ByKey(d, "A:2");
+        Assert.DoesNotContain(d.Parcelas, p => p.Chave == "A:3");
+        Assert.Equal(720, u.Area, 2);
+        Assert.Equal(24, u.Frente, 6);
+        Assert.Equal(new[] { "A:2", "A:3" }, u.Unidos);
+        Assert.DoesNotContain(u.Forma.Outer, v => Math.Abs(v.X - 24) < 1e-6); // sem a divisa do meio no contorno
+        Assert.Equal(Enumerable.Range(1, n0 - 1), d.Parcelas.Where(p => p.Categoria == CategoriaLote.Lote).Select(p => int.Parse(p.Numero)).OrderBy(n => n));
+        Assert.Equal(before.Parcelas.Sum(p => p.Area), d.Parcelas.Sum(p => p.Area), 2);
+        Assert.Equal(q.UniaoDe("A:3"), q.UniaoDe("A:2"));
+        // Lote da sobra maior: a sobra de 6 m unida ao último lote (6 + 12 = 18 m).
+        var s = Q102();
+        s.Miolo = ModoMiolo.AreaPropria;
+        var ds = Div(s);
+        var last = ds.Parcelas.Where(p => p.TestadaId == "A" && !p.Sobra).OrderBy(p => p.Forma.Centroid.X).Last();
+        s.Unioes.Add(new List<string> { last.Chave, ds.Parcelas.Single(p => p.Sobra).Chave });
+        Assert.Equal(18, Div(s).Parcelas.Single(p => p.Chave == last.Chave).Frente, 6);
+    }
+
+    [Fact]
+    public void R1_UnirLotesQueNaoSeTocam_FicamComoEstao()
+    {
+        var q = LTScenes.Scene("uma-testada");
+        var n = Div(q).Parcelas.Count;
+        q.Unioes.Add(new List<string> { "A:1", "A:5" });
+        var d = Div(q);
+        Assert.Equal(n, d.Parcelas.Count);
+        Assert.All(d.Parcelas, p => Assert.Null(p.Unidos));
+        Assert.Contains(d.Avisos, a => a.Contains($"lotes {ByKey(d, "A:1").Numero} + {ByKey(d, "A:5").Numero}") && a.Contains("não são vizinhos"));
     }
 
     // ================================================================== R2 – numeração por quadra
@@ -194,7 +323,7 @@ public class LTLoteamentoTests
         var counts = new List<int>();
         foreach (var q in w.Quadras)
         {
-            var d = LotDivider.Divide(q, w.Lot.Categorias);
+            var d = LotDivider.Divide(q, w.Lot);
             var nums = d.Parcelas.Where(p => p.Categoria == CategoriaLote.Lote).Select(p => int.Parse(p.Numero)).OrderBy(n => n).ToList();
             Assert.Equal(1, nums[0]);
             Assert.Equal(Enumerable.Range(1, nums.Count), nums);
@@ -251,15 +380,16 @@ public class LTLoteamentoTests
     // ================================================================== R3 – categorias
 
     [Fact]
-    public void R3_CategoriasPadrao_LoteInstitucionalAreaVerdeSobra()
+    public void R3_CategoriasPadrao_LoteInstitucionalAreaVerde()
     {
+        // Sem categoria de sobra: a sobra de testada é um lote comum.
         var c = CategoriaLote.Padrao();
-        Assert.Equal(new[] { CategoriaLote.Lote, CategoriaLote.Institucional, CategoriaLote.AreaVerde, CategoriaLote.Sobra }, c.Select(x => x.Nome));
+        Assert.Equal(new[] { CategoriaLote.Lote, CategoriaLote.Institucional, CategoriaLote.AreaVerde }, c.Select(x => x.Nome));
         Assert.True(c.Single(x => x.Nome == CategoriaLote.Institucional).Publica);
         Assert.True(c.Single(x => x.Nome == CategoriaLote.AreaVerde).Publica);
         Assert.False(c.Single(x => x.Nome == CategoriaLote.Lote).Publica);
-        Assert.Equal(4, c.Select(x => x.Cor).Distinct().Count());
-        Assert.Equal(4, c.Select(x => x.Hachura).Distinct().Count());
+        Assert.Equal(3, c.Select(x => x.Cor).Distinct().Count());
+        Assert.Equal(3, c.Select(x => x.Hachura).Distinct().Count());
     }
 
     [Fact]
@@ -301,8 +431,12 @@ public class LTLoteamentoTests
         q.AjusteOuNovo("T1:2").Categoria = CategoriaLote.Institucional;
         q.Esquinas.Add(new EsquinaLote { Ponto = new(1, 2), Modo = ModoEsquina.MedidaPropria, FrenteAnterior = 14, FrentePosterior = 18 });
         w.Lot.Minimos["Área verde"] = 10;
+        w.Lot.FrenteMinimaLote = 6;
+        q.Miolo = ModoMiolo.AreaPropria;
+        q.MioloCategoria = CategoriaLote.Institucional;
+        q.Unioes.Add(new List<string> { "T1:3", "T1:4" });
         foreach (MarkingDefinition d in new MarkingDefinition[] { w.Lot, q, new LoteamentoDetalheDefinition { LoteamentoId = w.Lot.Id },
-                     new QuadroLoteamentoDefinition { LoteamentoId = w.Lot.Id, Conteudo = TipoQuadroLoteamento.Lotes } })
+                     new QuadroLoteamentoDefinition { LoteamentoId = w.Lot.Id, Conteudo = TipoQuadroLoteamento.Lotes, Quadra = "A" } })
         {
             var json = d.ToJson();
             var back = MarkingDefinition.FromJson(json)!;
@@ -325,7 +459,7 @@ public class LTLoteamentoTests
         var ground = TopoScene.Terrains[terrain];
         var w = LTScenes.World();
         var q = w.Quadras.OrderByDescending(x => x.Polygon!.Area).First();
-        var d = LotDivider.Divide(q, w.Lot.Categorias);
+        var d = LotDivider.Divide(q, w.Lot);
         foreach (var p in d.Parcelas.Take(6))
         {
             // Vértices e pontos do contorno: na cota do terreno.
@@ -363,7 +497,7 @@ public class LTLoteamentoTests
         Assert.Equal("Quadra", headers[0]);
         Assert.Equal(w.Quadras.Count + 1, rows.Count);
         Assert.Equal("Total", rows[^1][0]);
-        Assert.Equal(LotReport.M(w.Quadras.Sum(q => LotDivider.Divide(q, w.Lot.Categorias).Quadra.Area)), rows[^1][^1]);
+        Assert.Equal(LotReport.M(w.Quadras.Sum(q => LotDivider.Divide(q, w.Lot).Quadra.Area)), rows[^1][^1]);
         Assert.Equal(r.TotalLotes.ToString(), rows[^1][1]);
     }
 
@@ -423,12 +557,92 @@ public class LTLoteamentoTests
         Assert.DoesNotContain("Proprietário", text + string.Join("", doc.Blocks.OfType<MemField>().Select(f => f.Label)));
         Assert.DoesNotContain("atrícula", text + string.Join("", doc.Blocks.OfType<MemField>().Select(f => f.Label)));
         Assert.Contains("[a confirmar", text);
+        // Quadro de lotes de cada quadra no memorial (lote a lote).
+        var tables = doc.Blocks.OfType<MemTable>().Where(t => t.Headers.Contains("Frente para")).ToList();
+        Assert.Equal(w.Quadras.Count, tables.Count);
+        Assert.Equal(r.Quadras.Sum(q => q.Divisao.Parcelas.Count), tables.Sum(t => t.Rows.Count));
         var bytes = DocxWriter.Write(doc);
         using var zip = new ZipArchive(new MemoryStream(bytes));
         using var sr = new StreamReader(zip.GetEntry("word/document.xml")!.Open(), Encoding.UTF8);
         var xml = sr.ReadToEnd();
         Assert.Contains("QUADRO DE ÁREAS", xml.ToUpperInvariant());
         Assert.Contains("Rua das Flores", xml);
+    }
+
+    [Fact]
+    public void R5_QuadroDeAreas_SemCategoriaDeSobras()
+    {
+        var w = LTScenes.World();
+        var r = LotReport.Resumo(w.Lot, w.Quadras);
+        var rows = LotMemorial.LinhasAreas(r);
+        Assert.DoesNotContain(rows, x => x.Item.Contains("Sobra", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(r.Categorias, c => c.Nome.Contains("Sobra", StringComparison.OrdinalIgnoreCase));
+        // Todas as parcelas das quadras de lotes são lotes: as sobras de testada entram como lotes comuns.
+        Assert.Equal(r.Quadras.Sum(q => q.Divisao.Parcelas.Count), r.Categorias.Sum(c => c.Quantidade));
+        Assert.Equal(r.Quadras.Sum(q => q.Divisao.Parcelas.Count(p => p.Categoria == CategoriaLote.Lote)), r.TotalLotes);
+    }
+
+    [Fact]
+    public void R5_QuadroDeLotes_LoteALote()
+    {
+        var w = LTScenes.World();
+        w.Quadras[0].AjusteOuNovo("T1:2").Categoria = CategoriaLote.AreaVerde;
+        var r = LotReport.Resumo(w.Lot, w.Quadras);
+        var rows = LotReport.LinhasLotes(r);
+        Assert.Equal(r.Quadras.Sum(q => q.Divisao.Parcelas.Count), rows.Count);
+        Assert.All(rows, x => Assert.Equal(LotReport.CabecalhosLotes.Length, x.Length));
+        Assert.Equal(new[] { "QUADRA", "LOTE", "CATEGORIA", "FRENTE PARA", "FRENTE (m)", "LADO DIR. (m)", "LADO ESQ. (m)", "FUNDOS (m)", "ÁREA (m²)", "OBSERVAÇÃO" },
+            LotReport.CabecalhosLotes);
+        // Lote comum de 12 × 30: frente para a via, lados de 30 m, fundos de 12 m.
+        bool Std(Parcela p) => p.Categoria == CategoriaLote.Lote && p.Frente == 12 && Math.Abs(p.Area - 360) < 0.01 && !p.Esquina;
+        var (qa, da) = r.Quadras.First(x => x.Divisao.Parcelas.Any(Std));
+        var std = da.Parcelas.First(Std);
+        var row = rows.Single(x => x[0] == qa.Nome && x[1] == std.Numero);
+        Assert.Equal(CategoriaLote.Lote, row[2]);
+        Assert.NotEqual("–", row[3]);
+        Assert.Equal(new[] { "12,00", "30,00", "30,00", "12,00", "360,00", "" }, row[4..]);
+        // Lote de esquina: duas vias na frente e a observação.
+        var corner = rows.First(x => x[9].Contains("esquina"));
+        Assert.Contains(" / ", corner[3]);
+        Assert.Contains(" + ", corner[4]);
+        // Na ordem da numeração em cada quadra: 1..N e depois as outras categorias.
+        foreach (var g in rows.GroupBy(x => x[0]))
+        {
+            var lotes = g.Where(x => x[2] == CategoriaLote.Lote).Select(x => int.Parse(x[1])).ToList();
+            Assert.Equal(Enumerable.Range(1, lotes.Count), lotes);
+            Assert.All(g.SkipWhile(x => x[2] == CategoriaLote.Lote), x => Assert.NotEqual(CategoriaLote.Lote, x[2]));
+        }
+        Assert.Contains(rows, x => x[1] == "AV-1" && x[2] == CategoriaLote.AreaVerde);
+        // Filtro por quadra.
+        Assert.All(LotReport.LinhasLotes(r, "B"), x => Assert.Equal("B", x[0]));
+        Assert.Equal(r.Quadras.Single(x => x.Quadra.Nome == "B").Divisao.Parcelas.Count, LotReport.LinhasLotes(r, "B").Count);
+    }
+
+    [Fact]
+    public void R5_QuadroDeLotesDesenhado_ComFiltroDeQuadra_EUniaoEAbaixoDoMinimoNaObservacao()
+    {
+        var w = LTScenes.World();
+        var q = w.Quadras.Single(x => x.Nome == "A");
+        q.Unioes.Add(new List<string> { "T1:2", "T1:3" });
+        q.AjusteOuNovo("T1:5").Frente = 4;
+        var defs = new List<MarkingDefinition> { w.Lot };
+        defs.AddRange(w.Quadras);
+        var ctx = new BuildContext { Catalog = Cat, AllDefinitions = () => defs, ViewScale = 100 };
+        var all = MarkingBuilder.Build(new QuadroLoteamentoDefinition { LoteamentoId = w.Lot.Id, Conteudo = TipoQuadroLoteamento.Lotes, LinhasPorColuna = 400 }, null, ctx);
+        var texts = all.Annotations.OfType<AnnotationText>().Select(t => t.Text).ToList();
+        foreach (var h in LotReport.CabecalhosLotes) Assert.Contains(h, texts);
+        Assert.Contains("QUADRO DE LOTES", texts);
+        Assert.Contains(texts, t => t.Contains("união de 2 lotes"));
+        Assert.Contains(texts, t => t.Contains("abaixo do mínimo: frente 4,00 m < 5,00 m"));
+        Assert.Contains("Rua das Flores", texts);
+        var one = new QuadroLoteamentoDefinition { LoteamentoId = w.Lot.Id, Conteudo = TipoQuadroLoteamento.Lotes, Quadra = "A", LinhasPorColuna = 400 };
+        var geo = MarkingBuilder.Build(one, null, ctx);
+        var t1 = geo.Annotations.OfType<AnnotationText>().Select(t => t.Text).ToList();
+        Assert.Contains("QUADRO DE LOTES – QUADRA A", t1);
+        Assert.DoesNotContain("QUADRA", t1);
+        var r = LotReport.Resumo(w.Lot, w.Quadras);
+        foreach (var p in r.Quadras.Single(x => x.Quadra.Nome == "A").Divisao.Parcelas) Assert.Contains(p.Numero, t1);
+        Assert.True(t1.Count < texts.Count);
     }
 
     [Fact]
@@ -443,9 +657,17 @@ public class LTLoteamentoTests
         var frente = lados.Single(l => l.Tipo == TipoLado.Frente);
         Assert.Equal(12, frente.Comprimento, 6);
         Assert.Equal("Rua Sul", frente.Confrontante);
-        Assert.Equal(30, lados.Single(l => l.Tipo == TipoLado.LadoDireito).Comprimento, 6);
-        Assert.Equal(30, lados.Single(l => l.Tipo == TipoLado.LadoEsquerdo).Comprimento, 6);
-        Assert.StartsWith("Sobra", lados.Single(l => l.Tipo == TipoLado.Fundos).Confrontante);
+        Assert.True(frente.Via);
+        // Fundos até a divisa (miolo aos lotes): 12 × 60. Sem gleba e sem testada, o fundo é divisa – não via.
+        Assert.Equal(60, lados.Single(l => l.Tipo == TipoLado.LadoDireito).Comprimento, 6);
+        Assert.Equal(60, lados.Single(l => l.Tipo == TipoLado.LadoEsquerdo).Comprimento, 6);
+        var fundos = lados.Single(l => l.Tipo == TipoLado.Fundos);
+        Assert.Equal("a divisa da Quadra U", fundos.Confrontante);
+        Assert.False(fundos.Via);
+        // Com o miolo como área própria, os fundos confrontam com ela.
+        q.Miolo = ModoMiolo.AreaPropria;
+        d = Div(q);
+        Assert.Equal($"Área verde AV-1 da Quadra U", LotReport.Lados(ByKey(d, "A:3"), d, q, null).Single(l => l.Tipo == TipoLado.Fundos).Confrontante);
         // De quem olha o lote da rua (sul): o lado direito é o leste.
         var right = lados.Single(l => l.Tipo == TipoLado.LadoDireito);
         Assert.True((right.A + right.B).X / 2 > p.Forma.Centroid.X);
@@ -464,20 +686,82 @@ public class LTLoteamentoTests
         var geo = MarkingBuilder.Build(det, null, ctx);
         var texts = geo.Annotations.OfType<AnnotationText>().ToList();
         var q = w.Quadras[0];
-        var d = LotDivider.Divide(q, w.Lot.Categorias);
+        var d = LotDivider.Divide(q, w.Lot);
         var lot = d.Parcelas.First(p => p.Categoria == CategoriaLote.Lote && p.Frente == 12 && Math.Abs(p.Area - 360) < 0.01);
         Assert.Contains(texts, t => t.Text == lot.Numero && lot.Forma.Contains(t.Position));
         Assert.Contains(texts, t => t.Text == "360,00 m²" && lot.Forma.Contains(t.Position));
         Assert.Contains(texts, t => t.Text == "12,00" && lot.Forma.Contains(t.Position));
         Assert.Contains(texts, t => t.Text == "30,00" && lot.Forma.Contains(t.Position));
-        Assert.Contains(texts, t => t.Text == $"QUADRA {q.Nome}");
+        Assert.Contains(texts, t => t.Text == q.Nome);
+        Assert.DoesNotContain(texts, t => t.Text.StartsWith("QUADRA "));
         Assert.Contains(texts, t => t.Text == "RUA DAS FLORES");
-        Assert.Contains(texts, t => t.Text == "SOBRA");
+        Assert.DoesNotContain(texts, t => t.Text.Contains("SOBRA"));
         // Cada item desliga.
         var off = new LoteamentoDetalheDefinition { LoteamentoId = w.Lot.Id, Numero = false, Area = false, Cotas = false, Categoria = false, Quadra = false, Vias = false };
         Assert.Empty(MarkingBuilder.Build(off, null, ctx).Annotations.OfType<AnnotationText>());
         var cores = MarkingBuilder.Build(new LoteamentoDetalheDefinition { LoteamentoId = w.Lot.Id, Cores = true, Divisas = true }, null, ctx);
-        Assert.Equal(w.Quadras.Sum(x => LotDivider.Divide(x, w.Lot.Categorias).Parcelas.Count), cores.Pieces.Count);
+        Assert.Equal(w.Quadras.Sum(x => LotDivider.Divide(x, w.Lot).Parcelas.Count), cores.Pieces.Count(p => p.Layer!.StartsWith(LotDrawing.LayerPrefix)));
+        // Círculo da letra: miolo branco e anel preto em cada quadra.
+        Assert.Equal(2 * w.Quadras.Count, cores.Pieces.Count(p => p.Layer!.StartsWith(LotDrawing.QuadraLayerPrefix)));
+        // Categoria escrita nas áreas públicas (a cor/hachura também a mostra).
+        q.AjusteOuNovo("T1:2").Categoria = CategoriaLote.Institucional;
+        Assert.Contains(MarkingBuilder.Build(det, null, ctx).Annotations.OfType<AnnotationText>(), t => t.Text == "INSTITUCIONAL");
+    }
+
+    [Theory]
+    [InlineData("grade", 500)]
+    [InlineData("grade", 1000)]
+    [InlineData("cruz", 500)]
+    [InlineData("avenida", 1000)]
+    public void R6_LetraDaQuadraNumCirculo_NoMeioSemSobreporOsRotulos(string kind, double scale)
+    {
+        var w = LTScenes.World(kind);
+        var defs = new List<MarkingDefinition> { w.Lot };
+        defs.AddRange(w.Quadras);
+        var ctx = new BuildContext { Catalog = Cat, AllDefinitions = () => defs, ViewScale = scale };
+        var geo = MarkingBuilder.Build(new LoteamentoDetalheDefinition { LoteamentoId = w.Lot.Id }, null, ctx);
+        var texts = geo.Annotations.OfType<AnnotationText>().ToList();
+        var mm = ctx.Mm(1);
+        foreach (var q in w.Quadras)
+        {
+            var quad = q.Polygon!;
+            var letter = Assert.Single(texts, t => t.Text == q.Nome);
+            var ring = geo.Pieces.Single(p => p.Layer == LotDrawing.QuadraLayerPrefix + q.Nome && p.Shape.Holes.Count == 1);
+            var c = new Polygon2(ring.Shape.Outer).Centroid;
+            var radius = ring.Shape.Outer.Max(v => v.DistanceTo(c));
+            // Letra centrada no círculo, círculo dentro da quadra.
+            Assert.True(Math.Abs(letter.Position.X - c.X) < 1e-6);
+            Assert.True(quad.Contains(c) && quad.DistanceTo(c) >= radius, $"{kind}: círculo da quadra {q.Nome} sai dela");
+            // Fora dos números, áreas e cotas dos lotes.
+            foreach (var t in texts.Where(t => t != letter && quad.Contains(t.Position)))
+            {
+                var box = LotDrawing.TextBox(t, mm);
+                Assert.True(!box.Contains(c) && box.DistanceTo(c) >= radius, $"{kind} 1:{scale}: círculo da quadra {q.Nome} sobre \"{t.Text}\"");
+            }
+            // No meio da quadra: perto do ponto mais central dela.
+            var (mn, mx) = quad.Bounds;
+            Assert.True(c.DistanceTo(LotDrawing.InteriorPoint(quad)) < 0.25 * Math.Min(mx.X - mn.X, mx.Y - mn.Y), $"{kind}: círculo da quadra {q.Nome} longe do meio");
+        }
+    }
+
+    [Fact]
+    public void R6_LetraDaQuadra_DesviaDosRotulosNumaFileiraSo()
+    {
+        // Uma testada, lotes 12 × 60: o meio da quadra cai no rótulo de um lote – o círculo vai para a divisa ao lado.
+        var q = LTScenes.Scene("uma-testada");
+        var lot = new LoteamentoDefinition { Nome = "X" };
+        q.LoteamentoId = lot.Id;
+        var defs = new List<MarkingDefinition> { lot, q };
+        var ctx = new BuildContext { Catalog = Cat, AllDefinitions = () => defs, ViewScale = 500 };
+        var geo = MarkingBuilder.Build(new LoteamentoDetalheDefinition { LoteamentoId = lot.Id }, null, ctx);
+        var texts = geo.Annotations.OfType<AnnotationText>().ToList();
+        var letter = texts.Single(t => t.Text == "U");
+        var ring = geo.Pieces.Single(p => p.Layer == LotDrawing.QuadraLayerPrefix + "U" && p.Shape.Holes.Count == 1);
+        var c = new Polygon2(ring.Shape.Outer).Centroid;
+        var radius = ring.Shape.Outer.Max(v => v.DistanceTo(c));
+        foreach (var t in texts.Where(t => t != letter))
+            Assert.True(LotDrawing.TextBox(t, ctx.Mm(1)).DistanceTo(c) >= radius, $"círculo sobre \"{t.Text}\"");
+        Assert.InRange(c.Y, 20, 40);
     }
 
     [Fact]
@@ -561,6 +845,8 @@ public class LTLoteamentoTests
         foreach (var c in new[] { CategoriaQuantitativo.PavimentacaoGeometria, CategoriaQuantitativo.CalcadasUrbanizacao, CategoriaQuantitativo.MobiliarioUrbano })
             Assert.False(Masterplan.Oculta(c));
         Assert.Contains(Masterplan.Detalhamento, Masterplan.ValoresOcultos);
+        // O detalhamento dos lotes (números e letra da quadra no círculo) fica visível.
+        Assert.DoesNotContain(Masterplan.Loteamento, Masterplan.ValoresOcultos);
         var det = Masterplan.Detalhe("x");
         Assert.True(det.Numero && det.Quadra && det.Vias);
         Assert.False(det.Area || det.Cotas || det.Categoria);

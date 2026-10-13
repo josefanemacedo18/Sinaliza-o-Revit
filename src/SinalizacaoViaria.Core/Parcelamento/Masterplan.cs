@@ -22,12 +22,17 @@ public static class Masterplan
     /// <summary>Valor de SV_Categoria dos detalhes do plugin (cotas, quadros, legendas) – também ocultos.</summary>
     public const string Detalhamento = "Detalhamento";
 
+    /// <summary>
+    /// Valor de SV_Categoria do detalhamento dos lotes (números, letra da quadra no círculo, cores): fica visível no masterplan.
+    /// </summary>
+    public const string Loteamento = "Loteamento";
+
     public static bool Oculta(CategoriaQuantitativo c) => Ocultas.Contains(c);
 
     /// <summary>Valores de SV_Categoria ocultos (regras do filtro do modelo de vista).</summary>
     public static IEnumerable<string> ValoresOcultos => Ocultas.Select(QuantityRow.CategoryLabel).Append(Detalhamento);
 
-    /// <summary>Detalhamento do masterplan: só nomes de quadra e de via e números dos lotes, sem áreas, cotas nem categorias.</summary>
+    /// <summary>Detalhamento do masterplan: letra da quadra no círculo, nomes das vias e números dos lotes, sem áreas, cotas nem categorias.</summary>
     public static Definitions.LoteamentoDetalheDefinition Detalhe(string loteamentoId) => new()
     {
         LoteamentoId = loteamentoId,

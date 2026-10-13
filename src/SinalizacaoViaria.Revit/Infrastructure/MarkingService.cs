@@ -1822,7 +1822,8 @@ public sealed class MarkingService
             SharedParameters.Set(e, SharedParameters.Descricao, info.Name);
             SharedParameters.Set(e, SharedParameters.Grupo, def is UrbanElementDefinition ue && PluginContext.Catalog.Movel(ue.Code) is { } mv
                 ? UrbanCategories.Label(UrbanCategories.Of(mv.Forma)) : QuantityRow.GroupLabel(info.Group));
-            SharedParameters.Set(e, SharedParameters.Categoria, def is IAnnotationDefinition ? "Detalhamento" : QuantityRow.CategoryLabel(QuantityRow.Categorize(def, info.Group)));
+            SharedParameters.Set(e, SharedParameters.Categoria, def is LoteamentoDetalheDefinition ? Core.Parcelamento.Masterplan.Loteamento
+                : def is IAnnotationDefinition ? "Detalhamento" : QuantityRow.CategoryLabel(QuantityRow.Categorize(def, info.Group)));
             SharedParameters.Set(e, SharedParameters.Hierarquia, def is IAnnotationDefinition ? "" : Core.Definitions.Hierarquia.Label(def.Hierarchy));
             // Memorial (placas, dispositivos, mobiliário...): contado por modelo, sem desdobrar por cor nem material
             // – igual à janela de quantitativos; as peças coloridas de uma placa ficam numa só linha da tabela.

@@ -207,18 +207,21 @@ public static class RibbonBuilder
             "numerados de 1 a N em cada quadra. Cada lote é uma subdivisão do Toposolid: acompanha o relevo em planta e no 3D (sem Toposolid, piso plano).");
         Split(lote, "SvLoteEdicao", "Quadra e Lote",
             Data(typeof(CmdQuadraLote), "Quadra", "quadra",
-                "Clique um lote: medidas padrão da quadra, sobra, testadas (apontar com cliques, em ordem de prioridade), lote de esquina em cada esquina " +
+                "Clique um lote: medidas padrão da quadra, sobra, miolo, testadas (apontar com cliques, em ordem de prioridade), lote de esquina em cada esquina " +
                 "(por uma testada, pela outra ou com medida própria), sentido da numeração e lote 1."),
             Data(typeof(CmdLote), "Lote", "lote",
-                "Clique um lote: frente, profundidade, divisão em partes e categoria (Lote, Institucional, Área verde, Sobra ou outra) – os vizinhos e a numeração se ajustam."));
+                "Clique um lote: frente, profundidade, divisão em partes e categoria (Lote, Institucional, Área verde ou outra) – os vizinhos e a numeração se ajustam."),
+            Data(typeof(CmdUnirLotes), "Unir Lotes", "unirlotes",
+                "Selecione lotes vizinhos da mesma quadra: viram um lote só (sobra maior, lote maior que o padrão) e a numeração se refaz. Desfazer: Lote → Desfazer a união."));
         StackTwo(lote,
             Data(typeof(CmdNomearVias), "Nomear Vias", "vianome", "Selecione a via (eixo, piso ou elemento dela) e escreva o nome – entra nas confrontações do memorial, no detalhamento e no masterplan."),
             Data(typeof(CmdCategoriasLotes), "Categorias e Filtros", "filtrolote",
                 "Categorias de lote (cor e hachura em planta e no 3D, numeração com prefixo, área pública, mínimo %), nova categoria e filtros de vista para mostrar/ocultar cada uma."));
         Split(lote, "SvLoteDoc", "Detalhar e Quadros",
-            Data(typeof(CmdDetalharLotes), "Detalhar Lotes", "detalhelotes", "Na vista ativa: número, área, medidas dos lados, categoria, nome da quadra e das vias (cada item opcional)."),
+            Data(typeof(CmdDetalharLotes), "Detalhar Lotes", "detalhelotes", "Na vista ativa: número, área, medidas dos lados, categoria, letra da quadra num círculo e nome das vias (cada item opcional)."),
             Data(typeof(CmdQuadrosLoteamento), "Quadros do Loteamento", "quadrolote",
-                "Quadro de áreas (m² e % da gleba), de quadras e de lotes numa Legenda própria (vai para qualquer folha) – e a tabela nativa dos lotes."),
+                "Quadro de áreas (m² e % da gleba), de quadras e de lotes (lote a lote: rua, medidas dos lados, área – todas as quadras, uma ou uma por quadra) " +
+                "numa Legenda própria (vai para qualquer folha) – e a tabela nativa dos lotes."),
             Data(typeof(CmdMemorialLoteamento), "Memorial do Loteamento", "memorial", "Memorial descritivo (.docx): gleba, quadro de áreas, sistema viário, quadras e descrição de cada lote com as confrontações."));
         Large(lote, typeof(CmdMasterplan), "Masterplan", "masterplan",
             "Cópia da planta ativa só com o layout: lotes nas cores das categorias, vias, calçadas, árvores e mobiliário, nomes das quadras e vias e números dos lotes – " +

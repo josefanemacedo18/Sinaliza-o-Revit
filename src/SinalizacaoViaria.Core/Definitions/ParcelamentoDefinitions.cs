@@ -5,7 +5,7 @@ using SinalizacaoViaria.Core.Model;
 namespace SinalizacaoViaria.Core.Definitions;
 
 /// <summary>
-/// Categoria de área do loteamento (Lote, Institucional, Área verde, Sobra ou outra criada pelo usuário): cor e hachura
+/// Categoria de área do loteamento (Lote, Institucional, Área verde ou outra criada pelo usuário): cor e hachura
 /// em planta e no 3D, filtro e numeração.
 /// </summary>
 public sealed class CategoriaLote
@@ -27,8 +27,6 @@ public sealed class CategoriaLote
     public const string Lote = "Lote";
     public const string Institucional = "Institucional";
     public const string AreaVerde = "Área verde";
-    /// <summary>Sobra de testada (último lote) e miolo de quadra que não vira lote – registrada no quadro.</summary>
-    public const string Sobra = "Sobra";
 
     /// <summary>Categorias padrão de um loteamento novo.</summary>
     public static List<CategoriaLote> Padrao() => new()
@@ -36,19 +34,30 @@ public sealed class CategoriaLote
         new() { Nome = Lote, Cor = "#F2D7A6", Hachura = Hachura.Nenhuma, Publica = false, Prefixo = "" },
         new() { Nome = Institucional, Cor = "#E8A3A3", Hachura = Hachura.Diagonal, Publica = true, Prefixo = "AI" },
         new() { Nome = AreaVerde, Cor = "#9BCB8A", Hachura = Hachura.Grama, Publica = true, Prefixo = "AV" },
-        new() { Nome = Sobra, Cor = "#D9D9D9", Hachura = Hachura.Pontos, Publica = false, Prefixo = "S" },
     };
 }
 
 /// <summary>O que fazer com o comprimento de testada que sobra depois do último lote inteiro.</summary>
 public enum ModoSobra
 {
-    /// <summary>A sobra é somada ao último lote da testada (lote de esquina maior).</summary>
+    /// <summary>A sobra é somada ao último lote da testada.</summary>
     IncorporarUltimo,
     /// <summary>A sobra é dividida igualmente entre os lotes de medida padrão da testada.</summary>
     Distribuir,
-    /// <summary>A sobra vira o último lote da testada, na categoria Sobra (registrado no quadro).</summary>
+    /// <summary>
+    /// A sobra vira o último lote da testada (lote normal) quando atinge a frente e a área mínimas do loteamento; menor que
+    /// isso, é somada ao último lote.
+    /// </summary>
     LoteSobra,
+}
+
+/// <summary>O que fazer com o miolo da quadra (a área atrás dos lotes que nenhuma testada alcança).</summary>
+public enum ModoMiolo
+{
+    /// <summary>Os lotes vão até o fundo: cada um fica com o miolo atrás dele (até a divisa ou outros lotes).</summary>
+    AosLotes,
+    /// <summary>O miolo vira uma área própria, na categoria escolhida (ex.: área verde).</summary>
+    AreaPropria,
 }
 
 /// <summary>Testada apontada na quadra: um ponto sobre o lado (o lado é reencontrado se o contorno mudar) e medidas próprias.</summary>
@@ -111,7 +120,7 @@ public sealed class EsquinaLote
 /// </summary>
 public sealed class LoteAjuste
 {
-    /// <summary>"testada:ordem" (lote), "testada:ordem.parte" (parte de lote dividido), "esq:k" (lote de esquina com medida própria) ou "m:k" (miolo).</summary>
+    /// <summary>"testada:ordem" (lote), "testada:ordem.parte" (parte de lote dividido), "testada:s" (sobra), "esq:a-b" (lote de esquina com medida própria) ou "m:k" (miolo).</summary>
     public string Chave { get; set; } = "";
     public double? Frente { get; set; }
     public double? Profundidade { get; set; }
@@ -139,6 +148,13 @@ public sealed class LoteamentoDefinition : MarkingDefinition
     /// nº 6.766/1979 remete à lei municipal; conferir). Chave: nome da categoria, "Sistema viário" ou "Áreas públicas".
     /// </summary>
     public Dictionary<string, double> Minimos { get; set; } = new();
+    /// <summary>
+    /// Frente mínima de um lote (m). Padrão 5 m, informado pela usuária (norma ou lei de parcelamento – [a confirmar]); lotes
+    /// menores são avisados e a sobra de testada menor que isso não vira lote.
+    /// </summary>
+    public double FrenteMinimaLote { get; set; } = 5;
+    /// <summary>Área mínima de um lote (m²). Padrão 125 m², informado pela usuária ([a confirmar]).</summary>
+    public double AreaMinimaLote { get; set; } = 125;
     /// <summary>Município/UF (memorial). Vazio = campo a preencher no Word.</summary>
     public string? Municipio { get; set; }
     /// <summary>Nomes das vias (memorial, confrontações e detalhamento), dados pelo usuário selecionando as vias.</summary>
@@ -198,9 +214,18 @@ public sealed class QuadraDefinition : MarkingDefinition
     public double Profundidade { get; set; } = 30;
     /// <summary>Quadra mais rasa que 2 × profundidade entre testadas opostas: os fundos ficam no meio da quadra.</summary>
     public bool FundoNoMeio { get; set; } = true;
-    /// <summary>Sobra de testada a partir da qual vira um lote a mais (m). 0 = igual à frente padrão.</summary>
+    /// <summary>Sobra de testada a partir da qual vira um lote a mais (m). 0 = a frente mínima do loteamento.</summary>
     public double FrenteMinima { get; set; }
+    /// <summary>Miolo da quadra: para os lotes (fundos até a divisa) ou área própria.</summary>
+    public ModoMiolo Miolo { get; set; }
+    /// <summary>Categoria do miolo quando ele é área própria.</summary>
+    public string MioloCategoria { get; set; } = CategoriaLote.AreaVerde;
+    /// <summary>Lotes unidos: cada grupo (chaves de lotes vizinhos) vira um lote só, com a chave do primeiro.</summary>
+    public List<List<string>> Unioes { get; set; } = new();
     public ModoSobra Sobra { get; set; } = ModoSobra.LoteSobra;
+
+    /// <summary>Grupo de união que contém a chave (nulo = lote não unido).</summary>
+    public List<string>? UniaoDe(string chave) => Unioes.FirstOrDefault(u => u.Contains(chave));
     /// <summary>Numeração no sentido horário (falso = anti-horário).</summary>
     public bool SentidoHorario { get; set; } = true;
     /// <summary>Chave do lote que recebe o número 1. Nulo = lote de esquina mais a noroeste.</summary>
@@ -266,11 +291,11 @@ public sealed class LoteamentoDetalheDefinition : MarkingDefinition, IAnnotation
 /// <summary>Tipo de quadro do loteamento.</summary>
 public enum TipoQuadroLoteamento
 {
-    /// <summary>Quadro de áreas: gleba, lotes, áreas institucionais, verdes, sistema viário e sobras, com m² e %.</summary>
+    /// <summary>Quadro de áreas: gleba, lotes, áreas institucionais, verdes e sistema viário, com m² e %.</summary>
     Areas,
     /// <summary>Quadro por quadra: número de lotes e áreas por categoria de cada quadra.</summary>
     Quadras,
-    /// <summary>Quadro de lotes: quadra, lote, categoria, frente, profundidade média e área de cada lote.</summary>
+    /// <summary>Quadro de lotes: um a um – quadra, lote, categoria, rua da frente, medidas dos lados, área e observações.</summary>
     Lotes,
 }
 
@@ -287,6 +312,8 @@ public sealed class QuadroLoteamentoDefinition : MarkingDefinition, IProjectWide
     public double TextMm { get; set; } = 2.0;
     /// <summary>Linhas por coluna no quadro de lotes (o quadro continua ao lado).</summary>
     public int LinhasPorColuna { get; set; } = 40;
+    /// <summary>Quadro de lotes de uma quadra só (nome); nulo = todas as quadras.</summary>
+    public string? Quadra { get; set; }
 
     public string? TargetId => LoteamentoId;
     public Vec2? DrawnAnchor { get; set; }
@@ -295,14 +322,14 @@ public sealed class QuadroLoteamentoDefinition : MarkingDefinition, IProjectWide
     public string TituloPadrao => Conteudo switch
     {
         TipoQuadroLoteamento.Quadras => "QUADRO DE QUADRAS",
-        TipoQuadroLoteamento.Lotes => "QUADRO DE LOTES",
+        TipoQuadroLoteamento.Lotes => string.IsNullOrWhiteSpace(Quadra) ? "QUADRO DE LOTES" : $"QUADRO DE LOTES – QUADRA {Quadra}",
         _ => "QUADRO DE ÁREAS DO LOTEAMENTO",
     };
 
     public override string KindName => Conteudo switch
     {
         TipoQuadroLoteamento.Quadras => "Quadro de quadras",
-        TipoQuadroLoteamento.Lotes => "Quadro de lotes",
+        TipoQuadroLoteamento.Lotes => string.IsNullOrWhiteSpace(Quadra) ? "Quadro de lotes" : $"Quadro de lotes – Quadra {Quadra}",
         _ => "Quadro de áreas",
     };
     public override string DisplayCode => "QUADRO-LOTEAMENTO";

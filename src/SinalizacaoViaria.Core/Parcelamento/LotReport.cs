@@ -48,7 +48,7 @@ public static class LotReport
     {
         var res = new ResumoLoteamento { Loteamento = lot };
         foreach (var q in quadras.Where(q => q.LoteamentoId == lot.Id).OrderBy(q => q.Nome, StringComparer.OrdinalIgnoreCase))
-            res.Quadras.Add(new QuadraDividida(q, LotDivider.Divide(q, lot.Categorias)));
+            res.Quadras.Add(new QuadraDividida(q, LotDivider.Divide(q, lot)));
         var gleba = lot.GlebaPolygon;
         res.AreaQuadras = res.Quadras.Sum(q => q.Divisao.Quadra.Area);
         if (gleba != null)
@@ -136,9 +136,17 @@ public static class LotReport
                 edges.Add((a, b, $"área da Quadra {q.Nome}", false));
                 continue;
             }
-            if (gleba != null && !gleba.Contains(probe))
+            // Fora da quadra: via quando o lado está numa testada ou, com a gleba conhecida, no espaço entre as quadras dentro dela
+            // (sistema viário); fora da gleba, o limite dela; sem gleba e sem testada, a divisa da quadra.
+            var naTestada = d.Cadeias.Any(c => c.TestadaId != null && Math.Abs(new Polyline2(c.Pontos).Project(mid).Signed) < 0.05);
+            if (!naTestada && gleba != null && !gleba.Contains(probe))
             {
                 edges.Add((a, b, "o limite da gleba", false));
+                continue;
+            }
+            if (!naTestada && gleba == null)
+            {
+                edges.Add((a, b, $"a divisa da Quadra {q.Nome}", false));
                 continue;
             }
             var via = ViaDe(mid, d, q, lot) ?? "via pública";
@@ -217,6 +225,56 @@ public static class LotReport
             if (!string.IsNullOrWhiteSpace(t?.Via)) return t!.Via;
         }
         return lot?.ViaEm(p);
+    }
+
+    /// <summary>Cabeçalhos do quadro de lotes (lote a lote).</summary>
+    public static readonly string[] CabecalhosLotes =
+        { "QUADRA", "LOTE", "CATEGORIA", "FRENTE PARA", "FRENTE (m)", "LADO DIR. (m)", "LADO ESQ. (m)", "FUNDOS (m)", "ÁREA (m²)", "OBSERVAÇÃO" };
+
+    /// <summary>
+    /// Quadro de lotes, lote a lote (na ordem da numeração): quadra, número, categoria, via(s) da frente, medida de cada lado, área e
+    /// observações (esquina, união, frente em curva, abaixo do mínimo). <paramref name="quadra"/> filtra uma quadra.
+    /// </summary>
+    public static List<string[]> LinhasLotes(ResumoLoteamento r, string? quadra = null)
+    {
+        var rows = new List<string[]>();
+        foreach (var (q, d) in r.Quadras)
+        {
+            if (quadra != null && !string.Equals(q.Nome, quadra, StringComparison.OrdinalIgnoreCase)) continue;
+            foreach (var p in NaOrdem(d.Parcelas)) rows.Add(LinhaLote(p, d, q, r.Loteamento));
+        }
+        return rows;
+    }
+
+    /// <summary>Parcelas na ordem da numeração: lotes 1..N, depois as outras categorias (AI-1, AV-1...).</summary>
+    public static IEnumerable<Parcela> NaOrdem(IEnumerable<Parcela> ps) =>
+        ps.OrderBy(p => string.Equals(p.Categoria, CategoriaLote.Lote, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(p => p.Numero.Contains('-') ? p.Numero[..p.Numero.LastIndexOf('-')] : "", StringComparer.OrdinalIgnoreCase)
+            .ThenBy(p => int.TryParse(p.Numero.Contains('-') ? p.Numero[(p.Numero.LastIndexOf('-') + 1)..] : p.Numero, out var n) ? n : int.MaxValue)
+            .ThenBy(p => p.Numero, StringComparer.Ordinal);
+
+    /// <summary>Linha do quadro de lotes (as colunas de <see cref="CabecalhosLotes"/>).</summary>
+    public static string[] LinhaLote(Parcela p, DivisaoQuadra d, QuadraDefinition q, LoteamentoDefinition? lot)
+    {
+        var lados = Lados(p, d, q, lot);
+        string Med(TipoLado t)
+        {
+            var ls = lados.Where(l => l.Tipo == t).ToList();
+            return ls.Count == 0 ? "–" : string.Join(" + ", ls.Select(l => M(l.Comprimento)));
+        }
+        var ruas = lados.Where(l => l.Via).Select(l => l.Confrontante).Distinct().ToList();
+        var obs = new List<string>();
+        // Esquina: frente para duas vias (ou dois lados de via).
+        if (lados.Count(l => l.Tipo == TipoLado.Frente) >= 2) obs.Add("esquina");
+        if (p.Unidos is { Count: > 1 } u) obs.Add($"união de {u.Count} lotes");
+        if (lados.Any(l => l.Tipo == TipoLado.Frente && l.Curvo)) obs.Add("frente em curva");
+        if (p.AbaixoDoMinimo != null) obs.Add("abaixo do mínimo: " + p.AbaixoDoMinimo);
+        else if (ruas.Count == 0) obs.Add("sem frente para via");
+        return new[]
+        {
+            q.Nome, p.Numero, p.Categoria, ruas.Count > 0 ? string.Join(" / ", ruas) : "–", Med(TipoLado.Frente), Med(TipoLado.LadoDireito),
+            Med(TipoLado.LadoEsquerdo), Med(TipoLado.Fundos), M(p.Area), string.Join("; ", obs),
+        };
     }
 
     /// <summary>Descrição do lote para o memorial (frente, lados, fundos e área).</summary>

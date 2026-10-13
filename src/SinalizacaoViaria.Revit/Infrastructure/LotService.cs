@@ -73,7 +73,7 @@ public static class LotService
         var res = new RenderResult();
         var lot = Loteamento(doc, q.LoteamentoId);
         var cats = lot?.Categorias ?? CategoriaLote.Padrao();
-        var div = LotDivider.Divide(q, cats);
+        var div = LotDivider.Divide(q, lot);
         res.Warnings.AddRange(div.Avisos);
         foreach (var r in existing) SafeDelete(doc, r.Element.Id);
         SharedParameters.Ensure(doc);

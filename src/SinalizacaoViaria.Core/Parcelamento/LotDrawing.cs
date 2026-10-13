@@ -14,12 +14,16 @@ public static class LotDrawing
     public static bool IsParcelamento(MarkingDefinition d) =>
         d is LoteamentoDefinition or QuadraDefinition or LoteamentoDetalheDefinition or QuadroLoteamentoDefinition;
 
+    /// <summary>Lotes da quadra com as categorias e os mínimos do loteamento.</summary>
+    public static MarkingGeometry Quadra(QuadraDefinition q, LoteamentoDefinition? lot) =>
+        Quadra(q, lot?.Categorias, lot?.FrenteMinimaLote ?? 5, lot?.AreaMinimaLote ?? 125);
+
     /// <summary>Lotes da quadra como peças com a cor e a hachura da categoria (pré-visualização e imagens).</summary>
-    public static MarkingGeometry Quadra(QuadraDefinition q, IReadOnlyList<CategoriaLote>? categorias)
+    public static MarkingGeometry Quadra(QuadraDefinition q, IReadOnlyList<CategoriaLote>? categorias, double frenteMinimaLote = 5, double areaMinimaLote = 125)
     {
         var cats = categorias ?? CategoriaLote.Padrao();
         var geo = new MarkingGeometry();
-        var d = LotDivider.Divide(q, cats);
+        var d = LotDivider.Divide(q, cats, frenteMinimaLote, areaMinimaLote);
         geo.Warnings.AddRange(d.Avisos);
         foreach (var p in d.Parcelas)
         {
@@ -111,7 +115,7 @@ public static class LotDrawing
 
     /// <summary>
     /// Detalhamento dos lotes: número e área no meio do lote, medida de cada lado junto a ele, categoria (áreas públicas),
-    /// nome da quadra, nome das vias; opcionalmente cores das categorias e divisas como linhas.
+    /// letra da quadra num círculo no meio dela, nome das vias; opcionalmente cores das categorias e divisas como linhas.
     /// </summary>
     public static MarkingGeometry Detalhe(LoteamentoDetalheDefinition d, BuildContext ctx)
     {
@@ -131,7 +135,8 @@ public static class LotDrawing
             geo.Annotations.Add(new AnnotationLine(gl.Outer.Append(gl.Outer[0]).ToList(), MarkingColor.Preta));
         foreach (var q in quadras)
         {
-            var div = LotDivider.Divide(q, lot.Categorias);
+            var firstText = geo.Annotations.Count;
+            var div = LotDivider.Divide(q, lot);
             foreach (var p in div.Parcelas)
             {
                 var cat = lot.Categoria(p.Categoria);
@@ -167,26 +172,7 @@ public static class LotDrawing
                     }
                 }
             }
-            if (d.Quadra)
-            {
-                // No miolo (a maior área sem frente) ou no centro da quadra – acima do rótulo do lote que estiver ali.
-                var miolo = div.Parcelas.Where(p => double.IsNaN(p.Posicao)).OrderByDescending(p => p.Area).FirstOrDefault();
-                var at = miolo != null && miolo.Area > 200 ? InteriorPoint(miolo.Forma) : div.Quadra.Centroid;
-                var hq = th * 2.4;
-                var y = at.Y + hq * mm / 2;
-                var under = div.Parcelas.FirstOrDefault(p => p.Forma.Contains(at));
-                if (under != null)
-                {
-                    var uc = InteriorPoint(under.Forma);
-                    var block = LabelLines(d, under, under.Forma.DistanceTo(uc), mm).Sum(l => l.Mm * 1.35) * mm;
-                    if (Math.Abs(uc.X - at.X) < 12 * hq * mm && Math.Abs(uc.Y - at.Y) < block + hq * mm)
-                    {
-                        at = uc;
-                        y = uc.Y + block / 2 + hq * mm * 1.25;
-                    }
-                }
-                geo.Annotations.Add(new AnnotationText(new Vec2(at.X, y), $"QUADRA {q.Nome}", hq));
-            }
+            if (d.Quadra) QuadraLabel(geo, q, div, th, mm, firstText);
         }
         if (d.Vias)
         {
@@ -209,6 +195,63 @@ public static class LotDrawing
             }
         }
         return geo;
+    }
+
+    /// <summary>Camada do disco branco sob a letra da quadra.</summary>
+    public const string QuadraLayerPrefix = "QUADRA:";
+
+    /// <summary>
+    /// Letra da quadra dentro de um círculo, no meio da quadra (sobre a divisa de fundos), fora dos números, áreas e cotas dos lotes
+    /// (textos da quadra a partir de <paramref name="firstText"/>). O miolo branco do círculo esconde as divisas sob ele.
+    /// </summary>
+    private static void QuadraLabel(MarkingGeometry geo, QuadraDefinition q, DivisaoQuadra div, double th, double mm, int firstText)
+    {
+        var quad = div.Quadra;
+        var hq = th * 2.2;
+        var r = 0.95 * hq * mm;
+        var target = InteriorPoint(quad);
+        // Quadra pequena: círculo menor (cabe com folga no meio dela).
+        var room = quad.DistanceTo(target);
+        if (r > room * 0.7)
+        {
+            r = room * 0.7;
+            hq = r / (0.95 * mm);
+        }
+        var boxes = geo.Annotations.Skip(firstText).OfType<AnnotationText>().Select(t => TextBox(t, mm)).ToList();
+        var gap = 1.5 * mm;
+        bool Free(Vec2 c) => quad.Contains(c) && quad.DistanceTo(c) >= r * 1.25 && boxes.All(b => !b.Contains(c) && b.DistanceTo(c) >= r + gap);
+        var at = target;
+        if (!Free(at))
+        {
+            var (mn, mx) = quad.Bounds;
+            const int n = 40;
+            var best = double.MaxValue;
+            for (int i = 0; i <= n; i++)
+                for (int j = 0; j <= n; j++)
+                {
+                    var c = new Vec2(mn.X + (mx.X - mn.X) * i / n, mn.Y + (mx.Y - mn.Y) * j / n);
+                    var dist = c.DistanceTo(target);
+                    if (dist < best && Free(c)) { best = dist; at = c; }
+                }
+        }
+        // Círculo como regiões (aparece também no masterplan, que oculta as linhas de detalhe): anel preto e miolo branco.
+        List<Vec2> Circle(double rad) => Enumerable.Range(0, 64).Select(i => at + Vec2.FromAngle(2 * Math.PI * i / 64) * rad).ToList();
+        var inner = Circle(r - Math.Min(0.35 * mm, r * 0.1));
+        geo.Pieces.Add(new MarkingPiece(new Polygon2(inner), MarkingColor.Branca) { Rgb = "#FFFFFF", Layer = QuadraLayerPrefix + q.Nome });
+        geo.Pieces.Add(new MarkingPiece(new Polygon2(Circle(r), new[] { inner }), MarkingColor.Preta) { Rgb = "#000000", Layer = QuadraLayerPrefix + q.Nome });
+        geo.Annotations.Add(new AnnotationText(new Vec2(at.X, at.Y + hq * mm / 2), q.Nome, hq));
+    }
+
+    /// <summary>Retângulo ocupado pelo texto (posição = topo do texto, girado em torno dela).</summary>
+    public static Polygon2 TextBox(AnnotationText t, double mm)
+    {
+        var w = DetailGenerator.LineWidthFactor(t.Text) * t.PaperHeightMm * mm;
+        var h = t.PaperHeightMm * mm;
+        var (x0, x1) = t.Align switch { TextAlign.Left => (0.0, w), TextAlign.Right => (-w, 0.0), _ => (-w / 2, w / 2) };
+        var u = Vec2.FromAngle(t.Rotation);
+        var v = u.PerpLeft;
+        Vec2 P(double x, double y) => t.Position + u * x + v * y;
+        return new Polygon2(new[] { P(x0, -h), P(x1, -h), P(x1, 0), P(x0, 0) });
     }
 
     /// <summary>
@@ -262,12 +305,16 @@ public static class LotDrawing
             }
             case TipoQuadroLoteamento.Lotes:
             {
-                var headers = new List<string> { "QUADRA", "LOTE", "CATEGORIA", "FRENTE (m)", "ÁREA (m²)" };
-                var aligns = new[] { TextAlign.Center, TextAlign.Center, TextAlign.Left, TextAlign.Right, TextAlign.Right };
-                var rows = new List<(string[] Cells, bool Total)>();
-                foreach (var (q, div) in r.Quadras)
-                    foreach (var p in div.Parcelas)
-                        rows.Add((new[] { q.Nome, p.Numero, p.Categoria, p.Frente > 0 ? LotReport.M(p.Frente) : "–", LotReport.M(p.Area) }, false));
+                // Lote a lote: quadra, número, categoria, via da frente, medidas dos lados, área e observações.
+                var headers = LotReport.CabecalhosLotes.ToList();
+                var aligns = new List<TextAlign> { TextAlign.Center, TextAlign.Center, TextAlign.Left, TextAlign.Left, TextAlign.Right, TextAlign.Right,
+                    TextAlign.Right, TextAlign.Right, TextAlign.Right, TextAlign.Left };
+                var cells = LotReport.LinhasLotes(r, string.IsNullOrWhiteSpace(d.Quadra) ? null : d.Quadra).Select(x => x.ToList()).ToList();
+                if (cells.Count == 0) geo.Warnings.Add(string.IsNullOrWhiteSpace(d.Quadra) ? "Loteamento sem lotes." : $"Quadra {d.Quadra} não encontrada no loteamento.");
+                // Sem observações: sem a coluna; com o filtro de uma quadra: sem a coluna da quadra (vai no título).
+                if (cells.All(c => c[^1].Length == 0)) { headers.RemoveAt(headers.Count - 1); aligns.RemoveAt(aligns.Count - 1); cells.ForEach(c => c.RemoveAt(c.Count - 1)); }
+                if (!string.IsNullOrWhiteSpace(d.Quadra)) { headers.RemoveAt(0); aligns.RemoveAt(0); cells.ForEach(c => c.RemoveAt(0)); }
+                var rows = cells.Select(c => (c.ToArray(), false)).ToList();
                 var per = Math.Max(5, d.LinhasPorColuna);
                 var x = d.Position.X;
                 var blocks = (rows.Count + per - 1) / per;

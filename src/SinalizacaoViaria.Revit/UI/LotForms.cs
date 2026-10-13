@@ -11,6 +11,7 @@ public sealed class NovoLoteamentoOpcoes
     public double Frente { get; set; } = 12;
     public double Profundidade { get; set; } = 30;
     public ModoSobra Sobra { get; set; } = ModoSobra.LoteSobra;
+    public ModoMiolo Miolo { get; set; } = ModoMiolo.AosLotes;
     public bool SentidoHorario { get; set; } = true;
     public double AreaMinimaQuadra { get; set; } = 50;
 }
@@ -20,10 +21,23 @@ public static class LotForms
 {
     public static readonly (string Label, ModoSobra Value)[] SobraOptions =
     {
-        ("Vira o último lote (categoria Sobra)", ModoSobra.LoteSobra),
+        ("Vira o último lote (lote comum, se atingir a frente e a área mínimas; senão, somada ao último)", ModoSobra.LoteSobra),
         ("Somada ao último lote", ModoSobra.IncorporarUltimo),
         ("Distribuída entre os lotes", ModoSobra.Distribuir),
     };
+
+    public static readonly (string Label, ModoMiolo Value)[] MioloOptions =
+    {
+        ("Vai para os lotes (fundos até a divisa ou até a fileira oposta)", ModoMiolo.AosLotes),
+        ("Área própria (na categoria escolhida)", ModoMiolo.AreaPropria),
+    };
+
+    /// <summary>Frente e área mínimas do lote (informadas no projeto – conferir na legislação aplicável).</summary>
+    private static FormWindow Minimos(FormWindow w, LoteamentoDefinition lot) => w
+        .Section("Lote mínimo", "Valores informados no projeto (padrão 5 m e 125 m²) – conferir na Lei Federal nº 6.766/1979 e na lei municipal [a confirmar]. " +
+                                "A sobra de testada só vira lote quando atinge os dois; lotes abaixo deles são avisados.")
+        .Number("Frente mínima (m)", () => lot.FrenteMinimaLote, v => lot.FrenteMinimaLote = v, 0, 100)
+        .Number("Área mínima (m²)", () => lot.AreaMinimaLote, v => lot.AreaMinimaLote = v, 0, 100000);
 
     public static readonly (string Label, bool Value)[] SentidoOptions = { ("Horário", true), ("Anti-horário", false) };
 
@@ -42,7 +56,7 @@ public static class LotForms
         var geo = new MarkingGeometry();
         foreach (var q in quadras)
         {
-            var g = LotDrawing.Quadra(q, lot?.Categorias);
+            var g = LotDrawing.Quadra(q, lot);
             geo.Pieces.AddRange(g.Pieces);
             geo.Annotations.AddRange(g.Annotations);
             geo.Warnings.AddRange(g.Warnings);
@@ -57,6 +71,7 @@ public static class LotForms
         {
             var q = Reconhecimento.NovaQuadra(r, lot, opt.Frente, opt.Profundidade);
             q.Sobra = opt.Sobra;
+            q.Miolo = opt.Miolo;
             q.SentidoHorario = opt.SentidoHorario;
             return q;
         }).ToList();
@@ -76,8 +91,10 @@ public static class LotForms
             .Number("Frente (m)", () => opt.Frente, v => opt.Frente = v, 1, 200)
             .Number("Profundidade (m)", () => opt.Profundidade, v => opt.Profundidade = v, 1, 500)
             .Choice("Sobra da testada", SobraOptions, () => opt.Sobra, v => opt.Sobra = v)
+            .Choice("Miolo da quadra (atrás dos lotes)", MioloOptions, () => opt.Miolo, v => opt.Miolo = v)
             .Choice("Numeração", SentidoOptions, () => opt.SentidoHorario, v => opt.SentidoHorario = v,
-                "Cada quadra numerada de 1 a N a partir do lote de esquina mais a noroeste (o lote 1 pode ser escolhido depois).")
+                "Cada quadra numerada de 1 a N a partir do lote de esquina mais a noroeste (o lote 1 pode ser escolhido depois).");
+        Minimos(w, lot)
             .Section("Relevo")
             .Number("Espessura do lote no Toposolid (m)", () => lot.AlturaLote, v => lot.AlturaLote = v, 0.005, 1, "0.000",
                 "Cada lote é uma subdivisão do Toposolid (acompanha o terreno). Sem Toposolid, o lote vira um piso plano na cota abaixo.")
@@ -91,15 +108,15 @@ public static class LotForms
     /// <summary>Quadra: medidas, sobra, numeração, testadas (frente, profundidade e nome da via de cada uma) e esquinas.</summary>
     public static FormWindow Quadra(QuadraDefinition q, LoteamentoDefinition? lot, Action<AcaoQuadra> acao)
     {
-        var div = LotDivider.Divide(q, lot?.Categorias);
+        var div = LotDivider.Divide(q, lot);
         FormWindow? w = null;
         w = new FormWindow("Loteamento – Quadra", $"Quadra {q.Nome}",
             $"{div.Parcelas.Count(p => p.Categoria == CategoriaLote.Lote)} lote(s), {LotReport.M(div.Quadra.Area)} m². As testadas, em ordem de prioridade, " +
             "definem de onde saem os lotes; em cada esquina escolha quem fica com o lote de esquina (ou dê medida própria).",
             q, () =>
             {
-                var geo = LotDrawing.Quadra(q, lot?.Categorias);
-                var d = LotDivider.Divide(q, lot?.Categorias);
+                var geo = LotDrawing.Quadra(q, lot);
+                var d = LotDivider.Divide(q, lot);
                 var guides = d.Cadeias.Where(c => c.TestadaId != null).Select(c => (IReadOnlyList<Vec2>)c.Pontos).ToList();
                 return new FormPreview(geo, null, guides, $"{d.Parcelas.Count(p => p.Categoria == CategoriaLote.Lote)} lote(s); testadas em amarelo.");
             }, showOutput: false, okText: "Aplicar", width: 1100, height: 760);
@@ -110,14 +127,19 @@ public static class LotForms
             .Section("Lotes")
             .Number("Frente padrão (m)", () => q.Frente, v => q.Frente = v, 1, 200)
             .Number("Profundidade padrão (m)", () => q.Profundidade, v => q.Profundidade = v, 1, 500)
-            .Check("Fundos no meio da quadra quando ela é mais rasa que 2 × profundidade", () => q.FundoNoMeio, v => q.FundoNoMeio = v)
+            .Check("Fundos no meio da quadra entre testadas opostas (quadra rasa, ou com o miolo para os lotes)", () => q.FundoNoMeio, v => q.FundoNoMeio = v)
             .Choice("Sobra da testada", SobraOptions, () => q.Sobra, v => q.Sobra = v)
-            .Number("Sobra que vira lote a partir de (m, 0 = frente padrão)", () => q.FrenteMinima, v => q.FrenteMinima = v, 0, 200)
+            .Number("Sobra vira lote a partir de (m, 0 = frente mínima do loteamento)", () => q.FrenteMinima, v => q.FrenteMinima = v, 0, 200)
+            .Choice("Miolo da quadra (atrás dos lotes)", MioloOptions, () => q.Miolo, v => q.Miolo = v)
+            .Choice("Categoria do miolo (área própria ou o que nenhum lote alcança)", CategoryOptions(lot), () => q.MioloCategoria, v => q.MioloCategoria = v)
             .Section("Numeração", "De 1 a N nesta quadra; institucionais e áreas verdes com prefixo (AI-1, AV-1).")
             .Choice("Sentido", SentidoOptions, () => q.SentidoHorario, v => q.SentidoHorario = v)
             .Hint(q.LoteInicial == null ? "Lote 1: o lote de esquina mais a noroeste." : $"Lote 1: {q.LoteInicial}.")
             .Button("Clicar o lote que recebe o número 1", () => { acao(AcaoQuadra.LoteInicial); w!.DialogResult = true; })
             .Button("Lote 1 automático (noroeste)", () => q.LoteInicial = null);
+        if (q.Unioes.Count > 0)
+            w.Section("Lotes unidos", $"{q.Unioes.Count} união(ões) nesta quadra (Unir Lotes). Para desfazer uma só, use Lote no lote unido.")
+                .Button("Desfazer todas as uniões desta quadra", () => q.Unioes.Clear());
 
         w.Section("Testadas", "Em ordem de prioridade (a primeira fica com o lote de esquina quando a esquina está em 'Prioridade'). 0 = medida padrão da quadra.")
             .Button("Apontar as testadas (clicar os lados, ESC termina)", () => { acao(AcaoQuadra.ApontarTestadas); w!.DialogResult = true; })
@@ -170,7 +192,10 @@ public static class LotForms
         var medidas = q.Ajuste(baseKey)?.Clone() ?? new LoteAjuste { Chave = baseKey };
         var cat = q.Ajuste(p.Chave)?.Categoria ?? (p.Chave != baseKey ? q.Ajuste(baseKey)?.Categoria : null) ?? p.Categoria;
         var start = q.LoteInicial == p.Chave;
-        var editable = !p.Chave.StartsWith("esq:") && !p.Chave.StartsWith("m:") && p.Chave != "q" && !p.Sobra;
+        var editable = !p.Chave.StartsWith("esq:") && !p.Chave.StartsWith("m:") && p.Chave != "q" && !p.Sobra && p.Unidos == null;
+        var desfazer = false;
+        // Categoria padrão desta parcela (gravada só quando muda): a do miolo nas áreas de miolo, a da quadra nos lotes.
+        string Padrao(QuadraDefinition t) => p.Chave.StartsWith("m:") || p.Chave == "q" && !t.Inteira ? t.MioloCategoria : t.CategoriaPadrao;
         // As edições valem numa cópia para a prévia e na quadra só ao aplicar.
         void ApplyTo(QuadraDefinition target)
         {
@@ -181,20 +206,23 @@ public static class LotForms
                 a.Profundidade = medidas.Profundidade;
                 a.Partes = Math.Max(1, medidas.Partes);
             }
-            target.AjusteOuNovo(p.Chave).Categoria = cat == target.CategoriaPadrao && p.Chave == baseKey && !p.Sobra ? null : cat;
+            target.AjusteOuNovo(p.Chave).Categoria = cat == Padrao(target) && p.Chave == baseKey ? null : cat;
+            if (desfazer) target.Unioes.RemoveAll(g => g.Contains(p.Chave));
             if (start) target.LoteInicial = p.Chave;
             else if (target.LoteInicial == p.Chave) target.LoteInicial = null;
             target.Ajustes.RemoveAll(x => x.Frente == null && x.Profundidade == null && x.Partes <= 1 && x.Categoria == null);
         }
         var w = new FormWindow("Loteamento – Lote", $"{LotReport.Rotulo(p)} – Quadra {q.Nome}",
             $"{LotReport.M(p.Area)} m², frente {LotReport.M(p.Frente)} m. Ao mudar a frente, os lotes seguintes da testada se reajustam e a sobra é refeita." +
-            (editable ? "" : " (Lote de esquina com medida própria, sobra ou miolo: só a categoria muda aqui – as medidas vêm da quadra.)"),
+            (p.Unidos != null ? $" União de {p.Unidos.Count} lotes (Unir Lotes)." : "") +
+            (editable ? "" : " (Lote de esquina com medida própria, sobra da testada, miolo ou união: só a categoria muda aqui – as medidas vêm da quadra.)") +
+            (p.AbaixoDoMinimo != null ? $"\nAbaixo do mínimo: {p.AbaixoDoMinimo}." : ""),
             q, () =>
             {
                 var draft = (QuadraDefinition)MarkingDefinition.FromJson(q.ToJson())!;
                 ApplyTo(draft);
-                var geo = LotDrawing.Quadra(draft, lot?.Categorias);
-                var d = LotDivider.Divide(draft, lot?.Categorias);
+                var geo = LotDrawing.Quadra(draft, lot);
+                var d = LotDivider.Divide(draft, lot);
                 var me = d.Parcelas.FirstOrDefault(x => x.Chave == p.Chave) ?? d.Parcelas.FirstOrDefault(x => x.Chave.StartsWith(baseKey + "."));
                 var guides = me == null ? null : new List<IReadOnlyList<Vec2>> { me.Forma.Outer.Append(me.Forma.Outer[0]).ToList() };
                 return new FormPreview(geo, null, guides, me == null ? null : $"{LotReport.Rotulo(me)}: {LotReport.M(me.Area)} m².");
@@ -209,6 +237,9 @@ public static class LotForms
         w.Section("Categoria")
             .Choice("Categoria", CategoryOptions(lot), () => cat, v => cat = v)
             .Check("Este lote recebe o número 1 da quadra", () => start, v => start = v);
+        if (p.Unidos != null)
+            w.Section("União")
+                .Check($"Desfazer a união (volta aos {p.Unidos.Count} lotes)", () => desfazer, v => desfazer = v);
         w.Closed += (_, _) => { if (w.DialogResult == true) ApplyTo(q); };
         return w;
     }
@@ -245,6 +276,7 @@ public static class LotForms
             .Text("Nome", () => lot.Nome, v => lot.Nome = string.IsNullOrWhiteSpace(v) ? lot.Nome : v!.Trim())
             .Text("Município/UF", () => lot.Municipio, v => lot.Municipio = string.IsNullOrWhiteSpace(v) ? null : v!.Trim())
             .Number("Espessura do lote no Toposolid (m)", () => lot.AlturaLote, v => lot.AlturaLote = v, 0.005, 1, "0.000");
+        Minimos(w, lot);
         double Min(string key) => lot.Minimos.TryGetValue(key, out var m) ? m : 0;
         void SetMin(string key, double v) { if (v > 1e-6) lot.Minimos[key] = v; else lot.Minimos.Remove(key); }
         w.Section("Mínimos gerais (% da gleba)")
@@ -263,7 +295,7 @@ public static class LotForms
                 .Text("Prefixo da numeração (vazio = numerada como lote)", () => cc.Prefixo, v => cc.Prefixo = (v ?? "").Trim())
                 .Number("Mínimo (% da gleba, 0 = sem)", () => Min(original), v => SetMin(original, v), 0, 100)
                 .Check("Mostrar na vista ativa", () => opt.Visivel[original], v => opt.Visivel[original] = v);
-            if (original != CategoriaLote.Lote && original != CategoriaLote.Sobra)
+            if (original != CategoriaLote.Lote)
                 w.Check("Excluir esta categoria (os lotes dela voltam a Lote)", () => opt.Excluir.Contains(original), v => { if (v) opt.Excluir.Add(original); else opt.Excluir.Remove(original); });
         }
         w.Section("Nova categoria")
@@ -284,8 +316,8 @@ public static class LotForms
             .Check("Número do lote", () => d.Numero, v => d.Numero = v)
             .Check("Área (m²)", () => d.Area, v => d.Area = v)
             .Check("Cotas dos lados (frente, laterais e fundos)", () => d.Cotas, v => d.Cotas = v)
-            .Check("Categoria (institucional, área verde, sobra)", () => d.Categoria, v => d.Categoria = v)
-            .Check("Nome da quadra", () => d.Quadra, v => d.Quadra = v)
+            .Check("Categoria (institucional, área verde...)", () => d.Categoria, v => d.Categoria = v)
+            .Check("Letra da quadra (num círculo no meio da quadra)", () => d.Quadra, v => d.Quadra = v)
             .Check("Nome das vias", () => d.Vias, v => d.Vias = v)
             .Check("Cores das categorias como regiões (vistas sem os lotes coloridos)", () => d.Cores, v => d.Cores = v)
             .Check("Divisas e limite da gleba como linhas", () => d.Divisas, v => d.Divisas = v)

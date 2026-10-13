@@ -139,11 +139,12 @@ public sealed class CmdLoteamento : CommandBase
         {
             var q = Reconhecimento.NovaQuadra(r, lot, opt.Frente, opt.Profundidade);
             q.Sobra = opt.Sobra;
+            q.Miolo = opt.Miolo;
             q.SentidoHorario = opt.SentidoHorario;
             return q;
         }).ToList();
         var results = LotCommands.Commit(uidoc, lot, quadras, "SV - Loteamento");
-        var lots = quadras.Sum(q => LotDivider.Divide(q, lot.Categorias).Parcelas.Count(p => p.Categoria == CategoriaLote.Lote));
+        var lots = quadras.Sum(q => LotDivider.Divide(q, lot).Parcelas.Count(p => p.Categoria == CategoriaLote.Lote));
         LotCommands.Report($"Loteamento \"{lot.Nome}\": {quadras.Count} quadra(s) e {lots} lote(s).", results, rec.Avisos.Concat(notes).Append(
             "Próximos passos: Quadra (testadas, esquinas, numeração), Lote (medidas e categoria), Nomear Vias, Detalhar Lotes, Quadros, Memorial e Masterplan."));
         return Result.Succeeded;
@@ -220,7 +221,13 @@ public sealed class CmdLoteamento : CommandBase
             }
             names.MoveNext();
             var nq = Reconhecimento.NovaQuadra(r with { Nome = names.Current ?? r.Nome }, lot, template?.Frente ?? 12, template?.Profundidade ?? 30);
-            if (template != null) { nq.Sobra = template.Sobra; nq.SentidoHorario = template.SentidoHorario; }
+            if (template != null)
+            {
+                nq.Sobra = template.Sobra;
+                nq.SentidoHorario = template.SentidoHorario;
+                nq.Miolo = template.Miolo;
+                nq.MioloCategoria = template.MioloCategoria;
+            }
             changed.Add(nq);
         }
         var lost = quadras.Where(q => !matched.Contains(q.Id)).Select(q => q.Nome).ToList();
@@ -318,12 +325,77 @@ public sealed class CmdLote : CommandBase
         if (picked == null) return Result.Cancelled;
         var (_, q, key) = picked.Value;
         var lot = LotService.Loteamento(doc, q.LoteamentoId);
-        var d = LotDivider.Divide(q, lot?.Categorias);
+        var d = LotDivider.Divide(q, lot);
         var p = d.Parcelas.FirstOrDefault(x => x.Chave == key) ?? throw new UserMessageException("Lote não encontrado na quadra (use Atualizar).");
         if (UiHelpers.ShowModal(LotForms.Lote(q, lot, p)) != true) return Result.Cancelled;
         var results = LotCommands.Commit(uidoc, lot, new[] { q }, $"SV - Lote {q.Nome}-{p.Numero}");
         var warn = results.SelectMany(r => r.Warnings).ToList();
         if (warn.Count > 0) LotCommands.Report($"Lote {p.Numero} da quadra {q.Nome}", results);
+        return Result.Succeeded;
+    }
+}
+
+/// <summary>
+/// Unir lotes: selecione dois ou mais lotes vizinhos da mesma quadra – viram um lote só (sobra maior, lote maior que o padrão);
+/// a numeração da quadra se refaz. Lotes que já são uniões entram com tudo o que já juntavam.
+/// </summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdUnirLotes : CommandBase
+{
+    protected override Result Run(UIApplication app, UIDocument uidoc)
+    {
+        var doc = uidoc.Document;
+        List<Element> els;
+        var pre = uidoc.Selection.GetElementIds().Select(doc.GetElement).Where(e => e != null && new LotSelectionFilter().AllowElement(e)).ToList();
+        if (pre.Count >= 2) els = pre!;
+        else
+        {
+            try
+            {
+                els = uidoc.Selection.PickObjects(ObjectType.Element, new LotSelectionFilter(), "Selecione os lotes vizinhos a unir (mesma quadra) e clique Concluir")
+                    .Select(doc.GetElement).Where(e => e != null).ToList();
+            }
+            catch (Autodesk.Revit.Exceptions.OperationCanceledException)
+            {
+                return Result.Cancelled;
+            }
+        }
+        var picked = els.Select(e => (Quadra: MarkingStorage.Read(e)?.Definition as QuadraDefinition, Key: LotService.KeyOf(e)))
+            .Where(x => x.Quadra != null && x.Key != null).ToList();
+        var quadras = picked.Select(x => x.Quadra!.Id).Distinct().ToList();
+        if (quadras.Count > 1) throw new UserMessageException("Os lotes escolhidos são de quadras diferentes: só lotes da mesma quadra podem ser unidos.");
+        var keys = picked.Select(x => x.Key!).Distinct().ToList();
+        if (keys.Count < 2) throw new UserMessageException("Escolha pelo menos dois lotes para unir.");
+        var q = picked[0].Quadra!;
+        var lot = LotService.Loteamento(doc, q.LoteamentoId);
+        var before = LotDivider.Divide(q, lot);
+        // Junta as uniões que já contêm algum dos lotes escolhidos.
+        var group = new List<string>();
+        foreach (var k in keys)
+        {
+            var old = q.UniaoDe(k);
+            foreach (var m in old ?? new List<string> { k })
+                if (!group.Contains(m)) group.Add(m);
+        }
+        q.Unioes.RemoveAll(g => g.Any(group.Contains));
+        // Ordem da união = ordem da numeração (a chave e a categoria do lote unido são as do primeiro).
+        var order = new Dictionary<string, int>();
+        var n = 0;
+        foreach (var x in LotReport.NaOrdem(before.Parcelas))
+            foreach (var k in x.Unidos ?? new List<string> { x.Chave })
+                order.TryAdd(k, n++);
+        group = group.OrderBy(k => order.TryGetValue(k, out var i) ? i : int.MaxValue).ToList();
+        q.Unioes.Add(group);
+        var after = LotDivider.Divide(q, lot);
+        var merged = after.Parcelas.FirstOrDefault(x => x.Unidos != null && x.Unidos.Contains(group[0]));
+        if (merged == null)
+        {
+            var nums = keys.Select(k => before.Parcelas.FirstOrDefault(x => x.Chave == k || (x.Unidos?.Contains(k) ?? false))?.Numero ?? k);
+            throw new UserMessageException($"Os lotes {string.Join(", ", nums)} não são vizinhos (não formam uma área só) – não foram unidos.");
+        }
+        var results = LotCommands.Commit(uidoc, lot, new[] { q }, $"SV - Unir lotes {q.Nome}");
+        LotCommands.Report($"Quadra {q.Nome}: lote {merged.Numero} com {LotReport.M(merged.Area)} m² (união de {merged.Unidos!.Count} lotes).", results,
+            new[] { "Para desfazer: Lote → clique o lote unido → Desfazer a união (ou Quadra → Desfazer todas as uniões)." });
         return Result.Succeeded;
     }
 }
@@ -405,9 +477,10 @@ public sealed class CmdQuadrosLoteamento : CommandBase
             MainContent = "Os quadros vão para uma vista própria (Legenda) que pode ser colocada em qualquer folha – não dependem de planta nenhuma.",
             CommonButtons = TaskDialogCommonButtons.Cancel,
         };
-        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Quadro de áreas", "Gleba, lotes, institucional, áreas verdes, sobras, sistema viário e áreas públicas – m² e %.");
+        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Quadro de áreas", "Gleba, lotes, institucional, áreas verdes, sistema viário e áreas públicas – m² e %.");
         td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Quadro de quadras", "Número de lotes e área por categoria de cada quadra.");
-        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Quadro de lotes", "Quadra, lote, categoria, frente e área de cada lote.");
+        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Quadro de lotes (lote a lote)",
+            "Quadra, lote, categoria, rua da frente, frente, lados, fundos, área e observações de cada lote – todas as quadras, uma quadra ou um quadro por quadra.");
         td.AddCommandLink(TaskDialogCommandLinkId.CommandLink4, "Tabela do Revit (lista de lotes)", "Tabela nativa: quadra, lote, categoria e área, atualizada pelo Revit.");
         var r = td.Show();
         if (r == TaskDialogResult.CommandLink4) return Schedule(uidoc);
@@ -419,7 +492,33 @@ public sealed class CmdQuadrosLoteamento : CommandBase
             _ => (TipoQuadroLoteamento?)null,
         };
         if (tipo == null) return Result.Cancelled;
-        var template = new QuadroLoteamentoDefinition { LoteamentoId = lot.Id, Conteudo = tipo.Value };
+        string? quadra = null;
+        if (tipo == TipoQuadroLoteamento.Lotes)
+        {
+            var sc = new TaskDialog(AppTitle)
+            {
+                MainInstruction = "Quadro de lotes",
+                MainContent = "Quais lotes?",
+                CommonButtons = TaskDialogCommonButtons.Cancel,
+            };
+            sc.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Todas as quadras num quadro só", "Continua em colunas ao lado a cada 40 linhas.");
+            sc.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Uma quadra", "Clique um lote da quadra.");
+            sc.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Um quadro por quadra", "Cada quadra na sua Legenda (vai para qualquer folha).");
+            switch (sc.Show())
+            {
+                case TaskDialogResult.CommandLink1: break;
+                case TaskDialogResult.CommandLink2:
+                {
+                    var l = LotCommands.PickLot(uidoc, "Clique um lote da quadra do quadro");
+                    if (l == null) return Result.Cancelled;
+                    quadra = l.Value.Quadra.Nome;
+                    break;
+                }
+                case TaskDialogResult.CommandLink3: return PorQuadra(uidoc, lot);
+                default: return Result.Cancelled;
+            }
+        }
+        var template = new QuadroLoteamentoDefinition { LoteamentoId = lot.Id, Conteudo = tipo.Value, Quadra = quadra };
         var label = template.KindName;
         var place = TablePlacementWindow.Ask(doc, uidoc.ActiveView, label.ToLowerInvariant(), ProjectTableViews.ViewName(template));
         if (place == null) return Result.Cancelled;
@@ -431,6 +530,51 @@ public sealed class CmdQuadrosLoteamento : CommandBase
         def.Position = DetailHelpers.ToCore(at);
         DetailHelpers.PrepareOutput(def, view);
         ProjectTableCommand.Warnings(MarkingCreator.Commit(uidoc, new[] { def }, "SV - " + label));
+        return Result.Succeeded;
+    }
+
+    /// <summary>Um quadro de lotes por quadra, cada um na sua Legenda (e, se pedido, todos na mesma folha).</summary>
+    private static Result PorQuadra(UIDocument uidoc, LoteamentoDefinition lot)
+    {
+        var doc = uidoc.Document;
+        var quadras = LotService.Quadras(doc, lot.Id).OrderBy(q => q.Nome, StringComparer.OrdinalIgnoreCase).ToList();
+        if (quadras.Count == 0) throw new UserMessageException("O loteamento não tem quadras.");
+        var first = new QuadroLoteamentoDefinition { LoteamentoId = lot.Id, Conteudo = TipoQuadroLoteamento.Lotes, Quadra = quadras[0].Nome };
+        var place = TablePlacementWindow.Ask(doc, uidoc.ActiveView, "quadros de lotes", ProjectTableViews.ViewName(first));
+        if (place == null) return Result.Cancelled;
+        var notes = new List<string>();
+        var results = new List<RenderResult>();
+        var views = new List<string>();
+        ViewSheet? sheet = place.SheetId != null ? doc.GetElement(place.SheetId) as ViewSheet : null;
+        using (var tg = new TransactionGroup(doc, "SV - Quadros de lotes por quadra"))
+        {
+            tg.Start();
+            foreach (var q in quadras)
+            {
+                var d = ProjectTableViews.ForOwnView(new QuadroLoteamentoDefinition { LoteamentoId = lot.Id, Conteudo = TipoQuadroLoteamento.Lotes, Quadra = q.Nome });
+                View view;
+                using (var t = new Transaction(doc, $"SV - Quadro de lotes {q.Nome} – vista"))
+                {
+                    t.Start();
+                    view = ProjectTableHost.EnsureView(doc, d, ProjectTableViews.ViewName(d), notes);
+                    t.Commit();
+                }
+                var r = MarkingCreator.Commit(uidoc, new[] { d }, $"SV - Quadro de lotes {q.Nome}");
+                results.AddRange(r);
+                views.Add(view.Name);
+                if (place.OnSheet && r.SelectMany(x => x.Elements).Any())
+                {
+                    using var t = new Transaction(doc, $"SV - Quadro de lotes {q.Nome} – folha");
+                    t.Start();
+                    sheet ??= ProjectTableHost.NewSheet(doc, "SV-Q01", "Quadros de lotes");
+                    ProjectTableHost.Place(doc, view, sheet, null, notes);
+                    t.Commit();
+                }
+            }
+            tg.Assimilate();
+        }
+        LotCommands.Report($"{views.Count} quadro(s) de lotes gerado(s) – Navegador de projeto → Legendas.", results,
+            notes.Prepend("Vistas: " + string.Join(", ", views) + (sheet != null ? $"; folha {sheet.SheetNumber} – {sheet.Name}." : ".")));
         return Result.Succeeded;
     }
 

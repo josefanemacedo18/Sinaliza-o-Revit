@@ -19,8 +19,13 @@ public sealed class Parcela
     public double Profundidade { get; init; }
     /// <summary>Trecho da testada em frente ao lote.</summary>
     public List<Vec2> LinhaFrente { get; set; } = new();
+    /// <summary>Último lote da testada feito com a sobra (lote normal).</summary>
     public bool Sobra { get; init; }
     public bool Esquina { get; init; }
+    /// <summary>Chaves dos lotes unidos neste (nulo = não é união).</summary>
+    public List<string>? Unidos { get; set; }
+    /// <summary>Motivo quando o lote fica abaixo da frente ou da área mínima (nulo = atende).</summary>
+    public string? AbaixoDoMinimo { get; set; }
     /// <summary>Número na quadra ("12") ou com prefixo da categoria ("AV-1").</summary>
     public string Numero { get; set; } = "";
     /// <summary>Estaca no perímetro da quadra do meio da frente (ordena a numeração). NaN = sem frente (miolo).</summary>
@@ -272,8 +277,15 @@ public static class LotDivider
         public Polygon2[]? Exclude;
     }
 
-    /// <summary>Divide a quadra. <paramref name="categorias"/> só define a numeração (categorias com prefixo).</summary>
-    public static DivisaoQuadra Divide(QuadraDefinition q, IReadOnlyList<CategoriaLote>? categorias = null)
+    /// <summary>Divide a quadra com as categorias e os mínimos do loteamento.</summary>
+    public static DivisaoQuadra Divide(QuadraDefinition q, LoteamentoDefinition? lot) =>
+        Divide(q, lot?.Categorias, lot?.FrenteMinimaLote ?? 5, lot?.AreaMinimaLote ?? 125);
+
+    /// <summary>
+    /// Divide a quadra. <paramref name="categorias"/> define a numeração (categorias com prefixo); a frente e a área mínimas
+    /// decidem se a sobra de testada vira lote e marcam os lotes abaixo do mínimo.
+    /// </summary>
+    public static DivisaoQuadra Divide(QuadraDefinition q, IReadOnlyList<CategoriaLote>? categorias = null, double frenteMinimaLote = 5, double areaMinimaLote = 125)
     {
         categorias ??= CategoriaLote.Padrao();
         var poly = q.Polygon;
@@ -308,8 +320,8 @@ public static class LotDivider
         }
         if (chainOf.Count == 0)
         {
-            res.Avisos.Add($"Quadra {q.Nome}: nenhuma testada apontada – a quadra ficou numa área só.");
-            res.Parcelas.Add(new Parcela { Chave = "q", Forma = quad, Categoria = CategoriaLote.Sobra });
+            res.Avisos.Add($"Quadra {q.Nome}: nenhuma testada apontada – a quadra ficou numa área só ({q.MioloCategoria}).");
+            res.Parcelas.Add(new Parcela { Chave = "q", Forma = quad, Categoria = q.MioloCategoria });
             Numerar(res, q, categorias);
             return res;
         }
@@ -322,7 +334,8 @@ public static class LotDivider
         foreach (var (id, c) in chainOf)
         {
             var d = Math.Max(0.5, testada[id].Profundidade ?? q.Profundidade);
-            if (q.FundoNoMeio && OppositeTestada(quad, chains, c) is { } w && w < 2 * d - 1e-6) d = w / 2;
+            // Com o miolo para os lotes, as fileiras opostas se encontram no meio mesmo além da profundidade dada.
+            if (q.FundoNoMeio && OppositeTestada(quad, chains, c) is { } w && (w < 2 * d - 1e-6 || q.Miolo == ModoMiolo.AosLotes && testada[id].Profundidade == null)) d = w / 2;
             depth[c] = d;
         }
 
@@ -434,48 +447,59 @@ public static class LotDivider
                 k++;
             }
             var rest = b0 - s;
-            var minF = q.FrenteMinima > 0 ? q.FrenteMinima : f;
+            // A sobra vira lote quando atinge a frente e a área mínimas (as do loteamento ou a frente da quadra, a maior).
+            var minF = Math.Max(frenteMinimaLote, q.FrenteMinima);
+            var restOk = rest >= minF - 1e-6 && RestArea(quad, c, s, b0, rest, depth[c], ownsEndCorner.Contains(c) && b0 >= c.Comprimento - 1e-6 && stations.Count > 0
+                ? stations[^1].B - stations[^1].A : 0) >= areaMinimaLote - 1e-6;
             if (rest > 1e-3)
             {
-                if (rest >= minF - 1e-6 || stations.Count == 0)
+                // Nenhum lote inteiro coube, ou a quadra pede lote a mais a partir de uma frente dada: lote comum com o resto.
+                if (stations.Count == 0 || q.FrenteMinima > 0 && restOk)
                 {
                     var aj = q.Ajuste($"{id}:{k}");
                     stations.Add((s, b0, k, aj?.Profundidade is > 0.1 ? aj.Profundidade.Value : depth[c], false, Math.Max(1, aj?.Partes ?? 1), true));
                 }
-                else switch (q.Sobra)
+                else
                 {
-                    case ModoSobra.IncorporarUltimo:
+                    var mode = q.Sobra == ModoSobra.LoteSobra && !restOk ? ModoSobra.IncorporarUltimo : q.Sobra;
+                    if (q.Sobra == ModoSobra.LoteSobra && !restOk)
+                        res.Avisos.Add($"Quadra {q.Nome}, testada {id}: sobra de {LotReport.M(rest)} m (menor que a frente mínima de {LotReport.M(minF)} m ou que a área mínima de {LotReport.M(areaMinimaLote)} m²) somada ao último lote.");
+                    switch (mode)
                     {
-                        var l = stations[^1];
-                        stations[^1] = l with { B = b0 };
-                        break;
-                    }
-                    case ModoSobra.Distribuir:
-                    {
-                        var free = stations.Count(x => !x.Custom);
-                        var add = rest / Math.Max(1, free > 0 ? free : stations.Count);
-                        var pos = a0;
-                        for (int i = 0; i < stations.Count; i++)
+                        case ModoSobra.IncorporarUltimo:
                         {
-                            var w = stations[i].B - stations[i].A + (free == 0 || !stations[i].Custom ? add : 0);
-                            stations[i] = stations[i] with { A = pos, B = pos + w };
-                            pos += w;
+                            var l = stations[^1];
+                            stations[^1] = l with { B = b0 };
+                            break;
                         }
-                        stations[^1] = stations[^1] with { B = b0 };
-                        break;
-                    }
-                    default:
-                    {
-                        // Lote sobra: o último da testada – antes do lote de esquina quando a testada fica com a esquina do fim.
-                        if (ownsEndCorner.Contains(c) && b0 >= c.Comprimento - 1e-6 && stations.Count > 0)
+                        case ModoSobra.Distribuir:
                         {
-                            var last = stations[^1];
-                            var w = last.B - last.A;
-                            stations[^1] = last with { A = s - w + rest, B = b0 };
-                            stations.Insert(stations.Count - 1, (s - w, s - w + rest, 0, depth[c], true, 1, false));
+                            var free = stations.Count(x => !x.Custom);
+                            var add = rest / Math.Max(1, free > 0 ? free : stations.Count);
+                            var pos = a0;
+                            for (int i = 0; i < stations.Count; i++)
+                            {
+                                var w = stations[i].B - stations[i].A + (free == 0 || !stations[i].Custom ? add : 0);
+                                stations[i] = stations[i] with { A = pos, B = pos + w };
+                                pos += w;
+                            }
+                            stations[^1] = stations[^1] with { B = b0 };
+                            break;
                         }
-                        else stations.Add((s, b0, 0, depth[c], true, 1, false));
-                        break;
+                        default:
+                        {
+                            // Lote da sobra (lote normal): o último da testada – antes do lote de esquina quando a testada fica com a
+                            // esquina do fim.
+                            if (ownsEndCorner.Contains(c) && b0 >= c.Comprimento - 1e-6 && stations.Count > 0)
+                            {
+                                var last = stations[^1];
+                                var w = last.B - last.A;
+                                stations[^1] = last with { A = s - w + rest, B = b0 };
+                                stations.Insert(stations.Count - 1, (s - w, s - w + rest, 0, depth[c], true, 1, false));
+                            }
+                            else stations.Add((s, b0, 0, depth[c], true, 1, false));
+                            break;
+                        }
                     }
                 }
             }
@@ -507,6 +531,8 @@ public static class LotDivider
 
         // Regiões: esquinas com medida própria, depois lotes de esquina, depois os demais (por prioridade e ao longo da testada).
         var assigned = new List<Polygon2>();
+        // Alcance de cada lote (para os fundos até a divisa): a faixa lateral dele, sem limite de profundidade.
+        var reach = new Dictionary<Parcela, (Polyline2 Line, double A, double B, bool OpenA, bool OpenB)>();
         var quadArr = new[] { quad };
         foreach (var cl in cornerLots)
         {
@@ -538,26 +564,118 @@ public static class LotDivider
             assigned.Add(shape);
             var cat = q.Ajuste(sl.Key)?.Categoria
                       ?? (sl.Parte > 0 ? q.Ajuste($"{sl.Testada.Id}:{sl.Ordem}")?.Categoria : null)
-                      ?? (sl.Sobra ? CategoriaLote.Sobra : q.CategoriaPadrao);
-            res.Parcelas.Add(new Parcela
+                      ?? q.CategoriaPadrao;
+            var parcel = new Parcela
             {
                 Chave = sl.Key, Forma = shape, Categoria = cat, TestadaId = sl.Testada.Id, Ordem = sl.Ordem, Parte = sl.Parte,
                 Frente = sl.B - sl.A, Profundidade = sl.Depth, LinhaFrente = line.SubPoints(sl.A, sl.B), Sobra = sl.Sobra,
                 Esquina = sl.Corner, Posicao = Perimeter(quad, sl.Chain.Inicio + (sl.A + sl.B) / 2),
-            });
+            };
+            res.Parcelas.Add(parcel);
+            var baseKey = sl.Parte > 0 ? $"{sl.Testada.Id}:{sl.Ordem}" : sl.Key;
+            if (q.Ajuste(baseKey)?.Profundidade == null)
+                reach[parcel] = (line, sl.A, sl.B, sl.OpenA && sl.A <= 1e-6, sl.OpenB && sl.B >= sl.Chain.Comprimento - 1e-6);
         }
 
-        // Miolo: o que sobrou da quadra. Lascas (< 1 m²) vão para o lote vizinho; o resto vira área própria.
+        // Miolo: o que sobrou da quadra. Para os lotes (padrão): cada lote fica com o miolo atrás dele (fundos até a divisa ou até
+        // outros lotes); o que nenhum alcança vai para o vizinho com a maior divisa. Área própria: vira uma área na categoria escolhida.
         var miolo = PolygonOps.Difference(quadArr, assigned).Where(p => p.Area > 1e-6).OrderByDescending(p => p.Area).ToList();
-        var mk = 1;
-        foreach (var m in miolo)
+        if (q.Miolo == ModoMiolo.AosLotes && miolo.Count > 0)
         {
-            if (m.Area < 1.0 && MergeIntoNeighbour(res.Parcelas, m)) continue;
+            foreach (var p in res.Parcelas.ToList())
+            {
+                if (!reach.TryGetValue(p, out var rc) || miolo.Count == 0) continue;
+                var far = Sector(rc.Line, rc.A, rc.B, rc.OpenA, rc.OpenB, Far / 8);
+                if (!PolygonOps.Intersect(miolo, new[] { far }).Any(x => x.Area > 1e-4)) continue;
+                // A faixa do lote segue para os fundos só enquanto está livre na largura toda: para no primeiro lote que a
+                // atravessa (sem lotes em L).
+                var (fmn, fmx) = far.Bounds;
+                var others = res.Parcelas.Where(o => !ReferenceEquals(o, p)).Select(o => o.Forma).Where(o =>
+                {
+                    var (mn, mx) = o.Bounds;
+                    return mn.X <= fmx.X && mx.X >= fmn.X && mn.Y <= fmx.Y && mx.Y >= fmn.Y;
+                }).ToList();
+                var stop = Far / 8;
+                if (others.Count > 0)
+                {
+                    var front = FrontLine(rc.Line, rc.A, rc.B);
+                    foreach (var b in PolygonOps.Intersect(new[] { far }, others).Where(x => x.Area > 1e-3))
+                        foreach (var v in b.Outer) stop = Math.Min(stop, Math.Abs(front.Project(v).Signed));
+                }
+                if (stop <= p.Profundidade + 1e-3) continue;
+                var parts = PolygonOps.Intersect(miolo, new[] { Sector(rc.Line, rc.A, rc.B, rc.OpenA, rc.OpenB, stop) }).Where(x => x.Area > 1e-4).ToList();
+                if (parts.Count == 0) continue;
+                var mine = PolygonOps.Union(parts.Append(p.Forma)).OrderByDescending(x => x.Area).First();
+                // Só as partes que encostam no lote (as que ficam atrás de outro lote não pulam por cima dele).
+                var taken = PolygonOps.Intersect(new[] { mine }, parts).Where(x => x.Area > 1e-4).ToList();
+                if (taken.Count == 0) continue;
+                p.Forma = mine.Simplified(0.001, 1e-7) ?? mine;
+                miolo = PolygonOps.Difference(miolo, taken).Where(x => x.Area > 1e-6).ToList();
+            }
+        }
+        var mk = 1;
+        foreach (var m in miolo.OrderByDescending(x => x.Area))
+        {
+            // Lascas e pedaços menores que um lote mínimo vão para o vizinho com a maior divisa; o resto vira área própria.
+            if ((m.Area < 1.0 || q.Miolo == ModoMiolo.AosLotes && m.Area < areaMinimaLote) && MergeIntoNeighbour(res.Parcelas, m)) continue;
             var key = $"m:{mk++}";
-            res.Parcelas.Add(new Parcela { Chave = key, Forma = m, Categoria = q.Ajuste(key)?.Categoria ?? CategoriaLote.Sobra });
+            var cat = q.Ajuste(key)?.Categoria ?? q.MioloCategoria;
+            res.Parcelas.Add(new Parcela { Chave = key, Forma = m, Categoria = cat });
+            if (q.Miolo == ModoMiolo.AosLotes)
+                res.Avisos.Add($"Quadra {q.Nome}: miolo de {LotReport.M(m.Area)} m² que nenhum lote alcança pelos fundos ficou como {cat} " +
+                               "(mude a categoria em Lote ou una a um lote vizinho com Unir Lotes).");
+        }
+        var naoUnidos = Unir(res, q);
+        foreach (var p in res.Parcelas.Where(p => string.Equals(p.Categoria, CategoriaLote.Lote, StringComparison.OrdinalIgnoreCase)))
+        {
+            var why = new List<string>();
+            if (p.LinhaFrente.Count < 2) why.Add("sem frente para via");
+            else if (p.Frente < frenteMinimaLote - 1e-6) why.Add($"frente {LotReport.M(p.Frente)} m < {LotReport.M(frenteMinimaLote)} m");
+            if (p.Area < areaMinimaLote - 1e-6) why.Add($"área {LotReport.M(p.Area)} m² < {LotReport.M(areaMinimaLote)} m²");
+            p.AbaixoDoMinimo = why.Count > 0 ? string.Join("; ", why) : null;
         }
         Numerar(res, q, categorias);
+        foreach (var g in naoUnidos)
+            res.Avisos.Add($"Quadra {q.Nome}: os lotes {string.Join(" + ", g.Select(p => p.Numero))} não são vizinhos – não foram unidos.");
+        foreach (var p in res.Parcelas.Where(p => p.AbaixoDoMinimo != null))
+            res.Avisos.Add($"Quadra {q.Nome}, lote {p.Numero}: abaixo do mínimo ({p.AbaixoDoMinimo}).");
         return res;
+    }
+
+    /// <summary>
+    /// Lotes unidos: cada grupo de lotes vizinhos vira um lote só (chave e categoria do primeiro, frentes somadas). Grupos com
+    /// lotes que não se tocam ficam como estão (devolvidos para o aviso, depois da numeração).
+    /// </summary>
+    private static List<List<Parcela>> Unir(DivisaoQuadra res, QuadraDefinition q)
+    {
+        var failed = new List<List<Parcela>>();
+        foreach (var group in q.Unioes.Where(g => g.Count >= 2))
+        {
+            var members = group.Select(k => res.Parcelas.FirstOrDefault(p => p.Chave == k)).Where(p => p != null).Cast<Parcela>().Distinct().ToList();
+            if (members.Count < 2) continue;
+            var union = PolygonOps.Union(members.Select(m => m.Forma)).Where(x => x.Area > 1e-6).ToList();
+            if (union.Count != 1)
+            {
+                failed.Add(members);
+                continue;
+            }
+            var first = members[0];
+            var ordered = members.Where(m => !double.IsNaN(m.Posicao)).OrderBy(m => m.Posicao).ToList();
+            var front = new List<Vec2>();
+            foreach (var m in ordered.Where(m => m.TestadaId == first.TestadaId))
+                front.AddRange(front.Count > 0 && m.LinhaFrente.Count > 0 && front[^1].DistanceTo(m.LinhaFrente[0]) < 1e-3 ? m.LinhaFrente.Skip(1) : m.LinhaFrente);
+            var merged = new Parcela
+            {
+                Chave = first.Chave, Forma = union[0].Simplified(0.001, 1e-7) ?? union[0], Categoria = first.Categoria, TestadaId = first.TestadaId,
+                Ordem = first.Ordem, Parte = first.Parte, Frente = members.Sum(m => m.Frente), Profundidade = members.Max(m => m.Profundidade),
+                LinhaFrente = front.Count >= 2 ? front : first.LinhaFrente, Esquina = members.Any(m => m.Esquina),
+                Posicao = ordered.Count > 0 ? ordered[0].Posicao : double.NaN, Unidos = members.Select(m => m.Chave).ToList(),
+            };
+            var at = res.Parcelas.IndexOf(first);
+            foreach (var m in members) res.Parcelas.Remove(m);
+            res.Parcelas.Insert(Math.Min(at, res.Parcelas.Count), merged);
+        }
+        return failed;
     }
 
     /// <summary>Distância do meio da testada, para dentro, até outra testada do outro lado da quadra (nulo = não há).</summary>
@@ -581,6 +699,16 @@ public static class LotDivider
             }
         }
         return hit?.TestadaId != null ? best : null;
+    }
+
+    /// <summary>
+    /// Área do lote que a sobra formaria (a faixa dela até a profundidade, dentro da quadra): no fim da testada ou, quando a testada
+    /// fica com a esquina do fim (<paramref name="cornerWidth"/> &gt; 0), logo antes do lote de esquina.
+    /// </summary>
+    private static double RestArea(Polygon2 quad, Cadeia c, double s, double b0, double rest, double depth, double cornerWidth)
+    {
+        var (a, b) = cornerWidth > 0 ? (s - cornerWidth, s - cornerWidth + rest) : (s, b0);
+        return PolygonOps.TotalArea(PolygonOps.Intersect(new[] { quad }, new[] { Sector(c.Linha, a, b, false, false, depth) }));
     }
 
     private static double? SegmentHit(Vec2 o, Vec2 d, Vec2 a, Vec2 b)
@@ -711,6 +839,19 @@ public static class LotDivider
     }
 
     /// <summary>Junta a lasca ao lote vizinho com a maior divisa em comum; falso se nenhum encosta nela.</summary>
+    /// <summary>Frente do lote prolongada pelas tangentes das pontas (mede a profundidade de qualquer ponto da faixa).</summary>
+    private static Polyline2 FrontLine(Polyline2 line, double a, double b)
+    {
+        var pts = line.SubPoints(a, b);
+        if (pts.Count < 2) pts = new List<Vec2> { line.PointAt(a), line.PointAt(b) };
+        var ta = (pts[1] - pts[0]).Normalized();
+        var tb = (pts[^1] - pts[^2]).Normalized();
+        var res = new List<Vec2> { pts[0] - ta * Far };
+        res.AddRange(pts);
+        res.Add(pts[^1] + tb * Far);
+        return new Polyline2(res);
+    }
+
     private static bool MergeIntoNeighbour(List<Parcela> parcels, Polygon2 sliver)
     {
         Parcela? best = null;

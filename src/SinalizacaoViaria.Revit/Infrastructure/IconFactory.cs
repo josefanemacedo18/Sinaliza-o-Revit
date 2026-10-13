@@ -605,6 +605,18 @@ public static class IconFactory
                 dc.DrawLine(P(key == "quadra" ? Red : Asphalt, 3), new Point(2, 28), new Point(30, 28));
                 break;
             }
+            case "unirlotes":
+            {
+                // Dois lotes vizinhos viram um (divisa do meio tracejada, contorno do lote unido em destaque).
+                dc.DrawRectangle(B(Color.FromRgb(242, 215, 166)), P(Asphalt, 1.2), new Rect(3, 3, 26, 22));
+                dc.DrawLine(P(Asphalt, 1), new Point(9.5, 3), new Point(9.5, 25));
+                dc.DrawLine(P(Asphalt, 1), new Point(22.5, 3), new Point(22.5, 25));
+                dc.DrawRectangle(B(Color.FromRgb(255, 184, 28)), P(Red, 1.6), new Rect(9.5, 3, 13, 22));
+                dc.DrawLine(new Pen(B(Asphalt), 1) { DashStyle = DashStyles.Dash }, new Point(16, 3), new Point(16, 25));
+                Text(dc, "+", 12, Red, new Point(16, 7), true);
+                dc.DrawLine(P(Asphalt, 3), new Point(2, 28), new Point(30, 28));
+                break;
+            }
             case "vianome":
                 RoadBackground(dc);
                 Text(dc, "RUA", 11, White, new Point(16, 9), true);
@@ -622,7 +634,7 @@ public static class IconFactory
                 for (int i = 0; i < 4; i++)
                 {
                     dc.DrawLine(P(Asphalt, 0.8), new Point(2, 9 + i * 5), new Point(30, 9 + i * 5));
-                    var c = i switch { 0 => Color.FromRgb(242, 215, 166), 1 => Color.FromRgb(232, 163, 163), 2 => Color.FromRgb(155, 203, 138), _ => Color.FromRgb(217, 217, 217) };
+                    var c = i switch { 1 => Color.FromRgb(232, 163, 163), 2 => Color.FromRgb(155, 203, 138), _ => Color.FromRgb(242, 215, 166) };
                     dc.DrawRectangle(B(c), null, new Rect(4, 10 + i * 5, 5, 3));
                 }
                 dc.DrawLine(P(Asphalt, 0.8), new Point(11, 9), new Point(11, 29));
