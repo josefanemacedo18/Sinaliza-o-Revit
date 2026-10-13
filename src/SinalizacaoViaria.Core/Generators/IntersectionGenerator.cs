@@ -1081,7 +1081,9 @@ public static partial class IntersectionGenerator
         Slope = Math.Clamp(d.RampSlope, 0.02, MaxRampSlope),
         FlareSlope = Math.Clamp(d.RampFlareSlope, 0.02, MaxFlareSlope),
         Tactile = d.RampTactile,
-        DirectionalTactile = d.RampDirectional,
+        TactileSetback = TactileGenerator.RampAlertSetback,
+        TactileWidth = TactileGenerator.CrossingAlert,
+        DirectionalTactile = d.RampTactile && d.RampDirectional,
         SquareCut = true,
     };
 
@@ -1975,6 +1977,12 @@ public static partial class IntersectionGenerator
         if (member is RoadPavementDefinition || IsPhysical(member)) return phys;
         // Elementos derivados da via (extensões de calçada, piso tátil, rampas e mobiliário das travessias – ids "via:..."):
         // saem só onde a interseção refaz a calçada, não na área de pintura das aproximações.
+        if (member is TactileRouteDefinition && member.Id.Contains(':'))
+        {
+            // A rede tátil da interseção vai até as junções dos ramais das rampas das travessias: a faixa da via sai ali.
+            var over = TactileOverlap(L, road);
+            return over.Count == 0 ? phys : PolygonOps.Union(phys.Concat(over));
+        }
         if (member is CurbExtensionDefinition or TactileRouteDefinition || member is RampDefinition or UrbanElementDefinition && member.Id.Contains(':'))
             return phys;
         if (member is ParkingMarkingDefinition || member is LinearMarkingDefinition { Code: RoadSetup.ParkingLineCode })
@@ -2925,6 +2933,8 @@ public static partial class IntersectionGenerator
                     var ramp = (RampDefinition)tpl.CloneWithNewId();
                     ramp.PathRef = PathReference.FromPoints(new[] { curb, curb + side }, z);
                     Add(ramp);
+                    // Sem rede tátil nas calçadas: direcional transversal no eixo do rebaixamento até o lote (NBR 16537, 7.8.5 b).
+                    if (!TactileNetworkOn(L) && CrossingDirectional(L, leg, (int)sgn, tc, ramp, z) is { } tr) Add(tr);
                 }
                 // Canteiro central atravessado: rampas nas duas faces com patamar no meio, ou passagem rebaixada no nível da
                 // pista com faixa de alerta junto a cada borda (NBR 9050 / NBR 16537 – itens a confirmar).
@@ -3115,6 +3125,8 @@ public static partial class IntersectionGenerator
                 var f = RampGenerator.FrameOf(new Polyline2(r.PathRef.Points));
                 return !L.Obstacles.Any(o => o.Contains(f.P(0, 0.3)));
             }).ToList();
+            // O ramal da rede segue pelo eixo da rampa até a faixa de alerta (Figura 69): direcional na rampa.
+            foreach (var r in sideRamps.Where(r => r.Tactile && r.Type != TipoRampa.RebaixamentoTotal)) r.DirectionalTactile = true;
             foreach (var t in TactileNetwork(L, z, sideRamps)) Add(t);
         }
         // Pista de terra: nada de pintura automática sobre ela (travessias, retenção, legendas e linhas ficam nas pistas pavimentadas).

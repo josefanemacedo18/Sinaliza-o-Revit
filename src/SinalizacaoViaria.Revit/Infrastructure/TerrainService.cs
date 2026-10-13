@@ -113,6 +113,7 @@ public static class TerrainService
             };
             a.Left.AddRange(c.Left.Select(p => p with { Z = p.Z + baseZ }));
             a.Right.AddRange(c.Right.Select(p => p with { Z = p.Z + baseZ }));
+            a.Inner.AddRange(c.Inner.Select(l => l.Select(p => p with { Z = p.Z + baseZ }).ToList()));
             corridors.Add(a);
         }
         pads.AddRange(geo.Pads.Select(p => new GradePad(p.Area, p.Z + baseZ)
@@ -136,19 +137,17 @@ public static class TerrainService
                 var s1 = Math.Max(s0 + 0.5, axis.Length - Math.Max(0, road.EndSetback));
                 var works = (all ?? Array.Empty<MarkingDefinition>()).Where(h => road.GroupId != null && h is IHostedStructure hs && hs.HostRoad == road.GroupId);
                 // Fora dos trechos em obra; junto a encontros e emboques a via termina numa face vertical (emboque: testa + talude).
-                var roadCorr = InfraRoads.RoadCorridors(axis, prof, right, left, s0, s1, opt.Subgrade, cut, fill, works).Select(c => c.WithOffset(z0)).ToList();
-                // Concordância com os nós em que a via é secundária: a plataforma acompanha a mesma superfície dos pisos.
-                if (g != null && service?.SurfaceFor(road, axis) is { Blends.Count: > 0 } blended)
+                var roadCorr = InfraRoads.RoadCorridors(axis, prof, right, left, s0, s1, opt.Subgrade, cut, fill, works);
+                // A plataforma acompanha a mesma superfície dos pisos (abaulamento, superelevação e concordância com os nós).
+                if (g != null)
                 {
-                    var plain = new Core.Geometry.GradeSurface(axis, blended.Grade);
-                    double D(Vec3 v) => blended.Z(v.XY) - plain.Z(v.XY);
-                    foreach (var c in roadCorr)
-                    {
-                        for (int k = 0; k < c.Left.Count; k++) c.Left[k] = c.Left[k] with { Z = c.Left[k].Z + D(c.Left[k]) };
-                        for (int k = 0; k < c.Right.Count; k++) c.Right[k] = c.Right[k] with { Z = c.Right[k].Z + D(c.Right[k]) };
-                    }
+                    var surf = service?.SurfaceFor(road, axis) ?? new Core.Geometry.GradeSurface(axis, g);
+                    InfraRoads.FitToSurface(roadCorr, left, right, surf.Z, opt.Subgrade, InfraRoads.SectionBreaks(surf.Grade));
+                    // Nós em que a via é secundária: a crista da via principal, prolongada, cruza a concordância.
+                    foreach (var b in surf.Blends)
+                        foreach (var c in roadCorr) c.Breaklines.AddRange(InfraRoads.NodeBreaklines(b.Node));
                 }
-                corridors.AddRange(roadCorr);
+                corridors.AddRange(roadCorr.Select(c => c.WithOffset(z0)));
                 break;
             }
             case IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition:
@@ -159,11 +158,29 @@ public static class TerrainService
                 var union = Core.Geometry.PolygonOps.Union(geo.Pieces.Where(p => p.Elevation < 0.5).Select(p => p.Shape));
                 var (cutS, fillS) = RoadSlopes(def, all, opt);
                 foreach (var u in union.Where(u => u.Area > 1))
-                    pads.Add(new GradePad(u, z0 - opt.Subgrade)
+                {
+                    var pad = new GradePad(u, z0 - opt.Subgrade)
                     {
                         CutSlope = cutS, FillSlope = fillS, Label = def.KindName,
                         ZAt = node == null ? null : q => node.Z(q) - opt.Subgrade,
-                    });
+                    };
+                    // Crista e fim do caimento da via principal: pontos do Toposolid sobre as quebras da superfície do nó.
+                    if (node != null) pad.Breaklines.AddRange(InfraRoads.NodeBreaklines(node));
+                    pads.Add(pad);
+                }
+                break;
+            }
+            case var _ when service?.MemberSurface(def) is { } members && service.NodeFor(def) is { } memberNode:
+            {
+                // Marcas do nó no chão (calçadas de esquina, extensões, rampas): plataforma na superfície delas – a do nó dentro
+                // dele e a da via além dele –, sem talude próprio (ficam dentro das plataformas do nó e das vias).
+                var union = Core.Geometry.PolygonOps.Union(geo.Pieces.Where(p => p.Elevation < 0.5).Select(p => p.Shape));
+                foreach (var u in union.Where(u => u.Area > 0.05))
+                {
+                    var pad = new GradePad(u, z0 - opt.Subgrade) { Daylight = false, Label = def.KindName, ZAt = q => members(q) - opt.Subgrade };
+                    pad.Breaklines.AddRange(InfraRoads.NodeBreaklines(memberNode));
+                    pads.Add(pad);
+                }
                 break;
             }
         }
@@ -289,7 +306,7 @@ public static class TerrainService
             foreach (var m in originals.Values) if (m.Z(p) is { } z && (best == null || z > best)) best = z;
             return best;
         }
-        var design = Grading.Design(corridors, pads, Ground, 0, Math.Max(5, opt.MaxDaylight), 0.5, 4.0, 1.0);
+        var design = Grading.Design(corridors, pads, Ground, 0, Math.Max(5, opt.MaxDaylight), 0.5, 1.0, 1.0);
         report.Cut = design.CutM3;
         report.Fill = design.FillM3;
         report.Area = design.AreaM2;
@@ -321,7 +338,8 @@ public static class TerrainService
                 var editor = topo.GetSlabShapeEditor();
                 if (editor == null) continue;
                 if (!editor.IsEnabled) editor.Enable();
-                var inRegion = TerrainRebuild.Mask(region, 0.5);
+                // 1 m: os pontos naturais colados na área de projeto saem também do Toposolid (ver TerrainRebuild.Points).
+                var inRegion = TerrainRebuild.Mask(region, 1.0);
                 var pts = TerrainRebuild.Points(orig, design, inRegion);
                 ApplyPoints(doc, topo, editor, inRegion, pts, report);
                 report.Toposolids++;

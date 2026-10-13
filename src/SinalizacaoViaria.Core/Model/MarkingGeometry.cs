@@ -341,13 +341,34 @@ public sealed class GradeCorridor
     /// à frente da ponta até o terreno (cone de aterro sob o primeiro vão).
     /// </summary>
     public bool EndSpill { get; set; }
+    /// <summary>
+    /// Ponta livre da via (início/fim sem obra): fecha em talude até o terreno à frente da ponta – sem isso a plataforma terminava
+    /// num degrau vertical e o Toposolid ligava a borda da pista aos pontos naturais logo depois dela (paredão dentro da pista).
+    /// </summary>
+    public bool SpillStart { get; set; }
+    public bool SpillEnd { get; set; }
     public string Label { get; set; } = "";
+    /// <summary>
+    /// Linhas internas da faixa, da esquerda para a direita, nas mesmas estacas das bordas (vazio = faixa plana de borda a
+    /// borda): a plataforma acompanha o abaulamento, o caimento e a concordância com os nós em vez de ligar as bordas em reta.
+    /// </summary>
+    public List<List<Vec3>> Inner { get; } = new();
+    /// <summary>
+    /// Cota exata da plataforma no ponto (mesma referência das bordas; nula = plana entre as linhas da seção): a terraplenagem
+    /// usa a superfície da via em vez dos triângulos entre as linhas – só em memória.
+    /// </summary>
+    public Func<Vec2, double>? Surface { get; set; }
+    /// <summary>Linhas de quebra da superfície que cruzam a faixa (a crista da via principal de um nó, prolongada): pontos do terreno sobre elas.</summary>
+    public List<List<Vec2>> Breaklines { get; } = new();
 
     /// <summary>Soma <paramref name="dz"/> a todas as cotas (relativas → absolutas).</summary>
     public GradeCorridor WithOffset(double dz)
     {
         for (int i = 0; i < Left.Count; i++) Left[i] = Left[i] with { Z = Left[i].Z + dz };
         for (int i = 0; i < Right.Count; i++) Right[i] = Right[i] with { Z = Right[i].Z + dz };
+        foreach (var l in Inner)
+            for (int i = 0; i < l.Count; i++) l[i] = l[i] with { Z = l[i].Z + dz };
+        if (Surface is { } f) Surface = p => f(p) + dz;
         return this;
     }
 }
@@ -370,4 +391,10 @@ public sealed class GradePad
 
     /// <summary>Cota da plataforma no ponto.</summary>
     public double At(Vec2 p) => ZAt?.Invoke(p) ?? Z;
+
+    /// <summary>
+    /// Linhas de quebra da superfície da plataforma (eixo do abaulamento e fim do caimento da via principal no nó): o terreno
+    /// ganha pontos sobre elas – sem quebras de linha, a triangulação do Toposolid cortaria a crista (só em memória).
+    /// </summary>
+    public List<List<Vec2>> Breaklines { get; } = new();
 }

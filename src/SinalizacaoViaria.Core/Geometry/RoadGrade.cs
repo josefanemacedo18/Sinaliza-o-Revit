@@ -301,8 +301,14 @@ public sealed class GradeSurface
         if (best == null) return z;
         var t = best.Weight(bd);
         if (t >= 1) return z;
-        var zRef = best.Node.Z(p) - best.BaseZ;
-        return zRef + (z - zRef) * t;
+        if (t <= 0) return best.Node.Z(p) - best.BaseZ;
+        // Concordância: o greide próprio mais a diferença para o nó medida na borda dele (no mesmo afastamento), que some
+        // em curva S. Misturar as cotas do nó prolongado com as do greide criava rampas muito maiores que as das duas
+        // superfícies quando o greide desce forte (o nó prolongado fica plano, a diferença cresce ao longo da concordância).
+        var edge = Math.Clamp(best.Station + (s >= best.Station ? best.Start : -best.Start), 0, _axis.Length);
+        var q = _axis.PointAt(edge) + _axis.TangentAt(edge).PerpLeft * y;
+        var diff = best.Node.Z(q) - best.BaseZ - _grade.Z(edge, y);
+        return z + diff * (1 - t);
     }
 
     /// <summary>

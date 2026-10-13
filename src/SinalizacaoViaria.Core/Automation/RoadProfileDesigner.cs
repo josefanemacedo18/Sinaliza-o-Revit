@@ -46,6 +46,7 @@ public sealed class PerfilOpcoes
     {
         var c = (PerfilOpcoes)MemberwiseClone();
         c.Fixed = new List<Vec2>(Fixed);
+        c.FixedHalf = new List<double>(FixedHalf);
         return c;
     }
 
@@ -79,6 +80,12 @@ public sealed class PerfilOpcoes
     /// na cota da outra via ali, concordando suavemente numa janela de <see cref="FixedBlend"/> m.
     /// </summary>
     public List<Vec2> Fixed { get; set; } = new();
+    /// <summary>
+    /// Meia extensão do patamar de cada ponto obrigado (mesma ordem de <see cref="Fixed"/>; faltando = 6 m): o alcance da área do
+    /// nó ao longo da via (<see cref="RoadProfileDesigner.NodeReach"/>) – num Y a área do nó vai bem além de 6 m.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<double> FixedHalf { get; set; } = new();
     public double FixedBlend { get; set; } = 40;
 
     // ---- obras automáticas
@@ -243,27 +250,16 @@ public static class RoadProfileDesigner
                 }
                 sm[0] = z0;
                 sm[^1] = z1;
-                // Cruzamentos com vias existentes: o greide é puxado para a cota delas (concordância em cosseno).
-                foreach (var f in o.Fixed)
-                    for (int i = 0; i < ss.Count; i++)
-                    {
-                        var d = Math.Abs(ss[i] - f.X);
-                        if (d >= o.FixedBlend) continue;
-                        var wf = 0.5 + 0.5 * Math.Cos(Math.PI * d / o.FixedBlend);
-                        sm[i] = sm[i] * (1 - wf) + f.Y * wf;
-                    }
-                var z = LimitGrade(ss, sm, g);
-                var pts = DouglasPeucker(ss.Select((s, i) => new Vec2(s, z[i])).ToList(), 0.25);
-                foreach (var p in pts) grade.Points.Add(new GradePoint(p.X, p.Y));
-                // Plataforma de 12 m em nível no cruzamento (a cota é exata ali e a interseção fica sem rampa no miolo).
-                foreach (var f in o.Fixed.Where(f => f.X > 0.5 && f.X < L - 0.5))
-                {
-                    grade.Points.RemoveAll(q => Math.Abs(q.S - f.X) < 8);
-                    if (f.X - 6 > 0.5) grade.Points.Add(new GradePoint(f.X - 6, f.Y));
-                    grade.Points.Add(new GradePoint(f.X, f.Y));
-                    if (f.X + 6 < L - 0.5) grade.Points.Add(new GradePoint(f.X + 6, f.Y));
-                }
-                grade.Normalize();
+                // Cotas obrigadas: pontas informadas e cruzamentos com as vias existentes (o greide passa exatamente na cota
+                // delas, em nível 6 m para cada lado – a interseção fica sem rampa no miolo). Entre elas, o terreno suavizado
+                // limitado pela rampa máxima. Antes as cotas eram "puxadas" e depois a rampa máxima as deslocava; o patamar
+                // colado de volta deixava saltos (rampas de até 120 %) ao lado dele e nas pontas.
+                var (zs, pinned, gEff) = PinnedGrade(ss, sm, g, L, o.StartZ != null ? z0 : null, o.EndZ != null ? z1 : null, o.Fixed, 0, o.FixedHalf);
+                if (gEff > g + 1e-6)
+                    res.Warnings.Add($"As cotas obrigadas (cruzamentos/pontas) exigem rampa de {gEff.ToString("P0", CultureInfo.GetCultureInfo("pt-BR"))} " +
+                                     $"(máx. {g.ToString("P0", CultureInfo.GetCultureInfo("pt-BR"))}) entre elas.");
+                SetPivs(grade, zs, pinned);
+                Smooth(grade, ss, L, gEff, MaxCurvature(g, o.VerticalCurve), o.StartZ != null ? z0 : null, o.EndZ != null ? z1 : null, o.Fixed, o.FixedHalf);
                 break;
             }
         }
@@ -297,32 +293,259 @@ public static class RoadProfileDesigner
         return res;
     }
 
-    /// <summary>Greide mais próximo da referência com rampa ≤ g, pontas fixas (duas varreduras de envoltória).</summary>
-    private static double[] LimitGrade(List<double> ss, double[] target, double g)
+    /// <summary>
+    /// PIVs do greide a partir das cotas por estação: simplificação (0,25 m) com as cotas obrigadas mantidas como PIVs – inclusive
+    /// o centro de cada patamar (colinear, a normalização o tirava), que limita as curvas das bordas do patamar a metade dele.
+    /// </summary>
+    private static void SetPivs(RoadGrade grade, List<Vec2> zs, List<Vec2> pinned, double tol = 0.25)
     {
-        var n = ss.Count;
-        var up = new double[n];
-        var dn = new double[n];
-        // Envoltória superior e inferior alcançáveis a partir das pontas.
-        var z = (double[])target.Clone();
-        for (int iter = 0; iter < 3; iter++)
+        var pts = DouglasPeucker(zs, tol);
+        pts.RemoveAll(q => pinned.Any(pp => Math.Abs(pp.X - q.X) < 0.5 && Math.Abs(pp.X - q.X) > 1e-9));
+        foreach (var pp in pinned.Where(pp => !pts.Any(q => Math.Abs(q.X - pp.X) < 1e-9))) pts.Add(pp);
+        grade.Points.Clear();
+        foreach (var p in pts.OrderBy(q => q.X)) grade.Points.Add(new GradePoint(p.X, p.Y));
+        grade.Normalize();
+        foreach (var pp in pinned.Where(pp => !grade.Points.Any(q => Math.Abs(q.S - pp.X) < 1e-6))) grade.Points.Add(new GradePoint(pp.X, pp.Y));
+        grade.Points.Sort((a, b) => a.S.CompareTo(b.S));
+        grade.Touch();
+    }
+
+    /// <summary>
+    /// Patamares numa via que já tem greide: nos nós dela (estação, cota) o greide passa na cota e fica em nível 6 m para cada lado,
+    /// e em volta a rampa fica limitada a <paramref name="maxGrade"/> (ou à rampa que a via já tinha, se maior). Usado quando
+    /// outra via é ligada a ela – antes só a via nova ganhava o patamar e a existente chegava inclinada ao nó (a superfície do nó
+    /// prolongava a rampa dela por cima da boca das outras vias).
+    /// </summary>
+    public static RoadGrade WithPlatforms(RoadGrade g, double length, IEnumerable<Vec2> pins, double maxGrade, IReadOnlyList<double>? halves = null)
+    {
+        var L = Math.Max(1, length);
+        var n = Math.Max(2, (int)Math.Ceiling(L / Step));
+        var ss = Enumerable.Range(0, n + 1).Select(i => L * i / n).ToList();
+        var target = ss.Select(x => g.Z(x)).ToArray();
+        var current = 0.0;
+        for (int i = 1; i < ss.Count; i++) current = Math.Max(current, Math.Abs(target[i] - target[i - 1]) / (ss[i] - ss[i - 1]));
+        var gm = Math.Max(maxGrade, current);
+        var pinList = pins.ToList();
+        var (zs, pinned, gEff) = PinnedGrade(ss, target, gm, L, null, null, pinList, 0, halves);
+        var res = g.Clone();
+        res.WithoutWorks = null;
+        SetPivs(res, zs, pinned);
+        Smooth(res, ss, L, gEff, MaxCurvature(gm, g.DefaultCurve), null, null, pinList, halves);
+        return res;
+    }
+
+    /// <summary>
+    /// Greide pelas cotas obrigadas: estações (as da amostragem + as das cotas obrigadas), cota de cada uma – o alvo limitado
+    /// à faixa alcançável a partir das cotas obrigadas com a rampa máxima e depois a rampa limitada entre vizinhas –, os pontos
+    /// obrigados (PIVs) e a rampa usada (maior que a pedida só quando as cotas obrigadas a exigem).
+    /// </summary>
+    /// <param name="curvature">
+    /// Variação máxima da rampa por metro (1/m; 0 = sem limite): as mudanças de rampa ficam espalhadas em curvas verticais –
+    /// sem ela o vale/crista do terreno virava uma quina (−30 % a +30 % em 5 m).
+    /// </param>
+    public static (List<Vec2> Z, List<Vec2> Pins, double Grade) PinnedGrade(List<double> ss, double[] target, double g, double L,
+        double? startZ, double? endZ, IEnumerable<Vec2> fixedPts, double curvature = 0, IReadOnlyList<double>? halves = null)
+    {
+        // Intervalos em nível: patamar em cada cruzamento cobrindo a área do nó (no mínimo 6 m para cada lado; só para dentro
+        // da via nas pontas); pontas informadas.
+        var flats = new List<(double A, double B, double Z)>();
+        if (startZ is { } sz) flats.Add((0, 0, sz));
+        if (endZ is { } ez) flats.Add((L, L, ez));
+        var k0 = 0;
+        foreach (var f in fixedPts)
         {
+            var c = Math.Clamp(f.X, 0, L);
+            var h = Math.Max(PlatformHalf, halves != null && k0 < halves.Count ? halves[k0] : 0);
+            k0++;
+            flats.Add((Math.Max(0, c - h), Math.Min(L, c + h), f.Y));
+        }
+        // Estações: as da amostragem + as bordas e o centro de cada patamar (sem amostras coladas nelas: intervalos curtos
+        // encurtariam as curvas verticais dos PIVs vizinhos).
+        var st = new SortedSet<double>(ss);
+        var gap = ss.Count > 1 ? (ss[^1] - ss[0]) / (ss.Count - 1) : 1;
+        foreach (var (a, b, _) in flats)
+        {
+            if (curvature > 0)
+                st.RemoveWhere(x => x > 1e-9 && x < L - 1e-9 && (Math.Abs(x - a) < gap / 2 || Math.Abs(x - b) < gap / 2) && (x < a - 1e-9 || x > b + 1e-9));
+            st.Add(a); st.Add(b); st.Add((a + b) / 2);
+        }
+        var s = st.ToList();
+        var n = s.Count;
+        double Target(double x)
+        {
+            if (x <= ss[0]) return target[0];
+            for (int i = 1; i < ss.Count; i++)
+                if (x <= ss[i]) return target[i - 1] + (target[i] - target[i - 1]) * (x - ss[i - 1]) / Math.Max(1e-9, ss[i] - ss[i - 1]);
+            return target[^1];
+        }
+        var pin = new double?[n];
+        foreach (var (a, b, fz) in flats)
+            for (int i = 0; i < n; i++)
+                if (s[i] >= a - 1e-9 && s[i] <= b + 1e-9) pin[i] = fz;
+        // Rampa possível: a pedida, ou a que as cotas obrigadas vizinhas exigem.
+        var gEff = g;
+        int? last = null;
+        for (int i = 0; i < n; i++)
+        {
+            if (pin[i] == null) continue;
+            if (last is { } j && s[i] - s[j] > 1e-6) gEff = Math.Max(gEff, Math.Abs(pin[i]!.Value - pin[j]!.Value) / (s[i] - s[j]) * 1.0001);
+            last = i;
+        }
+        // Faixa alcançável das cotas obrigadas e alvo dentro dela.
+        var z = new double[n];
+        for (int i = 0; i < n; i++)
+        {
+            if (pin[i] is { } pz) { z[i] = pz; continue; }
+            double lo = double.MinValue, hi = double.MaxValue;
+            for (int k = 0; k < n; k++)
+            {
+                if (pin[k] is not { } kz) continue;
+                var d = Math.Abs(s[i] - s[k]);
+                lo = Math.Max(lo, kz - gEff * d);
+                hi = Math.Min(hi, kz + gEff * d);
+            }
+            z[i] = Math.Clamp(Target(s[i]), Math.Min(lo, hi), Math.Max(lo, hi));
+        }
+        // Rampa limitada entre vizinhas (as obrigadas ficam).
+        for (int iter = 0; iter < 20; iter++)
+        {
+            var changed = false;
             for (int i = 1; i < n; i++)
             {
-                var ds = ss[i] - ss[i - 1];
-                z[i] = Math.Clamp(z[i], z[i - 1] - g * ds, z[i - 1] + g * ds);
+                if (pin[i] != null) continue;
+                var ds = s[i] - s[i - 1];
+                var c = Math.Clamp(z[i], z[i - 1] - gEff * ds, z[i - 1] + gEff * ds);
+                if (Math.Abs(c - z[i]) > 1e-9) { z[i] = c; changed = true; }
             }
-            z[n - 1] = target[n - 1];
             for (int i = n - 2; i >= 0; i--)
             {
-                var ds = ss[i + 1] - ss[i];
-                z[i] = Math.Clamp(z[i], z[i + 1] - g * ds, z[i + 1] + g * ds);
+                if (pin[i] != null) continue;
+                var ds = s[i + 1] - s[i];
+                var c = Math.Clamp(z[i], z[i + 1] - gEff * ds, z[i + 1] + gEff * ds);
+                if (Math.Abs(c - z[i]) > 1e-9) { z[i] = c; changed = true; }
             }
-            z[0] = target[0];
+            if (!changed) break;
         }
-        _ = up; _ = dn;
-        return z;
+        if (curvature > 0) LimitCurvature(s, z, pin, gEff, curvature);
+        var pins = new List<Vec2>();
+        foreach (var (a, b, zz) in flats)
+        {
+            pins.Add(new Vec2(a, zz));
+            if (b - a > 1e-6) { pins.Add(new Vec2((a + b) / 2, zz)); pins.Add(new Vec2(b, zz)); }
+        }
+        return (s.Select((x, i) => new Vec2(x, z[i])).ToList(), pins.DistinctBy(p => Math.Round(p.X, 6)).ToList(), gEff);
     }
+
+    /// <summary>
+    /// Curvas verticais nas cotas por estação: a variação de rampa em cada estação fica abaixo de
+    /// <paramref name="curvature"/> × o menor intervalo vizinho (com folga de 2 %, a curva que o greide põe no PIV cabe entre os
+    /// vizinhos), sem passar da rampa máxima. Projeções sucessivas sobre cada restrição (só as estações livres se movem, o
+    /// mínimo que a corrige) até todas valerem.
+    /// </summary>
+    private static void LimitCurvature(List<double> s, double[] z, double?[] pin, double g, double curvature)
+    {
+        var n = s.Count;
+        for (int iter = 0; iter < 40000; iter++)
+        {
+            var worst = 0.0;
+            // Varreduras alternadas (ida e volta): a ordem das projeções não empurra o greide para um lado.
+            var back = iter % 2 == 1;
+            // Rampa entre vizinhas: as duas estações (livres) se aproximam igualmente.
+            for (int ii = 1; ii < n; ii++)
+            {
+                var i = back ? n - ii : ii;
+                var h = s[i] - s[i - 1];
+                if (h < 1e-9) continue;
+                var d = (z[i] - z[i - 1]) / h;
+                var e = Math.Abs(d) - g;
+                if (e <= 1e-9) continue;
+                double ga = pin[i - 1] == null ? -1 / h : 0, gb = pin[i] == null ? 1 / h : 0;
+                var nn = ga * ga + gb * gb;
+                if (nn < 1e-12) continue;
+                worst = Math.Max(worst, e);
+                var k = -Math.Sign(d) * e / nn;
+                z[i - 1] += k * ga;
+                z[i] += k * gb;
+            }
+            // Variação da rampa em cada estação.
+            for (int ii = 1; ii + 1 < n; ii++)
+            {
+                var i = back ? n - 1 - ii : ii;
+                var h1 = s[i] - s[i - 1];
+                var h2 = s[i + 1] - s[i];
+                if (h1 < 1e-9 || h2 < 1e-9) continue;
+                var d = (z[i + 1] - z[i]) / h2 - (z[i] - z[i - 1]) / h1;
+                var e = Math.Abs(d) - curvature * 0.98 * Math.Min(h1, h2);
+                if (e <= 1e-9) continue;
+                double ga = pin[i - 1] == null ? 1 / h1 : 0, gb = pin[i] == null ? -(1 / h1 + 1 / h2) : 0, gc = pin[i + 1] == null ? 1 / h2 : 0;
+                var nn = ga * ga + gb * gb + gc * gc;
+                if (nn < 1e-12) continue;
+                worst = Math.Max(worst, e);
+                var k = -Math.Sign(d) * e / nn;
+                z[i - 1] += k * ga;
+                z[i] += k * gb;
+                z[i + 1] += k * gc;
+            }
+            if (worst < 1e-7) break;
+        }
+    }
+
+    /// <summary>
+    /// Curvas verticais cortadas: quando os PIVs ficam tão perto que as curvas não cabem entre eles, a rampa muda numa quina
+    /// (−30 % a +30 % em 5 m no fundo de um vale). Nesses casos o greide é refeito pelas estações com a variação de rampa
+    /// limitada (<see cref="LimitCurvature"/>) e PIVs a cada estação na parte curva; greides que já são suaves ficam como estão.
+    /// </summary>
+    private static void Smooth(RoadGrade grade, List<double> ss, double L, double g, double curvature, double? startZ, double? endZ, IEnumerable<Vec2> fixedPts,
+        IReadOnlyList<double>? halves = null)
+    {
+        if (curvature <= 0 || CurvatureOf(grade, L) <= curvature) return;
+        var target = ss.Select(x => grade.Z(x)).ToArray();
+        var (zs, pinned, _) = PinnedGrade(ss, target, g, L, startZ, endZ, fixedPts, curvature, halves);
+        // Um PIV por estação na parte curva (só os colineares saem): juntar estações alongava os trechos e as curvas dos
+        // PIVs vizinhos deixavam de caber (até 10 % acima do limite em curvas longas).
+        SetPivs(grade, zs, pinned, 1e-4);
+    }
+
+    /// <summary>Meia extensão mínima do patamar em nível de um cruzamento (m).</summary>
+    public const double PlatformHalf = 6;
+
+    /// <summary>
+    /// Alcance da área de um nó ao longo do eixo: maior distância, em estação, entre o nó e os pontos dos recortes que ele fez
+    /// na via (zonas que contêm o nó ou passam a até 2 m dele). 0 = sem recorte. É a extensão em que a via segue a superfície do
+    /// nó – o patamar do greide tem de cobri-la, senão a concordância vence o desnível em poucos metros (rampas de até 55 % num Y
+    /// em terreno de 25 %).
+    /// </summary>
+    public static double NodeReach(Polyline2 axis, Vec2 node, IEnumerable<IReadOnlyList<Vec2>> zones)
+    {
+        var c = axis.Project(node).Station;
+        var best = 0.0;
+        foreach (var z in zones)
+        {
+            if (z.Count < 3) continue;
+            var poly = new Polygon2(z);
+            if (!poly.Contains(node) && poly.DistanceTo(node) > 2) continue;
+            foreach (var p in z) best = Math.Max(best, Math.Abs(axis.Project(p).Station - c));
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// Meia extensão do patamar de um cruzamento: o alcance do nó (<see cref="NodeReach"/>) mais a parte da curva vertical que
+    /// entra no patamar (até 1/4 da curva padrão, com a rampa de chegada no máximo) – a curva vertical fica fora da área do nó,
+    /// que segue em nível. 0 = sem recorte (patamar mínimo).
+    /// </summary>
+    public static double PlatformFor(double reach, double curve) => reach > 1e-6 ? reach + Math.Max(0, curve) / 4 : 0;
+
+    /// <summary>Maior variação de rampa por metro do greide (amostras a cada 0,5 m, diferença segunda em 1 m).</summary>
+    public static double CurvatureOf(RoadGrade g, double length)
+    {
+        var worst = 0.0;
+        for (var s = 1.0; s <= length - 1; s += 0.5) worst = Math.Max(worst, Math.Abs(g.Z(s + 1) - 2 * g.Z(s) + g.Z(s - 1)));
+        return worst;
+    }
+
+    /// <summary>Curvatura máxima do greide (1/m) para a curva vertical e a rampa máxima: uma curva inteira vai de −rampa a +rampa.</summary>
+    public static double MaxCurvature(double maxGrade, double curve) => curve > 1e-6 ? 2 * Math.Max(0.005, maxGrade) / curve : 0;
 
     public static List<Vec2> DouglasPeucker(List<Vec2> pts, double tol)
     {

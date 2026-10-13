@@ -30,12 +30,12 @@ public class AC3TactileNetworkTests
         var islands = w.Nodes.SelectMany(n => n.Layout.Obstacles).ToList();
         var comps = net.Where(p => p.Area > 0.05 && !islands.Any(o => o.Contains(p.Centroid))).ToList();
         if (comps.Count != blocks) res.Add($"rede tátil em {comps.Count} partes: " + string.Join(" ", comps.Select(c => $"{c.Centroid}/{c.Area:0.0}")));
-        // Cada rampa (das calçadas) ligada à rede: o alerta do topo encosta nela.
+        // Cada rampa (das calçadas) ligada à rede: o ramal no eixo dela parte do topo da rampa (NBR 16537, Figura 69).
         var ramps = w.Defs.OfType<RampDefinition>().Where(r => RoadFeatures.RampTop(r) is { } t && disk[0].Contains((t.A + t.B) / 2)).ToList();
         foreach (var r in ramps)
         {
             var (a, b, dir) = RoadFeatures.RampTop(r)!.Value;
-            var probe = (a + b) / 2 + dir * (RoadFeatures.RampTopAlert / 2);
+            var probe = (a + b) / 2 + dir * 0.10;
             if (islands.Any(o => o.Contains((a + b) / 2))) continue;   // rampa do canteiro central
             if (!net.Any(p => p.Contains(probe))) res.Add($"rampa em {r.PathRef.Points[0]} sem ligação com a rede tátil");
         }
@@ -51,7 +51,7 @@ public class AC3TactileNetworkTests
         var furniture = parts.Where(p => p.Def is UrbanElementDefinition).Select(p => p.Piece.Shape).ToList();
         if (Over(furniture) > 1e-3) res.Add($"piso tátil sob mobiliário ({Over(furniture):0.000} m²)");
         // Alerta (domos) em cada junção e mudança de direção.
-        var domes = parts.Where(p => p.Def is TactileRouteDefinition && p.Piece.Color == MarkingColor.RelevoTatil && p.Piece.Shape.Outer.Count == 6)
+        var domes = parts.Where(p => p.Def is TactileRouteDefinition && p.Piece.Color == MarkingColor.RelevoTatil && p.Piece.Shape.Outer.Count == 8)
             .Select(p => p.Piece.Shape.Centroid).ToList();
         bool Alert(Vec2 q) => domes.Any(d => d.DistanceTo(q) < 0.45);
         foreach (var t in w.Defs.OfType<TactileRouteDefinition>().Where(t => !t.AlertOnly))
@@ -68,7 +68,7 @@ public class AC3TactileNetworkTests
                 var u = (pts[i] - pts[i - 1]).Normalized();
                 var v = (pts[i + 1] - pts[i]).Normalized();
                 var turn = Math.Acos(Math.Clamp(u.Dot(v), -1, 1)) * 180 / Math.PI;
-                if (turn >= 20 && disk[0].Contains(pts[i]) && !Alert(pts[i])) res.Add($"mudança de direção ({turn:0}°) sem alerta em {pts[i]}");
+                if (turn >= TactileGenerator.SharpTurnDeg && disk[0].Contains(pts[i]) && !Alert(pts[i])) res.Add($"mudança de direção ({turn:0}°) sem alerta em {pts[i]}");
             }
         }
         return res;
@@ -85,9 +85,9 @@ public class AC3TactileNetworkTests
             s.ExtensoesCalcada.Add(new ExtensaoCalcada { LadoEsquerdo = false, Estaca = 40, Comprimento = 20, Travessia = true, Bancos = 1, Paraciclos = 2, Arvores = 2, Canteiro = true });
         });
         Assert.Equal(2, defs.OfType<RampDefinition>().Count());
-        // Uma faixa direcional por calçada + o alerta no topo de cada rampa.
+        // Uma faixa direcional por calçada; sem alerta avulso no topo das rampas (NBR 16537, Figura 69).
         Assert.Equal(2, defs.OfType<TactileRouteDefinition>().Count(t => !t.AlertOnly));
-        Assert.Equal(2, defs.OfType<TactileRouteDefinition>().Count(t => t.AlertOnly));
+        Assert.Equal(0, defs.OfType<TactileRouteDefinition>().Count(t => t.AlertOnly));
         Assert.All(defs.OfType<TactileRouteDefinition>().Where(t => !t.AlertOnly), t => Assert.Single(t.Branches!));
         // Rede ligada às rampas dos dois lados: cada calçada é uma rede conexa (a travessia liga as duas).
         foreach (var side in new[] { 1, -1 })
@@ -117,7 +117,7 @@ public class AC3TactileNetworkTests
             {
                 var side = axis.Project(t.PathRef.Points[0]).Signed > 0;
                 var lado = s.Lado(side);
-                var o = lado.Face + lado.FreeCenter;
+                var o = lado.Face + lado.TactileCenter();
                 Assert.All(t.PathRef.Points, p => Assert.InRange(Math.Abs(axis.Project(p).Signed), o - 0.02, o + 0.02));
             }
         }

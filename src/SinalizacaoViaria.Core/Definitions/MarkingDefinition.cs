@@ -758,10 +758,11 @@ public sealed class RampDefinition : MarkingDefinition
     /// <summary>Inclinação das abas laterais (10 %).</summary>
     public double FlareSlope { get; set; } = 0.10;
     public bool Tactile { get; set; } = true;
+    /// <summary>Largura (profundidade) da faixa de alerta: 0,40 a 0,60 m (NBR 16537, 6.6, Figuras 22 a 26).</summary>
     public double TactileWidth { get; set; } = 0.40;
     public MarkingColor TactileColor { get; set; } = MarkingColor.Amarela;
-    /// <summary>Afastamento do piso tátil em relação à face do meio-fio (m).</summary>
-    public double TactileSetback { get; set; }
+    /// <summary>Afastamento do piso tátil em relação à face do meio-fio (m): 0,50 m da guia (NBR 16537, 6.6, Figuras 22 a 26).</summary>
+    public double TactileSetback { get; set; } = Generators.TactileGenerator.RampAlertSetback;
     /// <summary>Profundidade da calçada rebaixada (m) – rebaixamento total.</summary>
     public double SidewalkDepth { get; set; } = 1.80;
     /// <summary>Piso tátil direcional no eixo da rampa, até o fim da subida.</summary>
@@ -829,6 +830,11 @@ public sealed class TrafficCalmingDefinition : MarkingDefinition
     public MarkingColor? MarkingColor { get; set; }
     /// <summary>Faixa elevada: pintar faixa de pedestres zebrada no platô.</summary>
     public bool Crosswalk { get; set; } = true;
+    /// <summary>
+    /// Faixa elevada: faixa de alerta de 0,40 m nas duas calçadas, paralela à travessia e a 0,50 m da guia, na largura do platô
+    /// (NBR 16537, 6.6, Figuras 27 e 75). Os bordos clicados são as faces dos meios-fios.
+    /// </summary>
+    public bool TactileAlert { get; set; } = true;
     /// <summary>Almofada: largura de cada almofada (m) – 1,60 a 1,90 m (CET – Medidas Moderadoras).</summary>
     public double CushionWidth { get; set; } = 1.70;
     /// <summary>Almofada: quantidade na largura da pista (0 = uma por faixa de ~3,5 m).</summary>
@@ -1741,8 +1747,11 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public double RampFreeWidth { get; set; } = 1.20;
     /// <summary>Piso tátil de alerta na rampa (NBR 16537).</summary>
     public bool RampTactile { get; set; } = true;
-    /// <summary>Piso tátil direcional no eixo da rampa até o fim da subida (NBR 16537).</summary>
-    public bool RampDirectional { get; set; }
+    /// <summary>
+    /// Piso tátil direcional no eixo da rampa, do alerta até o fim da subida e daí, pela calçada, até o alinhamento do lote ou a
+    /// faixa direcional da calçada (NBR 16537, 7.8.5 b, Figura 69).
+    /// </summary>
+    public bool RampDirectional { get; set; } = true;
     /// <summary>Altura do meio-fio junto à rampa (m). Nulo = a altura do meio-fio da via.</summary>
     public double? RampCurbHeight { get; set; }
 

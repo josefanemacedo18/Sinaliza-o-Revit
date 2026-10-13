@@ -905,7 +905,9 @@ vigente do manual. O catálogo pode ser alterado (seção `placas`, campo `picto
   piso tátil (largura, comprimento ao longo do meio-fio, afastamento, cor) e largura do direcional.
   A rampa é um sólido inclinado (0 na pista → altura do meio-fio no topo, com a inclinação
   escolhida), as abas são cunhas triangulares com a inclinação das abas e o piso tátil de alerta
-  acompanha a rampa (afastamento do meio-fio configurável; direcional opcional no eixo). Tipos:
+  acompanha a rampa: faixa de **0,40 m a 0,50 m da guia** por padrão (ABNT NBR 16537:2024, 6.6, Figuras 22 a 26;
+  afastamento e largura configuráveis), na largura da rampa; direcional opcional no eixo, do alerta até o fim da subida
+  (7.8.5 b, Figura 69). Tipos:
   com abas, sem abas (laterais protegidas), **rebaixamento total** (calçada estreita: plataforma
   rebaixada na largura da travessia com rampas laterais; informe a profundidade da calçada) e guia
   rebaixada de veículos. A calçada, o meio-fio e o gramado sob a rampa são recortados. Excluir a
@@ -920,6 +922,9 @@ Quebra-molas tipo A (3,70 m × 0,08 m) e tipo B (1,50 m × 0,06 m), faixa elevad
 1,50 m, 0,15 m de altura, zebrado no platô), lombada invertida e **almofada** (*speed cushion*, CET-SP – Medidas
 Moderadoras do Tráfego: 3,0 m × 6–7,5 cm, largura de 1,60–1,90 m, **uma por faixa** – ônibus e veículos de emergência
 passam com as rodas ao lado; quantidade e largura editáveis). Clique os dois bordos da pista.
+Na **faixa elevada**, a opção **Piso tátil de alerta nas calçadas, a 0,50 m da guia** (ligada por padrão) põe nas duas
+calçadas uma faixa de alerta de **0,40 m**, paralela à travessia, a **0,50 m da guia**, na largura do platô e no nível da
+calçada (ABNT NBR 16537:2024, 6.6, Figuras 27 e 75). Os dois bordos clicados são as faces dos meios-fios.
 A **lombada invertida** recorta o pavimento (piso) e as linhas sobre ela, ficando visível a depressão em concreto.
 As dimensões padrão devem ser conferidas com as resoluções do CONTRAN vigentes; lembre-se da
 sinalização vertical obrigatória (ex.: A-18).
@@ -1342,7 +1347,7 @@ mover vias):
 | **Inclinação da rampa** | 8,33 % | no máximo 8,33 % (com meio-fio de 15 cm a rampa tem 1,80 m) |
 | **Inclinação das abas** | 10 % | no máximo 10 % |
 | **Faixa livre atrás da rampa** | 1,20 m | no mínimo 1,20 m |
-| **Piso tátil (NBR 16537)** | alerta na rampa | sem / alerta / alerta + direcional no eixo |
+| **Piso tátil (NBR 16537)** | alerta + direcional no eixo | sem / alerta / alerta + direcional no eixo – alerta de 0,40 m a **0,50 m da guia** (6.6, Figuras 22 a 26); direcional no eixo da rampa até a calçada (7.8.5 b, Figura 69) |
 | **Altura do meio-fio** | 0 = a da via | – |
 
 Para **alterar todas as rampas de uma vez** depois: *Interseção → Todos os cruzamentos* (aplica as medidas a todas as
@@ -1357,8 +1362,9 @@ não cabe, ela é ajustada e o **relatório avisa**:
 
 1. **Calçada estreita** (não comporta a rampa e a faixa livre de 1,20 m atrás dela – NBR 9050, 6.12.7): **rebaixamento
    total** da calçada. O trecho da travessia fica **no nível da pista/sarjeta** em toda a profundidade da calçada (platô
-   com **piso tátil de alerta** junto à face, NBR 16537), e o pedestre que segue pela calçada desce e sobe por **rampas
-   longitudinais laterais** a no máximo 5 % (NBR 9050, 6.12.7.3.3). O meio-fio acompanha o rebaixamento. A escolha é
+   com **piso tátil de alerta** de 0,40 m a 0,50 m da guia – ABNT NBR 16537:2024, 6.6, Figuras 22 e 23), e o pedestre que
+   segue pela calçada desce e sobe por **rampas longitudinais laterais** a no máximo 5 % (Figura 23 da NBR 16537; NBR 9050,
+   6.12.7.3.3). O meio-fio acompanha o rebaixamento. A escolha é
    automática pela largura da calçada (profundidade da rampa a 8,33 % + patamar + 1,20 m livres); o tipo aparece no rótulo
    da rampa na pré-visualização e no relatório (*feito o rebaixamento total...*);
 2. **Calçada larga**: rampa comum, com **patamar** até a faixa de passeio – a **faixa livre de 1,20 m** fica sempre atrás da
@@ -1495,7 +1501,7 @@ Bloco **Canteiro central** da janela da interseção:
 | Opção | O que é gerado |
 |---|---|
 | **Automática** (padrão) | rampas e patamar quando o canteiro comporta (largura ≥ 2 × comprimento da rampa + 1,20 m de patamar – 4,80 m com meio-fio de 15 cm a 8,33 %); senão, passagem rebaixada |
-| **Passagem rebaixada no nível da pista** | o canteiro é cortado na largura da faixa (refúgio no nível da pista) e recebe **faixa de piso tátil de alerta** (2 placas de 0,25 m) junto às duas bordas, em toda a largura da faixa |
+| **Passagem rebaixada no nível da pista** | o canteiro é cortado na largura da faixa (refúgio no nível da pista) e recebe **piso tátil de alerta** em toda a largura da faixa, pela largura L do canteiro (ABNT NBR 16537:2024, 6.6): **L < 1,40 m** – uma faixa de 0,40 m no centro (Figura 28); **1,40 ≤ L ≤ 1,80 m** – uma faixa de 0,50 m de uma borda até 0,50 m da outra (Figura 29); **L > 1,80 m** – duas faixas de 0,40 m a 0,50 m de cada borda (Figura 30) |
 | **Rampas dos dois lados e patamar** | o canteiro fica; uma rampa (8,33 %, abas de 10 %, piso tátil de alerta) sobe em cada face e as duas se encontram no meio – o patamar é o que sobra (metade do canteiro − rampa); o meio-fio e a grama do canteiro saem sob as rampas e a pintura da faixa não passa sobre o canteiro |
 
 Avisos: **canteiro mais estreito que 1,20 m** (largura mínima do refúgio usada pelo plugin – NBR 9050, item [a confirmar]):
@@ -1756,39 +1762,49 @@ substituída (com os recortes que ela fazia). A rotatória ligada às vias **aco
 são movidos e ganha um **ramo novo** quando uma via é desenhada até ela (**Via** desenhada por pontos, clicando dentro da
 rotatória); também pode ser criada direto na conexão (**Via → Rotatória** ou **Conexões → Trocar Conexão**). Confira as dimensões com o manual do DNIT / órgão local e com o veículo de projeto.
 
-## 21. Piso tátil (NBR 16537)
+## 21. Piso tátil (ABNT NBR 16537:2024)
 
-**Complementos → Piso Tátil** desenha a **rota tátil** com placas moduladas de 0,25, 0,30 ou 0,40 m e
-**relevo** (visível em 3D e em planta):
+**Complementos → Piso Tátil** desenha a **rota tátil** com placas moduladas de 0,25, 0,30 ou 0,40 m **sobrepostas** ao piso e
+com **relevo** (visível em 3D e em planta). Medidas conferidas com a ABNT NBR 16537:2024 (o PDF da norma foi a referência
+desta rodada):
 
-* **direcional**: barras paralelas ao sentido do deslocamento;
-* **alerta**: domos em malha ortogonal, colocados automaticamente nas **mudanças de direção**, nas
-  **extremidades** e nas **junções em T** entre trechos (selecione ou desenhe vários trechos de uma vez);
-* largura em fileiras de placas, cor contrastante, lado do quadrado de alerta e profundidade do alerta
-  nos extremos; opção *Somente faixa de alerta* (junto a rebaixamentos, desníveis, obstáculos);
-* as placas são assentadas no topo da calçada (0,15 m, ajustável).
+| Regra (item da norma) | Valor usado pelo plugin |
+|---|---|
+| Relevo de alerta – diâmetro da base 24–28 mm, entre centros 42–53 mm, diagonal 60–75 mm, primeira linha a ½ espaçamento da borda (Tabela 1 e nota) | octógono com **25 mm** entre faces (27,1 mm entre vértices), **50 mm** entre centros (diagonal 70,7 mm), primeira linha a **25 mm** da borda da placa |
+| Relevo direcional – base 30–40 mm, entre centros 70–85 mm, entre bases 45–55 mm, primeira linha a ½ espaçamento (Tabela 3 e nota) | barra de **30 mm**; placa de 0,25 m: 3 barras a **83,3 mm** (53,3 mm entre bases); 0,30 m: 4 a 75 mm; 0,40 m: 5 a 80 mm |
+| Piso sobreposto – desnível até **2 mm**; a altura do relevo é a altura total do piso sobreposto, 3–5 mm (8.2, Tabelas 1 e 3) | placa de **2 mm** + relevo de 2 mm = **4 mm** (o chanfro de 45° da borda não é modelado) |
+| Mudança de direção – até 30° de deflexão (ângulo de 150° a 180°) sem alerta; de 30° a 90° área de alerta com o **dobro da largura** (7.4.2, 7.4.3, Figuras 46 e 47) | quadrado de **2 × largura** com o canto externo no encontro dos alinhamentos de fora |
+| Encontro de três faixas – alerta com o **triplo da largura**, até 0,90 m, um lado ortogonal a uma das faixas (7.4.4, Figura 48) | retângulo de **3 × largura (≤ 0,90 m)** ao longo da faixa contínua × **2 × largura** (da borda de lá até uma largura além da borda de cá) |
+| Encontro de quatro faixas – idem, quadrado (7.4.5, Figura 51) | quadrado de **3 × largura (≤ 0,90 m)** centrado no encontro |
+| Largura da direcional 0,25–0,40 m; largura e cor constantes; alerta das mudanças de direção da mesma cor (7.3.5, 7.3.7) | 0,25 m (ou o módulo × fileiras); uma cor por rota |
 
-Os rebaixamentos (rampas) também usam placas com relevo acompanhando a inclinação. Confira dimensões e
-distribuição com a ABNT NBR 16537 vigente.
+Os rebaixamentos (rampas) usam as mesmas placas, acompanhando a inclinação.
 
 ### 21.1 Piso tátil nas calçadas da via, ligado às rampas
 
 Na janela da **Via**, a opção **Piso tátil nas calçadas (faixa direcional ligada às rampas)** gera a rede tátil das calçadas
 junto com a via – e a refaz a partir do **eixo** sempre que a via é editada ou movida:
 
-* **faixa direcional** no **meio da faixa livre** de cada calçada, ao longo da via;
-* em cada **rampa** da via (travessias no meio da quadra, seção 17), **faixa de alerta no topo da rampa**, na largura dela,
-  e um **ramal direcional perpendicular** do alerta até a faixa principal;
-* **alerta nas junções** (ramal × faixa principal) e nas **mudanças de direção** (giro ≥ 20°, como no gerador de piso tátil);
+* **faixa direcional na faixa livre**, posicionada pela largura dela (7.8.2): **1,45 m ou mais** – no eixo da faixa livre,
+  com 0,60 m lisos de cada lado (a); **1,20 a 1,45 m** – fora do eixo, com os **0,60 m lisos do lado do lote** (b);
+  **menos de 1,20 m** – no eixo, com **alerta de 0,50 m nas pontas** e aviso no relatório (c);
+* em cada **rampa** (travessias no meio da quadra e das interseções), o **ramal direcional no eixo do rebaixamento**, do fim
+  da subida até a faixa da calçada, e a **direcional sobre a rampa** até a faixa de alerta (7.8.5 b, Figura 69) – **sem
+  alerta no topo da rampa** (as Figuras 22 a 26 e 69 só têm a faixa de alerta a 0,50 m da guia);
+* **área de alerta nas junções** (ramal × faixa principal, 7.4.4) e nas **mudanças de direção de 30° ou mais** (7.4.3);
 * com faixa de serviço gramada, o ramal passa por uma **passagem pavimentada** (a grama é recortada na largura da rampa);
-* **nas interseções**, a rede contorna **cada esquina** (no meio da faixa livre, acompanhando a curva) e segue reta nos
-  **lados contínuos**, emendando na faixa de cada via; cada rampa das travessias recebe o alerta no topo e o ramal até a
-  rede. As rampas sobre o **canteiro central** têm a sinalização própria delas (19.1.5);
+* **nas interseções**, a rede contorna **cada esquina** e segue reta nos **lados contínuos**; ela vai além da área do nó até
+  passar as **rampas das travessias** (que ficam no trecho reto do meio-fio), e a faixa da via sai nesse trecho – sem placas
+  sobrepostas. As rampas sobre o **canteiro central** têm a sinalização própria delas (19.1.5);
 * o piso tátil **não passa** sobre rampas, meio-fio, grama nem mobiliário (bancos, paraciclos, árvores, canteiros).
 
-Dimensões usadas: placas de **0,25 m** com relevo, como no gerador de piso tátil (domos de base 22–30 mm – NBR 16537);
-**profundidade do alerta no topo da rampa: 0,50 m (2 placas) [a confirmar]**; posição da faixa direcional no meio da faixa
-livre e ramal perpendicular até a rampa **[a confirmar]** com a ABNT NBR 16537 vigente (itens não conferidos no repositório).
+**Sem a rede na calçada**, cada rebaixamento das travessias com piso tátil ganha a **faixa direcional transversal** no eixo
+da rampa, do fim da subida até o **alinhamento do lote** (7.8.5 b, Figura 69 a), sem alerta nas pontas.
+
+**Fora do que o plugin gera** (o relatório da rodada lista): contraste de luminância de 30 pontos LRV (5.6 – depende do
+material escolhido; o plugin usa amarelo e evita verde com vermelho), limite de plataformas (6.7), escadas e elevadores
+(6.4, 6.9), direcional até o botão do semáforo (7.8.5 a), ilhas de travessia com direcional entre elas (7.8.6), pontos de
+ônibus (7.8.7) e chanfros/cortes das placas (8.2, 8.5).
 
 ## 22.1 Famílias do Revit como elementos urbanos
 
@@ -2056,8 +2072,28 @@ escolher qual é a principal. Além da ponta de um eixo o greide segue na rampa 
 pinturas, faixas de pedestres, retenções e rampas do nó ficam nessa superfície (sem degrau na emenda com o piso da via), e o
 nó entra na terraplenagem sempre que **qualquer via ligada** a ele molda o terreno: plataforma inclinada sob o pavimento e as
 calçadas, taludes das vias ligadas. Ao criar uma via com relevo que cruza (ou encosta em) vias existentes, o greide dela é
-**obrigado a passar na cota da outra via** no cruzamento, com uma plataforma de 12 m em nível – as duas chegam juntas à
-interseção.
+**obrigado a passar na cota da outra via** no cruzamento, com um **patamar em nível que cobre toda a área do nó** naquela via
+(o alcance do recorte da interseção ao longo do eixo – num Y passa de 20 m) **mais 1/4 da curva vertical**: a curva vertical
+fica fora da interseção, e a concordância com o nó só ajusta o abaulamento. A via existente ganha o mesmo patamar.
+
+**Vias na topografia – o que é garantido (rodada AL)**, conferido numa matriz de 95 cenas (terrenos plano, ondulado, degrau,
+vale, crista e ruído × via local, coletora, arterial com canteiro e mão única × isolada, cruz, T e Y, nos dois relevos):
+
+* **Planta igual à do terreno plano** (≤ 1 mm): o relevo só muda cotas.
+* **Greide suave**: dentro da rampa máxima, passando na cota da outra via no cruzamento, com a variação de rampa limitada à
+  de uma curva vertical do modo escolhido (os PIVs muito próximos não viram quina). Ao longo do eixo, a superfície em que se
+  anda (nó, concordância e greide) **não fica mais íngreme que o greide** (+3 %): a concordância soma ao greide só a
+  diferença medida na borda do nó, desfeita em curva S (antes misturava as cotas do nó prolongado com as do greide e chegava
+  a 55 % numa via de 30 %).
+* **Interseção num plano coerente**: as vias chegam ao nó sem degrau (≤ 5 mm).
+* **Nada flutuando nem enterrado**: sob todos os pisos da via e do nó (calçadas de esquina, extensões, rampas, ilhas) o
+  Toposolid fica no fundo da estrutura do pavimento a até **5 mm**. A plataforma segue a mesma superfície dos pisos, e o
+  Toposolid recebe pontos densos nas bordas (0,5 m), nas linhas de quebra da seção (crista e fim do caimento) e nas quebras do
+  nó prolongadas – sem linhas de quebra, a triangulação só respeita a superfície se os pontos nelas forem densos.
+* **Taludes nas razões pedidas** e fechando no terreno: inclinação até a do talude (+5 %), Toposolid a até 5 cm do talude
+  teórico (10 cm na faixa de 0,25 m junto ao pé, onde o talude encontra o terreno entre dois pontos).
+* **Toposolid alterado só na obra**: a mais de 5 m da obra o terreno fica como estava (≤ 1 mm).
+* **Pisos planos sem partes degeneradas**: cada parte a no máximo 2 cm da superfície (com 20 % de folga na corda das curvas).
 
 **Espessura do Toposolid**: o fundo do Toposolid precisa ficar abaixo do corte mais fundo – senão o Revit recusa ("o sólido
 topográfico é muito fino para seu tipo"). O plugin confere antes e, se preciso, cria um tipo "… SV +N m" com a camada mais

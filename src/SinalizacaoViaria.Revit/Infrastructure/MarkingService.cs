@@ -229,10 +229,41 @@ public sealed class MarkingService
 
     private ISurface? GradeForCore(MarkingDefinition def, double baseZ)
     {
-        if (def.Output.Mode == OutputMode.Modelo3D && NodeFor(def) is { } node) return new NodeSampler(node);
+        if (def.Output.Mode == OutputMode.Modelo3D && NodeFor(def) is { } node)
+        {
+            if (NodeOwner(def) is not { } owner || owner.Id == def.Id) return new NodeSampler(node);
+            return new NodeSampler(node, NodeRoads(node, owner.Id));
+        }
         if (!Graded(def)) return null;
         var axis = PathResolver.Resolve(_doc, def.Path)?.Main;
         return axis == null ? null : new GradeSampler(SurfaceFor(def, axis), baseZ);
+    }
+
+    /// <summary>
+    /// Superfície das marcas de um nó: a do nó dentro dele e, fora, a da via em que a peça está (com a concordância) –
+    /// rampas, extensões e faixas que passam da borda do nó ficam sobre a calçada e a pista da via, sem degrau.
+    /// </summary>
+    /// <summary>Superfície (cota absoluta, m) de uma marca do nó (NodeSurface.ForMembers) – nula se a marca não é de um nó com greide.</summary>
+    public Func<Vec2, double>? MemberSurface(MarkingDefinition def)
+    {
+        if (NodeOwner(def) is not { } owner || owner.Id == def.Id || NodeFor(def) is not { } node) return null;
+        return node.ForMembers(NodeRoads(node, owner.Id));
+    }
+
+    private List<NodeSurface.MemberRoad> NodeRoads(NodeSurface node, string ownerId)
+    {
+        var roads = new List<NodeSurface.MemberRoad>();
+        foreach (var leg in node.Legs)
+        {
+            if (leg.Id == null || !Definitions.TryGetValue(leg.Id, out var d) || d is not RoadPavementDefinition pav) continue;
+            if (PathResolver.Resolve(_doc, pav.Path) is not { Main: { Points.Count: >= 2 } axis } path || pav.Output.Grade == null) continue;
+            var surf = SurfaceFor(pav, axis);
+            // Trecho da via ocupado pelo nó: o recorte dele na via (o mesmo que a concordância usa).
+            var cut = pav.Exclusions.Where(e => e.SourceId == ownerId).SelectMany(e => e.Points).Select(q => surf.Locate(q).S).ToList();
+            if (cut.Count == 0) continue;
+            roads.Add(new NodeSurface.MemberRoad(surf, path.Z, pav.Id, cut.Min(), cut.Max(), Math.Max(pav.TotalLeft, pav.TotalRight) + 3));
+        }
+        return roads;
     }
 
     private readonly Dictionary<string, GradeSurface> _surfaces = new();
@@ -1492,8 +1523,10 @@ public sealed class MarkingService
             {
                 var zf = SurfaceZ(terrain, UnitConv.Ft(baseZ + def.Output.ElevationOffset));
                 var tol = terrain is SurfaceSampler ? 0.03 : GradeFloorTolerance;
-                var split = FloorPlanes.Split(m, zf, tol, (terrain as GradeSampler)?.Surface ?? (terrain as NodeSampler)?.Node.Major?.Surface,
-                    terrain is SurfaceSampler ? 60 : 25, ringStep: terrain is SurfaceSampler ? 3.0 : 1.0);
+                var split = terrain is NodeSampler { Zones.Count: > 0 } ns
+                    ? FloorPlanes.SplitMember(m, zf, tol, ns.Zones, ns.Node.Major?.Surface, 25, 1.0)
+                    : FloorPlanes.Split(m, zf, tol, (terrain as GradeSampler)?.Surface ?? (terrain as NodeSampler)?.Node.Major?.Surface,
+                        terrain is SurfaceSampler ? 60 : 25, ringStep: terrain is SurfaceSampler ? 3.0 : 1.0);
                 // Partes empenadas (superfície torcida, só sem eixo de referência) seguem com edição de forma.
                 parts.AddRange(split.Select(x => (x.Part, x.Warped ? null : (Plane3?)x.Plane)));
             }
@@ -1520,17 +1553,23 @@ public sealed class MarkingService
         TiledSampler? ts = null;
         try
         {
-            var g = BuildGeometry(src, out var b);
-            var terrain = GradeFor(src, b);
-            if (terrain != null)
+            var tiles = new List<(Polygon2, Plane3, double)>();
+            void AddTiles(MarkingDefinition owner)
             {
-                var tiles = new List<(Polygon2, Plane3, double)>();
-                foreach (var grp in g.Pieces.Where(p => FloorEligible(src, p) && p.Color is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto or MarkingColor.PavimentoTerra)
+                var g = BuildGeometry(owner, out var b);
+                var terrain = GradeFor(owner, b);
+                if (terrain == null) return;
+                foreach (var grp in g.Pieces.Where(p => FloorEligible(owner, p) && p.Color is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto or MarkingColor.PavimentoTerra)
                              .GroupBy(p => (p.Color, E: Math.Round(p.Elevation, 3), T: Math.Round(p.Thickness, 3), p.Layer)))
-                    foreach (var (shape, plane) in FloorParts(src, grp.Select(p => p.Shape), terrain, b))
+                    foreach (var (shape, plane) in FloorParts(owner, grp.Select(p => p.Shape), terrain, b))
                         if (plane is { } pl) tiles.Add((shape, pl, grp.Key.E + grp.Key.T));
-                if (tiles.Count > 0) ts = new TiledSampler(baseSampler, tiles);
             }
+            AddTiles(src);
+            // Pintura do nó que passa da borda dele (faixas, LCO): fica sobre os pisos planos da via em que está.
+            if (src is IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition && NodeFor(src) is { } node)
+                foreach (var leg in node.Legs)
+                    if (leg.Id != null && Definitions.TryGetValue(leg.Id, out var rd) && rd is RoadPavementDefinition) AddTiles(rd);
+            if (tiles.Count > 0) ts = new TiledSampler(baseSampler, tiles);
         }
         catch (Exception ex) { Log.Error("Pisos da pista para a pintura", ex); }
         _tiles[src.Id] = ts;

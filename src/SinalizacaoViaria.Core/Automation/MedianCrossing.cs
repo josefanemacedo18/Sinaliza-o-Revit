@@ -30,8 +30,21 @@ public static class MedianCrossing
     /// <summary>Patamar mínimo entre as duas rampas no topo do canteiro (m) – [a confirmar].</summary>
     public const double MinLanding = 1.20;
 
-    /// <summary>Profundidade da faixa de alerta em cada borda da passagem rebaixada (2 placas de 0,25 m) – [a confirmar].</summary>
-    public const double AlertDepth = 0.50;
+    /// <summary>Largura da faixa de alerta da passagem rebaixada (NBR 16537, Figuras 28 a 30: 0,40 m).</summary>
+    public const double AlertDepth = TactileGenerator.CrossingAlert;
+
+    /// <summary>
+    /// Faixas de alerta no rebaixamento do canteiro divisor (NBR 16537, 6.6), pela largura L do canteiro (afastamentos a partir
+    /// da borda de baixo): L &lt; 1,40 m – uma faixa de 0,40 m no centro (Figura 28); 1,40 m ≤ L ≤ 1,80 m – uma faixa de 0,50 m
+    /// de cada borda até 0,50 m da outra (Figura 29); L &gt; 1,80 m – duas faixas de 0,40 m a 0,50 m de cada borda (Figura 30).
+    /// </summary>
+    public static List<(double A, double B)> AlertBands(double width)
+    {
+        if (width < 1.40 - 1e-9)
+            return width < AlertDepth ? new() : new() { (width / 2 - AlertDepth / 2, width / 2 + AlertDepth / 2) };
+        if (width <= 1.80 + 1e-9) return new() { (0.50, width - 0.50) };
+        return new() { (0.50, 0.50 + AlertDepth), (width - 0.50 - AlertDepth, width - 0.50) };
+    }
 
     /// <summary>Largura de canteiro a partir da qual cabem as duas rampas e o patamar: 2 × comprimento da rampa + patamar.</summary>
     public static double RampsMinWidth(RampDefinition template)
@@ -60,24 +73,30 @@ public static class MedianCrossing
     }
 
     /// <summary>
-    /// Faixas de alerta da passagem rebaixada: uma em cada borda do canteiro, no nível da pista, ao longo de toda a largura da
-    /// faixa de pedestres. <paramref name="at"/>(s, o) dá o ponto na estaca s e no deslocamento o (+ à esquerda do eixo);
-    /// [s0, s1] é a largura da faixa e [lo, hi] o canteiro.
+    /// Faixas de alerta da passagem rebaixada (<see cref="AlertBands"/>), no nível da pista, ao longo de toda a largura da faixa
+    /// de pedestres. <paramref name="at"/>(s, o) dá o ponto na estaca s e no deslocamento o (+ à esquerda do eixo); [s0, s1] é a
+    /// largura da faixa e [lo, hi] o canteiro.
     /// </summary>
     public static List<TactileRouteDefinition> AlertStrips(Func<double, double, Vec2> at, double s0, double s1, double lo, double hi, double z, string? groupId)
     {
         var res = new List<TactileRouteDefinition>();
-        if (hi - lo < 2 * AlertDepth + 0.05 || s1 - s0 < 0.5) return res;
-        foreach (var o in new[] { lo + AlertDepth / 2, hi - AlertDepth / 2 })
+        if (s1 - s0 < 0.5) return res;
+        foreach (var (a, b) in AlertBands(hi - lo))
+        {
+            var w = b - a;
+            var (module, rows) = TactileGenerator.ForWidth(w);
+            if (Math.Abs(module * rows - w) > 1e-3) { rows = (int)Math.Ceiling(w / 0.40 - 1e-9); module = w / rows; }
+            var o = lo + (a + b) / 2;
             res.Add(new TactileRouteDefinition
             {
                 PathRef = PathReference.FromPoints(new[] { at(s0 + 0.05, o), at(s1 - 0.05, o) }, z),
                 AlertOnly = true,
-                Module = 0.25,
-                Rows = (int)Math.Round(AlertDepth / 0.25),
+                Module = module,
+                Rows = rows,
                 Elevation = 0.0,
                 GroupId = groupId,
             });
+        }
         return res;
     }
 
@@ -159,6 +178,8 @@ public sealed partial class RoadSetup
         Slope = IntersectionGenerator.MaxRampSlope,
         FlareSlope = IntersectionGenerator.MaxFlareSlope,
         Tactile = true,
+        TactileSetback = TactileGenerator.RampAlertSetback,
+        TactileWidth = TactileGenerator.CrossingAlert,
         SquareCut = true,
         CutSidewalk = false,
     };

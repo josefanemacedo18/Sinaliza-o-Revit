@@ -114,13 +114,18 @@ public static class InfraRoads
             var e = Math.Min(a, s1);
             if (e - cursor > 2)
             {
-                var c = Infra.Corridor(axis, prof, right, left, cursor, e, subgrade, cut, fill, step: 3, label: "Via");
+                // Estacas a cada 1 m: a plataforma acompanha as curvas verticais do greide a milímetros (com 3 m a corda das
+                // curvas de "acompanhar terreno" ficava até 1,7 cm fora do fundo do pavimento).
+                var c = Infra.Corridor(axis, prof, right, left, cursor, e, subgrade, cut, fill, step: 1, label: "Via");
                 c.WallStart = before.Face;
                 c.WallEnd = face && a <= s1;
                 // Uma faixa só tem um limite de testa: vale o do emboque (o encontro de ponte não tem limite).
                 c.WallCap = c.WallEnd ? cap : before.Cap;
                 if (c.WallStart && c.WallEnd && before.Cap == null) c.WallCap = cap;
                 c.EndSpill = c.WallEnd ? spill : before.Spill;
+                // Pontas livres da via (sem obra): fecham em talude até o terreno.
+                c.SpillStart = !c.WallStart && Math.Abs(cursor - s0) < 1e-6;
+                c.SpillEnd = !c.WallEnd && e >= s1 - 1e-6;
                 res.Add(c);
             }
             before = (face, cap, spill);
@@ -128,6 +133,71 @@ public static class InfraRoads
             if (cursor >= s1) break;
         }
         return res;
+    }
+
+    /// <summary>
+    /// Plataforma da via sob os pisos: bordas e linhas internas (as quebras da seção em <paramref name="breaks"/> – eixo do
+    /// abaulamento, fim do caimento – e a cada <paramref name="spacing"/> m) na cota da superfície menos
+    /// <paramref name="subgrade"/>. Antes as bordas ficavam na cota do eixo e a faixa era reta de borda a borda: a plataforma
+    /// passava até 0,4 m fora do fundo do pavimento com abaulamento, superelevação ou concordância com os nós.
+    /// </summary>
+    /// <param name="left">Afastamento (m, positivo à esquerda) da borda <see cref="GradeCorridor.Left"/>.</param>
+    /// <param name="right">Afastamento da borda <see cref="GradeCorridor.Right"/> (negativo à direita).</param>
+    public static void FitToSurface(IEnumerable<GradeCorridor> corridors, double left, double right, Func<Vec2, double> surface, double subgrade,
+        IEnumerable<double> breaks, double spacing = 1.0)
+    {
+        if (left - right < 1e-6) return;
+        var ys = breaks.Where(y => y < left - 0.1 && y > right + 0.1).ToList();
+        for (var y = right + spacing; y < left - 0.1; y += spacing)
+            if (ys.All(b => Math.Abs(b - y) > spacing * 0.4)) ys.Add(y);
+        ys = ys.Distinct().OrderByDescending(y => y).ToList();
+        foreach (var c in corridors)
+        {
+            var n = Math.Min(c.Left.Count, c.Right.Count);
+            c.Inner.Clear();
+            c.Surface = p => surface(p) - subgrade;
+            var lines = ys.Select(_ => new List<Vec3>(n)).ToList();
+            for (int i = 0; i < n; i++)
+            {
+                var a = c.Left[i].XY;
+                var b = c.Right[i].XY;
+                c.Left[i] = Vec3.At(a, surface(a) - subgrade);
+                c.Right[i] = Vec3.At(b, surface(b) - subgrade);
+                for (int k = 0; k < ys.Count; k++)
+                {
+                    var q = a + (b - a) * ((left - ys[k]) / (left - right));
+                    lines[k].Add(Vec3.At(q, surface(q) - subgrade));
+                }
+            }
+            c.Inner.AddRange(lines);
+        }
+    }
+
+    /// <summary>
+    /// Linhas de quebra da superfície de um nó (<see cref="GradePad.Breaklines"/>): eixo do abaulamento e fim do caimento da
+    /// via principal, prolongados 30 m além das pontas do eixo (como a superfície do nó).
+    /// </summary>
+    public static List<List<Vec2>> NodeBreaklines(NodeSurface node)
+    {
+        var res = new List<List<Vec2>>();
+        if (node.Major?.Surface is not { } surf) return res;
+        var g = surf.Grade;
+        if (Math.Abs(g.Crossfall) < 1e-9 && g.Superelevation.Count == 0) return res;
+        var L = surf.Axis.Length;
+        foreach (var y in SectionBreaks(g))
+        {
+            var line = new List<Vec2>();
+            for (var s = -30.0; s <= L + 30 + 1e-9; s += 1.0) line.Add(FloorPlanes.AxisPoint(surf, s, y));
+            res.Add(line);
+        }
+        return res;
+    }
+
+    /// <summary>Quebras da seção da via (eixo do abaulamento e fim do caimento) para <see cref="FitToSurface"/>.</summary>
+    public static IEnumerable<double> SectionBreaks(RoadGrade g)
+    {
+        yield return 0;
+        if (g.CrossfallWidth > 0.1) { yield return g.CrossfallWidth; yield return -g.CrossfallWidth; }
     }
 
     /// <summary>Greide a partir de um perfil do gerador (mesmos PIVs e curva).</summary>

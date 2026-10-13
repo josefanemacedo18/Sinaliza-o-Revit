@@ -333,6 +333,17 @@ public static class SidewalkGenerator
             curb = PolygonOps.Union(curb.Concat(thin)).Where(p => p.Area >= 0.005).ToList();
             platform = PolygonOps.Difference(whole, curb.Concat(planter));
         }
+        // Peças do meio-fio separadas por frestas submilimétricas (a ponta fina passada ao meio-fio encosta nele quase na mesma
+        // reta): fechadas com 2 mm – unidas no piso do Revit, a fresta virava uma ponta de 0° (extensão de um lado só a 75°).
+        if (curb.Count > 1)
+        {
+            var closed = PolygonOps.Offset(PolygonOps.Offset(curb, 0.002), -0.002).Where(p => p.Area >= 0.005).ToList();
+            if (closed.Count < curb.Count)
+            {
+                curb = closed;
+                platform = PolygonOps.Difference(whole, curb.Concat(planter));
+            }
+        }
         AddRaised(geo, platform, MarkingColor.Concreto, d.Height);
         foreach (var c in curb) geo.Pieces.Add(new MarkingPiece(c, MarkingColor.Concreto) { Thickness = Math.Max(0.001, d.Height), Layer = "MEIO-FIO" });
         AddRaised(geo, planter, MarkingColor.Grama, d.Height);

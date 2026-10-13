@@ -171,10 +171,19 @@ public static class TerrainRebuild
             if (original.Z(p0.XY) == null) continue;               // fora do terreno
             Add(p0 with { Z = design.DesignZ(p0.XY) ?? p0.Z });
         }
+        // Terreno natural colado no pé dos taludes (cota do levantamento).
+        foreach (var p0 in design.GroundPoints)
+            if (original.Z(p0.XY) is { } zo) Add(p0 with { Z = zo });
+        // Pontos naturais colados nas plataformas (a menos de 1 m delas) saem: com a cota do terreno a centímetros da borda
+        // da plataforma, a triangulação fazia um paredão para dentro da pista. Nos taludes ficam (a malha dos taludes já
+        // é densa e o terreno natural entre os pés continua valendo).
+        var plats = design.PlatformAreas.Concat(design.Pads.Select(p => p.Area)).ToList();
+        if (plats.Count == 0) plats = design.Footprint;
+        var near = plats.Count == 0 ? (_ => false) : Mask(plats, 1.0);
         foreach (var v in original.DistinctPoints())
         {
             if (!inRegion(v.XY)) continue;
-            if (design.DesignZ(v.XY) != null) continue;          // substituído pelo projeto
+            if (design.DesignZ(v.XY) != null || near(v.XY)) continue;          // substituído pelo projeto
             Add(v);
         }
         return res;
@@ -187,7 +196,7 @@ public static class TerrainRebuild
     public static TerrainMesh Simulate(TerrainMesh original, GradingResult design, double margin = 0.5)
     {
         var region = design.Footprint.Count == 0 ? new List<Polygon2>() : PolygonOps.Union(design.Footprint).Where(f => f.Area > 0.5).ToList();
-        var inRegion = Mask(region, margin);
+        var inRegion = Mask(region, Math.Max(margin, 1.0));
         var pts = original.DistinctPoints().Where(v => !inRegion(v.XY)).ToList();
         pts.AddRange(Points(original, design, inRegion));
         return Tin.Mesh(pts);

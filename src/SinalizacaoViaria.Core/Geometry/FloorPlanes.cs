@@ -90,6 +90,42 @@ public static class FloorPlanes
         }
     }
 
+    /// <summary>
+    /// Pisos das marcas de um nó (calçadas e guias das esquinas, rampas, faixas que seguem pelas vias): divididos primeiro nas
+    /// faixas de cada via secundária além do nó (<see cref="NodeSurface.MemberZones"/>) – lá ao longo da via, no resto ao
+    /// longo da via principal. Uma calçada de esquina segue pela principal e pela secundária: com um eixo só, a parte
+    /// transversal a ele não ficava plana. Pedaços menores que 0,05 m² no corte: a peça é dividida inteira.
+    /// </summary>
+    public static List<(Polygon2 Part, Plane3 Plane, bool Warped)> SplitMember(Polygon2 shape, Func<Vec2, double> z, double tol,
+        IReadOnlyList<(Polygon2 Zone, GradeSurface Reference)> zones, GradeSurface? major, double warpArea = 25, double ringStep = 1.0)
+    {
+        if (zones.Count > 0)
+        {
+            try
+            {
+                var pieces = new List<(Polygon2 Shape, GradeSurface? Ref)>();
+                var rest = new List<Polygon2> { shape };
+                foreach (var (zone, rf) in zones)
+                {
+                    var inZone = PolygonOps.Intersect(rest, new[] { zone }).Where(x => x.Area > 1e-6).ToList();
+                    if (inZone.Count == 0) continue;
+                    pieces.AddRange(inZone.Select(x => (x, (GradeSurface?)rf)));
+                    rest = PolygonOps.Difference(rest, new[] { zone }).Where(x => x.Area > 1e-6).ToList();
+                }
+                pieces.AddRange(rest.Select(x => (x, major)));
+                if (pieces.Count > 1 && pieces.All(x => x.Shape.Area >= 0.05))
+                {
+                    var res = new List<(Polygon2, Plane3, bool)>();
+                    foreach (var (x, rf) in pieces) res.AddRange(Split(x, z, tol, rf, warpArea, ringStep: ringStep));
+                    return res;
+                }
+                if (pieces.Count == 1) return Split(shape, z, tol, pieces[0].Ref, warpArea, ringStep: ringStep);
+            }
+            catch (Exception) { /* sem as faixas */ }
+        }
+        return Split(shape, z, tol, major, warpArea, ringStep: ringStep);
+    }
+
     /// <summary>Ponto do plano a partir de estação/afastamento no eixo (prolongado em reta além das pontas).</summary>
     public static Vec2 AxisPoint(GradeSurface surf, double s, double y)
     {

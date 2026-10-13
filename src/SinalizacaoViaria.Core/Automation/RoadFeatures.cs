@@ -63,6 +63,14 @@ public sealed partial class RoadSetup
     {
         /// <summary>Afastamento (a partir da face do meio-fio) do meio da faixa livre.</summary>
         public double FreeCenter => CurbW + Service + Free / 2;
+
+        /// <summary>
+        /// Afastamento (a partir da face do meio-fio) do eixo da faixa direcional de largura <paramref name="width"/> (NBR 16537,
+        /// 7.8.2): faixa livre de 1,45 m ou mais – no eixo dela, com 0,60 m lisos de cada lado (a); entre 1,20 e 1,45 m – fora
+        /// do eixo, com os 0,60 m lisos do lado do lote (b); menor que 1,20 m – no eixo (c, com alerta de 0,50 m nas pontas).
+        /// </summary>
+        public double TactileCenter(double width = 0.25) =>
+            Free >= 1.45 - 1e-9 || Free < 1.20 - 1e-9 ? FreeCenter : CurbW + Service + Free - 0.60 - width / 2;
     }
 
     /// <summary>Medidas de um lado da via, como a geração das calçadas as usa.</summary>
@@ -125,8 +133,6 @@ public static class RoadFeatures
 {
     /// <summary>Folga lateral da travessia sem mobiliário, além da rampa com as abas (m).</summary>
     public const double CrossingClearance = 0.50;
-    /// <summary>Profundidade do alerta no topo das rampas (2 placas de 0,25 m) – [a confirmar].</summary>
-    public const double RampTopAlert = 0.50;
 
     public static bool HasAny(RoadSetup s) => s.ExtensoesCalcada.Count > 0 || s.PisoTatil || s.Sinalizacao is { Empty: false };
 
@@ -142,6 +148,10 @@ public static class RoadFeatures
         Slope = IntersectionGenerator.MaxRampSlope,
         FlareSlope = IntersectionGenerator.MaxFlareSlope,
         Tactile = tactile,
+        TactileSetback = TactileGenerator.RampAlertSetback,
+        TactileWidth = TactileGenerator.CrossingAlert,
+        // Direcional no eixo do rebaixamento até a calçada (NBR 16537, 7.8.5 b, Figura 69).
+        DirectionalTactile = tactile,
         SquareCut = true,
         CutSidewalk = false,
     };
@@ -248,6 +258,7 @@ public static class RoadFeatures
                     tpl.Type = TipoRampa.RebaixamentoTotal;
                     tpl.SidewalkDepth = lado.SidewalkWidth;
                     tpl.Slope = IntersectionGenerator.TotalSideSlope;
+                    tpl.DirectionalTactile = false;
                     res.Warnings.Add($"Travessia na estaca {PontoLargura.FormatEstaca(sc)}: calçada estreita para a rampa e a faixa livre de 1,20 m – feito o rebaixamento total.");
                 }
                 var curb = At(sc, lado.Sigma * (lado.Face - face));
@@ -285,10 +296,18 @@ public static class RoadFeatures
         foreach (var p in planos)
             furniture.AddRange(Mobiliario(p, axis, z, cat, res, AddD));
 
-        // 6. Piso tátil: faixa direcional no meio da faixa livre de cada calçada, ligada a cada rampa da via.
+        // 6. Piso tátil: faixa direcional na faixa livre de cada calçada, ligada a cada rampa da via; sem ela, faixa transversal
+        // no eixo de cada rebaixamento até o alinhamento do lote (NBR 16537, 7.8.5 b).
         if (s.PisoTatil)
             foreach (var lado in new[] { left, right }.Where(l => l.HasSidewalk && l.Free >= 0.6))
                 Tatil(s, lado, axis, z, rampsBySide[lado.Sigma], res, AddD);
+        foreach (var lado in new[] { left, right }.Where(l => l.HasSidewalk && !(s.PisoTatil && l.Free >= 0.6)))
+        {
+            var k = 0;
+            foreach (var (ramp, rid) in rampsBySide[lado.Sigma])
+                if (CrossingDirectional(ramp, p => lado.Sigma * axis.Project(p).Signed, lado.Face + lado.SidewalkWidth, z, lado.Top) is { } tr)
+                    AddD(tr, $"tatil-travessia-{(lado.Sigma > 0 ? "E" : "D")}{k++}");
+        }
 
         // 7. Sinalização vertical automática da via (R-19, R-24a, A-32b nas travessias) – refeita com o eixo, ids fixos.
         if (s.Sinalizacao is { Empty: false })
@@ -441,48 +460,63 @@ public static class RoadFeatures
     }
 
     /// <summary>
-    /// Rede tátil de um lado: faixa direcional no meio da faixa livre (ao longo da via) e, para cada rampa daquele lado, um
-    /// ramal perpendicular até a faixa de alerta no topo da rampa (junção com alerta na faixa principal).
+    /// Rede tátil de um lado: faixa direcional na faixa livre (ao longo da via, posição pela largura dela – 7.8.2) e, para cada
+    /// rampa daquele lado, um ramal no eixo do rebaixamento, do fim da subida até a faixa da calçada (7.8.5 b, Figura 69): sem
+    /// alerta no topo da rampa – o alerta é a faixa a 0,50 m da guia (6.6) – e com a área de alerta da junção na faixa principal.
     /// </summary>
     private static void Tatil(RoadSetup s, RoadSetup.LadoVia lado, Polyline2 axis, double z, List<(RampDefinition Ramp, string Id)> ramps,
         ElementosDerivados res, Func<MarkingDefinition, string, MarkingDefinition> add)
     {
         var tag = lado.Sigma > 0 ? "E" : "D";
-        var off = lado.Sigma * (lado.Face + lado.FreeCenter);
+        var off = lado.Sigma * (lado.Face + lado.TactileCenter());
         var main = axis.Offset(off);
         var branches = new List<List<Vec2>>();
-        var cover = new List<Polygon2>();
-        var k = 0;
         foreach (var (ramp, _) in ramps)
         {
-            var top = RampTop(ramp);
-            if (top == null) continue;
-            var (a, b, dir) = top.Value;
+            if (RampTop(ramp) is not { } top) continue;
+            var (a, b, dir) = top;
             var mid = (a + b) / 2;
-            // Alerta no topo da rampa, na largura dela (a faixa principal não passa por cima dele).
-            var alertEnd = mid + dir * RampTopAlert;
-            cover.Add(new Polygon2(new[] { a, b, b + dir * RampTopAlert, a + dir * RampTopAlert }));
-            add(new TactileRouteDefinition
-            {
-                PathRef = PathReference.FromPoints(new[] { a + dir * (RampTopAlert / 2), b + dir * (RampTopAlert / 2) }, z),
-                AlertOnly = true, Module = 0.25, Rows = (int)Math.Round(RampTopAlert / 0.25), Elevation = lado.Top,
-            }, $"tatil-alerta-{tag}{k++}");
-            // Ramal perpendicular do topo (alerta) até a faixa principal.
-            var (st, _) = main.Project(alertEnd);
-            var foot = main.PointAt(st);
-            if (foot.DistanceTo(alertEnd) > 0.05 && (foot - alertEnd).Dot(dir) > 0)
-                branches.Add(new List<Vec2> { alertEnd, foot });
+            if (IntersectionGenerator.RayHitPath(mid, dir, main.Points, 8) is { } foot && foot.DistanceTo(mid) > 0.05)
+                branches.Add(new List<Vec2> { mid, foot });
         }
+        var narrow = lado.Free < 1.20 - 1e-9;
+        if (narrow)
+            res.Warnings.Add($"Piso tátil ({(lado.Sigma > 0 ? "lado esquerdo" : "lado direito")}): faixa livre de {lado.Free:0.00} m, menor que 1,20 m – " +
+                             "faixa direcional no eixo dela com alerta de 0,50 m nas pontas (NBR 16537, 7.8.2 c).");
         var route = add(new TactileRouteDefinition
         {
             PathRef = PathReference.FromPoints(main.Points, z),
-            Module = 0.25, Rows = 1, Elevation = lado.Top, AlertAtEnds = false, AlertAtJunctions = true, AlertAtTurns = true,
+            Module = 0.25, Rows = 1, Elevation = lado.Top, AlertAtEnds = narrow, EndAlertModules = 2, AlertAtJunctions = true, AlertAtTurns = true,
             Branches = branches.Count > 0 ? branches : null,
         }, $"tatil-{tag}");
-        // Nada sobre as rampas (rebaixamento total de calçada estreita) e sob os alertas do topo.
+        // Nada sobre as rampas (rebaixamento total de calçada estreita).
         foreach (var (ramp, rid) in ramps)
             route.Exclusions.Add(new ExclusionZone { SourceId = rid, Points = RampGenerator.Footprint(ramp, new Polyline2(ramp.PathRef.Points)).Outer.ToList() });
-        foreach (var c in cover) route.Exclusions.Add(new ExclusionZone { SourceId = res.Prefix + "tatil", Points = c.Outer.ToList() });
+    }
+
+    /// <summary>
+    /// Sem rede tátil na calçada: faixa direcional transversal no eixo de cada rebaixamento, do fim da subida até o alinhamento do
+    /// lote (NBR 16537, 7.8.5 b, Figura 69 a). <paramref name="lot"/> é o afastamento do alinhamento a partir do eixo da via.
+    /// </summary>
+    public static TactileRouteDefinition? CrossingDirectional(RampDefinition ramp, Func<Vec2, double> offsetOf, double lot, double z, double top)
+    {
+        if (!ramp.Tactile || !ramp.DirectionalTactile || RampTop(ramp) is not { } t) return null;
+        var (a, b, dir) = t;
+        var mid = (a + b) / 2;
+        // Até o alinhamento: afastamento do eixo crescendo ao longo da subida (bissecção).
+        double lo = 0, hi = 15;
+        if (offsetOf(mid) >= lot - 0.05 || offsetOf(mid + dir * hi) < lot) return null;
+        for (int i = 0; i < 40; i++)
+        {
+            var m = (lo + hi) / 2;
+            if (offsetOf(mid + dir * m) < lot) lo = m; else hi = m;
+        }
+        if (lo < 0.10) return null;
+        return new TactileRouteDefinition
+        {
+            PathRef = PathReference.FromPoints(new[] { mid, mid + dir * lo }, z),
+            Module = 0.25, Rows = 1, Elevation = top, AlertAtEnds = false, AlertAtJunctions = false, AlertAtTurns = false,
+        };
     }
 
     /// <summary>

@@ -24,7 +24,7 @@
                 <TextBlock Style="{StaticResource Hint}" Text="Clique os dois bordos da pista no eixo do dispositivo (repete até ESC), ou selecione uma linha atravessando a pista."/>
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <TextBlock Text="Tipo" Style="{StaticResource FieldLabel}"/>
                     <ComboBox Grid.Column="1" x:Name="CbType" SelectionChanged="TypeChanged"/>
                     <TextBlock Grid.Row="1" Text="Extensão no sentido do tráfego (m)" Style="{StaticResource FieldLabel}"/>
@@ -42,6 +42,8 @@
                              ToolTip="1,60 a 1,90 m: mais estreita que a bitola de ônibus e veículos de emergência, que passam com as rodas ao lado (CET-SP – Medidas Moderadoras do Tráfego)."/>
                     <TextBlock Grid.Row="8" x:Name="LblCushionN" Text="Almofada: quantidade na pista (0 = uma por faixa)" Style="{StaticResource FieldLabel}" Visibility="Collapsed"/>
                     <TextBox Grid.Row="8" Grid.Column="1" x:Name="TbCushionN" Text="0" TextChanged="AnyChanged" Visibility="Collapsed"/>
+                    <CheckBox Grid.Row="9" Grid.ColumnSpan="2" x:Name="CkTactile" Content="Piso tátil de alerta nas calçadas, a 0,50 m da guia" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
+                              ToolTip="NBR 16537:2024, 6.6, Figuras 27 e 75: faixa de alerta de 0,40 m paralela à faixa de travessia, a 0,50 m da guia, nas duas calçadas."/>
                 </Grid>
                 <GroupBox x:Name="GbPath" Header="Posição">
                     <StackPanel>

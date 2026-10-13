@@ -155,7 +155,7 @@ public static class AB2Check
                     else
                     {
                         var tr = kids.OfType<TactileRouteDefinition>().Where(t => t.AlertOnly && Math.Abs(t.Elevation) < 1e-6 && t.PathRef.Points.All(p => OnMedian(p, 0.01))).ToList();
-                        var need = mp.Width >= 2 * MedianCrossing.AlertDepth + 0.05 ? 2 : 1;
+                        var need = MedianCrossing.AlertBands(mp.Width).Count;   // NBR 16537, Figuras 28 a 30
                         if (tr.Count < need) res.Add($"passagem rebaixada no canteiro de {mp.Width:0.00} m com {tr.Count} faixas de alerta (esperadas {need})");
                     }
                 }
@@ -365,9 +365,11 @@ public class AB2IntersectionTests
         var d = L.Definition!;
         Assert.All(L.Legs.SelectMany(l => IntersectionGenerator.MedianPassesOf(d, L, l)), m => Assert.Equal(TipoTravessiaCanteiro.NivelDaPista, m.Mode));
         var strips = w.Defs.OfType<TactileRouteDefinition>().Where(t => t.GroupId == d.Id && t.AlertOnly).ToList();
-        Assert.Equal(4, strips.Count);
+        var med = IntersectionGenerator.MedianPassesOf(d, L, L.Legs[0]).Concat(L.Legs.SelectMany(l => IntersectionGenerator.MedianPassesOf(d, L, l))).First();
+        Assert.Equal(L.Legs.SelectMany(l => IntersectionGenerator.MedianPassesOf(d, L, l)).Sum(m => MedianCrossing.AlertBands(m.Width).Count), strips.Count);
         Assert.All(strips, t => Assert.Equal(0.0, t.Elevation));
-        Assert.All(strips, t => Assert.Equal(2, t.Rows));
+        // Larguras da NBR 16537 (Figuras 28 a 30): 0,40 m, ou de 0,50 m de uma borda a 0,50 m da outra (1,40 a 1,80 m).
+        Assert.All(strips, t => Assert.Contains(MedianCrossing.AlertBands(med.Width), b => Math.Abs(b.B - b.A - t.Module * t.Rows) < 1e-6));
         Assert.Empty(AB2Check.Run(w).Median);
         // Pedido "rampas" num canteiro estreito: fica rebaixado, com aviso.
         var tpl = AB2Matrix.Template();
@@ -423,12 +425,14 @@ public class AB2IntersectionTests
         Assert.True(op.Pedestrian);
         Assert.InRange(op.Start, 50 - 2 + 0.1 - 1e-6, 50 - 2 + 0.1 + 1e-6);
         Assert.InRange(op.End, 50 + 2 - 0.1 - 1e-6, 50 + 2 - 0.1 + 1e-6);
-        // Faixa de alerta no nível da pista junto às duas bordas do canteiro, na largura da faixa.
+        // Faixas de alerta no nível da pista, de 0,40 m a 0,50 m de cada borda do canteiro de 3,00 m (NBR 16537, Figura 30), na
+        // largura da faixa.
         var strips = defs.OfType<TactileRouteDefinition>().Where(t => t.AlertOnly).ToList();
         Assert.Equal(2, strips.Count);
         Assert.All(strips, t => Assert.Equal(0.0, t.Elevation));
-        Assert.Contains(strips, t => Math.Abs(t.PathRef.Points[0].Y - (-1.5 + 0.25)) < 1e-6);
-        Assert.Contains(strips, t => Math.Abs(t.PathRef.Points[0].Y - (1.5 - 0.25)) < 1e-6);
+        Assert.All(strips, t => Assert.Equal(0.40, t.Module * t.Rows, 6));
+        Assert.Contains(strips, t => Math.Abs(t.PathRef.Points[0].Y - (-1.5 + 0.70)) < 1e-6);
+        Assert.Contains(strips, t => Math.Abs(t.PathRef.Points[0].Y - (1.5 - 0.70)) < 1e-6);
         Assert.All(strips, t => Assert.All(t.PathRef.Points, p => Assert.InRange(p.X, 48, 52)));
         // Faixa de pedestres de bordo a bordo, sem pintura sobre o canteiro.
         var cw = defs.OfType<LinearMarkingDefinition>().Single(l => l.Code.StartsWith("FTP"));

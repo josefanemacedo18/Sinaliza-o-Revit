@@ -67,7 +67,16 @@ public sealed class LevelSampler : ISurface
 public sealed class NodeSampler : ISurface
 {
     private readonly Core.Geometry.NodeSurface _node;
-    public NodeSampler(Core.Geometry.NodeSurface node) => _node = node;
+    private readonly Func<Core.Geometry.Vec2, double> _z;
+    /// <param name="z">Cota absoluta (m) – nula = a do nó; as marcas do nó usam <see cref="Core.Geometry.NodeSurface.ForMembers"/>.</param>
+    public NodeSampler(Core.Geometry.NodeSurface node, IReadOnlyList<Core.Geometry.NodeSurface.MemberRoad>? memberRoads = null)
+    {
+        _node = node;
+        _z = memberRoads == null ? node.Z : node.ForMembers(memberRoads);
+        Zones = memberRoads == null ? new() : node.MemberZones(memberRoads);
+    }
+    /// <summary>Marcas do nó: faixas das vias secundárias além do nó, onde os pisos seguem a via (FloorPlanes.SplitMember).</summary>
+    public List<(Core.Geometry.Polygon2 Zone, Core.Geometry.GradeSurface Reference)> Zones { get; }
     public Core.Geometry.NodeSurface Node => _node;
     public bool IsAvailable => true;
     // Sólidos do nó já vêm deformados vértice a vértice pela superfície (MarkingService.BuildGeometry).
@@ -75,10 +84,10 @@ public sealed class NodeSampler : ISurface
     public bool TrySample(double xFt, double yFt, double zHintFt, out double zFt, out XYZ normal)
     {
         var p = new Core.Geometry.Vec2(UnitConv.M(xFt), UnitConv.M(yFt));
-        var z = _node.Z(p);
+        var z = _z(p);
         zFt = UnitConv.Ft(z);
-        var zx = _node.Z(p + new Core.Geometry.Vec2(0.5, 0)) - z;
-        var zy = _node.Z(p + new Core.Geometry.Vec2(0, 0.5)) - z;
+        var zx = _z(p + new Core.Geometry.Vec2(0.5, 0)) - z;
+        var zy = _z(p + new Core.Geometry.Vec2(0, 0.5)) - z;
         normal = new XYZ(-zx / 0.5, -zy / 0.5, 1).Normalize();
         return true;
     }

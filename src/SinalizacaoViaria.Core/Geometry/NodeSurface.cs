@@ -65,6 +65,52 @@ public sealed class NodeSurface
         return l.BaseZ + z;
     }
 
+    /// <summary>
+    /// Via do nó para as marcas dele: superfície (com a concordância), cota da base, identificador, trecho do eixo ocupado pelo
+    /// nó (estações <see cref="S0"/>–<see cref="S1"/>, o recorte do nó na via) e meia largura da faixa da via.
+    /// </summary>
+    public sealed record MemberRoad(GradeSurface Surface, double BaseZ, string? Id, double S0, double S1, double Width);
+
+    /// <summary>
+    /// Superfície das marcas do nó (rampas, extensões de calçada, guias e calçadas das esquinas, faixas...): a do nó dentro
+    /// dele e, ao longo de cada via secundária além do trecho ocupado pelo nó, a da via – com a concordância, que parte da
+    /// superfície do nó ali. Antes as peças que seguem pela via secundária ficavam na superfície do nó (que prolonga a da via
+    /// principal) por cima da via: até 28 cm acima ou abaixo da calçada e da plataforma da via ao lado.
+    /// </summary>
+    public Func<Vec2, double> ForMembers(IReadOnlyList<MemberRoad> roads)
+    {
+        if (roads.Count == 0 || _major == null) return Z;
+        return p => RoadAt(roads, p) is { } r ? r.BaseZ + r.Surface.Z(p) : Z(p);
+    }
+
+    /// <summary>Eixo de referência da divisão em planos das marcas do nó no ponto: o da via secundária fora do nó, senão o da principal.</summary>
+    public GradeSurface? MemberReference(IReadOnlyList<MemberRoad> roads, Vec2 p) => RoadAt(roads, p)?.Surface ?? _major?.Surface;
+
+    /// <summary>Faixas de cada via secundária além do trecho ocupado pelo nó (onde as marcas do nó seguem a via) e o eixo dela.</summary>
+    public List<(Polygon2 Zone, GradeSurface Reference)> MemberZones(IReadOnlyList<MemberRoad> roads)
+    {
+        var res = new List<(Polygon2, GradeSurface)>();
+        foreach (var r in roads)
+        {
+            if (_major != null && r.Id != null && r.Id == _major.Id) continue;
+            var L = r.Surface.Axis.Length;
+            if (r.S0 > 0.5) res.Add((FloorPlanes.Band(r.Surface, -0.5, r.S0, -r.Width, r.Width), r.Surface));
+            if (r.S1 < L - 0.5) res.Add((FloorPlanes.Band(r.Surface, r.S1, L + 0.5, -r.Width, r.Width), r.Surface));
+        }
+        return res;
+    }
+
+    private MemberRoad? RoadAt(IReadOnlyList<MemberRoad> roads, Vec2 p)
+    {
+        foreach (var r in roads)
+        {
+            if (_major != null && r.Id != null && r.Id == _major.Id) continue;
+            var (s, y) = r.Surface.Locate(p);
+            if ((s < r.S0 || s > r.S1) && Math.Abs(y) <= r.Width) return r;
+        }
+        return null;
+    }
+
     /// <summary>Todas as vias no mesmo plano horizontal (sem greide): o nó fica plano na cota comum.</summary>
     public bool IsFlat => _legs.All(l => l.Surface.Grade.IsFlat) && _legs.Select(l => Math.Round(l.BaseZ, 3)).Distinct().Count() <= 1;
 }

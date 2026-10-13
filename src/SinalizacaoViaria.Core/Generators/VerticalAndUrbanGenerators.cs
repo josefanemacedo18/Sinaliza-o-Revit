@@ -680,6 +680,18 @@ public static class TrafficCalmingGenerator
             geo.Pieces.AddRange(DrapeOnProfile(paint, a, t, Z, -L / 2, L / 2));
         }
 
+        if (d.Type == TipoModeracao.FaixaElevada && d.TactileAlert)
+        {
+            // Alerta nas calçadas (NBR 16537, 6.6, Figuras 27 e 75): faixa de 0,40 m paralela à travessia, a 0,50 m da guia, na
+            // largura do platô e no nível da calçada.
+            var plateau = Math.Max(0.5, L - 2 * R);
+            foreach (var (edge, outward) in new[] { (a, -u), (b, u) })
+            {
+                var o = edge + outward * (TactileGenerator.RampAlertSetback + TactileGenerator.CrossingAlert / 2);
+                TactileGenerator.AddTiles(geo, TactileGenerator.Box(o, t, plateau, TactileGenerator.CrossingAlert, TactileGenerator.CrossingAlert), MarkingColor.Amarela, H);
+            }
+        }
+
         geo.UnitCount = 1;
         geo.PathLength = width;
         return geo;

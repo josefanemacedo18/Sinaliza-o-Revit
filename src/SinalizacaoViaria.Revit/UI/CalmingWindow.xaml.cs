@@ -56,6 +56,7 @@ public partial class CalmingWindow : Window
         TbRamp.Text = UiHelpers.F(d?.RampLength ?? r);
         TbRamp.IsEnabled = t is TipoModeracao.FaixaElevada or TipoModeracao.Almofada;
         CkCrosswalk.IsEnabled = t == TipoModeracao.FaixaElevada;
+        CkTactile.IsEnabled = t == TipoModeracao.FaixaElevada;
         var cushion = t == TipoModeracao.Almofada;
         LblCushionW.Visibility = TbCushionW.Visibility = LblCushionN.Visibility = TbCushionN.Visibility = cushion ? Visibility.Visible : Visibility.Collapsed;
         if (d != null)
@@ -64,6 +65,7 @@ public partial class CalmingWindow : Window
             TbCushionN.Text = d.CushionCount.ToString();
             CkMarking.IsChecked = d.Marking;
             CkCrosswalk.IsChecked = d.Crosswalk;
+            CkTactile.IsChecked = d.TactileAlert;
             UiHelpers.SelectColor(CbColor, d.MarkingColor);
         }
     }
@@ -93,6 +95,7 @@ public partial class CalmingWindow : Window
         d.Marking = CkMarking.IsChecked == true;
         d.MarkingColor = UiHelpers.SelectedColor(CbColor);
         d.Crosswalk = CkCrosswalk.IsChecked == true;
+        d.TactileAlert = CkTactile.IsChecked == true;
         if (d.Type == TipoModeracao.Almofada)
         {
             d.CushionWidth = UiHelpers.Parse(TbCushionW, 1.70, "Largura da almofada", 0.8, 3.0);

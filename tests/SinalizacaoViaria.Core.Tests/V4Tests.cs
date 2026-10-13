@@ -134,8 +134,8 @@ public class V4Tests
         var relief = geo.Pieces.Where(p => p.Color == MarkingColor.RelevoTatil).ToList();
         Assert.All(tiles, p => Assert.Equal(0.15, p.Elevation, 6));
         Assert.All(relief, p => Assert.True(p.Elevation > 0.15));
-        // Domos (hexágonos pequenos) na curva (6,0), na junção (3,0) e nas extremidades livres.
-        bool DomesNear(Vec2 c) => relief.Any(r => r.Shape.Outer.Count == 6 && r.Shape.Centroid.DistanceTo(c) < 0.2);
+        // Domos (octógonos pequenos) na curva (6,0), na junção (3,0) e nas extremidades livres.
+        bool DomesNear(Vec2 c) => relief.Any(r => r.Shape.Outer.Count == 8 && r.Shape.Centroid.DistanceTo(c) < 0.2);
         Assert.True(DomesNear(new Vec2(6, 0)));
         Assert.True(DomesNear(new Vec2(3, 0)));
         Assert.True(DomesNear(new Vec2(0.125, 0)));

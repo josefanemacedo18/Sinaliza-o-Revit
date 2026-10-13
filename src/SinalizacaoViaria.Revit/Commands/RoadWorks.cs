@@ -234,21 +234,44 @@ internal static class RoadWorks
         var covered = Enumerable.Range(0, 21).Count(i => ground(axis.PointAt(axis.Length * i / 20)) != null);
         if (covered < 5) return res;
         var opt = RoadProfileDesigner.ForRelief(relief, st.RoadReliefMaxGrade, st.RoadCutSlope, st.RoadFillSlope);
+        // Vias existentes que ganham patamar no nó com a via nova (antes só a nova ficava em nível no cruzamento e a existente
+        // chegava inclinada – a superfície do nó prolongava a rampa dela sobre a boca das outras vias).
+        var platforms = new List<(Core.Generators.IntersectionRoad Road, RoadGrade Grade)>();
         // Cruzamentos e entroncamentos com as vias existentes: a via nova passa na cota delas (interseção no mesmo nível).
         try
         {
             var sv = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
             var roads = sv.Roads();
             var mine = roads.FindIndex(r => r.Def.Id == road.Pavement.Id);
+            // Alcance da área do nó ao longo de cada via (recortes da interseção que contêm o nó): o patamar cobre a área toda.
+            double Reach(Core.Generators.IntersectionRoad r, Vec2 node) => RoadProfileDesigner.NodeReach(r.Axis, node,
+                r.Def.Exclusions.Where(e => e.SourceId != null).Select(e => (IReadOnlyList<Vec2>)e.Points));
             if (mine >= 0)
-                foreach (var (node, ids) in Core.Generators.IntersectionGenerator.FindNodes(roads).Where(n => n.Roads.Contains(mine)))
+            {
+                var nodes = Core.Generators.IntersectionGenerator.FindNodes(roads).ToList();
+                var touched = new HashSet<int>();
+                foreach (var (node, ids) in nodes.Where(n => n.Roads.Contains(mine)))
                 {
                     var others = ids.Where(i => i != mine).Select(i => roads[i]).ToList();
                     if (others.Count == 0) continue;
                     var zAbs = others.Average(o => sv.RoadZ(o, node));
                     var s = axis.Project(node).Station;
                     opt.Fixed.Add(new Vec2(Math.Clamp(s, 0, axis.Length), zAbs - road.BaseZ));
+                    opt.FixedHalf.Add(RoadProfileDesigner.PlatformFor(Reach(roads[mine], node), opt.VerticalCurve));
+                    foreach (var i in ids.Where(i => i != mine && roads[i].Def.Output.Grade != null)) touched.Add(i);
                 }
+                foreach (var i in touched)
+                {
+                    var o = roads[i];
+                    var g0 = o.Def.Output.Grade!;
+                    // Todos os nós da via existente: cota atual mantida, patamar em cada um.
+                    var mineNodes = nodes.Where(n => n.Roads.Contains(i)).ToList();
+                    var pins = mineNodes
+                        .Select(n => { var so = Math.Clamp(o.Axis.Project(n.Node).Station, 0, o.Axis.Length); return new Vec2(so, g0.Z(so)); }).ToList();
+                    var halves = mineNodes.Select(n => RoadProfileDesigner.PlatformFor(Reach(o, n.Node), g0.DefaultCurve)).ToList();
+                    platforms.Add((o, RoadProfileDesigner.WithPlatforms(g0, o.Axis.Length, pins, st.RoadReliefMaxGrade, halves)));
+                }
+            }
             // Pontas coladas a outra via: a cota da ponta é a dela.
             if (opt.Fixed.FirstOrDefault(f => f.X < 1) is { } f0 && f0 != default) opt.StartZ = f0.Y;
             if (opt.Fixed.FirstOrDefault(f => f.X > axis.Length - 1) is { } f1 && f1 != default) opt.EndZ = f1.Y;
@@ -260,6 +283,12 @@ internal static class RoadWorks
         grade.CutSlope = st.RoadCutSlope;
         grade.FillSlope = st.RoadFillSlope;
         res.AddRange(SetGrade(uidoc, road.GroupId, grade));
+        foreach (var (o, g) in platforms)
+            if (o.Def.GroupId != null)
+            {
+                try { res.AddRange(SetGrade(uidoc, o.Def.GroupId, g)); }
+                catch (Exception ex) { Log.Error("Patamar da via existente no nó", ex); }
+            }
         TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { road.Pavement }, quiet: true);
         var r = new RenderResult();
         r.Warnings.Add((relief == RelevoVia.AcompanharTerreno ? "Relevo: a via acompanha o terreno" : "Relevo: greide suavizado") +
