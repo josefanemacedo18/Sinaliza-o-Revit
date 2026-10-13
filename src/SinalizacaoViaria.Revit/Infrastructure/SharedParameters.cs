@@ -40,6 +40,77 @@ public static class SharedParameters
 
     public static IReadOnlyList<Def> All { get; } = new[] { Codigo, Descricao, Grupo, Cor, Material, Area, Extensao, Quantidade, Referencia, Id, Categoria, Hierarquia, Unidade, QtdMedicao, NivelServico, Trafego };
 
+    // Loteamento: identificação do lote (filtros por categoria, tabelas e etiquetas). Ligados a Toposolid, Pisos e Modelos genéricos.
+    public static readonly Def Quadra = new("SV_Quadra", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B11"), SpecTypeId.String.Text, "Quadra do loteamento (A, B, C...).");
+    public static readonly Def Lote = new("SV_Lote", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B12"), SpecTypeId.String.Text, "Número do lote na quadra (1 a N) ou da área (AV-1, AI-1...).");
+    public static readonly Def CategoriaLote = new("SV_CategoriaLote", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B13"), SpecTypeId.String.Text, "Categoria da área do loteamento: Lote, Institucional, Área verde, Sobra...");
+    public static readonly Def AreaLote = new("SV_AreaLote", new("A1D4C1B0-5E3F-4D3A-9B21-0C8E7F6A5B14"), SpecTypeId.Area, "Área do lote (projeção horizontal).");
+
+    public static IReadOnlyList<Def> Lotes { get; } = new[] { Quadra, Lote, CategoriaLote, AreaLote };
+
+    /// <summary>Categorias que recebem os parâmetros de lote (subdivisão do Toposolid, piso sem Toposolid e forma direta).</summary>
+    public static readonly BuiltInCategory[] LotCategories = { BuiltInCategory.OST_Toposolid, BuiltInCategory.OST_Floors, BuiltInCategory.OST_GenericModel };
+
+    /// <summary>Garante os parâmetros de lote no documento (transação aberta).</summary>
+    public static void EnsureLotes(Document doc)
+    {
+        var app = doc.Application;
+        var cats = app.Create.NewCategorySet();
+        foreach (var bic in LotCategories)
+            if (Category.GetCategory(doc, bic) is { AllowsBoundParameters: true } c) cats.Insert(c);
+        var missing = Lotes.Where(d => SharedParameterElement.Lookup(doc, d.Guid) == null).ToList();
+        if (missing.Count > 0)
+        {
+            var original = app.SharedParametersFilename;
+            try
+            {
+                Directory.CreateDirectory(PluginPaths.Root);
+                if (!File.Exists(PluginPaths.SharedParameters)) File.WriteAllText(PluginPaths.SharedParameters, string.Empty);
+                app.SharedParametersFilename = PluginPaths.SharedParameters;
+                var file = app.OpenSharedParameterFile();
+                if (file == null) { Log.Info("Não foi possível abrir o arquivo de parâmetros compartilhados."); return; }
+                var group = file.Groups.get_Item(GroupName) ?? file.Groups.Create(GroupName);
+                foreach (var d in missing)
+                {
+                    var def = group.Definitions.get_Item(d.Name) as ExternalDefinition;
+                    if (def == null || def.GUID != d.Guid)
+                        def = (ExternalDefinition)group.Definitions.Create(new ExternalDefinitionCreationOptions(def == null ? d.Name : d.Name + "_", d.Spec)
+                        {
+                            GUID = d.Guid,
+                            Description = d.Description,
+                        });
+                    doc.ParameterBindings.Insert(def, app.Create.NewInstanceBinding(cats), GroupTypeId.Data);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("SharedParameters.EnsureLotes", ex);
+            }
+            finally
+            {
+                try { app.SharedParametersFilename = original; } catch { /* sem arquivo original */ }
+            }
+        }
+        // Projetos em que os parâmetros já existiam: garante as três categorias.
+        foreach (var d in Lotes)
+        {
+            try
+            {
+                if (SharedParameterElement.Lookup(doc, d.Guid) is not { } spe) continue;
+                var def = spe.GetDefinition();
+                if (doc.ParameterBindings.get_Item(def) is not InstanceBinding b) continue;
+                var changed = false;
+                foreach (Category c in cats)
+                    if (!b.Categories.Contains(c)) { b.Categories.Insert(c); changed = true; }
+                if (changed) doc.ParameterBindings.ReInsert(def, b, GroupTypeId.Data);
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"SharedParameters.EnsureLotes {d.Name}", ex);
+            }
+        }
+    }
+
     private const string GroupName = "Sinalizacao Viaria";
 
     /// <summary>Garante os parâmetros no documento. Deve ser chamado dentro de uma transação.</summary>

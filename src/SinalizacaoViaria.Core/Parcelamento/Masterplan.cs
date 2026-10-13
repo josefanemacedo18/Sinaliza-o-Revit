@@ -1,0 +1,43 @@
+using SinalizacaoViaria.Core.Quantities;
+
+namespace SinalizacaoViaria.Core.Parcelamento;
+
+/// <summary>
+/// Masterplan (layout limpo): ficam os lotes por categoria, as vias, calçadas, canteiros, árvores e mobiliário, os nomes das
+/// quadras e das vias e os números dos lotes; saem a sinalização, os dispositivos, o piso tátil, a drenagem, as cotas e os
+/// textos técnicos.
+/// </summary>
+public static class Masterplan
+{
+    public const string NomeModelo = "SV - Masterplan";
+    public const string PrefixoVista = "SV - Masterplan";
+
+    /// <summary>Categorias do plugin (parâmetro SV_Categoria) que o masterplan oculta.</summary>
+    public static readonly CategoriaQuantitativo[] Ocultas =
+    {
+        CategoriaQuantitativo.SinalizacaoHorizontal, CategoriaQuantitativo.SinalizacaoVertical, CategoriaQuantitativo.DispositivosSegregacao,
+        CategoriaQuantitativo.Acessibilidade, CategoriaQuantitativo.Drenagem,
+    };
+
+    /// <summary>Valor de SV_Categoria dos detalhes do plugin (cotas, quadros, legendas) – também ocultos.</summary>
+    public const string Detalhamento = "Detalhamento";
+
+    public static bool Oculta(CategoriaQuantitativo c) => Ocultas.Contains(c);
+
+    /// <summary>Valores de SV_Categoria ocultos (regras do filtro do modelo de vista).</summary>
+    public static IEnumerable<string> ValoresOcultos => Ocultas.Select(QuantityRow.CategoryLabel).Append(Detalhamento);
+
+    /// <summary>Detalhamento do masterplan: só nomes de quadra e de via e números dos lotes, sem áreas, cotas nem categorias.</summary>
+    public static Definitions.LoteamentoDetalheDefinition Detalhe(string loteamentoId) => new()
+    {
+        LoteamentoId = loteamentoId,
+        Numero = true,
+        Area = false,
+        Cotas = false,
+        Categoria = false,
+        Quadra = true,
+        Vias = true,
+        Divisas = false,
+        Cores = false,
+    };
+}

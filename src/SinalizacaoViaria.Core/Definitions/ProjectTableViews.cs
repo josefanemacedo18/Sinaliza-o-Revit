@@ -14,7 +14,7 @@ public static class ProjectTableViews
     public const int Scale = 100;
 
     /// <summary>Quadros que leem o projeto inteiro e podem ter vista própria.</summary>
-    public static bool IsProjectTable(MarkingDefinition d) => d is LegendDefinition or QuantityTableDefinition;
+    public static bool IsProjectTable(MarkingDefinition d) => d is LegendDefinition or QuantityTableDefinition or QuadroLoteamentoDefinition;
 
     /// <summary>Nome da vista própria do quadro.</summary>
     public static string ViewName(MarkingDefinition d) => d switch
@@ -24,6 +24,7 @@ public static class ProjectTableViews
         QuantityTableDefinition q when !string.IsNullOrEmpty(q.Category) && Enum.TryParse<CategoriaQuantitativo>(q.Category, out var c) =>
             $"SV - Quadro de quantitativos – {QuantityRow.CategoryLabel(c)}",
         QuantityTableDefinition => "SV - Quadro de quantitativos",
+        QuadroLoteamentoDefinition ql => "SV - Loteamento – " + ql.KindName,
         _ => "SV - " + d.KindName,
     };
 
@@ -47,6 +48,10 @@ public static class ProjectTableViews
                 qt.Position = Vec2.Zero;
                 qt.DrawnAnchor = null;
                 qt.SheetSegmentId = null;
+                break;
+            case QuadroLoteamentoDefinition ql:
+                ql.Position = Vec2.Zero;
+                ql.DrawnAnchor = null;
                 break;
         }
         return c;

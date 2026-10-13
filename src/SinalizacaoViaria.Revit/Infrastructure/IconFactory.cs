@@ -579,6 +579,58 @@ public static class IconFactory
                 dc.DrawRectangle(B(Yellow), null, new Rect(9, 13, 14, 2));
                 dc.DrawRectangle(B(White), null, new Rect(9, 18, 10, 2));
                 break;
+            case "loteamento":
+            case "masterplan":
+            {
+                // Quadras divididas em lotes coloridos (masterplan: com área verde e via).
+                dc.DrawRectangle(B(Asphalt), null, new Rect(1, 1, 30, 30));
+                var lote = Color.FromRgb(242, 215, 166);
+                var verde = Color.FromRgb(155, 203, 138);
+                var inst = Color.FromRgb(232, 163, 163);
+                for (int i = 0; i < 3; i++)
+                {
+                    dc.DrawRectangle(B(i == 2 && key == "masterplan" ? verde : lote), P(Asphalt, 0.8), new Rect(3 + i * 4.4, 3, 4.4, 11));
+                    dc.DrawRectangle(B(i == 0 && key == "masterplan" ? inst : lote), P(Asphalt, 0.8), new Rect(3 + i * 4.4, 18, 4.4, 11));
+                }
+                dc.DrawRectangle(B(key == "masterplan" ? verde : lote), P(Asphalt, 0.8), new Rect(19, 3, 10, 26));
+                if (key == "loteamento") for (int j = 0; j < 4; j++) dc.DrawLine(P(Asphalt, 0.8), new Point(19, 3 + j * 6.5), new Point(29, 3 + j * 6.5));
+                break;
+            }
+            case "lote":
+            case "quadra":
+            {
+                dc.DrawRectangle(B(Color.FromRgb(242, 215, 166)), P(Asphalt, 1.2), new Rect(3, 3, 26, 22));
+                for (int i = 1; i < 4; i++) dc.DrawLine(P(Asphalt, 1), new Point(3 + i * 6.5, 3), new Point(3 + i * 6.5, 25));
+                if (key == "lote") dc.DrawRectangle(B(Color.FromRgb(255, 184, 28)), P(Red, 1.6), new Rect(9.5, 3, 6.5, 22));
+                dc.DrawLine(P(key == "quadra" ? Red : Asphalt, 3), new Point(2, 28), new Point(30, 28));
+                break;
+            }
+            case "vianome":
+                RoadBackground(dc);
+                Text(dc, "RUA", 11, White, new Point(16, 9), true);
+                break;
+            case "detalhelotes":
+            {
+                dc.DrawRectangle(B(White), P(Asphalt, 1.2), new Rect(5, 5, 22, 22));
+                Text(dc, "12", 9, Asphalt, new Point(16, 11), true);
+                dc.DrawLine(P(Red, 1), new Point(5, 2.5), new Point(27, 2.5));
+                dc.DrawLine(P(Red, 1), new Point(29.5, 5), new Point(29.5, 27));
+                break;
+            }
+            case "quadrolote":
+                dc.DrawRectangle(B(White), P(Asphalt, 1.5), new Rect(2, 3, 28, 26));
+                for (int i = 0; i < 4; i++)
+                {
+                    dc.DrawLine(P(Asphalt, 0.8), new Point(2, 9 + i * 5), new Point(30, 9 + i * 5));
+                    var c = i switch { 0 => Color.FromRgb(242, 215, 166), 1 => Color.FromRgb(232, 163, 163), 2 => Color.FromRgb(155, 203, 138), _ => Color.FromRgb(217, 217, 217) };
+                    dc.DrawRectangle(B(c), null, new Rect(4, 10 + i * 5, 5, 3));
+                }
+                dc.DrawLine(P(Asphalt, 0.8), new Point(11, 9), new Point(11, 29));
+                break;
+            case "filtrolote":
+                dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(3, 4), new Point(29, 4), new Point(19, 16), new Point(19, 28), new Point(13, 24), new Point(13, 16))));
+                dc.DrawRectangle(B(Color.FromRgb(155, 203, 138)), null, new Rect(22, 20, 8, 8));
+                break;
             default:
                 dc.DrawEllipse(B(Blue), null, new Point(16, 16), 13, 13);
                 Text(dc, "i", 16, White, new Point(16, 5), true);

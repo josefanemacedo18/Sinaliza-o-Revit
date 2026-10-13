@@ -297,6 +297,10 @@ public static class MarkingBuilder
         RumbleStripDefinition rs => path == null || path.Points.Count < 2 ? Missing("Caminho do sonorizador não encontrado.") : RumbleStripGenerator.Generate(rs, path),
         EscapeRampDefinition er => path == null || path.Points.Count < 2 ? Missing("Eixo da área de escape não encontrado.") : EscapeRampGenerator.Generate(er, path, ctx),
         ChannelizationDefinition cz => path == null || path.Points.Count < 2 ? Missing("Linha de referência da canalização não encontrada.") : ChannelizationGenerator.Generate(cz, path, ctx),
+        QuadraDefinition qd => Parcelamento.LotDrawing.Quadra(qd, (ctx.Lookup?.Invoke(qd.LoteamentoId) as LoteamentoDefinition)?.Categorias),
+        LoteamentoDefinition => new MarkingGeometry(),
+        LoteamentoDetalheDefinition ld => Parcelamento.LotDrawing.Detalhe(ld, ctx),
+        QuadroLoteamentoDefinition ql => Parcelamento.LotDrawing.Quadro(ql, ctx),
         _ => throw new NotSupportedException(def.GetType().Name),
     };
 

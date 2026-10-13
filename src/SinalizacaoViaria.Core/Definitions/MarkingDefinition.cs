@@ -181,6 +181,10 @@ public enum Justificacao
 [JsonDerivedType(typeof(RumbleStripDefinition), "sonorizador")]
 [JsonDerivedType(typeof(EscapeRampDefinition), "area-escape")]
 [JsonDerivedType(typeof(SheetSegmentDefinition), "trecho-prancha")]
+[JsonDerivedType(typeof(LoteamentoDefinition), "loteamento")]
+[JsonDerivedType(typeof(QuadraDefinition), "quadra")]
+[JsonDerivedType(typeof(LoteamentoDetalheDefinition), "detalhe-lotes")]
+[JsonDerivedType(typeof(QuadroLoteamentoDefinition), "quadro-loteamento")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;

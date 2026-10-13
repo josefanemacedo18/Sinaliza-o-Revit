@@ -179,6 +179,8 @@ public static class QuantityCalculator
         foreach (var (def, geo) in items)
         {
             if (def is IAnnotationDefinition) continue;
+            // Lotes e quadras têm quadro próprio (quadro de áreas do loteamento).
+            if (Parcelamento.LotDrawing.IsParcelamento(def)) continue;
             // Placas empilhadas no mesmo suporte: cada uma conta como uma unidade do seu código (o suporte é da principal).
             if (def is SignDefinition { Stack.Count: > 0 } stacked)
                 foreach (var plate in SignStack.Plates(stacked).Skip(1))

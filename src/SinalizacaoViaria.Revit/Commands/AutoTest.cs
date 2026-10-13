@@ -45,7 +45,8 @@ public sealed class CmdAutoteste : CommandBase
             .Check("Obras: viaduto, ponte, túnel, trincheira, muros, taludes, nó viário (pesado)", () => o.Works, v => o.Works = v)
             .Check("Edição e detalhamento", () => o.Editing, v => { o.Editing = v; o.Detailing = v; })
             .Check("Simulador de Tráfego", () => o.Traffic, v => o.Traffic = v)
-            .Check("Verificações do modelo (pintura × pisos, continuidade)", () => o.Checks, v => o.Checks = v);
+            .Check("Verificações do modelo (pintura × pisos, continuidade)", () => o.Checks, v => o.Checks = v)
+            .Check("Loteamento (gleba, quadras, lotes, quadros, filtros e masterplan)", () => o.Loteamento, v => o.Loteamento = v);
         if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
         var runner = new AutoTestRunner(app, uidoc, o);
         var (summary, text) = runner.Run();
@@ -68,6 +69,7 @@ internal sealed class AutoTestOptions
     public bool Editing { get; set; }
     public bool Detailing { get; set; }
     public bool Checks { get; set; }
+    public bool Loteamento { get; set; } = true;
     /// <summary>Completo: todas as variantes; senão, no máximo 3 etapas por bloco e 3 minutos no total.</summary>
     public bool Full { get; set; }
     public int StepsPerGroup => Full ? int.MaxValue : 3;
@@ -145,6 +147,7 @@ internal sealed partial class AutoTestRunner
         {
             tg.Start();
             Setup();
+            if (_opt.Loteamento) Loteamento();
             if (_opt.Roads) Roads();
             if (_opt.Connections) Connections();
             if (_opt.Horizontal) Horizontal();

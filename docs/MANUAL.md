@@ -33,6 +33,7 @@ Guia **SinalizaBIM Infra**:
 | **Contenções** | muro de arrimo · talude |
 | **Relevo e Terreno** | Perfil da Via · Terraplenagem |
 | **Nós Viários** | Nó Viário (interseção em desnível) |
+| **Loteamento** | **Loteamento** · **Quadra e Lote** (quadra · lote) · Nomear Vias · Categorias e Filtros · **Detalhar e Quadros** (detalhar lotes · quadros do loteamento · memorial do loteamento) · **Masterplan** (seção 27) |
 
 Os botões com seta (▾) agrupam ferramentas afins; o botão mostra a última usada do grupo.
 
@@ -2543,3 +2544,135 @@ mesmo. Velocidade das vias inferidas: 50 km/h, ou a da placa R-19 sobre elas [a 
 > divisórias brancas) ela é de mão única no sentido certo – sem nada que diga o sentido, fica como *ambígua*. Pisos com
 > forma muito irregular podem pedir as linhas de eixo selecionadas, ou a conversão em via do plugin (§2.0.7).
 
+---
+
+## 27. Loteamento
+
+Guia **SinalizaBIM Infra → Loteamento**. Do limite da gleba aos lotes numerados, com quadros, memorial e masterplan.
+
+### 27.1 Fluxo
+
+1. **Vias primeiro**: crie as vias com **Via** / **Pista** (ou desenhe-as como pisos do Revit). As quadras são **a gleba menos
+   o que as vias ocupam** – pista, calçadas, meios-fios, sarjetas e canteiros.
+2. **Loteamento**: escolha o limite da gleba – **selecionar** (linha de propriedade, linhas fechadas de modelo ou de detalhe, ou o
+   Toposolid) ou **desenhar** por cliques (ESC fecha o contorno). O plugin reconhece as quadras (nomes A, B, C…, de cima para
+   baixo e da esquerda para a direita; áreas livres menores que 50 m² entram no sistema viário) e, em cada quadra, as
+   **testadas**: os lados que encostam numa via. Na janela: nome do loteamento, município, **frente e profundidade padrão**
+   (ex.: 12 × 30), o que fazer com a **sobra** e o sentido da numeração – com a pré-visualização de todos os lotes.
+3. **Quadra** (clique um lote): medidas padrão da quadra, sobra, numeração, **testadas** (apontar com cliques, em ordem de
+   prioridade, ou automáticas) e, **em cada esquina, quem fica com o lote de esquina** (escolhido na hora).
+4. **Lote** (clique um lote): frente, profundidade, divisão em partes iguais e categoria do lote – os vizinhos e a numeração
+   se ajustam.
+5. **Nomear Vias**, **Detalhar Lotes**, **Quadros do Loteamento**, **Memorial do Loteamento** e **Masterplan**.
+
+Num projeto que já tem loteamento, **Loteamento** oferece **reconhecer as quadras de novo** (as vias mudaram: refaz o contorno
+das quadras e mantém testadas, lotes personalizados e nomes; quadras novas recebem o próximo nome livre) ou abrir as categorias.
+
+### 27.2 Como os lotes são divididos
+
+* **Frente** medida ao longo da testada; **divisas laterais perpendiculares** à testada (nas curvas, pela normal; nos vértices,
+  pela bissetriz); **fundos** na profundidade dada, paralelos à testada.
+* **Esquinas arredondadas**: a frente é medida até o **encontro dos alinhamentos** (como se a esquina fosse viva); o arco só
+  recorta o lote de esquina.
+* **Fundos no meio da quadra**: entre duas testadas opostas mais próximas que 2 × profundidade, cada lado fica com a metade
+  (opção da quadra).
+* **Sobra da testada** (o que não completa um lote): por padrão **vira o último lote**, na categoria **Sobra** (S-1, S-2…),
+  registrado no quadro; quando a testada fica com a esquina do fim, a sobra entra **antes** do lote de esquina (que continua
+  inteiro). Outras opções: somada ao último lote ou distribuída entre os lotes. Uma sobra maior que a "sobra que vira lote"
+  vira um lote normal.
+* **Lote de esquina** – em cada esquina entre duas testadas:
+  * **Pela prioridade**: a testada que vem primeiro na lista fica com o lote de esquina (frente para as duas ruas);
+  * **Testada X** ou **Testada Y**: escolhida na hora;
+  * **Medida própria**: frente em cada uma das duas testadas (ex.: 15 × 20); as duas testadas começam depois dele.
+* **Miolo**: o que sobra no meio da quadra (quadras fundas ou formas irregulares) vira uma área **Sobra**; lascas menores que
+  1 m² vão para o lote vizinho. **A soma das áreas das parcelas é sempre a área da quadra** (tolerância de 0,01 m²).
+* **Quadra inteira**: uma área só (praça, área verde, institucional), sem divisão.
+* Cada lote tem uma **chave estável** (testada + ordem ao longo dela, e a parte quando dividido): as personalizações não se
+  perdem quando a numeração muda.
+
+### 27.3 Numeração
+
+Cada quadra tem a sua: **lotes de 1 a N** (Quadra H com 20 lotes: 1 a 20; Quadra G com 17: 1 a 17). Categorias com prefixo
+são numeradas à parte na quadra: **AI-1** (institucional), **AV-1** (área verde), **S-1** (sobra). A numeração segue o
+contorno da quadra no sentido escolhido (horário por padrão), a partir do **lote 1** – o lote de esquina mais a noroeste ou o
+que você clicar (Quadra → "Clicar o lote que recebe o número 1", ou Lote → "Este lote recebe o número 1"). É refeita sozinha
+quando lotes são criados, divididos, unidos (frente maior) ou mudam de categoria.
+
+### 27.4 Categorias, cores e filtros
+
+Categorias padrão: **Lote** (bege), **Institucional** (rosado, hachura diagonal, pública, AI), **Área verde** (verde, hachura de
+grama, pública, AV) e **Sobra** (cinza, pontilhado, S). Em **Categorias e Filtros** você muda nome, cor (#RRGGBB), hachura,
+"área pública", prefixo e o **mínimo em % da gleba**, cria categorias novas (ex.: Comercial) e exclui categorias (os lotes delas
+voltam a Lote).
+
+No Revit, cada categoria tem:
+
+* um **material** "SV - Lote – {categoria}": cor no **3D** e, em planta, fundo na cor com a hachura por cima;
+* um **filtro de vista** "SV - Lote – {categoria}" (parâmetro **SV_CategoriaLote**): na mesma janela, marque quais categorias
+  mostrar na vista ativa e se os filtros aplicam as cores. Se a vista usa um modelo de vista, os filtros vão para o modelo.
+
+Parâmetros de cada lote: **SV_Quadra**, **SV_Lote** (número), **SV_CategoriaLote**, **SV_AreaLote** (m², projeção horizontal),
+além de Comentários "SV lote H 12 [T1:3]" e Marca "H-12" – prontos para etiquetas e tabelas.
+
+### 27.5 Lotes no relevo e no 3D
+
+Cada lote é uma **subdivisão do Toposolid**: acompanha as ondulações do terreno em planta e no 3D, com o material da
+categoria e uma espessura pequena (3 cm, ajustável) que deixa as divisas visíveis no 3D. A **Terraplenagem** edita o
+Toposolid existente, e as subdivisões acompanham o terreno ajustado. **Sem Toposolid** (ou com o lote fora dele), o lote
+vira um **piso plano** de 5 cm no nível, com o mesmo material e os mesmos parâmetros (o Toposolid não é obrigatório).
+
+### 27.6 Detalhamento
+
+**Detalhar Lotes** desenha na vista ativa, em mm de papel × escala: **número** do lote, **área** em m², **medida de cada
+lado** (frente, laterais e fundos; trechos curvos com o desenvolvimento), **categoria** (institucional, área verde, sobra),
+**nome da quadra** e **nome das vias**; opcionalmente as **cores das categorias** como regiões e as **divisas** e o limite da
+gleba como linhas (vistas sem os lotes coloridos). Cada item liga e desliga; os textos acompanham as mudanças dos lotes.
+
+### 27.7 Vias com nome
+
+**Nomear Vias**: selecione a via (o eixo, um piso ou qualquer elemento da via do plugin) e escreva o nome. O nome entra nas
+**confrontações do memorial** (frente dos lotes), no detalhamento e no masterplan. Uma testada também pode ter nome próprio
+(Quadra → Testadas → "Nome da via").
+
+### 27.8 Quadros e memorial
+
+**Quadros do Loteamento** – independentes de vista (Legenda própria, vai para várias folhas; ou na vista ativa):
+
+* **Quadro de áreas**: amostra de cor de cada categoria, quantidade, área (m²) e % da gleba – lotes, institucional, áreas
+  verdes, sobras, **sistema viário** (gleba menos as quadras), **área total da gleba** (100 %) e **áreas públicas** (sistema
+  viário + categorias públicas); coluna **Mínimo** quando informado.
+* **Quadro de quadras**: lotes e área por categoria de cada quadra, com total.
+* **Quadro de lotes**: quadra, lote, categoria, frente e área de cada lote (continua em colunas ao lado).
+* **Tabela do Revit**: "SV - Lotes do loteamento", nativa (quadra, lote, categoria, área), atualizada pelo próprio Revit.
+
+**Memorial do Loteamento** (.docx): identificação (município a preencher), gleba (área, perímetro, quadras, lotes; limites e
+confrontações da gleba a preencher), quadro de áreas, sistema viário (vias nomeadas e extensão no loteamento), quadro de
+quadras, **descrição de cada lote** (frente para a via, lados direito e esquerdo – de quem olha o lote da via –, fundos, com
+quem confronta e área) e responsabilidade técnica a preencher. É projetual: sem proprietário nem matrícula.
+
+**Lei Federal nº 6.766/1979**: o texto da lei não foi anexado a esta rodada. O plugin **não embute percentuais legais**: os
+mínimos são campos editáveis (por categoria, sistema viário e áreas públicas), vazios por padrão, e o quadro e o memorial avisam
+o que ficar abaixo. Os requisitos da lei e da lei municipal aplicável estão **[a confirmar]**.
+
+### 27.9 Masterplan
+
+**Masterplan** cria uma cópia da planta ativa (sem as anotações dela) com o layout limpo:
+
+* ficam os **lotes nas cores das categorias**, as **vias**, **calçadas**, **canteiros**, **árvores** e **mobiliário**, os
+  **nomes das quadras e das vias** e os **números dos lotes**;
+* saem a sinalização horizontal e vertical, os dispositivos, o piso tátil e as rampas, a drenagem, as cotas, etiquetas, níveis,
+  eixos e linhas – por categoria e pelo filtro "SV - Masterplan – sinalização e detalhes";
+* estilo de vista em **cores consistentes**; na primeira vez cria o modelo de vista **"SV - Masterplan"**, para aplicar o mesmo
+  layout em outras plantas.
+
+### 27.10 Formato salvo
+
+O loteamento fica num elemento de dados do projeto (DataStorage) e cada quadra é gravada nos elementos dos seus lotes, no
+mesmo esquema de dados das demais marcas do plugin (tipos novos "loteamento", "quadra", "detalhe-lotes" e
+"quadro-loteamento"). Os projetos antigos não mudam.
+
+### 27.11 Autoteste
+
+O **Autoteste** tem o bloco **Loteamento**: cria três vias numa área de teste, reconhece as seis quadras, gera os lotes
+(subdivisões ou pisos), confere a soma das áreas e a numeração, personaliza um lote, cria detalhamento, quadro na Legenda,
+filtros, masterplan e memorial – e registra no relatório o que falhar.

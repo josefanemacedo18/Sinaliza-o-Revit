@@ -422,6 +422,8 @@ public sealed class MarkingService
         _definitions = null;
         _present = null;
         var existing = MarkingStorage.ById(_doc, def.Id);
+        // Loteamento: dados num elemento próprio; quadra: um lote por subdivisão do Toposolid (ou piso plano).
+        if (def is LoteamentoDefinition or QuadraDefinition) return LotService.Render(_doc, def, existing);
         PruneExclusions(def);
         // Traçado das linhas de referência guardado na marca: apagar a linha depois não faz a marca perder o caminho.
         try { PathResolver.RefreshCache(_doc, def.Path); } catch (Exception ex) { Log.Error("Cache do caminho", ex); }

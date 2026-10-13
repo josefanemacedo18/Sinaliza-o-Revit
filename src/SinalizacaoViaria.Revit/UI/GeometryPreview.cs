@@ -242,7 +242,8 @@ public sealed class GeometryPreview : FrameworkElement
             foreach (var piece in _geometry.Pieces)
             {
                 if (piece.Layer == Core.Generators.EarthworksGenerator.BoreLayer) continue;
-                var rgb = MarkingColors.Display(piece.Color);
+                // Cor própria da peça (lotes por categoria, regiões do detalhamento) ou a cor da marca.
+                var rgb = Rgb.TryParse(piece.Rgb, out var own) ? own : MarkingColors.Display(piece.Color);
                 var brush = new SolidColorBrush(Color.FromRgb(rgb.R, rgb.G, rgb.B));
                 brush.Freeze();
                 dc.DrawGeometry(brush, OutlinePen, ToGeometry(piece.Shape, P));

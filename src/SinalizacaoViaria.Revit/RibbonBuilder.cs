@@ -200,6 +200,30 @@ public static class RibbonBuilder
         Large(rel, typeof(CmdTerraplenagem), "Terraplenagem", "terraplenagem",
             "Ajusta o Toposolid (Massa e terreno) às vias, conexões e obras: plataformas, taludes de corte e aterro até o terreno natural, reaterro de muros e escavação – com volumes de corte e aterro.");
 
+        // ---------------------------------------------------------------- Loteamento
+        var lote = app.CreateRibbonPanel(InfraTab, "Loteamento");
+        Large(lote, typeof(CmdLoteamento), "Loteamento", "loteamento",
+            "Gleba (linha de propriedade, linhas, Toposolid ou cliques) → quadras reconhecidas (a gleba menos as vias) → lotes pela testada com medida padrão (ex.: 12 × 30), " +
+            "numerados de 1 a N em cada quadra. Cada lote é uma subdivisão do Toposolid: acompanha o relevo em planta e no 3D (sem Toposolid, piso plano).");
+        Split(lote, "SvLoteEdicao", "Quadra e Lote",
+            Data(typeof(CmdQuadraLote), "Quadra", "quadra",
+                "Clique um lote: medidas padrão da quadra, sobra, testadas (apontar com cliques, em ordem de prioridade), lote de esquina em cada esquina " +
+                "(por uma testada, pela outra ou com medida própria), sentido da numeração e lote 1."),
+            Data(typeof(CmdLote), "Lote", "lote",
+                "Clique um lote: frente, profundidade, divisão em partes e categoria (Lote, Institucional, Área verde, Sobra ou outra) – os vizinhos e a numeração se ajustam."));
+        StackTwo(lote,
+            Data(typeof(CmdNomearVias), "Nomear Vias", "vianome", "Selecione a via (eixo, piso ou elemento dela) e escreva o nome – entra nas confrontações do memorial, no detalhamento e no masterplan."),
+            Data(typeof(CmdCategoriasLotes), "Categorias e Filtros", "filtrolote",
+                "Categorias de lote (cor e hachura em planta e no 3D, numeração com prefixo, área pública, mínimo %), nova categoria e filtros de vista para mostrar/ocultar cada uma."));
+        Split(lote, "SvLoteDoc", "Detalhar e Quadros",
+            Data(typeof(CmdDetalharLotes), "Detalhar Lotes", "detalhelotes", "Na vista ativa: número, área, medidas dos lados, categoria, nome da quadra e das vias (cada item opcional)."),
+            Data(typeof(CmdQuadrosLoteamento), "Quadros do Loteamento", "quadrolote",
+                "Quadro de áreas (m² e % da gleba), de quadras e de lotes numa Legenda própria (vai para qualquer folha) – e a tabela nativa dos lotes."),
+            Data(typeof(CmdMemorialLoteamento), "Memorial do Loteamento", "memorial", "Memorial descritivo (.docx): gleba, quadro de áreas, sistema viário, quadras e descrição de cada lote com as confrontações."));
+        Large(lote, typeof(CmdMasterplan), "Masterplan", "masterplan",
+            "Cópia da planta ativa só com o layout: lotes nas cores das categorias, vias, calçadas, árvores e mobiliário, nomes das quadras e vias e números dos lotes – " +
+            "sem sinalização, cotas nem textos técnicos. Cria o modelo de vista \"SV - Masterplan\".");
+
     }
 
     private static void Split(RibbonPanel panel, string name, string text, params PushButtonData[] items)
