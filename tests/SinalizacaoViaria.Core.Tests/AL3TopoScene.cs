@@ -378,7 +378,8 @@ public static class TopoScene
             var road = node == null ? sc.World.Groups.FindIndex(g => g.Contains(grp.Key.Def)) : -1;
             foreach (var m in PolygonOps.Union(grp.Select(x => x.Piece.Shape)).Where(p => p.Area > 0.01))
             {
-                var tiles = node != null ? tiling.ForNode(node.Id, m) : road >= 0 ? tiling.ForRoad(sc.World.Roads[road].Def.Id, m) : null;
+                var paint = MarkingColors.IsPaint(grp.Key.Color);
+                var tiles = node != null ? tiling.ForNode(node.Id, m, paint) : road >= 0 ? tiling.ForRoad(sc.World.Roads[road].Def.Id, m, paint) : null;
                 if (tiles != null)
                 {
                     foreach (var (part, plane) in tiles) res.Add((grp.Key.Def, grp.First().Piece, m, part, plane, false, zf));

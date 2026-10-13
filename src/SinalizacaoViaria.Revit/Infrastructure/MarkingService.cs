@@ -597,7 +597,7 @@ public sealed class MarkingService
                 foreach (var grp in floorPieces.Where(p => !locked.Contains(p.Color))
                              .GroupBy(ElementPlan.FloorKey))
                 {
-                    var parts = FloorParts(def, grp.Select(p => p.Shape), terrain, baseZ);
+                    var parts = FloorParts(def, grp.Select(p => p.Shape), terrain, baseZ, MarkingColors.IsPaint(grp.Key.Color));
                     if (MarkingColors.IsPaint(grp.Key.Color) && parts.Count > 1)
                     {
                         // Pintura: um piso por cor e por plano, com todos os traços/áreas como contornos do mesmo esboço.
@@ -1562,7 +1562,8 @@ public sealed class MarkingService
     /// PLANAS (cada uma um piso plano inclinado, sem os vincos da edição de forma) – juntas retas perpendiculares ao eixo e na
     /// crista do abaulamento, partes coplanares fundidas de volta. Plano nulo = piso na cota (sem superfície) ou empenado.
     /// </summary>
-    private List<(Polygon2 Shape, Plane3? Plane)> FloorParts(MarkingDefinition def, IEnumerable<Polygon2> shapes, ISurface? terrain, double baseZ)
+    private List<(Polygon2 Shape, Plane3? Plane)> FloorParts(MarkingDefinition def, IEnumerable<Polygon2> shapes, ISurface? terrain, double baseZ,
+        bool paint = false)
     {
         var merged = PolygonOps.Union(shapes).Where(p => p.Area > 0.01).ToList();
         var parts = new List<(Polygon2 Shape, Plane3? Plane)>();
@@ -1570,7 +1571,7 @@ public sealed class MarkingService
         {
             if (terrain == null) { parts.Add((m, null)); continue; }
             // Via e nó com greide: o retalhamento comum (as mesmas juntas e os mesmos planos para todos os pisos).
-            if (terrain is GradeSampler or NodeSampler && TiledParts(def, m, baseZ) is { } tiled)
+            if (terrain is GradeSampler or NodeSampler && TiledParts(def, m, baseZ, paint) is { } tiled)
             {
                 parts.AddRange(tiled);
                 continue;
@@ -1600,15 +1601,15 @@ public sealed class MarkingService
     /// com greide). A marca com base própria diferente da base da via leva os planos junto (a superfície dela é o greide a partir
     /// da própria base).
     /// </summary>
-    private List<(Polygon2 Shape, Plane3? Plane)>? TiledParts(MarkingDefinition def, Polygon2 shape, double baseZ)
+    private List<(Polygon2 Shape, Plane3? Plane)>? TiledParts(MarkingDefinition def, Polygon2 shape, double baseZ, bool paint)
     {
         try
         {
             var tiling = Tiling();
             if (NodeOwner(def) is { } owner)
-                return tiling.ForNode(owner.Id, shape)?.Select(x => (x.Part, (Plane3?)x.Plane)).ToList();
+                return tiling.ForNode(owner.Id, shape, paint)?.Select(x => (x.Part, (Plane3?)x.Plane)).ToList();
             if (RoadOf(def) is not { Output.Grade: not null } road) return null;
-            var parts = tiling.ForRoad(road.Id, shape);
+            var parts = tiling.ForRoad(road.Id, shape, paint);
             if (parts == null) return null;
             var dz = baseZ - (PathResolver.Resolve(_doc, road.Path)?.Z ?? baseZ);
             return parts.Select(x => (x.Part, (Plane3?)(x.Plane with { A = x.Plane.A + dz }))).ToList();

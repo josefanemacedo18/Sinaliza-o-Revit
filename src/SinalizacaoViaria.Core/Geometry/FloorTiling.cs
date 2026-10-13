@@ -69,21 +69,25 @@ public sealed class FloorTiling
     /// Partes planas de um piso de uma via (pista, calçada, linha...): a malha da via e, na área dos nós em que ela é
     /// secundária, a da via principal. Nulo = a via não tem greide (fica a divisão própria do piso).
     /// </summary>
-    public List<(Polygon2 Part, Plane3 Plane)>? ForRoad(string roadId, Polygon2 shape)
+    /// <param name="onTop">
+    /// A peça assenta sobre as outras (pintura): uma lasca juntada à vizinha deixa o plano dela na mais alta das duas faces
+    /// – como uma peça rígida sobre a crista –, nunca abaixo do pavimento.
+    /// </param>
+    public List<(Polygon2 Part, Plane3 Plane)>? ForRoad(string roadId, Polygon2 shape, bool onTop = false)
     {
         if (FrameOf(roadId) is not { } f) return null;
         var regions = new List<(Polygon2 Region, Frame Frame)>();
         foreach (var z in f.In.Zones)
             if (_node(z.NodeId) is { } n && FrameOf(n.MajorId) is { } m && !ReferenceEquals(m, f))
                 regions.Add((FloorPlanes.Band(f.Surf, z.Station - z.Start, z.Station + z.Start, -f.W, f.W), m));
-        return Split(shape, regions, f);
+        return Split(shape, regions, f, onTop);
     }
 
     /// <summary>
     /// Partes planas de um piso de um nó (pavimento do nó, calçadas e guias das esquinas, faixas, rampas): a malha da via
     /// principal e, ao longo de cada secundária além do alcance do nó, a dela. Nulo = nó sem via principal com greide.
     /// </summary>
-    public List<(Polygon2 Part, Plane3 Plane)>? ForNode(string nodeId, Polygon2 shape)
+    public List<(Polygon2 Part, Plane3 Plane)>? ForNode(string nodeId, Polygon2 shape, bool onTop = false)
     {
         if (_node(nodeId) is not { } n || FrameOf(n.MajorId) is not { } m) return null;
         var regions = new List<(Polygon2 Region, Frame Frame)>();
@@ -99,7 +103,7 @@ public sealed class FloorTiling
                     regions.Add((FloorPlanes.Band(g.Surf, -Extension, z.Station - z.Start, -g.W, g.W), g));
             }
         }
-        return Split(shape, regions, m);
+        return Split(shape, regions, m, onTop);
     }
 
     /// <summary>Cota (m) das faces dos pisos de uma via no ponto (a malha da via; na área dos nós em que ela é secundária, a da principal).</summary>
@@ -542,7 +546,7 @@ public sealed class FloorTiling
 
     // ------------------------------------------------------------------ recorte dos pisos
 
-    private List<(Polygon2 Part, Plane3 Plane)> Split(Polygon2 shape, List<(Polygon2 Region, Frame Frame)> regions, Frame main)
+    private List<(Polygon2 Part, Plane3 Plane)> Split(Polygon2 shape, List<(Polygon2 Region, Frame Frame)> regions, Frame main, bool onTop)
     {
         var parts = new List<(Polygon2, Plane3)>();
         var rest = new List<Polygon2> { shape };
@@ -555,7 +559,7 @@ public sealed class FloorTiling
             rest = PolygonOps.Difference(rest, new[] { region }).Where(p => p.Area > 1e-7).ToList();
         }
         foreach (var p in rest) parts.AddRange(Tile(main, p));
-        return MergeSlivers(parts);
+        return MergeSlivers(parts, onTop);
     }
 
     /// <summary>Peça recortada pelas células da malha: cada parte com o plano da face em que está.</summary>
@@ -638,20 +642,24 @@ public sealed class FloorTiling
         return new Polygon2(left ? new[] { a, b, b + n * M, a + n * M } : new[] { a, a + n * M, b + n * M, b });
     }
 
-    /// <summary>
-    /// Lascas (&lt; 0,01 m² ou com menos de 2 cm de largura média) juntadas à parte vizinha com a maior borda em comum – onde o
-    /// contorno da peça passa rente a uma junta. A lasca fica no plano da vizinha (diferença ≤ largura × diferença de rampa).
-    /// </summary>
+    /// <summary>Perímetro (m) do contorno e dos furos.</summary>
     private static double Perimeter(Polygon2 p)
     {
         static double Ring(IReadOnlyList<Vec2> r) { var s = 0.0; for (int i = 0; i < r.Count; i++) s += r[i].DistanceTo(r[(i + 1) % r.Count]); return s; }
         return Math.Max(1e-9, Ring(p.Outer) + p.Holes.Sum(Ring));
     }
 
-    private static List<(Polygon2 Part, Plane3 Plane)> MergeSlivers(List<(Polygon2 Part, Plane3 Plane)> parts)
+    /// <summary>
+    /// Lascas (&lt; 0,01 m² ou com menos de 2 cm de largura média; na pintura, frestas de menos de 3 mm) juntadas à parte vizinha
+    /// com a maior borda em comum – onde o contorno da peça passa rente a uma junta. A lasca fica no plano da vizinha
+    /// (diferença ≤ largura × diferença de rampa).
+    /// </summary>
+    private static List<(Polygon2 Part, Plane3 Plane)> MergeSlivers(List<(Polygon2 Part, Plane3 Plane)> parts, bool onTop = false)
     {
         static double Per(Polygon2 p) => Perimeter(p);
-        static bool Thin(Polygon2 p) => p.Area < 0.01 || 2 * p.Area / Math.Max(1e-9, Per(p)) < 0.02;
+        // Pintura: só as frestas de verdade (< 3 mm) – os pedaços pequenos de uma faixa cortada numa junta ficam com o plano
+        // da própria face (juntados à vizinha, ficariam até 5 mm fora do pavimento numa célula torcida).
+        bool Thin(Polygon2 p) => onTop ? 2 * p.Area / Math.Max(1e-9, Per(p)) < 0.003 : p.Area < 0.01 || 2 * p.Area / Math.Max(1e-9, Per(p)) < 0.02;
         var list = parts.ToList();
         var stuck = new HashSet<Polygon2>();
         for (int guard = 0; guard < 2000; guard++)
@@ -681,7 +689,16 @@ public sealed class FloorTiling
                 if (shared > bestShared) { bestShared = shared; best = k; bestUnion = u[0]; }
             }
             if (best < 0) { stuck.Add(sl); continue; }
-            list[best] = (bestUnion!, list[best].Plane);
+            var plane = list[best].Plane;
+            if (onTop)
+            {
+                // Sobre a lasca, a face dela pode ficar acima do plano da vizinha: o plano sobe o necessário (≤ largura × diferença
+                // de rampa) para a peça ficar toda sobre o pavimento.
+                var sp = list[i].Plane;
+                var lift = sl.Outer.Concat(sl.Holes.SelectMany(h => h)).Max(v => sp.Z(v) - plane.Z(v));
+                if (lift > 0) plane = plane with { A = plane.A + lift };
+            }
+            list[best] = (bestUnion!, plane);
             list.RemoveAt(i);
         }
         return list;

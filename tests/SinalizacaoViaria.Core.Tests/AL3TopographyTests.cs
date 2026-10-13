@@ -180,7 +180,8 @@ public class AL3TopographyTests
     /// Pisos sem deformação: cada piso vira partes planas (nenhuma empenada onde há eixo de referência), cada parte a até
     /// 1,2 × 2 cm da superfície em todo ponto (a tolerância de plano dos pisos do plugin; o plano "de corda", que passa
     /// exatamente na superfície nas juntas para as partes vizinhas se encontrarem sem degrau, pode usar até 1,2 × ela –
-    /// FloorPlanes.Chord), nenhuma lasca (&lt; 0,01 m²) e a área total preservada.
+    /// FloorPlanes.Chord), nenhuma lasca (&lt; 0,01 m²; na pintura, cortada nas juntas, nenhuma fresta de menos de 3 mm) e a
+    /// área total preservada.
     /// </summary>
     [Theory]
     [MemberData(nameof(Matrix))]
@@ -193,7 +194,9 @@ public class AL3TopographyTests
         {
             var name = f.Def.GetType().Name + "/" + f.Piece.Layer;
             Assert.False(f.Warped, $"{name}: parte empenada");
-            Assert.True(f.Part.Area >= 0.01, $"{name}: lasca de {f.Part.Area:0.0000} m²");
+            // Pintura cortada nas juntas: pedaços pequenos no plano da própria face (nunca frestas de menos de 3 mm).
+            if (MarkingColors.IsPaint(f.Piece.Color)) Assert.True(2 * f.Part.Area / VTRelevoTests.Perimeter(f.Part) >= 0.003, $"{name}: fresta de pintura");
+            else Assert.True(f.Part.Area >= 0.01, $"{name}: lasca de {f.Part.Area:0.0000} m²");
             foreach (var v in FloorPlanes.Samples(f.Part, f.Z, 1.0))
             {
                 var d = Math.Abs(f.Plane.Z(v.XY) - v.Z);
@@ -320,7 +323,8 @@ public class AL3TopographyTests
         {
             var u = PolygonOps.Union(new[] { f.Part });
             Assert.True(u.Count == 1 && Math.Abs(u[0].Area - f.Part.Area) <= 1e-4 * Math.Max(1, f.Part.Area), $"{f.Def.GetType().Name}: parte com autointerseção");
-            Assert.True(f.Part.Area >= 0.01, $"{f.Def.GetType().Name}: parte de {f.Part.Area:0.0000} m²");
+            if (MarkingColors.IsPaint(f.Piece.Color)) Assert.True(2 * f.Part.Area / VTRelevoTests.Perimeter(f.Part) >= 0.003, $"{f.Def.GetType().Name}: fresta de pintura");
+            else Assert.True(f.Part.Area >= 0.01, $"{f.Def.GetType().Name}: parte de {f.Part.Area:0.0000} m²");
             Assert.True(double.IsFinite(f.Plane.A) && double.IsFinite(f.Plane.B) && double.IsFinite(f.Plane.C) && f.Plane.Slope < 1, $"{f.Def.GetType().Name}: plano inválido (rampa {f.Plane.Slope:0.00})");
         }
         var pts = TerrainRebuild.Points(sc.Original, sc.Design, TerrainRebuild.Mask(PolygonOps.Union(sc.Design.Footprint), 1.0));

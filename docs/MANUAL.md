@@ -239,6 +239,12 @@ legendas e vagas são criadas como **pisos finos** (uma cor = um piso com todos 
 pavimento – como as calçadas e a pista. Assim dá para editar o contorno com as ferramentas do Revit, filtrar por
 material e quantificar pela área real. Desligado, volta o modo anterior (sólidos/regiões).
 
+**No greide e nos nós** a pintura usa a **mesma malha de juntas e os mesmos planos do pavimento embaixo** (retalhamento
+comum, seção 24.8): cada pedaço de faixa fica no plano da face do pavimento em que está, então o fundo da pintura coincide
+com o topo do pavimento em todo ponto – sem afundar nem flutuar. Uma faixa que cruza uma junta vira dois pedaços (um em cada
+face, no mesmo piso da cor); só frestas de menos de 3 mm são juntadas à vizinha, assentadas na face mais alta. Antes a
+pintura era dividida por conta própria e ficava até 37 mm enterrada ou 29 mm acima do pavimento.
+
 ### 2.0.5 Via nova a partir da ponta de outra (emenda concordada)
 
 Quando uma via nova começa (ou termina) exatamente na **ponta** de uma via existente – pelo ímã de conexão ou

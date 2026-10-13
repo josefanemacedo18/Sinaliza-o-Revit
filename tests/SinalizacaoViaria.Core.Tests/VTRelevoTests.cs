@@ -89,6 +89,12 @@ public class VTRelevoTests
         }
     }
 
+    internal static double Perimeter(Polygon2 p)
+    {
+        static double Ring(IReadOnlyList<Vec2> r) { var s = 0.0; for (int i = 0; i < r.Count; i++) s += r[i].DistanceTo(r[(i + 1) % r.Count]); return s; }
+        return Math.Max(1e-9, Ring(p.Outer) + p.Holes.Sum(Ring));
+    }
+
     /// <summary>Pavimento (asfalto, bloquete, concreto, terra) – o resto é calçada, meio-fio, sarjeta, grama ou pintura.</summary>
     internal static bool IsPavement(MarkingColor c) => c is MarkingColor.Asfalto or MarkingColor.Bloquete or MarkingColor.PavimentoConcreto or MarkingColor.PavimentoTerra;
 
@@ -158,7 +164,14 @@ public class VTRelevoTests
         var sc = Get(terrain, kind, a, b);
         var floors = TopoScene.Floors(sc).Where(f => f.Piece.Solid == null && f.Piece.Profile == null).ToList();
         Assert.NotEmpty(floors);
-        foreach (var f in floors) Assert.True(f.Part.Area >= 0.01, $"{f.Def.GetType().Name}: lasca de {f.Part.Area:0.0000} m²");
+        // Lascas: nenhuma parte de piso com menos de 0,01 m² ou mais fina que 2 cm; na pintura (faixas cortadas nas juntas, cada
+        // pedaço no plano da própria face), nenhuma mais fina que 3 mm.
+        foreach (var f in floors)
+        {
+            var thick = 2 * f.Part.Area / Perimeter(f.Part);
+            if (MarkingColors.IsPaint(f.Piece.Color)) Assert.True(thick >= 0.003, $"{f.Def.GetType().Name}: fresta de pintura de {thick * 1000:0.0} mm");
+            else Assert.True(f.Part.Area >= 0.01 && thick >= 0.0199, $"{f.Def.GetType().Name}: lasca de {f.Part.Area:0.0000} m² ({thick * 100:0.0} cm)");
+        }
         var node = sc.World.Nodes[0].Layout.Definition!.Node;
         foreach (var (p, step, what) in Steps(floors))
         {
@@ -190,5 +203,41 @@ public class VTRelevoTests
             Assert.True(g.Count() <= 2, $"{terrain}/{kind}/{a}x{b}: pista da principal ({g.Key.Area:0} m²) em {g.Count()} partes");
         foreach (var g in floors.Where(f => f.Def.Id == it.Id).GroupBy(f => f.Merged))
             Assert.True(g.Count() <= 4, $"{terrain}/{kind}/{a}x{b}: pavimento do nó ({g.Key.Area:0} m²) em {g.Count()} partes");
+    }
+
+    /// <summary>
+    /// Pintura sobre o pavimento: em todo ponto pintado (malha de 0,1 m e contorno), o fundo da pintura fica sobre o topo do
+    /// pavimento embaixo, com folga entre 0 e 5 mm – a pintura usa os mesmos planos do pavimento e, onde uma lasca dela é
+    /// juntada à vizinha, assenta na face mais alta. Antes a pintura como piso era dividida por conta própria: até 37 mm
+    /// enterrada e 29 mm flutuando.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Matrix))]
+    public void V4_PinturaSobreOPavimento_SemEnterrarNemFlutuar(string terrain, string kind, string a, string b)
+    {
+        var sc = Get(terrain, kind, a, b);
+        var floors = TopoScene.Floors(sc).Where(f => f.Piece.Solid == null && f.Piece.Profile == null).ToList();
+        var pav = floors.Where(f => IsPavement(f.Piece.Color)).ToList();
+        var paint = floors.Where(f => MarkingColors.IsPaint(f.Piece.Color)).ToList();
+        Assert.NotEmpty(paint);
+        var n = 0;
+        foreach (var p in paint)
+        {
+            var (mn, mx) = p.Part.Bounds;
+            var c = p.Part.Centroid;
+            var pts = p.Part.Outer.Select(v => v + (c - v) * 0.02).ToList();
+            for (var x = mn.X + 0.05; x < mx.X; x += 0.1)
+                for (var y = mn.Y + 0.05; y < mx.Y; y += 0.1)
+                    if (p.Part.Contains(new Vec2(x, y))) pts.Add(new Vec2(x, y));
+            foreach (var v in pts)
+            {
+                var under = pav.FirstOrDefault(f => f.Part.Contains(v));
+                if (under.Def == null) continue;
+                var gap = p.Plane.Z(v) + p.Piece.Elevation - Top(under, v);
+                n++;
+                Assert.True(gap >= -1e-4 && gap <= 0.005, $"{terrain}/{kind}/{a}x{b}: pintura {p.Def.GetType().Name} a {gap * 1000:0.0} mm do pavimento em {v}");
+            }
+        }
+        Assert.True(n > 1000);
     }
 }
