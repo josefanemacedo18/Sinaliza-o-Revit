@@ -103,7 +103,7 @@ public static class LotForms
     }
 
     /// <summary>Ação pedida na janela da quadra (clique no Revit e reabre).</summary>
-    public enum AcaoQuadra { Nenhuma, ApontarTestadas, TestadasAutomaticas, LoteInicial }
+    public enum AcaoQuadra { Nenhuma, ApontarTestadas, TestadasAutomaticas, LoteInicial, Recarregar }
 
     /// <summary>Quadra: medidas, sobra, numeração, testadas (frente, profundidade e nome da via de cada uma) e esquinas.</summary>
     public static FormWindow Quadra(QuadraDefinition q, LoteamentoDefinition? lot, Action<AcaoQuadra> acao)
@@ -148,6 +148,12 @@ public static class LotForms
         {
             var tt = t;
             w.Section($"Testada {tt.Id}")
+                .Integer("Prioridade (1 = primeira; fica com as esquinas em 'Prioridade')", () => q.Testadas.IndexOf(tt) + 1, v =>
+                {
+                    var i = Math.Clamp(v, 1, q.Testadas.Count) - 1;
+                    q.Testadas.Remove(tt);
+                    q.Testadas.Insert(i, tt);
+                }, 1, Math.Max(1, q.Testadas.Count))
                 .Number("Frente (m)", () => tt.Frente ?? 0, v => tt.Frente = v > 0.1 ? v : null, 0, 200)
                 .Number("Profundidade (m)", () => tt.Profundidade ?? 0, v => tt.Profundidade = v > 0.1 ? v : null, 0, 500)
                 .Text("Nome da via (memorial)", () => tt.Via, v => tt.Via = string.IsNullOrWhiteSpace(v) ? null : v!.Trim(),
@@ -182,6 +188,29 @@ public static class LotForms
                         .Number($"Frente na testada {e.Posterior} (m)", () => esq.FrentePosterior, v => esq.FrentePosterior = v, 0.5, 200));
             }
         }
+
+        // Lote por lote: medidas e categoria de cada lote da quadra (números como na prévia).
+        w.Section("Lote por lote", "Cada lote desta quadra, na ordem da numeração (0 = medida padrão da testada/quadra). Mudar a frente " +
+                                   "de um lote empurra os seguintes da mesma testada. Para ver a lista com os números novos, use o botão abaixo.")
+            .Button("Atualizar a lista de lotes (aplica e reabre)", () => { acao(AcaoQuadra.Recarregar); w!.DialogResult = true; });
+        foreach (var p in LotReport.NaOrdem(div.Parcelas))
+        {
+            var pp = p;
+            var baseKey = pp.Chave.Contains('.') ? pp.Chave[..pp.Chave.IndexOf('.')] : pp.Chave;
+            var editable = !pp.Chave.StartsWith("esq:") && !pp.Chave.StartsWith("m:") && pp.Chave != "q" && !pp.Sobra && pp.Unidos == null;
+            string Padrao() => pp.Chave.StartsWith("m:") || pp.Chave == "q" && !q.Inteira ? q.MioloCategoria : q.CategoriaPadrao;
+            var info = $"{LotReport.M(pp.Frente)} × {LotReport.M(pp.Profundidade)} m, {LotReport.M(pp.Area)} m²" +
+                       (pp.TestadaId != null ? $", testada {pp.TestadaId}" : "") + (pp.Esquina ? ", esquina" : "") + (pp.Sobra ? ", sobra da testada" : "") +
+                       (pp.Unidos != null ? $", união de {pp.Unidos.Count}" : "");
+            w.Section($"{LotReport.Rotulo(pp)} ({info})");
+            if (editable)
+                w.Number("Frente (m)", () => q.Ajuste(baseKey)?.Frente ?? 0, v => q.AjusteOuNovo(baseKey).Frente = v > 0.1 ? v : null, 0, 200)
+                    .Number("Profundidade (m)", () => q.Ajuste(baseKey)?.Profundidade ?? 0, v => q.AjusteOuNovo(baseKey).Profundidade = v > 0.1 ? v : null, 0, 500)
+                    .Integer("Dividir em partes iguais", () => q.Ajuste(baseKey)?.Partes ?? 1, v => q.AjusteOuNovo(baseKey).Partes = Math.Max(1, v), 1, 20);
+            w.Choice("Categoria", CategoryOptions(lot), () => q.Ajuste(pp.Chave)?.Categoria ?? (pp.Chave != baseKey ? q.Ajuste(baseKey)?.Categoria : null) ?? pp.Categoria,
+                v => q.AjusteOuNovo(pp.Chave).Categoria = v == Padrao() && pp.Chave == baseKey ? null : v);
+        }
+        w.Closed += (_, _) => q.Ajustes.RemoveAll(x => x.Frente == null && x.Profundidade == null && x.Partes <= 1 && x.Categoria == null);
         return w;
     }
 

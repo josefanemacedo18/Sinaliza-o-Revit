@@ -262,6 +262,37 @@ public class LTLoteamentoTests
     }
 
     [Fact]
+    public void R1_QuadraPersonalizada_PontasComLotesDeFrenteParaAsLaterais()
+    {
+        // Quadra 98 × 60 com quatro testadas: as laterais (oeste e leste) primeiro na prioridade, com 25 m de profundidade –
+        // 5 lotes de 12 × 25 em cada ponta; as testadas longas ficam com 4 lotes de 12 × 30 entre elas (25 + 4 × 12 + 25 = 98).
+        var q = LTScenes.Q("Q", new List<Vec2> { new(0, 0), new(98, 0), new(98, 60), new(0, 60) }, new Vec2(0, 30), new Vec2(98, 30), new Vec2(49, 0), new Vec2(49, 60));
+        q.Testadas[0].Profundidade = 25;
+        q.Testadas[1].Profundidade = 25;
+        var d = Div(q);
+        Assert.Equal(18, d.Parcelas.Count);
+        foreach (var id in new[] { "A", "B" })
+        {
+            var ponta = d.Parcelas.Where(p => p.TestadaId == id).ToList();
+            Assert.Equal(5, ponta.Count);
+            Assert.All(ponta, p => { var (mn, mx) = p.Forma.Bounds; Assert.Equal(25, mx.X - mn.X, 3); Assert.Equal(12, mx.Y - mn.Y, 3); });
+        }
+        foreach (var id in new[] { "C", "D" })
+        {
+            var meio = d.Parcelas.Where(p => p.TestadaId == id).OrderBy(p => p.Forma.Centroid.X).ToList();
+            Assert.Equal(4, meio.Count);
+            Assert.Equal(new[] { 25.0, 37, 49, 61 }, meio.Select(p => Math.Round(p.Forma.Bounds.Min.X, 3)));
+            Assert.All(meio, p => Assert.Equal(360, p.Area, 2));
+        }
+        Assert.Equal(Enumerable.Range(1, 18), d.Parcelas.Select(p => int.Parse(p.Numero)).OrderBy(n => n));
+        // Qualquer lote pode mudar depois: o lote 3 da ponta oeste com 15 m empurra os seguintes da mesma testada.
+        q.AjusteOuNovo("A:3").Frente = 15;
+        d = Div(q);
+        Assert.Equal(15 * 25, ByKey(d, "A:3").Area, 2);
+        Assert.Equal(98 * 60, d.Parcelas.Sum(p => p.Area), 2);
+    }
+
+    [Fact]
     public void R1_UnirLotes_UmLoteSoComAsAreasSomadas()
     {
         var q = LTScenes.Scene("uma-testada");

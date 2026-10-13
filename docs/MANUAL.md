@@ -2601,6 +2601,18 @@ das quadras e mantém testadas, lotes personalizados e nomes; quadras novas rece
 * Cada lote tem uma **chave estável** (testada + ordem ao longo dela, e a parte quando dividido): as personalizações não se
   perdem quando a numeração muda.
 
+**Quadra personalizada lote por lote** (Quadra → seções "Testada" e "Lote por lote"):
+
+* cada testada tem **prioridade** (1 = primeira; fica com os lotes de esquina quando a esquina está em "Prioridade"),
+  **frente** e **profundidade** próprias;
+* a seção **Lote por lote** lista todos os lotes da quadra na ordem da numeração (com medidas e área atuais): frente,
+  profundidade, divisão em partes e categoria de cada um – a prévia mostra o resultado na hora. Mudar a frente de um lote empurra
+  os seguintes da mesma testada; "Atualizar a lista de lotes" aplica e reabre a janela com a lista nova.
+
+Exemplo – quadra 98 × 60 com lotes de frente para as laterais nas pontas: prioridade 1 e 2 para as testadas curtas (oeste e
+leste), com **profundidade 25 m**; as testadas longas ficam com 12 × 30 (fundos no meio). Resultado: 5 lotes de 12 × 25 em
+cada ponta e 4 lotes de 12 × 30 de cada lado no meio (25 + 4 × 12 + 25 = 98 m).
+
 **Unir Lotes** (Quadra e Lote → Unir Lotes): selecione dois ou mais lotes **vizinhos da mesma quadra** e clique Concluir – viram
 um lote só (para deixar a sobra maior, ou ter um lote maior que o padrão da quadra). O lote unido fica com a categoria do
 primeiro (na ordem da numeração), a frente é a soma das frentes e a numeração da quadra se refaz (sem falhas). Um lote que já é

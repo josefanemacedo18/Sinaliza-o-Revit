@@ -274,6 +274,8 @@ public sealed class CmdQuadraLote : CommandBase
                     else TaskDialog.Show(AppTitle, "Nenhum lado desta quadra encosta numa via.");
                     break;
                 }
+                case LotForms.AcaoQuadra.Recarregar:
+                    break;
                 case LotForms.AcaoQuadra.LoteInicial:
                 {
                     var l = LotCommands.PickLot(uidoc, "Clique o lote que recebe o número 1");
