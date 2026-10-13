@@ -339,6 +339,34 @@ public sealed class GradeSurface
 /// </summary>
 public sealed record NodeBlend(NodeSurface Node, double Station, double Start, double Length, double BaseZ)
 {
+    /// <summary>Rampa relativa máxima do bordo da pista em relação ao eixo na concordância (empeno): 0,75 % (AASHTO/DNIT, ~30–40 km/h).</summary>
+    public const double MaxRelativeGradient = 0.0075;
+
+    /// <summary>
+    /// Comprimento da concordância da via secundária com o nó: 20 m (mais longa quando a rampa própria é forte, 200 m por
+    /// m/m) e o necessário para o bordo da pista não subir nem descer em relação ao eixo mais que
+    /// <see cref="MaxRelativeGradient"/> – a pista sai do plano do nó (inclinado pela rampa da principal) para o abaulamento
+    /// dela. Até 60 m. Antes eram 20 m em qualquer caso: empeno de até 1,4 % e, nos pisos planos, juntas a cada 2 m.
+    /// </summary>
+    public static double LengthFor(NodeSurface node, GradeSurface own, double baseZ, double station, double start)
+    {
+        var g = own.Grade;
+        var L = own.Axis.Length;
+        var len = 20 + 200 * Math.Abs(g.GradeAt(Math.Clamp(station + start + 10, 0, L)));
+        var cw = Math.Max(1, g.CrossfallWidth);
+        foreach (var side in new[] { 1, -1 })
+        {
+            var e = station + side * start;
+            if (e <= 0 || e >= L) continue;
+            var a = own.Axis.PointAt(e);
+            var n = own.Axis.TangentAt(e).PerpLeft;
+            double Diff(double y) => node.Z(a + n * y) - baseZ - g.Z(e, y);
+            var d0 = Diff(0);
+            foreach (var y in new[] { cw, -cw }) len = Math.Max(len, Math.Abs(Diff(y) - d0) / MaxRelativeGradient);
+        }
+        return Math.Clamp(len, 20, 60);
+    }
+
     /// <summary>Peso do greide próprio (0 = superfície do nó, 1 = greide da via) à distância <paramref name="d"/> da estação do nó.</summary>
     public double Weight(double d)
     {

@@ -234,42 +234,60 @@ internal static class RoadWorks
         var covered = Enumerable.Range(0, 21).Count(i => ground(axis.PointAt(axis.Length * i / 20)) != null);
         if (covered < 5) return res;
         var opt = RoadProfileDesigner.ForRelief(relief, st.RoadReliefMaxGrade, st.RoadCutSlope, st.RoadFillSlope);
-        // Vias existentes que ganham patamar no nó com a via nova (antes só a nova ficava em nível no cruzamento e a existente
-        // chegava inclinada – a superfície do nó prolongava a rampa dela sobre a boca das outras vias).
+        // Em cada nó a via PRINCIPAL (a mesma da superfície do nó: hierarquia, empate = a mais larga) atravessa com o próprio
+        // greide e as secundárias ficam em nível, na cota dela, só no alcance da interseção. Antes as duas vias ganhavam patamar
+        // (~60 m em nível mesmo em rampa constante: cortes e aterros à toa e mais curvas verticais).
         var platforms = new List<(Core.Generators.IntersectionRoad Road, RoadGrade Grade)>();
-        // Cruzamentos e entroncamentos com as vias existentes: a via nova passa na cota delas (interseção no mesmo nível).
+        var roads = new List<Core.Generators.IntersectionRoad>();
+        var nodes = new List<(Vec2 Node, List<int> Roads)>();
+        var touched = new HashSet<int>();
+        var mine = -1;
+        var its = new List<IntersectionDefinition>();
+        // Alcance da área do nó ao longo de cada via (recortes da interseção que contêm o nó): o patamar cobre a área toda.
+        double Reach(Core.Generators.IntersectionRoad r, Vec2 node) => RoadProfileDesigner.NodeReach(r.Axis, node,
+            r.Def.Exclusions.Where(e => e.SourceId != null).Select(e => (IReadOnlyList<Vec2>)e.Points));
+        // Via principal do nó, na ordem das vias da interseção (a da superfície do nó), quando ela já existe.
+        int Major(Vec2 node, List<int> ids)
+        {
+            var it = its.Where(d => ids.Any(i => d.RoadIds.Contains(roads[i].Def.Id)))
+                .Where(d => d.Node.DistanceTo(node) < Core.Generators.IntersectionGenerator.NodeMergeDistance * 4)
+                .OrderBy(d => d.Node.DistanceTo(node)).FirstOrDefault();
+            var order = it == null ? ids : ids.OrderBy(i => it.RoadIds.IndexOf(roads[i].Def.Id) is var k && k >= 0 ? k : int.MaxValue).ToList();
+            var m = RoadProfileDesigner.MajorOf(order.Select(i => roads[i].Def).ToList());
+            return m < 0 ? -1 : order[m];
+        }
+        double Clamp(Polyline2 ax, Vec2 p) => Math.Clamp(ax.Project(p).Station, 0, ax.Length);
+        // Cruzamentos e entroncamentos com as vias existentes: interseção no mesmo nível.
         try
         {
             var sv = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
-            var roads = sv.Roads();
-            var mine = roads.FindIndex(r => r.Def.Id == road.Pavement.Id);
-            // Alcance da área do nó ao longo de cada via (recortes da interseção que contêm o nó): o patamar cobre a área toda.
-            double Reach(Core.Generators.IntersectionRoad r, Vec2 node) => RoadProfileDesigner.NodeReach(r.Axis, node,
-                r.Def.Exclusions.Where(e => e.SourceId != null).Select(e => (IReadOnlyList<Vec2>)e.Points));
+            roads = sv.Roads();
+            its = MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().ToList();
+            mine = roads.FindIndex(r => r.Def.Id == road.Pavement.Id);
             if (mine >= 0)
             {
-                var nodes = Core.Generators.IntersectionGenerator.FindNodes(roads).ToList();
-                var touched = new HashSet<int>();
+                nodes = Core.Generators.IntersectionGenerator.FindNodes(roads).ToList();
                 foreach (var (node, ids) in nodes.Where(n => n.Roads.Contains(mine)))
                 {
-                    var others = ids.Where(i => i != mine).Select(i => roads[i]).ToList();
+                    var others = ids.Where(i => i != mine).ToList();
                     if (others.Count == 0) continue;
-                    var zAbs = others.Average(o => sv.RoadZ(o, node));
-                    var s = axis.Project(node).Station;
-                    opt.Fixed.Add(new Vec2(Math.Clamp(s, 0, axis.Length), zAbs - road.BaseZ));
+                    var major = Major(node, ids);
+                    if (major == mine)
+                    {
+                        // A via nova é a principal: passa com a própria rampa; as secundárias ficam em nível na cota dela.
+                        foreach (var i in others.Where(i => roads[i].Def.Output.Grade != null)) touched.Add(i);
+                        continue;
+                    }
+                    // Secundária: na cota da boca do nó (a da principal menos o abaulamento) e com a rampa do nó ao longo dela (em
+                    // nível num cruzamento em ângulo reto), no alcance do nó.
+                    var sm = major >= 0 ? Clamp(roads[major].Axis, node) : 0;
+                    var gm = major >= 0 ? roads[major].Def.Output.Grade : null;
+                    var zAbs = gm != null
+                        ? sv.RoadZ(roads[major], node) - gm.Z(sm) + RoadProfileDesigner.MouthZ(gm, sm, roads[major].Def)
+                        : major >= 0 ? sv.RoadZ(roads[major], node) : others.Average(o => sv.RoadZ(roads[o], node));
+                    opt.Fixed.Add(new Vec2(Clamp(axis, node), zAbs - road.BaseZ));
                     opt.FixedHalf.Add(RoadProfileDesigner.PlatformFor(Reach(roads[mine], node), opt.VerticalCurve));
-                    foreach (var i in ids.Where(i => i != mine && roads[i].Def.Output.Grade != null)) touched.Add(i);
-                }
-                foreach (var i in touched)
-                {
-                    var o = roads[i];
-                    var g0 = o.Def.Output.Grade!;
-                    // Todos os nós da via existente: cota atual mantida, patamar em cada um.
-                    var mineNodes = nodes.Where(n => n.Roads.Contains(i)).ToList();
-                    var pins = mineNodes
-                        .Select(n => { var so = Math.Clamp(o.Axis.Project(n.Node).Station, 0, o.Axis.Length); return new Vec2(so, g0.Z(so)); }).ToList();
-                    var halves = mineNodes.Select(n => RoadProfileDesigner.PlatformFor(Reach(o, n.Node), g0.DefaultCurve)).ToList();
-                    platforms.Add((o, RoadProfileDesigner.WithPlatforms(g0, o.Axis.Length, pins, st.RoadReliefMaxGrade, halves)));
+                    opt.FixedSlope.Add(gm != null ? RoadProfileDesigner.NodeSlope(gm, sm, roads[major].Axis.Length, roads[major].Axis.TangentAt(sm), axis.TangentAt(Clamp(axis, node))) : 0);
                 }
             }
             // Pontas coladas a outra via: a cota da ponta é a dela.
@@ -282,6 +300,35 @@ internal static class RoadWorks
         grade.AdjustTerrain = true;
         grade.CutSlope = st.RoadCutSlope;
         grade.FillSlope = st.RoadFillSlope;
+        // Vias existentes secundárias num nó em que a via nova é a principal: em nível na cota da via nova ali; nos outros nós
+        // delas a cota fica (patamar onde são secundárias, a própria rampa onde são as principais).
+        try
+        {
+            foreach (var i in touched)
+            {
+                var o = roads[i];
+                var g0 = o.Def.Output.Grade!;
+                var oBase = PathResolver.Resolve(doc, o.Def.Path)?.Z ?? o.Def.Path?.Z ?? 0;
+                var pins = new List<Vec2>();
+                var halves = new List<double>();
+                var slopes = new List<double>();
+                foreach (var (node, ids) in nodes.Where(n => n.Roads.Contains(i)))
+                {
+                    var so = Clamp(o.Axis, node);
+                    var m = Major(node, ids);
+                    if (m == i) { pins.Add(new Vec2(so, g0.Z(so))); halves.Add(RoadProfileDesigner.PassThrough); slopes.Add(0); continue; }
+                    var mineMajor = m == mine && ids.Contains(mine);
+                    var sm = Clamp(axis, node);
+                    var z = mineMajor ? road.BaseZ + RoadProfileDesigner.MouthZ(grade, sm, road.Pavement) - oBase : g0.Z(so);
+                    pins.Add(new Vec2(so, z));
+                    halves.Add(RoadProfileDesigner.PlatformFor(Reach(o, node), g0.DefaultCurve));
+                    // Nos outros nós a rampa atual dela no nó (o patamar que ela já tinha).
+                    slopes.Add(mineMajor ? RoadProfileDesigner.NodeSlope(grade, sm, axis.Length, axis.TangentAt(sm), o.Axis.TangentAt(so)) : g0.GradeAt(so));
+                }
+                platforms.Add((o, RoadProfileDesigner.WithPlatforms(g0, o.Axis.Length, pins, st.RoadReliefMaxGrade, halves, slopes)));
+            }
+        }
+        catch (Exception ex) { Log.Error("Relevo – patamar das vias secundárias", ex); }
         res.AddRange(SetGrade(uidoc, road.GroupId, grade));
         foreach (var (o, g) in platforms)
             if (o.Def.GroupId != null)

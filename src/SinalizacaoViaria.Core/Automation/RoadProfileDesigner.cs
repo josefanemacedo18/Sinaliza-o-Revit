@@ -1,4 +1,5 @@
 using System.Globalization;
+using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Core.Model;
 
@@ -47,6 +48,7 @@ public sealed class PerfilOpcoes
         var c = (PerfilOpcoes)MemberwiseClone();
         c.Fixed = new List<Vec2>(Fixed);
         c.FixedHalf = new List<double>(FixedHalf);
+        c.FixedSlope = new List<double>(FixedSlope);
         return c;
     }
 
@@ -82,10 +84,17 @@ public sealed class PerfilOpcoes
     public List<Vec2> Fixed { get; set; } = new();
     /// <summary>
     /// Meia extensão do patamar de cada ponto obrigado (mesma ordem de <see cref="Fixed"/>; faltando = 6 m): o alcance da área do
-    /// nó ao longo da via (<see cref="RoadProfileDesigner.NodeReach"/>) – num Y a área do nó vai bem além de 6 m.
+    /// nó ao longo da via (<see cref="RoadProfileDesigner.NodeReach"/>) – num Y a área do nó vai bem além de 6 m. Negativo
+    /// (<see cref="RoadProfileDesigner.PassThrough"/>) = sem patamar: a via é a principal do nó e passa com a própria rampa.
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public List<double> FixedHalf { get; set; } = new();
+    /// <summary>
+    /// Rampa do patamar de cada ponto obrigado (mesma ordem de <see cref="Fixed"/>; faltando = 0, em nível): a da superfície do
+    /// nó ao longo do eixo da via secundária – a rampa da principal projetada no eixo dela (zero num cruzamento em ângulo reto).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<double> FixedSlope { get; set; } = new();
     public double FixedBlend { get; set; } = 40;
 
     // ---- obras automáticas
@@ -235,16 +244,21 @@ public static class RoadProfileDesigner
                 break;
             default:
             {
-                // Terreno suavizado (média móvel), com as pontas fixas, deslocado e limitado pela rampa máxima.
+                // Terreno suavizado (média móvel), com as pontas fixas, deslocado e limitado pela rampa máxima. Perto das pontas a
+                // janela usa o terreno refletido na ponta (2·z0 − z): a média de uma rampa constante continua sendo a rampa. Antes a
+                // janela cortada puxava a média para dentro e o greide dobrava nos primeiros 10 m (juntas à toa nos pisos).
                 var w = Math.Max(1, (int)Math.Round(Math.Max(Step, o.Smoothing) / Step / 2));
+                var last = ss.Count - 1;
+                double G(int k) => k < 0 ? 2 * ground[0] - ground[Math.Min(last, -k)]
+                    : k > last ? 2 * ground[last] - ground[Math.Max(0, 2 * last - k)] : ground[k];
                 var sm = new double[ss.Count];
                 for (int i = 0; i < ss.Count; i++)
                 {
                     double sum = 0, wsum = 0;
-                    for (int k = Math.Max(0, i - w); k <= Math.Min(ss.Count - 1, i + w); k++)
+                    for (int k = i - w; k <= i + w; k++)
                     {
                         var wk = 1.0 - Math.Abs(k - i) / (w + 1.0);
-                        sum += ground[k] * wk; wsum += wk;
+                        sum += G(k) * wk; wsum += wk;
                     }
                     sm[i] = sum / wsum + o.Offset;
                 }
@@ -254,12 +268,12 @@ public static class RoadProfileDesigner
                 // delas, em nível 6 m para cada lado – a interseção fica sem rampa no miolo). Entre elas, o terreno suavizado
                 // limitado pela rampa máxima. Antes as cotas eram "puxadas" e depois a rampa máxima as deslocava; o patamar
                 // colado de volta deixava saltos (rampas de até 120 %) ao lado dele e nas pontas.
-                var (zs, pinned, gEff) = PinnedGrade(ss, sm, g, L, o.StartZ != null ? z0 : null, o.EndZ != null ? z1 : null, o.Fixed, 0, o.FixedHalf);
+                var (zs, pinned, gEff) = PinnedGrade(ss, sm, g, L, o.StartZ != null ? z0 : null, o.EndZ != null ? z1 : null, o.Fixed, 0, o.FixedHalf, o.FixedSlope);
                 if (gEff > g + 1e-6)
                     res.Warnings.Add($"As cotas obrigadas (cruzamentos/pontas) exigem rampa de {gEff.ToString("P0", CultureInfo.GetCultureInfo("pt-BR"))} " +
                                      $"(máx. {g.ToString("P0", CultureInfo.GetCultureInfo("pt-BR"))}) entre elas.");
                 SetPivs(grade, zs, pinned);
-                Smooth(grade, ss, L, gEff, MaxCurvature(g, o.VerticalCurve), o.StartZ != null ? z0 : null, o.EndZ != null ? z1 : null, o.Fixed, o.FixedHalf);
+                Smooth(grade, ss, L, gEff, MaxCurvature(g, o.VerticalCurve), o.StartZ != null ? z0 : null, o.EndZ != null ? z1 : null, o.Fixed, o.FixedHalf, o.FixedSlope);
                 break;
             }
         }
@@ -316,7 +330,8 @@ public static class RoadProfileDesigner
     /// outra via é ligada a ela – antes só a via nova ganhava o patamar e a existente chegava inclinada ao nó (a superfície do nó
     /// prolongava a rampa dela por cima da boca das outras vias).
     /// </summary>
-    public static RoadGrade WithPlatforms(RoadGrade g, double length, IEnumerable<Vec2> pins, double maxGrade, IReadOnlyList<double>? halves = null)
+    public static RoadGrade WithPlatforms(RoadGrade g, double length, IEnumerable<Vec2> pins, double maxGrade, IReadOnlyList<double>? halves = null,
+        IReadOnlyList<double>? slopes = null)
     {
         var L = Math.Max(1, length);
         var n = Math.Max(2, (int)Math.Ceiling(L / Step));
@@ -326,11 +341,11 @@ public static class RoadProfileDesigner
         for (int i = 1; i < ss.Count; i++) current = Math.Max(current, Math.Abs(target[i] - target[i - 1]) / (ss[i] - ss[i - 1]));
         var gm = Math.Max(maxGrade, current);
         var pinList = pins.ToList();
-        var (zs, pinned, gEff) = PinnedGrade(ss, target, gm, L, null, null, pinList, 0, halves);
+        var (zs, pinned, gEff) = PinnedGrade(ss, target, gm, L, null, null, pinList, 0, halves, slopes);
         var res = g.Clone();
         res.WithoutWorks = null;
         SetPivs(res, zs, pinned);
-        Smooth(res, ss, L, gEff, MaxCurvature(gm, g.DefaultCurve), null, null, pinList, halves);
+        Smooth(res, ss, L, gEff, MaxCurvature(gm, g.DefaultCurve), null, null, pinList, halves, slopes);
         return res;
     }
 
@@ -344,26 +359,30 @@ public static class RoadProfileDesigner
     /// sem ela o vale/crista do terreno virava uma quina (−30 % a +30 % em 5 m).
     /// </param>
     public static (List<Vec2> Z, List<Vec2> Pins, double Grade) PinnedGrade(List<double> ss, double[] target, double g, double L,
-        double? startZ, double? endZ, IEnumerable<Vec2> fixedPts, double curvature = 0, IReadOnlyList<double>? halves = null)
+        double? startZ, double? endZ, IEnumerable<Vec2> fixedPts, double curvature = 0, IReadOnlyList<double>? halves = null,
+        IReadOnlyList<double>? slopes = null)
     {
-        // Intervalos em nível: patamar em cada cruzamento cobrindo a área do nó (no mínimo 6 m para cada lado; só para dentro
-        // da via nas pontas); pontas informadas.
-        var flats = new List<(double A, double B, double Z)>();
-        if (startZ is { } sz) flats.Add((0, 0, sz));
-        if (endZ is { } ez) flats.Add((L, L, ez));
+        // Patamares: em cada cruzamento cobrindo a área do nó (no mínimo 6 m para cada lado; só para dentro da via nas pontas),
+        // na cota obrigada e com a rampa do nó ao longo da via (em nível num cruzamento em ângulo reto); pontas informadas.
+        var flats = new List<(double A, double B, double Z, double C, double G)>();
+        if (startZ is { } sz) flats.Add((0, 0, sz, 0, 0));
+        if (endZ is { } ez) flats.Add((L, L, ez, L, 0));
         var k0 = 0;
         foreach (var f in fixedPts)
         {
             var c = Math.Clamp(f.X, 0, L);
-            var h = Math.Max(PlatformHalf, halves != null && k0 < halves.Count ? halves[k0] : 0);
+            var hk = halves != null && k0 < halves.Count ? halves[k0] : 0;
+            var gk = slopes != null && k0 < slopes.Count ? slopes[k0] : 0;
+            // Via principal do nó (PassThrough): passa na cota com a própria rampa, sem patamar.
+            var h = hk < 0 ? 0 : Math.Max(PlatformHalf, hk);
             k0++;
-            flats.Add((Math.Max(0, c - h), Math.Min(L, c + h), f.Y));
+            flats.Add((Math.Max(0, c - h), Math.Min(L, c + h), f.Y, c, hk < 0 ? 0 : gk));
         }
         // Estações: as da amostragem + as bordas e o centro de cada patamar (sem amostras coladas nelas: intervalos curtos
         // encurtariam as curvas verticais dos PIVs vizinhos).
         var st = new SortedSet<double>(ss);
         var gap = ss.Count > 1 ? (ss[^1] - ss[0]) / (ss.Count - 1) : 1;
-        foreach (var (a, b, _) in flats)
+        foreach (var (a, b, _, _, _) in flats)
         {
             if (curvature > 0)
                 st.RemoveWhere(x => x > 1e-9 && x < L - 1e-9 && (Math.Abs(x - a) < gap / 2 || Math.Abs(x - b) < gap / 2) && (x < a - 1e-9 || x > b + 1e-9));
@@ -379,9 +398,9 @@ public static class RoadProfileDesigner
             return target[^1];
         }
         var pin = new double?[n];
-        foreach (var (a, b, fz) in flats)
+        foreach (var (a, b, fz, fc, fg) in flats)
             for (int i = 0; i < n; i++)
-                if (s[i] >= a - 1e-9 && s[i] <= b + 1e-9) pin[i] = fz;
+                if (s[i] >= a - 1e-9 && s[i] <= b + 1e-9) pin[i] = fz + fg * (s[i] - fc);
         // Rampa possível: a pedida, ou a que as cotas obrigadas vizinhas exigem.
         var gEff = g;
         int? last = null;
@@ -428,10 +447,10 @@ public static class RoadProfileDesigner
         }
         if (curvature > 0) LimitCurvature(s, z, pin, gEff, curvature);
         var pins = new List<Vec2>();
-        foreach (var (a, b, zz) in flats)
+        foreach (var (a, b, zz, fc, fg) in flats)
         {
-            pins.Add(new Vec2(a, zz));
-            if (b - a > 1e-6) { pins.Add(new Vec2((a + b) / 2, zz)); pins.Add(new Vec2(b, zz)); }
+            pins.Add(new Vec2(a, zz + fg * (a - fc)));
+            if (b - a > 1e-6) { pins.Add(new Vec2((a + b) / 2, zz + fg * ((a + b) / 2 - fc))); pins.Add(new Vec2(b, zz + fg * (b - fc))); }
         }
         return (s.Select((x, i) => new Vec2(x, z[i])).ToList(), pins.DistinctBy(p => Math.Round(p.X, 6)).ToList(), gEff);
     }
@@ -496,11 +515,11 @@ public static class RoadProfileDesigner
     /// limitada (<see cref="LimitCurvature"/>) e PIVs a cada estação na parte curva; greides que já são suaves ficam como estão.
     /// </summary>
     private static void Smooth(RoadGrade grade, List<double> ss, double L, double g, double curvature, double? startZ, double? endZ, IEnumerable<Vec2> fixedPts,
-        IReadOnlyList<double>? halves = null)
+        IReadOnlyList<double>? halves = null, IReadOnlyList<double>? slopes = null)
     {
         if (curvature <= 0 || CurvatureOf(grade, L) <= curvature) return;
         var target = ss.Select(x => grade.Z(x)).ToArray();
-        var (zs, pinned, _) = PinnedGrade(ss, target, g, L, startZ, endZ, fixedPts, curvature, halves);
+        var (zs, pinned, _) = PinnedGrade(ss, target, g, L, startZ, endZ, fixedPts, curvature, halves, slopes);
         // Um PIV por estação na parte curva (só os colineares saem): juntar estações alongava os trechos e as curvas dos
         // PIVs vizinhos deixavam de caber (até 10 % acima do limite em curvas longas).
         SetPivs(grade, zs, pinned, 1e-4);
@@ -508,6 +527,51 @@ public static class RoadProfileDesigner
 
     /// <summary>Meia extensão mínima do patamar em nível de um cruzamento (m).</summary>
     public const double PlatformHalf = 6;
+
+    /// <summary>
+    /// Meia extensão de uma cota obrigada sem patamar (<see cref="PerfilOpcoes.FixedHalf"/>): a via PRINCIPAL do nó passa na cota
+    /// com a própria rampa; só as secundárias ficam em nível dentro da interseção. Antes as duas vias ganhavam patamar de ~60 m
+    /// mesmo em rampa constante (cortes e aterros à toa e mais curvas verticais).
+    /// </summary>
+    public const double PassThrough = -1;
+
+    /// <summary>
+    /// Via principal de um nó (índice em <paramref name="roads"/>, na ordem das vias do nó): a que atravessa o cruzamento com o
+    /// próprio greide – a mesma regra da superfície do nó (<see cref="NodeSurface.MajorIndex"/>: maior hierarquia, empate = pista
+    /// mais larga, depois a primeira). −1 = nenhuma via.
+    /// </summary>
+    /// <summary>
+    /// Cota (relativa à base da principal) em que a via secundária fica em nível no nó: a da boca da interseção – a superfície
+    /// do nó além da pista da principal fica na cota da borda dela (eixo menos o abaulamento). Com superelevação, a do eixo
+    /// (as duas bocas ficam em cotas diferentes; a concordância vence a diferença). Antes era a cota do eixo da principal: a
+    /// secundária ficava 2 % × meia pista acima da boca e a concordância empenava a pista para descer até ela.
+    /// </summary>
+    public static double MouthZ(RoadGrade major, double station, RoadPavementDefinition majorDef)
+        => MouthZCore(major, station, majorDef);
+
+    /// <summary>
+    /// Rampa do patamar da via secundária no nó: a da superfície do nó ao longo do eixo dela – a rampa da principal projetada
+    /// na direção da secundária (zero num cruzamento em ângulo reto). Num Y com a principal em rampa, o ramo oblíquo em nível
+    /// ficava metros acima ou abaixo da boca do nó e a concordância vencia a diferença com rampas acima da máxima.
+    /// </summary>
+    public static double NodeSlope(RoadGrade major, double majorStation, double majorLength, Vec2 majorTangent, Vec2 secondaryTangent)
+    {
+        // Na ponta da principal (ramo de um Y, T pela ponta) a rampa é a do fim dela – o greide não segue além da ponta.
+        double a = Math.Max(0, majorStation - 0.5), b = Math.Min(majorLength, majorStation + 0.5);
+        var g = b - a > 1e-6 ? (major.Z(b) - major.Z(a)) / (b - a) : 0;
+        return g * majorTangent.Dot(secondaryTangent);
+    }
+
+    private static double MouthZCore(RoadGrade major, double station, RoadPavementDefinition majorDef)
+    {
+        var z = major.Z(station);
+        if (Math.Abs(major.E(station)) > 1e-9) return z;
+        return z - major.Crossfall * Math.Max(1, Math.Max(majorDef.LeftWidth, majorDef.RightWidth));
+    }
+
+    public static int MajorOf(IReadOnlyList<RoadPavementDefinition> roads) =>
+        NodeSurface.MajorIndex(roads.Select(p => (p.Hierarchy is { } h && h != HierarquiaViaria.NaoDefinida ? (int)h : 10,
+            Math.Max(1, Math.Max(p.LeftWidth, p.RightWidth)))).ToList());
 
     /// <summary>
     /// Alcance da área de um nó ao longo do eixo: maior distância, em estação, entre o nó e os pontos dos recortes que ele fez

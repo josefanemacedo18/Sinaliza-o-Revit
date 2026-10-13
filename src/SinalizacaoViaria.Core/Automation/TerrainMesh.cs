@@ -186,7 +186,52 @@ public static class TerrainRebuild
             if (design.DesignZ(v.XY) != null || near(v.XY)) continue;          // substituído pelo projeto
             Add(v);
         }
+        Refine(original, design, inRegion, res, Add);
         return res;
+    }
+
+    /// <summary>Desvio máximo (m) entre a triangulação do Toposolid e a superfície de projeto nos pontos conferidos.</summary>
+    public const double RefineTolerance = 0.02;
+
+    /// <summary>
+    /// Conferência da triangulação junto às plataformas (até 2,5 m das bordas, onde a malha dos taludes não põe pontos e os
+    /// taludes se encontram nos cantos): os pontos, com os do terreno fora da região, são triangulados como o Toposolid
+    /// (Delaunay) e comparados com a superfície de projeto numa malha de 0,5 m; onde passam de 2 cm – vinco entre dois taludes
+    /// ou entre o talude e a borda cortando um triângulo – o ponto de projeto entra, e confere de novo. Antes um vinco entre
+    /// dois taludes de corte ficava 7 cm abaixo no Toposolid.
+    /// </summary>
+    private static void Refine(TerrainMesh original, GradingResult design, Func<Vec2, bool> inRegion, List<Vec3> pts, Action<Vec3> add)
+    {
+        var plats = design.PlatformAreas.Concat(design.Pads.Select(p => p.Area)).Where(a => a.Area > 1e-4).ToList();
+        if (plats.Count == 0 || pts.Count < 3) return;
+        var near = Mask(plats, 2.5);
+        var inside = Mask(plats, 0);
+        double x0 = double.MaxValue, y0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue;
+        foreach (var f in plats)
+        {
+            var (mn, mx) = f.Bounds;
+            x0 = Math.Min(x0, mn.X - 2.5); y0 = Math.Min(y0, mn.Y - 2.5); x1 = Math.Max(x1, mx.X + 2.5); y1 = Math.Max(y1, mx.Y + 2.5);
+        }
+        const double h = 0.5;
+        if ((x1 - x0) * (y1 - y0) / (h * h) > 4_000_000) return;
+        var samples = new List<(Vec2 P, double Z)>();
+        for (var x = Math.Floor(x0 / h) * h; x <= x1; x += h)
+            for (var y = Math.Floor(y0 / h) * h; y <= y1; y += h)
+            {
+                var q = new Vec2(x, y);
+                if (!near(q) || inside(q) || !inRegion(q) || original.Z(q) == null || design.DesignZ(q) is not { } z) continue;
+                samples.Add((q, z));
+            }
+        if (samples.Count == 0) return;
+        var outside = original.DistinctPoints().Where(v => !inRegion(v.XY)).ToList();
+        for (int iter = 0; iter < 3; iter++)
+        {
+            var mesh = Tin.Mesh(outside.Concat(pts).ToList());
+            var before = pts.Count;
+            foreach (var (q, z) in samples)
+                if (mesh.Z(q) is { } m && Math.Abs(m - z) > RefineTolerance) add(Vec3.At(q, z));
+            if (pts.Count == before) break;
+        }
     }
 
     /// <summary>

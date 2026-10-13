@@ -28,6 +28,11 @@ public static class TopoScene
         ["ruido"] = Noise(20260412),
         // Referência: terreno plano (a planta das peças tem de ser a mesma em qualquer terreno).
         ["plano"] = _ => 0,
+        // Rodada VT: rampas constantes na diagonal (30° do eixo x) e ondulação suave (poucos níveis), como nos projetos reais.
+        ["incl2"] = p => 100 + 0.02 * (0.866 * p.X + 0.5 * p.Y),
+        ["incl5"] = p => 100 + 0.05 * (0.866 * p.X + 0.5 * p.Y),
+        ["incl8"] = p => 100 + 0.08 * (0.866 * p.X + 0.5 * p.Y),
+        ["suave"] = p => 100 + 0.03 * p.X + 1.2 * Math.Sin(2 * Math.PI * p.X / 140) * Math.Cos(2 * Math.PI * p.Y / 120) + 0.6 * Math.Sin(2 * Math.PI * (p.X - p.Y) / 90),
     };
 
     private static Func<Vec2, double> Noise(int seed)
@@ -56,9 +61,13 @@ public static class TopoScene
         public List<Vec2> Fixed { get; } = new();
         /// <summary>Cotas obrigadas de cada via (estaca, cota) e a rampa máxima pedida.</summary>
         public List<List<Vec2>> Pins { get; } = new();
-        /// <summary>Meia extensão do patamar de cada cota obrigada (o alcance do nó na via; mínimo 6 m).</summary>
+        /// <summary>Meia extensão do patamar de cada cota obrigada (o alcance do nó na via; mínimo 6 m; PassThrough = via principal, sem patamar).</summary>
         public List<List<double>> Halves { get; } = new();
+        /// <summary>Rampa do patamar de cada cota obrigada (a do nó ao longo da via; 0 = em nível).</summary>
+        public List<List<double>> Slopes { get; } = new();
         public List<double> MaxGrades { get; } = new();
+        /// <summary>Retalhamento comum dos pisos (montado na primeira consulta).</summary>
+        public FloorTiling? Tiling { get; set; }
         public List<List<string>> GradeWarnings { get; } = new();
         public const double Subgrade = 0.40;
         public const double Cut = 1.0;
@@ -89,31 +98,54 @@ public static class TopoScene
         var fixedPts = new List<Vec2>();
         var pins = new List<List<Vec2>>();
         var halves = new List<List<double>>();
+        var slopes = new List<List<double>>();
         var maxG = new List<double>();
         var warns = new List<List<string>>();
         for (int i = 0; i < axes.Count; i++)
         {
             var axis = axes[i];
             var opt = RoadProfileDesigner.ForRelief(relief, 0.08, Scene.Cut, Scene.Fill);
+            // Nós em que a via i é a principal: ela passa com a própria rampa e a via j fica em nível na cota dela (depois).
+            var passes = new List<(int J, Vec2 Node, double Si)>();
             for (int j = 0; j < i; j++)
                 foreach (var node in Crossings(axes[i], axes[j]))
                 {
                     var sj = Math.Clamp(axes[j].Project(node).Station, 0, axes[j].Length);
-                    var zj = grades[j].Z(sj);
-                    opt.Fixed.Add(new Vec2(Math.Clamp(axis.Project(node).Station, 0, axis.Length), zj));
-                    opt.FixedHalf.Add(RoadProfileDesigner.PlatformFor(Reach(i, node), opt.VerticalCurve));
+                    var si = Math.Clamp(axis.Project(node).Station, 0, axis.Length);
                     fixedPts.Add(node);
-                    // A via existente também ganha o patamar no nó (como o plugin faz ao ligar a via nova a ela).
-                    pins[j].Add(new Vec2(sj, zj));
-                    halves[j].Add(RoadProfileDesigner.PlatformFor(Reach(j, node), grades[j].DefaultCurve));
-                    grades[j] = RoadProfileDesigner.WithPlatforms(grades[j], axes[j].Length, pins[j], maxG[j], halves[j]);
+                    var m = MajorAt(w, node, i, j);
+                    if (m == i) { passes.Add((j, node, si)); continue; }
+                    // A via i é secundária: em nível na cota da boca do nó, no alcance dele; a principal fica como está.
+                    var sm = Math.Clamp(axes[m].Project(node).Station, 0, axes[m].Length);
+                    var zm = RoadProfileDesigner.MouthZ(grades[m], sm, w.Roads[m].Def);
+                    opt.Fixed.Add(new Vec2(si, zm));
+                    opt.FixedHalf.Add(RoadProfileDesigner.PlatformFor(Reach(i, node), opt.VerticalCurve));
+                    opt.FixedSlope.Add(RoadProfileDesigner.NodeSlope(grades[m], sm, axes[m].Length, axes[m].TangentAt(sm), axis.TangentAt(si)));
+                    if (m == j) { pins[j].Add(new Vec2(sj, grades[j].Z(sj))); halves[j].Add(RoadProfileDesigner.PassThrough); slopes[j].Add(0); }
                 }
             if (opt.Fixed.FirstOrDefault(f => f.X < 1) is { } f0 && f0 != default) opt.StartZ = f0.Y;
             if (opt.Fixed.FirstOrDefault(f => f.X > axis.Length - 1) is { } f1 && f1 != default) opt.EndZ = f1.Y;
             var res = RoadProfileDesigner.Design(axis.Length, s => ground(axis.PointAt(s)), opt);
             var g = res.Grade;
-            pins.Add(opt.Fixed.ToList());
-            halves.Add(opt.FixedHalf.ToList());
+            var myPins = opt.Fixed.ToList();
+            var myHalves = opt.FixedHalf.ToList();
+            var mySlopes = opt.FixedSlope.ToList();
+            foreach (var (j, node, si) in passes)
+            {
+                // A via existente j é a secundária: em nível na cota da boca do nó na via i (como o plugin faz ao ligar a via
+                // nova a ela).
+                var sj = Math.Clamp(axes[j].Project(node).Station, 0, axes[j].Length);
+                pins[j].Add(new Vec2(sj, RoadProfileDesigner.MouthZ(g, si, w.Roads[i].Def)));
+                halves[j].Add(RoadProfileDesigner.PlatformFor(Reach(j, node), grades[j].DefaultCurve));
+                slopes[j].Add(RoadProfileDesigner.NodeSlope(g, si, axis.Length, axis.TangentAt(si), axes[j].TangentAt(sj)));
+                grades[j] = RoadProfileDesigner.WithPlatforms(grades[j], axes[j].Length, pins[j], maxG[j], halves[j], slopes[j]);
+                myPins.Add(new Vec2(si, g.Z(si)));
+                myHalves.Add(RoadProfileDesigner.PassThrough);
+                mySlopes.Add(0);
+            }
+            pins.Add(myPins);
+            halves.Add(myHalves);
+            slopes.Add(mySlopes);
             maxG.Add(opt.MaxGrade);
             warns.Add(res.Warnings.ToList());
             g.AdjustTerrain = true;
@@ -133,6 +165,7 @@ public static class TopoScene
         sc.Fixed.AddRange(fixedPts);
         sc.Pins.AddRange(pins);
         sc.Halves.AddRange(halves);
+        sc.Slopes.AddRange(slopes);
         sc.MaxGrades.AddRange(maxG);
         sc.GradeWarnings.AddRange(warns);
         // 3) Superfícies: nós (via principal atravessa) e vias (concordância onde são secundárias).
@@ -160,6 +193,22 @@ public static class TopoScene
     {
         var pts = w.Roads.SelectMany(r => r.Axis.Points).ToList();
         return (new Vec2(pts.Min(p => p.X), pts.Min(p => p.Y)), new Vec2(pts.Max(p => p.X), pts.Max(p => p.Y)));
+    }
+
+    /// <summary>
+    /// Via principal (índice no mundo) do nó em <paramref name="node"/> quando a via <paramref name="i"/> é criada sobre a
+    /// <paramref name="j"/>: a regra do plugin (RoadProfileDesigner.MajorOf), na ordem das vias da interseção, entre as vias que já
+    /// existem (índice ≤ i).
+    /// </summary>
+    private static int MajorAt(Y34TipTests.World w, Vec2 node, int i, int j)
+    {
+        var (a, b) = (w.Roads[i].Def.Id, w.Roads[j].Def.Id);
+        var it = w.Nodes.Select(n => n.Layout.Definition!).Where(d => d.RoadIds.Contains(a) && d.RoadIds.Contains(b))
+            .OrderBy(d => d.Node.DistanceTo(node)).FirstOrDefault();
+        var ids = (it?.RoadIds.Distinct().ToList() ?? new List<string> { b, a }).Where(id => RoadIndex(w, id) is var k && k >= 0 && k <= i).ToList();
+        var defs = ids.Select(id => w.Roads.FirstOrDefault(r => r.Def.Id == id)?.Def).OfType<RoadPavementDefinition>().ToList();
+        var m = RoadProfileDesigner.MajorOf(defs);
+        return m < 0 ? j : RoadIndex(w, defs[m].Id);
     }
 
     /// <summary>Pontos onde dois eixos se cruzam (ou onde a ponta de um encosta no outro).</summary>
@@ -219,8 +268,7 @@ public static class TopoScene
             var locs = cut.Select(surf.Locate).ToList();
             var c = surf.Locate(new Polygon2(cut).Centroid).S;
             var reach = locs.Max(l => Math.Abs(l.S - c));
-            var own = surf.Grade.GradeAt(Math.Clamp(c + reach + 10, 0, surf.Axis.Length));
-            var len = Math.Clamp(20 + 200 * Math.Abs(own), 20, 40);
+            var len = NodeBlend.LengthFor(node, surf, 0, c, reach);
             surf.Blends.Add(new NodeBlend(node, c, reach, len, 0));
         }
         return surf;
@@ -295,20 +343,48 @@ public static class TopoScene
     /// <summary>Tolerância de plano dos pisos no greide (MarkingService.GradeFloorTolerance).</summary>
     public const double FloorTolerance = 0.02;
 
-    /// <summary>Pisos divididos em partes planas, como o plugin cria no Revit (mesmo agrupamento, tolerância e referência).</summary>
+    /// <summary>
+    /// Retalhamento comum dos pisos da cena (como MarkingService.Tiling): uma malha de juntas por via, com a superfície dela (e
+    /// as concordâncias), as larguras da seção e os nós em que ela é secundária; o nó usa a malha da principal.
+    /// </summary>
+    public static FloorTiling TilingOf(Scene sc)
+    {
+        if (sc.Tiling != null) return sc.Tiling;
+        var w = sc.World;
+        var roads = new List<FloorTiling.Road>();
+        for (int i = 0; i < w.Roads.Count; i++)
+        {
+            var pav = w.Roads[i].Def;
+            var surf = sc.Surfaces[i];
+            var zones = surf.Blends.Select(b => (Id: sc.Nodes.FirstOrDefault(kv => ReferenceEquals(kv.Value, b.Node)).Key, b))
+                .Where(x => x.Id != null).Select(x => new FloorTiling.Zone(x.Id!, x.b.Station, x.b.Start)).ToList();
+            roads.Add(new FloorTiling.Road(pav.Id, surf, 0, pav.TotalLeft, pav.TotalRight, zones));
+        }
+        var nodes = sc.Nodes.Where(kv => kv.Value.Major?.Id != null)
+            .ToDictionary(kv => kv.Key, kv => new FloorTiling.Node(kv.Value.Major!.Id!, kv.Value.Legs.Select(l => l.Id).OfType<string>().ToList()));
+        return sc.Tiling = new FloorTiling(roads, nodes, FloorTolerance);
+    }
+
+    /// <summary>Pisos divididos em partes planas, como o plugin cria no Revit (mesmo agrupamento, tolerância e retalhamento comum).</summary>
     public static List<(MarkingDefinition Def, MarkingPiece Piece, Polygon2 Merged, Polygon2 Part, Plane3 Plane, bool Warped, Func<Vec2, double> Z)> Floors(Scene sc)
     {
         var res = new List<(MarkingDefinition, MarkingPiece, Polygon2, Polygon2, Plane3, bool, Func<Vec2, double>)>();
+        var tiling = TilingOf(sc);
         foreach (var grp in sc.Parts.GroupBy(p => (p.Def, p.Piece.Color, E: Math.Round(p.Piece.Elevation, 3), T: Math.Round(p.Piece.Thickness, 3), p.Piece.Layer)))
         {
             var zf = SurfaceOf(sc, grp.Key.Def);
             if (zf == null) continue;
-            var node = NodeOf(sc, grp.Key.Def);
+            var node = NodeOf(sc, grp.Key.Def) ?? sc.World.Nodes.Select(n => n.Layout.Definition!).FirstOrDefault(it => it.Id == grp.Key.Def.Id);
+            var road = node == null ? sc.World.Groups.FindIndex(g => g.Contains(grp.Key.Def)) : -1;
             foreach (var m in PolygonOps.Union(grp.Select(x => x.Piece.Shape)).Where(p => p.Area > 0.01))
             {
-                var split = node != null
-                    ? FloorPlanes.SplitMember(m, zf, FloorTolerance, sc.Nodes[node.Id].MemberZones(Roads(sc, node)), sc.Nodes[node.Id].Major?.Surface, 25, 1.0)
-                    : FloorPlanes.Split(m, zf, FloorTolerance, RefOf(sc, grp.Key.Def), 25, ringStep: 1.0);
+                var tiles = node != null ? tiling.ForNode(node.Id, m) : road >= 0 ? tiling.ForRoad(sc.World.Roads[road].Def.Id, m) : null;
+                if (tiles != null)
+                {
+                    foreach (var (part, plane) in tiles) res.Add((grp.Key.Def, grp.First().Piece, m, part, plane, false, zf));
+                    continue;
+                }
+                var split = FloorPlanes.Split(m, zf, FloorTolerance, RefOf(sc, grp.Key.Def), 25, ringStep: 1.0);
                 foreach (var (part, plane, warped) in split)
                     res.Add((grp.Key.Def, grp.First().Piece, m, part, plane, warped, zf));
             }

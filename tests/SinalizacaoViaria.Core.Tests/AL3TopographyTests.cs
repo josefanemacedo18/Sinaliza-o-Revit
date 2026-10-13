@@ -52,8 +52,10 @@ public class AL3TopographyTests
     }
 
     /// <summary>
-    /// Greide: dentro da rampa máxima em todo ponto (sem saltos), passando exatamente na cota das outras vias nos cruzamentos e em
-    /// nível no miolo da interseção (±3 m; o patamar tem ±6 m e as curvas verticais entram até a metade dele).
+    /// Greide: dentro da rampa máxima em todo ponto (sem saltos), passando exatamente na cota das outras vias nos cruzamentos e,
+    /// nas vias secundárias do nó, no patamar do miolo da interseção (com a rampa do nó ao longo delas – em nível num cruzamento
+    /// em ângulo reto; o patamar tem no mínimo ±6 m e as curvas verticais entram até a metade dele); a principal passa com a
+    /// própria rampa.
     /// </summary>
     [Theory]
     [MemberData(nameof(Matrix))]
@@ -66,22 +68,26 @@ public class AL3TopographyTests
             var L = sc.World.Roads[i].Axis.Length;
             var max = sc.MaxGrades[i];
             // Cotas obrigadas incompatíveis com a rampa máxima: vale a menor rampa possível entre elas (com aviso).
-            var pins = sc.Pins[i].Select((p, k) => (P: p, H: Math.Max(RoadProfileDesigner.PlatformHalf, sc.Halves[i][k])))
+            // Via principal do nó (PassThrough): passa na cota com a própria rampa, sem patamar.
+            var pins = sc.Pins[i].Select((p, k) => (P: p, H: sc.Halves[i][k] < 0 ? 0 : Math.Max(RoadProfileDesigner.PlatformHalf, sc.Halves[i][k]),
+                    G: sc.Slopes[i].Count > k ? sc.Slopes[i][k] : 0))
                 .OrderBy(x => x.P.X).ToList();
             for (int k = 0; k + 1 < pins.Count; k++)
-                max = Math.Max(max, Math.Abs(pins[k + 1].P.Y - pins[k].P.Y) / Math.Max(1e-6, pins[k + 1].P.X - pins[k].P.X - pins[k].H - pins[k + 1].H));
+                max = Math.Max(max, Math.Abs(pins[k + 1].P.Y + pins[k + 1].G * -pins[k + 1].H - pins[k].P.Y - pins[k].G * pins[k].H)
+                                    / Math.Max(1e-6, pins[k + 1].P.X - pins[k].P.X - pins[k].H - pins[k + 1].H));
             for (var s = 0.0; s < L - 0.5; s += 0.5)
             {
                 var r = Math.Abs(g.Z(s + 0.5) - g.Z(s)) / 0.5;
                 Assert.True(r <= max + 0.01, $"via {i}: rampa de {r:P0} em {s:0.0} m (máx. {max:P0})");
             }
-            foreach (var (p, h) in pins)
+            foreach (var (p, h, gp) in pins)
             {
                 Assert.True(Math.Abs(g.Z(p.X) - p.Y) < 0.01, $"via {i}: cruzamento em {p.X:0.0} m na cota {g.Z(p.X):0.000} (devia {p.Y:0.000})");
                 // Em nível na metade interna do patamar (as curvas verticais das bordas entram até a metade dele).
+                if (h <= 0) continue;
                 for (var d = -h / 2; d <= h / 2 + 1e-9; d += h / 4)
                     if (p.X + d > 0 && p.X + d < L)
-                        Assert.True(Math.Abs(g.Z(p.X + d) - p.Y) < 0.02, $"via {i}: patamar do cruzamento fora de nível em {p.X + d:0.0} m");
+                        Assert.True(Math.Abs(g.Z(p.X + d) - p.Y - gp * d) < 0.02, $"via {i}: patamar do cruzamento fora da rampa do nó em {p.X + d:0.0} m");
             }
         }
     }

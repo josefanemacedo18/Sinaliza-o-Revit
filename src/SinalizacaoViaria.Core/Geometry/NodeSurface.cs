@@ -21,8 +21,17 @@ public sealed class NodeSurface
     public NodeSurface(IEnumerable<Leg> legs)
     {
         _legs = legs.ToList();
-        _major = _legs.Select((l, i) => (l, i)).OrderBy(t => t.l.Rank).ThenByDescending(t => t.l.Half).ThenBy(t => t.i).Select(t => t.l).FirstOrDefault();
+        var m = MajorIndex(_legs.Select(l => (l.Rank, l.Half)).ToList());
+        _major = m >= 0 ? _legs[m] : null;
     }
+
+    /// <summary>
+    /// Índice da via principal entre as vias do nó (prioridade, meia largura da pista; na ordem do nó): menor prioridade, empate =
+    /// mais larga, depois a primeira. −1 = nenhuma via. É a regra da superfície do nó – o greide usa a mesma para decidir qual via
+    /// atravessa o cruzamento com a própria rampa.
+    /// </summary>
+    public static int MajorIndex(IReadOnlyList<(int Rank, double Half)> legs) =>
+        legs.Count == 0 ? -1 : Enumerable.Range(0, legs.Count).OrderBy(i => legs[i].Rank).ThenByDescending(i => legs[i].Half).ThenBy(i => i).First();
 
     public int Count => _legs.Count;
     public Leg? Major => _major;

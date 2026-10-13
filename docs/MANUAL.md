@@ -2043,18 +2043,29 @@ Revit triangula de novo. Por isso cada obra entrega os pontos certos:
 * **Greide suavizado** – rampa máxima e curvas verticais, com cortes e aterros maiores em talude;
 * **Plana** – sem alterar o terreno.
 Taludes de corte/aterro e a rampa máxima ficam na mesma janela. Depois, **Perfil da Via** ajusta o greide e cria as obras.
-**Pisos planos, sem vincos**: sobre o greide, o nó ou o terreno, cada piso é dividido em **partes planas** (o topo de cada
-parte fica a no máximo 2 cm da superfície teórica; 3 cm sobre o Toposolid) e cada parte é um **piso plano inclinado** –
-uma única face, sem as linhas de triangulação da edição de forma. As divisões seguem a lógica da obra: primeiro na
-**crista do abaulamento** (cada caimento é um plano), depois **perpendiculares ao eixo** (juntas retas, como as juntas de
-pavimentação). Numa rampa constante a pista inteira são só **dois pisos** (um por caimento); nas curvas verticais e
-horizontais as partes ficam mais curtas. Ao longo das vias e nos nós a divisão continua sempre em faixas
-transversais até ficar plana (nunca triângulos); só em superfícies sem eixo de referência (terreno) uma parte torcida vira
-piso com edição de forma em malha regular. Partes vizinhas que juntas ainda cabem num plano são **fundidas de volta** (pisos grandes, poucas juntas) e o plano de
-cada parte passa **exatamente pela superfície nas juntas** – sem degraus entre partes. A **pintura segue os próprios pisos**: é recortada nas mesmas juntas e
-assenta no plano de cada piso, 4 mm acima dele – sem afundar nem flutuar. O relevo **acompanhar o terreno** usa suavização e curvas de
-40 m (tangentes mais longas, pisos maiores). As curvas verticais do greide nunca se sobrepõem e têm comprimento mínimo K = 10 m por % de
-variação de rampa.
+**Pisos planos, sem vincos e sem remendos (retalhamento comum)**: sobre o greide e o nó, cada **via tem uma única malha de
+juntas** e **todos os pisos dela** – pista, sarjeta, meio-fio, calçada, grama e a pintura – são recortados por essa malha e
+usam **o mesmo plano em cada célula**. Cada parte é um **piso plano inclinado** (uma única face, sem as linhas de triangulação
+da edição de forma), a no máximo 2 cm da superfície teórica.
+* **Juntas só onde a superfície dobra**: as juntas transversais (perpendiculares ao eixo, como as juntas de pavimentação)
+  ficam o mais longe possível umas das outras dentro dos 2 cm – numa **rampa constante a via principal e o nó não têm junta
+  nenhuma** (um plano por caimento, de ponta a ponta); nas curvas verticais e horizontais as partes ficam mais curtas. As
+  linhas longitudinais são as da seção: **crista do abaulamento** e **borda da pista** (onde o caimento termina).
+* **Juntas alinhadas de lado a lado**: pista, sarjeta, meio-fio e calçada são cortados nas mesmas estacas, e as células vizinhas
+  têm os mesmos vértices, na superfície – **nenhum degrau** entre partes do mesmo piso nem entre pisos diferentes (a diferença
+  medida fica abaixo de 1 mm; antes chegava a 4 cm).
+* **Onde a superfície é torcida** (a concordância da via secundária com o nó), a célula vira **dois triângulos planos** –
+  diagonais na mesma direção de um trecho para o outro –, sem degrau.
+* **No nó** os pisos usam a malha da **via principal** (a superfície do nó é a dela); na área do nó a via secundária também.
+  Na borda do nó, a primeira junta da secundária pega as cotas das faces da principal (com os vincos delas): a emenda fica sem
+  degrau mesmo com a principal em curva vertical. Onde a boca do nó é curva na transversal (vale ou crista), as juntas ganham
+  vértices entre as linhas da seção enquanto for preciso.
+* **Sem lascas**: pedaços com menos de 0,01 m² ou mais finos que 2 cm (o contorno da peça rente a uma junta) são juntados à
+  parte vizinha da mesma peça.
+* A **pintura** usa a mesma malha e os mesmos planos do pavimento embaixo: fica com folga constante, sem afundar nem flutuar.
+* Calçadas com níveis variáveis e pisos sobre o Toposolid (sem via) seguem a divisão própria (3 cm sobre o Toposolid).
+O relevo **acompanhar o terreno** usa suavização e curvas de 40 m (tangentes mais longas, pisos maiores). As curvas verticais
+do greide nunca se sobrepõem e têm comprimento mínimo K = 10 m por % de variação de rampa.
 
 **Correção importante**: a localização de pontos em relação ao eixo (estaca e afastamento) errava para pontos a mais de
 ~10 m do eixo em trechos curvos – calçadas e canteiros largos recebiam a cota de outra estaca (degraus e calçadas
@@ -2072,10 +2083,28 @@ escolher qual é a principal. Além da ponta de um eixo o greide segue na rampa 
 (antes formava um cone em volta da ponta). Pisos,
 pinturas, faixas de pedestres, retenções e rampas do nó ficam nessa superfície (sem degrau na emenda com o piso da via), e o
 nó entra na terraplenagem sempre que **qualquer via ligada** a ele molda o terreno: plataforma inclinada sob o pavimento e as
-calçadas, taludes das vias ligadas. Ao criar uma via com relevo que cruza (ou encosta em) vias existentes, o greide dela é
-**obrigado a passar na cota da outra via** no cruzamento, com um **patamar em nível que cobre toda a área do nó** naquela via
-(o alcance do recorte da interseção ao longo do eixo – num Y passa de 20 m) **mais 1/4 da curva vertical**: a curva vertical
-fica fora da interseção, e a concordância com o nó só ajusta o abaulamento. A via existente ganha o mesmo patamar.
+calçadas, taludes das vias ligadas.
+
+**Greide no cruzamento (ao criar uma via com relevo que cruza ou encosta em vias existentes)**:
+* A **via principal do nó** (a mesma regra da superfície do nó: maior hierarquia; empate = pista mais larga; depois a
+  primeira) **mantém o próprio greide** e atravessa o cruzamento com a própria rampa – sem patamar. Se a principal é a via
+  existente, ela não muda.
+* A **via secundária** se ajusta a ela: passa na **cota da boca do nó** (a da principal menos o abaulamento – a superfície do
+  nó além da pista da principal fica na cota da borda dela) com um **patamar só na área do nó** – o alcance do recorte da
+  interseção ao longo do eixo (num Y passa de 20 m) mais 1/4 da curva vertical, que fica fora da interseção. O patamar segue a
+  **rampa do nó ao longo da secundária**: em nível num cruzamento em ângulo reto; num Y, a rampa da principal projetada no
+  ramo (um ramo em nível ficaria metros acima ou abaixo da boca do nó).
+* Se a via nova é a principal, a **existente secundária** é que ganha o patamar, na cota da via nova; nos outros nós dela a
+  cota fica como estava.
+* Antes as **duas** vias ganhavam um patamar em nível de ~60 m, mesmo em rampa constante: cortes e aterros à toa (até 1,3 m
+  fora do terreno nas pontas do patamar) e mais curvas verticais – portanto mais juntas nos pisos.
+* A **concordância** da secundária (a passagem da superfície do nó para o próprio abaulamento) tem **20 m**, ou mais quando a
+  rampa própria é forte ou quando o bordo da pista subiria ou desceria em relação ao eixo mais que **0,75 %** (rampa relativa
+  máxima do bordo, AASHTO/DNIT para 30–40 km/h) – até 60 m. Antes eram 20–40 m em qualquer caso, com empeno de até 1,4 %.
+
+**Toposolid conferido junto às plataformas**: depois de montar os pontos da terraplenagem, o plugin triangula como o Revit
+(Delaunay) e compara com a superfície de projeto a cada 0,5 m até 2,5 m das plataformas; onde passa de 2 cm – o vinco entre
+dois taludes ou entre o talude e a borda cortando um triângulo – o ponto de projeto entra e a conferência é refeita.
 
 **Vias na topografia – o que é garantido (rodada AL)**, conferido numa matriz de 95 cenas (terrenos plano, ondulado, degrau,
 vale, crista e ruído × via local, coletora, arterial com canteiro e mão única × isolada, cruz, T e Y, nos dois relevos):

@@ -284,8 +284,57 @@ public sealed class MarkingService
         if (pav != null) grade.CrossfallWidth = Math.Max(1, Math.Max(pav.LeftWidth, pav.RightWidth));
         var surf = new GradeSurface(axis, grade);
         if (pav != null)
-            foreach (var blend in BlendsFor(pav, surf, PathResolver.Resolve(_doc, pav.Path)?.Z ?? 0)) surf.Blends.Add(blend);
+        {
+            var zones = new List<FloorTiling.Zone>();
+            foreach (var (ownerId, blend) in BlendsFor(pav, surf, PathResolver.Resolve(_doc, pav.Path)?.Z ?? 0))
+            {
+                surf.Blends.Add(blend);
+                zones.Add(new FloorTiling.Zone(ownerId, blend.Station, blend.Start));
+            }
+            _zones[surf] = zones;
+        }
         return _surfaces[key] = surf;
+    }
+
+    /// <summary>Nós em que a via de cada superfície é secundária (para o retalhamento comum dos pisos).</summary>
+    private readonly Dictionary<GradeSurface, List<FloorTiling.Zone>> _zones = new();
+    private FloorTiling? _tiling;
+    private object? _tilingFor;
+
+    /// <summary>
+    /// Retalhamento comum dos pisos do documento: uma malha de juntas por via com greide (montada só quando uma marca dela é
+    /// gerada), usada por todos os pisos da via – pista, sarjeta, meio-fio, calçada, grama e pintura – e, nos nós, a da via
+    /// principal. Refeito quando as definições mudam.
+    /// </summary>
+    private FloorTiling Tiling()
+    {
+        var defs = Definitions;
+        if (_tiling != null && ReferenceEquals(_tilingFor, defs)) return _tiling;
+        _tilingFor = defs;
+        return _tiling = new FloorTiling(TilingRoad, TilingNode, GradeFloorTolerance);
+    }
+
+    private FloorTiling.Road? TilingRoad(string id)
+    {
+        if (!Definitions.TryGetValue(id, out var d) || d is not RoadPavementDefinition pav) return null;
+        var path = PathResolver.Resolve(_doc, pav.Path);
+        if (path?.Main is not { Points.Count: >= 2 } axis) return null;
+        GradeSurface surf;
+        if (pav.Output.Grade != null) surf = SurfaceFor(pav, axis);
+        else
+        {
+            // Via sem greide como principal de um nó com greide: plano na cota da base.
+            var flat = RoadGrade.Flat(axis.Length);
+            flat.CrossfallWidth = Math.Max(1, Math.Max(pav.LeftWidth, pav.RightWidth));
+            surf = new GradeSurface(axis, flat);
+        }
+        return new FloorTiling.Road(pav.Id, surf, path.Z, pav.TotalLeft, pav.TotalRight, _zones.GetValueOrDefault(surf) ?? new List<FloorTiling.Zone>());
+    }
+
+    private FloorTiling.Node? TilingNode(string id)
+    {
+        if (!Definitions.TryGetValue(id, out var owner) || NodeFor(owner) is not { Major.Id: { } major } node) return null;
+        return new FloorTiling.Node(major, node.Legs.Select(l => l.Id).OfType<string>().ToList());
     }
 
     /// <summary>Pavimento da via a que a marca pertence (o próprio, ou o do mesmo grupo).</summary>
@@ -297,7 +346,7 @@ public sealed class MarkingService
     }
 
     /// <summary>Concordâncias da via com as interseções e rotatórias em que ela não é a principal.</summary>
-    private IEnumerable<NodeBlend> BlendsFor(RoadPavementDefinition pav, GradeSurface surf, double baseZ)
+    private IEnumerable<(string OwnerId, NodeBlend Blend)> BlendsFor(RoadPavementDefinition pav, GradeSurface surf, double baseZ)
     {
         foreach (var owner in Definitions.Values)
         {
@@ -315,10 +364,9 @@ public sealed class MarkingService
             var locs = cut.Select(surf.Locate).ToList();
             var c = surf.Locate(new Polygon2(cut).Centroid).S;
             var reach = locs.Max(l => Math.Abs(l.S - c));
-            // Concordância de 20 m (mais longa quando a diferença de rampa é grande, até 40 m).
-            var own = surf.Grade.GradeAt(Math.Clamp(c + reach + 10, 0, surf.Axis.Length));
-            var len = Math.Clamp(20 + 200 * Math.Abs(own), 20, 40);
-            yield return new NodeBlend(node, c, reach, len, baseZ);
+            // Concordância de 20 m (mais longa quando a rampa própria é forte ou o empeno da pista passaria de 0,75 %).
+            var len = NodeBlend.LengthFor(node, surf, baseZ, c, reach);
+            yield return (owner.Id, new NodeBlend(node, c, reach, len, baseZ));
         }
     }
 
@@ -1521,6 +1569,12 @@ public sealed class MarkingService
         foreach (var m in merged)
         {
             if (terrain == null) { parts.Add((m, null)); continue; }
+            // Via e nó com greide: o retalhamento comum (as mesmas juntas e os mesmos planos para todos os pisos).
+            if (terrain is GradeSampler or NodeSampler && TiledParts(def, m, baseZ) is { } tiled)
+            {
+                parts.AddRange(tiled);
+                continue;
+            }
             try
             {
                 var zf = SurfaceZ(terrain, UnitConv.Ft(baseZ + def.Output.ElevationOffset));
@@ -1539,6 +1593,31 @@ public sealed class MarkingService
             }
         }
         return parts;
+    }
+
+    /// <summary>
+    /// Partes de um piso pelo retalhamento comum: o do nó para as marcas do nó, o da via para as marcas dela (nulo = sem via
+    /// com greide). A marca com base própria diferente da base da via leva os planos junto (a superfície dela é o greide a partir
+    /// da própria base).
+    /// </summary>
+    private List<(Polygon2 Shape, Plane3? Plane)>? TiledParts(MarkingDefinition def, Polygon2 shape, double baseZ)
+    {
+        try
+        {
+            var tiling = Tiling();
+            if (NodeOwner(def) is { } owner)
+                return tiling.ForNode(owner.Id, shape)?.Select(x => (x.Part, (Plane3?)x.Plane)).ToList();
+            if (RoadOf(def) is not { Output.Grade: not null } road) return null;
+            var parts = tiling.ForRoad(road.Id, shape);
+            if (parts == null) return null;
+            var dz = baseZ - (PathResolver.Resolve(_doc, road.Path)?.Z ?? baseZ);
+            return parts.Select(x => (x.Part, (Plane3?)(x.Plane with { A = x.Plane.A + dz }))).ToList();
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Retalhamento comum dos pisos", ex);
+            return null;
+        }
     }
 
     private readonly Dictionary<string, TiledSampler?> _tiles = new();

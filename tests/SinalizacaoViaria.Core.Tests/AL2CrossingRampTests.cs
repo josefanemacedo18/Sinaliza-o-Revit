@@ -169,14 +169,22 @@ public class AL2CrossingRampTests
             Assert.InRange(to - from, 0.39, 0.61);
         }
         // A rampa fica sobre a superfície das marcas do nó (sem degrau na guia nem no topo): a cota da superfície é contínua ali.
+        // A superfície pode ser inclinada – o nó segue a rampa da via principal, até 30 % nestes terrenos –, mas sem salto: a
+        // variação de cota entre amostras vizinhas (a cada 0,25 m) muda menos de 2 cm de uma para a outra.
         foreach (var r in ramps)
         {
             var z = TopoScene.SurfaceOf(sc, r);
             if (z == null) continue;
             var f = RampGenerator.FrameOf(new Polyline2(r.PathRef.Points));
             var (_, run, _) = RampGenerator.Dimensions(r);
+            double? prev = null;
             for (var u = 0.0; u < run; u += 0.25)
-                Assert.True(Math.Abs(z(f.P(0, u + 0.25)) - z(f.P(0, u))) < 0.05, "superfície sob a rampa com degrau");
+            {
+                var dz = z(f.P(0, u + 0.25)) - z(f.P(0, u));
+                Assert.True(Math.Abs(dz) < 0.10, "superfície sob a rampa com degrau");
+                if (prev is { } pd) Assert.True(Math.Abs(dz - pd) < 0.02, "superfície sob a rampa com degrau");
+                prev = dz;
+            }
         }
     }
 }
