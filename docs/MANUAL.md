@@ -2083,8 +2083,14 @@ nível na transversal** (a cota da borda). O nó inteiro – pavimento, esquinas
 planos grandes**, sem os triângulos e "leques" que apareciam. As **vias secundárias fazem a concordância fora do nó**, nos
 primeiros 20–40 m depois dele: partem exatamente da superfície do nó e passam suavemente (curva em S) para o próprio greide
 e abaulamento – os pisos dessa transição ficam em faixas planas transversais (juntas retas), a plataforma do Toposolid
-acompanha a mesma superfície. **Rampas de acessibilidade, meios-fios, ilhas e dispositivos do nó** acompanham a superfície
-**vértice a vértice** (antes subiam só pela cota do centro e ficavam tortos ou soltos). Defina a **hierarquia** das vias para
+acompanha a mesma superfície. **Rampas de acessibilidade, meios-fios, ilhas, piso tátil e dispositivos do nó** acompanham
+**vértice a vértice as faces dos pisos** do nó e da via (o retalhamento comum) – encostam na calçada e na sarjeta em volta
+sem fresta nem degrau (antes subiam só pela cota do centro, e depois pela superfície teórica, até 1,6 cm fora das faces
+planas dos pisos). Barreiras, dispositivos e moderadores das vias com greide também assentam nas faces dos pisos da via.
+**Rampas na rua inclinada**: a rampa fica na inclinação de projeto (8,33 %) em relação à calçada e à sarjeta e com a mesma
+planta do terreno plano (alinhada à faixa); a rampa da via na direção dela soma ou subtrai. Quando o total passa de 8,33 %
+(NBR 9050) – a rampa voltada para a subida –, o plugin avisa com a inclinação total e o comprimento de rampa que resolve
+(ou o rebaixamento total, quando a via sozinha já passa do limite). Defina a **hierarquia** das vias para
 escolher qual é a principal. Além da ponta de um eixo o greide segue na rampa final e o abaulamento é medido na normal da ponta
 (antes formava um cone em volta da ponta). Pisos,
 pinturas, faixas de pedestres, retenções e rampas do nó ficam nessa superfície (sem degrau na emenda com o piso da via), e o
@@ -2130,6 +2136,17 @@ vale, crista e ruído × via local, coletora, arterial com canteiro e mão únic
   teórico (10 cm na faixa de 0,25 m junto ao pé, onde o talude encontra o terreno entre dois pontos).
 * **Toposolid alterado só na obra**: a mais de 5 m da obra o terreno fica como estava (≤ 1 mm).
 * **Pisos planos sem partes degeneradas**: cada parte a no máximo 2 cm da superfície (com 20 % de folga na corda das curvas).
+
+**O que a rodada VT garante** (cruz e T entre locais, coletora × local e local × coletora, em rampas constantes de 2, 5 e
+8 % na diagonal e em ondulação suave):
+* **Greide**: a via principal tem exatamente o greide que teria sozinha; a secundária fica no patamar da boca do nó em toda a
+  área da interseção.
+* **Pisos**: nenhum degrau acima de 1 mm entre faces vizinhas do pavimento da interseção (2 mm nos demais pisos) e nenhuma
+  lasca; em rampa constante a pista da principal e o pavimento do nó ficam em 2 a 4 planos.
+* **Pintura**: o fundo da pintura fica entre 0 e 5 mm do topo do pavimento em todo ponto pintado.
+* **Meio-fio** com altura constante (±5 mm), inclusive nas curvas das esquinas.
+* **Rampas** apoiadas nas faces dos pisos (≤ 5 mm), na inclinação de projeto em relação a eles, com aviso acima de 8,33 % no
+  total.
 
 **Espessura do Toposolid**: o fundo do Toposolid precisa ficar abaixo do corte mais fundo – senão o Revit recusa ("o sólido
 topográfico é muito fino para seu tipo"). O plugin confere antes e, se preciso, cria um tipo "… SV +N m" com a camada mais

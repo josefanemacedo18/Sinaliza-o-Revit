@@ -387,6 +387,25 @@ public static class RampGenerator
     }
 
     /// <summary>Área ocupada em planta (usada para recortar a calçada).</summary>
+    /// <summary>
+    /// Inclinação da rampa no relevo: a rampa sobe a altura do meio-fio no comprimento dela em relação aos pisos em volta, e a
+    /// rampa da via na direção dela (<paramref name="z"/>: cota dos pisos) soma ou subtrai. Devolve a inclinação total, a da
+    /// via e, acima de 8,33 % (NBR 9050), o aviso com o que fazer (nulo se cabe). Acesso de veículos e rebaixamento total ficam
+    /// de fora.
+    /// </summary>
+    public static (double Total, double Street, string? Warning) SlopeOnRelief(RampDefinition d, Polyline2 path, Func<Vec2, double> z)
+    {
+        var f = FrameOf(path);
+        var (_, run, _) = Dimensions(d);
+        if (d.Type is TipoRampa.AcessoVeiculos or TipoRampa.RebaixamentoTotal || run < 0.1) return (0, 0, null);
+        var rise = d.Height - Math.Clamp(d.LipHeight, 0, d.Height * 0.5);
+        var street = (z(f.P(0, run)) - z(f.P(0, 0))) / run;
+        var total = rise / run + street;
+        if (total <= 0.0833 + 1e-3) return (total, street, null);
+        var fix = 0.0833 - street > 0.02 ? $"aumente o comprimento da rampa para {rise / (0.0833 - street):0.00} m ou use o rebaixamento total" : "use o rebaixamento total";
+        return (total, street, $"Rampa a {total * 100:0.0} % no relevo (a via sobe {street * 100:0.0} % na direção dela; NBR 9050: até 8,33 %): {fix}.");
+    }
+
     public static Polygon2 Footprint(RampDefinition d, Polyline2 path)
     {
         var f = FrameOf(path);

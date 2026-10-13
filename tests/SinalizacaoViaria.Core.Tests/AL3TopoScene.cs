@@ -365,6 +365,23 @@ public static class TopoScene
         return sc.Tiling = new FloorTiling(roads, nodes, FloorTolerance);
     }
 
+    /// <summary>
+    /// Cota absoluta em que as peças sólidas de uma marca assentam (como MarkingService.BuildGeometry/RoadLift): as faces dos
+    /// pisos do nó (marcas do nó) ou da via (marcas da via), pelo retalhamento comum; fora dele, a superfície teórica.
+    /// </summary>
+    public static Func<Vec2, double>? LiftOf(Scene sc, MarkingDefinition def)
+    {
+        var tiling = TilingOf(sc);
+        var node = NodeOf(sc, def) ?? sc.World.Nodes.Select(n => n.Layout.Definition!).FirstOrDefault(it => it.Id == def.Id);
+        var zf = SurfaceOf(sc, def);
+        if (zf == null) return null;
+        if (node != null) return p => tiling.NodeZ(node.Id, p) ?? zf(p);
+        var road = sc.World.Groups.FindIndex(g => g.Contains(def));
+        if (road < 0) return zf;
+        var id = sc.World.Roads[road].Def.Id;
+        return p => tiling.RoadZ(id, p) ?? zf(p);
+    }
+
     /// <summary>Pisos divididos em partes planas, como o plugin cria no Revit (mesmo agrupamento, tolerância e retalhamento comum).</summary>
     public static List<(MarkingDefinition Def, MarkingPiece Piece, Polygon2 Merged, Polygon2 Part, Plane3 Plane, bool Warped, Func<Vec2, double> Z)> Floors(Scene sc)
     {

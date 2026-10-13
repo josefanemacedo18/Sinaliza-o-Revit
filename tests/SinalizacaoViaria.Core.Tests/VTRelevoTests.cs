@@ -1,5 +1,6 @@
 using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Definitions;
+using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Core.Model;
 
@@ -240,4 +241,123 @@ public class VTRelevoTests
         }
         Assert.True(n > 1000);
     }
+
+    /// <summary>Meio-fio (guia) – linhas e peças da camada MEIO-FIO.</summary>
+    private static bool IsCurb((MarkingDefinition Def, MarkingPiece Piece, Polygon2 Merged, Polygon2 Part, Plane3 Plane, bool Warped, Func<Vec2, double> Z) f) =>
+        f.Def is LinearMarkingDefinition l && l.Code.StartsWith("MEIO-FIO") || f.Piece.Layer?.StartsWith("MEIO-FIO") == true;
+
+    /// <summary>
+    /// Meio-fio com altura constante, inclusive nas curvas das esquinas: ao longo de toda a guia, o topo dela fica acima do topo
+    /// do pavimento ou da sarjeta encostados exatamente a altura nominal (cota + espessura das peças), ±5 mm.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Matrix))]
+    public void V5_MeioFioComAlturaConstante(string terrain, string kind, string a, string b)
+    {
+        var sc = Get(terrain, kind, a, b);
+        var floors = TopoScene.Floors(sc).Where(f => f.Piece.Solid == null && f.Piece.Profile == null && !MarkingColors.IsPaint(f.Piece.Color)).ToList();
+        var curbs = floors.Where(IsCurb).ToList();
+        var low = floors.Where(f => !IsCurb(f) && f.Piece.Elevation + f.Piece.Thickness < 0.05).ToList();
+        Assert.NotEmpty(curbs);
+        var n = 0;
+        foreach (var c in curbs)
+        {
+            var ring = c.Part.Outer;
+            for (int k = 0; k < ring.Count; k++)
+            {
+                var p0 = ring[k];
+                var p1 = ring[(k + 1) % ring.Count];
+                var len = p0.DistanceTo(p1);
+                if (len < 0.05) continue;
+                var dir = (p1 - p0) * (1 / len);
+                for (var t = 0.02; t < len; t += 0.25)
+                {
+                    var q = p0 + dir * t;
+                    foreach (var side in new[] { dir.PerpLeft, dir.PerpRight })
+                    {
+                        var probe = q + side * 0.03;
+                        if (c.Part.Contains(probe)) continue;
+                        var nb = low.FirstOrDefault(f => f.Part.Contains(probe));
+                        if (nb.Def == null) continue;
+                        var h = Top(c, q) - Top(nb, q);
+                        var nominal = c.Piece.Elevation + c.Piece.Thickness - nb.Piece.Elevation - nb.Piece.Thickness;
+                        n++;
+                        Assert.True(Math.Abs(h - nominal) <= 0.005, $"{terrain}/{kind}/{a}x{b}: meio-fio com {h * 100:0.0} cm (nominal {nominal * 100:0.0}) em {q}");
+                    }
+                }
+            }
+        }
+        Assert.True(n > 100);
+    }
+
+    /// <summary>
+    /// Rampas encaixadas: as peças sólidas das rampas, levantadas pelas faces dos pisos (como o plugin), encostam na calçada no
+    /// topo e na sarjeta/pista no meio-fio a até 5 mm – sem fresta nem degrau –, e ficam na inclinação de projeto em relação a
+    /// essas faces. Antes subiam pela superfície teórica, a até 2 cm das faces planas dos pisos em volta.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Matrix))]
+    public void V6_RampasEncaixadasNosPisos(string terrain, string kind, string a, string b)
+    {
+        var sc = Get(terrain, kind, a, b);
+        var floors = TopoScene.Floors(sc).Where(f => f.Piece.Solid == null && f.Piece.Profile == null && !MarkingColors.IsPaint(f.Piece.Color)).ToList();
+        var ramps = sc.Parts.Where(x => x.Def is RampDefinition && x.Piece.Solid != null && !MarkingColors.IsPaint(x.Piece.Color)).ToList();
+        Assert.NotEmpty(ramps);
+        var n = 0;
+        foreach (var (def, piece) in ramps)
+        {
+            var lift = TopoScene.LiftOf(sc, def)!;
+            var r = (RampDefinition)def;
+            // Só os vértices de cima (o mais alto em cada ponto da planta), no topo da calçada ou no meio-fio: os de baixo ficam
+            // sob os pisos.
+            var tops = piece.Solid!.Faces.SelectMany(f => f).GroupBy(v => (Math.Round(v.X, 3), Math.Round(v.Y, 3))).Select(g => g.MaxBy(v => v.Z));
+            foreach (var v in tops)
+            {
+                if (Math.Abs(v.Z - r.Height) > 1e-3 && Math.Abs(v.Z - Math.Clamp(r.LipHeight, 0, r.Height * 0.5)) > 1e-3) continue;
+                // A rampa sobe a partir da mesma face dos pisos em volta: cota de apoio da rampa = plano da face do piso vizinho
+                // (as alturas nominais – calçada, sarjeta – ficam de fora da comparação).
+                var z = lift(v.XY);
+                var near = floors.Where(f => f.Part.Contains(v.XY) || f.Part.DistanceTo(v.XY) < 0.03).ToList();
+                if (near.Count == 0) continue;
+                var err = near.Min(f => Math.Abs(f.Plane.Z(v.XY) - z));
+                n++;
+                Assert.True(err <= 0.005, $"{terrain}/{kind}/{a}x{b}: rampa a {err * 1000:0.0} mm do piso vizinho em {v.XY} (z local {v.Z:0.000})");
+            }
+        }
+        Assert.True(n > 0);
+    }
+
+    /// <summary>
+    /// Rampas na inclinação da norma: em relação aos pisos em volta cada rampa fica exatamente na inclinação de projeto (8,33 %
+    /// por padrão) e alinhada à faixa (a planta não muda com o relevo); a rampa da via na direção dela soma ou subtrai, e acima
+    /// de 8,33 % no total (NBR 9050) o plugin avisa e diz o comprimento que resolve.
+    /// </summary>
+    [Theory]
+    [InlineData("incl2")]
+    [InlineData("incl8")]
+    [InlineData("suave")]
+    public void V7_RampasNaInclinacaoDaNorma_ComAvisoNaRuaInclinada(string terrain)
+    {
+        var sc = Get(terrain, "cruz", "local2", "local2");
+        var flat = TopoScene.Make("plano", "cruz", "local2", "local2", 90);
+        var ramps = sc.World.Defs.OfType<RampDefinition>().ToList();
+        Assert.NotEmpty(ramps);
+        var warned = 0;
+        foreach (var r in ramps)
+        {
+            var path = new Polyline2(r.PathRef.Points);
+            var (total, street, warning) = RampGenerator.SlopeOnRelief(r, path, TopoScene.LiftOf(sc, r)!);
+            var (_, run, _) = RampGenerator.Dimensions(r);
+            Assert.True(Math.Abs(total - street - r.Height / run) < 1e-6, $"{terrain}: rampa fora da inclinação de projeto em relação aos pisos");
+            Assert.True(total <= r.Slope + 1e-3 + Math.Max(0, street), $"{terrain}: rampa a {total:P1}");
+            Assert.Equal(total > 0.0833 + 1e-3, warning != null);
+            if (warning != null) { warned++; Assert.Contains("NBR 9050", warning); }
+            // Alinhada à faixa: a mesma planta do terreno plano.
+            var r0 = flat.World.Defs.OfType<RampDefinition>().MinBy(x => x.PathRef.Points[0].DistanceTo(r.PathRef.Points[0]))!;
+            Assert.True(r0.PathRef.Points[0].DistanceTo(r.PathRef.Points[0]) < 1e-3 && r0.PathRef.Points[^1].DistanceTo(r.PathRef.Points[^1]) < 1e-3);
+        }
+        // Na rua inclinada as rampas voltadas para a subida passam de 8,33 %: avisadas.
+        Assert.True(warned > 0, $"{terrain}: nenhuma rampa avisada");
+    }
 }
+

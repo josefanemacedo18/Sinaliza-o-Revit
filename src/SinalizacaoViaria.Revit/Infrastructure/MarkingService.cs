@@ -144,14 +144,37 @@ public sealed class MarkingService
     public MarkingGeometry BuildGeometry(MarkingDefinition def, out double baseZ, List<string>? warnings = null, View? view = null)
     {
         var geo = BuildGeometryCore(def, out baseZ, warnings, view);
-        // Nó no relevo: rampas, ilhas, meios-fios e dispositivos acompanham a superfície do nó vértice a vértice (antes só
-        // subiam pela cota do centro e ficavam tortos/soltos em interseções inclinadas).
+        // Nó no relevo: rampas, ilhas, meios-fios e dispositivos acompanham vértice a vértice as FACES DOS PISOS do nó
+        // (retalhamento comum) – encostam na calçada e na sarjeta em volta sem fresta nem degrau; fora da malha, a superfície do
+        // nó. Antes seguiam a superfície teórica, a até 2 cm das faces planas dos pisos.
         if (def.Output.Mode == OutputMode.Modelo3D && NodeFor(def) is { } node)
         {
             var b = baseZ;
-            GradeLift.Apply(geo, v => node.Z(v) - b);
+            var owner = NodeOwner(def);
+            var tiling = owner != null ? TryTiling() : null;
+            double Abs(Vec2 v) => (owner != null ? tiling?.NodeZ(owner.Id, v) : null) ?? node.Z(v);
+            GradeLift.Apply(geo, v => Abs(v) - b);
+            if (def is RampDefinition ramp && PathResolver.Resolve(_doc, ramp.Path)?.Main is { Points.Count: >= 2 } rp)
+                RampSlopeWarning(geo, ramp, rp, Abs);
         }
         return geo;
+    }
+
+    /// <summary>Retalhamento comum dos pisos, ou nulo se não der para montar (as peças seguem a superfície teórica).</summary>
+    private FloorTiling? TryTiling()
+    {
+        try { return Tiling(); }
+        catch (Exception ex)
+        {
+            Log.Error("Retalhamento comum dos pisos", ex);
+            return null;
+        }
+    }
+
+    /// <summary>Rampa numa rua inclinada: aviso quando a inclinação total passa de 8,33 % (RampGenerator.SlopeOnRelief).</summary>
+    private static void RampSlopeWarning(MarkingGeometry geo, RampDefinition ramp, Polyline2 path, Func<Vec2, double> z)
+    {
+        if (RampGenerator.SlopeOnRelief(ramp, path, z).Warning is { } w) geo.Warnings.Add(w);
     }
 
     private MarkingGeometry BuildGeometryCore(MarkingDefinition def, out double baseZ, List<string>? warnings, View? view)
@@ -182,8 +205,12 @@ public sealed class MarkingService
         if (def is RampDefinition or TrafficCalmingDefinition or CulDeSacDefinition or CurbExtensionDefinition)
         {
             var g1 = MarkingBuilder.Build(def, path.Main, ctx);
-            // Na via com greide (fora de nós), rampas e moderadores acompanham o greide vértice a vértice.
-            if (Graded(def) && path.Main != null && NodeFor(def) == null) GradeLift.Apply(g1, SurfaceFor(def, path.Main));
+            // Na via com greide (fora de nós), rampas e moderadores acompanham vértice a vértice as faces dos pisos da via.
+            if (Graded(def) && path.Main != null && NodeFor(def) == null)
+            {
+                GradeLift.Apply(g1, RoadLift(def, path.Main));
+                if (def is RampDefinition ramp) RampSlopeWarning(g1, ramp, path.Main, RoadLift(def, path.Main));
+            }
             return g1;
         }
 
@@ -206,8 +233,22 @@ public sealed class MarkingService
             var c = graded ? new Polyline2(CurveTools.Densify(chain.Points, 2.0), chain.Closed) : chain;
             geo.Merge(MarkingBuilder.Build(def, c, ctx));
         }
-        if (graded) GradeLift.Apply(geo, SurfaceFor(def, path.Main!));
+        if (graded) GradeLift.Apply(geo, RoadLift(def, path.Main!));
         return geo;
+    }
+
+    /// <summary>
+    /// Cota (relativa à base da via) das peças sólidas de uma marca da via: as faces dos pisos dela (retalhamento comum) –
+    /// barreiras, dispositivos, rampas e moderadores assentam nos pisos em volta; sem a malha, o greide teórico.
+    /// </summary>
+    private Func<Vec2, double> RoadLift(MarkingDefinition def, Polyline2 axis)
+    {
+        var surf = SurfaceFor(def, axis);
+        var road = RoadOf(def);
+        var tiling = road?.Output.Grade != null ? TryTiling() : null;
+        var roadBase = road != null ? PathResolver.Resolve(_doc, road.Path)?.Z ?? 0 : 0;
+        if (tiling == null || road == null) return surf.Z;
+        return v => tiling.RoadZ(road.Id, v) is { } z ? z - roadBase : surf.Z(v);
     }
 
     /// <summary>Marca da via que acompanha o greide (as obras hospedadas já aplicam o greide na própria geração).</summary>
