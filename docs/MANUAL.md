@@ -2026,8 +2026,20 @@ as duas vias são criadas antes, com a ferramenta de vias.
 **Como o corte e o aterro acontecem no Toposolid.** O Toposolid é uma superfície triangulada pelos seus pontos: o plugin
 troca os pontos da área de projeto pelos pontos da plataforma, das cristas e pés de talude e dos degraus dos muros – e o
 Revit triangula de novo. Por isso cada obra entrega os pontos certos:
-* **Via em corte/aterro**: plataforma (bordas e eixo a cada 3 m) e **taludes** até o terreno natural, com pontos no meio da
-  face dos taludes altos.
+* **Via em corte/aterro**: plataforma **por camadas**, de alinhamento a alinhamento, e **taludes** até o terreno natural:
+  * **sob a pista** (faixas, sarjetas, canteiros e extensões dentro dela) o terreno fica no **fundo da estrutura do
+    pavimento** (superfície menos o subleito, 0,40 m por padrão);
+  * **sob o meio-fio, a calçada e a faixa gramada** ele fica no **fundo da laje** (a laje assenta no terreno) – a passagem da
+    caixa do pavimento para o fundo da laje fica escondida sob o meio-fio;
+  * **na borda externa** (alinhamento do lote, quina da esquina) o terreno **sobe ao topo da calçada** – na altura, na
+    inclinação transversal e nos níveis no alinhamento da seção – e o **talude parte do topo da calçada**. Sem calçada, o
+    terreno encontra o bordo da pista. Nas **pontas livres** da via (sem nó nem obra) a testa também sobe ao acabamento, com o
+    degrau do meio-fio, e o talude à frente parte dele.
+  * Antes a plataforma inteira ficava 0,40 m abaixo da pista e ia até 0,30 m além da calçada: o terreno junto ao lote ficava
+    **0,55 m abaixo do topo da calçada** em toda a borda (um degrau com a laje "flutuando") e o corte sob as calçadas era
+    contado como se fosse caixa de pavimento.
+  * Pontos no Toposolid: as duas linhas de cada transição a cada 0,25 m, as bordas a cada 0,5 m, a crista e o fim do caimento
+    da pista a cada 0,5 m, e pontos no meio da face dos taludes altos.
 * **Muros** (trincheira, rampas em terra armada): **degrau** de 10 cm atrás da face do muro, no terreno natural – o terreno
   fica natural atrás do muro, sem a "rampa de terra" até a borda.
 * **Emboque de túnel**: a via em corte termina numa **testa vertical** até a altura do emboque e, acima dela, a encosta é
@@ -2115,8 +2127,12 @@ calçadas, taludes das vias ligadas.
   máxima do bordo, AASHTO/DNIT para 30–40 km/h) – até 60 m. Antes eram 20–40 m em qualquer caso, com empeno de até 1,4 %.
 
 **Toposolid conferido junto às plataformas**: depois de montar os pontos da terraplenagem, o plugin triangula como o Revit
-(Delaunay) e compara com a superfície de projeto a cada 0,5 m até 2,5 m das plataformas; onde passa de 2 cm – o vinco entre
-dois taludes ou entre o talude e a borda cortando um triângulo – o ponto de projeto entra e a conferência é refeita.
+(Delaunay) e compara com a superfície de projeto a cada 0,5 m até 2,5 m das plataformas (a cada 0,25 m no primeiro metro,
+onde o talude parte do topo da calçada); onde passa de 2 cm – o vinco entre dois taludes ou entre o talude e a borda cortando
+um triângulo – o ponto de projeto entra e a conferência é refeita. **Esquinas**: nos cantos convexos (pontas de via) o talude
+contorna em **cone**, com pontos em leque a cada 15°; nas **quinas do lote** entre duas vias os dois taludes se encontram num
+**vinco na bissetriz**, com pontos a cada 0,25 m até o pé. Pés de talude a menos de 12 cm da borda não entram (o talude ali
+tem poucos centímetros e o ponto natural colado à borda fazia a triangulação afundar a borda).
 
 **Vias na topografia – o que é garantido (rodada AL)**, conferido numa matriz de 95 cenas (terrenos plano, ondulado, degrau,
 vale, crista e ruído × via local, coletora, arterial com canteiro e mão única × isolada, cruz, T e Y, nos dois relevos):
@@ -2128,8 +2144,8 @@ vale, crista e ruído × via local, coletora, arterial com canteiro e mão únic
   diferença medida na borda do nó, desfeita em curva S (antes misturava as cotas do nó prolongado com as do greide e chegava
   a 55 % numa via de 30 %).
 * **Interseção num plano coerente**: as vias chegam ao nó sem degrau (≤ 5 mm).
-* **Nada flutuando nem enterrado**: sob todos os pisos da via e do nó (calçadas de esquina, extensões, rampas, ilhas) o
-  Toposolid fica no fundo da estrutura do pavimento a até **5 mm**. A plataforma segue a mesma superfície dos pisos, e o
+* **Nada flutuando nem enterrado**: o Toposolid fica, a até **5 mm**, no fundo da estrutura do pavimento sob a pista e no
+  fundo das lajes sob meio-fio, calçada e grama (calçadas de esquina incluídas). A plataforma segue a mesma superfície dos pisos, e o
   Toposolid recebe pontos densos nas bordas (0,5 m), nas linhas de quebra da seção (crista e fim do caimento) e nas quebras do
   nó prolongadas – sem linhas de quebra, a triangulação só respeita a superfície se os pontos nelas forem densos.
 * **Taludes nas razões pedidas** e fechando no terreno: inclinação até a do talude (+5 %), Toposolid a até 5 cm do talude
@@ -2147,6 +2163,13 @@ vale, crista e ruído × via local, coletora, arterial com canteiro e mão únic
 * **Meio-fio** com altura constante (±5 mm), inclusive nas curvas das esquinas.
 * **Rampas** apoiadas nas faces dos pisos (≤ 5 mm), na inclinação de projeto em relação a eles, com aviso acima de 8,33 % no
   total.
+* **Terreno no acabamento**: logo fora da borda externa dos pisos (5 cm) o Toposolid fica no topo do piso da borda, mais ou
+  menos o que o talude sobe ou desce nesses 5 cm (3 cm de folga); antes ficava 55 cm abaixo.
+* **Camadas**: Toposolid no fundo da estrutura sob a pista e no fundo das lajes sob meio-fio e calçada (±5 mm).
+* **Taludes contínuos até o terreno**: em toda a área alterada fora das plataformas – pé, cones e vincos das esquinas
+  incluídos – o Toposolid reproduz a superfície de projeto a até **5 cm**.
+* **Volumes** conferidos com o cálculo analítico (via reta em corte e em aterro, com abaulamento, calçadas e taludes: ≤ 1 %)
+  e repartidos por via e por interseção, somando o total.
 
 **Espessura do Toposolid**: o fundo do Toposolid precisa ficar abaixo do corte mais fundo – senão o Revit recusa ("o sólido
 topográfico é muito fino para seu tipo"). O plugin confere antes e, se preciso, cria um tipo "… SV +N m" com a camada mais
@@ -2159,7 +2182,8 @@ inteira, sem afinar).
 * O terreno é **lido direto da geometria do Toposolid** (sem depender de vista 3D) e, na primeira terraplenagem, o
   **terreno original é guardado no próprio Toposolid**. Cada ajuste refaz o terreno **a partir do original** com **todas** as
   vias com greide e obras do projeto: regerar não acumula aterros, e apagar uma obra devolve o terreno natural.
-* Vias com greide moldam o terreno: plataforma sob o pavimento e **taludes de corte e aterro** até o terreno natural –
+* Vias com greide moldam o terreno: plataforma por camadas (estrutura sob a pista, lajes das calçadas no terreno, terreno no
+  topo da calçada no alinhamento) e **taludes de corte e aterro** até o terreno natural –
   **exceto sob pontes e viadutos** (o terreno fica natural) e nos túneis. Taludes vizinhos viram uma superfície só.
 * **Terraplenagem** (botão): refaz tudo; vias escolhidas sem greide passam a moldar o terreno. Opção **novo levantamento**:
   o Toposolid atual vira o terreno natural (depois de editá-lo à mão ou importar outro levantamento).
@@ -2170,7 +2194,10 @@ inteira, sem afinar).
   aterrado (mais de 10 cm) – para conferir e apresentar; rode de novo sem a opção para tirar.
 * **Relatório**: área terraplenada, corte, aterro, **balanço de massas** com o **fator de homogeneização** (corte in situ por
   m³ de aterro compactado, 1,20–1,40 – DNIT): indica **bota-fora** (sobra de corte) ou **empréstimo** (falta), e os
-  **volumes de cada elemento** (via, interseção, obra).
+  **volumes de cada elemento** (via, interseção, obra) – a parte de cada um no projeto conjunto: cada ponto vai para a
+  plataforma em que está ou para a borda cujo talude define a cota ali, e a soma das partes é o total (antes cada elemento era
+  calculado isolado e o nó e o começo das vias contavam duas vezes). Os volumes são amostrados com um ponto sorteado (fixo) por
+  célula de 1 m – com o ponto no centro, as transições da plataforma caíam sempre do mesmo lado numa via alinhada à malha.
 * Cotas conferidas nos vértices inseridos (correção automática de deslocamento constante); **grama** de taludes, ilhas e laços
   como **subdivisões** do Toposolid; volumes de corte e aterro no relatório. Use **Desfazer** para voltar.
 

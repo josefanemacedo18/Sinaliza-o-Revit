@@ -215,10 +215,16 @@ public static class TerrainRebuild
         const double h = 0.5;
         if ((x1 - x0) * (y1 - y0) / (h * h) > 4_000_000) return;
         var samples = new List<(Vec2 P, double Z)>();
-        for (var x = Math.Floor(x0 / h) * h; x <= x1; x += h)
-            for (var y = Math.Floor(y0 / h) * h; y <= y1; y += h)
+        // Junto às bordas (até 1 m) a conferência é mais fina (0,25 m): é onde o talude parte do topo da calçada, logo depois do fundo
+        // da laje, e a triangulação pode passar por cima do degrau.
+        var edgeBand = Mask(plats, 1.0);
+        const double hf = h / 2;
+        for (var x = Math.Floor(x0 / hf) * hf; x <= x1; x += hf)
+            for (var y = Math.Floor(y0 / hf) * hf; y <= y1; y += hf)
             {
                 var q = new Vec2(x, y);
+                var coarse = Math.Abs(x / h - Math.Round(x / h)) < 1e-6 && Math.Abs(y / h - Math.Round(y / h)) < 1e-6;
+                if (!coarse && !edgeBand(q)) continue;
                 if (!near(q) || inside(q) || !inRegion(q) || original.Z(q) == null || design.DesignZ(q) is not { } z) continue;
                 samples.Add((q, z));
             }

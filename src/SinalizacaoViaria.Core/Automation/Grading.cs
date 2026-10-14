@@ -21,6 +21,8 @@ public sealed class SlopeEdge
     public double Reach { get; set; } = 60;
     /// <summary>Distância até o pé/crista na normal de cada vértice (mesma contagem de <see cref="Line"/>).</summary>
     public List<double> Day { get; } = new();
+    /// <summary>Marca dona da borda (volumes por via/interseção).</summary>
+    public string? Owner { get; set; }
 
     private const double DayMargin = 2.0;
 
@@ -65,6 +67,27 @@ public sealed class GradingResult
     public List<string> Warnings { get; } = new();
 
     /// <summary>
+    /// Volumes por marca dona (via, interseção...; <see cref="GradeCorridor.Owner"/>, <see cref="GradePad.Owner"/>): cada ponto da
+    /// área alterada vai para a plataforma em que está ou para a borda cujo talude define a cota ali – a soma é o total.
+    /// </summary>
+    public Dictionary<string, (double Cut, double Fill, double Area)> ByOwner { get; } = new();
+
+    /// <summary>Dona de cada plataforma (mesma contagem de <see cref="Pads"/>).</summary>
+    public List<string?> PadOwners { get; } = new();
+    /// <summary>Dona de cada trecho exato (mesma contagem de <see cref="Platforms"/>).</summary>
+    public List<string?> PlatformOwners { get; } = new();
+    /// <summary>Trecho de uma faixa por camadas (mesma contagem de <see cref="Platforms"/>).</summary>
+    public List<bool> PlatformLayered { get; } = new();
+    /// <summary>Faixas de índices de <see cref="Triangles"/> por dona.</summary>
+    public List<(int From, int To, string? Owner)> TriangleOwners { get; } = new();
+
+    private string? TriangleOwner(int i)
+    {
+        foreach (var (a, b, o) in TriangleOwners) if (i >= a && i < b) return o;
+        return null;
+    }
+
+    /// <summary>
     /// Pontos do terreno natural colados na área alterada (junto ao pé dos taludes perto das plataformas): entram no Toposolid
     /// com os de projeto – o pé do talude fica marcado dos dois lados, sem triângulos até os pontos do levantamento.
     /// </summary>
@@ -78,8 +101,12 @@ public sealed class GradingResult
     private Dictionary<(int, int), List<int>>? _platIndex;
     private int _platIndexed = -1;
 
-    /// <summary>Cota da plataforma exata no ponto (a mais alta das que o contêm) – nula fora delas.</summary>
-    private double? PlatformZ(Vec2 p)
+    /// <summary>
+    /// Cota da plataforma exata no ponto e a dona dela – nula fora delas. Entre faixas comuns vale a mais alta; entre faixas por
+    /// camadas, a mais baixa: onde a pista de uma via atravessa a calçada da outra (boca do nó) a estrutura do pavimento continua
+    /// (com a mais alta, a calçada da principal subia o terreno 40 cm na pista da secundária).
+    /// </summary>
+    private (double Z, string? Owner)? PlatformAt(Vec2 p)
     {
         if (Platforms.Count == 0) return null;
         if (_platIndex == null || _platIndexed != Platforms.Count)
@@ -100,15 +127,17 @@ public sealed class GradingResult
             _platIndexed = Platforms.Count;
         }
         if (!_platIndex.TryGetValue(Key(p.X, p.Y), out var cand)) return null;
-        double? best = null;
+        (double Z, string? Owner)? best = null, low = null;
         foreach (var i in cand)
             // Borda inclusiva: os pontos das linhas da seção são vértices dos trechos (fora de todos, caíam no talude).
             if (Platforms[i].Area.Contains(p) || Platforms[i].Area.DistanceTo(p) <= 1e-6)
             {
                 var z = Platforms[i].Z(p);
-                if (best == null || z > best) best = z;
+                var o = i < PlatformOwners.Count ? PlatformOwners[i] : null;
+                if (i < PlatformLayered.Count && PlatformLayered[i]) { if (low == null || z < low.Value.Z) low = (z, o); }
+                else if (best == null || z > best.Value.Z) best = (z, o);
             }
-        return best;
+        return low ?? best;
     }
 
     /// <summary>Triângulo de talude (falso = plataforma/faixa de projeto, que tem prioridade).</summary>
@@ -146,14 +175,18 @@ public sealed class GradingResult
     /// Cota de projeto no ponto (nulo = fora da área terraplenada). Plataformas têm prioridade; onde taludes de obras
     /// vizinhas se sobrepõem vale o mais alto nos aterros e o mais baixo nos cortes (superfície única, sem "degraus").
     /// </summary>
-    public double? DesignZ(Vec2 p)
+    public double? DesignZ(Vec2 p) => DesignAt(p).Z;
+
+    /// <summary>Cota de projeto no ponto e a marca dona dela (a plataforma em que está ou a borda cujo talude vale ali).</summary>
+    public (double? Z, string? Owner) DesignAt(Vec2 p)
     {
-        foreach (var (area, z) in Pads) if (area.Contains(p)) return z(p);
-        if (PlatformZ(p) is { } pz) return pz;
+        for (int i = 0; i < Pads.Count; i++)
+            if (Pads[i].Area.Contains(p)) return (Pads[i].Z(p), i < PadOwners.Count ? PadOwners[i] : null);
+        if (PlatformAt(p) is { } pz) return (pz.Z, pz.Owner);
         Index();
-        if (!_index!.TryGetValue(Key(p.X, p.Y), out var cand)) return SlopeZ(p);
-        double? platform = null;
-        List<double>? slopes = null;
+        if (!_index!.TryGetValue(Key(p.X, p.Y), out var cand)) return SlopeAt(p);
+        (double Z, string? Owner)? platform = null;
+        List<(double Z, string? Owner)>? slopes = null;
         foreach (var i in cand)
         {
             var (a, b, c) = Triangles[i];
@@ -165,17 +198,22 @@ public sealed class GradingResult
             if (l1 < -1e-9 || l2 < -1e-9 || l3 < -1e-9) continue;
             var z = l1 * a.Z + l2 * b.Z + l3 * c.Z;
             var slope = i < TriangleIsSlope.Count && TriangleIsSlope[i];
-            if (!slope) platform = platform == null ? z : Math.Max(platform.Value, z);
-            else (slopes ??= new()).Add(z);
+            if (!slope) { if (platform == null || z > platform.Value.Z) platform = (z, TriangleOwner(i)); }
+            else (slopes ??= new()).Add((z, TriangleOwner(i)));
         }
-        if (platform != null) return platform;
-        if (slopes == null) return SlopeZ(p);
-        if (SlopeZ(p) is { } sf) slopes.Add(sf);
-        if (slopes.Count == 1) return slopes[0];
+        if (platform != null) return (platform.Value.Z, platform.Value.Owner);
+        if (slopes == null) return SlopeAt(p);
+        if (SlopeAt(p) is { Z: { } sf } so) slopes.Add((sf, so.Owner));
+        if (slopes.Count == 1) return (slopes[0].Z, slopes[0].Owner);
         var g = Ground?.Invoke(p);
-        if (g == null) return slopes.Max();
-        var fills = slopes.Where(z => z > g.Value).ToList();
-        return fills.Count > 0 ? fills.Max() : slopes.Min();
+        (double Z, string? Owner) pick;
+        if (g == null) pick = slopes.MaxBy(x => x.Z);
+        else
+        {
+            var fills = slopes.Where(x => x.Z > g.Value).ToList();
+            pick = fills.Count > 0 ? fills.MaxBy(x => x.Z) : slopes.MinBy(x => x.Z);
+        }
+        return (pick.Z, pick.Owner);
     }
 
     private const double EdgeCell = 8.0;
@@ -222,28 +260,34 @@ public sealed class GradingResult
     /// de aterro que encosta na borda. Cota final = máx(maior aterro, mín(terreno, menor corte)) – contínua: na divisa das
     /// regiões o plano encontra o terreno.
     /// </summary>
-    public double? SlopeZ(Vec2 p)
+    public double? SlopeZ(Vec2 p) => SlopeAt(p).Z;
+
+    /// <summary><see cref="SlopeZ"/> e a dona da borda cujo talude vale no ponto.</summary>
+    public (double? Z, string? Owner) SlopeAt(Vec2 p)
     {
-        if (SlopeEdges.Count == 0 || Ground?.Invoke(p) is not { } t) return null;
+        if (SlopeEdges.Count == 0 || Ground?.Invoke(p) is not { } t) return (null, null);
         IndexEdges();
-        var (cut, fill, _, _) = Planes(p);
-        if (cut == double.MaxValue && fill == double.MinValue) return null;
+        var (cut, fill, _, _, ce, fe) = Planes(p);
+        if (cut == double.MaxValue && fill == double.MinValue) return (null, null);
         var reach = Reach(p);
         var cutMin = cut < t && (reach & 1) != 0 ? cut : double.MaxValue;
         var fillMax = fill > t && (reach & 2) != 0 ? fill : double.MinValue;
-        if (cutMin == double.MaxValue && fillMax == double.MinValue) return null;
+        if (cutMin == double.MaxValue && fillMax == double.MinValue) return (null, null);
         var f = Math.Max(fillMax, Math.Min(t, cutMin));
-        return Math.Abs(f - t) < 1e-3 ? null : f;
+        if (Math.Abs(f - t) < 1e-3) return (null, null);
+        var e = f == fillMax ? fe : ce;
+        return (f, e >= 0 ? SlopeEdges[e].Owner : null);
     }
 
     /// <summary>
     /// Planos de corte e de aterro no ponto (o mais baixo dos cortes, o mais alto dos aterros, das bordas ao alcance) e a
     /// distância ao trecho de borda abaixo/acima do terreno mais próximo (sementes das regiões).
     /// </summary>
-    private (double Cut, double Fill, double CutDist, double FillDist) Planes(Vec2 p)
+    private (double Cut, double Fill, double CutDist, double FillDist, int CutEdge, int FillEdge) Planes(Vec2 p)
     {
         double cut = double.MaxValue, fill = double.MinValue, dc = double.MaxValue, df = double.MaxValue;
-        if (!_edgeIndex!.TryGetValue(((int)Math.Floor(p.X / EdgeCell), (int)Math.Floor(p.Y / EdgeCell)), out var cand)) return (cut, fill, dc, df);
+        int ce = -1, fe = -1;
+        if (!_edgeIndex!.TryGetValue(((int)Math.Floor(p.X / EdgeCell), (int)Math.Floor(p.Y / EdgeCell)), out var cand)) return (cut, fill, dc, df, ce, fe);
         foreach (var (e, k) in cand)
         {
             var ed = SlopeEdges[e];
@@ -265,14 +309,16 @@ public sealed class GradingResult
             var z = a.Z + (b.Z - a.Z) * u;
             // Todo trecho de borda dá os dois planos (separar por corte/aterro fazia a superfície saltar onde a borda cruza o
             // terreno); onde cada um vale decidem as regiões ligadas às bordas (Reach).
-            cut = Math.Min(cut, z + d / Math.Max(0.1, ed.Cut));
-            fill = Math.Max(fill, z - d / Math.Max(0.1, ed.Fill));
+            var zc = z + d / Math.Max(0.1, ed.Cut);
+            var zf = z - d / Math.Max(0.1, ed.Fill);
+            if (zc < cut) { cut = zc; ce = e; }
+            if (zf > fill) { fill = zf; fe = e; }
             var eg = _edgeGround![e];
             var tq = eg[k] + (eg[(k + 1) % n] - eg[k]) * u;
             if (z <= tq) dc = Math.Min(dc, d);
             else df = Math.Min(df, d);
         }
-        return (cut, fill, dc, df);
+        return (cut, fill, dc, df, ce, fe);
     }
 
     /// <summary>Malha (m) das regiões de corte/aterro ligadas às bordas.</summary>
@@ -325,7 +371,7 @@ public sealed class GradingResult
             {
                 var c = new Vec2(_rx0 + i * h, _ry0 + j * h);
                 if (Ground?.Invoke(c) is not { } t) continue;
-                var (cut, fill, dc, df) = Planes(c);
+                var (cut, fill, dc, df, _, _) = Planes(c);
                 var k = j * _rnx + i;
                 inCut[k] = cut < t;
                 inFill[k] = fill > t;
@@ -430,10 +476,16 @@ public static class Grading
         double maxDaylight = 60, double step = 0.5, double padGrid = 4.0, double sampling = 1.0)
     {
         var res = new GradingResult { Ground = ground };
-        foreach (var c in corridors)
+        var corridorList = corridors.ToList();
+        var padList = pads.ToList();
+        // Linhas dos degraus das faixas por camadas: onde a plataforma de um nó tem um degrau sobre uma delas, valem só os pontos
+        // da faixa (duas fileiras sobrepostas com pontos defasados de 1 a 3 cm deixavam a triangulação passar por cima do degrau).
+        var stepRows = new List<(Vec2 A, Vec2 B)>();
+        foreach (var c in corridorList)
         {
             var n = Math.Min(c.Left.Count, c.Right.Count);
             if (n < 2) continue;
+            var t0 = res.Triangles.Count;
             var left = c.Left.Take(n).Select(p => p with { Z = p.Z + baseZ }).ToList();
             var right = c.Right.Take(n).Select(p => p with { Z = p.Z + baseZ }).ToList();
             // Faixa: tiras entre as linhas da seção (bordas e linhas internas, quando há) – quadriláteros em dois triângulos.
@@ -458,7 +510,12 @@ public static class Grading
                 var plat = new Polygon2(new[] { left[i].XY, left[i + 1].XY, right[i + 1].XY, right[i].XY });
                 res.Footprint.Add(plat);
                 res.PlatformAreas.Add(plat);
-                if (exact != null) res.Platforms.Add((plat, exact));
+                if (exact != null)
+                {
+                    res.Platforms.Add((plat, exact));
+                    res.PlatformOwners.Add(c.Owner);
+                    res.PlatformLayered.Add(c.Paved.Count > 0);
+                }
             }
             // Quebras da superfície que cruzam a faixa (crista e fim do caimento da via principal de um nó): pontos sobre elas.
             if (exact != null && c.Breaklines.Count > 0)
@@ -471,11 +528,19 @@ public static class Grading
             // Pontos do terreno nas linhas, a no máximo 1 m um do outro: sem quebras de linha no Toposolid, a triangulação só
             // respeita a borda da plataforma e as quebras da seção se os pontos nelas forem densos.
             if (lines.Count == 2) lines.Insert(1, Enumerable.Range(0, n).Select(i => (left[i] + right[i]) * 0.5).ToList());
-            foreach (var l in lines)
+            // Plataforma por camadas: as transições (sob o meio-fio e na borda da calçada) só aparecem no Toposolid com as
+            // duas linhas de cada uma tão densas quanto a borda.
+            var layered = c.Paved.Count > 0;
+            for (int li = 0; li < lines.Count; li++)
             {
+                var l = lines[li];
                 var dense = new List<Vec3>();
-                // Bordas a cada 0,5 m (contornos de pontos a 0,3 m delas, fora), linhas internas a cada 1 m.
-                var spacing = ReferenceEquals(l, left) || ReferenceEquals(l, right) ? 0.5 : 1.0;
+                // Bordas a cada 0,5 m (contornos de pontos a 0,3 m delas, fora), linhas internas a cada 1 m; por camadas, as linhas
+                // dos degraus (borda da calçada e meio-fio) a cada 0,25 m – mais espaçadas, a triangulação do Toposolid passava
+                // por cima do degrau entre dois pontos da borda e afundava o talude junto dela (até 8 cm).
+                var stepLine = layered && c.StepLines.Contains(li);
+                var spacing = stepLine ? StepSpacing : layered || ReferenceEquals(l, left) || ReferenceEquals(l, right) ? 0.5 : 1.0;
+                if (stepLine) for (int i = 0; i + 1 < n; i++) stepRows.Add((l[i].XY, l[i + 1].XY));
                 for (int i = 0; i + 1 < n; i++)
                 {
                     var k = Math.Max(1, (int)Math.Ceiling(l[i].XY.DistanceTo(l[i + 1].XY) / spacing));
@@ -492,28 +557,62 @@ public static class Grading
             var faceStart = c.WallStart && !c.EndSpill;
             var faceEnd = c.WallEnd && !c.EndSpill;
             // Taludes: do lado de fora de cada borda (superfície contínua pela distância); muros: degrau até o terreno natural.
-            var dayL = c.DaylightLeft ? SlopeLine(res, left, right, c.CutSlope, c.FillSlope, ground, maxDaylight, step, !faceStart, !faceEnd)
+            var dayL = c.DaylightLeft ? SlopeLine(res, left, right, c.CutSlope, c.FillSlope, ground, maxDaylight, step, !faceStart, !faceEnd, c.Owner)
                 : c.WallLeft ? WallBand(res, left, right, ground) : left;
-            var dayR = c.DaylightRight ? SlopeLine(res, right, left, c.CutSlope, c.FillSlope, ground, maxDaylight, step, !faceStart, !faceEnd)
+            var dayR = c.DaylightRight ? SlopeLine(res, right, left, c.CutSlope, c.FillSlope, ground, maxDaylight, step, !faceStart, !faceEnd, c.Owner)
                 : c.WallRight ? WallBand(res, right, left, ground) : right;
+            // Testas: a seção inteira da ponta (bordas e linhas internas, da esquerda para a direita) – com a reta de borda a borda
+            // a testa ignorava o abaulamento e as camadas da plataforma.
+            var startSection = lines.Select(l => l[0]).ToList();
+            var endSection = lines.Select(l => l[n - 1]).ToList();
+            // Pontas livres por camadas: o talude da testa parte do acabamento pronto (com o degrau do meio-fio).
+            var startSpill = c.StartFinish.Count >= 2 ? c.StartFinish.Select(p => p with { Z = p.Z + baseZ }).ToList() : startSection;
+            var endSpill = c.EndFinish.Count >= 2 ? c.EndFinish.Select(p => p with { Z = p.Z + baseZ }).ToList() : endSection;
             if (faceStart) EndWall(res, dayL[0], left[0], right[0], dayR[0], (left[0].XY + right[0].XY) * 0.5 - (left[1].XY + right[1].XY) * 0.5, ground,
-                c.WallCap, c.CutSlope, maxDaylight, step);
+                c.WallCap, c.CutSlope, maxDaylight, step, section: startSection);
             if (faceEnd) EndWall(res, dayL[n - 1], left[n - 1], right[n - 1], dayR[n - 1], (left[n - 1].XY + right[n - 1].XY) * 0.5 - (left[n - 2].XY + right[n - 2].XY) * 0.5, ground,
-                c.WallCap, c.CutSlope, maxDaylight, step);
-            if (spillStart) EndSlope(res, right[0], left[0], (left[0].XY + right[0].XY) * 0.5 - (left[1].XY + right[1].XY) * 0.5, c.CutSlope, c.FillSlope, ground, maxDaylight, step);
-            if (spillEnd) EndSlope(res, left[n - 1], right[n - 1], (left[n - 1].XY + right[n - 1].XY) * 0.5 - (left[n - 2].XY + right[n - 2].XY) * 0.5, c.CutSlope, c.FillSlope, ground, maxDaylight, step);
+                c.WallCap, c.CutSlope, maxDaylight, step, section: endSection);
+            // Testa por camadas: pontos a cada 0,25 m (como as linhas dos degraus) – a testa sobe do fundo da estrutura ao acabamento
+            // na última transição; a estaca dela também ganha pontos de lado a lado (senão a triangulação ligava a testa às linhas
+            // da calçada e o terreno subia até 1 m para dentro).
+            var endSpacing = layered ? StepSpacing : 1.5;
+            void Cross(int i)
+            {
+                for (int k = 0; k + 1 < lines.Count; k++)
+                {
+                    var (a, b) = (lines[k][i], lines[k + 1][i]);
+                    var m = Math.Max(1, (int)Math.Ceiling(a.XY.DistanceTo(b.XY) / StepSpacing));
+                    for (int j = 1; j < m; j++) res.Points.Add(a + (b - a) * ((double)j / m));
+                }
+            }
+            if (layered && spillStart && n > 2) Cross(1);
+            if (layered && spillEnd && n > 2) Cross(n - 2);
+            if (spillStart) EndSlope(res, Enumerable.Reverse(startSpill).ToList(), (left[0].XY + right[0].XY) * 0.5 - (left[1].XY + right[1].XY) * 0.5, c.CutSlope, c.FillSlope, ground, maxDaylight, step, c.Owner, endSpacing);
+            if (spillEnd) EndSlope(res, endSpill, (left[n - 1].XY + right[n - 1].XY) * 0.5 - (left[n - 2].XY + right[n - 2].XY) * 0.5, c.CutSlope, c.FillSlope, ground, maxDaylight, step, c.Owner, endSpacing);
+            res.TriangleOwners.Add((t0, res.Triangles.Count, c.Owner));
         }
-        foreach (var pad in pads)
+        // Pistas (estrutura do pavimento) de todas as plataformas: as plataformas por camadas fazem a transição junto delas.
+        // (Distintas: as plataformas de um mesmo nó compartilham a mesma lista de pista.)
+        var paved = NearField.Of(padList.SelectMany(p => p.Paved).Concat(corridorList.SelectMany(c => c.Paved)).Distinct());
+        // Contorno da pista de tudo (uma união só): as plataformas por camadas põem pontos dos dois lados dele.
+        List<Polygon2> pavedOutline;
+        try { pavedOutline = padList.Any(p => p.Structure > 0) && paved.Polygons.Count > 0 ? PolygonOps.Union(paved.Polygons) : new List<Polygon2>(); }
+        catch (Exception) { pavedOutline = new List<Polygon2>(); }
+        var rows = NearField.Of(stepRows);
+        bool OnRow(Vec2 q) => rows.Distance(q, 0.03) < 0.02;
+        foreach (var pad in padList)
         {
             var outer = pad.Area.Outer.ToList();
             if (outer.Count < 3) continue;
             var pd = pad;
             Func<Vec2, double> z = p => pd.At(p) + baseZ;
-            res.Pads.Add((pad.Area, z));
-            res.Footprint.Add(pad.Area);
             var ring = CurveTools.Densify(outer, 1.0);
             if (ring.Count > 1 && ring[0].AlmostEquals(ring[^1], 1e-6)) ring.RemoveAt(ring.Count - 1);
-            res.Points.AddRange(CurveTools.Densify(outer, 0.5).Select(p => Vec3.At(p, z(p))));
+            if (pd.Structure > 0) z = Layered(res, pd, padList, ring, z, paved, pavedOutline, OnRow);
+            res.Pads.Add((pad.Area, z));
+            res.PadOwners.Add(pd.Owner);
+            res.Footprint.Add(pad.Area);
+            res.Points.AddRange(CurveTools.Densify(outer, 0.5).Where(p => pd.Structure <= 0 || !OnRow(p)).Select(p => Vec3.At(p, z(p))));
             // Quebras da superfície (crista e fim do caimento) dentro da plataforma.
             var breaks = new List<List<Vec2>>();
             foreach (var bl in pad.Breaklines)
@@ -539,13 +638,97 @@ public static class Grading
                     if (curved || ix % lattice == 0 && iy % lattice == 0) res.Points.Add(Vec3.At(p, zp));
                 }
             }
-            if (pad.Daylight) PadSlopes(res, ring, z, pad.CutSlope, pad.FillSlope, ground, maxDaylight, step);
+            if (pad.Daylight) PadSlopes(res, ring, z, pad.CutSlope, pad.FillSlope, ground, maxDaylight, step, pd.Owner);
         }
         SetReach(res, ground, maxDaylight);
         SlopePoints(res, ground);
         res.Points.RemoveAll(p => double.IsNaN(p.Z));
         Volumes(res, ground, sampling);
         return res;
+    }
+
+    /// <summary>
+    /// Plataforma por camadas de um nó (rodada VT): <paramref name="bottom"/> (fundo da estrutura) sob a pista – a dele e a das
+    /// faixas vizinhas –, fundo das lajes (<see cref="GradePad.Structure"/> acima) no resto e, nas bordas externas (as que não
+    /// encostam em outra plataforma), o topo do acabamento (<see cref="GradePad.EdgeRise"/>), onde o talude começa; transições de
+    /// <see cref="InfraRoads.LayerStep"/> m. Antes a plataforma inteira ficava no fundo da estrutura e as calçadas de esquina
+    /// terminavam 0,55 m acima do terreno junto ao lote. Acrescenta os pontos dos dois lados de cada transição.
+    /// </summary>
+    private static Func<Vec2, double> Layered(GradingResult res, GradePad pd, List<GradePad> pads, List<Vec2> ring, Func<Vec2, double> bottom, NearField paved,
+        List<Polygon2> pavedOutline, Func<Vec2, bool> onRow)
+    {
+        var G = InfraRoads.LayerStep;
+        var S = pd.Structure;
+        // Bordas externas: do lado de fora não há outra plataforma (faixa de via ou outro nó) – nas bocas o nó continua na via.
+        var others = TerrainRebuild.Mask(res.PlatformAreas.Concat(pads.Where(q => !ReferenceEquals(q, pd)).Select(q => q.Area)), 0);
+        var outerSegs = new List<(Vec2 A, Vec2 B, Vec2 Out)>();
+        for (int i = 0; i < ring.Count; i++)
+        {
+            var a = ring[i];
+            var b = ring[(i + 1) % ring.Count];
+            if (a.DistanceTo(b) < 1e-6) continue;
+            // Lado de fora pelo próprio contorno (a orientação do anel não serve: as plataformas das marcas do nó vêm de
+            // diferenças de polígonos e podem vir no sentido horário – a borda de dentro virava "externa").
+            var m = (a + b) * 0.5;
+            var o = (b - a).Normalized().PerpRight;
+            if (pd.Area.Contains(m + o * 0.05)) o = -o;
+            if (!others(m + o * 0.1) && !pd.Area.Contains(m + o * 0.1)) outerSegs.Add((a, b, o));
+        }
+        var edge = NearField.Of(outerSegs.Select(s => (s.A, s.B)));
+        double Z(Vec2 p)
+        {
+            var b = bottom(p);
+            var lift = S * Math.Clamp(paved.Distance(p, G) / G, 0, 1);
+            var w = Math.Clamp(1 - edge.Distance(p, G) / G, 0, 1);
+            if (w <= 0) return b + lift;
+            return b + lift + (S + (pd.EdgeRise?.Invoke(p) ?? 0) - lift) * w;
+        }
+        var (mn, mx) = pd.Area.Bounds;
+        // Caixa envolvente antes do polígono: o contorno da pista de tudo passa por todas as plataformas e a distância ao contorno
+        // de um nó com milhares de vértices, ponto a ponto, levava minutos.
+        bool Inside(Vec2 q) => q.X >= mn.X - 1e-6 && q.X <= mx.X + 1e-6 && q.Y >= mn.Y - 1e-6 && q.Y <= mx.Y + 1e-6
+                               && (pd.Area.Contains(q) || pd.Area.DistanceTo(q) <= 1e-6);
+        // Transição pista × laje: contorno da pista dentro do nó, dos dois lados, a cada 0,25 m.
+        bool Near(IReadOnlyList<Vec2> r)
+        {
+            double x0 = double.MaxValue, y0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue;
+            foreach (var v in r) { x0 = Math.Min(x0, v.X); y0 = Math.Min(y0, v.Y); x1 = Math.Max(x1, v.X); y1 = Math.Max(y1, v.Y); }
+            return x0 <= mx.X + 1 && x1 >= mn.X - 1 && y0 <= mx.Y + 1 && y1 >= mn.Y - 1;
+        }
+        try
+        {
+            foreach (var u in pavedOutline)
+                foreach (var r in u.Holes.Prepend(u.Outer).Where(Near))
+                {
+                    var dense = CurveTools.Densify(r.Append(r[0]).ToList(), StepSpacing);
+                    for (int i = 0; i + 1 < dense.Count; i++)
+                    {
+                        var q = dense[i];
+                        if (!Inside(q)) continue;
+                        var t = (dense[i + 1] - q).Normalized();
+                        if (!onRow(q)) res.Points.Add(Vec3.At(q, Z(q)));
+                        foreach (var nv in new[] { t.PerpLeft, t.PerpRight })
+                        {
+                            var q2 = q + nv * G;
+                            if (Inside(q2) && !onRow(q2) && paved.Distance(q2, G) >= G * 0.999) res.Points.Add(Vec3.At(q2, Z(q2)));
+                        }
+                    }
+                }
+        }
+        catch (Exception) { /* contorno opcional: a malha interna da plataforma continua */ }
+        // Borda externa: o topo nela e o fundo da laje logo para dentro, a cada 0,25 m (as outras bordas ficam a cada 0,5 m).
+        foreach (var (a, b, o) in outerSegs)
+        {
+            var k = Math.Max(1, (int)Math.Ceiling(a.DistanceTo(b) / StepSpacing));
+            for (int j = 0; j <= k; j++)
+            {
+                var e = a + (b - a) * ((double)j / k);
+                if (!onRow(e)) res.Points.Add(Vec3.At(e, Z(e)));
+                var q = e - o * G;
+                if (Inside(q) && !onRow(q)) res.Points.Add(Vec3.At(q, Z(q)));
+            }
+        }
+        return Z;
     }
 
     /// <summary>Ponto mais próximo do contorno dos polígonos (externos e furos).</summary>
@@ -602,6 +785,9 @@ public static class Grading
 
     /// <summary>Espaçamento (m) dos pontos dos taludes no terreno (malha regular sobre a área dos taludes).</summary>
     public const double SlopeGrid = 1.0;
+
+    /// <summary>Espaçamento (m) dos pontos das duas linhas de cada degrau da plataforma por camadas (meio-fio, borda da calçada).</summary>
+    public const double StepSpacing = 0.25;
 
     /// <summary>
     /// Pontos dos taludes para o Toposolid: malha regular sobre a área alterada dos taludes (cota da superfície contínua), mais
@@ -757,6 +943,21 @@ public static class Grading
                         if (a.DistanceTo(b) < 1e-6 || c.DistanceTo(b) < 1e-6) continue;
                         var u1 = (b - a).Normalized();
                         var u2 = (c - b).Normalized();
+                        if (u1.Cross(u2) <= -Math.Sin(20 * Math.PI / 180))
+                        {
+                            // Canto reentrante (quina do lote entre duas vias): os taludes dos dois lados se encontram num vinco na
+                            // bissetriz – pontos sobre ele a cada 0,25 m até o pé (sem eles a triangulação cortava o vinco: 7 cm).
+                            var bis = (u2 - u1).Normalized();
+                            var miss = 0;
+                            for (var d = 0.25; d <= 30 + 1e-9; d += 0.25)
+                            {
+                                var q = b + bis * d;
+                                if (inside3(q)) continue;
+                                if (res.DesignZ(q) is { } zq) { res.Points.Add(Vec3.At(q, zq)); miss = 0; }
+                                else if (++miss >= 2) break;
+                            }
+                            continue;
+                        }
                         if (u1.Cross(u2) < Math.Sin(20 * Math.PI / 180)) continue;            // só cantos convexos (≥ 20°)
                         // Leque de raios (a cada ≤ 15°) entre as normais dos dois lados: o cone do canto é curvo.
                         var a0 = Math.Atan2(u1.PerpRight.Y, u1.PerpRight.X);
@@ -778,6 +979,10 @@ public static class Grading
                     }
         }
         catch (Exception) { /* contorno opcional */ }
+        // Pés colados na borda (a menos de 12 cm): o talude ali tem poucos centímetros e o ponto natural junto da fileira da borda
+        // fazia a triangulação passar por cima dela (o terreno afundava até 10 cm logo fora da calçada).
+        var tooClose = TerrainRebuild.Mask(res.Pads.Select(p => p.Area).Concat(res.PlatformAreas), 0.12);
+        res.GroundPoints.RemoveAll(g => tooClose(g.XY));
     }
 
     private static double Distance(IReadOnlyList<Vec2> ring, Vec2 p, bool closed = true)
@@ -864,15 +1069,20 @@ public static class Grading
 
     /// <summary>Face vertical transversal no início/fim de uma faixa (emboque, encontro): de uma crista de talude à outra.</summary>
     private static void EndWall(GradingResult res, Vec3 dayL, Vec3 left, Vec3 right, Vec3 dayR, Vec2 outward, Func<Vec2, double?> ground,
-        double? cap = null, double cut = 1.0, double maxDist = 60, double step = 0.5, double? spillFill = null)
+        double? cap = null, double cut = 1.0, double maxDist = 60, double step = 0.5, double? spillFill = null, IReadOnlyList<Vec3>? section = null)
     {
+        // Pares de pontos da testa: talude esquerdo, seção da ponta (da esquerda para a direita) e talude direito.
+        var mid = section is { Count: >= 2 } ? section : new[] { left, right };
+        var pairs = new List<(Vec3, Vec3)> { (dayL, mid[0]) };
+        for (int i = 0; i + 1 < mid.Count; i++) pairs.Add((mid[i], mid[i + 1]));
+        pairs.Add((mid[^1], dayR));
         if (outward.Length < 1e-9) return;
         var dir = outward.Normalized();
         if (spillFill is { } fs)
         {
             // Saia: da ponta, talude à frente (aterro na razão do aterro, corte na do corte) até encontrar o terreno.
             var edgeLine = new List<Vec3>();
-            foreach (var (a, b) in new[] { (dayL, left), (left, right), (right, dayR) })
+            foreach (var (a, b) in pairs)
             {
                 var len = a.XY.DistanceTo(b.XY);
                 var k = Math.Max(1, (int)Math.Ceiling(len / 1.5));
@@ -903,7 +1113,7 @@ public static class Grading
         var o = dir * WallGap;
         var capZ = cap is { } h ? Math.Max(left.Z, right.Z) + h : double.MaxValue;
         var line = new List<Vec3>();
-        foreach (var (a, b) in new[] { (dayL, left), (left, right), (right, dayR) })
+        foreach (var (a, b) in pairs)
         {
             var len = a.XY.DistanceTo(b.XY);
             var k = Math.Max(1, (int)Math.Ceiling(len / 1.0));
@@ -956,7 +1166,7 @@ public static class Grading
     /// área alterada e pontos do terreno).
     /// </summary>
     private static List<Vec3> SlopeLine(GradingResult res, List<Vec3> edge, List<Vec3> other, double cut, double fill, Func<Vec2, double?> ground,
-        double maxDist, double step, bool openStart, bool openEnd)
+        double maxDist, double step, bool openStart, bool openEnd, string? owner = null)
     {
         var day = new List<Vec3>();
         for (int i = 0; i < edge.Count; i++)
@@ -966,7 +1176,7 @@ public static class Grading
             var n = (e - o).Length < 1e-9 ? Vec2.UnitY : (e - o).Normalized();
             day.Add(Daylight(e, edge[i].Z, n, cut, fill, ground, maxDist, step));
         }
-        var se = new SlopeEdge { Cut = cut, Fill = fill, OpenStart = openStart, OpenEnd = openEnd };
+        var se = new SlopeEdge { Cut = cut, Fill = fill, OpenStart = openStart, OpenEnd = openEnd, Owner = owner };
         se.Line.AddRange(edge);
         se.Day.AddRange(day.Select((d, i) => d.XY.DistanceTo(edge[i].XY)));
         se.Finish(maxDist);
@@ -983,16 +1193,22 @@ public static class Grading
         return day;
     }
 
-    /// <summary>Ponta livre da faixa: talude à frente da ponta, de <paramref name="a"/> a <paramref name="b"/>, até o terreno.</summary>
-    private static void EndSlope(GradingResult res, Vec3 a, Vec3 b, Vec2 outward, double cut, double fill, Func<Vec2, double?> ground, double maxDist, double step)
+    /// <summary>Ponta livre da faixa: talude à frente da ponta, ao longo da seção dela (<paramref name="section"/>), até o terreno.</summary>
+    private static void EndSlope(GradingResult res, List<Vec3> section, Vec2 outward, double cut, double fill, Func<Vec2, double?> ground, double maxDist, double step,
+        string? owner = null, double spacing = 1.5)
     {
-        if (outward.Length < 1e-9) return;
+        if (outward.Length < 1e-9 || section.Count < 2) return;
         var dir = outward.Normalized();
         var line = new List<Vec3>();
-        var k = Math.Max(1, (int)Math.Ceiling(a.XY.DistanceTo(b.XY) / 1.5));
-        for (int i = 0; i <= k; i++) line.Add(a + (b - a) * ((double)i / k));
+        for (int s = 0; s + 1 < section.Count; s++)
+        {
+            var (a, b) = (section[s], section[s + 1]);
+            var k = Math.Max(1, (int)Math.Ceiling(a.XY.DistanceTo(b.XY) / spacing));
+            for (int i = 0; i < k; i++) line.Add(a + (b - a) * ((double)i / k));
+        }
+        line.Add(section[^1]);
         var day = line.Select(p => Daylight(p.XY, p.Z, dir, cut, fill, ground, maxDist, step)).ToList();
-        var se = new SlopeEdge { Cut = cut, Fill = fill };
+        var se = new SlopeEdge { Cut = cut, Fill = fill, Owner = owner };
         se.Line.AddRange(line);
         se.Day.AddRange(day.Select((d, i) => d.XY.DistanceTo(line[i].XY)));
         se.Finish(maxDist);
@@ -1012,7 +1228,8 @@ public static class Grading
         res.Points.AddRange(day.Where((d, i) => d.XY.DistanceTo(line[i].XY) > 0.05));
     }
 
-    private static void PadSlopes(GradingResult res, List<Vec2> ring, Func<Vec2, double> zAt, double cut, double fill, Func<Vec2, double?> ground, double maxDist, double step)
+    private static void PadSlopes(GradingResult res, List<Vec2> ring, Func<Vec2, double> zAt, double cut, double fill, Func<Vec2, double?> ground, double maxDist, double step,
+        string? owner = null)
     {
         var ccw = Polygon2.SignedArea(ring) > 0;
         var day = new List<Vec3>();
@@ -1027,7 +1244,7 @@ public static class Grading
             var n = (n1 + n2).Length < 1e-9 ? n1 : (n1 + n2).Normalized();
             day.Add(Daylight(ring[i], zAt(ring[i]), n, cut, fill, ground, maxDist, step));
         }
-        var se = new SlopeEdge { Cut = cut, Fill = fill, Closed = true };
+        var se = new SlopeEdge { Cut = cut, Fill = fill, Closed = true, Owner = owner };
         se.Line.AddRange(ring.Select(r => Vec3.At(r, zAt(r))));
         se.Day.AddRange(day.Select((d, i) => d.XY.DistanceTo(ring[i])));
         se.Finish(maxDist);
@@ -1057,20 +1274,108 @@ public static class Grading
         var n = (maxX - minX) * (maxY - minY) / (cell * cell);
         if (n > 250_000) cell *= Math.Sqrt(n / 250_000);
         double cut = 0, fill = 0, area = 0;
-        for (var x = minX + cell / 2; x < maxX; x += cell)
-            for (var y = minY + cell / 2; y < maxY; y += cell)
+        res.ByOwner.Clear();
+        var a2 = cell * cell;
+        // Amostra estratificada (um ponto sorteado – fixo – por célula): com o ponto no centro das células, as transições
+        // da plataforma por camadas (meio-fio, borda da calçada) caíam sempre do mesmo lado numa via alinhada à malha e o
+        // volume errava até 4 % com células de 1 m; sorteado, o erro some na média.
+        var nx = (int)Math.Ceiling((maxX - minX) / cell);
+        var ny = (int)Math.Ceiling((maxY - minY) / cell);
+        for (var i = 0; i < nx; i++)
+            for (var j = 0; j < ny; j++)
             {
-                var p = new Vec2(x, y);
-                var dz = res.DesignZ(p);
+                var (u, v) = Jitter(i, j);
+                var p = new Vec2(minX + (i + u) * cell, minY + (j + v) * cell);
+                var (dz, owner) = res.DesignAt(p);
                 if (dz == null) continue;
                 var g = ground(p);
                 if (g == null) continue;
-                area += cell * cell;
+                area += a2;
                 var d = g.Value - dz.Value;
-                if (d > 0) cut += d * cell * cell; else fill -= d * cell * cell;
+                if (d > 0) cut += d * a2; else fill -= d * a2;
+                if (owner == null) continue;
+                res.ByOwner.TryGetValue(owner, out var o);
+                res.ByOwner[owner] = (o.Cut + Math.Max(0, d) * a2, o.Fill + Math.Max(0, -d) * a2, o.Area + a2);
             }
         res.CutM3 = cut;
         res.FillM3 = fill;
         res.AreaM2 = area;
+    }
+
+    /// <summary>Posição (0..1, 0..1) do ponto sorteado na célula – determinística (hash dos índices).</summary>
+    private static (double U, double V) Jitter(int i, int j)
+    {
+        static uint H(uint x)
+        {
+            x ^= x >> 16; x *= 0x7feb352d; x ^= x >> 15; x *= 0x846ca68b; x ^= x >> 16;
+            return x;
+        }
+        var h1 = H(unchecked((uint)i * 73856093u ^ (uint)j * 19349663u));
+        var h2 = H(h1 ^ 0x9e3779b9u);
+        return ((h1 & 0xffffff) / (double)0x1000000, (h2 & 0xffffff) / (double)0x1000000);
+    }
+}
+
+/// <summary>Distância (até um teto ≤ 2 m) a contornos de polígonos ou a segmentos, com índice em malha – plataformas por camadas.</summary>
+internal sealed class NearField
+{
+    private const double Cell = 2.0;
+    private readonly Dictionary<(int, int), List<(Vec2 A, Vec2 B)>> _grid = new();
+    private Func<Vec2, bool>? _inside;
+
+    /// <summary>Polígonos do campo (dentro deles a distância é 0).</summary>
+    public List<Polygon2> Polygons { get; } = new();
+
+    private NearField(IEnumerable<(Vec2 A, Vec2 B)> segs)
+    {
+        foreach (var (a, b) in segs)
+        {
+            int x0 = K(Math.Min(a.X, b.X)), x1 = K(Math.Max(a.X, b.X)), y0 = K(Math.Min(a.Y, b.Y)), y1 = K(Math.Max(a.Y, b.Y));
+            for (var x = x0; x <= x1; x++)
+                for (var y = y0; y <= y1; y++)
+                {
+                    if (!_grid.TryGetValue((x, y), out var l)) _grid[(x, y)] = l = new();
+                    l.Add((a, b));
+                }
+        }
+    }
+
+    private static int K(double v) => (int)Math.Floor(v / Cell);
+
+    public static NearField Of(IEnumerable<(Vec2 A, Vec2 B)> segs) => new(segs);
+
+    public static NearField Of(IEnumerable<Polygon2> polys)
+    {
+        var list = polys.Where(p => Math.Abs(p.Area) > 1e-6).ToList();
+        var segs = new List<(Vec2, Vec2)>();
+        foreach (var p in list)
+            foreach (var r in p.Holes.Prepend(p.Outer))
+                for (int i = 0; i < r.Count; i++) segs.Add((r[i], r[(i + 1) % r.Count]));
+        var f = new NearField(segs);
+        f.Polygons.AddRange(list);
+        if (list.Count > 0) f._inside = TerrainRebuild.Mask(list, 0);
+        return f;
+    }
+
+    /// <summary>0 dentro dos polígonos; senão a distância ao contorno mais próximo, limitada a <paramref name="cap"/>.</summary>
+    public double Distance(Vec2 p, double cap)
+    {
+        if (_inside != null && _inside(p)) return 0;
+        var best = cap;
+        int cx = K(p.X), cy = K(p.Y);
+        for (var x = cx - 1; x <= cx + 1; x++)
+            for (var y = cy - 1; y <= cy + 1; y++)
+            {
+                if (!_grid.TryGetValue((x, y), out var l)) continue;
+                foreach (var (a, b) in l)
+                {
+                    var ab = b - a;
+                    var len2 = ab.Dot(ab);
+                    var t = len2 < 1e-12 ? 0 : Math.Clamp((p - a).Dot(ab) / len2, 0, 1);
+                    var d = p.DistanceTo(a + ab * t);
+                    if (d < best) best = d;
+                }
+            }
+        return best;
     }
 }

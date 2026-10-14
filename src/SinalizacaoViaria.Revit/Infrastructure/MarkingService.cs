@@ -416,7 +416,7 @@ public sealed class MarkingService
     /// nulo quando nenhuma via ligada tem greide (o nó fica plano, como antes).
     /// </summary>
     /// <summary>Nó (interseção, rotatória, cul-de-sac) dono da marca – ele mesmo ou o pai das marcas filhas.</summary>
-    private MarkingDefinition? NodeOwner(MarkingDefinition def) =>
+    internal MarkingDefinition? NodeOwner(MarkingDefinition def) =>
         def is IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition ? def
             : Definitions.Values.FirstOrDefault(o => o is IntersectionDefinition i && i.ChildIds.Contains(def.Id) || o is RoundaboutDefinition r && r.ChildIds.Contains(def.Id));
 

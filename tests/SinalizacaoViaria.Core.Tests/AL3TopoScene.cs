@@ -410,23 +410,58 @@ public static class TopoScene
         return res;
     }
 
-    /// <summary>Faixas da terraplenagem da via (como TerrainService.Features): plataforma de calçada a calçada, no greide, com a concordância.</summary>
+    /// <summary>
+    /// Faixas da terraplenagem da via (como TerrainService.Features): plataforma por camadas de alinhamento a alinhamento – estrutura
+    /// sob a pista, fundo das lajes sob meio-fio e calçada, topo da calçada no alinhamento –, no greide, com a concordância.
+    /// </summary>
     public static List<GradeCorridor> RoadCorridors(Scene sc, int i)
     {
         var road = sc.World.Roads[i].Def;
         var axis = sc.World.Roads[i].Axis;
         var g = road.Output.Grade!;
         var prof = g.ToProfile(2);
-        var right = -(road.TotalRight + 0.3);
-        var left = road.TotalLeft + 0.3;
+        var right = -road.TotalRight;
+        var left = road.TotalLeft;
         var s0 = Math.Max(0, road.StartSetback);
         var s1 = Math.Max(s0 + 0.5, axis.Length - Math.Max(0, road.EndSetback));
         var corr = InfraRoads.RoadCorridors(axis, prof, right, left, s0, s1, Scene.Subgrade, g.CutSlope, g.FillSlope, Array.Empty<MarkingDefinition>());
-        InfraRoads.FitToSurface(corr, left, right, sc.Surfaces[i].Z, Scene.Subgrade, InfraRoads.SectionBreaks(g));
+        InfraRoads.FitToSection(corr, left, right, sc.Surfaces[i], InfraRoads.Edges(road, axis), Scene.Subgrade, InfraRoads.SectionBreaks(g));
+        foreach (var c in corr) c.Owner = road.Id;
         // Nós em que a via é secundária: a crista da via principal, prolongada, cruza a concordância.
         foreach (var b in sc.Surfaces[i].Blends)
             foreach (var c in corr) c.Breaklines.AddRange(InfraRoads.NodeBreaklines(b.Node));
         return corr;
+    }
+
+    /// <summary>
+    /// Ponto dentro da pista de alguma via (entre as faces dos meios-fios, mais <paramref name="margin"/>): canteiros, ilhas e
+    /// extensões sobre a pista ficam sobre a estrutura; na faixa de transição junto à face do meio-fio, qualquer cota entre as duas.
+    /// </summary>
+    public static bool InCarriageway(Scene sc, Vec2 p, double margin = 0)
+    {
+        for (int i = 0; i < sc.World.Roads.Count; i++)
+        {
+            var road = sc.World.Roads[i];
+            var (s, y) = sc.Surfaces[i].Locate(p);
+            if (s < -1e-6 || s > road.Axis.Length + 1e-6) continue;
+            var e = InfraRoads.Edges(road.Def, road.Axis)(s);
+            if (y <= e.PavedLeft + margin + 1e-6 && y >= e.PavedRight - margin - 1e-6) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Plataforma esperada sob uma peça no chão (rodada VT): sob a pista e o que é rente a ela (pavimento, sarjeta, pintura) o
+    /// fundo da estrutura – superfície menos o subleito; sob o acabamento elevado fora da pista (meio-fio, calçada, grama, piso
+    /// tátil) o fundo da laje, na superfície. Nulo = elevado dentro da pista (canteiro, ilha, extensão sobre a faixa) ou na faixa de
+    /// transição junto à face do meio-fio (qualquer das duas).
+    /// </summary>
+    public static double? PlatformWant(Scene sc, MarkingPiece piece, Func<Vec2, double> zf, Vec2 p)
+    {
+        var raised = piece.Elevation + piece.Thickness >= 0.05;
+        if (!raised) return zf(p) - Scene.Subgrade;
+        if (InCarriageway(sc, p, InfraRoads.LayerStep)) return null;
+        return zf(p) + Math.Min(0, piece.Elevation);
     }
 
     /// <summary>Plataformas do nó (como TerrainService.Features): contorno das peças, na superfície do nó, sob o pavimento.</summary>
@@ -434,17 +469,38 @@ public static class TopoScene
     {
         var it = n.Layout.Definition!;
         var node = sc.Nodes[it.Id];
-        var pieces = sc.Parts.Where(p => p.Def.Id == it.Id && p.Piece.Elevation < 0.5).Select(p => p.Piece.Shape);
+        var nodePieces = sc.Parts.Where(p => p.Def.Id == it.Id && p.Piece.Elevation < 0.5).Select(p => p.Piece).ToList();
+        var pieces = nodePieces.Select(p => p.Shape);
+        // Por camadas: estrutura sob a pista do nó, fundo das lajes sob as calçadas de esquina, topo delas na quina do lote.
+        var (paved, rise) = InfraRoads.PadLayers(nodePieces);
         var pads = PolygonOps.Union(pieces).Where(u => u.Area > 1)
-            .Select(u => new GradePad(u, -Scene.Subgrade) { CutSlope = Scene.Cut, FillSlope = Scene.Fill, Label = "Interseção", ZAt = q => node.Z(q) - Scene.Subgrade })
+            .Select(u =>
+            {
+                var pd = new GradePad(u, -Scene.Subgrade)
+                {
+                    CutSlope = Scene.Cut, FillSlope = Scene.Fill, Label = "Interseção", ZAt = q => node.Z(q) - Scene.Subgrade,
+                    Structure = Scene.Subgrade, EdgeRise = rise, Owner = it.Id,
+                };
+                pd.Paved.AddRange(paved);
+                return pd;
+            })
             .ToList();
         // Marcas do nó no chão (calçadas de esquina, extensões, rampas): plataforma na superfície delas, sem talude próprio –
         // ficam dentro das plataformas do nó e das vias (como TerrainService.Features).
         var members = MembersOf(sc, it);
         var own = PolygonOps.Union(pieces).Where(u => u.Area > 1).ToList();
-        var mine = sc.Parts.Where(p => p.Def.Id != it.Id && NodeOf(sc, p.Def)?.Id == it.Id && p.Piece.Elevation < 0.5).Select(p => p.Piece.Shape).ToList();
+        var minePieces = sc.Parts.Where(p => p.Def.Id != it.Id && NodeOf(sc, p.Def)?.Id == it.Id && p.Piece.Elevation < 0.5).Select(p => p.Piece).ToList();
+        var mine = minePieces.Select(p => p.Shape).ToList();
+        var (mPaved, mRise) = InfraRoads.PadLayers(minePieces);
         foreach (var u in PolygonOps.Difference(PolygonOps.Union(mine), own).Where(u => u.Area > 0.05))
-            pads.Add(new GradePad(u, -Scene.Subgrade) { Daylight = false, Label = "Interseção", ZAt = q => members(q) - Scene.Subgrade });
+        {
+            var pd = new GradePad(u, -Scene.Subgrade)
+            {
+                Daylight = false, Label = "Interseção", ZAt = q => members(q) - Scene.Subgrade, Structure = Scene.Subgrade, EdgeRise = mRise, Owner = it.Id,
+            };
+            pd.Paved.AddRange(mPaved);
+            pads.Add(pd);
+        }
         foreach (var pd in pads) pd.Breaklines.AddRange(InfraRoads.NodeBreaklines(node));
         return pads;
     }

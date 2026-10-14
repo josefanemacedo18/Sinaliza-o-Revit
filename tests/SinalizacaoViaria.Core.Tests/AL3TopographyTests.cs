@@ -211,15 +211,15 @@ public class AL3TopographyTests
     }
 
     /// <summary>
-    /// Nada flutuando nem enterrado: sob todos os pisos da via e do nó o Toposolid refeito fica no fundo da estrutura do
-    /// pavimento – superfície menos o subleito – a até 5 mm.
+    /// Nada flutuando nem enterrado: o Toposolid refeito fica, a até 5 mm, no fundo da estrutura do pavimento (superfície menos o
+    /// subleito) sob a pista e no fundo das lajes sob meio-fio, calçada e grama (rodada VT: a estrutura só sob a pista).
     /// </summary>
     [Theory]
     [MemberData(nameof(Matrix))]
     public void Platform_ToposolidUnderTheFloors(string terrain, string kind, string a, string b, string relevo)
     {
         var sc = Get(terrain, kind, a, b, relevo);
-        foreach (var (def, piece) in sc.Parts.Where(p => p.Piece.Elevation < 0.5))
+        foreach (var (def, piece) in sc.Parts.Where(p => p.Piece.Elevation < 0.5 && p.Piece.Solid == null))
         {
             var zf = TopoScene.SurfaceOf(sc, def);
             if (zf == null) continue;
@@ -229,7 +229,7 @@ public class AL3TopographyTests
                 {
                     var p = new Vec2(x, y);
                     if (!piece.Shape.Contains(p) || piece.Shape.DistanceTo(p) < 0.3) continue;
-                    var want = zf(p) - TopoScene.Scene.Subgrade;
+                    if (TopoScene.PlatformWant(sc, piece, zf, p) is not { } want) continue;
                     var dz = sc.Design.DesignZ(p);
                     Assert.True(dz != null && Math.Abs(dz.Value - want) <= 0.005, $"{def.GetType().Name}: plataforma {dz:0.000} ≠ {want:0.000} em {p}");
                     var tz = sc.Terrain.Z(p);

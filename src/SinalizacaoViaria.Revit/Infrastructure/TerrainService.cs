@@ -52,7 +52,7 @@ public sealed class TerrainReport
     public List<string> Notes { get; } = new();
     public bool DryRun { get; set; }
     public double Homogenization { get; set; } = 1.25;
-    /// <summary>Volumes de cada elemento (calculados isoladamente – a soma pode diferir do total onde taludes se sobrepõem).</summary>
+    /// <summary>Volumes de cada elemento: a parte dele no projeto conjunto (GradingResult.ByOwner) – a soma é o total.</summary>
     public List<(string Name, double Cut, double Fill, double Area)> Items { get; } = new();
 
     /// <summary>Balanço de massas: corte disponível menos o corte necessário para os aterros (× fator de homogeneização).</summary>
@@ -110,6 +110,7 @@ public static class TerrainService
             {
                 CutSlope = c.CutSlope, FillSlope = c.FillSlope, DaylightLeft = c.DaylightLeft, DaylightRight = c.DaylightRight, Label = c.Label,
                 WallLeft = c.WallLeft, WallRight = c.WallRight, WallStart = c.WallStart, WallEnd = c.WallEnd, WallCap = c.WallCap, EndSpill = c.EndSpill,
+                Owner = def.Id,
             };
             a.Left.AddRange(c.Left.Select(p => p with { Z = p.Z + baseZ }));
             a.Right.AddRange(c.Right.Select(p => p with { Z = p.Z + baseZ }));
@@ -119,20 +120,21 @@ public static class TerrainService
         pads.AddRange(geo.Pads.Select(p => new GradePad(p.Area, p.Z + baseZ)
         {
             CutSlope = p.CutSlope, FillSlope = p.FillSlope, Daylight = p.Daylight, Label = p.Label,
-            ZAt = p.ZAt == null ? null : q => p.ZAt(q) + baseZ,
+            ZAt = p.ZAt == null ? null : q => p.ZAt(q) + baseZ, Owner = def.Id,
         }));
         switch (def)
         {
             case RoadPavementDefinition road when PathResolver.Resolve(doc, road.Path)?.Main is { } axis:
             {
-                // Via: plataforma do bordo externo de uma calçada ao da outra, no greide, sob a estrutura do pavimento – fora dos
+                // Via: plataforma de alinhamento a alinhamento, no greide, por camadas (rodada VT) – a estrutura do pavimento só sob a
+                // pista, o fundo das lajes sob meio-fio e calçada e o topo da calçada no alinhamento, de onde o talude parte –, fora dos
                 // trechos em obra (sob pontes e viadutos o terreno fica natural; túneis e trincheiras cuidam do próprio trecho).
                 var g = road.Output.Grade;
                 var prof = g != null ? g.ToProfile(2) : VerticalProfile.Flat(0);
                 var cut = g?.CutSlope ?? opt.CutSlope;
                 var fill = g?.FillSlope ?? opt.FillSlope;
-                var right = -(road.TotalRight + 0.3);
-                var left = road.TotalLeft + 0.3;
+                var right = g != null ? -road.TotalRight : -(road.TotalRight + 0.3);
+                var left = g != null ? road.TotalLeft : road.TotalLeft + 0.3;
                 var s0 = Math.Max(0, road.StartSetback);
                 var s1 = Math.Max(s0 + 0.5, axis.Length - Math.Max(0, road.EndSetback));
                 var works = (all ?? Array.Empty<MarkingDefinition>()).Where(h => road.GroupId != null && h is IHostedStructure hs && hs.HostRoad == road.GroupId);
@@ -142,11 +144,12 @@ public static class TerrainService
                 if (g != null)
                 {
                     var surf = service?.SurfaceFor(road, axis) ?? new Core.Geometry.GradeSurface(axis, g);
-                    InfraRoads.FitToSurface(roadCorr, left, right, surf.Z, opt.Subgrade, InfraRoads.SectionBreaks(surf.Grade));
+                    InfraRoads.FitToSection(roadCorr, left, right, surf, InfraRoads.Edges(road, axis), opt.Subgrade, InfraRoads.SectionBreaks(surf.Grade));
                     // Nós em que a via é secundária: a crista da via principal, prolongada, cruza a concordância.
                     foreach (var b in surf.Blends)
                         foreach (var c in roadCorr) c.Breaklines.AddRange(InfraRoads.NodeBreaklines(b.Node));
                 }
+                foreach (var c in roadCorr) c.Owner = road.Id;
                 corridors.AddRange(roadCorr.Select(c => c.WithOffset(z0)));
                 break;
             }
@@ -155,15 +158,20 @@ public static class TerrainService
                 // Conexões: plataforma com o contorno de todas as peças (calçadas incluídas), na superfície costurada ao greide das
                 // vias que chegam (plana quando nenhuma tem greide), sob a estrutura do pavimento.
                 var node = service?.NodeFor(def);
-                var union = Core.Geometry.PolygonOps.Union(geo.Pieces.Where(p => p.Elevation < 0.5).Select(p => p.Shape));
+                var onGround = geo.Pieces.Where(p => p.Elevation < 0.5).ToList();
+                var union = Core.Geometry.PolygonOps.Union(onGround.Select(p => p.Shape));
                 var (cutS, fillS) = RoadSlopes(def, all, opt);
+                // Por camadas: estrutura sob a pista do nó, fundo das lajes sob calçadas e ilhas, topo das calçadas na quina do lote.
+                var (paved, rise) = InfraRoads.PadLayers(onGround);
                 foreach (var u in union.Where(u => u.Area > 1))
                 {
                     var pad = new GradePad(u, z0 - opt.Subgrade)
                     {
                         CutSlope = cutS, FillSlope = fillS, Label = def.KindName,
                         ZAt = node == null ? null : q => node.Z(q) - opt.Subgrade,
+                        Structure = opt.Subgrade, EdgeRise = rise, Owner = def.Id,
                     };
+                    pad.Paved.AddRange(paved);
                     // Crista e fim do caimento da via principal: pontos do Toposolid sobre as quebras da superfície do nó.
                     if (node != null) pad.Breaklines.AddRange(InfraRoads.NodeBreaklines(node));
                     pads.Add(pad);
@@ -174,10 +182,18 @@ public static class TerrainService
             {
                 // Marcas do nó no chão (calçadas de esquina, extensões, rampas): plataforma na superfície delas – a do nó dentro
                 // dele e a da via além dele –, sem talude próprio (ficam dentro das plataformas do nó e das vias).
-                var union = Core.Geometry.PolygonOps.Union(geo.Pieces.Where(p => p.Elevation < 0.5).Select(p => p.Shape));
+                var onGround = geo.Pieces.Where(p => p.Elevation < 0.5).ToList();
+                var union = Core.Geometry.PolygonOps.Union(onGround.Select(p => p.Shape));
+                var (paved, rise) = InfraRoads.PadLayers(onGround);
+                var owner = service.NodeOwner(def)?.Id ?? def.Id;
                 foreach (var u in union.Where(u => u.Area > 0.05))
                 {
-                    var pad = new GradePad(u, z0 - opt.Subgrade) { Daylight = false, Label = def.KindName, ZAt = q => members(q) - opt.Subgrade };
+                    var pad = new GradePad(u, z0 - opt.Subgrade)
+                    {
+                        Daylight = false, Label = def.KindName, ZAt = q => members(q) - opt.Subgrade,
+                        Structure = opt.Subgrade, EdgeRise = rise, Owner = owner,
+                    };
+                    pad.Paved.AddRange(paved);
                     pad.Breaklines.AddRange(InfraRoads.NodeBreaklines(memberNode));
                     pads.Add(pad);
                 }
@@ -311,18 +327,12 @@ public static class TerrainService
         report.Fill = design.FillM3;
         report.Area = design.AreaM2;
         report.Notes.AddRange(design.Warnings);
-        // Volumes por elemento (cada um isolado).
-        if (perDef.Count > 1 && perDef.Count <= 60)
-            foreach (var (d, c, p) in perDef)
-            {
-                try
-                {
-                    var one = Grading.Design(c, p, Ground, 0, Math.Max(5, opt.MaxDaylight), 0.5, 4.0, 2.0);
-                    var name = d is RoadPavementDefinition rp ? $"Via {rp.DisplayCode}" : d.KindName;
-                    report.Items.Add((name, one.CutM3, one.FillM3, one.AreaM2));
-                }
-                catch (Exception ex) { Log.Error("Volumes por elemento", ex); }
-            }
+        // Volumes por elemento: a parte de cada um no projeto conjunto (a soma é o total). Antes cada um era projetado isolado e as
+        // áreas comuns – o nó e o começo das vias que chegam nele – contavam duas vezes.
+        if (perDef.Count > 1)
+            foreach (var (d, _, _) in perDef)
+                if (design.ByOwner.TryGetValue(d.Id, out var v))
+                    report.Items.Add((d is RoadPavementDefinition rp ? $"Via {rp.DisplayCode}" : d.KindName, v.Cut, v.Fill, v.Area));
         if (opt.DryRun) return report;
         var footprint = design.Footprint.Count == 0 ? new List<Polygon2>() : PolygonOps.Union(design.Footprint).Where(f => f.Area > 0.5).ToList();
 

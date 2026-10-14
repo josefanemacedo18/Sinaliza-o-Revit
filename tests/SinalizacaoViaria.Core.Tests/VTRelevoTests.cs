@@ -361,3 +361,202 @@ public class VTRelevoTests
     }
 }
 
+
+/// <summary>
+/// Rodada VT, fase 4: corte e aterro. A estrutura do pavimento só sob a pista; sob meio-fio e calçada o terreno fica no fundo
+/// das lajes e, na borda externa, encontra o topo do acabamento – o talude parte dali; volumes conferidos com o cálculo
+/// analítico e repartidos por via e interseção.
+/// </summary>
+public class VTTerraplenagemTests
+{
+    /// <summary>
+    /// Terreno no acabamento: logo fora da borda externa dos pisos (5 cm) o Toposolid fica no topo do piso da borda, mais ou
+    /// menos o que o talude sobe ou desce nesses 5 cm (corte 1:1, aterro 1,5:1) e 3 cm de folga. Antes ficava 55 cm abaixo do
+    /// topo da calçada em toda a borda (plataforma 40 cm abaixo da pista e 30 cm além da calçada).
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(VTRelevoTests.Matrix), MemberType = typeof(VTRelevoTests))]
+    public void V8_TerrenoEncontraOAcabamentoNaBordaExterna(string terrain, string kind, string a, string b)
+    {
+        var sc = VTRelevoTests.Get(terrain, kind, a, b);
+        var floors = TopoScene.Floors(sc).Where(f => f.Piece.Solid == null && f.Piece.Profile == null).ToList();
+        // Sólidos no chão (rampas) também cobrem o terreno: a borda deles não é borda externa.
+        var solids = sc.Parts.Where(p => p.Piece.Solid != null && p.Piece.Elevation < 0.5).Select(p => p.Piece.Shape);
+        var union = PolygonOps.Union(floors.Select(f => f.Part).Concat(solids)).ToList();
+        const double d = 0.05;
+        double lo = -d / TopoScene.Scene.Fill - 0.03, hi = d / TopoScene.Scene.Cut + 0.03;
+        var n = 0;
+        var worst = (D: 0.0, P: Vec2.Zero);
+        foreach (var u in union)
+            foreach (var ring in u.Holes.Prepend(u.Outer))
+            {
+                var dense = CurveTools.Densify(ring.Append(ring[0]).ToList(), 0.5);
+                for (int i = 0; i + 1 < dense.Count; i++)
+                {
+                    var q = (dense[i] + dense[i + 1]) / 2;
+                    var t = (dense[i + 1] - dense[i]).Normalized();
+                    foreach (var nv in new[] { t.PerpLeft, t.PerpRight })
+                    {
+                        var outside = q + nv * d;
+                        var inside = q - nv * 0.05;
+                        if (union.Any(x => x.Contains(outside))) continue;
+                        var top = floors.Where(f => f.Part.Contains(inside)).Select(f => (double?)VTRelevoTests.Top(f, q)).Max();
+                        if (top == null || sc.Terrain.Z(outside) is not { } tz) continue;
+                        n++;
+                        var step = tz - top.Value;
+                        if (step < lo || step > hi)
+                            if (Math.Abs(step) > Math.Abs(worst.D)) worst = (step, q);
+                    }
+                }
+            }
+        Assert.True(n > 100, $"{terrain}/{kind}: poucas amostras na borda ({n})");
+        Assert.True(worst.D == 0, $"{terrain}/{kind}/{a}x{b}: terreno {worst.D * 100:0.0} cm do topo do piso logo fora da borda em ({worst.P.X:0.0}; {worst.P.Y:0.0})");
+    }
+
+    /// <summary>
+    /// Plataforma por camadas: o Toposolid refeito fica no fundo da estrutura sob a pista e no fundo das lajes sob meio-fio,
+    /// calçada e grama (±5 mm). Antes ficava 40 cm abaixo da pista em toda a largura – um vão de 40 cm sob as calçadas.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(VTRelevoTests.Matrix), MemberType = typeof(VTRelevoTests))]
+    public void V9_EstruturaSoSobAPista_LajesNoTerreno(string terrain, string kind, string a, string b)
+    {
+        var sc = VTRelevoTests.Get(terrain, kind, a, b);
+        var raisedChecked = 0;
+        foreach (var (def, piece) in sc.Parts.Where(p => p.Piece.Elevation < 0.5 && p.Piece.Solid == null))
+        {
+            var zf = TopoScene.SurfaceOf(sc, def);
+            if (zf == null) continue;
+            var (mn, mx) = piece.Shape.Bounds;
+            for (var x = Math.Ceiling(mn.X); x < mx.X; x += 1.5)
+                for (var y = Math.Ceiling(mn.Y); y < mx.Y; y += 1.5)
+                {
+                    var p = new Vec2(x, y);
+                    if (!piece.Shape.Contains(p) || piece.Shape.DistanceTo(p) < 0.3) continue;
+                    if (TopoScene.PlatformWant(sc, piece, zf, p) is not { } want) continue;
+                    if (piece.Elevation + piece.Thickness >= 0.05) raisedChecked++;
+                    var tz = sc.Terrain.Z(p);
+                    Assert.True(tz != null && Math.Abs(tz.Value - want) <= 0.005,
+                        $"{terrain}/{kind}/{a}x{b} {def.GetType().Name}/{piece.Color}: Toposolid {tz:0.000} ≠ {want:0.000} em ({p.X:0.0}; {p.Y:0.0})");
+                }
+        }
+        Assert.True(raisedChecked > 50, "poucas amostras sob as calçadas");
+    }
+
+    /// <summary>
+    /// Taludes contínuos até o terreno: em toda a área alterada fora das plataformas (inclusive o pé e os cantos em cone das
+    /// esquinas) o Toposolid refeito reproduz a superfície de projeto a até 5 cm.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(VTRelevoTests.Matrix), MemberType = typeof(VTRelevoTests))]
+    public void V10_TaludesContinuosAteOTerreno(string terrain, string kind, string a, string b)
+    {
+        var sc = VTRelevoTests.Get(terrain, kind, a, b);
+        var d = sc.Design;
+        var plat = TerrainRebuild.Mask(d.PlatformAreas.Concat(d.Pads.Select(p => p.Area)), 0.1);
+        var worst = (D: 0.0, P: Vec2.Zero);
+        var n = 0;
+        for (var x = -100.0; x < 100; x += 0.5)
+            for (var y = -100.0; y < 100; y += 0.5)
+            {
+                var p = new Vec2(x + 0.25, y + 0.25);
+                if (plat(p) || d.DesignZ(p) is not { } z || sc.Terrain.Z(p) is not { } tz) continue;
+                n++;
+                if (Math.Abs(tz - z) > Math.Abs(worst.D)) worst = (tz - z, p);
+            }
+        Assert.True(n > 100, $"poucas amostras nos taludes ({n})");
+        Assert.True(Math.Abs(worst.D) <= 0.05, $"{terrain}/{kind}/{a}x{b}: Toposolid {worst.D * 100:0.0} cm fora do talude em ({worst.P.X:0.00}; {worst.P.Y:0.00})");
+    }
+
+    /// <summary>Via reta (calçadas, abaulamento) com o greide a <paramref name="h"/> m do terreno plano – faixa como TerrainService.</summary>
+    private static (GradingResult Design, RoadPavementDefinition Road) Straight(double h, double length = 120, double crossfall = 0.02)
+    {
+        var road = new RoadPavementDefinition { RightWidth = 4.0, LeftWidth = 4.0, RightSidewalk = 2.5, LeftSidewalk = 2.5, CurbHeight = 0.15 };
+        road.Id = "via";
+        var axis = new Polyline2(new[] { new Vec2(0, 0), new Vec2(length, 0) });
+        var g = new RoadGrade { Crossfall = crossfall, CrossfallWidth = 4.0, Points = { new(0, h), new(length, h) } };
+        var surf = new GradeSurface(axis, g);
+        var corr = InfraRoads.RoadCorridors(axis, g.ToProfile(2), -road.TotalRight, road.TotalLeft, 0, length, 0.40, 1.0, 1.5, Array.Empty<MarkingDefinition>());
+        InfraRoads.FitToSection(corr, road.TotalLeft, -road.TotalRight, surf, InfraRoads.Edges(road, axis), 0.40, InfraRoads.SectionBreaks(g));
+        // Pontas em face (sem talude à frente): o volume fica só o do prisma da seção, que tem conta fechada.
+        foreach (var c in corr) { c.SpillStart = c.SpillEnd = false; c.WallStart = c.WallEnd = true; c.Owner = road.Id; }
+        return (Grading.Design(corr, Array.Empty<GradePad>(), _ => 0.0, 0, 60, 0.5, 4.0, 0.25), road);
+    }
+
+    /// <summary>
+    /// Área da seção (m²) entre a plataforma por camadas e o terreno plano a <paramref name="h"/> m abaixo do greide (aterro
+    /// h &gt; 0, corte h &lt; 0): pista com abaulamento e estrutura de 0,40 m, transições de 5 cm, calçadas no fundo da laje,
+    /// topo da calçada no alinhamento e taludes de 1,5:1 (aterro) ou 1:1 (corte).
+    /// </summary>
+    private static double SectionArea(double h, double crossfall)
+    {
+        const double W = 4.0, S = 2.5, sub = 0.40, rise = 0.15, G = InfraRoads.LayerStep;
+        // Superfície da via: h − cf·|y| na pista, h − cf·W além dela (calçadas em nível na transversal).
+        double Surf(double y) => h - crossfall * Math.Min(Math.Abs(y), W);
+        double Off(double y)
+        {
+            var d = Math.Abs(y) - W;
+            if (d <= 0) return -sub;
+            if (d < G) return -sub * (1 - d / G);
+            return rise * Math.Clamp((d - (S - G)) / G, 0, 1);
+        }
+        // Integração numérica fina da plataforma (as funções são lineares por trechos: erro desprezível).
+        var area = 0.0;
+        const int N = 200_000;
+        var half = W + S;
+        for (int i = 0; i < N; i++)
+        {
+            var y = -half + (i + 0.5) * (2 * half / N);
+            area += (Surf(y) + Off(y)) * (2 * half / N);
+        }
+        // Taludes dos dois lados, do topo da calçada até o terreno.
+        var edge = Surf(half) + rise;
+        var ratio = edge >= 0 ? 1.5 : 1.0;
+        area += 2 * 0.5 * Math.Abs(edge) * Math.Abs(edge) * ratio * Math.Sign(edge);
+        return area;
+    }
+
+    /// <summary>
+    /// Volumes de corte e aterro conferidos com o cálculo analítico (≤ 1 %): via reta em aterro e em corte sobre terreno plano.
+    /// </summary>
+    [Theory]
+    [InlineData(1.5)]
+    [InlineData(3.0)]
+    [InlineData(-1.5)]
+    [InlineData(-3.0)]
+    public void V11_VolumesConferemComOCalculoAnalitico(double h)
+    {
+        const double L = 120;
+        var (design, road) = Straight(h, L);
+        var want = Math.Abs(SectionArea(h, 0.02)) * L;
+        var got = h > 0 ? design.FillM3 : design.CutM3;
+        var other = h > 0 ? design.CutM3 : design.FillM3;
+        Assert.True(Math.Abs(got - want) <= 0.01 * want, $"h = {h}: {got:0.0} m³ ≠ {want:0.0} m³ ({(got - want) / want:P2})");
+        Assert.True(other <= 0.002 * want, $"h = {h}: volume do outro tipo {other:0.0} m³");
+        // Repartição: tudo da via.
+        Assert.True(design.ByOwner.TryGetValue(road.Id, out var v));
+        Assert.True(Math.Abs(v.Cut - design.CutM3) < 1e-6 && Math.Abs(v.Fill - design.FillM3) < 1e-6);
+    }
+
+    /// <summary>
+    /// Volumes por via e por interseção: a soma das partes é o total, cada via e cada interseção da cena tem a sua parte e a da
+    /// interseção fica na área dela.
+    /// </summary>
+    [Theory]
+    [InlineData("incl5", "cruz", "local2", "local2")]
+    [InlineData("suave", "T", "local2", "local2")]
+    [InlineData("incl8", "cruz", "coletora4", "local2")]
+    public void V12_VolumesPorViaEInterseção_SomamOTotal(string terrain, string kind, string a, string b)
+    {
+        var sc = VTRelevoTests.Get(terrain, kind, a, b);
+        var d = sc.Design;
+        Assert.True(d.CutM3 + d.FillM3 > 10);
+        var cut = d.ByOwner.Values.Sum(v => v.Cut);
+        var fill = d.ByOwner.Values.Sum(v => v.Fill);
+        Assert.True(Math.Abs(cut - d.CutM3) <= 1e-6 * Math.Max(1, d.CutM3) && Math.Abs(fill - d.FillM3) <= 1e-6 * Math.Max(1, d.FillM3),
+            $"partes {cut:0.0}/{fill:0.0} ≠ total {d.CutM3:0.0}/{d.FillM3:0.0}");
+        foreach (var r in sc.World.Roads) Assert.True(d.ByOwner.ContainsKey(r.Def.Id), $"via {r.Def.Id} sem volume");
+        foreach (var n in sc.World.Nodes) Assert.True(d.ByOwner.ContainsKey(n.Layout.Definition!.Id), "interseção sem volume");
+        Assert.True(d.ByOwner.Keys.All(k => sc.World.Roads.Any(r => r.Def.Id == k) || sc.World.Nodes.Any(n => n.Layout.Definition!.Id == k)));
+    }
+}

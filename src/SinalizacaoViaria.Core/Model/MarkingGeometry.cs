@@ -360,13 +360,31 @@ public sealed class GradeCorridor
     public Func<Vec2, double>? Surface { get; set; }
     /// <summary>Linhas de quebra da superfície que cruzam a faixa (a crista da via principal de um nó, prolongada): pontos do terreno sobre elas.</summary>
     public List<List<Vec2>> Breaklines { get; } = new();
+    /// <summary>
+    /// Trechos de pista da faixa (onde fica a estrutura do pavimento; fora deles o terreno fica no fundo das lajes) – as
+    /// plataformas vizinhas (nós, extensões) fazem a transição do fundo da estrutura ao da laje junto deles. Só em memória.
+    /// </summary>
+    public List<Polygon2> Paved { get; } = new();
+    /// <summary>Marca dona da faixa (volumes de corte e aterro por via/interseção) – só em memória.</summary>
+    public string? Owner { get; set; }
+    /// <summary>
+    /// Linhas dos degraus da plataforma por camadas (índices em borda esquerda, <see cref="Inner"/>..., borda direita): pontos mais
+    /// densos no Toposolid. Só em memória.
+    /// </summary>
+    public HashSet<int> StepLines { get; } = new();
+    /// <summary>
+    /// Acabamento da seção nas pontas livres (da esquerda para a direita, com o degrau do meio-fio): o talude à frente da testa
+    /// parte dele. Vazio = a seção da plataforma na ponta. Só em memória.
+    /// </summary>
+    public List<Vec3> StartFinish { get; } = new();
+    public List<Vec3> EndFinish { get; } = new();
 
     /// <summary>Soma <paramref name="dz"/> a todas as cotas (relativas → absolutas).</summary>
     public GradeCorridor WithOffset(double dz)
     {
         for (int i = 0; i < Left.Count; i++) Left[i] = Left[i] with { Z = Left[i].Z + dz };
         for (int i = 0; i < Right.Count; i++) Right[i] = Right[i] with { Z = Right[i].Z + dz };
-        foreach (var l in Inner)
+        foreach (var l in Inner.Append(StartFinish).Append(EndFinish))
             for (int i = 0; i < l.Count; i++) l[i] = l[i] with { Z = l[i].Z + dz };
         if (Surface is { } f) Surface = p => f(p) + dz;
         return this;
@@ -391,6 +409,23 @@ public sealed class GradePad
 
     /// <summary>Cota da plataforma no ponto.</summary>
     public double At(Vec2 p) => ZAt?.Invoke(p) ?? Z;
+
+    /// <summary>
+    /// Plataforma por camadas (rodada VT): <see cref="ZAt"/> é o fundo da estrutura do pavimento, que só vale sob
+    /// <see cref="Paved"/> (e sob as pistas das faixas vizinhas); no resto (calçadas, meios-fios, ilhas, canteiros) a plataforma
+    /// sobe <see cref="Structure"/> m até o fundo das lajes, numa transição sob o meio-fio (InfraRoads.LayerStep). 0 = plataforma única em
+    /// <see cref="ZAt"/>. Só em memória.
+    /// </summary>
+    public double Structure { get; set; }
+    /// <summary>Pista do nó (estrutura do pavimento sob ela) – com <see cref="Structure"/>.</summary>
+    public List<Polygon2> Paved { get; } = new();
+    /// <summary>
+    /// Nível do acabamento acima da pista no contorno externo (topo da calçada na quina do lote; nulo = 0): nas bordas que não
+    /// encostam em outra plataforma o terreno sobe a ele e o talude parte dali. Só em memória.
+    /// </summary>
+    public Func<Vec2, double>? EdgeRise { get; set; }
+    /// <summary>Marca dona da plataforma (volumes por via/interseção) – só em memória.</summary>
+    public string? Owner { get; set; }
 
     /// <summary>
     /// Linhas de quebra da superfície da plataforma (eixo do abaulamento e fim do caimento da via principal no nó): o terreno
