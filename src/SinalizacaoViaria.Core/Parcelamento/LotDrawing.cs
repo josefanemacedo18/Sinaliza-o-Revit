@@ -353,7 +353,7 @@ public static class LotDrawing
             default:
             {
                 var lines = LotMemorial.LinhasAreas(r);
-                var headers = new List<string> { "", "ESPECIFICAÇÃO", "QUANT.", "ÁREA (m²)", "%", "MÍNIMO" };
+                var headers = new List<string> { "", "ESPECIFICAÇÃO", "QUANT.", "ÁREA (m²)", "% DA GLEBA", "MÍNIMO" };
                 var aligns = new[] { TextAlign.Center, TextAlign.Left, TextAlign.Center, TextAlign.Right, TextAlign.Right, TextAlign.Right };
                 var rows = lines.Select((l, i) => (new[] { "", l.Item, l.Qtd, l.Area, l.Pct, l.Min }, l.Item.StartsWith("Área total"))).ToList();
                 var hasMin = lines.Any(l => l.Min.Length > 0);
@@ -367,61 +367,118 @@ public static class LotDrawing
                 for (int i = 0; i < r.Categorias.Count; i++) swatches.Add((i, lot.Categoria(r.Categorias[i].Nome)));
                 Table(geo, ctx, d.Position, title, headers, aligns, rows, d.RowMm, d.TextMm, swatches);
                 var bottom = geo.Annotations.OfType<AnnotationLine>().SelectMany(l => l.Points).Min(p => p.Y);
-                geo.Annotations.Add(new AnnotationText(new Vec2(d.Position.X, bottom - ctx.Mm(2)),
-                    "Mínimos: informados no projeto (legislação municipal e Lei Federal nº 6.766/1979 – a confirmar).", d.TextMm * 0.8, TextAlign.Left));
+                var notes = new List<string>();
+                if (r.AreaRemanescente > 0.01)
+                    notes.Add($"{LotReport.CategoriaRemanescente(lot).Nome} inclui {LotReport.M(r.AreaRemanescente)} m² de área remanescente da gleba (fora das quadras e das vias).");
+                notes.Add("Mínimos: informados no projeto (legislação municipal e Lei Federal nº 6.766/1979 – a confirmar).");
+                var ny = bottom - ctx.Mm(2);
+                foreach (var n in notes)
+                {
+                    geo.Annotations.Add(new AnnotationText(new Vec2(d.Position.X, ny), n, d.TextMm * 0.8, TextAlign.Left));
+                    ny -= ctx.Mm(d.TextMm * 0.8 * 1.6);
+                }
                 break;
             }
         }
         return geo;
     }
 
+    /// <summary>Largura de avanço da Arial (milésimos do em) – a fonte dos textos do plugin no Revit.</summary>
+    private static readonly Dictionary<char, int> Arial = BuildArial();
+
+    private static Dictionary<char, int> BuildArial()
+    {
+        var w = new Dictionary<char, int>
+        {
+            [' '] = 278, ['.'] = 278, [','] = 278, [':'] = 278, [';'] = 278, ['('] = 333, [')'] = 333, ['+'] = 584, ['%'] = 889, ['²'] = 333,
+            ['-'] = 333, ['–'] = 556, ['—'] = 1000, ['/'] = 278, ['º'] = 365, ['°'] = 400, ['×'] = 584, ['='] = 584,
+        };
+        var up = new[] { 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611 };
+        var lo = new[] { 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500 };
+        for (int i = 0; i < 26; i++) { w[(char)('A' + i)] = up[i]; w[(char)('a' + i)] = lo[i]; }
+        for (var d = '0'; d <= '9'; d++) w[d] = 556;
+        return w;
+    }
+
     /// <summary>
-    /// Tabela com título, cabeçalho e linhas (a linha marcada como total ganha um traço duplo acima); amostras de cor das
-    /// categorias na primeira coluna. Devolve a largura e a altura (m).
+    /// Largura (mm de papel) do texto em Arial com altura <paramref name="heightMm"/> – a altura do texto do Revit é a das
+    /// maiúsculas (0,716 do em). Letras acentuadas medem como a letra base.
+    /// </summary>
+    public static double ArialWidthMm(string text, double heightMm) => text.Sum(ch =>
+    {
+        if (Arial.TryGetValue(ch, out var v)) return v;
+        var b = ch.ToString().Normalize(System.Text.NormalizationForm.FormD)[0];
+        return Arial.TryGetValue(b, out var bv) ? bv : 556;
+    }) / 1000.0 / 0.716 * heightMm;
+
+    /// <summary>
+    /// Tabela com título, cabeçalho e linhas (a linha marcada como total ganha fundo cinza-claro e traço duplo acima); amostras de
+    /// cor das categorias na primeira coluna. Colunas na largura do maior texto em Arial mais 2 mm de cada lado – nenhum texto
+    /// encosta nas divisas; cabeçalho com fundo cinza. Devolve a largura e a altura (m).
     /// </summary>
     public static Vec2 Table(MarkingGeometry geo, BuildContext ctx, Vec2 topLeft, string title, IReadOnlyList<string> headers, IReadOnlyList<TextAlign> aligns,
         IReadOnlyList<(string[] Cells, bool Total)> rows, double rowMm, double textMm, IReadOnlyList<(int Row, CategoriaLote Cat)>? swatches)
     {
-        var rowH = ctx.Mm(rowMm);
-        var pad = ctx.Mm(1.5);
         var th = textMm;
+        var titleMm = th * 1.25;
+        var rowH = ctx.Mm(Math.Max(rowMm, th * 2.4));
+        var headH = ctx.Mm(Math.Max(rowMm, th * 2.6));
+        var titleH = ctx.Mm(Math.Max(rowMm * 1.4, titleMm * 3));
+        var pad = Math.Max(2.0, th * 0.9);
         var widths = new double[headers.Count];
         for (int c = 0; c < headers.Count; c++)
-            widths[c] = rows.Where(r => r.Cells.Length > c).Select(r => r.Cells[c]).Append(headers[c])
-                .Max(s => DetailGenerator.LineWidthFactor(s)) * ctx.Mm(th) + 2 * pad;
-        if (swatches != null && widths.Length > 0) widths[0] = Math.Max(widths[0], ctx.Mm(10));
+            widths[c] = ctx.Mm(rows.Where(r => r.Cells.Length > c).Select(r => r.Cells[c]).Append(headers[c])
+                .Max(s => ArialWidthMm(s, th)) + 2 * pad);
+        if (swatches != null && widths.Length > 0) widths[0] = Math.Max(widths[0], ctx.Mm(14));
+        // O título cabe na largura toda: a sobra vai para a coluna mais larga.
+        var titleW = ctx.Mm(ArialWidthMm(title, titleMm) + 2 * pad);
+        if (widths.Sum() < titleW && widths.Length > 0)
+        {
+            var k = Array.IndexOf(widths, widths.Max());
+            widths[k] += titleW - widths.Sum();
+        }
         var totalW = widths.Sum();
-        var titleH = rowH * 1.3;
-        var totalH = titleH + rowH * (rows.Count + 1);
+        var totalH = titleH + headH + rowH * rows.Count;
         var x0 = topLeft.X;
         var y0 = topLeft.Y;
         void Line(double ax, double ay, double bx, double by) => geo.Annotations.Add(new AnnotationLine(new[] { new Vec2(ax, ay), new Vec2(bx, by) }, MarkingColor.Preta));
+        void Fill(double top, double h, string rgb) =>
+            geo.Pieces.Add(new MarkingPiece(Polygon2.Rectangle(new Vec2(x0, top - h), new Vec2(x0 + totalW, top)), MarkingColor.Branca) { Rgb = rgb });
+        // Fundos: cabeçalho cinza, linhas de total cinza-claro.
+        Fill(y0 - titleH, headH, "#E2E2E2");
+        for (int i = 0; i < rows.Count; i++)
+            if (rows[i].Total) Fill(y0 - titleH - headH - rowH * i, rowH, "#F2F2F2");
         geo.Annotations.Add(new AnnotationLine(new[] { new Vec2(x0, y0), new Vec2(x0 + totalW, y0), new Vec2(x0 + totalW, y0 - totalH), new Vec2(x0, y0 - totalH), new Vec2(x0, y0) }, MarkingColor.Preta));
         Line(x0, y0 - titleH, x0 + totalW, y0 - titleH);
-        geo.Annotations.Add(new AnnotationText(new Vec2(x0 + totalW / 2, y0 - (titleH - ctx.Mm(th * 1.2)) / 2), title, th * 1.2));
+        geo.Annotations.Add(new AnnotationText(new Vec2(x0 + totalW / 2, y0 - (titleH - ctx.Mm(titleMm)) / 2), title, titleMm));
         var y = y0 - titleH;
-        void Cells(string[] cells)
+        void Cells(string[] cells, double h, bool header)
         {
             var x = x0;
             for (int c = 0; c < widths.Length && c < cells.Length; c++)
             {
-                var tx = aligns[c] switch { TextAlign.Left => x + pad, TextAlign.Right => x + widths[c] - pad, _ => x + widths[c] / 2 };
-                if (cells[c].Length > 0) geo.Annotations.Add(new AnnotationText(new Vec2(tx, y - (rowH - ctx.Mm(th)) / 2), cells[c], th, aligns[c]));
+                var al = header && aligns[c] == TextAlign.Right ? TextAlign.Center : aligns[c];
+                var tx = al switch { TextAlign.Left => x + ctx.Mm(pad), TextAlign.Right => x + widths[c] - ctx.Mm(pad), _ => x + widths[c] / 2 };
+                if (cells[c].Length > 0) geo.Annotations.Add(new AnnotationText(new Vec2(tx, y - (h - ctx.Mm(th)) / 2), cells[c], th, al));
                 x += widths[c];
             }
-            y -= rowH;
+            y -= h;
             Line(x0, y, x0 + totalW, y);
         }
-        Cells(headers.ToArray());
+        Cells(headers.ToArray(), headH, true);
         for (int i = 0; i < rows.Count; i++)
         {
             if (rows[i].Total) Line(x0, y - ctx.Mm(0.6), x0 + totalW, y - ctx.Mm(0.6));
             var top = y;
-            Cells(rows[i].Cells);
+            Cells(rows[i].Cells, rowH, false);
             if (swatches?.FirstOrDefault(s => s.Row == i) is { Cat: not null } sw)
             {
-                var m = ctx.Mm(1.2);
-                var box = Polygon2.Rectangle(new Vec2(x0 + m, top - rowH + m), new Vec2(x0 + widths[0] - m, top - m));
+                // Amostra do mesmo tamanho em todas as linhas, centrada na célula.
+                var bw = Math.Min(widths[0] - ctx.Mm(2 * pad), ctx.Mm(10));
+                var bh = Math.Min(rowH - ctx.Mm(2.4), ctx.Mm(5));
+                var cx = x0 + widths[0] / 2;
+                var cy = top - rowH / 2;
+                var box = Polygon2.Rectangle(new Vec2(cx - bw / 2, cy - bh / 2), new Vec2(cx + bw / 2, cy + bh / 2));
                 geo.Pieces.Add(new MarkingPiece(box, MarkingColor.Terra) { Rgb = sw.Cat.Cor, Hatch = sw.Cat.Hachura });
                 geo.Annotations.Add(new AnnotationLine(box.Outer.Append(box.Outer[0]).ToList(), MarkingColor.Preta));
             }

@@ -23,8 +23,10 @@ public sealed class ResumoLoteamento
     public List<QuadraDividida> Quadras { get; } = new();
     public double AreaGleba { get; set; }
     public double AreaQuadras { get; set; }
-    /// <summary>Gleba menos as quadras (vias, calçadas, canteiros e o que não virou quadra).</summary>
+    /// <summary>Gleba menos as quadras e a área remanescente (vias, calçadas, canteiros).</summary>
     public double AreaViaria { get; set; }
+    /// <summary>Sobra da gleba em volta das vias (não é quadra) – entra na área verde.</summary>
+    public double AreaRemanescente { get; set; }
     public List<LinhaCategoria> Categorias { get; } = new();
     public List<LinhaQuadra> LinhasQuadras { get; } = new();
     public double AreaPublica { get; set; }
@@ -51,6 +53,7 @@ public static class LotReport
             res.Quadras.Add(new QuadraDividida(q, LotDivider.Divide(q, lot)));
         var gleba = lot.GlebaPolygon;
         res.AreaQuadras = res.Quadras.Sum(q => q.Divisao.Quadra.Area);
+        var rem = lot.RemanescentePolygons.ToList();
         if (gleba != null)
         {
             res.AreaGleba = gleba.Area;
@@ -58,11 +61,14 @@ public static class LotReport
             var union = PolygonOps.TotalArea(PolygonOps.Union(res.Quadras.Select(q => q.Divisao.Quadra)));
             if (res.AreaQuadras - inside > 1) res.Avisos.Add($"{M(res.AreaQuadras - inside)} m² de quadras ficam fora da gleba.");
             if (res.AreaQuadras - union > 1) res.Avisos.Add($"{M(res.AreaQuadras - union)} m² de quadras se sobrepõem.");
-            res.AreaViaria = Math.Max(0, res.AreaGleba - inside);
+            // A sobra da gleba em volta das vias é área verde: o sistema viário é o que resta (a soma das linhas dá a gleba).
+            res.AreaRemanescente = rem.Count == 0 ? 0 : PolygonOps.TotalArea(PolygonOps.Intersect(rem, new[] { gleba }));
+            res.AreaViaria = Math.Max(0, res.AreaGleba - inside - res.AreaRemanescente);
         }
         else
         {
-            res.AreaGleba = res.AreaQuadras;
+            res.AreaRemanescente = rem.Sum(p => p.Area);
+            res.AreaGleba = res.AreaQuadras + res.AreaRemanescente;
             res.Avisos.Add("Gleba não definida: os percentuais são sobre a soma das quadras e o sistema viário não é calculado.");
         }
 
@@ -71,13 +77,17 @@ public static class LotReport
         foreach (var extra in parcels.Select(p => p.Categoria).Distinct(StringComparer.OrdinalIgnoreCase)
                      .Where(c => !names.Contains(c, StringComparer.OrdinalIgnoreCase)))
             names.Add(extra);
+        var remCat = CategoriaRemanescente(lot);
+        if (res.AreaRemanescente > 0.01 && !names.Contains(remCat.Nome, StringComparer.OrdinalIgnoreCase)) names.Add(remCat.Nome);
         foreach (var name in names)
         {
             var ps = parcels.Where(p => string.Equals(p.Categoria, name, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (ps.Count == 0 && name != CategoriaLote.Lote) continue;
-            var cat = lot.Categoria(name);
-            var area = ps.Sum(p => p.Area);
-            res.Categorias.Add(new LinhaCategoria(name, ps.Count, area, res.Pct(area), cat.Nome == name && cat.Publica, Minimo(lot, name)));
+            var isRem = res.AreaRemanescente > 0.01 && string.Equals(name, remCat.Nome, StringComparison.OrdinalIgnoreCase);
+            var count = ps.Count + (isRem ? rem.Count : 0);
+            if (count == 0 && name != CategoriaLote.Lote) continue;
+            var cat = isRem ? remCat : lot.Categoria(name);
+            var area = ps.Sum(p => p.Area) + (isRem ? res.AreaRemanescente : 0);
+            res.Categorias.Add(new LinhaCategoria(name, count, area, res.Pct(area), string.Equals(cat.Nome, name, StringComparison.OrdinalIgnoreCase) && cat.Publica, Minimo(lot, name)));
         }
         res.AreaPublica = res.AreaViaria + res.Categorias.Where(c => c.Publica).Sum(c => c.Area);
         foreach (var (q, d) in res.Quadras)

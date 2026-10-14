@@ -2796,9 +2796,15 @@ as divisas por baixo) – por isso aparece também no masterplan.
 
 **Quadros do Loteamento** – independentes de vista (Legenda própria, vai para várias folhas; ou na vista ativa):
 
-* **Quadro de áreas**: amostra de cor de cada categoria, quantidade, área (m²) e % da gleba – lotes, institucional, áreas
-  verdes, **sistema viário** (gleba menos as quadras), **área total da gleba** (100 %) e **áreas públicas** (sistema viário +
-  categorias públicas); coluna **Mínimo** quando informado. Sem linha de "sobras": as sobras de testada são lotes.
+* **Quadro de áreas**: amostra de cor de cada categoria, quantidade, área (m²) e **% da gleba** – lotes, institucional, áreas
+  verdes (com a **área remanescente** da gleba somada, explicada numa nota abaixo do quadro), **sistema viário** (gleba menos as
+  quadras e a área remanescente: vias, calçadas e canteiros), **área total da gleba** (100 %) e **áreas públicas** (sistema
+  viário + categorias públicas); coluna **Mínimo** quando informado. **A gleba é a soma de tudo**: lotes + institucional + área
+  verde + sistema viário = 100 % (cada linha "retira" a sua parte da gleba – ex.: 35 % de áreas públicas e sistema viário, 65 %
+  de lotes). Sem linha de "sobras": as sobras de testada são lotes. Desenho: título numa faixa própria, cabeçalho com fundo
+  cinza, colunas na largura do maior texto (medido na fonte Arial dos textos do Revit) com 2 mm de folga de cada lado – nenhum
+  texto encosta nas divisas –, números alinhados à direita, amostras de cor do mesmo tamanho e a linha da gleba destacada.
+  Os quadros de quadras e de lotes usam o mesmo desenho.
 * **Quadro de quadras**: lotes e área por categoria de cada quadra, com total.
 * **Quadro de lotes – lote a lote**, na ordem da numeração: **quadra**, **lote**, **categoria**, **frente para** (nome da rua;
   duas ruas no lote de esquina), **frente**, **lado direito**, **lado esquerdo** e **fundos** (m; lados com dois trechos

@@ -145,4 +145,85 @@ public class LVCorrecoesTests
         var profile = DetailGenerator.SectionProfileDrawing(SectionProfileDefinition.From(cut, Vec2.Zero), withCut);
         Assert.Contains(profile.Annotations.OfType<AnnotationText>(), Number);
     }
+
+    // ================================================================== 3 – quadro de áreas
+
+    [Fact]
+    public void D3_QuadroDeAreas_SistemaViarioContadoESomaIgualAGleba()
+    {
+        var a = Anel();
+        var r = LotReport.Resumo(a.Lot, a.Quadras);
+        // Vias dentro da gleba: 80² − 60² = 2800 m².
+        Assert.InRange(r.AreaViaria, 2800 - 1, 2800 + 1);
+        Assert.All(r.Categorias, c => Assert.InRange(c.Percentual, 0, 100));
+        // A gleba é a soma de tudo: lotes + áreas (a sobra da gleba como área verde) + sistema viário = 100 %.
+        Assert.InRange(r.Categorias.Sum(c => c.Area) + r.AreaViaria, r.AreaGleba - 0.01, r.AreaGleba + 0.01);
+        Assert.InRange(r.Categorias.Sum(c => c.Percentual) + r.Pct(r.AreaViaria), 100 - 1e-6, 100 + 1e-6);
+        Assert.InRange(r.AreaRemanescente, 29600 - 1, 29600 + 1);
+        var verde = Assert.Single(r.Categorias, c => c.Nome == CategoriaLote.AreaVerde);
+        Assert.InRange(verde.Area, 29600 + r.Quadras.Sum(q => q.Divisao.Parcelas.Where(p => p.Categoria == CategoriaLote.AreaVerde).Sum(p => p.Area)) - 1, double.MaxValue);
+        Assert.True(verde.Publica);
+        Assert.InRange(r.Pct(r.AreaPublica), 0, 100);
+        // No grade normal (sem sobra), a mesma soma.
+        var w = LTScenes.World();
+        var rw = LotReport.Resumo(w.Lot, w.Quadras);
+        Assert.InRange(rw.Categorias.Sum(c => c.Area) + rw.AreaViaria, rw.AreaGleba - 0.01, rw.AreaGleba + 0.01);
+        Assert.True(rw.AreaViaria > 1000);
+    }
+
+    /// <summary>Largura de avanço da Arial (milésimos do em); a altura do texto do Revit é a altura das maiúsculas (0,716 em).</summary>
+    private static readonly Dictionary<char, int> Arial = BuildArial();
+
+    private static Dictionary<char, int> BuildArial()
+    {
+        var w = new Dictionary<char, int> { [' '] = 278, ['.'] = 278, [','] = 278, ['('] = 333, [')'] = 333, ['+'] = 584, ['%'] = 889, ['²'] = 333,
+            ['-'] = 333, ['–'] = 556, ['/'] = 278, [':'] = 278, ['º'] = 365 };
+        var up = new[] { 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611 };
+        var lo = new[] { 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500 };
+        for (int i = 0; i < 26; i++) { w[(char)('A' + i)] = up[i]; w[(char)('a' + i)] = lo[i]; }
+        for (char d = '0'; d <= '9'; d++) w[d] = 556;
+        return w;
+    }
+
+    /// <summary>Largura (mm de papel) do texto em Arial com a altura de maiúsculas <paramref name="mm"/>.</summary>
+    public static double ArialWidthMm(string s, double mm) => s.Sum(ch =>
+    {
+        if (Arial.TryGetValue(ch, out var v)) return v;
+        var b = ch.ToString().Normalize(System.Text.NormalizationForm.FormD)[0];
+        return Arial.TryGetValue(b, out var bv) ? bv : 556;
+    }) / 1000.0 / 0.716 * mm;
+
+    [Fact]
+    public void D3_QuadroDeAreas_TextosCabemNasCelulas()
+    {
+        var w = LTScenes.World();
+        var defs = new List<MarkingDefinition> { w.Lot };
+        defs.AddRange(w.Quadras);
+        var ctx = new BuildContext { Catalog = Cat, AllDefinitions = () => defs, ViewScale = 100 };
+        var qd = new QuadroLoteamentoDefinition { LoteamentoId = w.Lot.Id, Conteudo = TipoQuadroLoteamento.Areas };
+        var geo = MarkingBuilder.Build(qd, null, ctx);
+        var mm = ctx.Mm(1);
+        var lines = geo.Annotations.OfType<AnnotationLine>().ToList();
+        var pts = lines.SelectMany(l => l.Points).ToList();
+        double left = pts.Min(p => p.X), right = pts.Max(p => p.X), bottom = pts.Min(p => p.Y);
+        var xs = lines.Where(l => l.Points.Count == 2 && Math.Abs(l.Points[0].X - l.Points[1].X) < 1e-6).Select(l => l.Points[0].X)
+            .Append(left).Append(right).Distinct().OrderBy(x => x).ToList();
+        var faults = new List<string>();
+        foreach (var t in geo.Annotations.OfType<AnnotationText>().Where(t => t.Position.Y > bottom))
+        {
+            var width = ArialWidthMm(t.Text, t.PaperHeightMm) * mm;
+            var (x0, x1) = t.Align switch
+            {
+                TextAlign.Left => (t.Position.X, t.Position.X + width),
+                TextAlign.Right => (t.Position.X - width, t.Position.X),
+                _ => (t.Position.X - width / 2, t.Position.X + width / 2),
+            };
+            // Célula onde o texto foi ancorado (o título ocupa a largura toda).
+            var title = t.Text == qd.TituloPadrao;
+            var cl = title ? left : xs.Last(x => x <= t.Position.X + 1e-6 - (t.Align == TextAlign.Right ? 1e-3 : 0));
+            var cr = title ? right : xs.First(x => x > cl + 1e-6);
+            if (x0 < cl + 0.8 * mm || x1 > cr - 0.8 * mm) faults.Add($"\"{t.Text}\" ({(x1 - x0) / mm:0.0} mm) não cabe na célula de {(cr - cl) / mm:0.0} mm");
+        }
+        Assert.True(faults.Count == 0, string.Join(" | ", faults));
+    }
 }
