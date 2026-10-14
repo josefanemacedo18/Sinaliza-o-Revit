@@ -1613,7 +1613,7 @@ public static partial class IntersectionGenerator
         L.Legs.AddRange(legs);
         var warn0 = L.Warnings.Count;
         FinishRampPlans(d, L, pav);
-        if (EarCorners(d, L).Any() || StraightEarSides(d, L).Any())
+        if (EarCorners(d, L).Any() || StraightEarSides(d, L).Any() || HasManualEars(d, L))
         {
             // Orelhas nas esquinas: planejadas com folga, as rampas refeitas na borda delas (a travessia fica sobre a orelha)
             // e o plano final com a posição definitiva das travessias.
@@ -1956,6 +1956,9 @@ public static partial class IntersectionGenerator
     public static List<Polygon2> CutsFor(MarkingDefinition member, int road, IntersectionLayout L)
     {
         var cuts = BaseCutsFor(member, road, L);
+        // Extensão criada à mão na via: sai onde a interseção a assume (ela a refaz com a travessia e as rampas na borda).
+        var manual = L.Ears.Count == 0 ? new List<Polygon2>() : ManualEarCut(member, L);
+        if (manual.Count > 0) cuts = PolygonOps.Union(cuts.Concat(manual));
         // Orelhas das esquinas: saem o pavimento, a sarjeta, a pintura e as vagas da via por baixo delas.
         if (L.Ears.Count == 0 || !CutByEars(member)) return cuts;
         return PolygonOps.Union(cuts.Concat(L.Ears.SelectMany(e => EarCut(e, member))));

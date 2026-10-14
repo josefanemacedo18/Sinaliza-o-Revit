@@ -20,6 +20,13 @@ public sealed record EarPlan(IntersectionLeg LegA, IntersectionLeg LegB, bool Si
     public Polyline2? GutterPath { get; init; }
     /// <summary>Extensão no lado contínuo (não esquina) da travessia do ramo A: só ao longo dele.</summary>
     public bool Straight { get; init; }
+    /// <summary>
+    /// Extensão criada à mão na via (Extensão de calçada) que a interseção assumiu no trecho dela: id da peça da via
+    /// ("via:extensão:ext"), recortada onde a interseção a refaz.
+    /// </summary>
+    public string? ManualId { get; init; }
+    /// <summary>Faixa do ramo onde a peça da via (e a sarjeta dela) sai: do nó até o fim do trecho assumido.</summary>
+    public List<Polygon2> ManualCut { get; init; } = new();
 }
 
 /// <summary>Trecho de um lado de ramo coberto por orelha: avanço e estacas (t) onde a orelha tem a largura toda.</summary>
@@ -421,6 +428,7 @@ public static partial class IntersectionGenerator
         }
         }
         PlanStraightEars(d, L, notes, provisional);
+        PlanManualEars(d, L);
         if (!provisional)
             foreach (var n in notes.Distinct()) L.Warnings.Add($"Extensões de calçada: {n}.");
     }
@@ -822,6 +830,191 @@ public static partial class IntersectionGenerator
                 Ramp = ls?.OppositeExtensionRamp ?? true, Tactile = ls?.OppositeExtensionTactile,
             };
         }
+    }
+
+    /// <summary>
+    /// Extensões de calçada criadas à mão nas vias do nó que chegam a um ramo (até a travessia e as rampas dele): (ramo, lado,
+    /// extensão). Com mais de uma no mesmo lado, a que cobre a travessia (ou a mais próxima do nó).
+    /// </summary>
+    private static List<(IntersectionLeg Leg, int Side, RoadFeatures.ExtensaoPlanejada Ext)> ManualEarSides(IntersectionDefinition d, IntersectionLayout L)
+    {
+        var res = new List<(IntersectionLeg, int, RoadFeatures.ExtensaoPlanejada)>();
+        if (L.IsBend || L.Legs.Count < 3) return res;
+        for (int i = 0; i < L.Roads.Count; i++)
+        {
+            var r = L.Roads[i];
+            var setup = RoadTemplates.FromJson(r.Def.SetupJson);
+            if (setup == null || setup.ExtensoesCalcada.Count == 0) continue;
+            var exts = RoadFeatures.Extensoes(setup, r.Def, r.Axis);
+            if (exts.Count == 0) continue;
+            foreach (var leg in L.Legs.Where(l => l.Road == i))
+            {
+                // Até onde o ramo é da interseção: a travessia com as rampas (ou o fim da curva, sem travessia).
+                var reach = CrosswalkOn(d, L, leg) ? CrosswalkT(d, L, leg) + CrosswalkWidthOf(d, L, leg) / 2 + 3 : leg.Clear + 2;
+                var tc = CrosswalkOn(d, L, leg) ? CrosswalkT(d, L, leg) : leg.Clear;
+                foreach (var side in new[] { 1, -1 })
+                {
+                    var sigma = (side > 0) == (leg.Sign > 0) ? 1 : -1;
+                    var pick = exts.Where(e => e.Sigma == sigma)
+                        .Select(e => (E: e, T0: Math.Min(leg.Sign * (e.S0 - leg.NodeStation), leg.Sign * (e.S1 - leg.NodeStation)),
+                            T1: Math.Max(leg.Sign * (e.S0 - leg.NodeStation), leg.Sign * (e.S1 - leg.NodeStation))))
+                        .Where(x => x.T1 > 0.5 && x.T0 < reach)
+                        .OrderBy(x => x.T0 <= tc && x.T1 >= tc ? 0 : 1).ThenBy(x => Math.Max(0, x.T0))
+                        .FirstOrDefault();
+                    if (pick.E != null) res.Add((leg, side, pick.E));
+                }
+            }
+        }
+        return res;
+    }
+
+    /// <summary>
+    /// Extensão de calçada criada à mão na via que chega à interseção: a interseção a assume no trecho do ramo – face, sarjeta,
+    /// recortes do pavimento, da sarjeta e do meio-fio antigos, travessia e rampas na borda dela (como nas extensões da própria
+    /// interseção) – com as pontas que ela tem; onde ela segue além do ramo (ou atravessa o nó), a ponta é reta e encosta na
+    /// parte que a via mantém. Antes a interseção não a conhecia: refazia o meio-fio antigo, a rampa ficava atrás da extensão e a
+    /// faixa era pintada sobre ela.
+    /// </summary>
+    private static void PlanManualEars(IntersectionDefinition d, IntersectionLayout L)
+    {
+        var straight = StraightSides(L).Select(x => (x.Leg, x.Side)).ToHashSet();
+        // Trecho de cada extensão em cada ramo (t do nó para fora), com as pontas.
+        var parts = new List<(IntersectionLeg Leg, int Side, RoadFeatures.ExtensaoPlanejada Ext, double T0, double T1, TipoTransicao K0, double R0, TipoTransicao K1, double R1, bool AtNode)>();
+        foreach (var (leg, side, ext) in ManualEarSides(d, L))
+        {
+            var startIsS0 = leg.Sign > 0;
+            var tA = leg.Sign * (ext.S0 - leg.NodeStation);
+            var tB = leg.Sign * (ext.S1 - leg.NodeStation);
+            var t0 = Math.Min(tA, tB);
+            var t1 = Math.Max(tA, tB);
+            // No lado contínuo a extensão pode atravessar o nó (o outro ramo tem a outra metade); na esquina ela começa no fim
+            // da curva.
+            var isStraight = straight.Contains((leg, side));
+            // Fim da curva daquele lado (cada lado do ramo tem o seu).
+            var tLo = isStraight ? 0 : Math.Max(leg.Clear, L.SideTangentT.TryGetValue((leg.Road, leg.Sign, side), out var st) ? st : leg.Clear);
+            var tHi = MaxT(L, leg) - 0.5;
+            var clipLo = t0 < tLo;
+            var clipHi = t1 > tHi;
+            t0 = Math.Max(t0, tLo);
+            t1 = Math.Min(t1, tHi);
+            if (t1 - t0 < 1) continue;
+            var tp = ext.Template;
+            var (kNear, rNear) = startIsS0 ? (tp.Transition, tp.Radius) : (tp.EndTransition ?? tp.Transition, tp.EndRadius ?? tp.Radius);
+            var (kFar, rFar) = startIsS0 ? (tp.EndTransition ?? tp.Transition, tp.EndRadius ?? tp.Radius) : (tp.Transition, tp.Radius);
+            // Ponta cortada além do ramo: reta, encostando na parte que a via mantém.
+            if (clipHi) kFar = TipoTransicao.Reta;
+            // Ponta cortada no nó (a outra metade continua) ou no fim da curva da esquina (a calçada refeita pela interseção vai
+            // até ali): reta.
+            if (clipLo) kNear = TipoTransicao.Reta;
+            if (clipLo && !isStraight)
+                L.Warnings.Add($"Extensão de calçada da via {L.Roads[leg.Road].Def.DisplayCode}: começava dentro da curva da esquina – feita a partir do fim da curva " +
+                               "(para contornar a esquina, use as extensões de calçada da interseção).");
+            parts.Add((leg, side, ext, t0, t1, kNear, rNear, kFar, rFar, clipLo && isStraight));
+        }
+        foreach (var grp in parts.GroupBy(x => (x.Ext.Id, x.AtNode)))
+        {
+            var list = grp.ToList();
+            // A extensão atravessa o nó pelo lado contínuo: uma peça só, de uma ponta à outra (as duas metades se encontravam
+            // com pontas retas e as sarjetas delas se cruzavam no nó).
+            if (grp.Key.AtNode && list.Count == 2)
+            {
+                var (b, a) = (list[0], list[1]);
+                var ptsB = Edge(L, b.Leg, b.Side, b.T0, b.T1);
+                var ptsA = Edge(L, a.Leg, a.Side, a.T0, a.T1);
+                ptsB.Reverse();
+                var path = new Polyline2(CleanFacePath(ptsB.Concat(ptsA.Skip(1)).ToList()));
+                if (AddManualEar(L, a.Leg, a.Side, a.Ext, path, b.K1, b.R1, a.K1, a.R1, a.Side > 0,
+                        ManualBand(L, b.Leg, b.Side, b.T1, a.Ext).Concat(ManualBand(L, a.Leg, a.Side, a.T1, a.Ext)).ToList()))
+                {
+                    var face = a.Ext.Face;
+                    L.EarSides[(b.Leg.Road, b.Leg.Sign, b.Side)] = new EarSide(face, 0, b.T1 - EarTransition(b.K1, b.R1, face), 0, b.T1);
+                    L.EarSides[(a.Leg.Road, a.Leg.Sign, a.Side)] = new EarSide(face, 0, a.T1 - EarTransition(a.K1, a.R1, face), 0, a.T1);
+                    L.Ears.RemoveAll(e => e.Straight && e.ManualId == null && (e.LegA == b.Leg && e.SideA == b.Side > 0));
+                }
+                continue;
+            }
+            foreach (var x in list)
+            {
+                var face = x.Ext.Face;
+                var lt0 = EarTransition(x.K0, x.R0, face);
+                var lt1 = EarTransition(x.K1, x.R1, face);
+                if (x.T1 - x.T0 < lt0 + lt1 + 0.5) continue;
+                var path = new Polyline2(CleanFacePath(Edge(L, x.Leg, x.Side, x.T0, x.T1)));
+                if (AddManualEar(L, x.Leg, x.Side, x.Ext, path, x.K0, x.R0, x.K1, x.R1, x.Side > 0, ManualBand(L, x.Leg, x.Side, x.T1, x.Ext)))
+                    L.EarSides[(x.Leg.Road, x.Leg.Sign, x.Side)] = new EarSide(face, x.T0 + lt0, x.T1 - lt1, x.T0, x.T1);
+            }
+        }
+    }
+
+    /// <summary>Pontos do bordo da pista de um lado do ramo, de t0 a t1 (a cada 0,5 m).</summary>
+    private static List<Vec2> Edge(IntersectionLayout L, IntersectionLeg leg, int side, double t0, double t1)
+    {
+        var pts = new List<Vec2>();
+        var n = Math.Max(2, (int)Math.Ceiling((t1 - t0) / 0.5));
+        for (int k = 0; k <= n; k++)
+        {
+            var t = t0 + (t1 - t0) * k / (double)n;
+            pts.Add(L.At(leg, t, side > 0 ? L.HiEdge(leg, t) : -L.LoEdge(leg, t)));
+        }
+        return pts;
+    }
+
+    /// <summary>Monta a extensão assumida pela interseção sobre <paramref name="path"/> (face do meio-fio da pista).</summary>
+    /// <summary>
+    /// Faixa do ramo, de um lado, do nó até <paramref name="t1"/>: da face da extensão até além da sarjeta e do meio-fio antigos – a
+    /// peça da via sai inteira dali (inclusive o pedaço que ficaria na curva da esquina).
+    /// </summary>
+    private static List<Polygon2> ManualBand(IntersectionLayout L, IntersectionLeg leg, int side, double t1, RoadFeatures.ExtensaoPlanejada ext)
+    {
+        var inner = ext.Face + ext.Gutter + 0.5;
+        return side > 0
+            ? L.LegPoly(leg, 0, t1, t => L.HiEdge(leg, t) - inner, t => L.HiEdge(leg, t) + 1.0)
+            : L.LegPoly(leg, 0, t1, t => -L.LoEdge(leg, t) - 1.0, t => -L.LoEdge(leg, t) + inner);
+    }
+
+    private static bool AddManualEar(IntersectionLayout L, IntersectionLeg leg, int side, RoadFeatures.ExtensaoPlanejada ext, Polyline2 path,
+        TipoTransicao k0, double r0, TipoTransicao k1, double r1, bool sidewalkOnLeft, List<Polygon2> band)
+    {
+        var face = ext.Face;
+        var gutter = ext.Gutter;
+        var tpl = new CurbExtensionDefinition
+        {
+            Depth = face, Transition = k0, Radius = r0, EndTransition = k1, EndRadius = r1, SidewalkOnLeft = sidewalkOnLeft,
+            Height = L.CurbHeight, CurbWidth = L.CurbWidth, CutRoadMarkings = true,
+        };
+        var fp = SidewalkGenerator.EarFootprint(tpl, path);
+        if (fp == null) return false;
+        Polyline2? gutterPath = null;
+        if (gutter > 0.01)
+        {
+            var edge = new Polyline2(CleanFacePath(SidewalkGenerator.EarOuterEdge(tpl, path)));
+            if (edge.Length > 1) gutterPath = edge.Offset(sidewalkOnLeft ? -gutter / 2 : gutter / 2);
+        }
+        var cut = SidewalkGenerator.EarCutZone(tpl, path);
+        if (gutterPath != null) cut = PolygonOps.Union(cut.Concat(PolygonOps.Strip(gutterPath.Points, gutter, roundJoins: true)));
+        // A extensão pedida na via prevalece sobre a do lado contínuo da própria interseção.
+        L.Ears.RemoveAll(e => e.Straight && e.ManualId == null && e.LegA == leg && e.SideA == side > 0);
+        L.Ears.Add(new EarPlan(leg, leg, side > 0, side < 0, path.Length, 0, face + gutter, path, fp, tpl)
+        {
+            Gutter = gutter, GutterPath = gutterPath, CutZone = cut, Straight = true, ManualId = ext.Id, ManualCut = band,
+        });
+        return true;
+    }
+
+    /// <summary>A interseção tem extensões criadas à mão nas vias dela para assumir.</summary>
+    private static bool HasManualEars(IntersectionDefinition d, IntersectionLayout L) => ManualEarSides(d, L).Count > 0;
+
+    /// <summary>Recorte da extensão criada à mão na via (e da sarjeta dela) onde a interseção a refaz.</summary>
+    public static List<Polygon2> ManualEarCut(MarkingDefinition member, IntersectionLayout L)
+    {
+        var res = new List<Polygon2>();
+        foreach (var e in L.Ears.Where(e => e.ManualId != null))
+        {
+            var baseId = e.ManualId![..^":ext".Length];
+            if (member.Id == e.ManualId || member.Id == baseId + ":sarjeta")
+                res.AddRange(e.CutZone.Append(e.Footprint).Concat(e.ManualCut));
+        }
+        return res;
     }
 
     /// <summary>

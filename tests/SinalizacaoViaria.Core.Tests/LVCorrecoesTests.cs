@@ -226,4 +226,105 @@ public class LVCorrecoesTests
         }
         Assert.True(faults.Count == 0, string.Join(" | ", faults));
     }
+
+    // ================================================================== 1 – extensão manual junto à interseção
+
+    /// <summary>
+    /// T com a via local contínua (estacionamento dos dois lados) e uma extensão de calçada criada à mão na via, no lado contínuo,
+    /// cobrindo a boca do T e as duas travessias (como na imagem 1).
+    /// </summary>
+    public static (Y34TipTests.World W, RoadSetup Setup) TComExtensaoManual() => ComExtensaoManual("T", new ExtensaoCalcada { LadoEsquerdo = false, Estaca = 58, Comprimento = 44 });
+
+    /// <summary>
+    /// Via local contínua (estacionamento dos dois lados) de x = −80 a 80 com a extensão <paramref name="ext"/> e uma via local
+    /// chegando no T (<paramref name="kind"/> = "T") ou cruzando ("cruz"); <paramref name="own"/> liga as extensões da interseção.
+    /// </summary>
+    public static (Y34TipTests.World W, RoadSetup Setup) ComExtensaoManual(string kind, ExtensaoCalcada ext, bool own = false)
+    {
+        var w = new Y34TipTests.World();
+        void Road(Vec2[] pts, Action<RoadSetup>? tune)
+        {
+            var s = RoadTemplates.All[0].Create();
+            tune?.Invoke(s);
+            var pr = PathReference.FromPoints(pts, 0);
+            var axis = new Polyline2(pr.Points);
+            var g = s.Build(pr, new OutputSettings(), Cat, axis: axis);
+            foreach (var m in g)
+                if (m.Path is { } p && (p.Points.Count == pr.Points.Count && p.Points.Count > 0 && p.Points[0].DistanceTo(pr.Points[0]) < 1e-9 || p.Points.Count < 2))
+                    w.Paths[m.Id] = axis;
+            w.Defs.AddRange(g);
+            w.Groups.Add(g);
+            w.Roads.Add(new IntersectionRoad(g.OfType<RoadPavementDefinition>().First(), axis));
+        }
+        RoadSetup? main = null;
+        Road(new[] { new Vec2(-80, 0), new Vec2(80, 0) }, s =>
+        {
+            s.ExtensoesCalcada.Add(ext);
+            main = s;
+        });
+        Road(kind == "cruz" ? new[] { new Vec2(0, -80), new Vec2(0, 80) } : new[] { Vec2.Zero, new Vec2(0, 80) }, null);
+        foreach (var (node, ids) in IntersectionGenerator.FindNodes(w.Roads))
+        {
+            var rs = ids.Select(i => w.Roads[i]).ToList();
+            if (!IntersectionGenerator.NeedsIntersection(rs, node)) continue;
+            var d = new IntersectionDefinition { Control = ControleIntersecao.Pare, CurbExtensions = own, CurbExtensionsOpposite = own, Node = node };
+            w.Nodes.Add(IntersectionDemo.Create(d, rs, ids.Select(i => w.Groups[i]).ToList(), w.Paths, w.Defs, Cat));
+        }
+        return (w, main!);
+    }
+
+    [Fact]
+    public void D1_ExtensaoManual_RampasDaInterseçãoNaFaceDaExtensao()
+    {
+        var (w, s) = TComExtensaoManual();
+        var L = Assert.Single(w.Nodes).Layout;
+        var lado = s.Lado(false);
+        var extFace = lado.Face - (lado.Parking!.Value - lado.Gutter);
+        // Rampas da interseção no lado contínuo (y < 0): na face da extensão, não no meio-fio antigo (atrás dela).
+        var ramps = w.Defs.OfType<RampDefinition>().Where(r => r.GroupId == L.Definition!.Id && r.PathRef.Points[0].Y < 0).ToList();
+        Assert.NotEmpty(ramps);
+        Assert.All(ramps, r => Assert.True(Math.Abs(-r.PathRef.Points[0].Y - extFace) < 0.05,
+            $"rampa em y = {r.PathRef.Points[0].Y:0.00} – a face da extensão está em y = {-extFace:0.00} (meio-fio antigo em {-lado.Face:0.00})"));
+    }
+
+    [Fact]
+    public void D1_ExtensaoManual_SemFalhasNaInterseçao()
+    {
+        var (w, _) = TComExtensaoManual();
+        var faults = Y34TipTests.Faults(w);
+        Assert.True(faults.Count == 0, string.Join(" | ", faults));
+    }
+
+    public static IEnumerable<object[]> Variantes() => new[]
+    {
+        // Só a travessia do ramo x > 0 (não chega ao nó).
+        new object[] { "T", false, 86.0, 22.0, false },
+        // Atravessa o nó com as extensões da própria interseção ligadas (a pedida na via prevalece no lado contínuo).
+        new object[] { "T", false, 56.0, 48.0, true },
+        // Cruz: lado com esquina (y < 0, ramo x > 0), do fim da curva até depois da travessia.
+        new object[] { "cruz", false, 88.0, 16.0, false },
+        // Lado esquerdo da via (y > 0) no T: é o lado com as esquinas; a extensão de um ramo.
+        new object[] { "T", true, 89.0, 15.0, false },
+    };
+
+    [Theory]
+    [MemberData(nameof(Variantes))]
+    public void D1_ExtensaoManual_Variantes(string kind, bool left, double estaca, double comprimento, bool own)
+    {
+        var (w, s) = ComExtensaoManual(kind, new ExtensaoCalcada { LadoEsquerdo = left, Estaca = estaca, Comprimento = comprimento }, own);
+        var L = Assert.Single(w.Nodes).Layout;
+        var lado = s.Lado(left);
+        var extFace = lado.Face - (lado.Parking!.Value - lado.Gutter);
+        var sign = left ? 1 : -1;
+        var x0 = estaca - 80;
+        var x1 = x0 + comprimento;
+        // Rampas da interseção dentro do trecho da extensão, do lado dela: na face da extensão.
+        var ramps = w.Defs.OfType<RampDefinition>().Where(r => r.GroupId == L.Definition!.Id && Math.Sign(r.PathRef.Points[0].Y) == sign
+            && r.PathRef.Points[0].X > x0 + 1 && r.PathRef.Points[0].X < x1 - 1).ToList();
+        Assert.NotEmpty(ramps);
+        Assert.All(ramps, r => Assert.True(Math.Abs(Math.Abs(r.PathRef.Points[0].Y) - extFace) < 0.05,
+            $"rampa em y = {r.PathRef.Points[0].Y:0.00} – a face da extensão está em {sign * extFace:0.00}"));
+        var faults = Y34TipTests.Faults(w);
+        Assert.True(faults.Count == 0, string.Join(" | ", faults));
+    }
 }

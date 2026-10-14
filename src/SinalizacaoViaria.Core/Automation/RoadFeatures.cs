@@ -181,31 +181,7 @@ public static class RoadFeatures
         var right = s.Lado(false);
         RoadSetup.LadoVia LadoDe(bool l) => l ? left : right;
 
-        // 1. Extensões pedidas (as que levam travessia são estendidas para a faixa e as rampas caberem).
-        var planos = new List<Plano>();
-        foreach (var e in s.ExtensoesCalcada)
-        {
-            var p = Planejar(s, e, LadoDe(e.LadoEsquerdo), axis, res.Prefix + e.Id, res.Warnings);
-            if (p != null) planos.Add(p);
-        }
-        // 2. Travessias: extensão espelhada do outro lado (quando há estacionamento lá e nenhuma extensão cobre a faixa).
-        foreach (var p in planos.ToList().Where(p => p.Spec.Travessia))
-        {
-            var sc = p.Spec.EstacaTravessia;
-            var other = LadoDe(!p.Spec.LadoEsquerdo);
-            if (planos.Any(q => q.Spec.LadoEsquerdo != p.Spec.LadoEsquerdo && q.S0 <= sc - p.Spec.LarguraFaixa / 2 && q.S1 >= sc + p.Spec.LarguraFaixa / 2)) continue;
-            if (other.Parking == null || !other.HasSidewalk) continue;
-            var mirror = p.Spec.Clone();
-            mirror.LadoEsquerdo = !p.Spec.LadoEsquerdo;
-            mirror.Profundidade = null;
-            mirror.Estaca = p.S0;
-            mirror.Comprimento = p.S1 - p.S0;
-            mirror.Travessia = false;
-            mirror.Canteiro = false;
-            mirror.Arvores = mirror.Paraciclos = mirror.Bancos = 0;
-            var q = Planejar(s, mirror, other, axis, res.Prefix + p.Spec.Id + "-oposta", res.Warnings);
-            if (q != null) planos.Add(q);
-        }
+        var planos = Planos(s, axis, res.Prefix, res.Warnings);
 
         // 3. Extensões: piso, sarjeta na frente e recortes.
         var rampsBySide = new Dictionary<int, List<(RampDefinition Ramp, string Id)>> { [1] = new(), [-1] = new() };
@@ -318,6 +294,52 @@ public static class RoadFeatures
         }
         return res;
     }
+
+    /// <summary>
+    /// Extensões da via como serão geradas: as pedidas (as que levam travessia, estendidas para a faixa e as rampas caberem) e a
+    /// espelhada do outro lado de cada travessia.
+    /// </summary>
+    private static List<Plano> Planos(RoadSetup s, Polyline2 axis, string prefix, List<string> warnings)
+    {
+        var left = s.Lado(true);
+        var right = s.Lado(false);
+        RoadSetup.LadoVia LadoDe(bool l) => l ? left : right;
+        // 1. Extensões pedidas (as que levam travessia são estendidas para a faixa e as rampas caberem).
+        var planos = new List<Plano>();
+        foreach (var e in s.ExtensoesCalcada)
+        {
+            var p = Planejar(s, e, LadoDe(e.LadoEsquerdo), axis, prefix + e.Id, warnings);
+            if (p != null) planos.Add(p);
+        }
+        // 2. Travessias: extensão espelhada do outro lado (quando há estacionamento lá e nenhuma extensão cobre a faixa).
+        foreach (var p in planos.ToList().Where(p => p.Spec.Travessia))
+        {
+            var sc = p.Spec.EstacaTravessia;
+            var other = LadoDe(!p.Spec.LadoEsquerdo);
+            if (planos.Any(q => q.Spec.LadoEsquerdo != p.Spec.LadoEsquerdo && q.S0 <= sc - p.Spec.LarguraFaixa / 2 && q.S1 >= sc + p.Spec.LarguraFaixa / 2)) continue;
+            if (other.Parking == null || !other.HasSidewalk) continue;
+            var mirror = p.Spec.Clone();
+            mirror.LadoEsquerdo = !p.Spec.LadoEsquerdo;
+            mirror.Profundidade = null;
+            mirror.Estaca = p.S0;
+            mirror.Comprimento = p.S1 - p.S0;
+            mirror.Travessia = false;
+            mirror.Canteiro = false;
+            mirror.Arvores = mirror.Paraciclos = mirror.Bancos = 0;
+            var q = Planejar(s, mirror, other, axis, prefix + p.Spec.Id + "-oposta", warnings);
+            if (q != null) planos.Add(q);
+        }
+        return planos;
+    }
+
+    /// <summary>Extensão de calçada da via já planejada: id da peça, lado (σ), trecho no eixo, avanço da face, sarjeta e pontas.</summary>
+    public sealed record ExtensaoPlanejada(string Id, int Sigma, double S0, double S1, double Face, double Gutter, CurbExtensionDefinition Template);
+
+    /// <summary>Extensões de calçada da via (criadas à mão ou espelhadas nas travessias), como a via as gera – para a interseção assumi-las.</summary>
+    public static List<ExtensaoPlanejada> Extensoes(RoadSetup s, RoadPavementDefinition pav, Polyline2 axis) =>
+        axis.Length < 2 || s.ExtensoesCalcada.Count == 0 ? new()
+            : Planos(s, axis, PrefixOf(pav), new List<string>())
+                .Select(p => new ExtensaoPlanejada(p.Id + ":ext", p.Lado.Sigma, p.S0, p.S1, p.Face, p.Gutter, p.Template)).ToList();
 
     /// <summary>Trecho, caminho na face do meio-fio e contorno de uma extensão; nulo (com aviso) quando não cabe.</summary>
     private static Plano? Planejar(RoadSetup s, ExtensaoCalcada e, RoadSetup.LadoVia lado, Polyline2 axis, string id, List<string> warnings)

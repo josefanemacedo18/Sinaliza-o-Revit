@@ -1428,6 +1428,16 @@ Todos os cruzamentos* não os apaga.
 
 ### 19.1.4 Extensões de calçada nas esquinas e no lado contínuo
 
+**Extensão criada à mão na via junto à interseção.** Uma extensão de calçada criada pela ferramenta *Extensão de calçada* (gravada
+na via) que chega à travessia de um ramo é **assumida pela interseção** no trecho dela: a face do meio-fio, a sarjeta na
+frente, o recorte do pavimento, da sarjeta e do meio-fio antigos, a **faixa de pedestres até a face da extensão** e a
+**rampa na borda da extensão** (com o piso tátil e a passagem pela faixa de serviço) – como as extensões da própria interseção.
+As pontas são as que você deu à extensão; onde ela continua além do ramo, a ponta é reta e encosta na parte que a via mantém.
+No **lado contínuo de um T** a extensão pode atravessar a boca do T de uma ponta à outra (uma peça só). No **lado de uma
+esquina** ela começa no fim da curva (com aviso, se você a começou dentro dela – para contornar a esquina, use as extensões da
+interseção). Ela prevalece sobre a extensão do lado contínuo da própria interseção. Antes a interseção não a conhecia: refazia o
+meio-fio antigo, a rampa ficava atrás da extensão (rebaixando o meio dela) e a faixa era pintada sobre ela.
+
 O bloco **Extensões de calçada nas esquinas** da janela da interseção gera, junto com ela, o **avanço da calçada sobre a
 faixa de estacionamento** em cada esquina (encurta a travessia, melhora a visibilidade e impede o estacionamento junto à
 esquina – CTB art. 181):
