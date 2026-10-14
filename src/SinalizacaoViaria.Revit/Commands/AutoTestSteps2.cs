@@ -165,6 +165,17 @@ internal sealed partial class AutoTestRunner
             });
             Step("Obras", "Terraplenagem – simulação (só volumes)", s => Grade(s, new GradingOptions { DryRun = true }));
             Step("Obras", "Terraplenagem – aplicar no Toposolid", s => Grade(s, new GradingOptions()));
+            Step("Obras", "Terraplenagem – quantitativo (corte e aterro por elemento)", s =>
+            {
+                var service = new MarkingService(_doc, _uidoc.ActiveView);
+                var (items, cut, fill) = TerrainService.Quantities(_doc, service, MarkingStorage.Definitions(_doc));
+                if (items.Count == 0) { s.Error("Nenhum volume de terraplenagem no quantitativo."); return; }
+                var (sc, sf) = (items.Sum(i => i.Cut), items.Sum(i => i.Fill));
+                if (Math.Abs(sc - cut) > 0.01 * Math.Max(1, cut) + 1 || Math.Abs(sf - fill) > 0.01 * Math.Max(1, fill) + 1)
+                    s.Error($"As partes ({sc:0.0} / {sf:0.0} m³) não somam o total ({cut:0.0} / {fill:0.0} m³).");
+                var rows = Core.Quantities.QuantityCalculator.AddEarthworks(new List<Core.Quantities.QuantityRow>(), items);
+                s.Note($"{items.Count} elemento(s): corte {cut:0.0} m³, aterro {fill:0.0} m³ – {rows.Count} linha(s) no quantitativo.");
+            });
             Step("Obras", "Terraplenagem – mapa de corte e aterro", s => Grade(s, new GradingOptions { CutFillMap = true }));
         }
         var nodes = _opt.Full ? Enum.GetValues<TipoNoViario>() : new[] { TipoNoViario.Diamante, TipoNoViario.TrevoParcial };

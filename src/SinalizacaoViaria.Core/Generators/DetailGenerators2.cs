@@ -713,8 +713,8 @@ public static partial class DetailGenerator
                 foreach (var g in cg.GroupBy(r => r.Code).OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
                 {
                     var first = g.First();
-                    var q = first.Unit switch { "m²" => g.Sum(r => r.Area), "m" => g.Sum(r => r.PaintedLength), _ => g.Sum(r => r.Units) };
-                    rows.Add((new[] { $"{catNo}.{++item}", first.Code, first.Name, first.Unit, first.Unit is "m²" or "m" ? F(q) : q.ToString("0") }, false, null));
+                    var q = first.Unit switch { "m²" => g.Sum(r => r.Area), "m" => g.Sum(r => r.PaintedLength), "m³" => g.Sum(r => r.Volume), _ => g.Sum(r => r.Units) };
+                    rows.Add((new[] { $"{catNo}.{++item}", first.Code, first.Name, first.Unit, first.Unit is "m²" or "m" or "m³" ? F(q) : q.ToString("0") }, false, null));
                 }
             }
         }

@@ -107,7 +107,14 @@ public partial class QuantitiesWindow : Window
             new Kpi("Placas", v.Where(r => r.Category == CategoriaQuantitativo.SinalizacaoVertical).Sum(r => r.Units).ToString("N0", pt), "un", "#C62828"),
             new Kpi("Elementos urbanos", v.Where(r => r.Category == CategoriaQuantitativo.MobiliarioUrbano).Sum(r => r.Units).ToString("N0", pt), "un", "#4E8F3A"),
             new Kpi("Tinta estimada", v.Sum(r => r.MaterialConsumption).ToString("N1", pt), v.FirstOrDefault(r => r.MaterialConsumption > 0)?.ConsumptionUnit ?? "", "#7A5AA6"),
-        };
+        }.Concat(v.Any(r => r.Unit == "m³")
+            ? new[]
+            {
+                // Terraplenagem (corte e aterro no terreno, calculados contra o terreno original).
+                new Kpi("Corte", v.Where(r => r.Code == "TER-CORTE").Sum(r => r.Volume).ToString("N1", pt), "m³", "#B5651D"),
+                new Kpi("Aterro", v.Where(r => r.Code == "TER-ATERRO").Sum(r => r.Volume).ToString("N1", pt), "m³", "#6D8B3A"),
+            }
+            : Array.Empty<Kpi>()).ToArray();
     }
 
     /// <summary>Resumo em árvore: subtotal da categoria seguido das subcategorias.</summary>

@@ -31,6 +31,8 @@ public sealed class QuantityRow
     public string Material { get; set; } = "";
     public double Area { get; set; }
     public double PaintedLength { get; set; }
+    /// <summary>Volume (m³) – terraplenagem: corte, aterro e balanço.</summary>
+    public double Volume { get; set; }
     public int Units { get; set; }
     public int Elements { get; set; }
     public string Unit { get; set; } = "";
@@ -87,6 +89,7 @@ public sealed class QuantityRow
             var parts = new List<string> { $"{Elements} elemento(s) no modelo" };
             if (Area > 1e-6) parts.Add($"área {AreaKind}: {Area.ToString("N2", pt)} m²");
             if (PaintedLength > 1e-6) parts.Add($"extensão: {PaintedLength.ToString("N2", pt)} m");
+            if (Volume > 1e-6) parts.Add($"volume: {Volume.ToString("N2", pt)} m³");
             if (RoadLength > 1e-6) parts.Add($"extensão de via (eixo): {RoadLength.ToString("N2", pt)} m");
             if (GlassBeadsKg > 1e-6) parts.Add($"microesferas: {GlassBeadsKg.ToString("N2", pt)} kg");
             var text = string.Join(" · ", parts);
@@ -111,6 +114,7 @@ public sealed class QuantityRow
     {
         "m²" => Area,
         "m" => PaintedLength,
+        "m³" => Volume,
         _ => Units,
     };
 
@@ -297,6 +301,63 @@ public static class QuantityCalculator
             })
             .OrderBy(r => r.Category).ThenBy(r => r.Name).ToList();
 
+    /// <summary>Subcategoria das linhas de terraplenagem (categoria 10).</summary>
+    public const string EarthworkSubcategory = "Terraplenagem (corte e aterro no terreno)";
+
+    /// <summary>
+    /// Acrescenta a terraplenagem: corte (escavação in situ) e aterro (compactado) por hierarquia viária, com a parte de cada
+    /// elemento (via, interseção, obra) na referência, e o balanço de massas – bota-fora (sobra de corte) ou empréstimo (falta) –
+    /// com o fator de homogeneização (m³ de corte in situ por m³ de aterro compactado; DNIT: 1,20–1,40).
+    /// </summary>
+    public static List<QuantityRow> AddEarthworks(IEnumerable<QuantityRow> rows, IEnumerable<EarthworkItem> items, double homogenization = 1.25)
+    {
+        var list = rows.ToList();
+        var pt = CultureInfo.GetCultureInfo("pt-BR");
+        var all = items.Where(i => i.Cut + i.Fill > 1e-6).ToList();
+        if (all.Count == 0) return list;
+        QuantityRow Row(string code, string name, HierarquiaViaria? h, string reference) => new()
+        {
+            Code = code, Name = name, Group = GrupoMarca.Urbanizacao, Color = MarkingColor.Preta, Memorial = true,
+            Category = CategoriaQuantitativo.ObrasDeArteTerraplenagem, Subcategory = EarthworkSubcategory, Hierarchy = h, Unit = "m³",
+            Reference = reference,
+        };
+        string Parts(IEnumerable<EarthworkItem> g, Func<EarthworkItem, double> v) =>
+            string.Join("; ", g.Where(i => v(i) > 0.05).OrderByDescending(v).Select(i => $"{i.Name}: {v(i).ToString("N1", pt)} m³"));
+        foreach (var g in all.GroupBy(i => i.Hierarchy))
+        {
+            var cut = g.Sum(i => i.Cut);
+            var fill = g.Sum(i => i.Fill);
+            if (cut > 1e-6)
+            {
+                var r = Row("TER-CORTE", "Corte (escavação, volume in situ)", g.Key, Parts(g, i => i.Cut));
+                r.Volume = cut;
+                r.Elements = g.Count(i => i.Cut > 1e-6);
+                list.Add(r);
+            }
+            if (fill > 1e-6)
+            {
+                var r = Row("TER-ATERRO", "Aterro (volume compactado)", g.Key, Parts(g, i => i.Fill));
+                r.Volume = fill;
+                r.Elements = g.Count(i => i.Fill > 1e-6);
+                list.Add(r);
+            }
+        }
+        var totalCut = all.Sum(i => i.Cut);
+        var totalFill = all.Sum(i => i.Fill);
+        var balance = totalCut - totalFill * homogenization;
+        var basis = $"corte {totalCut.ToString("N1", pt)} m³ − aterro {totalFill.ToString("N1", pt)} m³ × {homogenization.ToString("0.00", pt)} " +
+                    "(fator de homogeneização – corte in situ por m³ de aterro compactado, DNIT)";
+        if (Math.Abs(balance) > 1e-6)
+        {
+            var b = balance > 0
+                ? Row("TER-BOTAFORA", "Bota-fora (sobra de corte, volume in situ)", null, basis)
+                : Row("TER-EMPRESTIMO", "Empréstimo (falta de material, volume in situ)", null, basis);
+            b.Volume = Math.Abs(balance);
+            list.Add(b);
+        }
+        return Sort(list);
+    }
+
     /// <summary>Resumo por hierarquia viária: extensão de vias, pavimento, pintura, placas e elementos.</summary>
     public static List<HierarchySummaryRow> HierarchySummary(IEnumerable<QuantityRow> rows) =>
         rows.GroupBy(r => r.Hierarchy)
@@ -323,6 +384,7 @@ public static class QuantityCalculator
                 Category = g.Key,
                 Area = g.Sum(r => r.Area),
                 PaintedLength = g.Sum(r => r.PaintedLength),
+                Volume = g.Sum(r => r.Volume),
                 Units = g.Sum(r => r.Units),
                 Elements = g.Sum(r => r.Elements),
                 MaterialConsumption = g.Sum(r => r.MaterialConsumption),
@@ -419,6 +481,9 @@ public static class QuantityCalculator
 }
 
 /// <summary>Família do Revit classificada como elemento urbano (entrada do quantitativo).</summary>
+/// <summary>Volumes de terraplenagem de um elemento (a parte dele no projeto conjunto; m³ e m²).</summary>
+public sealed record EarthworkItem(string Name, HierarquiaViaria? Hierarchy, double Cut, double Fill, double Area);
+
 public sealed record FamilyItem(string Code, string Description, string TypeName, CategoriaUrbana Category, HierarquiaViaria? Hierarchy, double Length = 0);
 
 /// <summary>Totais de uma hierarquia viária.</summary>

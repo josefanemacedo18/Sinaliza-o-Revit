@@ -75,6 +75,14 @@ public sealed class CmdQuantitativos : CommandBase
         var rows = QuantityCalculator.Compute(items, PluginContext.Catalog, PluginContext.Settings.DefaultMaterial);
         // Famílias do Revit do usuário classificadas como elementos urbanos (Elementos Urbanos → Famílias do Revit).
         if (families.Count > 0) rows = QuantityCalculator.AddFamilies(rows, families);
+        // Terraplenagem: corte e aterro de cada via, interseção e obra, calculados na hora contra o terreno original guardado no
+        // Toposolid (nada é gravado).
+        try
+        {
+            var (earth, _, _) = TerrainService.Quantities(doc, service, defs);
+            if (earth.Count > 0) rows = QuantityCalculator.AddEarthworks(rows, earth, new GradingOptions().Homogenization);
+        }
+        catch (Exception ex) { Log.Error("Quantitativo de terraplenagem", ex); }
         return (items, rows);
     }
 

@@ -203,6 +203,59 @@ public static class TerrainService
         return (corridors, pads);
     }
 
+    /// <summary>
+    /// Terraplenagem para o quantitativo (rodada VT): o mesmo projeto da Terraplenagem – todas as vias e obras que moldam o
+    /// terreno, por camadas – contra o terreno original guardado no Toposolid (sem a terraplenagem aplicada, o terreno atual é
+    /// o natural): corte, aterro e área de cada elemento (a parte dele no projeto conjunto) e os totais. Calculado na hora, nada
+    /// é gravado; vazio sem Toposolid ou sem obras que moldem o terreno. Usa os taludes do greide de cada via e o subleito
+    /// padrão das opções.
+    /// </summary>
+    public static (List<EarthworkItem> Items, double Cut, double Fill) Quantities(Document doc, MarkingService service, IReadOnlyCollection<MarkingDefinition> all,
+        GradingOptions? opt = null)
+    {
+        opt ??= new GradingOptions();
+        var items = new List<EarthworkItem>();
+        var topos = TerrainModel.Hosts(doc);
+        if (topos.Count == 0) return (items, 0, 0);
+        var list = Participants(doc, all);
+        if (list.Count == 0) return (items, 0, 0);
+        var corridors = new List<GradeCorridor>();
+        var pads = new List<GradePad>();
+        var defs = new List<MarkingDefinition>();
+        foreach (var def in list)
+        {
+            try
+            {
+                var geo = service.BuildGeometry(def, out var baseZ);
+                var (c, p) = Features(doc, def, geo, baseZ, opt, all, service);
+                corridors.AddRange(c);
+                pads.AddRange(p);
+                if (c.Count + p.Count > 0) defs.Add(def);
+            }
+            catch (Exception ex) { Log.Error($"Quantitativo de terraplenagem {def.DisplayCode}", ex); }
+        }
+        if (defs.Count == 0) return (items, 0, 0);
+        var originals = topos.Select(TerrainModel.Original).Where(m => m.Count > 0).ToList();
+        if (originals.Count == 0) return (items, 0, 0);
+        double? Ground(Vec2 p)
+        {
+            double? best = null;
+            foreach (var m in originals) if (m.Z(p) is { } z && (best == null || z > best)) best = z;
+            return best;
+        }
+        var design = Grading.Design(corridors, pads, Ground, 0, Math.Max(5, opt.MaxDaylight), 0.5, 1.0, 1.0);
+        var count = new Dictionary<string, int>();
+        foreach (var d in defs)
+        {
+            if (!design.ByOwner.TryGetValue(d.Id, out var v) || v.Cut + v.Fill < 1e-3) continue;
+            var kind = d is RoadPavementDefinition ? "Via" : d.KindName;
+            count[kind] = count.GetValueOrDefault(kind) + 1;
+            var label = d.Hierarchy is { } h && h != HierarquiaViaria.NaoDefinida ? $" {Hierarquia.Label(h).ToLowerInvariant()}" : "";
+            items.Add(new EarthworkItem($"{kind}{label} {count[kind]}", d.Hierarchy, v.Cut, v.Fill, v.Area));
+        }
+        return (items, design.CutM3, design.FillM3);
+    }
+
     /// <summary>Vias ligadas a um nó (interseção, rotatória, cul-de-sac).</summary>
     public static IEnumerable<string> NodeRoads(MarkingDefinition d) => (d switch
     {

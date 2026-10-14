@@ -743,7 +743,7 @@ criada 400 m à direita de tudo o que existe no projeto:
 | Calçadas | rampas (todos os tipos, com recorte), extensão de calçada, áreas de calçada, canteiros, moderação, piso tátil, via férrea, drenagem (todos os tipos e em série) |
 | Largura e recuos / Segurança | via com largura variável e estreitamento do lote, baia de ônibus + faixas de desaceleração e aceleração, calçada com inclinação e níveis do alinhamento, arterial × coletora com LCO, sonorizadores (todos os tipos) e área de escape; via nova emendada na ponta de outra em ângulo (emenda concordada); várias linhas selecionadas virando uma malha de vias com T e cruz; recuo (baia) acrescentado numa via já criada; **via reconhecida em pisos comuns** (T feito com dois pisos, pista já modelada) |
 | Topografia | Toposolid de teste com encosta, dois morros e um vale; vias acompanhando o terreno e suavizadas; cruzamentos no relevo; Perfil da Via em todos os modos e aplicado com obras automáticas |
-| Obras | viaduto sobre outra via, ponte no vale, passarela, túnel, trincheira, muros (todos), taludes, nós viários, terraplenagem (simulação, aplicação, mapa) |
+| Obras | viaduto sobre outra via, ponte no vale, passarela, túnel, trincheira, muros (todos), taludes, nós viários, terraplenagem (simulação, aplicação, quantitativo de corte e aterro por elemento – as partes somam o total –, mapa) |
 | Edição | editar linha/interseção/rotatória, mover eixo (atualização automática), Apagar Trecho (na via, fora da via, zebrado, sem linha de referência, devolver peças), 2D/3D, excluir, Atualizar Todas |
 | Detalhamento | detalhe de placas, anotação, legenda, cota de seção + perfil, detalhe típico, quadros, notas, norte, eixos, quantitativos e tabelas |
 | Tráfego | Simulador de Tráfego sobre a área de teste: leitura da rede, análise HCM e diagnóstico, microssimulação de 5 min, cenários (rotatória × semáforo coordenado × contagem) com comparação, cenários gravados e lidos do projeto, plano semafórico gravado na interseção, sinalização interpretada (placas, marcas, dispositivos e semáforos associados a trechos e cruzamentos), resultados nos parâmetros SV_NivelServico/SV_Trafego e mapa de níveis de serviço na planta; **contatos entre veículos (deve ser zero) e setas**, **planta real no mapa**, **recomendação de tempos e onda verde**, **semáforo de travessia do cenário** e **soluções testadas** para o pior cruzamento |
@@ -815,6 +815,22 @@ desdobrar por cor nem por material da chapa. Cores e materiais (consumo de tinta
   parâmetro *Imagem* dos elementos e a tabela é colocada numa **folha SV-Q01** – o Revit só desenha imagens de
   tabela em folhas. **Tabelas por categoria** cria uma tabela para cada categoria. O parâmetro compartilhado **SV_Categoria** também pode ser usado em filtros de vista.
 * Para a prancha, use **Detalhamento → Quadro de Quantitativos** (seção 16).
+
+**Terraplenagem no quantitativo.** O corte e o aterro feitos no terreno entram na categoria **10. Obras de arte,
+contenções e terraplenagem**, subcategoria *Terraplenagem (corte e aterro no terreno)*, em **m³**:
+* **TER-CORTE – Corte (escavação, volume in situ)** e **TER-ATERRO – Aterro (volume compactado)**, uma linha por
+  hierarquia viária, com a **parte de cada via, interseção e obra** na referência (ex.: *Via local 1: 1.234,5 m³;
+  Interseção 1: 210,0 m³*);
+* **TER-BOTAFORA – Bota-fora** (sobra de corte) ou **TER-EMPRESTIMO – Empréstimo** (falta de material): corte − aterro ×
+  1,25 (fator de homogeneização padrão – corte in situ por m³ de aterro compactado, DNIT);
+* cartões **Corte** e **Aterro** no alto da janela; CSV, planilha Excel e memorial descritivo trazem as mesmas linhas.
+Os volumes são calculados **na hora**, com o mesmo projeto da *Terraplenagem* (todas as vias e obras que moldam o terreno,
+plataforma por camadas, taludes do greide de cada via) contra o **terreno original guardado no Toposolid** – nada é
+gravado no projeto. Sem a terraplenagem aplicada, o terreno atual é o natural e os volumes são os previstos. A conta usa o
+subleito padrão (0,40 m): se você aplicou a terraplenagem com outra profundidade de subleito, os volumes do quantitativo são
+os do subleito padrão. A **Tabela nativa do Revit** conta elementos e por isso **não** traz a terraplenagem (os volumes não
+são elementos do modelo), nem o *Quadro de Quantitativos* da prancha (montado só com as marcas); use a janela, o Excel,
+o CSV ou o memorial.
 
 **Janela redesenhada**: cabeçalho com o projeto, **cartões de resumo** (elementos, área pintada, extensão
 pintada, pavimento, placas, elementos urbanos e tinta estimada), filtros e **grupos recolhíveis** por
@@ -2194,7 +2210,8 @@ inteira, sem afinar).
   aterrado (mais de 10 cm) – para conferir e apresentar; rode de novo sem a opção para tirar.
 * **Relatório**: área terraplenada, corte, aterro, **balanço de massas** com o **fator de homogeneização** (corte in situ por
   m³ de aterro compactado, 1,20–1,40 – DNIT): indica **bota-fora** (sobra de corte) ou **empréstimo** (falta), e os
-  **volumes de cada elemento** (via, interseção, obra) – a parte de cada um no projeto conjunto: cada ponto vai para a
+  **volumes de cada elemento** (via, interseção, obra) – os mesmos que entram no **quantitativo** (seção 10) – a parte de
+  cada um no projeto conjunto: cada ponto vai para a
   plataforma em que está ou para a borda cujo talude define a cota ali, e a soma das partes é o total (antes cada elemento era
   calculado isolado e o nó e o começo das vias contavam duas vezes). Os volumes são amostrados com um ponto sorteado (fixo) por
   célula de 1 m – com o ponto no centro, as transições da plataforma caíam sempre do mesmo lado numa via alinhada à malha.
