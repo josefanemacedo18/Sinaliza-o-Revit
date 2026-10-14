@@ -32,6 +32,22 @@ public static class LotForms
         ("Área própria (na categoria escolhida)", ModoMiolo.AreaPropria),
     };
 
+    public static readonly (string Label, ModoRemanescente Value)[] RemanescenteOptions =
+    {
+        ("Área verde no desenho (piso, rótulo e área) e no quadro", ModoRemanescente.AreaVerde),
+        ("Só no quadro de áreas (como área verde), sem piso nem rótulo", ModoRemanescente.SoNoQuadro),
+    };
+
+    /// <summary>Sobra da gleba em volta das vias (não é quadra): como aparece.</summary>
+    private static FormWindow Remanescente(FormWindow w, LoteamentoDefinition lot)
+    {
+        var area = lot.RemanescentePolygons.Sum(p => p.Area);
+        return w.Section("Sobra da gleba", area > 0.01
+                ? $"{LotReport.M(area)} m² da gleba ficam fora das quadras e das vias (em volta do sistema viário): é a área remanescente, contada como área verde."
+                : "Parte da gleba fora das quadras e das vias (reconhecida com as quadras), contada como área verde.")
+            .Choice("Área remanescente", RemanescenteOptions, () => lot.Remanescente, v => lot.Remanescente = v);
+    }
+
     /// <summary>Frente e área mínimas do lote (informadas no projeto – conferir na legislação aplicável).</summary>
     private static FormWindow Minimos(FormWindow w, LoteamentoDefinition lot) => w
         .Section("Lote mínimo", "Valores informados no projeto (padrão 5 m e 125 m²) – conferir na Lei Federal nº 6.766/1979 e na lei municipal [a confirmar]. " +
@@ -82,7 +98,9 @@ public static class LotForms
             {
                 var qs = Quadras();
                 var geo = Preview(qs, lot);
-                return new FormPreview(geo, occupied, Info: $"{qs.Count} quadra(s), {LotReport.M(rec.AreaViaria)} m² de sistema viário ({LotReport.P(rec.AreaViaria / Math.Max(1e-9, rec.Gleba.Area) * 100)}).");
+                var rem = rec.Remanescentes.Sum(r => r.Area);
+                return new FormPreview(geo, occupied, Info: $"{qs.Count} quadra(s), {LotReport.M(rec.AreaViaria)} m² de sistema viário ({LotReport.P(rec.AreaViaria / Math.Max(1e-9, rec.Gleba.Area) * 100)})" +
+                    (rem > 0.01 ? $", {LotReport.M(rem)} m² de área remanescente (área verde)." : "."));
             }, showOutput: false, okText: "Criar loteamento", width: 1100, height: 720);
         w.Section("Loteamento")
             .Text("Nome", () => lot.Nome, v => lot.Nome = string.IsNullOrWhiteSpace(v) ? "Loteamento" : v!.Trim())
@@ -94,6 +112,7 @@ public static class LotForms
             .Choice("Miolo da quadra (atrás dos lotes)", MioloOptions, () => opt.Miolo, v => opt.Miolo = v)
             .Choice("Numeração", SentidoOptions, () => opt.SentidoHorario, v => opt.SentidoHorario = v,
                 "Cada quadra numerada de 1 a N a partir do lote de esquina mais a noroeste (o lote 1 pode ser escolhido depois).");
+        if (rec.Remanescentes.Count > 0) Remanescente(w, lot);
         Minimos(w, lot)
             .Section("Relevo")
             .Number("Espessura do lote no Toposolid (m)", () => lot.AlturaLote, v => lot.AlturaLote = v, 0.005, 1, "0.000",
@@ -305,6 +324,7 @@ public static class LotForms
             .Text("Nome", () => lot.Nome, v => lot.Nome = string.IsNullOrWhiteSpace(v) ? lot.Nome : v!.Trim())
             .Text("Município/UF", () => lot.Municipio, v => lot.Municipio = string.IsNullOrWhiteSpace(v) ? null : v!.Trim())
             .Number("Espessura do lote no Toposolid (m)", () => lot.AlturaLote, v => lot.AlturaLote = v, 0.005, 1, "0.000");
+        Remanescente(w, lot);
         Minimos(w, lot);
         double Min(string key) => lot.Minimos.TryGetValue(key, out var m) ? m : 0;
         void SetMin(string key, double v) { if (v > 1e-6) lot.Minimos[key] = v; else lot.Minimos.Remove(key); }

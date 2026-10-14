@@ -174,6 +174,30 @@ public static class LotDrawing
             }
             if (d.Quadra) QuadraLabel(geo, q, div, th, mm, firstText);
         }
+        // Sobra da gleba em volta das vias: área verde do loteamento (sem letra de quadra nem cotas – o contorno é o da gleba e o
+        // das vias).
+        if (lot.Remanescente == ModoRemanescente.AreaVerde)
+        {
+            var rem = lot.RemanescentePolygons.ToList();
+            var cat = LotReport.CategoriaRemanescente(lot);
+            for (int i = 0; i < rem.Count; i++)
+            {
+                var p = new Parcela { Chave = "r:" + i, Forma = rem[i], Categoria = cat.Nome, Numero = LotReport.NumeroRemanescente(lot, i, rem.Count) };
+                if (d.Cores)
+                    geo.Pieces.Add(new MarkingPiece(p.Forma, MarkingColor.Terra) { Rgb = cat.Cor, Hatch = cat.Hachura, Layer = LayerPrefix + p.Chave });
+                if (d.Divisas)
+                    foreach (var ring in p.Forma.Holes.Prepend(p.Forma.Outer))
+                        geo.Annotations.Add(new AnnotationLine(ring.Append(ring[0]).ToList(), MarkingColor.Preta));
+                var c = InteriorPoint(p.Forma);
+                var lines = LabelLines(d, p, p.Forma.DistanceTo(c), mm);
+                var y = c.Y + lines.Sum(l => l.Mm * 1.35) * mm / 2;
+                foreach (var (text, h) in lines)
+                {
+                    geo.Annotations.Add(new AnnotationText(new Vec2(c.X, y), text, h));
+                    y -= h * 1.35 * mm;
+                }
+            }
+        }
         if (d.Vias)
         {
             var gleba = lot.GlebaPolygon;

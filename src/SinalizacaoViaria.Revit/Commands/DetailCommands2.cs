@@ -29,13 +29,17 @@ internal static class DetailForms
     private static readonly (string, TerminalCota)[] Terminals =
         { ("Traço a 45° (padrão ABNT)", TerminalCota.Traco), ("Seta cheia", TerminalCota.Seta), ("Ponto", TerminalCota.Ponto) };
 
-    public static FormWindow Section(SectionDimensionDefinition d, bool edit) =>
-        new FormWindow(edit ? "Editar cota de seção" : "Cotar seção transversal", "Cota automática da seção",
-                "Clique sobre uma via (corte perpendicular ao eixo, de alinhamento a alinhamento) ou dois pontos atravessando-a: a seção em planta é criada. " +
-                "Em seguida clique onde colocar o PERFIL TRANSVERSAL (ESC = sem perfil) – ele é um grupo separado, que se move inteiro. O plugin corta pavimento, sarjetas, meios-fios, calçadas, canteiros, plataformas e pintura e desenha: " +
+    public static FormWindow Section(SectionDimensionDefinition d, bool edit, bool onlyProfile = false) =>
+        new FormWindow(edit ? "Editar cota de seção" : onlyProfile ? "Corte transversal" : "Cotar seção transversal", onlyProfile ? "Corte transversal da via" : "Cota automática da seção",
+                (onlyProfile
+                    ? "Clique sobre uma via (corte perpendicular ao eixo) ou dois pontos atravessando-a e, em seguida, onde colocar o PERFIL TRANSVERSAL – " +
+                      "sem precisar cotar a seção antes: na planta ficam só a linha de corte e as marcas A–A. "
+                    : "Clique sobre uma via (corte perpendicular ao eixo, de alinhamento a alinhamento) ou dois pontos atravessando-a: a seção em planta é criada. " +
+                      "Em seguida clique onde colocar o PERFIL TRANSVERSAL (ESC = sem perfil) – ele é um grupo separado, que se move inteiro. ") +
+                "O plugin corta pavimento, sarjetas, meios-fios, calçadas, canteiros, plataformas e pintura e desenha: " +
                 "o corte em escala com as camadas preenchidas, nome e nível de cada trecho, caimento da pista, cotas horizontais e verticais (desníveis), " +
-                "eixo, legenda dos materiais e o título SEÇÃO TRANSVERSAL A–A – além da cadeia de cotas e das marcas do corte na planta. " +
-                "Tudo se atualiza quando a via muda. Repete até ESC.",
+                "eixo, legenda dos materiais e o título SEÇÃO TRANSVERSAL A–A" + (onlyProfile ? "." : " – além da cadeia de cotas e das marcas do corte na planta.") +
+                " Tudo se atualiza quando a via muda. Repete até ESC.",
                 d, () =>
                 {
                     // Pré-visualização numa via de exemplo (calçadas, meios-fios, ciclofaixa, linhas e eixo).
@@ -53,6 +57,10 @@ internal static class DetailForms
                     foreach (var x in defs) if (geo(x) is { } gx) g.Pieces.InsertRange(0, gx.Pieces);
                     return new FormPreview(g, Paper: true, ViewScale: 100, Info: "Exemplo: via com calçadas de 3,00 m, ciclofaixa e duas faixas por sentido.");
                 }, false, edit ? "Aplicar" : "Iniciar", 1100, 720)
+            .Section("O que gerar")
+            .Choice("Gerar", new[] { ("Cotas na planta e corte transversal", 0), ("Só o corte transversal (sem cotas na planta)", 1), ("Só as cotas na planta", 2) },
+                () => d.PlanChain && d.Profile ? 0 : d.Profile ? 1 : 2,
+                v => { d.PlanChain = v != 1; d.Profile = v != 2; })
             .Section("Como cortar")
             .Choice("Linha de corte", new[] { ("Um clique sobre a via (perpendicular ao eixo)", true), ("Dois pontos livres", false) },
                 () => d.PerpendicularToRoad, v => d.PerpendicularToRoad = v)
@@ -330,18 +338,41 @@ internal static class NotesPresets
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdCotarSecao : CommandBase
 {
-    protected override Result Run(UIApplication app, UIDocument uidoc)
+    protected override Result Run(UIApplication app, UIDocument uidoc) => SectionTool.Run(uidoc, onlyProfile: false);
+}
+
+/// <summary>
+/// Corte transversal direto: um clique sobre a via e outro onde colocar o perfil – sem a cadeia de cotas na planta (só a linha
+/// de corte com as marcas A–A, que liga o perfil à via e o mantém atualizado).
+/// </summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdCorteTransversal : CommandBase
+{
+    protected override Result Run(UIApplication app, UIDocument uidoc) => SectionTool.Run(uidoc, onlyProfile: true);
+}
+
+internal static class SectionTool
+{
+    private const string AppTitle = CommandBase.AppTitle;
+
+    public static Result Run(UIDocument uidoc, bool onlyProfile)
     {
         var view = DetailHelpers.RequireDetailView(uidoc);
         var doc = uidoc.Document;
-        var template = UiHelpers.Remembered<SectionDimensionDefinition>("CotaSecao") ?? new SectionDimensionDefinition();
+        var key = onlyProfile ? "CorteTransversal" : "CotaSecao";
+        var template = UiHelpers.Remembered<SectionDimensionDefinition>(key) ?? new SectionDimensionDefinition();
+        if (onlyProfile)
+        {
+            template.PlanChain = false;
+            template.Profile = true;
+        }
         var st = PluginContext.Settings;
         var review = st.Get("secao:revisar") != "0";
-        var form = DetailForms.Section(template, false)
+        var form = DetailForms.Section(template, false, onlyProfile)
             .Section("Elementos da seção")
             .Check("Revisar nomes, cores e hachuras dos elementos antes de colocar cada perfil (ficam guardados no projeto)", () => review, v => review = v);
         if (UiHelpers.ShowModal(form) != true) return Result.Cancelled;
-        UiHelpers.Remember("CotaSecao", template);
+        UiHelpers.Remember(key, template);
         st.Set("secao:revisar", review ? "1" : "0");
         PluginContext.SaveSettings();
         var results = new List<RenderResult>();
@@ -420,7 +451,7 @@ public sealed class CmdCotarSecao : CommandBase
             }
         }
         if (results.Count == 0) return Result.Cancelled;
-        Report("Cota de seção", results);
+        CommandBase.ReportResults(onlyProfile ? "Corte transversal" : "Cota de seção", results);
         return Result.Succeeded;
     }
 

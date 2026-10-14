@@ -11,7 +11,12 @@ public sealed class ResultadoReconhecimento
 {
     public Polygon2 Gleba { get; init; } = null!;
     public List<QuadraReconhecida> Quadras { get; } = new();
-    /// <summary>Área da gleba ocupada pelo sistema viário (vias, calçadas, canteiros) – gleba menos as quadras.</summary>
+    /// <summary>
+    /// Sobra da gleba que não é quadra: parte livre em volta do sistema viário (com o furo dele) – a gleba desenhada maior que as
+    /// vias. Vira área verde (ou só entra no quadro).
+    /// </summary>
+    public List<Polygon2> Remanescentes { get; } = new();
+    /// <summary>Área da gleba ocupada pelo sistema viário (vias, calçadas, canteiros) – gleba menos as quadras e a sobra.</summary>
     public double AreaViaria { get; set; }
     public List<string> Avisos { get; } = new();
 }
@@ -40,7 +45,11 @@ public static class Reconhecimento
         {
             if (p.Area < areaMinima) { if (p.Area > 1) pequenas++; continue; }
             var s = p.Simplified(0.01, 1e-4) ?? p;
-            quadras.Add(new Polygon2(LotDivider.CleanRing(s.Outer), s.Holes));
+            var clean = new Polygon2(LotDivider.CleanRing(s.Outer), s.Holes);
+            // Parte livre com um furo do tamanho de uma quadra (o sistema viário e o que ele cerca): é a sobra da gleba em volta das
+            // vias, não uma quadra – como quadra, perdia o furo e virava uma segunda "quadra" do tamanho da gleba.
+            if (clean.Holes.Any(h => Math.Abs(Polygon2.SignedArea(h)) >= areaMinima)) { res.Remanescentes.Add(clean); continue; }
+            quadras.Add(clean);
         }
         if (pequenas > 0) res.Avisos.Add($"{pequenas} área(s) livre(s) menores que {areaMinima:0} m² não viraram quadra (entram no sistema viário).");
         if (quadras.Count == 0) res.Avisos.Add("Nenhuma quadra encontrada: a gleba não tem área livre de vias.");
@@ -48,8 +57,27 @@ public static class Reconhecimento
         var ordered = quadras.OrderBy(q => -Math.Round(q.Centroid.Y / 25)).ThenBy(q => q.Centroid.X).ToList();
         for (int i = 0; i < ordered.Count; i++)
             res.Quadras.Add(new QuadraReconhecida(names[i], ordered[i], TestadasAutomaticas(ordered[i], occ)));
-        res.AreaViaria = Math.Max(0, gleba.Area - ordered.Sum(q => q.Area));
+        res.AreaViaria = Math.Max(0, gleba.Area - ordered.Sum(q => q.Area) - res.Remanescentes.Sum(r => r.Area));
         return res;
+    }
+
+    /// <summary>Coincidência de dois contornos: área comum sobre a área da união (1 = iguais, 0 = disjuntos).</summary>
+    public static double Coincidencia(Polygon2 a, Polygon2 b)
+    {
+        var inter = PolygonOps.TotalArea(PolygonOps.Intersect(new[] { a }, new[] { b }));
+        var union = PolygonOps.TotalArea(PolygonOps.Union(new[] { a, b }));
+        return union > 1e-9 ? inter / union : 0;
+    }
+
+    /// <summary>
+    /// Quadra gravada que, no reconhecimento atual, é a sobra da gleba em volta das vias (mais da metade dela cai na área remanescente)
+    /// – versões anteriores gravavam essa sobra como quadra, sem o furo das vias.
+    /// </summary>
+    public static bool ESobra(Polygon2? quadra, ResultadoReconhecimento rec)
+    {
+        if (quadra == null || rec.Remanescentes.Count == 0) return false;
+        var inRem = PolygonOps.TotalArea(PolygonOps.Intersect(new[] { quadra }, rec.Remanescentes));
+        return inRem > 0.5 * quadra.Area && rec.Quadras.All(r => Coincidencia(quadra, r.Contorno) < 0.3);
     }
 
     /// <summary>União do que as vias ocupam, com as frestas de até 10 cm entre peças fechadas.</summary>

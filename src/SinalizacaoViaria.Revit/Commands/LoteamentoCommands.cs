@@ -133,7 +133,11 @@ public sealed class CmdLoteamento : CommandBase
         var rec = Reconhecimento.Quadras(gleba, occ, opt.AreaMinimaQuadra);
         if (rec.Quadras.Count == 0)
             throw new UserMessageException("Nenhuma quadra na gleba: não há área livre entre as vias.\n\nCrie as vias (Via / Pista) antes, ou desenhe a gleba maior que o sistema viário.");
-        var lot = new LoteamentoDefinition { Gleba = gleba.Outer.ToList(), GlebaElementos = ids, Z = LotCommands.LevelZ(uidoc.ActiveView) ?? 0 };
+        var lot = new LoteamentoDefinition
+        {
+            Gleba = gleba.Outer.ToList(), GlebaElementos = ids, Z = LotCommands.LevelZ(uidoc.ActiveView) ?? 0,
+            Remanescentes = rec.Remanescentes.Select(AreaRemanescente.From).ToList(),
+        };
         if (UiHelpers.ShowModal(LotForms.Novo(lot, opt, rec, Reconhecimento.Ocupacao(occ))) != true) return Result.Cancelled;
         var quadras = rec.Quadras.Select(r =>
         {
@@ -205,13 +209,22 @@ public sealed class CmdLoteamento : CommandBase
         var rec = Reconhecimento.Quadras(gleba, occ);
         var quadras = LotService.Quadras(doc, lot.Id);
         var changed = new List<QuadraDefinition>();
+        var matched = new HashSet<string>();
+        // Quadra gravada que é a sobra da gleba em volta das vias (a gleba inteira, sem o furo – versões anteriores): sai; a sobra
+        // passa a ser a área remanescente do loteamento.
+        lot.Remanescentes = rec.Remanescentes.Select(AreaRemanescente.From).ToList();
+        var removed = quadras.Where(q => Reconhecimento.ESobra(q.Polygon, rec)).ToList();
+        quadras = quadras.Except(removed).ToList();
         var used = quadras.Select(q => q.Nome).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var names = Reconhecimento.Nomes(used.Count + rec.Quadras.Count + 5).Where(n => !used.Contains(n)).GetEnumerator();
-        var matched = new HashSet<string>();
         var template = quadras.FirstOrDefault();
         foreach (var r in rec.Quadras)
         {
-            var q = quadras.FirstOrDefault(x => !matched.Contains(x.Id) && x.Polygon is { } p && (r.Contorno.Contains(p.Centroid) || p.Contains(r.Contorno.Centroid)));
+            // A gravada que mais coincide com a reconhecida (área comum sobre a união) – o centroide de uma quadra grande podia cair
+            // dentro de outra e trocar os nomes.
+            var q = quadras.Where(x => !matched.Contains(x.Id) && x.Polygon != null)
+                .Select(x => (Q: x, S: Reconhecimento.Coincidencia(x.Polygon!, r.Contorno))).Where(x => x.S > 0.3)
+                .OrderByDescending(x => x.S).Select(x => x.Q).FirstOrDefault();
             if (q != null)
             {
                 matched.Add(q.Id);
@@ -231,8 +244,23 @@ public sealed class CmdLoteamento : CommandBase
             changed.Add(nq);
         }
         var lost = quadras.Where(q => !matched.Contains(q.Id)).Select(q => q.Nome).ToList();
-        var results = LotCommands.Commit(uidoc, lot, changed, "SV - Loteamento – reconhecer quadras");
+        List<RenderResult> results;
+        using (var tg = new TransactionGroup(doc, "SV - Loteamento – reconhecer quadras"))
+        {
+            tg.Start();
+            if (removed.Count > 0)
+            {
+                using var t = new Transaction(doc, "SV - Loteamento – quadra que era a sobra da gleba");
+                t.Start();
+                foreach (var q in removed) service.Delete(q.Id);
+                t.Commit();
+            }
+            results = LotCommands.Commit(uidoc, lot, changed, "SV - Loteamento – reconhecer quadras");
+            tg.Assimilate();
+        }
         var extra = rec.Avisos.ToList();
+        if (removed.Count > 0)
+            extra.Add($"Quadra(s) {string.Join(", ", removed.Select(q => q.Nome))} removida(s): era(m) a sobra da gleba em volta das vias – agora é a área remanescente ({LotReport.M(rec.Remanescentes.Sum(x => x.Area))} m²).");
         if (lost.Count > 0) extra.Add($"Quadra(s) {string.Join(", ", lost)} não encontrada(s) entre as vias atuais – ficaram como estavam (apague os lotes delas se não existem mais).");
         LotCommands.Report($"{changed.Count} quadra(s) atualizada(s).", results, extra);
         return Result.Succeeded;

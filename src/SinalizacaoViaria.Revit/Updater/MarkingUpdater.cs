@@ -207,8 +207,9 @@ public sealed class MarkingUpdater : IUpdater
     }
 
     /// <summary>
-    /// Escala da vista mudou: cotas de seção, perfis, detalhes de placa, legendas, quadros, notas e norte da vista são refeitos
-    /// com a nova escala – textos e símbolos mantêm o tamanho no papel, em volta do mesmo ponto de inserção.
+    /// Escala da vista mudou: cotas de seção, perfis, detalhes de placa, legendas, quadros, notas, norte e o detalhamento dos
+    /// lotes são ajustados no lugar para a nova escala – textos e símbolos mantêm o tamanho no papel, e o que foi movido, apagado
+    /// ou editado à mão neles é mantido.
     /// </summary>
     private static void Rescale(Document doc, IEnumerable<View> views)
     {
@@ -218,16 +219,23 @@ public sealed class MarkingUpdater : IUpdater
         foreach (var v in views)
         {
             var list = Core.Definitions.AnnotationScale.ToRescale(defs, v.UniqueId);
-            if (list.Count == 0) continue;
+            var old = ViewScaleMemory.Known(doc, v);
+            if (list.Count == 0 || old == v.Scale) continue;
             using var scope = MarkingService.RenderScope();
             var service = new MarkingService(doc, v, interactive: false);
             foreach (var d in list)
             {
                 // Trecho de prancha: a escala mudada à mão na vista passa a ser a do trecho.
                 if (d is Core.Definitions.SheetSegmentDefinition ss) ss.Scale = v.Scale;
-                try { service.Render(d); }
+                try
+                {
+                    // Detalhes: ajustados no lugar – o que a pessoa moveu, apagou ou editou neles continua como estava.
+                    if (Core.Definitions.AnnotationScale.AjustaNoLugar(d)) service.RescaleInPlace(d, v, old);
+                    else service.Render(d);
+                }
                 catch (Exception ex) { Log.Error($"Escala da vista – {d.DisplayCode}", ex); }
             }
+            ViewScaleMemory.Remember(doc, v);
         }
     }
 

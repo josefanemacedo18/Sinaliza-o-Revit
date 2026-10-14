@@ -131,6 +131,29 @@ public sealed class LoteAjuste
     public LoteAjuste Clone() => (LoteAjuste)MemberwiseClone();
 }
 
+/// <summary>O que fazer com a sobra da gleba (fora das quadras e das vias).</summary>
+public enum ModoRemanescente
+{
+    /// <summary>Vira área verde no desenho (piso, rótulo e área) e no quadro de áreas.</summary>
+    AreaVerde,
+    /// <summary>Entra só no quadro de áreas (como área verde), sem piso nem rótulo no desenho.</summary>
+    SoNoQuadro,
+}
+
+/// <summary>
+/// Área remanescente da gleba: parte livre de vias que não é quadra (fica em volta do sistema viário, com o furo dele) – contorno
+/// e furos (m), gravados ao reconhecer as quadras.
+/// </summary>
+public sealed class AreaRemanescente
+{
+    public List<Vec2> Contorno { get; set; } = new();
+    public List<List<Vec2>> Furos { get; set; } = new();
+
+    [JsonIgnore] public Polygon2? Polygon => Contorno.Count >= 3 ? new Polygon2(Contorno, Furos) : null;
+
+    public static AreaRemanescente From(Polygon2 p) => new() { Contorno = p.Outer.ToList(), Furos = p.Holes.Select(h => h.ToList()).ToList() };
+}
+
 /// <summary>
 /// Loteamento: limite da gleba, categorias de área (cores, hachuras, numeração), mínimos de áreas públicas editáveis e dados
 /// do memorial. Fica num elemento de dados do projeto; as quadras apontam para ele.
@@ -163,6 +186,12 @@ public sealed class LoteamentoDefinition : MarkingDefinition
     public double AlturaLote { get; set; } = 0.03;
     /// <summary>Elevação (m) da base quando não há Toposolid.</summary>
     public double Z { get; set; }
+    /// <summary>Sobra da gleba fora das quadras e das vias (reconhecida com as quadras).</summary>
+    public List<AreaRemanescente> Remanescentes { get; set; } = new();
+    /// <summary>Como a sobra da gleba aparece: área verde desenhada ou só no quadro de áreas.</summary>
+    public ModoRemanescente Remanescente { get; set; }
+
+    [JsonIgnore] public IEnumerable<Polygon2> RemanescentePolygons => Remanescentes.Select(r => r.Polygon).Where(p => p is { IsValid: true }).Cast<Polygon2>();
 
     [JsonIgnore] public Polygon2? GlebaPolygon => Gleba.Count >= 3 ? new Polygon2(Gleba) : null;
 
@@ -189,6 +218,11 @@ public sealed class LoteamentoDefinition : MarkingDefinition
     {
         Gleba = Gleba.Select(p => p + delta).ToList();
         foreach (var v in Vias) v.Eixo = v.Eixo.Select(p => p + delta).ToList();
+        foreach (var r in Remanescentes)
+        {
+            r.Contorno = r.Contorno.Select(p => p + delta).ToList();
+            r.Furos = r.Furos.Select(h => h.Select(p => p + delta).ToList()).ToList();
+        }
         Z += dz;
     }
 

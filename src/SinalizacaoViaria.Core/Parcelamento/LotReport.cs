@@ -104,6 +104,19 @@ public static class LotReport
     private static double? Minimo(LoteamentoDefinition lot, string key) =>
         lot.Minimos.FirstOrDefault(kv => string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase)) is { Key: not null } kv ? kv.Value : null;
 
+    /// <summary>Categoria da sobra da gleba: a área verde do loteamento (ou uma nova, se ela foi excluída).</summary>
+    public static CategoriaLote CategoriaRemanescente(LoteamentoDefinition lot) =>
+        lot.Categorias.FirstOrDefault(c => string.Equals(c.Nome, CategoriaLote.AreaVerde, StringComparison.OrdinalIgnoreCase))
+        ?? CategoriaLote.Padrao().First(c => c.Nome == CategoriaLote.AreaVerde);
+
+    /// <summary>Número da sobra da gleba: "AV-R" (ou "AV-R1", "AV-R2"... com mais de uma) – não se confunde com as áreas das quadras.</summary>
+    public static string NumeroRemanescente(LoteamentoDefinition lot, int i, int count)
+    {
+        var pre = CategoriaRemanescente(lot).Prefixo;
+        var tag = (string.IsNullOrWhiteSpace(pre) ? "" : pre + "-") + "R";
+        return count > 1 ? tag + (i + 1) : tag;
+    }
+
     /// <summary>Rótulo do lote: "Lote 12" ou "Área verde AV-1".</summary>
     public static string Rotulo(Parcela p) =>
         string.Equals(p.Categoria, CategoriaLote.Lote, StringComparison.OrdinalIgnoreCase) ? $"Lote {p.Numero}" : $"{p.Categoria} {p.Numero}";

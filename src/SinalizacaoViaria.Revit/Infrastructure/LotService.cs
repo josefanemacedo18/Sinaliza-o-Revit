@@ -65,7 +65,75 @@ public static class LotService
         MarkingStorage.Write(ds, lot, MarkingColor.Terra);
         foreach (var r in existing.Where(r => r.Element.Id != ds.Id)) SafeDelete(doc, r.Element.Id);
         res.Elements.Add(ds.Id);
+        if (lot.Remanescente == ModoRemanescente.AreaVerde) RenderRemanescentes(doc, lot, res);
         return res;
+    }
+
+    /// <summary>
+    /// Sobra da gleba em volta das vias como área verde do loteamento: subdivisão do Toposolid (ou piso plano) com o furo das vias,
+    /// na cor e no material da área verde – sem letra de quadra (não é quadra).
+    /// </summary>
+    private static void RenderRemanescentes(Document doc, LoteamentoDefinition lot, RenderResult res)
+    {
+        var rem = lot.RemanescentePolygons.ToList();
+        if (rem.Count == 0) return;
+        SharedParameters.Ensure(doc);
+        SharedParameters.EnsureLotes(doc);
+        var styles = new StyleService(doc);
+        var cat = LotReport.CategoriaRemanescente(lot);
+        var material = LotMaterial(doc, styles, cat);
+        var hosts = TerrainModel.Hosts(doc);
+        var hostFoot = hosts.ToDictionary(h => h.Id, h => Footprint(doc, h));
+        var height = Math.Max(0.005, lot.AlturaLote);
+        for (int i = 0; i < rem.Count; i++)
+        {
+            var shape = rem[i];
+            var numero = LotReport.NumeroRemanescente(lot, i, rem.Count);
+            // Ponto dentro da área (o centroide de um anel cai no furo).
+            var inside = LotDrawing.InteriorPoint(shape);
+            Element? e = null;
+            var host = hosts.FirstOrDefault(h => hostFoot[h.Id] is { } f ? f.Contains(inside) : Contains(h, inside));
+            if (host != null)
+            {
+                try
+                {
+                    var loops = Loops(doc, shape, host.get_BoundingBox(null)?.Max.Z ?? 0);
+                    if (loops.Count > 0)
+                    {
+                        var sub = host.CreateSubDivision(doc, loops);
+                        sub.GetParameter(ParameterTypeId.ToposolidSubdivideMaterial)?.Set(material);
+                        sub.GetParameter(ParameterTypeId.ToposolidSubdivideHeight)?.Set(UnitConv.Ft(height));
+                        e = sub;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error($"Área remanescente {numero}: subdivisão do Toposolid", ex);
+                    res.Warnings.Add($"Área remanescente {numero}: o Toposolid recusou a subdivisão ({ex.Message}) – virou piso plano.");
+                }
+            }
+            if (e == null)
+            {
+                try { e = CreateFloor(doc, shape, cat, material, lot.Z); }
+                catch (Exception ex)
+                {
+                    Log.Error($"Área remanescente {numero}: piso", ex);
+                    res.Warnings.Add($"Área remanescente {numero}: não foi possível criar a área ({ex.Message}).");
+                }
+            }
+            if (e == null) continue;
+            try { e.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set($"SV área remanescente {numero}"); } catch { /* opcional */ }
+            try { e.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(numero); } catch { /* opcional */ }
+            SharedParameters.Set(e, SharedParameters.Lote, numero);
+            SharedParameters.Set(e, SharedParameters.CategoriaLote, cat.Nome);
+            SharedParameters.Set(e, SharedParameters.AreaLote, UnitConv.Ft2(shape.Area));
+            SharedParameters.Set(e, SharedParameters.Id, lot.Id);
+            SharedParameters.Set(e, SharedParameters.Codigo, numero);
+            SharedParameters.Set(e, SharedParameters.Descricao, $"Área remanescente da gleba ({cat.Nome.ToLowerInvariant()}) – {lot.Nome}");
+            SharedParameters.Set(e, SharedParameters.Categoria, "Loteamento");
+            MarkingStorage.Write(e, lot, MarkingColor.Terra);
+            res.Elements.Add(e.Id);
+        }
     }
 
     private static RenderResult RenderQuadra(Document doc, QuadraDefinition q, List<StoredMarking> existing)

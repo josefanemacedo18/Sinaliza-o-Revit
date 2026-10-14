@@ -1015,9 +1015,14 @@ Os comandos de detalhe trabalham na **vista ativa** (planta de piso/implantaçã
 medidas são em **milímetros de papel** × escala da vista (12 mm a 1:200 = 2,40 m no modelo; texto de 2,5 mm a 1:500 =
 1,25 m). Os textos são **notas de texto nativas** do Revit ("SV - Texto x mm"), que já seguem a escala; símbolos,
 quadros, cotas e perfis são linhas e regiões de detalhe. **Mudando a escala da vista**, cotas de seção, perfis,
-detalhes de placa, legendas, quadros, notas, norte e chamadas daquela vista **se refazem sozinhos** na nova escala, em
-volta do mesmo ponto de inserção (canto do quadro/perfil, suporte da placa, linha de corte) – no papel ficam do mesmo
-tamanho em 1:100, 1:500 ou 1:1000 (com *Atualização automática* ligada em Configurações). Os elementos ficam
+detalhes de placa, legendas, quadros, notas, norte, chamadas e o **detalhamento dos lotes** daquela vista **se ajustam no
+lugar** à nova escala, em volta do mesmo ponto de inserção (canto do quadro/perfil, suporte da placa, linha de corte, meio do
+lote) – no papel ficam do mesmo tamanho em 1:100, 1:500 ou 1:1000 (com *Atualização automática* ligada em Configurações).
+**O que você mexeu continua como deixou**: cada texto, linha ou região que você **moveu** vai para o lugar novo com o mesmo
+deslocamento, o que você **apagou** não volta e o texto que você **editou** fica com o seu texto – nada volta à estaca zero.
+Só aparece o que a escala nova acrescenta (ex.: uma linha do rótulo que antes não cabia). Ao abrir um projeto e mudar a
+escala logo em seguida, a escala antiga é reconhecida pelos textos que ficaram no lugar. (O trecho de prancha é a exceção:
+ele define a vista – escala, corte e posição na folha – e é refeito.) Os elementos ficam
 ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la remove o detalhe.
 
 * **Detalhar Placas**: escolha as placas (selecionadas, visíveis na vista ou todas), a largura do
@@ -1069,6 +1074,11 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   **Grupos**: o perfil – camadas, cotas, níveis, legenda e título – é um grupo (*SV - Perfil transversal A-A*) e a
   parte da planta – linha de corte, marcas e cadeia de cotas – outro (*SV - Cotas da seção A-A*): selecionar e mover
   leva as cotas junto.
+* **Corte Transversal** (Detalhar → Corte Transversal): **só o perfil transversal**, sem precisar cotar a seção antes – um
+  clique sobre a via (ou dois pontos) e outro onde colocar o perfil. Na planta ficam só a **linha de corte, as marcas A–A e
+  o título**, sem a cadeia de cotas (o corte liga o perfil à via e o mantém atualizado). A mesma escolha existe na janela do
+  Cotar Seção: *O que gerar* → **cotas na planta e corte transversal**, **só o corte transversal** ou **só as cotas na
+  planta**. As opções do Corte Transversal ficam guardadas à parte das do Cotar Seção.
 * **Cotar Seção** (cadeia em planta): cadeia de cotas com **nome de cada trecho** (calçada, meio-fio, faixa de
   rolamento, ciclofaixa, faixa de ônibus, faixa de caminhada, canteiro, estacionamento, zebrado),
   **eixo da via** em traço-ponto com a inscrição EIXO (opcionalmente dividindo as cotas em
@@ -2653,7 +2663,10 @@ Guia **SinalizaBIM Infra → Loteamento**. Do limite da gleba aos lotes numerado
 2. **Loteamento**: escolha o limite da gleba – **selecionar** (linha de propriedade, linhas fechadas de modelo ou de detalhe, ou o
    Toposolid) ou **desenhar** por cliques (ESC fecha o contorno). O plugin reconhece as quadras (nomes A, B, C…, de cima para
    baixo e da esquerda para a direita; áreas livres menores que 50 m² entram no sistema viário) e, em cada quadra, as
-   **testadas**: os lados que encostam numa via. Na janela: nome do loteamento, município, **frente e profundidade padrão**
+   **testadas**: os lados que encostam numa via. Com a gleba desenhada **maior que o sistema viário**, a parte livre que fica
+   **em volta das vias** (com o "furo" do sistema viário) **não é quadra**: é a **área remanescente** da gleba, contada como
+   **área verde** (seção 27.8). Antes ela virava uma segunda quadra do tamanho da gleba – com outra letra, outro piso, as
+   medidas da gleba e área verde acima de 100 %. Na janela: nome do loteamento, município, **frente e profundidade padrão**
    (ex.: 12 × 30), o que fazer com a **sobra** e com o **miolo**, o **lote mínimo** (frente e área) e o sentido da numeração –
    com a pré-visualização de todos os lotes.
 3. **Quadra** (clique um lote): medidas padrão da quadra, sobra, miolo, numeração, **testadas** (apontar com cliques, em ordem
@@ -2664,6 +2677,18 @@ Guia **SinalizaBIM Infra → Loteamento**. Do limite da gleba aos lotes numerado
 
 Num projeto que já tem loteamento, **Loteamento** oferece **reconhecer as quadras de novo** (as vias mudaram: refaz o contorno
 das quadras e mantém testadas, lotes personalizados e nomes; quadras novas recebem o próximo nome livre) ou abrir as categorias.
+Cada quadra gravada é reencontrada pela **maior área em comum** com a reconhecida (antes era pelo centro, que numa quadra grande
+podia cair dentro de outra e trocar os nomes). Uma quadra gravada que era a sobra da gleba em volta das vias (projetos de
+versões anteriores) é **removida** com aviso, e a sobra passa a ser a área remanescente.
+
+**Área remanescente** (Loteamento → janela do loteamento novo, ou Categorias, cores, mínimos e filtros → *Sobra da gleba*):
+
+* **Área verde no desenho** (padrão): piso/subdivisão do Toposolid na cor e no material da área verde, **com o furo das vias**
+  (não cobre a pista, as calçadas nem as quadras), número **AV-R** (AV-R1, AV-R2… com mais de uma) e área no detalhamento –
+  sem letra de quadra nem cotas (o contorno é o da gleba e o das vias);
+* **Só no quadro de áreas**: entra no quadro como área verde, sem piso nem rótulo no desenho.
+
+Ela é gravada ao reconhecer as quadras e refeita em *Reconhecer as quadras de novo*.
 
 ### 27.2 Como os lotes são divididos
 
@@ -2754,7 +2779,8 @@ vira um **piso plano** de 5 cm no nível, com o mesmo material e os mesmos parâ
 lado** (frente, laterais e fundos; trechos curvos com o desenvolvimento), **categoria** (institucional, área verde...),
 **letra da quadra dentro de um círculo no meio da quadra** e **nome das vias**; opcionalmente as **cores das categorias** como
 regiões e as **divisas** e o limite da gleba como linhas (vistas sem os lotes coloridos). Cada item liga e desliga; os textos
-acompanham as mudanças dos lotes.
+acompanham as mudanças dos lotes. **Mudar a escala da vista não desfaz o que você ajustou** no detalhamento (textos movidos,
+apagados ou editados): ele é ajustado no lugar (seção 16). A área remanescente aparece só com número (AV-R) e área.
 
 O círculo da quadra fica no ponto mais central dela (normalmente sobre a divisa de fundos) e se afasta sozinho dos números,
 áreas e cotas dos lotes; em quadras pequenas, diminui para caber. É desenhado como região (anel preto e miolo branco que esconde
@@ -2810,7 +2836,12 @@ O loteamento fica num elemento de dados do projeto (DataStorage) e cada quadra �
 mesmo esquema de dados das demais marcas do plugin (tipos novos "loteamento", "quadra", "detalhe-lotes" e
 "quadro-loteamento"). Os projetos antigos não mudam.
 
-Campos acrescentados nesta rodada (opcionais; quem não os tem lê o padrão): no loteamento, **FrenteMinimaLote** (5) e
+Campos acrescentados na rodada LV (autorizados; opcionais – projetos antigos leem o padrão): no loteamento,
+**Remanescentes** (lista de áreas com **Contorno** e **Furos**, em m – a sobra da gleba em volta das vias, gravada ao reconhecer
+as quadras; vazia = nenhuma) e **Remanescente** (*AreaVerde* = desenhada, padrão; *SoNoQuadro*). A escala em que cada detalhe
+foi desenhado fica só em memória (não é gravada).
+
+Campos acrescentados na rodada LU (opcionais; quem não os tem lê o padrão): no loteamento, **FrenteMinimaLote** (5) e
 **AreaMinimaLote** (125); na quadra, **Miolo** (AosLotes), **MioloCategoria** (Área verde) e **Unioes** (listas de chaves de
 lotes unidos); no quadro do loteamento, **Quadra** (filtro do quadro de lotes). O detalhamento dos lotes grava SV_Categoria
 "Loteamento" (fica visível no masterplan). Quadras gravadas antes desta rodada passam a usar o miolo para os lotes ao serem

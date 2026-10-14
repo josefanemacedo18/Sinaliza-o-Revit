@@ -26,6 +26,8 @@ public sealed class MarkingService
 {
     private readonly Document _doc;
     private readonly View? _activeView;
+    /// <summary>Escala usada na geração no lugar da escala da vista (ajuste de escala: desenho na escala antiga e na nova).</summary>
+    private double? _scaleOverride;
     private readonly bool _interactive;
     private StyleService? _styles;
 
@@ -188,7 +190,7 @@ public sealed class MarkingService
         // constrói no Toposolid (criado automaticamente quando o projeto não tem um).
         var native = true;
         var ctx = PluginContext.BuildContext(def.Output.Drape && def.Output.Mode == OutputMode.Modelo3D,
-            view?.Scale ?? 100, id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList(), OtherGeometry,
+            _scaleOverride ?? view?.Scale ?? 100, id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList(), OtherGeometry,
             d => PathResolver.Resolve(_doc, d.Path)?.Main, ground, native, d => PathResolver.Resolve(_doc, d.Path)?.Z ?? 0);
         if (def.Path == null)
         {
@@ -530,6 +532,8 @@ public sealed class MarkingService
             }
         }
 
+        // Escala em que o detalhe foi desenhado (base do ajuste quando a escala da vista mudar).
+        if (view != null && def is IAnnotationDefinition) ViewScaleMemory.Remember(_doc, view);
         // Detalhe movido à mão (ou o grupo dele): a nova posição passa a valer antes de regenerar.
         if (def is IPlacedAnnotation placed) FollowManualMove(def, placed, existing);
         // Trecho de prancha: escala, região de corte girada e posição na folha acompanham o eixo atual.
@@ -969,6 +973,160 @@ public sealed class MarkingService
         if (def.Exclusions.Count == 0) return;
         var ids = MarkingStorage.All(_doc).Select(r => r.MarkingId).ToHashSet();
         def.Exclusions.RemoveAll(z => !string.IsNullOrEmpty(z.SourceId) && !ids.Contains(z.SourceId!));
+    }
+
+    /// <summary>
+    /// Escala da vista mudou: o detalhe é ajustado no lugar – cada texto, linha e região existente vai para o lugar do desenho na
+    /// escala nova, com o deslocamento que a pessoa deu a ele; o que ela apagou continua apagado e o texto editado mantém o texto
+    /// dela (AnnotationScale.Ajustar). <paramref name="oldScale"/> nula = desconhecida: é deduzida pelos textos que ficaram no
+    /// lugar. Sem nada a aproveitar, o detalhe é refeito.
+    /// </summary>
+    public RenderResult RescaleInPlace(MarkingDefinition def, View view, double? oldScale)
+    {
+        var result = new RenderResult();
+        var existing = MarkingStorage.ById(_doc, def.Id).Where(r => r.Element.OwnerViewId == view.Id).ToList();
+        if (existing.Count == 0) return Render(def);
+        if (def is IPlacedAnnotation placed) FollowManualMove(def, placed, existing);
+        var newScale = (double)view.Scale;
+        // Tipo de região de cada cor/hachura do detalhe → chave da região (casa as regiões existentes com as geradas).
+        var regionKeys = new Dictionary<ElementId, string>();
+        List<ItemDetalhe> Draw(double scale, out MarkingGeometry g)
+        {
+            _scaleOverride = scale;
+            try { g = BuildGeometry(def, out _, null, view); }
+            finally { _scaleOverride = null; }
+            foreach (var p in g.Pieces.GroupBy(p => (p.Color, p.Rgb, p.Hatch)).Select(x => x.Key))
+                regionKeys.TryAdd(Styles.FilledRegionType(p.Color, p.Rgb, p.Hatch), AnnotationScale.ChaveRegiao(p.Color, p.Rgb, p.Hatch));
+            return AnnotationScale.Itens(g);
+        }
+        var depois = Draw(newScale, out var newGeo);
+        var items = existing.Select(r => ItemOf(r.Element, regionKeys)).ToList();
+        if (oldScale == null)
+        {
+            // Escala antiga desconhecida (projeto aberto depois da última geração): a que mais textos deixa exatamente no lugar.
+            var texts = items.Where(i => i?.Tipo == TipoItemDetalhe.Texto).Cast<ItemDetalhe>().ToList();
+            var best = 0;
+            foreach (var s in ViewScaleMemory.Candidates.Where(c => Math.Abs(c - newScale) > 0.5))
+            {
+                var g = Draw(s, out _).Where(i => i.Tipo == TipoItemDetalhe.Texto).ToList();
+                var hits = texts.Count(t => g.Any(x => x.Chave == t.Chave && x.Ref.DistanceTo(t.Ref) < 0.001));
+                if (hits > best) { best = hits; oldScale = s; }
+            }
+            if (oldScale == null) return Render(def);
+        }
+        var antes = Draw(oldScale.Value, out _);
+        var known = existing.Select((r, i) => (r, i)).Where(x => items[x.i] != null).ToList();
+        var plan = AnnotationScale.Ajustar(antes, depois, known.Select(x => items[x.i]!).ToList(), oldScale.Value / 1000.0);
+        if (plan.Mover.Count == 0 && known.Count > 0) return Render(def);
+
+        if (def is IGroupedAnnotation) Ungroup(existing);
+        var info = MarkingBuilder.Describe(def, Catalog);
+        var materialName = def.Output.Material ?? PluginContext.Settings.DefaultMaterial;
+        var z = PlaneZ(view);
+        var keep = new HashSet<ElementId>(existing.Where((r, i) => items[i] == null).Select(r => r.Element.Id));
+        XYZ P(Vec2 v) => new(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), z);
+        var regionsToMake = new List<ItemDetalhe>();
+        foreach (var (k, target) in plan.Mover)
+        {
+            var e = known[k].r.Element;
+            try
+            {
+                switch (e)
+                {
+                    case TextNote tn:
+                        tn.Coord = new XYZ(UnitConv.Ft(target.Ref.X), UnitConv.Ft(target.Ref.Y), tn.Coord.Z);
+                        keep.Add(e.Id);
+                        break;
+                    case CurveElement ce:
+                        ce.SetGeometryCurve(Line.CreateBound(P(target.Aneis[0][0]), P(target.Aneis[0][1])), true);
+                        keep.Add(e.Id);
+                        break;
+                    case FilledRegion:
+                        // Região não muda de contorno no lugar: é refeita com o mesmo estilo (a pessoa não a apagou).
+                        regionsToMake.Add(target);
+                        SafeDelete(e.Id);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Ajuste de escala {def.DisplayCode}", ex);
+                keep.Add(e.Id);
+            }
+        }
+        foreach (var k in plan.Apagar) SafeDelete(known[k].r.Element.Id);
+        regionsToMake.AddRange(plan.Criar.Where(c => c.Tipo == TipoItemDetalhe.Regiao));
+        foreach (var it in regionsToMake)
+        {
+            if (it.Fonte is not FonteRegiao src) continue;
+            var delta = it.Ref - ItemDetalheRef(src);
+            var shapes = src.Pecas.Select(p => p.Transform(v => v + delta)).ToList();
+            foreach (var fr in CreateRegions(view, src.Color, shapes, z, result.Warnings, src.Rgb, src.Hatch))
+            {
+                Tag(fr, def, info, src.Color, materialName, 0, newGeo, false);
+                keep.Add(fr.Id);
+            }
+        }
+        var fresh = plan.Criar.Where(c => c.Tipo != TipoItemDetalhe.Regiao).Select(c => c.Fonte).OfType<Annotation2D>().ToList();
+        foreach (var e in CreateAnnotations(view, fresh, z, result.Warnings))
+        {
+            MarkingStorage.Write(e, def, MarkingColor.Preta);
+            keep.Add(e.Id);
+        }
+        if (def is IPlacedAnnotation pa && LinesAnchor(newGeo) is { } anchor) pa.DrawnAnchor = anchor;
+        // A definição (posição seguida, âncora) fica gravada nos elementos do detalhe.
+        foreach (var id in keep)
+            if (_doc.GetElement(id) is { } el && MarkingStorage.Read(el) is { } r)
+                MarkingStorage.Write(el, def, r.Color);
+        if (def is IGroupedAnnotation grouped && keep.Count > 1) MakeGroup(keep, grouped.GroupName, result);
+        ViewScaleMemory.Remember(_doc, view);
+        result.Elements.AddRange(keep);
+        return result;
+    }
+
+    private static Vec2 ItemDetalheRef(FonteRegiao src)
+    {
+        var pts = src.Pecas.SelectMany(p => p.Holes.Prepend(p.Outer)).SelectMany(r => r).ToList();
+        return new Vec2((pts.Min(p => p.X) + pts.Max(p => p.X)) / 2, (pts.Min(p => p.Y) + pts.Max(p => p.Y)) / 2);
+    }
+
+    /// <summary>Elemento de detalhe existente como item do ajuste de escala (nulo = não é texto, linha nem região).</summary>
+    private static ItemDetalhe? ItemOf(Element e, IReadOnlyDictionary<ElementId, string> regionKeys)
+    {
+        try
+        {
+            switch (e)
+            {
+                case TextNote tn:
+                    return ItemDetalhe.Texto(tn.Text ?? "", new Vec2(UnitConv.M(tn.Coord.X), UnitConv.M(tn.Coord.Y)));
+                case CurveElement { ViewSpecific: true } ce when ce.GeometryCurve is Line { IsBound: true } l:
+                    return new ItemDetalhe(TipoItemDetalhe.Linha, "", new[] { (IReadOnlyList<Vec2>)new[]
+                    {
+                        new Vec2(UnitConv.M(l.GetEndPoint(0).X), UnitConv.M(l.GetEndPoint(0).Y)), new Vec2(UnitConv.M(l.GetEndPoint(1).X), UnitConv.M(l.GetEndPoint(1).Y)),
+                    } });
+                case FilledRegion fr:
+                {
+                    var rings = new List<IReadOnlyList<Vec2>>();
+                    foreach (var loop in fr.GetBoundaries())
+                    {
+                        var pts = new List<Vec2>();
+                        foreach (var c in loop)
+                        {
+                            var t = c.Tessellate();
+                            for (int i = 0; i + 1 < t.Count; i++) pts.Add(new Vec2(UnitConv.M(t[i].X), UnitConv.M(t[i].Y)));
+                        }
+                        if (pts.Count >= 3) rings.Add(pts);
+                    }
+                    if (rings.Count == 0) return null;
+                    return new ItemDetalhe(TipoItemDetalhe.Regiao, regionKeys.GetValueOrDefault(fr.GetTypeId()) ?? "", rings);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Elemento de detalhe no ajuste de escala", ex);
+        }
+        return null;
     }
 
     public void Delete(string markingId)

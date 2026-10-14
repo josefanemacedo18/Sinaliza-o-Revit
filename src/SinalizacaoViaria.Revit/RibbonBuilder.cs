@@ -122,6 +122,7 @@ public static class RibbonBuilder
         Split(det, "SvDetalhar", "Detalhar",
             Data(typeof(CmdAnotar), "Anotar", "anotar", "Chamada com texto automático para qualquer sinalização."),
             Data(typeof(CmdCotarSecao), "Cotar Seção", "cotasecao", "Um clique sobre a via: perfil transversal em corte (camadas, níveis, caimento, cotas horizontais e verticais, materiais) + cotas e marcas do corte na planta."),
+            Data(typeof(CmdCorteTransversal), "Corte Transversal", "cotasecao", "Só o perfil transversal em corte: um clique sobre a via e outro onde colocar o perfil – sem gerar antes a cota de seção (na planta ficam a linha de corte e as marcas A–A)."),
             Data(typeof(CmdDetalheTipico), "Detalhe Típico", "detalhetipico", "Detalhe ampliado e cotado de uma marca ou placa."),
             Data(typeof(CmdQuadroQuantitativos), "Quadro de Quantitativos", "quadroqtd", "Quadro de quantidades do projeto – numa Legenda própria (colocada direto na folha escolhida) ou na vista ativa."),
             Data(typeof(CmdNotas), "Notas Gerais", "notas", "Bloco de notas numeradas do projeto."),
