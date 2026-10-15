@@ -390,7 +390,7 @@ public sealed class TrafficWindow : Window
         _run.Click += (_, _) => Run(true);
         _quick.Click += (_, _) => Run(false);
         _cancel.Click += (_, _) => _cts?.Cancel();
-        return new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        return UiHelpers.Scroller(sp);
     }
 
     // ------------------------------------------------------------------------------------------------ mapa e animação
@@ -519,14 +519,14 @@ public sealed class TrafficWindow : Window
         Grid.SetRow(_diagList, 1);
         dg.Children.Add(_diagList);
         var det = new StackPanel();
-        det.Children.Add(new ScrollViewer { Content = _diagDetail, MaxHeight = 220, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        det.Children.Add(UiHelpers.Scroller(_diagDetail, 220));
         var db = new StackPanel { Orientation = Orientation.Horizontal };
         db.Children.Add(_diagMap);
         db.Children.Add(_diagModel);
         db.Children.Add(_diagSolve);
         _diagSolve.Margin = new Thickness(6, 0, 0, 0);
         det.Children.Add(db);
-        det.Children.Add(new ScrollViewer { Content = _diagSolutions, MaxHeight = 260, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        det.Children.Add(UiHelpers.Scroller(_diagSolutions, 260));
         _diagSolve.Click += (_, _) =>
         {
             if (_diagList.SelectedItem is ListBoxItem { Tag: TrafficDiagnostic d }) TestSolutions(d.Node, d.Link, _diagSolutions);
@@ -548,7 +548,7 @@ public sealed class TrafficWindow : Window
         _tabs.Items.Add(_tabSignals);
 
         // Indicadores
-        _tabs.Items.Add(new TabItem { Header = "Indicadores", Content = new ScrollViewer { Content = _kpis, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
+        _tabs.Items.Add(new TabItem { Header = "Indicadores", Content = UiHelpers.Scroller(_kpis) });
 
         // Nós
         var ng = new Grid();
@@ -1392,7 +1392,7 @@ public sealed class TrafficWindow : Window
             }
             catch (Exception ex) { UiHelpers.Error("Não foi possível aplicar: " + ex.Message); }
         };
-        return new ScrollViewer { Content = sp, MaxHeight = 330, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        return UiHelpers.Scroller(sp, 330);
     }
 
     // ------------------------------------------------------------------------------------------------ recomendação de tempos
@@ -1745,7 +1745,7 @@ public sealed class TrafficWindow : Window
             }
             catch (Exception ex) { UiHelpers.Error("Não foi possível gravar: " + ex.Message); }
         };
-        return new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        return UiHelpers.Scroller(sp);
     }
 
     private void FillSignalRows()

@@ -18,7 +18,7 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
             <StackPanel>
                 <TextBlock Text="Legenda automática" Style="{StaticResource Title}"/>
                 <TextBlock Style="{StaticResource Hint}" Text="Monta um quadro com o desenho e a descrição de cada tipo de PLACA (sinalização vertical) existente no projeto – regulamentação, advertência, indicação... O quadro se atualiza quando novas marcas são criadas ou com 'Atualizar Todas'. Depois de confirmar, clique o canto superior esquerdo do quadro."/>

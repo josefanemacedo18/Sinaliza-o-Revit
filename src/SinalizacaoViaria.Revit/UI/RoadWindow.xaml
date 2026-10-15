@@ -19,7 +19,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
             <StackPanel>
                 <TextBlock Text="Seção transversal" Style="{StaticResource Title}"/>
                 <TextBlock Style="{StaticResource Hint}" Text="Desenhe (ou selecione) o EIXO da via. Monte cada lado do eixo para fora: faixas, ciclofaixa, estacionamento, canteiros, calçada... O lado direito é o da direita de quem percorre o eixo no sentido em que foi desenhado. A pista e as conexões são criadas como na ferramenta Pista; calçadas, meios-fios e sarjetas entram em seguida junto ao bordo."/>

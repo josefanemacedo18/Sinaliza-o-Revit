@@ -18,7 +18,7 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
             <StackPanel>
                 <TextBlock Text="Símbolo da placa na planta" Style="{StaticResource Title}"/>
                 <TextBlock Style="{StaticResource Hint}" Text="Desenha a face da placa ampliada ao lado do suporte, com linha de chamada e código/nome – como nas pranchas de sinalização. As medidas são em milímetros de papel (acompanham a escala da vista) e o detalhe se atualiza quando a placa é editada."/>

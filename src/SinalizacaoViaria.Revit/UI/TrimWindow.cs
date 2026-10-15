@@ -71,7 +71,7 @@ public sealed class TrimWindow : Window
         buttons.Children.Add(clear);
         left.Children.Add(buttons);
         left.Children.Add(_status);
-        root.Children.Add(new ScrollViewer { Content = left, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        root.Children.Add(UiHelpers.Scroller(left));
 
         var border = new Border { BorderBrush = (System.Windows.Media.Brush)Resources["Border"], BorderThickness = new Thickness(1), Child = _preview };
         Grid.SetColumn(border, 1);

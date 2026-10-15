@@ -18,7 +18,7 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
             <StackPanel>
                 <TextBlock Text="Dispositivo" Style="{StaticResource Title}"/>
                 <TextBlock Style="{StaticResource Hint}" Text="Clique os dois bordos da pista no eixo do dispositivo (repete até ESC), ou selecione uma linha atravessando a pista."/>

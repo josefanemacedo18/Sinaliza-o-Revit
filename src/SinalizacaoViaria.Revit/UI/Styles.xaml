@@ -29,6 +29,8 @@
     <Style TargetType="TextBlock" x:Key="FieldLabel">
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="Margin" Value="0,3,8,3"/>
+        <Setter Property="MaxWidth" Value="260"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
     </Style>
 
     <Style TargetType="TextBox">

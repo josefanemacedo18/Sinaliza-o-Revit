@@ -511,4 +511,35 @@ public class LVCorrecoesTests
         var sign = new SignDefinition { Code = "R-1" };
         Assert.True(Masterplan.Oculta(sign, MarkingBuilder.Describe(sign, Cat)));
     }
+
+    // ================================================================== 2 – janelas
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "src", "SinalizacaoViaria.Revit"))) dir = dir.Parent;
+        return dir?.FullName ?? throw new DirectoryNotFoundException("raiz do repositório");
+    }
+
+    [Fact]
+    public void D2_Janelas_RolagemHorizontalEmTodas()
+    {
+        var ui = Path.Combine(RepoRoot(), "src", "SinalizacaoViaria.Revit", "UI");
+        var faults = new List<string>();
+        // Todo painel rolável das janelas (XAML e código) rola também na horizontal.
+        foreach (var f in Directory.GetFiles(ui, "*.xaml"))
+            foreach (Match m in Regex.Matches(File.ReadAllText(f), @"<ScrollViewer\b[^>]*>"))
+                if (!m.Value.Contains("HorizontalScrollBarVisibility=\"Auto\""))
+                    faults.Add($"{Path.GetFileName(f)}: {m.Value}");
+        foreach (var f in Directory.GetFiles(ui, "*.cs"))
+            foreach (Match m in Regex.Matches(File.ReadAllText(f), @"new ScrollViewer\b[^;]*"))
+                if (!Regex.IsMatch(m.Value, @"HorizontalScrollBarVisibility\s*=\s*ScrollBarVisibility\.(Auto|Visible)"))
+                    faults.Add($"{Path.GetFileName(f)}: {m.Value.Split('\n')[0].Trim()}");
+        Assert.True(faults.Count == 0, string.Join("\n", faults));
+        // Toda janela aberta pelo plugin ajusta os painéis: o conteúdo acompanha a largura sem cortar os campos.
+        Assert.Matches(@"ShowModal\(Window w\)\s*\{[^}]*FitScrollViewers\(w\)", File.ReadAllText(Path.Combine(ui, "UiHelpers.cs")));
+        // Coluna dos campos com largura mínima (rótulo longo não espreme o campo) e rótulos que quebram linha.
+        Assert.Contains("MinWidth = UiHelpers.MinFieldWidth", File.ReadAllText(Path.Combine(ui, "FormWindow.cs")));
+        Assert.Matches(@"x:Key=""FieldLabel"">(?:(?!</Style>).)*TextWrapping"" Value=""Wrap""", File.ReadAllText(Path.Combine(ui, "Styles.xaml")).Replace("\r", "").Replace("\n", " "));
+    }
 }

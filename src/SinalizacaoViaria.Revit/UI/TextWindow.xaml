@@ -23,7 +23,7 @@
             <TextBlock DockPanel.Dock="Top" Text="Legendas usuais" Style="{StaticResource Title}"/>
             <ListBox x:Name="LbPresets" SelectionChanged="PresetChanged"/>
         </DockPanel>
-        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
             <StackPanel>
                 <TextBlock Text="Texto" Style="{StaticResource Title}"/>
                 <TextBox x:Name="TbText" AcceptsReturn="True" Height="64" TextChanged="AnyChanged" CharacterCasing="Upper" VerticalContentAlignment="Top"

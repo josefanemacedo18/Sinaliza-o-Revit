@@ -12,6 +12,10 @@ Convenções usadas em todo o plugin:
 * **Deslocamento lateral positivo = à esquerda** do sentido em que o caminho foi desenhado.
 * **Circulação pela direita** (Brasil) para posicionar linhas de retenção.
 * O **sentido do tráfego** de setas e legendas é indicado pelo 2º clique.
+* **Janelas com rolagem nas duas direções**: o painel de opções de todas as janelas do plugin rola na **vertical e na
+  horizontal**. O conteúdo acompanha a largura da janela (os textos quebram linha), mas nunca fica mais estreito que os rótulos
+  mais a coluna dos campos (mínimo de 120 px por campo; rótulos longos quebram em duas linhas). Em janela estreita ou com
+  rótulo longo aparece a barra horizontal – arraste-a (ou Shift + roda do mouse) para ver tudo; nenhum campo fica cortado.
 
 ### Organização da faixa de opções
 

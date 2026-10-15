@@ -29,7 +29,7 @@
             </Border>
             <ListBox x:Name="LbSymbols" SelectionChanged="SymbolChanged"/>
         </DockPanel>
-        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" Grid.Column="1" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
             <StackPanel>
                 <TextBlock Text="Parâmetros" Style="{StaticResource Title}"/>
                 <GroupBox Header="Dimensões">

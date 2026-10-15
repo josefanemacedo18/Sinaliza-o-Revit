@@ -15,7 +15,7 @@
             <Button Content="Salvar" Style="{StaticResource Primary}" Click="SaveClick" IsDefault="True"/>
             <Button Content="Cancelar" IsCancel="True"/>
         </StackPanel>
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <GroupBox Header="Padrões de criação">
                     <Grid>

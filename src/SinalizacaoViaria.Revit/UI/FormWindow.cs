@@ -57,7 +57,11 @@ public sealed class FormWindow : Window
 
         _fields.Children.Add(new TextBlock { Text = heading, Style = (Style)Resources["Title"] });
         if (!string.IsNullOrWhiteSpace(hint)) _fields.Children.Add(new TextBlock { Text = hint, Style = (Style)Resources["Hint"] });
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0, 0, 12, 0), Content = _fields };
+        var scroll = new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Margin = new Thickness(0, 0, 12, 0), Content = _fields,
+        };
         root.Children.Add(scroll);
 
         if (showOutput && def != null)
@@ -90,6 +94,7 @@ public sealed class FormWindow : Window
         Content = root;
         Loaded += (_, _) =>
         {
+            UiHelpers.FitWidth(scroll);
             if (_output != null && def != null)
             {
                 _fields.Children.Add(_output);
@@ -165,7 +170,8 @@ public sealed class FormWindow : Window
         {
             _grid = new Grid();
             _grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            _grid.ColumnDefinitions.Add(new ColumnDefinition());
+            // Coluna dos campos com largura mínima: rótulo longo não espreme o campo (a janela rola na horizontal).
+            _grid.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = UiHelpers.MinFieldWidth });
             _fields.Children.Add(_grid);
         }
         var r = _grid.RowDefinitions.Count;

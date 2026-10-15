@@ -1,6 +1,8 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using SinalizacaoViaria.Core.Model;
 using SinalizacaoViaria.Revit.Infrastructure;
@@ -16,6 +18,8 @@ public static class UiHelpers
 
     public static bool? ShowModal(Window w)
     {
+        // Painéis roláveis da janela também na horizontal (nada cortado em janela estreita ou com rótulo longo).
+        w.Loaded += (_, _) => FitScrollViewers(w);
         // WindowStartupLocation não é propriedade de dependência: não pode ficar no estilo XAML.
         if (RevitHandle != IntPtr.Zero)
         {
@@ -27,6 +31,103 @@ public static class UiHelpers
             w.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
         return w.ShowDialog();
+    }
+
+    // ------------------------------------------------------------------ rolagem horizontal
+
+    /// <summary>Largura mínima da coluna dos campos (caixas de texto, listas) nas grades das janelas (px).</summary>
+    public const double MinFieldWidth = 120;
+
+    private static readonly ConditionalWeakTable<ScrollViewer, object> Fitted = new();
+
+    /// <summary>Painel rolável nas duas direções (veja <see cref="FitWidth"/>).</summary>
+    public static ScrollViewer Scroller(FrameworkElement content, double maxHeight = double.PositiveInfinity)
+    {
+        var sv = new ScrollViewer
+        {
+            Content = content, MaxHeight = maxHeight,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+        };
+        sv.Loaded += (_, _) => FitWidth(sv);
+        return sv;
+    }
+
+    /// <summary>Todos os painéis roláveis da janela (inclusive os de abas ainda não abertas) com <see cref="FitWidth"/>.</summary>
+    public static void FitScrollViewers(DependencyObject root)
+    {
+        foreach (var sv in LogicalDescendants(root).OfType<ScrollViewer>().ToList()) FitWidth(sv);
+    }
+
+    /// <summary>
+    /// Rolagem horizontal sem perder a quebra de linha: o conteúdo acompanha a largura visível do painel (os textos continuam
+    /// quebrando), mas nunca fica mais estreito que o necessário – rótulos (colunas de largura automática) + coluna dos campos com
+    /// <see cref="MinFieldWidth"/>. Abaixo disso aparece a barra horizontal e dá para arrastar até o fim; nada é cortado.
+    /// Desenhos (prévia, mapa) não são tocados.
+    /// </summary>
+    public static void FitWidth(ScrollViewer sv)
+    {
+        if (sv.Content is not (Panel or TextBlock) || sv.Content is Canvas || Fitted.TryGetValue(sv, out _)) return;
+        var content = (FrameworkElement)sv.Content;
+        Fitted.Add(sv, new object());
+        sv.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+        var grids = LogicalDescendants(content).OfType<Grid>().Prepend(content as Grid).OfType<Grid>().ToList();
+        foreach (var g in grids)
+            for (int i = 0; i < g.ColumnDefinitions.Count; i++)
+            {
+                var col = g.ColumnDefinitions[i];
+                if (col.Width.IsStar && col.MinWidth < MinFieldWidth
+                    && g.Children.OfType<Control>().Any(c => Grid.GetColumn(c) == i && c is TextBox or ComboBox or ListBox or Slider))
+                    col.MinWidth = MinFieldWidth;
+            }
+        double Need()
+        {
+            var need = 0.0;
+            foreach (var g in grids)
+            {
+                if (!g.IsVisible || g.ColumnDefinitions.Count < 2 || g != content && !content.IsAncestorOf(g)) continue;
+                var x = g == content ? 0 : g.TranslatePoint(new Point(0, 0), content).X;
+                var cols = g.ColumnDefinitions.Sum(c => c.Width.IsStar ? c.MinWidth : c.ActualWidth);
+                need = Math.Max(need, x + cols + g.Margin.Right);
+            }
+            // Itens de largura fixa (gráficos, botões) também não são cortados.
+            if (content is Panel panel)
+                foreach (var ch in panel.Children.OfType<FrameworkElement>().Where(c => c.IsVisible))
+                {
+                    var fixedW = double.IsNaN(ch.Width) ? ch.MinWidth : ch.Width;
+                    if (fixedW > 0) need = Math.Max(need, ch.Margin.Left + fixedW + ch.Margin.Right);
+                }
+            return need;
+        }
+        void Fit()
+        {
+            // Largura útil com a barra vertical sempre descontada: a largura do conteúdo não depende de a barra vertical aparecer
+            // (senão largura → quebra de linha → altura → barra → largura entraria em laço).
+            var view = sv.ActualWidth - SystemParameters.VerticalScrollBarWidth - sv.Padding.Left - sv.Padding.Right
+                       - sv.BorderThickness.Left - sv.BorderThickness.Right - content.Margin.Left - content.Margin.Right;
+            if (view <= 0) return;
+            var w = Math.Max(view, Need());
+            if (double.IsNaN(content.Width) || Math.Abs(content.Width - w) > 1) content.Width = w;
+        }
+        sv.SizeChanged += (_, _) => Fit();
+        // Shift + roda do mouse: rola na horizontal.
+        sv.PreviewMouseWheel += (_, e) =>
+        {
+            if (Keyboard.Modifiers != ModifierKeys.Shift || sv.ScrollableWidth <= 0) return;
+            sv.ScrollToHorizontalOffset(sv.HorizontalOffset - e.Delta);
+            e.Handled = true;
+        };
+        // Campos que aparecem/somem (opções condicionais) mudam a largura necessária.
+        content.LayoutUpdated += (_, _) => Fit();
+        Fit();
+    }
+
+    private static IEnumerable<DependencyObject> LogicalDescendants(DependencyObject root)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+        {
+            yield return child;
+            foreach (var d in LogicalDescendants(child)) yield return d;
+        }
     }
 
     public static string F(double v, string fmt = "0.00") => v.ToString(fmt, PtBr);
