@@ -210,6 +210,8 @@ public static class RibbonBuilder
             Data(typeof(CmdQuadraLote), "Quadra", "quadra",
                 "Clique um lote: medidas padrão da quadra, sobra, miolo, testadas (apontar com cliques, em ordem de prioridade), lote de esquina em cada esquina " +
                 "(por uma testada, pela outra ou com medida própria), sentido da numeração e lote 1."),
+            Data(typeof(CmdLotesPorLinhas), "Lotes por Linhas", "lotelinhas",
+                "Selecione o limite da quadra (linhas fechadas ou um lote de uma quadra) e depois as linhas que dividem os lotes: cada região fechada vira um lote. Mova as linhas e use Atualizar para refazer."),
             Data(typeof(CmdLote), "Lote", "lote",
                 "Clique um lote: frente, profundidade, divisão em partes e categoria (Lote, Institucional, Área verde ou outra) – os vizinhos e a numeração se ajustam."),
             Data(typeof(CmdUnirLotes), "Unir Lotes", "unirlotes",

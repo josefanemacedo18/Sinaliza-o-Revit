@@ -605,6 +605,16 @@ public static class IconFactory
                 dc.DrawLine(P(key == "quadra" ? Red : Asphalt, 3), new Point(2, 28), new Point(30, 28));
                 break;
             }
+            case "lotelinhas":
+            {
+                // Quadra com as linhas desenhadas (vermelhas) que dividem os lotes.
+                dc.DrawRectangle(B(Color.FromRgb(242, 215, 166)), P(Asphalt, 1.4), new Rect(3, 3, 26, 22));
+                dc.DrawLine(P(Red, 1.8), new Point(11, 1), new Point(11, 27));
+                dc.DrawLine(P(Red, 1.8), new Point(20, 1), new Point(16, 27));
+                dc.DrawLine(P(Red, 1.8), new Point(11, 14), new Point(31, 14));
+                dc.DrawLine(P(Asphalt, 3), new Point(2, 29), new Point(30, 29));
+                break;
+            }
             case "unirlotes":
             {
                 // Dois lotes vizinhos viram um (divisa do meio tracejada, contorno do lote unido em destaque).

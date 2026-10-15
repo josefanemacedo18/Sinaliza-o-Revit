@@ -141,6 +141,8 @@ public static class LotService
         var res = new RenderResult();
         var lot = Loteamento(doc, q.LoteamentoId);
         var cats = lot?.Categorias ?? CategoriaLote.Padrao();
+        // Lotes por linhas: limite e linhas relidos do documento (as linhas podem ter sido movidas ou editadas).
+        if (q.Divisao == ModoDivisao.Linhas) res.Warnings.AddRange(AtualizaLinhas(doc, q));
         var div = LotDivider.Divide(q, lot);
         res.Warnings.AddRange(div.Avisos);
         foreach (var r in existing) SafeDelete(doc, r.Element.Id);
@@ -605,6 +607,41 @@ public static class LotService
         if (ring[0].DistanceTo(ring[^1]) < 0.05) ring.RemoveAt(ring.Count - 1);
         var poly = new Polygon2(ring);
         return poly.IsValid ? poly : null;
+    }
+
+    /// <summary>
+    /// Quadra por linhas: contorno pelas linhas do limite (quando escolhidas) e cada linha de lote pela geometria atual dela;
+    /// linhas apagadas saem (aviso).
+    /// </summary>
+    public static List<string> AtualizaLinhas(Document doc, QuadraDefinition q)
+    {
+        var warn = new List<string>();
+        if (q.LimiteElementos.Count > 0)
+        {
+            var els = q.LimiteElementos.Select(doc.GetElement).Where(e => e != null).ToList();
+            if (els.Count < q.LimiteElementos.Count) warn.Add($"Quadra {q.Nome}: {q.LimiteElementos.Count - els.Count} linha(s) do limite foram apagadas.");
+            var notes = new List<string>();
+            if (els.Count > 0 && GlebaFrom(doc, els, notes) is { } poly) q.Contorno = poly.Outer.ToList();
+            else if (els.Count > 0) warn.Add($"Quadra {q.Nome}: as linhas do limite não fecham mais – ficou o contorno anterior.");
+        }
+        var gone = 0;
+        foreach (var l in q.LinhasLotes.ToList())
+        {
+            if (string.IsNullOrEmpty(l.Elemento)) continue;
+            if (doc.GetElement(l.Elemento) is not { } e) { q.LinhasLotes.Remove(l); gone++; continue; }
+            if (PontosDe(e) is { Count: >= 2 } pts) l.Pontos = pts;
+        }
+        if (gone > 0) warn.Add($"Quadra {q.Nome}: {gone} linha(s) de lote foram apagadas – os lotes foram refeitos sem elas.");
+        return warn;
+    }
+
+    /// <summary>Pontos (m, planta) da primeira curva do elemento (arcos e splines discretizados).</summary>
+    public static List<Vec2>? PontosDe(Element e)
+    {
+        var c = Curves(e).FirstOrDefault();
+        if (c == null) return null;
+        var pts = c.Tessellate().Select(p => new Vec2(UnitConv.M(p.X), UnitConv.M(p.Y))).ToList();
+        return pts.Count >= 2 ? pts : null;
     }
 
     private static IEnumerable<Curve> Curves(Element e)

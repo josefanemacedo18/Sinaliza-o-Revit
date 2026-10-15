@@ -21,6 +21,15 @@ internal sealed class LotSelectionFilter : ISelectionFilter
     public bool AllowReference(Reference reference, XYZ position) => false;
 }
 
+/// <summary>Seleção de linhas nativas (de modelo ou de detalhe) – limite da quadra e divisas dos lotes.</summary>
+internal sealed class LinhaSelectionFilter : ISelectionFilter
+{
+    private readonly bool _lots;
+    public LinhaSelectionFilter(bool lots) => _lots = lots;
+    public bool AllowElement(Element elem) => elem is CurveElement || _lots && new LotSelectionFilter().AllowElement(elem);
+    public bool AllowReference(Reference reference, XYZ position) => false;
+}
+
 /// <summary>Seleção do limite da gleba: linhas, linha de propriedade ou Toposolid.</summary>
 internal sealed class GlebaSelectionFilter : ISelectionFilter
 {
@@ -247,13 +256,17 @@ public sealed class CmdLoteamento : CommandBase
         // Quadra gravada que é a sobra da gleba em volta das vias (a gleba inteira, sem o furo – versões anteriores): sai; a sobra
         // passa a ser a área remanescente do loteamento.
         lot.Remanescentes = rec.Remanescentes.Select(AreaRemanescente.From).ToList();
-        var removed = quadras.Where(q => Reconhecimento.ESobra(q.Polygon, rec)).ToList();
+        // Quadra com o limite por linhas (Lotes por Linhas): o contorno segue as linhas dela – não é trocado nem duplicado.
+        var fixas = quadras.Where(q => q.LimiteElementos.Count > 0 && q.Polygon != null).ToList();
+        var removed = quadras.Except(fixas).Where(q => Reconhecimento.ESobra(q.Polygon, rec)).ToList();
         quadras = quadras.Except(removed).ToList();
         var used = quadras.Select(q => q.Nome).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var names = Reconhecimento.Nomes(used.Count + rec.Quadras.Count + 5).Where(n => !used.Contains(n)).GetEnumerator();
         var template = quadras.FirstOrDefault();
+        foreach (var f in fixas) matched.Add(f.Id);
         foreach (var r in rec.Quadras)
         {
+            if (fixas.Any(f => Reconhecimento.Coincidencia(f.Polygon!, r.Contorno) > 0.3)) continue;
             // A gravada que mais coincide com a reconhecida (área comum sobre a união) – o centroide de uma quadra grande podia cair
             // dentro de outra e trocar os nomes.
             var q = quadras.Where(x => !matched.Contains(x.Id) && x.Polygon != null)
@@ -378,6 +391,84 @@ public sealed class CmdQuadraLote : CommandBase
         var i = 1;
         while (set.Contains("T" + i)) i++;
         return "T" + i;
+    }
+}
+
+/// <summary>
+/// Lotes por linhas: 1) limite da quadra – linhas nativas fechadas (ou um lote de uma quadra existente); 2) as linhas que dividem
+/// os lotes. Cada região fechada vira um lote (numeração, categorias e quadros como sempre). Mover ou editar as linhas e usar
+/// Atualizar refaz os lotes.
+/// </summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdLotesPorLinhas : CommandBase
+{
+    protected override Result Run(UIApplication app, UIDocument uidoc)
+    {
+        var doc = uidoc.Document;
+        var lot = LotCommands.RequireLot(doc);
+        var quadras = LotService.Quadras(doc, lot.Id);
+        List<Element> limite;
+        try
+        {
+            limite = uidoc.Selection.PickObjects(ObjectType.Element, new LinhaSelectionFilter(lots: true),
+                    "1/2 – Selecione as linhas do LIMITE DA QUADRA (fechadas) ou clique um lote de uma quadra existente; depois Concluir")
+                .Select(r => doc.GetElement(r)).Where(e => e != null).ToList();
+        }
+        catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return Result.Cancelled; }
+        QuadraDefinition? q;
+        if (limite.FirstOrDefault(e => new LotSelectionFilter().AllowElement(e)) is { } lotEl && MarkingStorage.Read(lotEl)?.Definition is QuadraDefinition ex)
+            q = quadras.FirstOrDefault(x => x.Id == ex.Id) ?? ex;
+        else
+        {
+            var lines = limite.Where(e => e is CurveElement).ToList();
+            var notes = new List<string>();
+            var contorno = LotService.GlebaFrom(doc, lines, notes)
+                           ?? throw new UserMessageException("As linhas escolhidas não fecham o limite da quadra. Feche o contorno (as pontas devem se tocar) e tente de novo.");
+            // Limite que coincide com uma quadra existente: ela passa para o modo por linhas (nome, categorias e numeração ficam).
+            q = quadras.Where(x => x.Polygon != null).Select(x => (Q: x, S: Reconhecimento.Coincidencia(x.Polygon!, contorno)))
+                .Where(x => x.S > 0.3).OrderByDescending(x => x.S).Select(x => x.Q).FirstOrDefault();
+            if (q == null)
+            {
+                var used = quadras.Select(x => x.Nome).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var template = quadras.FirstOrDefault();
+                q = new QuadraDefinition
+                {
+                    LoteamentoId = lot.Id, Nome = Reconhecimento.Nomes(used.Count + 30).First(n => !used.Contains(n)), Z = lot.Z,
+                    Frente = template?.Frente ?? 12, Profundidade = template?.Profundidade ?? 30, SentidoHorario = template?.SentidoHorario ?? true,
+                };
+                // Testadas pelos lados junto às vias (nome da via e frente dos lotes).
+                try
+                {
+                    var gleba = lot.GlebaPolygon ?? contorno;
+                    var occ = LotService.Ocupacao(doc, new MarkingService(doc, uidoc.ActiveView, interactive: false), gleba, nativeFloors: true);
+                    var i = 0;
+                    foreach (var p in Reconhecimento.TestadasAutomaticas(contorno, Reconhecimento.Ocupacao(occ)))
+                        q.Testadas.Add(new TestadaLote { Id = "T" + ++i, Ponto = p });
+                }
+                catch (Exception e2) { Log.Error("Lotes por linhas: testadas", e2); }
+            }
+            q.Contorno = contorno.Outer.ToList();
+            q.LimiteElementos = lines.Select(e => e.UniqueId).ToList();
+        }
+        List<Element> divisas;
+        try
+        {
+            divisas = uidoc.Selection.PickObjects(ObjectType.Element, new LinhaSelectionFilter(lots: false),
+                    $"2/2 – Selecione as linhas que DIVIDEM OS LOTES da quadra {q.Nome}; depois Concluir")
+                .Select(r => doc.GetElement(r)).Where(e => e != null && !q.LimiteElementos.Contains(e.UniqueId)).ToList();
+        }
+        catch (Autodesk.Revit.Exceptions.OperationCanceledException) { return Result.Cancelled; }
+        q.LinhasLotes = divisas.Select(e => (E: e, P: LotService.PontosDe(e))).Where(x => x.P != null)
+            .Select(x => new LinhaDeLote { Elemento = x.E.UniqueId, Pontos = x.P! }).ToList();
+        q.Divisao = ModoDivisao.Linhas;
+        var results = LotCommands.Commit(uidoc, lot, new[] { q }, $"SV - Lotes por linhas – Quadra {q.Nome}");
+        var div = LotDivider.Divide(q, lot);
+        // Linhas que não fecharam lote ficam selecionadas para conferir.
+        var soltas = div.LinhasSoltas.Select(doc.GetElement).Where(e => e != null).Select(e => e!.Id).ToList();
+        if (soltas.Count > 0) uidoc.Selection.SetElementIds(soltas);
+        LotCommands.Report($"Quadra {q.Nome}: {div.Parcelas.Count} lote(s) pelas linhas.", results,
+            new[] { "Para mudar: mova ou edite as linhas no Revit e use Atualizar (ou rode Lotes por Linhas de novo para trocar as linhas)." });
+        return Result.Succeeded;
     }
 }
 

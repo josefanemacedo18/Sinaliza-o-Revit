@@ -124,6 +124,12 @@ public static class LotForms
     /// <summary>Ação pedida na janela da quadra (clique no Revit e reabre).</summary>
     public enum AcaoQuadra { Nenhuma, ApontarTestadas, TestadasAutomaticas, LoteInicial, Recarregar }
 
+    private static readonly (string Label, ModoDivisao Value)[] DivisaoOptions =
+    {
+        ("Pela testada (frente e profundidade)", ModoDivisao.Testada),
+        ("Pelas linhas desenhadas (Lotes por Linhas)", ModoDivisao.Linhas),
+    };
+
     private static readonly (string Label, int Value)[] ChanfroEsquinaOptions =
     {
         ("A face da quadra", 0),
@@ -158,6 +164,8 @@ public static class LotForms
             }, showOutput: false, okText: "Aplicar", width: 1100, height: 760);
         w.Section("Quadra")
             .Text("Nome", () => q.Nome, v => q.Nome = string.IsNullOrWhiteSpace(v) ? q.Nome : v!.Trim())
+            .Choice("Divisão dos lotes", DivisaoOptions, () => q.Divisao, v => q.Divisao = v,
+                tooltip: "Pelas linhas: cada região fechada pelas linhas escolhidas em Lotes por Linhas é um lote (as medidas abaixo não valem).")
             .Check("Quadra inteira numa área só (praça, área verde, institucional)", () => q.Inteira, v => q.Inteira = v)
             .Choice("Categoria dos lotes", CategoryOptions(lot), () => q.CategoriaPadrao, v => q.CategoriaPadrao = v)
             .Section("Lotes")
@@ -251,7 +259,7 @@ public static class LotForms
         {
             var pp = p;
             var baseKey = pp.Chave.Contains('.') ? pp.Chave[..pp.Chave.IndexOf('.')] : pp.Chave;
-            var editable = !pp.Chave.StartsWith("esq:") && !pp.Chave.StartsWith("m:") && pp.Chave != "q" && !pp.Sobra && pp.Unidos == null;
+            var editable = !pp.Chave.StartsWith("esq:") && !pp.Chave.StartsWith("m:") && !pp.Chave.StartsWith("l:") && pp.Chave != "q" && !pp.Sobra && pp.Unidos == null;
             string Padrao() => pp.Chave.StartsWith("m:") || pp.Chave == "q" && !q.Inteira ? q.MioloCategoria : q.CategoriaPadrao;
             var info = $"{LotReport.M(pp.Frente)} × {LotReport.M(pp.Profundidade)} m, {LotReport.M(pp.Area)} m²" +
                        (pp.TestadaId != null ? $", testada {pp.TestadaId}" : "") + (pp.Esquina ? ", esquina" : "") + (pp.Sobra ? ", sobra da testada" : "") +
@@ -275,7 +283,7 @@ public static class LotForms
         var medidas = q.Ajuste(baseKey)?.Clone() ?? new LoteAjuste { Chave = baseKey };
         var cat = q.Ajuste(p.Chave)?.Categoria ?? (p.Chave != baseKey ? q.Ajuste(baseKey)?.Categoria : null) ?? p.Categoria;
         var start = q.LoteInicial == p.Chave;
-        var editable = !p.Chave.StartsWith("esq:") && !p.Chave.StartsWith("m:") && p.Chave != "q" && !p.Sobra && p.Unidos == null;
+        var editable = !p.Chave.StartsWith("esq:") && !p.Chave.StartsWith("m:") && !p.Chave.StartsWith("l:") && p.Chave != "q" && !p.Sobra && p.Unidos == null;
         var desfazer = false;
         // Categoria padrão desta parcela (gravada só quando muda): a do miolo nas áreas de miolo, a da quadra nos lotes.
         string Padrao(QuadraDefinition t) => p.Chave.StartsWith("m:") || p.Chave == "q" && !t.Inteira ? t.MioloCategoria : t.CategoriaPadrao;

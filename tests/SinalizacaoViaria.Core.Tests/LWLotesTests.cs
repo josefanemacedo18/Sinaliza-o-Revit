@@ -82,4 +82,131 @@ public class LWLotesTests
         Assert.Equal(t.Headers.Count, t.Widths.Count);
         Assert.All(t.Rows, x => Assert.Equal(t.Headers.Count, x.Count));
     }
+
+    // ================================================================== 2 – lotes por linhas
+
+    /// <summary>Quadra 60 × 30 no modo por linhas, com as linhas dadas (pares de pontos), testada ao sul.</summary>
+    private static QuadraDefinition PorLinhas(params (string Id, Vec2[] Pts)[] linhas)
+    {
+        var q = new QuadraDefinition { Nome = "L", Contorno = Polygon2.Rectangle(Vec2.Zero, new Vec2(60, 30)).Outer.ToList(), Divisao = ModoDivisao.Linhas };
+        q.Testadas.Add(new TestadaLote { Id = "T1", Ponto = new Vec2(30, 0) });
+        foreach (var (id, pts) in linhas) q.LinhasLotes.Add(new LinhaDeLote { Elemento = id, Pontos = pts.ToList() });
+        return q;
+    }
+
+    private static (string, Vec2[]) V(string id, double x, double y0 = 0, double y1 = 30) => (id, new[] { new Vec2(x, y0), new Vec2(x, y1) });
+
+    [Fact]
+    public void L_LinhasRetas_CadaRegiaoUmLote_AreasSomamAQuadra()
+    {
+        var q = PorLinhas(V("a", 15), V("b", 30), V("c", 45));
+        var d = LotDivider.Divide(q);
+        Assert.Equal(4, d.Parcelas.Count);
+        Assert.All(d.Parcelas, p => Assert.Equal(450, p.Area, 3));
+        Assert.Equal(1800, d.Parcelas.Sum(p => p.Area), 3);
+        // Numeração 1..4 pela regra da quadra; frente de 15 m sobre a testada.
+        Assert.Equal(new[] { "1", "2", "3", "4" }, d.Parcelas.Select(p => p.Numero).OrderBy(x => x));
+        Assert.All(d.Parcelas, p => Assert.Equal(15, p.Frente, 3));
+        Assert.Empty(d.LinhasSoltas);
+        Assert.All(d.Parcelas, p => Assert.StartsWith("l:", p.Chave));
+    }
+
+    [Fact]
+    public void L_PontasCurtasProlongadas_PassadasIgnoradas_SoltasAvisadas()
+    {
+        // "a" para 0,3 m antes do contorno (prolongada); "b" passa 2 m para fora (sobra ignorada); "c" para 0,8 m antes (não fecha).
+        var q = PorLinhas(V("a", 15, 0.3, 29.7), V("b", 30, -2, 32), V("c", 45, 0.8, 30));
+        var d = LotDivider.Divide(q);
+        Assert.Equal(3, d.Parcelas.Count);
+        Assert.Equal(1800, d.Parcelas.Sum(p => p.Area), 3);
+        Assert.Equal(new[] { 450.0, 450.0, 900.0 }, d.Parcelas.Select(p => Math.Round(p.Area, 3)).OrderBy(x => x));
+        Assert.Equal(new[] { "c" }, d.LinhasSoltas);
+        Assert.Contains(d.Avisos, a => a.Contains("não fecham"));
+    }
+
+    [Fact]
+    public void L_LinhasCruzadasECurva()
+    {
+        // Cruz: 4 lotes de 30 × 15.
+        var cruz = LotDivider.Divide(PorLinhas(V("v", 30), ("h", new[] { new Vec2(0, 15), new Vec2(60, 15) })));
+        Assert.Equal(4, cruz.Parcelas.Count);
+        Assert.All(cruz.Parcelas, p => Assert.Equal(450, p.Area, 3));
+        // Linha curva (arco discretizado) de baixo para cima: duas regiões que somam a quadra.
+        var arc = Enumerable.Range(0, 31).Select(i => new Vec2(30 + 8 * Math.Sin(i * Math.PI / 30), i)).ToArray();
+        var curva = LotDivider.Divide(PorLinhas(("arc", arc)));
+        Assert.Equal(2, curva.Parcelas.Count);
+        Assert.Equal(1800, curva.Parcelas.Sum(p => p.Area), 3);
+        // Linha que só encosta no contorno (não corta): não fecha lote.
+        var toca = LotDivider.Divide(PorLinhas(("t", new[] { new Vec2(10, 0), new Vec2(10, -5) })));
+        Assert.Single(toca.Parcelas);
+        Assert.Equal(new[] { "t" }, toca.LinhasSoltas);
+    }
+
+    [Fact]
+    public void L_MoverALinha_MantemAChaveEACategoria()
+    {
+        var q = PorLinhas(V("a", 15), V("b", 30));
+        var d0 = LotDivider.Divide(q);
+        var meio = d0.Parcelas.Single(p => p.Forma.Contains(new Vec2(22, 10)));
+        q.AjusteOuNovo(meio.Chave).Categoria = CategoriaLote.AreaVerde;
+        // A linha "a" vai para x = 12: o lote do meio fica maior e continua área verde.
+        q.LinhasLotes[0].Pontos = new List<Vec2> { new(12, 0), new(12, 30) };
+        var d1 = LotDivider.Divide(q);
+        var av = Assert.Single(d1.Parcelas, p => p.Categoria == CategoriaLote.AreaVerde);
+        Assert.Equal(meio.Chave, av.Chave);
+        Assert.Equal(18 * 30, av.Area, 3);
+        Assert.StartsWith("AV-", av.Numero);
+    }
+
+    [Fact]
+    public void L_Lasca_VaiParaOVizinho_SemPerderArea()
+    {
+        // Duas linhas a 2 cm uma da outra: lasca de 0,6 m² somada ao vizinho, com aviso.
+        var d = LotDivider.Divide(PorLinhas(V("a", 30), V("b", 30.02)));
+        Assert.Equal(2, d.Parcelas.Count);
+        Assert.Equal(1800, d.Parcelas.Sum(p => p.Area), 3);
+        Assert.Contains(d.Avisos, a => a.Contains("Lasca"));
+    }
+
+    [Fact]
+    public void L_QuadroEMemorialDosLotesPorLinhas()
+    {
+        var lot = new LoteamentoDefinition { Nome = "L", Gleba = Polygon2.Rectangle(new Vec2(-20, -20), new Vec2(80, 30)).Outer.ToList() };
+        var q = PorLinhas(V("a", 15), V("b", 30), V("c", 45));
+        q.LoteamentoId = lot.Id;
+        q.Testadas[0].Via = "Rua Sul";
+        var r = LotReport.Resumo(lot, new[] { q });
+        var rows = LotReport.LinhasLotes(r, "L");
+        Assert.Equal(4, rows.Count);
+        // Lote do meio: 15 × 30 – área 450 e perímetro 90, frente para a Rua Sul.
+        var (qq, d) = r.Quadras[0];
+        var p = d.Parcelas.Single(x => x.Forma.Contains(new Vec2(22, 10)));
+        var row = rows.Single(x => x[1] == p.Numero);
+        Assert.Equal(new[] { "Rua Sul", "450,00", "90,00" }, row[3..6]);
+        var lados = LotReport.Lados(p, d, qq, lot);
+        Assert.Equal("Rua Sul", Assert.Single(lados, l => l.Tipo == TipoLado.Frente).Confrontante);
+    }
+
+    [Fact]
+    public void L_CasosDeBorda_EsquinaArredondada_Vertice_LinhaSobreOContorno()
+    {
+        // Quadra de esquinas arredondadas (arcos discretizados): linhas de um lado a outro – as áreas somam a quadra.
+        var q = LTScenes.Scene("arredondada");
+        var (mn, mx) = q.Polygon!.Bounds;
+        q.Divisao = ModoDivisao.Linhas;
+        for (int i = 1; i < 6; i++)
+        {
+            var x = mn.X + (mx.X - mn.X) * i / 6;
+            q.LinhasLotes.Add(new LinhaDeLote { Elemento = "v" + i, Pontos = new() { new(x, mn.Y - 1), new(x, mx.Y + 1) } });
+        }
+        var d = LotDivider.Divide(q);
+        Assert.Equal(6, d.Parcelas.Count);
+        Assert.Equal(q.Polygon!.Area, d.Parcelas.Sum(p => p.Area), 3);
+        // Diagonal de quina a quina (passa pelos vértices) e uma linha por cima do contorno (não divide nada).
+        var r = PorLinhas(("diag", new[] { Vec2.Zero, new Vec2(60, 30) }), ("borda", new[] { new Vec2(0, 30), new Vec2(60, 30) }));
+        var dd = LotDivider.Divide(r);
+        Assert.Equal(2, dd.Parcelas.Count);
+        Assert.All(dd.Parcelas, p => Assert.Equal(900, p.Area, 3));
+        Assert.Equal(new[] { "borda" }, dd.LinhasSoltas);
+    }
 }

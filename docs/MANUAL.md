@@ -2706,6 +2706,28 @@ Ela é gravada ao reconhecer as quadras e refeita em *Reconhecer as quadras de n
 
 ### 27.2 Como os lotes são divididos
 
+**Lotes por Linhas (o jeito mais direto).** Desenhe no Revit linhas comuns (de modelo ou de detalhe) e use **Quadra e Lote →
+Lotes por Linhas**:
+
+1. selecione as **linhas do limite da quadra** (fechadas – as pontas se tocando) e clique **Concluir**; ou clique um **lote de
+   uma quadra existente** para usar o contorno dela. Um limite que coincide com uma quadra existente **assume essa quadra**
+   (nome, categorias e numeração ficam); senão vira uma quadra nova, com a próxima letra;
+2. selecione as **linhas que dividem os lotes** (em qualquer ordem; retas, arcos ou polilinhas; cruzando a quadra ou só
+   chegando no limite) e clique **Concluir**.
+
+Cada região fechada vira um lote, numerado pela regra da quadra (seção 27.3) e com a categoria padrão. Pontas que param a até
+**0,50 m** de outra linha ou do limite são prolongadas até lá; trechos que passam para fora são ignorados; linhas que não fecham
+nenhum lote ficam **selecionadas** no fim, com aviso; lascas menores que 1 m² entre linhas quase coincidentes vão para o lote
+vizinho (aviso), para que a soma dos lotes continue igual à área da quadra. A frente de cada lote é o trecho dele sobre o
+limite da quadra (de preferência numa testada); quem encosta em duas testadas é lote de esquina.
+
+**Para mudar**: mova ou edite as linhas no Revit e use **Atualizar** – os lotes são refeitos e a categoria de cada um continua
+(a chave do lote é formada pelas linhas que o fecham, não pela posição delas). Linhas apagadas saem (aviso). Para trocar o
+conjunto de linhas, rode Lotes por Linhas de novo. Na janela **Quadra**, *Divisão dos lotes* volta para "Pela testada" quando
+quiser (as linhas ficam guardadas). Quadras com o limite por linhas não são alteradas por "Reconhecer as quadras de novo".
+
+**Pela testada** (o modo de sempre):
+
 * **Frente** medida ao longo da testada; **divisas laterais perpendiculares** à testada (nas curvas, pela normal; nos vértices,
   pela bissetriz); **fundos** na profundidade dada, paralelos à testada.
 * **Esquinas arredondadas**: a frente é medida até o **encontro dos alinhamentos** (como se a esquina fosse viva); o arco só
@@ -2872,6 +2894,11 @@ lei municipal aplicável estão **[a confirmar]**.
 O loteamento fica num elemento de dados do projeto (DataStorage) e cada quadra é gravada nos elementos dos seus lotes, no
 mesmo esquema de dados das demais marcas do plugin (tipos novos "loteamento", "quadra", "detalhe-lotes" e
 "quadro-loteamento"). Os projetos antigos não mudam.
+
+Campos acrescentados na rodada LW (autorizados; opcionais – quadras antigas continuam pela testada): na quadra, **Divisao**
+(*Testada*, padrão, ou *Linhas*), **LinhasLotes** (lista de linhas com **Elemento** – UniqueId da linha do Revit – e **Pontos**, em
+m) e **LimiteElementos** (UniqueIds das linhas do limite; vazio = contorno reconhecido pelas vias). Lotes por linhas têm a chave
+"l:…" (linhas que fecham o lote e o lado de cada uma), usada nas personalizações (categoria).
 
 Campos acrescentados na rodada LV (autorizados; opcionais – projetos antigos leem o padrão): no loteamento,
 **Remanescentes** (lista de áreas com **Contorno** e **Furos**, em m – a sobra da gleba em volta das vias, gravada ao reconhecer

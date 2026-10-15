@@ -116,6 +116,22 @@ public sealed class EsquinaLote
     public EsquinaLote Clone() => (EsquinaLote)MemberwiseClone();
 }
 
+/// <summary>Como os lotes da quadra são formados.</summary>
+public enum ModoDivisao
+{
+    /// <summary>Pela testada: frente e profundidade, esquinas, sobra, miolo.</summary>
+    Testada,
+    /// <summary>Pelas linhas desenhadas no Revit (Lotes por Linhas): cada região fechada é um lote.</summary>
+    Linhas,
+}
+
+/// <summary>Linha que divide os lotes (modo por linhas): pontos (m) e UniqueId da linha do Revit.</summary>
+public sealed class LinhaDeLote
+{
+    public string Elemento { get; set; } = "";
+    public List<Vec2> Pontos { get; set; } = new();
+}
+
 /// <summary>
 /// Personalização de um lote (chave estável: testada + ordem ao longo dela, e a parte quando o lote é dividido): medidas,
 /// divisão e categoria. A chave não muda com a renumeração.
@@ -280,6 +296,12 @@ public sealed class QuadraDefinition : MarkingDefinition
     public bool Chanfro { get; set; }
     /// <summary>Comprimento da face do chanfro (m) – a hipotenusa, recuando o mesmo nas duas testadas; o padrão é a largura da calçada.</summary>
     public double ChanfroFace { get; set; }
+    /// <summary>Como os lotes são formados: pela testada (medidas) ou pelas linhas desenhadas (Lotes por Linhas).</summary>
+    public ModoDivisao Divisao { get; set; }
+    /// <summary>Linhas que dividem os lotes no modo por linhas (pontos e UniqueId de cada linha do Revit).</summary>
+    public List<LinhaDeLote> LinhasLotes { get; set; } = new();
+    /// <summary>UniqueIds das linhas do limite da quadra (vazio = contorno reconhecido pelas vias): o contorno segue essas linhas.</summary>
+    public List<string> LimiteElementos { get; set; } = new();
     /// <summary>Elevação (m) da base quando não há Toposolid.</summary>
     public double Z { get; set; }
 
@@ -302,6 +324,7 @@ public sealed class QuadraDefinition : MarkingDefinition
         Contorno = Contorno.Select(p => p + delta).ToList();
         foreach (var t in Testadas) t.Ponto += delta;
         foreach (var e in Esquinas) e.Ponto += delta;
+        foreach (var l in LinhasLotes) l.Pontos = l.Pontos.Select(p => p + delta).ToList();
         Z += dz;
     }
 

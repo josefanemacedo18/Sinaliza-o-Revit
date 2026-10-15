@@ -83,6 +83,8 @@ public sealed class DivisaoQuadra
     public List<Cadeia> Cadeias { get; } = new();
     public List<EsquinaInfo> Esquinas { get; } = new();
     public List<ChanfroQuina> Chanfros { get; } = new();
+    /// <summary>Linhas (modo por linhas) que não fecham nenhum lote – identificadores (UniqueId) para apontar no Revit.</summary>
+    public List<string> LinhasSoltas { get; } = new();
     public List<string> Avisos { get; } = new();
 }
 
@@ -406,6 +408,12 @@ public static class LotDivider
             chainOf[t.Id] = c;
             rank[c] = rank.Count;
         }
+        // Lotes pelas linhas desenhadas: cada região fechada é um lote (numeração, categorias, mínimos e uniões como sempre).
+        if (q.Divisao == ModoDivisao.Linhas)
+        {
+            PorLinhas(res, q, quad, chains);
+            return Fecha(res, q, categorias, frenteMinimaLote, areaMinimaLote);
+        }
         if (chainOf.Count == 0)
         {
             res.Avisos.Add($"Quadra {q.Nome}: nenhuma testada apontada – a quadra ficou numa área só ({q.MioloCategoria}).");
@@ -724,6 +732,12 @@ public static class LotDivider
                 res.Avisos.Add($"Quadra {q.Nome}: miolo de {LotReport.M(m.Area)} m² que nenhum lote alcança pelos fundos ficou como {cat} " +
                                "(mude a categoria em Lote ou una a um lote vizinho com Unir Lotes).");
         }
+        return Fecha(res, q, categorias, frenteMinimaLote, areaMinimaLote);
+    }
+
+    /// <summary>Uniões, lotes abaixo do mínimo e numeração (comum aos dois modos de divisão).</summary>
+    private static DivisaoQuadra Fecha(DivisaoQuadra res, QuadraDefinition q, IReadOnlyList<CategoriaLote> categorias, double frenteMinimaLote, double areaMinimaLote)
+    {
         var naoUnidos = Unir(res, q);
         foreach (var p in res.Parcelas.Where(p => string.Equals(p.Categoria, CategoriaLote.Lote, StringComparison.OrdinalIgnoreCase)))
         {
@@ -739,6 +753,77 @@ public static class LotDivider
         foreach (var p in res.Parcelas.Where(p => p.AbaixoDoMinimo != null))
             res.Avisos.Add($"Quadra {q.Nome}, lote {p.Numero}: abaixo do mínimo ({p.AbaixoDoMinimo}).");
         return res;
+    }
+
+    /// <summary>
+    /// Lotes pelas linhas desenhadas: as regiões fechadas da quadra (<see cref="DivisaoPorLinhas"/>). A frente de cada lote é o
+    /// trecho mais longo do contorno dele sobre o contorno da quadra – de preferência numa testada; lote que encosta em duas
+    /// testadas é de esquina; a posição da frente no contorno ordena a numeração.
+    /// </summary>
+    private static void PorLinhas(DivisaoQuadra res, QuadraDefinition q, Polygon2 quad, List<Cadeia> chains)
+    {
+        var linhas = q.LinhasLotes.Where(l => l.Pontos.Count >= 2)
+            .Select((l, i) => new LinhaDivisa(string.IsNullOrEmpty(l.Elemento) ? $"#{i + 1}" : l.Elemento, l.Pontos)).ToList();
+        var div = DivisaoPorLinhas.Dividir(quad, linhas);
+        res.Avisos.AddRange(div.Avisos.Select(a => $"Quadra {q.Nome}: {a}"));
+        res.LinhasSoltas.AddRange(div.LinhasSoltas);
+        if (div.LinhasSoltas.Count > 0)
+            res.Avisos.Add($"Quadra {q.Nome}: {div.LinhasSoltas.Count} linha(s) não fecham nenhum lote (soltas, fora da quadra ou paradas a mais de " +
+                           "0,50 m de outra linha) – estão selecionadas no Revit.");
+        var ring = quad.Outer;
+        var outer = new Polygon2(ring);
+        foreach (var r in div.Regioes)
+        {
+            // Trechos do contorno do lote sobre o contorno da quadra, separados por cadeia (lado da quadra).
+            var runs = new List<(List<Vec2> Pts, Cadeia? Chain)>();
+            var o = r.Forma.Outer;
+            for (int i = 0; i < o.Count; i++)
+            {
+                var a = o[i];
+                var b = o[(i + 1) % o.Count];
+                var mid = (a + b) / 2;
+                if (outer.DistanceTo(mid) > 1e-3) continue;
+                var c = CadeiaEm(chains, mid);
+                if (runs.Count > 0 && runs[^1].Chain == c && runs[^1].Pts[^1].DistanceTo(a) < 1e-6) runs[^1].Pts.Add(b);
+                else runs.Add((new List<Vec2> { a, b }, c));
+            }
+            if (runs.Count > 1 && runs[0].Chain == runs[^1].Chain && runs[^1].Pts[^1].DistanceTo(runs[0].Pts[0]) < 1e-6)
+            {
+                runs[^1].Pts.AddRange(runs[0].Pts.Skip(1));
+                runs.RemoveAt(0);
+            }
+            static double Len(List<Vec2> p) { var s = 0.0; for (int i = 0; i + 1 < p.Count; i++) s += p[i].DistanceTo(p[i + 1]); return s; }
+            var rankOf = q.Testadas.Select((t, i) => (t.Id, i)).ToDictionary(x => x.Id, x => x.i);
+            var front = runs.Where(x => Len(x.Pts) > 0.05)
+                .OrderBy(x => x.Chain?.TestadaId is { } id && rankOf.TryGetValue(id, out var k) ? k : int.MaxValue)
+                .ThenByDescending(x => Len(x.Pts)).Select(x => ((List<Vec2>, Cadeia?)?)x).FirstOrDefault();
+            var testadas = runs.Where(x => x.Chain?.TestadaId != null && Len(x.Pts) >= 1).Select(x => x.Chain).Distinct().Count();
+            var lados = runs.Where(x => Len(x.Pts) >= 1).Select(x => x.Chain).Distinct().Count();
+            var lf = front?.Item1 ?? new List<Vec2>();
+            res.Parcelas.Add(new Parcela
+            {
+                Chave = r.Chave, Forma = r.Forma, Categoria = q.Ajuste(r.Chave)?.Categoria ?? q.CategoriaPadrao, TestadaId = front?.Item2?.TestadaId,
+                Frente = lf.Count >= 2 ? Len(lf) : 0, LinhaFrente = lf, Esquina = q.Testadas.Count > 0 ? testadas >= 2 : lados >= 2,
+                Posicao = lf.Count >= 2 ? Estaca(ring, new Polyline2(lf).PointAt(Len(lf) / 2)) : double.NaN,
+            });
+        }
+    }
+
+    /// <summary>Estaca (m) do ponto no perímetro do anel (a partir do primeiro vértice).</summary>
+    private static double Estaca(IReadOnlyList<Vec2> ring, Vec2 p)
+    {
+        double best = double.MaxValue, at = 0, cum = 0;
+        for (int i = 0; i < ring.Count; i++)
+        {
+            var a = ring[i];
+            var ab = ring[(i + 1) % ring.Count] - a;
+            var l = ab.Length;
+            var t = l < 1e-12 ? 0 : Math.Clamp((p - a).Dot(ab) / (l * l), 0, 1);
+            var d = p.DistanceTo(a + ab * t);
+            if (d < best) { best = d; at = cum + t * l; }
+            cum += l;
+        }
+        return at;
     }
 
     /// <summary>
