@@ -605,6 +605,15 @@ public static class IconFactory
                 dc.DrawLine(P(key == "quadra" ? Red : Asphalt, 3), new Point(2, 28), new Point(30, 28));
                 break;
             }
+            case "categorialote":
+            {
+                // Lotes com cores de categoria e um pincel.
+                dc.DrawRectangle(B(Color.FromRgb(242, 215, 166)), P(Asphalt, 1.2), new Rect(3, 3, 13, 22));
+                dc.DrawRectangle(B(Color.FromRgb(155, 203, 138)), P(Asphalt, 1.2), new Rect(16, 3, 13, 22));
+                dc.DrawLine(P(Asphalt, 3), new Point(14, 30), new Point(26, 14));
+                dc.DrawRectangle(B(Red), null, new Rect(24, 9, 5, 6));
+                break;
+            }
             case "lotelinhas":
             {
                 // Quadra com as linhas desenhadas (vermelhas) que dividem os lotes.

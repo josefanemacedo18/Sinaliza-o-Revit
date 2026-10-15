@@ -209,4 +209,50 @@ public class LWLotesTests
         Assert.All(dd.Parcelas, p => Assert.Equal(900, p.Area, 3));
         Assert.Equal(new[] { "borda" }, dd.LinhasSoltas);
     }
+
+    // ================================================================== 3 – categoria por clique (pincel)
+
+    [Fact]
+    public void C_PincelDeCategoria_TestadaELinhas()
+    {
+        // Pela testada: um lote vira institucional; a numeração se refaz (AI-1) e os vizinhos não mudam.
+        var w = LTScenes.World();
+        var q = w.Quadras[0];
+        var d = LotDivider.Divide(q, w.Lot);
+        var p = d.Parcelas.First(x => x.Categoria == CategoriaLote.Lote && !x.Esquina);
+        LotDivider.DefineCategoria(q, p, CategoriaLote.Institucional);
+        var d1 = LotDivider.Divide(q, w.Lot);
+        var inst = Assert.Single(d1.Parcelas, x => x.Chave == p.Chave);
+        Assert.Equal(CategoriaLote.Institucional, inst.Categoria);
+        Assert.StartsWith("AI-", inst.Numero);
+        Assert.Equal(d.Parcelas.Count, d1.Parcelas.Count);
+        // De volta a lote: o ajuste sai (nada gravado à toa).
+        LotDivider.DefineCategoria(q, inst, CategoriaLote.Lote);
+        Assert.Null(q.Ajuste(p.Chave));
+        // Por linhas: área verde num lote; os outros continuam lotes 1..3.
+        var l = PorLinhas(V("a", 15), V("b", 30), V("c", 45));
+        var dl = LotDivider.Divide(l);
+        LotDivider.DefineCategoria(l, dl.Parcelas[1], CategoriaLote.AreaVerde);
+        var dl1 = LotDivider.Divide(l);
+        Assert.Equal(dl.Parcelas[1].Chave, Assert.Single(dl1.Parcelas, x => x.Categoria == CategoriaLote.AreaVerde).Chave);
+        Assert.Equal(new[] { "1", "2", "3" }, dl1.Parcelas.Where(x => x.Categoria == CategoriaLote.Lote).Select(x => x.Numero).OrderBy(x => x));
+    }
+
+    [Fact]
+    public void Q_LoteComFrenteEFundosParaVia_NaoEEsquina()
+    {
+        // Gleba em volta de toda a quadra: os lados norte e sul são vias; o lote do meio (15 × 30) tem frente e fundos para via.
+        var lot = new LoteamentoDefinition { Nome = "L", Gleba = Polygon2.Rectangle(new Vec2(-20, -20), new Vec2(80, 50)).Outer.ToList() };
+        var q = PorLinhas(V("a", 15), V("b", 30), V("c", 45));
+        q.LoteamentoId = lot.Id;
+        var r = LotReport.Resumo(lot, new[] { q });
+        var (qq, d) = r.Quadras[0];
+        var meio = d.Parcelas.Single(x => x.Forma.Contains(new Vec2(22, 10)));
+        var obs = LotReport.LinhaLote(meio, d, qq, lot)[6];
+        Assert.DoesNotContain("esquina", obs);
+        Assert.Contains("frente e fundos para via", obs);
+        // O da ponta (via também no lado) é esquina.
+        var ponta = d.Parcelas.Single(x => x.Forma.Contains(new Vec2(5, 10)));
+        Assert.Contains("esquina", LotReport.LinhaLote(ponta, d, qq, lot)[6]);
+    }
 }

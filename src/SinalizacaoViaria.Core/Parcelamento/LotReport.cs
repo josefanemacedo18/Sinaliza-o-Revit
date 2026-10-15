@@ -305,8 +305,9 @@ public static class LotReport
         var ruas = lados.Where(l => l.Via && l.Tipo != TipoLado.Chanfro).OrderBy(l => l.Tipo == TipoLado.Frente ? 0 : 1).Select(l => l.Confrontante)
             .Distinct().ToList();
         var obs = new List<string>();
-        // Esquina: dois lados para via (a frente e a lateral).
-        if (lados.Count(l => l.Via && l.Tipo != TipoLado.Chanfro) >= 2) obs.Add("esquina");
+        // Esquina: a outra via fica num lado; nos fundos, o lote tem frente e fundos para via (não é esquina).
+        if (lados.Any(l => l.Via && l.Tipo is TipoLado.LadoDireito or TipoLado.LadoEsquerdo)) obs.Add("esquina");
+        else if (lados.Any(l => l.Via && l.Tipo == TipoLado.Fundos)) obs.Add("frente e fundos para via");
         if (p.Unidos is { Count: > 1 } u) obs.Add($"união de {u.Count} lotes");
         if (lados.Any(l => l.Tipo == TipoLado.Frente && l.Curvo)) obs.Add("frente em curva");
         foreach (var l in lados.Where(l => l.Tipo == TipoLado.Chanfro)) obs.Add($"chanfro {M(l.Comprimento)} m");

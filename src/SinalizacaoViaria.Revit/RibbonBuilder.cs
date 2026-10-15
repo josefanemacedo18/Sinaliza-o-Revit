@@ -212,6 +212,8 @@ public static class RibbonBuilder
                 "(por uma testada, pela outra ou com medida própria), sentido da numeração e lote 1."),
             Data(typeof(CmdLotesPorLinhas), "Lotes por Linhas", "lotelinhas",
                 "Selecione o limite da quadra (linhas fechadas ou um lote de uma quadra) e depois as linhas que dividem os lotes: cada região fechada vira um lote. Mova as linhas e use Atualizar para refazer."),
+            Data(typeof(CmdCategoriaLote), "Categoria do Lote", "categorialote",
+                "Pincel: escolha a categoria (Lote, Institucional, Área verde...) e clique os lotes um a um – cada clique já aplica; ESC termina."),
             Data(typeof(CmdLote), "Lote", "lote",
                 "Clique um lote: frente, profundidade, divisão em partes e categoria (Lote, Institucional, Área verde ou outra) – os vizinhos e a numeração se ajustam."),
             Data(typeof(CmdUnirLotes), "Unir Lotes", "unirlotes",
@@ -222,6 +224,8 @@ public static class RibbonBuilder
                 "Categorias de lote (cor e hachura em planta e no 3D, numeração com prefixo, área pública, mínimo %), nova categoria e filtros de vista para mostrar/ocultar cada uma."));
         Split(lote, "SvLoteDoc", "Detalhar e Quadros",
             Data(typeof(CmdDetalharLotes), "Detalhar Lotes", "detalhelotes", "Na vista ativa: número, área, medidas dos lados, categoria, letra da quadra num círculo e nome das vias (cada item opcional)."),
+            Data(typeof(CmdQuadroQuadra), "Quadro da Quadra", "quadrolote",
+                "Clique um lote: o quadro de lotes só daquela quadra (lote, categoria, via, área, perímetro), numa Legenda própria para qualquer folha ou na vista ativa."),
             Data(typeof(CmdQuadrosLoteamento), "Quadros do Loteamento", "quadrolote",
                 "Quadro de áreas (m² e % da gleba), de quadras e de lotes (lote a lote: via, área e perímetro – todas as quadras, uma ou uma por quadra) " +
                 "numa Legenda própria (vai para qualquer folha) – e a tabela nativa dos lotes."),

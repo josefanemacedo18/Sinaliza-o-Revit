@@ -809,6 +809,18 @@ public static class LotDivider
         }
     }
 
+    /// <summary>
+    /// Categoria do lote <paramref name="p"/> (pelo pincel ou pela janela Lote): gravada no ajuste da chave dele; a categoria
+    /// padrão da quadra (a do miolo nas áreas de miolo) não é gravada.
+    /// </summary>
+    public static void DefineCategoria(QuadraDefinition q, Parcela p, string categoria)
+    {
+        var baseKey = p.Chave.Contains('.') ? p.Chave[..p.Chave.IndexOf('.')] : p.Chave;
+        var padrao = p.Chave.StartsWith("m:") || p.Chave == "q" && !q.Inteira ? q.MioloCategoria : q.CategoriaPadrao;
+        q.AjusteOuNovo(p.Chave).Categoria = string.Equals(categoria, padrao, StringComparison.OrdinalIgnoreCase) && p.Chave == baseKey ? null : categoria;
+        q.Ajustes.RemoveAll(x => x.Frente == null && x.Profundidade == null && x.Partes <= 1 && x.Categoria == null);
+    }
+
     /// <summary>Estaca (m) do ponto no perímetro do anel (a partir do primeiro vértice).</summary>
     private static double Estaca(IReadOnlyList<Vec2> ring, Vec2 p)
     {

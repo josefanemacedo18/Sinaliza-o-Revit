@@ -52,10 +52,11 @@ internal static class LotCommands
         ?? throw new UserMessageException("Nenhum loteamento neste projeto: use primeiro Loteamento (gleba → quadras → lotes).");
 
     /// <summary>Lote clicado (ou pré-selecionado): elemento, quadra e chave do lote.</summary>
-    public static (Element Element, QuadraDefinition Quadra, string Key)? PickLot(UIDocument uidoc, string prompt)
+    public static (Element Element, QuadraDefinition Quadra, string Key)? PickLot(UIDocument uidoc, string prompt, bool preselection = true)
     {
         var doc = uidoc.Document;
-        var pre = uidoc.Selection.GetElementIds().Select(doc.GetElement).FirstOrDefault(e => e != null && new LotSelectionFilter().AllowElement(e));
+        var pre = !preselection ? null
+            : uidoc.Selection.GetElementIds().Select(doc.GetElement).FirstOrDefault(e => e != null && new LotSelectionFilter().AllowElement(e));
         Element? e = pre;
         if (e == null)
         {
@@ -472,6 +473,50 @@ public sealed class CmdLotesPorLinhas : CommandBase
     }
 }
 
+/// <summary>
+/// Categoria do Lote (pincel): escolhe a categoria (Lote, Institucional, Área verde...) e clica os lotes um a um – cada clique já
+/// aplica e a numeração se refaz; ESC termina. Vale para lotes pela testada e por linhas.
+/// </summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdCategoriaLote : CommandBase
+{
+    protected override Result Run(UIApplication app, UIDocument uidoc)
+    {
+        var doc = uidoc.Document;
+        var lot = LotCommands.RequireLot(doc);
+        var cat = CategoriaLote.Lote;
+        if (UiHelpers.ShowModal(LotForms.CategoriaPincel(lot, () => cat, v => cat = v)) != true) return Result.Cancelled;
+        uidoc.Selection.SetElementIds(new List<ElementId>());
+        var results = new List<RenderResult>();
+        var n = 0;
+        while (LotCommands.PickLot(uidoc, $"Clique os lotes que passam a ser \"{cat}\" – ESC termina", preselection: false) is { } picked)
+        {
+            var (_, q, key) = picked;
+            var p = LotDivider.Divide(q, lot).Parcelas.FirstOrDefault(x => x.Chave == key);
+            if (p == null) continue;
+            LotDivider.DefineCategoria(q, p, cat);
+            results.AddRange(LotCommands.Commit(uidoc, null, new[] { q }, $"SV - {cat}: lote {p.Numero} da quadra {q.Nome}"));
+            n++;
+        }
+        if (n == 0) return Result.Cancelled;
+        if (results.Any(r => r.Warnings.Count > 0)) LotCommands.Report($"{n} lote(s) passaram a ser {cat}.", results);
+        return Result.Succeeded;
+    }
+}
+
+/// <summary>Quadro de lotes de uma quadra: clique um lote dela e escolha onde o quadro vai (Legenda própria ou vista ativa).</summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdQuadroQuadra : CommandBase
+{
+    protected override Result Run(UIApplication app, UIDocument uidoc)
+    {
+        var lot = LotCommands.RequireLot(uidoc.Document);
+        var l = LotCommands.PickLot(uidoc, "Clique um lote da quadra do quadro");
+        if (l == null) return Result.Cancelled;
+        return CmdQuadrosLoteamento.Coloca(uidoc, new QuadroLoteamentoDefinition { LoteamentoId = lot.Id, Conteudo = TipoQuadroLoteamento.Lotes, Quadra = l.Value.Quadra.Nome });
+    }
+}
+
 /// <summary>Lote: frente, profundidade, divisão e categoria – os vizinhos e a numeração se ajustam.</summary>
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdLote : CommandBase
@@ -676,7 +721,13 @@ public sealed class CmdQuadrosLoteamento : CommandBase
                 default: return Result.Cancelled;
             }
         }
-        var template = new QuadroLoteamentoDefinition { LoteamentoId = lot.Id, Conteudo = tipo.Value, Quadra = quadra };
+        return Coloca(uidoc, new QuadroLoteamentoDefinition { LoteamentoId = lot.Id, Conteudo = tipo.Value, Quadra = quadra });
+    }
+
+    /// <summary>Quadro do loteamento numa Legenda própria (qualquer folha) ou na vista ativa, no ponto clicado.</summary>
+    internal static Result Coloca(UIDocument uidoc, QuadroLoteamentoDefinition template)
+    {
+        var doc = uidoc.Document;
         var label = template.KindName;
         var place = TablePlacementWindow.Ask(doc, uidoc.ActiveView, label.ToLowerInvariant(), ProjectTableViews.ViewName(template));
         if (place == null) return Result.Cancelled;

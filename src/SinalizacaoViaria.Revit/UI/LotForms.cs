@@ -335,6 +335,13 @@ public static class LotForms
         return w;
     }
 
+    /// <summary>Categoria do pincel (Categoria do Lote): a escolhida vale para cada lote clicado depois.</summary>
+    public static FormWindow CategoriaPincel(LoteamentoDefinition? lot, Func<string> get, Action<string> set) =>
+        new FormWindow("Loteamento – Categoria do Lote", "Categoria do lote",
+                "Escolha a categoria e clique os lotes, um a um – cada clique já aplica e a numeração da quadra se refaz. ESC termina. " +
+                "Vale para lotes pela testada e por linhas.", null, null, showOutput: false, okText: "Clicar os lotes", width: 560, height: 320)
+            .Choice("Categoria", CategoryOptions(lot), get, set);
+
     /// <summary>Categorias (nome, cor, hachura, pública, prefixo, mínimo), dados do loteamento e filtros da vista ativa.</summary>
     public sealed class CategoriasOpcoes
     {

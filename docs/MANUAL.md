@@ -2804,6 +2804,10 @@ de grama, pública, AV). Em **Categorias e Filtros** você muda nome, cor (#RRGG
 lotes delas voltam a Lote). Loteamentos criados na rodada anterior podem ter a categoria "Sobra" na lista: nenhum lote a usa
 mais (some dos quadros) – exclua-a em Categorias e Filtros.
 
+**Categoria do Lote (pincel)** – Quadra e Lote → *Categoria do Lote*: escolha a categoria (Lote, Institucional, Área verde ou
+outra do loteamento) e clique os lotes, um a um; cada clique já aplica (cor, número com o prefixo – AI-1, AV-1 – e a numeração
+da quadra se refazem). ESC termina. Vale para lotes pela testada e por linhas; para voltar, clique o lote com a categoria Lote.
+
 No Revit, cada categoria tem:
 
 * um **material** "SV - Lote – {categoria}": cor no **3D** e, em planta, fundo na cor com a hachura por cima;
@@ -2855,11 +2859,14 @@ as divisas por baixo) – por isso aparece também no masterplan.
 * **Quadro de quadras**: lotes e área por categoria de cada quadra, com total.
 * **Quadro de lotes – lote a lote**, na ordem da numeração: **lote**, **categoria**, **via** (nome da rua; as duas ruas no lote
   de esquina, a da frente primeiro), **área** (m²), **perímetro** (m, com o desenvolvimento dos trechos em curva) e
-  **observação** (esquina, chanfro, união de lotes, frente em curva, abaixo do mínimo, sem frente para via); no quadro com
+  **observação** (esquina – a outra rua num lado –, frente e fundos para via, chanfro, união de lotes, frente em curva, abaixo
+  do mínimo, sem frente para via); no quadro com
   todas as quadras, a coluna **quadra** vem antes. As medidas dos lados ficam no detalhamento (cotas) e no memorial. **Cada
   lote tem uma frente só** – a da testada dele; no lote de esquina o lado para a outra rua é o lado direito ou esquerdo,
   confrontando com essa rua (nada de frente somada). Ao escolher: **todas as quadras** num quadro (continua em colunas ao lado a cada 40 linhas),
-  **uma quadra** (clique um lote dela; título "QUADRO DE LOTES – QUADRA A") ou **um quadro por quadra** (cada um na sua Legenda,
+  **uma quadra** (clique um lote dela; título "QUADRO DE LOTES – QUADRA A" – também direto pelo botão **Quadro da Quadra**, em
+  Detalhar e Quadros: clique um lote e escolha se o quadro vai para uma Legenda própria, que entra em qualquer folha, ou para a
+  vista ativa, no ponto clicado) ou **um quadro por quadra** (cada um na sua Legenda,
   e todos na mesma folha se você pedir).
 * **Tabela do Revit**: "SV - Lotes do loteamento", nativa (quadra, lote, categoria, área), atualizada pelo próprio Revit.
 
