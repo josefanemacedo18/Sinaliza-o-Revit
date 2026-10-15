@@ -63,12 +63,26 @@ public sealed class Cadeia
 /// <summary>Esquina entre duas testadas consecutivas: onde a escolha do lote de esquina vale.</summary>
 public sealed record EsquinaInfo(Vec2 Ponto, string Anterior, string Posterior, double Giro, EsquinaLote Escolha);
 
+/// <summary>
+/// Chanfro da quina de esquina: <paramref name="Vertice"/> no encontro dos alinhamentos, a face de <paramref name="A"/> (na testada
+/// que chega à esquina) a <paramref name="B"/> (na que sai) e o triângulo que sai do lote.
+/// </summary>
+public sealed record ChanfroQuina(Vec2 Vertice, Vec2 A, Vec2 B, double Face, Polygon2 Triangulo)
+{
+    /// <summary>O lado <paramref name="a"/>–<paramref name="b"/> é a face deste chanfro (em qualquer sentido).</summary>
+    public bool EFace(Vec2 a, Vec2 b, double tol = 0.02) =>
+        a.DistanceTo(A) < tol && b.DistanceTo(B) < tol || a.DistanceTo(B) < tol && b.DistanceTo(A) < tol;
+}
+
 public sealed class DivisaoQuadra
 {
     public Polygon2 Quadra { get; init; } = null!;
+    /// <summary>Contorno sem os chanfros (com as quinas vivas); nulo quando a quadra não tem chanfro.</summary>
+    public Polygon2? SemChanfro { get; init; }
     public List<Parcela> Parcelas { get; } = new();
     public List<Cadeia> Cadeias { get; } = new();
     public List<EsquinaInfo> Esquinas { get; } = new();
+    public List<ChanfroQuina> Chanfros { get; } = new();
     public List<string> Avisos { get; } = new();
 }
 
@@ -255,6 +269,80 @@ public static class LotDivider
         return r;
     }
 
+    // ------------------------------------------------------------------ chanfro das quinas
+
+    /// <summary>A quadra tem chanfro ligado, com alguma face maior que zero (a dela ou a de alguma esquina).</summary>
+    public static bool TemChanfro(QuadraDefinition q) => q.Chanfro && !q.Inteira && (q.ChanfroFace > 0.05 || q.Esquinas.Any(e => e.Chanfro > 0.05));
+
+    /// <summary>
+    /// Chanfros das quinas da quadra (com <see cref="QuadraDefinition.Chanfro"/> ligado): em cada esquina convexa entre duas
+    /// testadas, a face (hipotenusa) com a medida da esquina (<see cref="EsquinaLote.Chanfro"/>; 0 = sem chanfro nela) ou a da
+    /// quadra (<see cref="QuadraDefinition.ChanfroFace"/>), com os catetos iguais ao longo das duas testadas a partir do encontro
+    /// dos alinhamentos. Vazio sem chanfro.
+    /// </summary>
+    public static List<ChanfroQuina> Chanfros(QuadraDefinition q)
+    {
+        if (!TemChanfro(q) || q.Polygon is not { IsValid: true } poly) return new();
+        var chains = Cadeias(CleanRing(poly.Outer));
+        var ids = new Dictionary<Cadeia, string>();
+        foreach (var t in q.Testadas)
+            if (CadeiaEm(chains, t.Ponto) is { } c && !ids.ContainsKey(c)) ids[c] = t.Id;
+        return Chanfros(q, chains, c => ids.GetValueOrDefault(c));
+    }
+
+    /// <summary>
+    /// Largura da calçada na quina <paramref name="p"/> do lote – o padrão da face do chanfro: a menor das calçadas das vias cujo
+    /// alinhamento passa pela quina (até <paramref name="tol"/> m); nula sem via.
+    /// </summary>
+    public static double? CalcadaNaQuina(IEnumerable<Generators.IntersectionRoad> roads, Vec2 p, double tol = 1.0)
+    {
+        double? best = null;
+        foreach (var r in roads)
+        {
+            var signed = r.Axis.Project(p).Signed;
+            var (edge, walk) = signed >= 0 ? (r.Def.TotalLeft, r.Def.LeftSidewalk) : (r.Def.TotalRight, r.Def.RightSidewalk);
+            if (walk < 0.05 || Math.Abs(Math.Abs(signed) - edge) > tol) continue;
+            best = best == null ? walk : Math.Min(best.Value, walk);
+        }
+        return best;
+    }
+
+    /// <summary>Triângulos dos chanfros das quadras do projeto (perto de <paramref name="near"/>, quando dado).</summary>
+    public static List<Polygon2> Triangulos(IEnumerable<MarkingDefinition> all, Vec2? near = null, double radius = 60) =>
+        all.OfType<QuadraDefinition>().Where(TemChanfro).SelectMany(Chanfros)
+            .Where(c => near == null || c.Vertice.DistanceTo(near.Value) <= radius).Select(c => c.Triangulo).ToList();
+
+    private static List<ChanfroQuina> Chanfros(QuadraDefinition q, IReadOnlyList<Cadeia> chains, Func<Cadeia, string?> testada)
+    {
+        var res = new List<ChanfroQuina>();
+        if (!TemChanfro(q) || chains.Count < 2) return res;
+        for (int i = 0; i < chains.Count; i++)
+        {
+            var c = chains[i];
+            var nx = chains[(i + 1) % chains.Count];
+            if (testada(c) == null || testada(nx) == null || c.GiroFim <= 1) continue;
+            var corner = c.Pontos[^1];
+            var esq = q.Esquinas.Where(e => e.Ponto.DistanceTo(corner) < 5).OrderBy(e => e.Ponto.DistanceTo(corner)).FirstOrDefault();
+            var face = esq?.Chanfro ?? q.ChanfroFace;
+            if (face < 0.05) continue;
+            var la = c.Linha;
+            var lb = nx.Linha;
+            var v = la.Points[^1];
+            var ua = (la.Points[^2] - v).Normalized();
+            var ub = (lb.Points[1] - v).Normalized();
+            var half = Math.Acos(Math.Clamp(ua.Dot(ub), -1, 1)) / 2;
+            if (half < 1e-3) continue;
+            // Catetos iguais: face = 2 × cateto × sen(ângulo/2); no máximo 45 % de cada testada.
+            var leg = Math.Min(face / (2 * Math.Sin(half)), 0.45 * Math.Min(la.Length, lb.Length));
+            var a = la.PointAt(la.Length - leg);
+            var b = lb.PointAt(leg);
+            var tri = new Polygon2(new[] { a, v, b });
+            if (tri.Area < 1e-4) continue;
+            res.Add(new ChanfroQuina(v, a, b, a.DistanceTo(b), tri));
+        }
+        return res;
+    }
+
     /// <summary>Cadeia mais próxima do ponto.</summary>
     public static Cadeia? CadeiaEm(IReadOnlyList<Cadeia> cadeias, Vec2 p) =>
         cadeias.OrderBy(c => Math.Abs(new Polyline2(c.Pontos).Project(p).Signed)).FirstOrDefault();
@@ -324,6 +412,17 @@ public static class LotDivider
             res.Parcelas.Add(new Parcela { Chave = "q", Forma = quad, Categoria = q.MioloCategoria });
             Numerar(res, q, categorias);
             return res;
+        }
+        // Chanfro das quinas de esquina: o triângulo sai da quadra (a calçada da interseção fica com ele); as frentes e as divisas
+        // continuam medidas a partir do encontro dos alinhamentos.
+        var chanfros = Chanfros(q, chains, c => c.TestadaId);
+        var sharp = quad;
+        if (chanfros.Count > 0 && Largest(PolygonOps.Difference(new[] { quad }, chanfros.Select(c => c.Triangulo))) is { } cut)
+        {
+            quad = new Polygon2(CleanRing(cut.Outer), cut.Holes);
+            res = new DivisaoQuadra { Quadra = quad, SemChanfro = sharp };
+            res.Cadeias.AddRange(chains);
+            res.Chanfros.AddRange(chanfros);
         }
         var testada = q.Testadas.Where(t => chainOf.ContainsKey(t.Id)).ToDictionary(t => t.Id);
         var nC = chains.Count;
@@ -546,7 +645,7 @@ public static class LotDivider
             {
                 Chave = cl.Key, Forma = shape, Categoria = aj?.Categoria ?? q.CategoriaPadrao, TestadaId = cl.Prev.TestadaId,
                 Frente = cl.FPrev + cl.FNext, Profundidade = Math.Max(cl.FPrev, cl.FNext), LinhaFrente = front, Esquina = true,
-                Posicao = Perimeter(quad, cl.Prev.Inicio + cl.Prev.Comprimento),
+                Posicao = Perimeter(sharp, cl.Prev.Inicio + cl.Prev.Comprimento),
             });
         }
         foreach (var sl in slots.OrderBy(x => x.Pass).ThenBy(x => x.ChainRank).ThenBy(x => x.A))
@@ -569,7 +668,7 @@ public static class LotDivider
             {
                 Chave = sl.Key, Forma = shape, Categoria = cat, TestadaId = sl.Testada.Id, Ordem = sl.Ordem, Parte = sl.Parte,
                 Frente = sl.B - sl.A, Profundidade = sl.Depth, LinhaFrente = line.SubPoints(sl.A, sl.B), Sobra = sl.Sobra,
-                Esquina = sl.Corner, Posicao = Perimeter(quad, sl.Chain.Inicio + (sl.A + sl.B) / 2),
+                Esquina = sl.Corner, Posicao = Perimeter(sharp, sl.Chain.Inicio + (sl.A + sl.B) / 2),
             };
             res.Parcelas.Add(parcel);
             var baseKey = sl.Parte > 0 ? $"{sl.Testada.Id}:{sl.Ordem}" : sl.Key;
@@ -892,8 +991,10 @@ public static class LotDivider
     public static void Numerar(DivisaoQuadra d, QuadraDefinition q, IReadOnlyList<CategoriaLote> categorias)
     {
         if (d.Parcelas.Count == 0) return;
-        var per = Perimeter(new Polygon2(d.Quadra.Outer));
-        var (mn, mx) = d.Quadra.Bounds;
+        // Estacas no contorno com as quinas vivas (o chanfro não muda a numeração).
+        var contorno = d.SemChanfro ?? d.Quadra;
+        var per = Perimeter(new Polygon2(contorno.Outer));
+        var (mn, mx) = contorno.Bounds;
         var nw = new Vec2(mn.X, mx.Y);
         Vec2 FrontMid(Parcela p) => p.LinhaFrente.Count >= 2 ? new Polyline2(p.LinhaFrente).PointAt(new Polyline2(p.LinhaFrente).Length / 2) : p.Forma.Centroid;
         var withPos = d.Parcelas.Where(p => !double.IsNaN(p.Posicao)).ToList();

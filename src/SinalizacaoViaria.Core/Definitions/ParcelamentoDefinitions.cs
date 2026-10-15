@@ -110,6 +110,8 @@ public sealed class EsquinaLote
     public double FrenteAnterior { get; set; } = 15;
     /// <summary>Medida própria: frente (m) na testada que sai da esquina.</summary>
     public double FrentePosterior { get; set; } = 15;
+    /// <summary>Chanfro da quina nesta esquina: comprimento da face (m). Nulo = o da quadra; 0 = sem chanfro aqui.</summary>
+    public double? Chanfro { get; set; }
 
     public EsquinaLote Clone() => (EsquinaLote)MemberwiseClone();
 }
@@ -271,6 +273,13 @@ public sealed class QuadraDefinition : MarkingDefinition
     public List<LoteAjuste> Ajustes { get; set; } = new();
     /// <summary>Escolha do lote de esquina em cada esquina entre testadas (sem escolha = prioridade das testadas).</summary>
     public List<EsquinaLote> Esquinas { get; set; } = new();
+    /// <summary>
+    /// Chanfra as quinas da quadra voltadas para os cruzamentos (entre duas testadas): a quina sai do lote de esquina (cotada e
+    /// descontada da área) e a calçada da interseção ocupa o chanfro.
+    /// </summary>
+    public bool Chanfro { get; set; }
+    /// <summary>Comprimento da face do chanfro (m) – a hipotenusa, recuando o mesmo nas duas testadas; o padrão é a largura da calçada.</summary>
+    public double ChanfroFace { get; set; }
     /// <summary>Elevação (m) da base quando não há Toposolid.</summary>
     public double Z { get; set; }
 

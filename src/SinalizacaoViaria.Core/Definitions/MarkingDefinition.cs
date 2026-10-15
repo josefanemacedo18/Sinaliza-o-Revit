@@ -1708,6 +1708,13 @@ public sealed class IntersectionDefinition : MarkingDefinition
     [JsonIgnore]
     public List<Vec2> NeighborNodes { get; set; } = new();
 
+    /// <summary>
+    /// Chanfros das quinas dos lotes de esquina em volta (quadras do loteamento): a calçada da interseção ocupa cada triângulo
+    /// que saiu do lote. Lido das quadras a cada geração; não gravado.
+    /// </summary>
+    [JsonIgnore]
+    public List<Polygon2> ChanfrosLote { get; set; } = new();
+
     /// <summary>Tipo II – ilha separadora (gota) nas aproximações das vias secundárias, com alargamento da pista.</summary>
     public TipoIlha SplitterIslands { get; set; } = TipoIlha.Nenhuma;
     public double SplitterLength { get; set; } = 15.0;

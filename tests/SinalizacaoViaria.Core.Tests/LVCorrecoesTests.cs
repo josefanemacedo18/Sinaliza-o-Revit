@@ -327,4 +327,166 @@ public class LVCorrecoesTests
         var faults = Y34TipTests.Faults(w);
         Assert.True(faults.Count == 0, string.Join(" | ", faults));
     }
+
+    // ================================================================== 5 – chanfro na quina do lote de esquina
+
+    /// <summary>
+    /// Quadra em paralelogramo com a quina V = (0, 0) de ângulo interno <paramref name="ang"/> entre duas testadas (os outros lados
+    /// são divisas): lotes de 12 m × 20 m.
+    /// </summary>
+    private static QuadraDefinition Paralelogramo(double ang)
+    {
+        var d = Y34TipTests.Dir(ang) * 40;
+        var q = new QuadraDefinition { Nome = "A", Frente = 12, Profundidade = 20, Contorno = new() { Vec2.Zero, new Vec2(60, 0), new Vec2(60, 0) + d, d } };
+        q.Testadas.Add(new TestadaLote { Id = "T1", Ponto = new Vec2(30, 0) });
+        q.Testadas.Add(new TestadaLote { Id = "T2", Ponto = d / 2 });
+        return q;
+    }
+
+    /// <summary>Lado do lote com as duas pontas a <paramref name="leg"/> da quina <paramref name="v"/> (a face do chanfro).</summary>
+    private static (Vec2 A, Vec2 B)? Face(Polygon2 p, Vec2 v, double leg)
+    {
+        var r = p.Outer;
+        for (int i = 0; i < r.Count; i++)
+        {
+            var a = r[i];
+            var b = r[(i + 1) % r.Count];
+            if (Math.Abs(a.DistanceTo(v) - leg) < 0.02 && Math.Abs(b.DistanceTo(v) - leg) < 0.02) return (a, b);
+        }
+        return null;
+    }
+
+    [Theory]
+    [InlineData(90.0, 3.0)]
+    [InlineData(60.0, 3.0)]
+    [InlineData(120.0, 2.5)]
+    [InlineData(90.0, 6.0)]
+    public void D5_Chanfro_FaceNaQuinaDescontadaDoLoteDeEsquina(double ang, double face)
+    {
+        var q = Paralelogramo(ang);
+        var antes = LotDivider.Divide(q);
+        q.Chanfro = true;
+        q.ChanfroFace = face;
+        var depois = LotDivider.Divide(q);
+        var half = ang / 2 * Math.PI / 180;
+        var leg = face / (2 * Math.Sin(half));
+        var tri = face * face / (4 * Math.Tan(half));
+        // A quadra e o lote de esquina perdem o triângulo (catetos iguais nas duas testadas, face com a medida dada).
+        Assert.Equal(antes.Parcelas.Sum(p => p.Area) - tri, depois.Parcelas.Sum(p => p.Area), 2);
+        var esq = Assert.Single(depois.Parcelas, p => Face(p.Forma, Vec2.Zero, leg) != null);
+        var antesEsq = Assert.Single(antes.Parcelas, p => p.Chave == esq.Chave);
+        Assert.Equal(antesEsq.Area - tri, esq.Area, 2);
+        var (fa, fb) = Face(esq.Forma, Vec2.Zero, leg)!.Value;
+        Assert.Equal(face, fa.DistanceTo(fb), 2);
+        // Os outros lotes ficam como estavam (as frentes continuam medidas até o encontro dos alinhamentos).
+        foreach (var p in depois.Parcelas.Where(p => p.Chave != esq.Chave))
+            Assert.Equal(antes.Parcelas.Single(x => x.Chave == p.Chave).Area, p.Area, 3);
+        Assert.Equal(antes.Parcelas.Select(p => p.Numero), depois.Parcelas.Select(p => p.Numero));
+    }
+
+    [Fact]
+    public void D5_Chanfro_PersonalizadoPorEsquina()
+    {
+        var q = Paralelogramo(90);
+        var sem = LotDivider.Divide(q).Parcelas.Sum(p => p.Area);
+        // Medida própria na esquina, com o chanfro da quadra desligado: nada muda.
+        q.Esquinas.Add(new EsquinaLote { Ponto = Vec2.Zero, Chanfro = 5 });
+        q.ChanfroFace = 3;
+        Assert.Equal(sem, LotDivider.Divide(q).Parcelas.Sum(p => p.Area), 3);
+        // Chanfro ligado: a medida da esquina vale nela.
+        q.Chanfro = true;
+        Assert.Equal(sem - 6.25, LotDivider.Divide(q).Parcelas.Sum(p => p.Area), 2);
+        // Esquina sem chanfro (0).
+        q.Esquinas[0].Chanfro = 0;
+        Assert.Equal(sem, LotDivider.Divide(q).Parcelas.Sum(p => p.Area), 3);
+        // Nulo: a medida da quadra.
+        q.Esquinas[0].Chanfro = null;
+        Assert.Equal(sem - 2.25, LotDivider.Divide(q).Parcelas.Sum(p => p.Area), 2);
+    }
+
+    /// <summary>Cruzamento de duas vias locais numa gleba de 240 × 180 m: quatro quadras com a quina no cruzamento.</summary>
+    public static (Y34TipTests.World W, LoteamentoDefinition Lot, Polygon2 Gleba, List<QuadraDefinition> Quadras) Cruz()
+    {
+        var w = Y34TipTests.Make(AB2Matrix.Template(), (0, new[] { new Vec2(-120, 0), new Vec2(120, 0) }), (0, new[] { new Vec2(0, -90), new Vec2(0, 90) }));
+        var occ = Y34TipTests.Geometry(w).Where(x => Reconhecimento.Viaria(x.Piece)).Select(x => x.Piece.Shape).ToList();
+        var gleba = Polygon2.Rectangle(new Vec2(-120, -90), new Vec2(120, 90));
+        var rec = Reconhecimento.Quadras(gleba, occ);
+        var lot = new LoteamentoDefinition { Nome = "Cruz", Gleba = gleba.Outer.ToList() };
+        return (w, lot, gleba, rec.Quadras.Select(r => Reconhecimento.NovaQuadra(r, lot, 12, 30)).ToList());
+    }
+
+    /// <summary>Peças de tudo o que a cena gera, com o projeto inteiro (loteamento e quadras) à vista dos geradores.</summary>
+    private static List<Y34TipTests.Part> GeometriaComLoteamento(Y34TipTests.World w, LoteamentoDefinition lot, IEnumerable<QuadraDefinition> quadras)
+    {
+        var all = w.Defs.Append(lot).Concat(quadras).ToList();
+        var ctx = new BuildContext
+        {
+            Catalog = Cat, Lookup = id => all.FirstOrDefault(x => x.Id == id), PathOf = x => w.Paths.GetValueOrDefault(x.Id), AllDefinitions = () => all,
+        };
+        var res = new List<Y34TipTests.Part>();
+        foreach (var def in w.Defs.Where(d => d is not SignDefinition))
+        {
+            var path = w.Paths.GetValueOrDefault(def.Id);
+            if (path == null && (def.Path ?? (def as HatchMarkingDefinition)?.Boundary) is { Points.Count: >= 2 } pr) path = new Polyline2(pr.Points, pr.Closed);
+            res.AddRange(MarkingBuilder.Build(def, path, ctx).Pieces.Select(p => new Y34TipTests.Part(def, p)));
+        }
+        return res;
+    }
+
+    [Fact]
+    public void D5_Chanfro_CalcadaDaInterseçaoOcupaOChanfroSemFalhas()
+    {
+        var c = Cruz();
+        var q = Assert.Single(c.Quadras, x => x.Polygon!.Contains(new Vec2(50, 50)));
+        var v = q.Polygon!.Outer.OrderBy(p => p.Length).First();
+        Assert.True(v.DistanceTo(new Vec2(8, 8)) < 0.3, $"quina em {v}");
+        // O padrão da face é a largura da calçada na quina.
+        Assert.Equal(c.W.Roads[0].Def.LeftSidewalk, LotDivider.CalcadaNaQuina(c.W.Roads, v)!.Value, 3);
+        var antes = LotDivider.Divide(q, c.Lot).Parcelas.Sum(p => p.Area);
+        q.Chanfro = true;
+        q.ChanfroFace = 3;
+        var div = LotDivider.Divide(q, c.Lot);
+        Assert.Equal(antes - 2.25, div.Parcelas.Sum(p => p.Area), 1);
+        var tri = new Polygon2(new[] { v + new Vec2(0, 3 / Math.Sqrt(2)), v, v + new Vec2(3 / Math.Sqrt(2), 0) });
+        // A calçada da interseção ocupa o triângulo que saiu do lote (sem vão entre o lote e a calçada).
+        var parts = GeometriaComLoteamento(c.W, c.Lot, c.Quadras);
+        var walk = parts.Where(x => x.Def is IntersectionDefinition && x.Piece.Color is MarkingColor.Concreto or MarkingColor.Grama && x.Piece.Thickness > 0.05)
+            .Select(x => x.Piece.Shape).ToList();
+        Assert.Equal(tri.Area, PolygonOps.TotalArea(PolygonOps.Intersect(new[] { tri }, walk)), 1);
+        // As outras quinas (sem chanfro) continuam sem calçada no lote.
+        foreach (var o in c.Quadras.Where(x => x != q))
+            Assert.True(PolygonOps.TotalArea(PolygonOps.Intersect(new[] { o.Polygon! }, walk)) < 0.05, $"calçada dentro da quadra {o.Nome}");
+        var node = Assert.Single(c.W.Nodes).Layout;
+        var faults = Y34TipTests.FaultsAt(parts, node.Node, Math.Max(25, node.Radius + 6), true);
+        Assert.True(faults.Count == 0, string.Join(" | ", faults));
+        // Reconhecer de novo (com a calçada no chanfro) devolve a quadra com a quina viva e os mesmos lotes.
+        var occ = parts.Where(x => Reconhecimento.Viaria(x.Piece)).Select(x => x.Piece.Shape).ToList();
+        var rec = Reconhecimento.Quadras(c.Gleba, Reconhecimento.SemChanfros(occ, c.Quadras));
+        var again = Assert.Single(rec.Quadras, x => x.Contorno.Contains(new Vec2(50, 50)));
+        Assert.Equal(q.Polygon!.Area, again.Contorno.Area, 1);
+    }
+
+    [Fact]
+    public void D5_Chanfro_CotadoNoDetalhamentoENoQuadroDeLotes()
+    {
+        var q = Paralelogramo(90);
+        q.Chanfro = true;
+        q.ChanfroFace = 3;
+        var lot = new LoteamentoDefinition { Nome = "L", Gleba = Polygon2.Rectangle(new Vec2(-20, -20), new Vec2(100, 60)).Outer.ToList() };
+        q.LoteamentoId = lot.Id;
+        var defs = new List<MarkingDefinition> { lot, q };
+        var det = new LoteamentoDetalheDefinition { LoteamentoId = lot.Id };
+        var geo = MarkingBuilder.Build(det, null, new BuildContext { Catalog = Cat, AllDefinitions = () => defs, ViewScale = 500 });
+        var mid = (new Vec2(3 / Math.Sqrt(2), 0) + new Vec2(0, 3 / Math.Sqrt(2))) / 2;
+        // A face do chanfro tem a cota dela (mesmo curta para o texto na escala).
+        Assert.Contains(geo.Annotations.OfType<AnnotationText>(), t => t.Text == "3,00" && t.Position.DistanceTo(mid) < 4);
+        // Quadro de lotes e memorial: o chanfro aparece como lado próprio (não soma na frente).
+        var r = LotReport.Resumo(lot, new[] { q });
+        var row = Assert.Single(LotReport.LinhasLotes(r), x => x[9].Contains("chanfro"));
+        Assert.Contains("3,00", row[9]);
+        Assert.DoesNotContain("3,00", row[4]);
+        var (qq, d) = r.Quadras[0];
+        var p = d.Parcelas.Single(x => Face(x.Forma, Vec2.Zero, 3 / Math.Sqrt(2)) != null);
+        Assert.Contains("Chanfro: 3,00 m", LotReport.Descricao(p, LotReport.Lados(p, d, qq, lot)));
+    }
 }

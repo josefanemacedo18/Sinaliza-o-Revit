@@ -124,10 +124,27 @@ public static class LotForms
     /// <summary>Ação pedida na janela da quadra (clique no Revit e reabre).</summary>
     public enum AcaoQuadra { Nenhuma, ApontarTestadas, TestadasAutomaticas, LoteInicial, Recarregar }
 
-    /// <summary>Quadra: medidas, sobra, numeração, testadas (frente, profundidade e nome da via de cada uma) e esquinas.</summary>
-    public static FormWindow Quadra(QuadraDefinition q, LoteamentoDefinition? lot, Action<AcaoQuadra> acao)
+    private static readonly (string Label, int Value)[] ChanfroEsquinaOptions =
+    {
+        ("A face da quadra", 0),
+        ("Sem chanfro nesta quina", 1),
+        ("Face própria", 2),
+    };
+
+    /// <summary>
+    /// Quadra: medidas, sobra, numeração, testadas (frente, profundidade e nome da via de cada uma), esquinas e chanfro das quinas.
+    /// <paramref name="calcada"/>: largura da calçada na quina (o padrão da face do chanfro).
+    /// </summary>
+    public static FormWindow Quadra(QuadraDefinition q, LoteamentoDefinition? lot, Action<AcaoQuadra> acao, Func<Vec2, double?>? calcada = null)
     {
         var div = LotDivider.Divide(q, lot);
+        // Face do chanfro ainda não dada: a largura da calçada mais comum nas esquinas (as quinas com outra calçada ficam com a delas).
+        var prefill = q.ChanfroFace <= 0.05;
+        if (prefill)
+        {
+            var larguras = div.Esquinas.Select(e => calcada?.Invoke(e.Ponto)).Where(x => x is > 0.05).Select(x => Math.Round(x!.Value, 2)).ToList();
+            q.ChanfroFace = larguras.Count > 0 ? larguras.GroupBy(x => x).OrderByDescending(g => g.Count()).ThenByDescending(g => g.Key).First().Key : 3;
+        }
         FormWindow? w = null;
         w = new FormWindow("Loteamento – Quadra", $"Quadra {q.Nome}",
             $"{div.Parcelas.Count(p => p.Categoria == CategoriaLote.Lote)} lote(s), {LotReport.M(div.Quadra.Area)} m². As testadas, em ordem de prioridade, " +
@@ -151,6 +168,11 @@ public static class LotForms
             .Number("Sobra vira lote a partir de (m, 0 = frente mínima do loteamento)", () => q.FrenteMinima, v => q.FrenteMinima = v, 0, 200)
             .Choice("Miolo da quadra (atrás dos lotes)", MioloOptions, () => q.Miolo, v => q.Miolo = v)
             .Choice("Categoria do miolo (área própria ou o que nenhum lote alcança)", CategoryOptions(lot), () => q.MioloCategoria, v => q.MioloCategoria = v)
+            .Section("Chanfro das quinas", "Nas esquinas entre duas testadas a quina do lote de esquina sai em chanfro: a face (cotada no " +
+                                           "detalhamento) é descontada da área do lote e a calçada da interseção ocupa o triângulo. O padrão " +
+                                           "é a largura da calçada; cada esquina pode ter a sua (em Esquinas).")
+            .Check("Chanfrar as quinas das esquinas", () => q.Chanfro, v => q.Chanfro = v)
+            .If(() => q.Chanfro, f => f.Number("Face do chanfro (m)", () => q.ChanfroFace, v => q.ChanfroFace = v, 0.1, 30))
             .Section("Numeração", "De 1 a N nesta quadra; institucionais e áreas verdes com prefixo (AI-1, AV-1).")
             .Choice("Sentido", SentidoOptions, () => q.SentidoHorario, v => q.SentidoHorario = v)
             .Hint(q.LoteInicial == null ? "Lote 1: o lote de esquina mais a noroeste." : $"Lote 1: {q.LoteInicial}.")
@@ -200,11 +222,24 @@ public static class LotForms
                     ($"Testada {e.Posterior}", ModoEsquina.TestadaPosterior),
                     ("Medida própria", ModoEsquina.MedidaPropria),
                 };
+                // Chanfro nesta quina: o da quadra (nulo), nenhum (0) ou face própria.
+                var largura = calcada?.Invoke(e.Ponto);
+                if (prefill && esq.Chanfro == null && largura is > 0.05 && Math.Abs(largura.Value - q.ChanfroFace) > 0.005)
+                    esq.Chanfro = Math.Round(largura.Value, 2);
+                var modo = esq.Chanfro == null ? 0 : esq.Chanfro < 0.05 ? 1 : 2;
+                var face = esq.Chanfro is > 0.05 ? esq.Chanfro.Value : largura ?? q.ChanfroFace;
+                void Grava() => esq.Chanfro = modo switch { 0 => null, 1 => 0, _ => face };
                 w.Section($"Esquina {k++} – testadas {e.Anterior} × {e.Posterior} ({e.Ponto.X:0.0}; {e.Ponto.Y:0.0})")
                     .Choice("Lote de esquina", opts, () => esq.Modo, v => esq.Modo = v)
                     .If(() => esq.Modo == ModoEsquina.MedidaPropria, f => f
                         .Number($"Frente na testada {e.Anterior} (m)", () => esq.FrenteAnterior, v => esq.FrenteAnterior = v, 0.5, 200)
-                        .Number($"Frente na testada {e.Posterior} (m)", () => esq.FrentePosterior, v => esq.FrentePosterior = v, 0.5, 200));
+                        .Number($"Frente na testada {e.Posterior} (m)", () => esq.FrentePosterior, v => esq.FrentePosterior = v, 0.5, 200))
+                    .If(() => q.Chanfro, f =>
+                    {
+                        f.Choice("Chanfro nesta quina", ChanfroEsquinaOptions, () => modo, v => { modo = v; Grava(); })
+                            .If(() => modo == 2, g => g.Number("Face do chanfro nesta quina (m)", () => face, v => { face = v; Grava(); }, 0.1, 30));
+                        if (largura is > 0.05) f.Hint($"Calçada nesta quina: {LotReport.M(largura.Value)} m.");
+                    });
             }
         }
 

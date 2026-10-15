@@ -2721,6 +2721,17 @@ Ela é gravada ao reconhecer as quadras e refeita em *Reconhecer as quadras de n
   * **Pela prioridade**: a testada que vem primeiro na lista fica com o lote de esquina (frente para as duas ruas);
   * **Testada X** ou **Testada Y**: escolhida na hora;
   * **Medida própria**: frente em cada uma das duas testadas (ex.: 15 × 20); as duas testadas começam depois dele.
+* **Chanfro da quina** (Quadra → "Chanfro das quinas" → *Chanfrar as quinas das esquinas*): em cada esquina entre duas
+  testadas a quina do lote de esquina sai em **chanfro** – a **face** (a hipotenusa, com a medida informada) recua o mesmo nas
+  duas testadas a partir do encontro dos alinhamentos (90° e face 3 m: 2,12 m em cada testada, 2,25 m² a menos). É a forma
+  que menos tira do lote para a mesma face. A **face padrão é a largura da calçada** na quina (lida das vias ao abrir a
+  janela; quinas com calçada diferente já vêm com a delas) e pode ser mudada na quadra e **em cada esquina** (seção Esquinas →
+  *Chanfro nesta quina*: a face da quadra, sem chanfro ou face própria). O triângulo é **descontado da área do lote** (quadros,
+  memorial e pisos), a face é **cotada** no detalhamento (do lado de fora, na calçada) e aparece no quadro de lotes
+  ("chanfro 3,00 m" na observação) e no memorial ("Chanfro: 3,00 m para a esquina da Rua A com a Rua B"); as frentes e a
+  numeração continuam as mesmas. **A calçada acompanha**: ao aplicar, as interseções em volta são refeitas e o passeio da
+  esquina ocupa o triângulo (sem vão entre o lote e a calçada). Reconhecer as quadras de novo mantém a quina viva no contorno
+  gravado (o chanfro é refeito na divisão), sem chanfrar duas vezes.
 * **Miolo** (o que fica atrás dos lotes em quadras fundas ou irregulares):
   * **Vai para os lotes** (padrão): cada lote segue até a divisa de fundos (ou até a fileira oposta) enquanto a faixa dele está
     livre na largura toda – sem lotes em L. Pedaços menores que o lote mínimo vão para o vizinho com a maior divisa; o que
@@ -2854,8 +2865,10 @@ mesmo esquema de dados das demais marcas do plugin (tipos novos "loteamento", "q
 
 Campos acrescentados na rodada LV (autorizados; opcionais – projetos antigos leem o padrão): no loteamento,
 **Remanescentes** (lista de áreas com **Contorno** e **Furos**, em m – a sobra da gleba em volta das vias, gravada ao reconhecer
-as quadras; vazia = nenhuma) e **Remanescente** (*AreaVerde* = desenhada, padrão; *SoNoQuadro*). A escala em que cada detalhe
-foi desenhado fica só em memória (não é gravada).
+as quadras; vazia = nenhuma) e **Remanescente** (*AreaVerde* = desenhada, padrão; *SoNoQuadro*); na quadra, **Chanfro** (falso)
+e **ChanfroFace** (m; 0 = ainda não dada – a janela da quadra preenche com a largura da calçada); em cada esquina da quadra,
+**Chanfro** (m; vazio = a face da quadra, 0 = sem chanfro nela). A escala em que cada detalhe foi desenhado e os triângulos dos
+chanfros que a interseção ocupa ficam só em memória (não são gravados).
 
 Campos acrescentados na rodada LU (opcionais; quem não os tem lê o padrão): no loteamento, **FrenteMinimaLote** (5) e
 **AreaMinimaLote** (125); na quadra, **Miolo** (AosLotes), **MioloCategoria** (Área verde) e **Unioes** (listas de chaves de

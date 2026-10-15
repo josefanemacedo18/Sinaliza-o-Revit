@@ -1840,6 +1840,7 @@ public static partial class IntersectionGenerator
         }
         // Calçada contornando a curva da esquina: faixa paralela ao meio-fio no canto entre ramos vizinhos (com raio maior
         // que a largura da calçada, as calçadas retas das duas vias não chegam à curva).
+        var chamfered = new HashSet<Polygon2>();
         foreach (var (tri, la, lb) in cornerZones)
         {
             var ra = L.Roads[la.Road].Def;
@@ -1866,6 +1867,15 @@ public static partial class IntersectionGenerator
             List<Polygon2> NoLot(List<Polygon2> a) => lot.Count > 0 ? PolygonOps.Difference(a, lot).Where(p => p.Area > 0.01).ToList() : a;
             if (swA > 0.01 || swB > 0.01)
                 L.SidewalkMax.AddRange(NoLot(PolygonOps.Difference(PolygonOps.Intersect(PolygonOps.Offset(pav, Math.Max(swA, swB), true), new[] { tri }), pav)));
+            // Chanfro da quina do lote de esquina (quadra do loteamento): a calçada ocupa o triângulo que saiu do lote.
+            if (swA > 0.01 || swB > 0.01)
+                foreach (var ch in d.ChanfrosLote.Where(t => !chamfered.Contains(t) && PolygonOps.TotalArea(PolygonOps.Intersect(new[] { t }, new[] { tri })) > 0.01))
+                {
+                    chamfered.Add(ch);
+                    var walk = PolygonOps.Difference(new[] { ch }, pav).Where(p => p.Area > 0.01).ToList();
+                    sideParts.AddRange(walk);
+                    L.SidewalkMax.AddRange(walk);
+                }
             if (swA <= 0.01 || swB <= 0.01) continue;
             sideParts.AddRange(NoLot(PolygonOps.Intersect(PolygonOps.Offset(pav, Math.Min(swA, swB), true), new[] { tri })));
         }
@@ -2177,6 +2187,7 @@ public static partial class IntersectionGenerator
 
     public static MarkingGeometry Build(IntersectionDefinition d, BuildContext ctx)
     {
+        if (ctx.AllDefinitions != null) d.ChanfrosLote = Parcelamento.LotDivider.Triangulos(ctx.AllDefinitions(), d.Node);
         var roads = ResolveRoads(d, ctx);
         var L = Layout(d, roads);
         var geo = new MarkingGeometry();

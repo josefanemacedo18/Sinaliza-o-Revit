@@ -160,14 +160,17 @@ public static class LotDrawing
                     {
                         var chord = a.DistanceTo(b);
                         var text = LotReport.M(len);
-                        if (chord < DetailGenerator.LineWidthFactor(text) * h * mm * 1.2) continue;
+                        // A face do chanfro é sempre cotada, do lado de fora (na calçada): curta, a cota não cabe dentro do lote.
+                        var chanfro = div.Chanfros.Any(c => c.EFace(a, b, 0.05));
+                        if (!chanfro && chord < DetailGenerator.LineWidthFactor(text) * h * mm * 1.2) continue;
                         var dir = (b - a).Normalized();
                         var inward = dir.PerpLeft;
                         var rot = Readable(dir);
                         var up = Vec2.FromAngle(rot).PerpLeft;
                         var mid = (a + b) / 2;
                         var gap = 0.8 * mm;
-                        var pos = up.Dot(inward) < 0 ? mid + inward * gap : mid + inward * (gap + h * mm);
+                        var pos = chanfro ? (up.Dot(inward) < 0 ? mid - inward * (gap + h * mm) : mid - inward * gap)
+                            : up.Dot(inward) < 0 ? mid + inward * gap : mid + inward * (gap + h * mm);
                         geo.Annotations.Add(new AnnotationText(pos, text, h) { Rotation = rot });
                     }
                 }

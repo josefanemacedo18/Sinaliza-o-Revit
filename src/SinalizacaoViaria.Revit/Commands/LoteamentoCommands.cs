@@ -73,6 +73,39 @@ internal static class LotCommands
         return MarkingCreator.Commit(uidoc, defs, name);
     }
 
+    /// <summary>Largura da calçada na quina do lote (padrão da face do chanfro), lida das vias do projeto na primeira consulta.</summary>
+    public static Func<Vec2, double?> CalcadaNaQuina(UIDocument uidoc)
+    {
+        List<Core.Generators.IntersectionRoad>? roads = null;
+        return p =>
+        {
+            roads ??= new IntersectionService(uidoc.Document, new MarkingService(uidoc.Document, uidoc.ActiveView, interactive: false)).Roads();
+            return LotDivider.CalcadaNaQuina(roads, p);
+        };
+    }
+
+    /// <summary>
+    /// Chanfros mudaram (<paramref name="antes"/> × <paramref name="depois"/>): as interseções em volta das quinas são refeitas – a
+    /// calçada passa a ocupar o chanfro novo (ou sai do que deixou de existir).
+    /// </summary>
+    public static List<RenderResult> RefazerInterseccoes(UIDocument uidoc, IReadOnlyList<ChanfroQuina> antes, IReadOnlyList<ChanfroQuina> depois, string name)
+    {
+        var same = antes.Count == depois.Count && antes.All(a => depois.Any(d => d.Vertice.DistanceTo(a.Vertice) < 1e-3 && d.A.DistanceTo(a.A) < 1e-3 && d.B.DistanceTo(a.B) < 1e-3));
+        if (same) return new List<RenderResult>();
+        var doc = uidoc.Document;
+        var quinas = antes.Concat(depois).Select(c => c.Vertice).ToList();
+        var its = MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().Where(it => quinas.Any(v => v.DistanceTo(it.Node) <= 60)).ToList();
+        var results = new List<RenderResult>();
+        if (its.Count == 0) return results;
+        using var scope = MarkingService.RenderScope();
+        using var t = new Transaction(doc, name);
+        t.Start();
+        var svc = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
+        foreach (var it in its) results.AddRange(svc.Refresh(it));
+        t.Commit();
+        return results;
+    }
+
     public static void Report(string title, List<RenderResult> results, IEnumerable<string>? extra = null)
     {
         var warn = results.SelectMany(r => r.Warnings).Concat(extra ?? Array.Empty<string>()).Distinct().ToList();
@@ -205,9 +238,10 @@ public sealed class CmdLoteamento : CommandBase
         var doc = uidoc.Document;
         var gleba = lot.GlebaPolygon ?? throw new UserMessageException("O loteamento não tem gleba gravada.");
         var service = new MarkingService(doc, uidoc.ActiveView, interactive: false);
-        var occ = LotService.Ocupacao(doc, service, gleba, nativeFloors: true);
-        var rec = Reconhecimento.Quadras(gleba, occ);
         var quadras = LotService.Quadras(doc, lot.Id);
+        // A calçada que ocupa o chanfro de uma quadra é da quadra para o reconhecimento (o contorno continua com a quina viva).
+        var occ = Reconhecimento.SemChanfros(LotService.Ocupacao(doc, service, gleba, nativeFloors: true), quadras);
+        var rec = Reconhecimento.Quadras(gleba, occ);
         var changed = new List<QuadraDefinition>();
         var matched = new HashSet<string>();
         // Quadra gravada que é a sobra da gleba em volta das vias (a gleba inteira, sem o furo – versões anteriores): sai; a sobra
@@ -278,10 +312,12 @@ public sealed class CmdQuadraLote : CommandBase
         if (picked == null) return Result.Cancelled;
         var q = picked.Value.Quadra;
         var lot = LotService.Loteamento(doc, q.LoteamentoId);
+        var chanfros = LotDivider.Chanfros(q);
+        var calcada = LotCommands.CalcadaNaQuina(uidoc);
         while (true)
         {
             var acao = LotForms.AcaoQuadra.Nenhuma;
-            if (UiHelpers.ShowModal(LotForms.Quadra(q, lot, a => acao = a)) != true) return Result.Cancelled;
+            if (UiHelpers.ShowModal(LotForms.Quadra(q, lot, a => acao = a, calcada)) != true) return Result.Cancelled;
             if (acao == LotForms.AcaoQuadra.Nenhuma) break;
             switch (acao)
             {
@@ -314,6 +350,7 @@ public sealed class CmdQuadraLote : CommandBase
             }
         }
         var results = LotCommands.Commit(uidoc, lot, new[] { q }, $"SV - Quadra {q.Nome}");
+        results.AddRange(LotCommands.RefazerInterseccoes(uidoc, chanfros, LotDivider.Chanfros(q), $"SV - Quadra {q.Nome} (calçadas dos chanfros)"));
         LotCommands.Report($"Quadra {q.Nome} atualizada.", results);
         return Result.Succeeded;
     }

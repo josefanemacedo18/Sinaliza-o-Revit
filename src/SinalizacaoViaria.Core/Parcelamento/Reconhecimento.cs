@@ -84,6 +84,17 @@ public static class Reconhecimento
     public static List<Polygon2> Ocupacao(IEnumerable<Polygon2> ocupado) =>
         PolygonOps.Offset(PolygonOps.Offset(PolygonOps.Union(ocupado.Where(p => p.IsValid)), 0.05), -0.05);
 
+    /// <summary>
+    /// Ocupação sem os chanfros das quadras gravadas: a calçada que ocupa o chanfro é da quadra para o reconhecimento – o contorno
+    /// dela continua com a quina viva (o chanfro é refeito na divisão), sem chanfrar de novo a cada reconhecimento.
+    /// </summary>
+    public static List<Polygon2> SemChanfros(IEnumerable<Polygon2> ocupado, IEnumerable<QuadraDefinition> quadras)
+    {
+        var tri = LotDivider.Triangulos(quadras);
+        var occ = ocupado.Where(p => p.IsValid).ToList();
+        return tri.Count == 0 ? occ : PolygonOps.Difference(occ, tri).ToList();
+    }
+
     /// <summary>Pontos (meio de cada lado) dos lados da quadra que encostam nas vias – as testadas sugeridas, do maior para o menor.</summary>
     public static List<Vec2> TestadasAutomaticas(Polygon2 quadra, IReadOnlyList<Polygon2> occ)
     {
