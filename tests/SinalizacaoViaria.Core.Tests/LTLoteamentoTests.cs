@@ -870,8 +870,10 @@ public class LTLoteamentoTests
     public void R8_Masterplan_LayoutLimpo()
     {
         foreach (var c in new[] { CategoriaQuantitativo.SinalizacaoHorizontal, CategoriaQuantitativo.SinalizacaoVertical, CategoriaQuantitativo.DispositivosSegregacao,
-                     CategoriaQuantitativo.Acessibilidade, CategoriaQuantitativo.Drenagem })
+                     CategoriaQuantitativo.Drenagem })
             Assert.True(Masterplan.Oculta(c));
+        // Acessibilidade: só o piso tátil sai (as rampas ficam – rodada LV, item 6).
+        Assert.False(Masterplan.Oculta(CategoriaQuantitativo.Acessibilidade));
         // Ficam vias, calçadas, canteiros, árvores e mobiliário.
         foreach (var c in new[] { CategoriaQuantitativo.PavimentacaoGeometria, CategoriaQuantitativo.CalcadasUrbanizacao, CategoriaQuantitativo.MobiliarioUrbano })
             Assert.False(Masterplan.Oculta(c));

@@ -489,4 +489,26 @@ public class LVCorrecoesTests
         var p = d.Parcelas.Single(x => Face(x.Forma, Vec2.Zero, 3 / Math.Sqrt(2)) != null);
         Assert.Contains("Chanfro: 3,00 m", LotReport.Descricao(p, LotReport.Lados(p, d, qq, lot)));
     }
+
+    // ================================================================== 6 – rampas no masterplan
+
+    [Fact]
+    public void D6_Masterplan_MostraAsRampasEOcultaOPisoTatil()
+    {
+        var ramp = new RampDefinition();
+        var info = MarkingBuilder.Describe(ramp, Cat);
+        // A categoria das rampas (Acessibilidade) não sai inteira do masterplan.
+        Assert.False(Masterplan.Oculta(QuantityRow.Categorize(ramp, info.Group)), "a rampa sai do masterplan");
+        Assert.DoesNotContain(QuantityRow.CategoryLabel(CategoriaQuantitativo.Acessibilidade), Masterplan.ValoresOcultos);
+        Assert.False(Masterplan.Oculta(ramp, info));
+        // O piso tátil (rotas e alertas) continua fora: a regra do filtro separa pela categoria E pelo grupo gravados no elemento.
+        var tatil = new TactileRouteDefinition();
+        var ti = MarkingBuilder.Describe(tatil, Cat);
+        Assert.True(Masterplan.Oculta(tatil, ti));
+        Assert.Equal((QuantityRow.CategoryLabel(QuantityRow.Categorize(tatil, ti.Group)), QuantityRow.GroupLabel(ti.Group)), Masterplan.RegraTatil);
+        Assert.NotEqual(Masterplan.RegraTatil.Grupo, QuantityRow.GroupLabel(info.Group));
+        // A sinalização continua fora.
+        var sign = new SignDefinition { Code = "R-1" };
+        Assert.True(Masterplan.Oculta(sign, MarkingBuilder.Describe(sign, Cat)));
+    }
 }

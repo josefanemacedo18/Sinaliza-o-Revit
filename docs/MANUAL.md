@@ -2850,10 +2850,14 @@ lei municipal aplicável estão **[a confirmar]**.
 
 **Masterplan** cria uma cópia da planta ativa (sem as anotações dela) com o layout limpo:
 
-* ficam os **lotes nas cores das categorias**, as **vias**, **calçadas**, **canteiros**, **árvores** e **mobiliário**, a
-  **letra de cada quadra no círculo**, os **nomes das vias** e os **números dos lotes**;
-* saem a sinalização horizontal e vertical, os dispositivos, o piso tátil e as rampas, a drenagem, as cotas, etiquetas, níveis,
-  eixos e linhas – por categoria e pelo filtro "SV - Masterplan – sinalização e detalhes";
+* ficam os **lotes nas cores das categorias**, as **vias**, **calçadas**, **rampas** (rebaixamentos das travessias e acessos,
+  com a faixa de alerta que faz parte de cada rampa), **canteiros**, **árvores** e **mobiliário**, a **letra de cada quadra no
+  círculo**, os **nomes das vias** e os **números dos lotes**;
+* saem a sinalização horizontal e vertical, os dispositivos, o **piso tátil** (rotas direcionais e alertas das calçadas), a
+  drenagem, as cotas, etiquetas, níveis, eixos e linhas – por categoria e pelo filtro "SV - Masterplan – sinalização e detalhes"
+  (o piso tátil sai pela regra *SV_Categoria = Acessibilidade **e** SV_Grupo = Acessibilidade*; as rampas, da mesma categoria,
+  têm o grupo Urbanização e ficam). Num projeto com um masterplan feito antes desta versão, gere o **Masterplan** de novo
+  uma vez: o filtro é atualizado e vale também para as vistas antigas que o usam;
 * estilo de vista em **cores consistentes**; na primeira vez cria o modelo de vista **"SV - Masterplan"**, para aplicar o mesmo
   layout em outras plantas.
 

@@ -454,12 +454,29 @@ public static class LotService
 
     // ------------------------------------------------------------------ masterplan
 
-    /// <summary>Filtro que esconde a sinalização, os dispositivos, o piso tátil, a drenagem e os detalhes do plugin.</summary>
+    /// <summary>
+    /// Filtro que esconde a sinalização, os dispositivos, o piso tátil, a drenagem e os detalhes do plugin – as rampas (mesma
+    /// categoria do piso tátil, outro grupo) ficam.
+    /// </summary>
     public static ParameterFilterElement? MasterplanFilter(Document doc)
     {
         if (ParamId(doc, SharedParameters.Categoria) is not { } pid) return null;
         var rules = Masterplan.ValoresOcultos.Select(v => (ElementFilter)new ElementParameterFilter(ParameterFilterRuleFactory.CreateEqualsRule(pid, v))).ToList();
         var cats = FilterCategories(doc, new[] { BuiltInCategory.OST_GenericModel, BuiltInCategory.OST_Floors, BuiltInCategory.OST_DetailComponents });
+        // Piso tátil: SV_Categoria "Acessibilidade" E SV_Grupo "Acessibilidade" (as rampas têm o grupo Urbanização).
+        if (ParamId(doc, SharedParameters.Grupo) is { } gid)
+        {
+            var (cat, grp) = Masterplan.RegraTatil;
+            var tatil = new LogicalAndFilter(new ElementParameterFilter(ParameterFilterRuleFactory.CreateEqualsRule(pid, cat)),
+                new ElementParameterFilter(ParameterFilterRuleFactory.CreateEqualsRule(gid, grp)));
+            var withTactile = new LogicalOrFilter(rules.Append(tatil).ToList());
+            try
+            {
+                if (cats.Count > 0 && ParameterFilterElement.ElementFilterIsAcceptableForParameterFilterElement(doc, cats.ToHashSet(), withTactile))
+                    rules.Add(tatil);
+            }
+            catch (Exception ex) { Log.Error("Filtro do piso tátil (masterplan)", ex); }
+        }
         return UpsertFilter(doc, $"{StyleService.Prefix}Masterplan – sinalização e detalhes", cats, new LogicalOrFilter(rules));
     }
 
