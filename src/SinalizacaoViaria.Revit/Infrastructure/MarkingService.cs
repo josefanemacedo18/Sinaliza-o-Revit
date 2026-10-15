@@ -515,6 +515,8 @@ public sealed class MarkingService
         var existing = MarkingStorage.ById(_doc, def.Id);
         // Loteamento: dados num elemento próprio; quadra: um lote por subdivisão do Toposolid (ou piso plano).
         if (def is LoteamentoDefinition or QuadraDefinition) return LotService.Render(_doc, def, existing);
+        // Só o corte transversal: nada na planta – a cota fica num elemento de dados, só para o perfil ler a linha de corte.
+        if (def is SectionDimensionDefinition sec && DetailGenerator.SectionDataOnly(sec)) return SaveAsData(def, existing);
         PruneExclusions(def);
         // Traçado das linhas de referência guardado na marca: apagar a linha depois não faz a marca perder o caminho.
         try { PathResolver.RefreshCache(_doc, def.Path); } catch (Exception ex) { Log.Error("Cache do caminho", ex); }
@@ -1132,6 +1134,22 @@ public sealed class MarkingService
     public void Delete(string markingId)
     {
         foreach (var r in MarkingStorage.ById(_doc, markingId)) SafeDelete(r.Element.Id);
+    }
+
+    /// <summary>
+    /// Grava a definição num elemento de dados (DataStorage, mesmo esquema das marcas), sem desenho: os elementos que ela tinha
+    /// (a linha de corte e as marcas A–A das versões anteriores) saem.
+    /// </summary>
+    private RenderResult SaveAsData(MarkingDefinition def, List<StoredMarking> existing)
+    {
+        var result = new RenderResult();
+        Ungroup(existing);
+        var ds = existing.Select(r => r.Element).OfType<Autodesk.Revit.DB.ExtensibleStorage.DataStorage>().FirstOrDefault()
+            ?? Autodesk.Revit.DB.ExtensibleStorage.DataStorage.Create(_doc);
+        MarkingStorage.Write(ds, def, MarkingColor.Preta);
+        // Sem desenho, nada a selecionar: o elemento de dados não entra na lista dos criados.
+        foreach (var r in existing.Where(r => r.Element.Id != ds.Id)) SafeDelete(r.Element.Id);
+        return result;
     }
 
     private void SafeDelete(ElementId id)

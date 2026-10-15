@@ -265,6 +265,10 @@ public sealed class MarkingUpdater : IUpdater
         var ids = all.Select(r => r.MarkingId).ToHashSet();
         var orphans = all.Where(r => r.Definition is Core.Definitions.IAnnotationDefinition { TargetId: { } t } && !ids.Contains(t))
             .Select(r => r.Element.Id).ToList();
+        // Só o corte transversal: a cota sem desenho (elemento de dados) existe para o perfil – perfil apagado, ela sai também.
+        var profiled = all.Select(r => r.Definition).OfType<Core.Definitions.SectionProfileDefinition>().Select(p => p.SectionId).ToHashSet();
+        orphans.AddRange(all.Where(r => r.Element is Autodesk.Revit.DB.ExtensibleStorage.DataStorage && r.Definition is Core.Definitions.SectionDimensionDefinition s
+            && Core.Generators.DetailGenerator.SectionDataOnly(s) && !profiled.Contains(s.Id)).Select(r => r.Element.Id));
         foreach (var id in orphans)
             try { doc.Delete(id); } catch { /* já removido */ }
         // Recortes de uma marca apagada (boca de lobo, grelha, rampa...): o piso/meio-fio/calçada volta a ser contínuo.

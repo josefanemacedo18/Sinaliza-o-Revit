@@ -1079,10 +1079,13 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   parte da planta – linha de corte, marcas e cadeia de cotas – outro (*SV - Cotas da seção A-A*): selecionar e mover
   leva as cotas junto.
 * **Corte Transversal** (Detalhar → Corte Transversal): **só o perfil transversal**, sem precisar cotar a seção antes – um
-  clique sobre a via (ou dois pontos) e outro onde colocar o perfil. Na planta ficam só a **linha de corte, as marcas A–A e
-  o título**, sem a cadeia de cotas (o corte liga o perfil à via e o mantém atualizado). A mesma escolha existe na janela do
-  Cotar Seção: *O que gerar* → **cotas na planta e corte transversal**, **só o corte transversal** ou **só as cotas na
-  planta**. As opções do Corte Transversal ficam guardadas à parte das do Cotar Seção.
+  clique sobre a via (ou dois pontos) e outro onde colocar o perfil. **Nada é desenhado na planta** – nem antes nem depois
+  do perfil: o único desenho é o perfil final. A linha de corte fica guardada só como dados (um elemento de dados do
+  projeto, sem desenho), ligando o perfil à via e mantendo-o atualizado; ESC no clique do perfil não deixa nada, e
+  **apagar o perfil** apaga também esses dados (a letra fica livre de novo). Cortes feitos em versões anteriores perdem a
+  linha de corte, as marcas A–A e o título da planta na próxima atualização. A mesma escolha existe na janela do Cotar
+  Seção: *O que gerar* → **cotas na planta e corte transversal**, **só o corte transversal** (nada na planta) ou **só as
+  cotas na planta**. As opções do Corte Transversal ficam guardadas à parte das do Cotar Seção.
 * **Cotar Seção** (cadeia em planta): cadeia de cotas com **nome de cada trecho** (calçada, meio-fio, faixa de
   rolamento, ciclofaixa, faixa de ônibus, faixa de caminhada, canteiro, estacionamento, zebrado),
   **eixo da via** em traço-ponto com a inscrição EIXO (opcionalmente dividindo as cotas em

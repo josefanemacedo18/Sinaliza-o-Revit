@@ -128,7 +128,7 @@ public class LVCorrecoesTests
     [Fact]
     public void D4_SoCorteTransversal_SemCotasNaPlanta()
     {
-        // "Só o corte transversal": na planta ficam a linha de corte e as marcas A–A (sem a cadeia de cotas); o perfil sai inteiro.
+        // "Só o corte transversal": nada na planta (rodada LX – nem a linha de corte e as marcas A–A); o perfil sai inteiro.
         var (defs, geoOf, pathOf) = DetailGenerator.SectionSample();
         var ctx = new BuildContext { Catalog = Cat, ViewScale = 100, AllDefinitions = () => defs, GeometryOf = geoOf, PathOf = pathOf };
         SectionDimensionDefinition Sd(bool chain) => new() { Start = new Vec2(15, -8.45), End = new Vec2(15, 8.45), PlanChain = chain, Profile = true };
@@ -137,8 +137,7 @@ public class LVCorrecoesTests
         static bool Number(AnnotationText t) => Regex.IsMatch(t.Text, @"^\d+,\d+$");
         Assert.Contains(full.Annotations.OfType<AnnotationText>(), Number);
         Assert.DoesNotContain(only.Annotations.OfType<AnnotationText>(), Number);
-        Assert.Contains(only.Annotations.OfType<AnnotationText>(), t => t.Text == "A");
-        Assert.Contains(only.Annotations.OfType<AnnotationText>(), t => t.Text.StartsWith("SEÇÃO A–A"));
+        Assert.Empty(only.Annotations);
         var cut = Sd(false);
         var withCut = new BuildContext { Catalog = Cat, ViewScale = 100, AllDefinitions = () => defs.Append(cut).ToList(), GeometryOf = geoOf, PathOf = pathOf,
             Lookup = id => id == cut.Id ? cut : defs.FirstOrDefault(x => x.Id == id) };

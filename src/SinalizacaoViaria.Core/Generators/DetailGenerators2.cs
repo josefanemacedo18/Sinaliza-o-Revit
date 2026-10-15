@@ -191,6 +191,12 @@ public static partial class DetailGenerator
         return res;
     }
 
+    /// <summary>
+    /// "Só o corte transversal" (perfil separado): a cota não desenha nada na planta – fica guardada só como a linha de corte
+    /// que o perfil lê. Seções antigas com o perfil embutido (posição gravada na cota) continuam desenhando.
+    /// </summary>
+    public static bool SectionDataOnly(SectionDimensionDefinition sd) => sd.Profile && !sd.PlanChain && sd.ProfilePosition == null;
+
     public static MarkingGeometry SectionDimensions(SectionDimensionDefinition sd, BuildContext ctx)
     {
         var geo = new MarkingGeometry();
@@ -245,12 +251,14 @@ public static partial class DetailGenerator
         if (sd.PlanChain && sd.Total && st.Count > 2)
             Dimension(geo, ctx, P(st[0]), P(st[^1]), n, totalOff, (st[^1] - st[0]).ToString(fmt, Pt), sd.TextMm, terminal: sd.Terminal);
         var outer = !sd.PlanChain ? ctx.Mm(2) : sd.Total && st.Count > 2 ? totalOff : off;
+        // Só o corte transversal: nada na planta (nem linha de corte, eixo, marcas ou título) – o único desenho é o perfil.
+        var onPlan = sd.PlanChain || !sd.Profile;
 
         // Linha de seção (traço fino) para referência.
-        geo.Annotations.Add(new AnnotationLine(new[] { a, b }, MarkingColor.Vermelha));
+        if (onPlan) geo.Annotations.Add(new AnnotationLine(new[] { a, b }, MarkingColor.Vermelha));
 
         // Eixo: linha traço-ponto atravessando a cadeia de cotas, com a inscrição "EIXO".
-        if (sd.AxisMarker)
+        if (onPlan && sd.AxisMarker)
             foreach (var s0 in axes)
             {
                 var from = P(s0) - n * ctx.Mm(4);
@@ -264,7 +272,7 @@ public static partial class DetailGenerator
 
         // Marcas de corte nas pontas (letra no círculo + seta do sentido de observação) e título.
         var letter = (sd.SectionLetter ?? "").Trim().ToUpperInvariant();
-        if (letter.Length > 0)
+        if (onPlan && letter.Length > 0)
         {
             var r = ctx.Mm(Math.Max(3.0, sd.TextMm * 1.6));
             foreach (var (p0, dir) in new[] { (a, -u), (b, u) })

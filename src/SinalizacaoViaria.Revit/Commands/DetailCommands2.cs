@@ -33,7 +33,7 @@ internal static class DetailForms
         new FormWindow(edit ? "Editar cota de seção" : onlyProfile ? "Corte transversal" : "Cotar seção transversal", onlyProfile ? "Corte transversal da via" : "Cota automática da seção",
                 (onlyProfile
                     ? "Clique sobre uma via (corte perpendicular ao eixo) ou dois pontos atravessando-a e, em seguida, onde colocar o PERFIL TRANSVERSAL – " +
-                      "sem precisar cotar a seção antes: na planta ficam só a linha de corte e as marcas A–A. "
+                      "sem precisar cotar a seção antes: na planta não fica nenhum desenho – só o perfil. "
                     : "Clique sobre uma via (corte perpendicular ao eixo, de alinhamento a alinhamento) ou dois pontos atravessando-a: a seção em planta é criada. " +
                       "Em seguida clique onde colocar o PERFIL TRANSVERSAL (ESC = sem perfil) – ele é um grupo separado, que se move inteiro. ") +
                 "O plugin corta pavimento, sarjetas, meios-fios, calçadas, canteiros, plataformas e pintura e desenha: " +
@@ -58,7 +58,7 @@ internal static class DetailForms
                     return new FormPreview(g, Paper: true, ViewScale: 100, Info: "Exemplo: via com calçadas de 3,00 m, ciclofaixa e duas faixas por sentido.");
                 }, false, edit ? "Aplicar" : "Iniciar", 1100, 720)
             .Section("O que gerar")
-            .Choice("Gerar", new[] { ("Cotas na planta e corte transversal", 0), ("Só o corte transversal (sem cotas na planta)", 1), ("Só as cotas na planta", 2) },
+            .Choice("Gerar", new[] { ("Cotas na planta e corte transversal", 0), ("Só o corte transversal (nada na planta)", 1), ("Só as cotas na planta", 2) },
                 () => d.PlanChain && d.Profile ? 0 : d.Profile ? 1 : 2,
                 v => { d.PlanChain = v != 1; d.Profile = v != 2; })
             .Section("Como cortar")
@@ -342,8 +342,8 @@ public sealed class CmdCotarSecao : CommandBase
 }
 
 /// <summary>
-/// Corte transversal direto: um clique sobre a via e outro onde colocar o perfil – sem a cadeia de cotas na planta (só a linha
-/// de corte com as marcas A–A, que liga o perfil à via e o mantém atualizado).
+/// Corte transversal direto: um clique sobre a via e outro onde colocar o perfil – nada na planta (a linha de corte fica
+/// guardada só como dados, ligando o perfil à via e mantendo-o atualizado).
 /// </summary>
 [Transaction(TransactionMode.Manual)]
 public sealed class CmdCorteTransversal : CommandBase
@@ -412,10 +412,13 @@ internal static class SectionTool
             if (!string.IsNullOrEmpty(d.SectionLetter) && used.Contains(d.SectionLetter))
                 d.SectionLetter = letters.Select(ch => ch.ToString()).FirstOrDefault(x => !used.Contains(x)) ?? d.SectionLetter;
             used.Add(d.SectionLetter);
-            // 1) A seção em planta (linha de corte, marcas A–A e cotas) é criada primeiro...
             d.ProfilePosition = null;
             DetailHelpers.PrepareOutput(d, view);
-            results.AddRange(MarkingCreator.Commit(uidoc, new[] { d }, "SV - Cotar seção"));
+            // Só o corte transversal: nada vai para a planta antes do perfil – a cota (só dados, sem desenho) é gravada junto com
+            // o perfil, no clique de posição; ESC não deixa nada.
+            var dataOnly = DetailGenerator.SectionDataOnly(d);
+            // 1) A seção em planta (linha de corte, marcas A–A e cotas) é criada primeiro...
+            if (!dataOnly) results.AddRange(MarkingCreator.Commit(uidoc, new[] { d }, "SV - Cotar seção"));
             // 2) ...e só depois o perfil transversal, onde o usuário clicar: um detalhe separado, agrupado (move tudo
             //    junto) e ligado à seção – acompanha as mudanças da via.
             if (d.Profile)
@@ -423,7 +426,10 @@ internal static class SectionTool
                 // Antes de colocar: nomes, cores e hachuras dos elementos desta seção (prévia do perfil ao vivo).
                 if (review)
                 {
-                    var ctx = new MarkingService(doc, view).ProjectContext(view);
+                    var pc = new MarkingService(doc, view).ProjectContext(view);
+                    // A cota ainda não gravada (só o corte) é achada pela prévia do perfil.
+                    var ctx = PluginContext.BuildContext(false, view.Scale, id => id == d.Id ? d : pc.Lookup?.Invoke(id), pc.AllDefinitions,
+                        pc.GeometryOf, pc.PathOf);
                     var items = DetailGenerator.SectionItems(d, ctx, d.ItemStyles);
                     if (items.Count > 0)
                     {
@@ -438,7 +444,7 @@ internal static class SectionTool
                         d.ItemStyles = merged.Count > 0 ? merged : null;
                         SectionStyleStore.Remember(doc, raw);
                         // Os nomes valem também para a cadeia de cotas da planta.
-                        if (raw.Any(x => x.Name != null)) results.AddRange(MarkingCreator.Commit(uidoc, new[] { d }, "SV - Cotar seção"));
+                        if (!dataOnly && raw.Any(x => x.Name != null)) results.AddRange(MarkingCreator.Commit(uidoc, new[] { d }, "SV - Cotar seção"));
                     }
                 }
                 var at = Picking.PickPoint(uidoc, $"Clique onde colocar o PERFIL TRANSVERSAL {d.SectionLetter}–{d.SectionLetter} (canto superior esquerdo) – ESC = sem perfil");
@@ -446,7 +452,8 @@ internal static class SectionTool
                 {
                     var profile = SectionProfileDefinition.From(d, DetailHelpers.ToCore(at));
                     DetailHelpers.PrepareOutput(profile, view);
-                    results.AddRange(MarkingCreator.Commit(uidoc, new[] { profile }, "SV - Perfil transversal"));
+                    results.AddRange(MarkingCreator.Commit(uidoc, dataOnly ? new MarkingDefinition[] { d, profile } : new MarkingDefinition[] { profile },
+                        "SV - Perfil transversal"));
                 }
             }
         }
