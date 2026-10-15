@@ -172,6 +172,9 @@ public sealed class StyleService
         Hachura.Cruzada => "Hachura cruzada",
         Hachura.Pontos => "Pontilhado",
         Hachura.Grama => "Grama",
+        Hachura.Brita => "Brita",
+        Hachura.Solo => "Solo",
+        Hachura.Terra => "Terra",
         _ => "Sem hachura",
     };
 
@@ -214,6 +217,39 @@ public sealed class StyleService
                 case Hachura.DiagonalDensa:
                     fp = new FillPattern(name, FillPatternTarget.Drafting, FillPatternHostOrientation.ToView, Math.PI / 4, 0.8 * mm);
                     break;
+                case Hachura.Brita:
+                {
+                    // Agregado: traços curtos em três direções (0°, 60° e 120°).
+                    fp = new FillPattern(name, FillPatternTarget.Drafting, FillPatternHostOrientation.ToView);
+                    var grids = new List<FillGrid>();
+                    foreach (var (ang, ox) in new[] { (0.0, 0.0), (Math.PI / 3, 0.5), (2 * Math.PI / 3, 1.0) })
+                    {
+                        var g = new FillGrid { Angle = ang, Origin = new UV(ox * mm, 0), Offset = 1.6 * mm, Shift = 0.9 * mm };
+                        g.SetSegments(new List<double> { 0.45 * mm, 1.35 * mm });
+                        grids.Add(g);
+                    }
+                    fp.SetFillGrids(grids);
+                    break;
+                }
+                case Hachura.Solo:
+                {
+                    // Traços horizontais desencontrados.
+                    fp = new FillPattern(name, FillPatternTarget.Drafting, FillPatternHostOrientation.ToView);
+                    var g1 = new FillGrid { Angle = 0, Origin = new UV(0, 0), Offset = 1.2 * mm, Shift = 1.2 * mm };
+                    g1.SetSegments(new List<double> { 1.6 * mm, 0.8 * mm });
+                    fp.SetFillGrids(new List<FillGrid> { g1 });
+                    break;
+                }
+                case Hachura.Terra:
+                {
+                    // Terra: linhas a 45° com traços curtos a 135°.
+                    fp = new FillPattern(name, FillPatternTarget.Drafting, FillPatternHostOrientation.ToView);
+                    var g1 = new FillGrid { Angle = Math.PI / 4, Origin = new UV(0, 0), Offset = 2.4 * mm, Shift = 0 };
+                    var g2 = new FillGrid { Angle = 3 * Math.PI / 4, Origin = new UV(0.6 * mm, 0), Offset = 2.4 * mm, Shift = 1.2 * mm };
+                    g2.SetSegments(new List<double> { 0.7 * mm, 1.7 * mm });
+                    fp.SetFillGrids(new List<FillGrid> { g1, g2 });
+                    break;
+                }
                 default:
                     fp = new FillPattern(name, FillPatternTarget.Drafting, FillPatternHostOrientation.ToView, Math.PI / 4, 1.8 * mm);
                     break;

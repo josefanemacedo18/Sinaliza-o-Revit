@@ -74,6 +74,12 @@ public enum Hachura
     Pontos,
     /// <summary>Tufos verticais (grama, vegetação).</summary>
     Grama,
+    /// <summary>Agregado graúdo – traços curtos em três direções (base de brita).</summary>
+    Brita,
+    /// <summary>Traços horizontais desencontrados (sub-base, solo estabilizado).</summary>
+    Solo,
+    /// <summary>Terra – linhas a 45° com traços cruzados (subleito, terreno natural, aterro apiloado).</summary>
+    Terra,
 }
 
 public static class MarkingColors

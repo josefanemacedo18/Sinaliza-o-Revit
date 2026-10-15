@@ -29,7 +29,41 @@ internal static class DetailForms
     private static readonly (string, TerminalCota)[] Terminals =
         { ("Traço a 45° (padrão ABNT)", TerminalCota.Traco), ("Seta cheia", TerminalCota.Seta), ("Ponto", TerminalCota.Ponto) };
 
-    public static FormWindow Section(SectionDimensionDefinition d, bool edit, bool onlyProfile = false) =>
+    private static readonly (string, Hachura)[] LayerHatches =
+    {
+        ("Brita (base)", Hachura.Brita), ("Solo (sub-base)", Hachura.Solo), ("Terra (subleito)", Hachura.Terra), ("Pontilhado", Hachura.Pontos),
+        ("Cruzada", Hachura.Cruzada), ("Diagonal", Hachura.Diagonal), ("Sem hachura", Hachura.Nenhuma),
+    };
+
+    /// <summary>Camadas do pavimento (até 4) e meio-fio/sarjeta do perfil – campos opcionais da cota e do perfil.</summary>
+    private static FormWindow ProfileBuild(FormWindow w, Func<List<SectionLayer>?> getLayers, Action<List<SectionLayer>?> setLayers,
+        Func<CurbGutterSpec?> getSpec, Action<CurbGutterSpec> setSpec)
+    {
+        var rows = (getLayers() ?? SectionLayer.Defaults()).Select(x => x.Clone()).ToList();
+        while (rows.Count < 4) rows.Add(new SectionLayer { Hatch = Hachura.Terra });
+        void Save() => setLayers(rows.Where(r => r.ThicknessCm > 0.05).Select(r => r.Clone()).ToList());
+        w.Section("Camadas do pavimento (perfil)", "Sob o revestimento da via, de cima para baixo. Espessura 0 = sem a camada. " +
+            "Valores indicativos – ajuste ao projeto de pavimentação.");
+        for (int i = 0; i < rows.Count; i++)
+        {
+            var r = rows[i];
+            var n = i + 1;
+            w.Text($"Camada {n} – nome", () => r.Name, v => { r.Name = (v ?? "").Trim(); Save(); })
+             .Number($"Camada {n} – espessura (cm)", () => r.ThicknessCm, v => { r.ThicknessCm = v; Save(); }, 0, 200, "0.#")
+             .Choice($"Camada {n} – hachura", LayerHatches, () => r.Hatch, v => { r.Hatch = v; Save(); });
+        }
+        var spec = (getSpec() ?? new CurbGutterSpec()).Clone();
+        void SaveSpec() => setSpec(spec.Clone());
+        return w.Section("Meio-fio e sarjeta (perfil)", "Larguras e altura aparente vêm da própria via; aqui ficam as medidas que ela não guarda.")
+            .Check("Detalhe ampliado do meio-fio e da sarjeta (cotas em cm)", () => spec.Detail, v => { spec.Detail = v; SaveSpec(); })
+            .Number("Escala do detalhe 1:", () => spec.DetailScale, v => { spec.DetailScale = v; SaveSpec(); }, 5, 100, "0")
+            .Number("Altura enterrada do meio-fio (cm)", () => spec.BuriedCm, v => { spec.BuriedCm = v; SaveSpec(); }, 0, 100, "0.#")
+            .Number("Inclinação do espelho do meio-fio (%)", () => spec.FaceSlopePct, v => { spec.FaceSlopePct = v; SaveSpec(); }, 0, 100, "0.#")
+            .Number("Caimento da sarjeta para o meio-fio (%)", () => spec.GutterSlopePct, v => { spec.GutterSlopePct = v; SaveSpec(); }, 0, 30, "0.#")
+            .Text("Nota do concreto (meio-fio e sarjeta)", () => spec.Concrete, v => { spec.Concrete = (v ?? "").Trim(); SaveSpec(); });
+    }
+
+    public static FormWindow Section(SectionDimensionDefinition d, bool edit, bool onlyProfile = false) => ProfileBuild(
         new FormWindow(edit ? "Editar cota de seção" : onlyProfile ? "Corte transversal" : "Cotar seção transversal", onlyProfile ? "Corte transversal da via" : "Cota automática da seção",
                 (onlyProfile
                     ? "Clique sobre uma via (corte perpendicular ao eixo) ou dois pontos atravessando-a e, em seguida, onde colocar o PERFIL TRANSVERSAL – " +
@@ -48,6 +82,8 @@ internal static class DetailForms
                     c.Start = new Vec2(15, -8.45);
                     c.End = new Vec2(15, 8.45);
                     c.ProfilePosition = c.Profile ? new Vec2(0, -11) : null;
+                    // Seção nova: a prévia mostra o desenho atual do perfil (o das seções criadas pela ferramenta).
+                    if (!edit) c.DesenhoVersao = SectionDimensionDefinition.DesenhoAtual;
                     var ctx = new BuildContext
                     {
                         Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs, ViewScale = 100,
@@ -93,9 +129,10 @@ internal static class DetailForms
             .Check("Nome de cada trecho (calçada, faixa de rolamento, ciclofaixa, canteiro...)", () => d.Labels, v => d.Labels = v)
             .Check("Marcar o eixo da via (traço-ponto)", () => d.AxisMarker, v => d.AxisMarker = v)
             .Check("Dividir as cotas no eixo (meias-larguras)", () => d.SplitAtAxis, v => d.SplitAtAxis = v)
-            .Text("Letra do corte (vazio = sem marcas/título)", () => d.SectionLetter, v => d.SectionLetter = (v ?? "").Trim().ToUpperInvariant());
+            .Text("Letra do corte (vazio = sem marcas/título)", () => d.SectionLetter, v => d.SectionLetter = (v ?? "").Trim().ToUpperInvariant()),
+        () => d.Layers, v => d.Layers = v, () => d.CurbGutter, v => d.CurbGutter = v);
 
-    public static FormWindow Profile(SectionProfileDefinition d, SectionDimensionDefinition? section) =>
+    public static FormWindow Profile(SectionProfileDefinition d, SectionDimensionDefinition? section) => ProfileBuild(
         new FormWindow("Editar perfil transversal", "Perfil transversal (corte)",
                 "Perfil desenhado a partir da cota de seção " + (section?.SectionLetter ?? "") + ". Para mudar a linha de corte, edite a cota de seção; " +
                 "para mudar a posição, mova o grupo do perfil (a nova posição é mantida).",
@@ -110,7 +147,8 @@ internal static class DetailForms
             .Check("Níveis de cada trecho (+0,15 / ±0,00)", () => d.ProfileLevels, v => d.ProfileLevels = v)
             .Check("Cotas verticais dos desníveis", () => d.ProfileHeights, v => d.ProfileHeights = v)
             .Check("Legenda dos materiais cortados", () => d.ProfileLegend, v => d.ProfileLegend = v)
-            .Check("Moldura em volta do perfil", () => d.FrameBox, v => d.FrameBox = v);
+            .Check("Moldura em volta do perfil", () => d.FrameBox, v => d.FrameBox = v),
+        () => d.Layers, v => d.Layers = v, () => d.CurbGutter, v => d.CurbGutter = v);
 
     public static FormWindow Typical(TypicalDetailDefinition d, MarkingDefinition target, double scale, bool edit)
     {
@@ -193,6 +231,7 @@ internal static class DetailForms
     {
         ("Do material", null), ("Sem hachura", Hachura.Nenhuma), ("Diagonal (concreto)", Hachura.Diagonal), ("Diagonal densa (meio-fio)", Hachura.DiagonalDensa),
         ("Cruzada (blocos)", Hachura.Cruzada), ("Pontilhado (asfalto, brita)", Hachura.Pontos), ("Grama", Hachura.Grama),
+        ("Brita (base)", Hachura.Brita), ("Solo (sub-base)", Hachura.Solo), ("Terra (subleito, aterro)", Hachura.Terra),
     };
 
     /// <summary>

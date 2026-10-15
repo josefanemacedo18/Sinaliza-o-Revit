@@ -1050,9 +1050,31 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   dispositivos e pintura, cada camada **preenchida com o seu material e contornada**, na escala escolhida (1:50 por
   padrão, com **exagero vertical** opcional), com **nome de cada trecho** e chamada, **níveis** (▽ +0,15 / ±0,00),
   **caimento da pista** (i = 2,0 % para fora do eixo, editável), **cotas verticais** dos desníveis (meio-fio,
-  plataforma, canteiro), **cotas horizontais** e total sob o perfil, **eixo**, linha do terreno, **legenda dos
-  materiais** com espessuras e o título **SEÇÃO TRANSVERSAL A–A** com a escala. A letra avança sozinha (A, B, C…).
-  Tudo se atualiza quando a via muda; a cadeia de cotas em planta é opcional.
+  plataforma, canteiro), **cotas horizontais** e total, **eixo**, terreno, **legenda** e o título **SEÇÃO TRANSVERSAL
+  A–A** com a escala. A letra avança sozinha (A, B, C…). Tudo se atualiza quando a via muda; a cadeia de cotas em planta
+  é opcional.
+  **Layout do perfil** (desenho por elemento, no modelo das seções típicas de via local e do detalhe de meio-fio com
+  sarjeta): de cima para baixo, o **símbolo do eixo (℄) com o rótulo EIXO**, a **cota total** e, logo abaixo, a **cadeia de
+  cotas por elemento** (vão estreito: o valor sobe para uma linha própria, com chamada até o vão); os **nomes** dos
+  elementos (os que não cabem no vão ficam lado a lado, com chamada até o elemento); **setas de caimento** junto à
+  superfície, paralelas a ela, com o % na pista e nas calçadas; e os **níveis**. O **eixo** atravessa o desenho em
+  traço-ponto e as linhas de chamada das cotas descem até a superfície, interrompidas atrás dos textos. Sob a pista, as
+  **camadas do pavimento** – revestimento da via e as camadas escolhidas (padrão: base de brita graduada simples 15 cm e
+  sub-base de solo-brita 15 cm, **valores indicativos – ajuste ao projeto de pavimentação**) – cada uma com **hachura
+  própria** (pontilhado, brita, solo) e **chamada** (linha + texto com o nome e a espessura) embaixo do perfil, junto com
+  o **subleito compactado**. O **terreno** (hachura de terra) fica sob todo o corte e **além do alinhamento dos dois
+  lados**, com linha de interrupção. Ao lado, abaixo da tabela de elementos, o **detalhe ampliado do meio-fio e da
+  sarjeta** (1:20 por padrão): forma real – espelho inclinado (15 %), parte enterrada (15 cm), sarjeta com caimento para o
+  meio-fio (3 %) –, **cotas em cm** (topo, base, sarjeta, alturas aparente, enterrada e total), as inclinações e as notas
+  **CONCRETO fck ≥ 20 MPa**, **GREIDE DO PAVIMENTO** e **PASSEIO OU TERRENO APILOADO**, com o título sublinhado e a escala.
+  Larguras e altura aparente vêm da própria via; o resto se ajusta na janela do Cotar Seção / Corte Transversal (e em
+  **Editar** o perfil): seções **Camadas do pavimento (perfil)** – até 4 camadas com nome, espessura (cm; 0 = sem a camada)
+  e hachura – e **Meio-fio e sarjeta (perfil)** – detalhe sim/não, escala do detalhe, altura enterrada, inclinação do
+  espelho, caimento da sarjeta e a nota do concreto. Os **títulos** (perfil e detalhe) são **sublinhados** (traço duplo
+  abaixo dos acentos e descendentes) com a escala embaixo. Tudo é medido em **mm de papel × escala da vista** e cada texto
+  vai para onde não encosta em outro – o perfil fica legível de 1:20 a 1:200, e o desenho começa à direita do ponto
+  clicado em qualquer escala. Nomes, cores e hachuras dos elementos, as opções do Cotar Seção e o ajuste de escala
+  continuam valendo. Perfis gravados com o desenho original (versão 0) continuam como estavam.
   **Caimento real** (*Desenhar o caimento real*, ligado por padrão): a pista é desenhada **em duas águas** a partir do
   eixo com o caimento do greide da via (ou o indicado, 2 %) – ou com a **superelevação** do greide na estaca do corte –
   e a **calçada sobe para o lote** com a inclinação da seção (ou a informada, 2 %). Os **níveis** mostram as cotas
@@ -1062,10 +1084,10 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   largura daquela estaca.
   **Desenho por elemento** (seções criadas a partir desta versão): cada elemento cortado tem **cor e hachura** próprias
   (pontilhado no asfalto, cruzada no bloquete, diagonal no concreto e no passeio, diagonal densa no meio-fio e na
-  sarjeta, tufos na grama – padrões *SV - Hachura…* criados no projeto); o **meio-fio é desenhado com o perfil** do
-  pré-moldado das notas de urbanização do plugin (100 × 15 × 13 × 30 cm: face do lado da pista inclinada na parte
-  aparente e embutido abaixo do pavimento tanto quanto aparece – 15 + 15 = 30 cm) [perfil indicativo – a confirmar
-  com o padrão do órgão], com as alturas em proporção (ou com o exagero vertical escolhido). A legenda passa a ser a
+  sarjeta, tufos na grama, brita, solo e terra nas camadas e no terreno – padrões *SV - Hachura…* criados no projeto); o
+  **meio-fio é desenhado com o perfil**: espelho do lado da pista inclinado (15 % na altura aparente) e parte enterrada
+  (15 cm), ambos ajustáveis em *Meio-fio e sarjeta (perfil)* – com 15 cm aparentes, 15 × 13 × 30 cm [perfil indicativo – a
+  confirmar com o padrão do órgão], com as alturas em proporção (ou com o exagero vertical escolhido). A legenda passa a ser a
   tabela **ELEMENTOS DA SEÇÃO**: **amostra** (cor e hachura), **nome** e **largura** de cada elemento (ex.: *Faixa de
   rolamento – 2 × 3,50 m*), emoldurada. Perfis gravados antes continuam com o desenho e a legenda de materiais de
   antes; para passar ao novo desenho, **Editar** o perfil (ou a cota) → *Desenho por elemento*.

@@ -1183,6 +1183,10 @@ public sealed class SectionProfileDefinition : MarkingDefinition, IProjectWideAn
     public int DesenhoVersao { get; set; }
     /// <summary>Nomes, cores e hachuras escolhidos para os elementos da seção (nulo = os padrões).</summary>
     public List<SectionItemStyle>? ItemStyles { get; set; }
+    /// <summary>Camadas do pavimento sob o revestimento (nulo = as típicas; lista vazia = nenhuma).</summary>
+    public List<SectionLayer>? Layers { get; set; }
+    /// <summary>Meio-fio e sarjeta: medidas e detalhe ampliado (nulo = o padrão).</summary>
+    public CurbGutterSpec? CurbGutter { get; set; }
 
     public string? TargetId => SectionId;
     public string GroupName => $"SV - Perfil transversal {Letter}-{Letter}";
@@ -1197,7 +1201,52 @@ public sealed class SectionProfileDefinition : MarkingDefinition, IProjectWideAn
         CrossSlopePct = sd.CrossSlopePct, DrawSlopes = sd.DrawSlopes, SidewalkSlopePct = sd.SidewalkSlopePct, ProfileLevels = sd.ProfileLevels, ProfileHeights = sd.ProfileHeights, ProfileLegend = sd.ProfileLegend,
         TextMm = sd.TextMm, Decimals = sd.Decimals, Terminal = sd.Terminal, Letter = string.IsNullOrWhiteSpace(sd.SectionLetter) ? "A" : sd.SectionLetter,
         Output = sd.Output.Clone(), DesenhoVersao = sd.DesenhoVersao, ItemStyles = sd.ItemStyles?.Select(x => x.Clone()).ToList(),
+        Layers = sd.Layers?.Select(x => x.Clone()).ToList(), CurbGutter = sd.CurbGutter?.Clone(),
     };
+}
+
+/// <summary>Camada do pavimento sob o revestimento, desenhada no perfil transversal: nome, espessura e hachura.</summary>
+public sealed class SectionLayer
+{
+    public string Name { get; set; } = "";
+    /// <summary>Espessura (cm).</summary>
+    public double ThicknessCm { get; set; }
+    public Hachura Hatch { get; set; } = Hachura.Brita;
+
+    public SectionLayer Clone() => (SectionLayer)MemberwiseClone();
+
+    /// <summary>Camadas típicas de via local – indicativas, a ajustar pelo projeto de pavimentação.</summary>
+    public static List<SectionLayer> Defaults() => new()
+    {
+        new() { Name = "Base de brita graduada simples (BGS)", ThicknessCm = 15, Hatch = Hachura.Brita },
+        new() { Name = "Sub-base de solo-brita", ThicknessCm = 15, Hatch = Hachura.Solo },
+    };
+
+    /// <summary>Camadas em uso (as típicas quando nulo), sem as de espessura nula.</summary>
+    public static List<SectionLayer> Effective(IEnumerable<SectionLayer>? layers) =>
+        (layers ?? Defaults()).Where(x => x.ThicknessCm > 0.05).ToList();
+}
+
+/// <summary>
+/// Meio-fio e sarjeta no perfil: o que a via não guarda (altura enterrada, inclinação do espelho, caimento da sarjeta, concreto) e
+/// o detalhe ampliado. Larguras e altura aparente vêm da própria via.
+/// </summary>
+public sealed class CurbGutterSpec
+{
+    /// <summary>Desenha o detalhe ampliado do meio-fio e da sarjeta ao lado do perfil.</summary>
+    public bool Detail { get; set; } = true;
+    /// <summary>Escala do detalhe (1:n).</summary>
+    public double DetailScale { get; set; } = 20;
+    /// <summary>Altura enterrada do meio-fio abaixo da sarjeta/pavimento (cm).</summary>
+    public double BuriedCm { get; set; } = 15;
+    /// <summary>Inclinação do espelho do meio-fio – face do lado da pista (%).</summary>
+    public double FaceSlopePct { get; set; } = 15;
+    /// <summary>Caimento da sarjeta para o meio-fio (%).</summary>
+    public double GutterSlopePct { get; set; } = 3;
+    /// <summary>Nota do material do meio-fio e da sarjeta.</summary>
+    public string Concrete { get; set; } = "CONCRETO fck ≥ 20 MPa";
+
+    public CurbGutterSpec Clone() => (CurbGutterSpec)MemberwiseClone();
 }
 
 /// <summary>Nome, cor e hachura de um elemento da seção transversal (chave = nome padrão: "Calçada", "Faixa de rolamento"...).</summary>
@@ -1368,6 +1417,10 @@ public sealed class SectionDimensionDefinition : MarkingDefinition, IProjectWide
     public int DesenhoVersao { get; set; }
     /// <summary>Nomes, cores e hachuras escolhidos para os elementos da seção (nulo = os padrões).</summary>
     public List<SectionItemStyle>? ItemStyles { get; set; }
+    /// <summary>Camadas do pavimento sob o revestimento, no perfil (nulo = as típicas; lista vazia = nenhuma).</summary>
+    public List<SectionLayer>? Layers { get; set; }
+    /// <summary>Meio-fio e sarjeta: medidas e detalhe ampliado no perfil (nulo = o padrão).</summary>
+    public CurbGutterSpec? CurbGutter { get; set; }
     /// <summary>Versão atual do desenho do perfil (seções criadas pela ferramenta).</summary>
     public const int DesenhoAtual = 2;
     /// <summary>Linha de corte, marcas e cadeia de cotas da planta formam um grupo (movem-se juntas).</summary>

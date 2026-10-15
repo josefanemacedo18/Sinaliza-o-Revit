@@ -83,20 +83,22 @@ public class AF3SectionStyleTests
         Assert.True(geo.Pieces.Count(p => p.Rgb == "#FF8800" && p.Hatch == Hachura.Cruzada) >= 2);   // camada + amostra
         Assert.Contains(geo.Pieces, p => p.Color == MarkingColor.Asfalto && p.Hatch == Hachura.Pontos);
         Assert.Contains(geo.Pieces, p => p.Color == MarkingColor.Concreto && p.Rgb == "#D2B48C" && p.Hatch == Hachura.Diagonal);
-        // Meio-fio com perfil (face inclinada: 5 vértices), embutido abaixo do pavimento, nos dois lados.
-        var curbs = geo.Pieces.Where(p => p.Hatch == Hachura.DiagonalDensa && p.Shape.Outer.Count == 5).ToList();
-        Assert.Equal(2, curbs.Count);
+        // Meio-fio com perfil (face inclinada: 5 vértices), embutido abaixo do pavimento, nos dois lados (o detalhe ampliado do
+        // meio-fio, à direita da legenda, é o terceiro).
         var legendX = geo.Annotations.OfType<AnnotationText>().First(t => t.Text == "ELEMENTOS DA SEÇÃO").Position.X - 5;
+        var curbs = geo.Pieces.Where(p => p.Hatch == Hachura.DiagonalDensa && p.Shape.Outer.Count == 5 && p.Shape.Bounds.Max.X < legendX).ToList();
+        Assert.Equal(2, curbs.Count);
         var asphaltBottom = geo.Pieces.Where(p => p.Color == MarkingColor.Asfalto && p.Shape.Bounds.Max.X < legendX).Min(p => p.Shape.Bounds.Min.Y);
         Assert.All(curbs, c => Assert.True(c.Shape.Bounds.Min.Y < asphaltBottom - 1e-6));
-        // Proporções do pré-moldado (notas de urbanização do plugin: 15 × 13 × 30 cm): altura total = 2 × aparente (0,30 m) e
-        // topo 13/15 da base, no desenho a 1:50 numa vista 1:100 (× 2).
+        // Proporções do meio-fio (rodada LX, referência do meio-fio com sarjeta tipo B): altura total = aparente + enterrada
+        // (15 + 15 = 30 cm) e espelho inclinado a 15 % na altura aparente (topo = 15 − 2,25 cm), no desenho a 1:50 numa vista
+        // 1:100 (× 2).
         Assert.All(curbs, c =>
         {
             var (mn, mx) = c.Shape.Bounds;
             Assert.Equal(0.30 * 2, mx.Y - mn.Y, 6);
             var top = c.Shape.Outer.Where(v => Math.Abs(v.Y - mx.Y) < 1e-9).ToList();
-            Assert.Equal(0.15 * 2 * 13 / 15, top.Count == 1 ? Math.Abs(top[0].X - (top[0].X - mn.X < mx.X - top[0].X ? mn.X : mx.X)) : top.Max(v => v.X) - top.Min(v => v.X), 6);
+            Assert.Equal((0.15 - 0.15 * 0.15) * 2, top.Count == 1 ? Math.Abs(top[0].X - (top[0].X - mn.X < mx.X - top[0].X ? mn.X : mx.X)) : top.Max(v => v.X) - top.Min(v => v.X), 6);
         });
         // Nomes também na planta (cadeia de cotas).
         var plan = DetailGenerator.SectionDimensions(sd, ctx).Annotations.OfType<AnnotationText>().Select(t => t.Text).ToList();

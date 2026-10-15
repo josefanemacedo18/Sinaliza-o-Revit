@@ -233,6 +233,8 @@ public static partial class DetailGenerator
     private static void SectionProfile(MarkingGeometry geo, SectionDimensionDefinition sd, SectionProfileDefinition pd, BuildContext ctx,
         IReadOnlyList<(MarkingDefinition Def, MarkingGeometry Geo)> withGeo, List<double> planStations, List<double> axes, Vec2 pos, string letter)
     {
+        // Desenho por elemento: layout das referências (cotas no topo, camadas com chamadas, detalhe do meio-fio) – rodada LX.
+        if (pd.DesenhoVersao >= 2) { SectionProfileV2(geo, sd, pd, ctx, withGeo, planStations, axes, pos, letter); return; }
         var a = sd.Start;
         var b = sd.End;
         var L = a.DistanceTo(b);
@@ -546,6 +548,7 @@ public static partial class DetailGenerator
         }).ToList();
         if (rows.Count == 0) return;
         var lm = tMm * 0.8;
+        var hm = Math.Max(lm * 0.85, tMm * 0.75);       // cabeçalho: legível (≥ 1,5 mm com o texto de 2 mm)
         var rowH = ctx.Mm(Math.Max(5.0, lm * 2.2));
         var sw = ctx.Mm(9);
         var pad = ctx.Mm(1.5);
@@ -559,10 +562,10 @@ public static partial class DetailGenerator
         geo.Annotations.Add(new AnnotationText(new Vec2(x0 + totalW / 2, y), "ELEMENTOS DA SEÇÃO", tMm, TextAlign.Center));
         y -= headH;
         var top = y;
-        geo.Annotations.Add(new AnnotationText(new Vec2(x0 + sw / 2 + pad, y - ctx.Mm(1.2)), "COR", lm * 0.85, TextAlign.Center));
-        geo.Annotations.Add(new AnnotationText(new Vec2(x0 + sw + 2 * pad + pad, y - ctx.Mm(1.2)), "ELEMENTO", lm * 0.85, TextAlign.Left));
-        geo.Annotations.Add(new AnnotationText(new Vec2(x0 + totalW - pad, y - ctx.Mm(1.2)), "LARGURA", lm * 0.85, TextAlign.Right));
-        y -= ctx.Mm(lm * 0.85 * 1.6 + 2.2);
+        geo.Annotations.Add(new AnnotationText(new Vec2(x0 + sw / 2 + pad, y - ctx.Mm(1.2)), "COR", hm, TextAlign.Center));
+        geo.Annotations.Add(new AnnotationText(new Vec2(x0 + sw + 2 * pad + pad, y - ctx.Mm(1.2)), "ELEMENTO", hm, TextAlign.Left));
+        geo.Annotations.Add(new AnnotationText(new Vec2(x0 + totalW - pad, y - ctx.Mm(1.2)), "LARGURA", hm, TextAlign.Right));
+        y -= ctx.Mm(hm * 1.6 + 2.2);
         geo.Annotations.Add(new AnnotationLine(new[] { new Vec2(x0, y), new Vec2(x0 + totalW, y) }, MarkingColor.Preta));
         foreach (var r in rows)
         {
