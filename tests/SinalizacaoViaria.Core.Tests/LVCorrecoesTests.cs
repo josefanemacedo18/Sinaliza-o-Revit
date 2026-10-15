@@ -482,9 +482,8 @@ public class LVCorrecoesTests
         Assert.Contains(geo.Annotations.OfType<AnnotationText>(), t => t.Text == "3,00" && t.Position.DistanceTo(mid) < 4);
         // Quadro de lotes e memorial: o chanfro aparece como lado próprio (não soma na frente).
         var r = LotReport.Resumo(lot, new[] { q });
-        var row = Assert.Single(LotReport.LinhasLotes(r), x => x[9].Contains("chanfro"));
-        Assert.Contains("3,00", row[9]);
-        Assert.DoesNotContain("3,00", row[4]);
+        var row = Assert.Single(LotReport.LinhasLotes(r), x => x[6].Contains("chanfro"));
+        Assert.Contains("3,00", row[6]);
         var (qq, d) = r.Quadras[0];
         var p = d.Parcelas.Single(x => Face(x.Forma, Vec2.Zero, 3 / Math.Sqrt(2)) != null);
         Assert.Contains("Chanfro: 3,00 m", LotReport.Descricao(p, LotReport.Lados(p, d, qq, lot)));

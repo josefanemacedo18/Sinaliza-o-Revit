@@ -2831,10 +2831,12 @@ as divisas por baixo) – por isso aparece também no masterplan.
   texto encosta nas divisas –, números alinhados à direita, amostras de cor do mesmo tamanho e a linha da gleba destacada.
   Os quadros de quadras e de lotes usam o mesmo desenho.
 * **Quadro de quadras**: lotes e área por categoria de cada quadra, com total.
-* **Quadro de lotes – lote a lote**, na ordem da numeração: **quadra**, **lote**, **categoria**, **frente para** (nome da rua;
-  duas ruas no lote de esquina), **frente**, **lado direito**, **lado esquerdo** e **fundos** (m; lados com dois trechos
-  aparecem somados, ex. "30,00 + 21,90"), **área** (m²) e **observação** (esquina, união de lotes, frente em curva, abaixo do
-  mínimo, sem frente para via). Ao escolher: **todas as quadras** num quadro (continua em colunas ao lado a cada 40 linhas),
+* **Quadro de lotes – lote a lote**, na ordem da numeração: **lote**, **categoria**, **via** (nome da rua; as duas ruas no lote
+  de esquina, a da frente primeiro), **área** (m²), **perímetro** (m, com o desenvolvimento dos trechos em curva) e
+  **observação** (esquina, chanfro, união de lotes, frente em curva, abaixo do mínimo, sem frente para via); no quadro com
+  todas as quadras, a coluna **quadra** vem antes. As medidas dos lados ficam no detalhamento (cotas) e no memorial. **Cada
+  lote tem uma frente só** – a da testada dele; no lote de esquina o lado para a outra rua é o lado direito ou esquerdo,
+  confrontando com essa rua (nada de frente somada). Ao escolher: **todas as quadras** num quadro (continua em colunas ao lado a cada 40 linhas),
   **uma quadra** (clique um lote dela; título "QUADRO DE LOTES – QUADRA A") ou **um quadro por quadra** (cada um na sua Legenda,
   e todos na mesma folha se você pedir).
 * **Tabela do Revit**: "SV - Lotes do loteamento", nativa (quadra, lote, categoria, área), atualizada pelo próprio Revit.

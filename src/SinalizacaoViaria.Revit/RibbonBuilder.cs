@@ -221,7 +221,7 @@ public static class RibbonBuilder
         Split(lote, "SvLoteDoc", "Detalhar e Quadros",
             Data(typeof(CmdDetalharLotes), "Detalhar Lotes", "detalhelotes", "Na vista ativa: número, área, medidas dos lados, categoria, letra da quadra num círculo e nome das vias (cada item opcional)."),
             Data(typeof(CmdQuadrosLoteamento), "Quadros do Loteamento", "quadrolote",
-                "Quadro de áreas (m² e % da gleba), de quadras e de lotes (lote a lote: rua, medidas dos lados, área – todas as quadras, uma ou uma por quadra) " +
+                "Quadro de áreas (m² e % da gleba), de quadras e de lotes (lote a lote: via, área e perímetro – todas as quadras, uma ou uma por quadra) " +
                 "numa Legenda própria (vai para qualquer folha) – e a tabela nativa dos lotes."),
             Data(typeof(CmdMemorialLoteamento), "Memorial do Loteamento", "memorial", "Memorial descritivo (.docx): gleba, quadro de áreas, sistema viário, quadras e descrição de cada lote com as confrontações."));
         Large(lote, typeof(CmdMasterplan), "Masterplan", "masterplan",

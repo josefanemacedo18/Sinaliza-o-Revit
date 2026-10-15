@@ -222,7 +222,19 @@ public static class LotReport
 
         static double Len(List<Vec2> pts) { var s = 0.0; for (int i = 0; i + 1 < pts.Count; i++) s += pts[i].DistanceTo(pts[i + 1]); return s; }
         static Vec2 Out(List<Vec2> pts) => (pts[^1] - pts[0]).Normalized().PerpRight;
-        var main = sides.Where(s => s.Via && !chanfros.Contains(s.Conf)).OrderByDescending(s => Len(s.Pts)).FirstOrDefault();
+        // Uma frente só: o lado para a via sobre a testada do lote (a linha da frente); sem ela, o lado para a via mais longo. Os
+        // outros lados para via (lote de esquina) são laterais ou fundos e continuam confrontando com a via.
+        var front = p.LinhaFrente.Count >= 2 ? new Polyline2(p.LinhaFrente) : null;
+        double OnFront(List<Vec2> pts)
+        {
+            if (front == null) return 0;
+            var s = 0.0;
+            for (int i = 0; i + 1 < pts.Count; i++)
+                if (Math.Abs(front.Project((pts[i] + pts[i + 1]) / 2).Signed) < 0.1) s += pts[i].DistanceTo(pts[i + 1]);
+            return s;
+        }
+        var main = sides.Where(s => s.Via && !chanfros.Contains(s.Conf)).OrderByDescending(s => OnFront(s.Pts)).ThenByDescending(s => Len(s.Pts))
+            .FirstOrDefault();
         var res = new List<LadoLote>();
         Vec2? nf = main.Pts != null ? Out(main.Pts) : null;
         foreach (var s in sides)
@@ -231,7 +243,7 @@ public static class LotReport
             var curvo = s.Pts.Count > 3 && s.Turn > 5;
             TipoLado tipo;
             if (chanfros.Contains(s.Conf)) tipo = TipoLado.Chanfro;
-            else if (s.Via) tipo = TipoLado.Frente;
+            else if (main.Pts != null && ReferenceEquals(s.Pts, main.Pts)) tipo = TipoLado.Frente;
             else if (nf is { } f)
             {
                 var o = Out(s.Pts);
@@ -244,7 +256,7 @@ public static class LotReport
             else tipo = TipoLado.Divisa;
             res.Add(new LadoLote(tipo, s.Pts[0], s.Pts[^1], len, s.Conf, curvo, s.Via));
         }
-        // Ordem do memorial: frente(s), lado direito, fundos, lado esquerdo (sentido anti-horário a partir da frente principal).
+        // Ordem do memorial: frente, lado direito, fundos, lado esquerdo (sentido anti-horário a partir da frente).
         return res.OrderBy(l => l.Tipo switch { TipoLado.Frente => 0, TipoLado.Chanfro => 0.5, TipoLado.LadoDireito => 1, TipoLado.Fundos => 2, TipoLado.LadoEsquerdo => 3, _ => 4 })
             .ThenByDescending(l => l.Comprimento).ToList();
     }
@@ -262,8 +274,7 @@ public static class LotReport
     }
 
     /// <summary>Cabeçalhos do quadro de lotes (lote a lote).</summary>
-    public static readonly string[] CabecalhosLotes =
-        { "QUADRA", "LOTE", "CATEGORIA", "FRENTE PARA", "FRENTE (m)", "LADO DIR. (m)", "LADO ESQ. (m)", "FUNDOS (m)", "ÁREA (m²)", "OBSERVAÇÃO" };
+    public static readonly string[] CabecalhosLotes = { "QUADRA", "LOTE", "CATEGORIA", "VIA", "ÁREA (m²)", "PERÍMETRO (m)", "OBSERVAÇÃO" };
 
     /// <summary>
     /// Quadro de lotes, lote a lote (na ordem da numeração): quadra, número, categoria, via(s) da frente, medida de cada lado, área e
@@ -291,15 +302,11 @@ public static class LotReport
     public static string[] LinhaLote(Parcela p, DivisaoQuadra d, QuadraDefinition q, LoteamentoDefinition? lot)
     {
         var lados = Lados(p, d, q, lot);
-        string Med(TipoLado t)
-        {
-            var ls = lados.Where(l => l.Tipo == t).ToList();
-            return ls.Count == 0 ? "–" : string.Join(" + ", ls.Select(l => M(l.Comprimento)));
-        }
-        var ruas = lados.Where(l => l.Via && l.Tipo != TipoLado.Chanfro).Select(l => l.Confrontante).Distinct().ToList();
+        var ruas = lados.Where(l => l.Via && l.Tipo != TipoLado.Chanfro).OrderBy(l => l.Tipo == TipoLado.Frente ? 0 : 1).Select(l => l.Confrontante)
+            .Distinct().ToList();
         var obs = new List<string>();
-        // Esquina: frente para duas vias (ou dois lados de via).
-        if (lados.Count(l => l.Tipo == TipoLado.Frente) >= 2) obs.Add("esquina");
+        // Esquina: dois lados para via (a frente e a lateral).
+        if (lados.Count(l => l.Via && l.Tipo != TipoLado.Chanfro) >= 2) obs.Add("esquina");
         if (p.Unidos is { Count: > 1 } u) obs.Add($"união de {u.Count} lotes");
         if (lados.Any(l => l.Tipo == TipoLado.Frente && l.Curvo)) obs.Add("frente em curva");
         foreach (var l in lados.Where(l => l.Tipo == TipoLado.Chanfro)) obs.Add($"chanfro {M(l.Comprimento)} m");
@@ -307,8 +314,8 @@ public static class LotReport
         else if (ruas.Count == 0) obs.Add("sem frente para via");
         return new[]
         {
-            q.Nome, p.Numero, p.Categoria, ruas.Count > 0 ? string.Join(" / ", ruas) : "–", Med(TipoLado.Frente), Med(TipoLado.LadoDireito),
-            Med(TipoLado.LadoEsquerdo), Med(TipoLado.Fundos), M(p.Area), string.Join("; ", obs),
+            q.Nome, p.Numero, p.Categoria, ruas.Count > 0 ? string.Join(" / ", ruas) : "–", M(p.Area), M(LotDivider.Perimeter(p.Forma)),
+            string.Join("; ", obs),
         };
     }
 

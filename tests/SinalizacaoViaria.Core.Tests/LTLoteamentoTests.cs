@@ -589,7 +589,7 @@ public class LTLoteamentoTests
         Assert.DoesNotContain("atrícula", text + string.Join("", doc.Blocks.OfType<MemField>().Select(f => f.Label)));
         Assert.Contains("[a confirmar", text);
         // Quadro de lotes de cada quadra no memorial (lote a lote).
-        var tables = doc.Blocks.OfType<MemTable>().Where(t => t.Headers.Contains("Frente para")).ToList();
+        var tables = doc.Blocks.OfType<MemTable>().Where(t => t.Headers.Contains("Via")).ToList();
         Assert.Equal(w.Quadras.Count, tables.Count);
         Assert.Equal(r.Quadras.Sum(q => q.Divisao.Parcelas.Count), tables.Sum(t => t.Rows.Count));
         var bytes = DocxWriter.Write(doc);
@@ -622,20 +622,20 @@ public class LTLoteamentoTests
         var rows = LotReport.LinhasLotes(r);
         Assert.Equal(r.Quadras.Sum(q => q.Divisao.Parcelas.Count), rows.Count);
         Assert.All(rows, x => Assert.Equal(LotReport.CabecalhosLotes.Length, x.Length));
-        Assert.Equal(new[] { "QUADRA", "LOTE", "CATEGORIA", "FRENTE PARA", "FRENTE (m)", "LADO DIR. (m)", "LADO ESQ. (m)", "FUNDOS (m)", "ÁREA (m²)", "OBSERVAÇÃO" },
-            LotReport.CabecalhosLotes);
-        // Lote comum de 12 × 30: frente para a via, lados de 30 m, fundos de 12 m.
+        // Rodada LW: sem as medidas dos lados – quadra, lote, categoria, via, área, perímetro e observação.
+        Assert.Equal(new[] { "QUADRA", "LOTE", "CATEGORIA", "VIA", "ÁREA (m²)", "PERÍMETRO (m)", "OBSERVAÇÃO" }, LotReport.CabecalhosLotes);
+        // Lote comum de 12 × 30: área de 360 m² e perímetro de 84 m.
         bool Std(Parcela p) => p.Categoria == CategoriaLote.Lote && p.Frente == 12 && Math.Abs(p.Area - 360) < 0.01 && !p.Esquina;
         var (qa, da) = r.Quadras.First(x => x.Divisao.Parcelas.Any(Std));
         var std = da.Parcelas.First(Std);
         var row = rows.Single(x => x[0] == qa.Nome && x[1] == std.Numero);
         Assert.Equal(CategoriaLote.Lote, row[2]);
         Assert.NotEqual("–", row[3]);
-        Assert.Equal(new[] { "12,00", "30,00", "30,00", "12,00", "360,00", "" }, row[4..]);
-        // Lote de esquina: duas vias na frente e a observação.
-        var corner = rows.First(x => x[9].Contains("esquina"));
+        Assert.Equal(new[] { "360,00", "84,00", "" }, row[4..]);
+        // Lote de esquina: as duas vias e a observação (sem medida somada).
+        var corner = rows.First(x => x[6].Contains("esquina"));
         Assert.Contains(" / ", corner[3]);
-        Assert.Contains(" + ", corner[4]);
+        Assert.DoesNotContain(corner, c => c.Contains(" + "));
         // Na ordem da numeração em cada quadra: 1..N e depois as outras categorias.
         foreach (var g in rows.GroupBy(x => x[0]))
         {

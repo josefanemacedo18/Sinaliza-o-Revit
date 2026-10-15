@@ -332,10 +332,10 @@ public static class LotDrawing
             }
             case TipoQuadroLoteamento.Lotes:
             {
-                // Lote a lote: quadra, número, categoria, via da frente, medidas dos lados, área e observações.
+                // Lote a lote: quadra, número, categoria, via(s), área, perímetro e observações.
                 var headers = LotReport.CabecalhosLotes.ToList();
                 var aligns = new List<TextAlign> { TextAlign.Center, TextAlign.Center, TextAlign.Left, TextAlign.Left, TextAlign.Right, TextAlign.Right,
-                    TextAlign.Right, TextAlign.Right, TextAlign.Right, TextAlign.Left };
+                    TextAlign.Left };
                 var cells = LotReport.LinhasLotes(r, string.IsNullOrWhiteSpace(d.Quadra) ? null : d.Quadra).Select(x => x.ToList()).ToList();
                 if (cells.Count == 0) geo.Warnings.Add(string.IsNullOrWhiteSpace(d.Quadra) ? "Loteamento sem lotes." : $"Quadra {d.Quadra} não encontrada no loteamento.");
                 // Sem observações: sem a coluna; com o filtro de uma quadra: sem a coluna da quadra (vai no título).

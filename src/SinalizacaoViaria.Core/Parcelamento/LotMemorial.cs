@@ -93,7 +93,7 @@ public static class LotMemorial
     {
         var headers = LotReport.CabecalhosLotes.Skip(1).Select(h => h[..1] + h[1..].ToLowerInvariant()).ToList();
         var rows = LotReport.LinhasLotes(r, quadra).Select(c => (IReadOnlyList<string>)c.Skip(1).ToList()).ToList();
-        return new MemTable(headers, rows, new[] { 0.6, 1.0, 1.6, 0.9, 0.9, 0.9, 0.9, 1.0, 1.6 }, new[] { 3, 4, 5, 6, 7 });
+        return new MemTable(headers, rows, new[] { 0.6, 1.0, 2.0, 1.0, 1.0, 1.8 }, new[] { 3, 4 });
     }
 
     public static MemTable QuadroQuadras(ResumoLoteamento r)

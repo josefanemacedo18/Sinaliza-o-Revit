@@ -547,7 +547,7 @@ public sealed class CmdQuadrosLoteamento : CommandBase
         td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Quadro de áreas", "Gleba, lotes, institucional, áreas verdes, sistema viário e áreas públicas – m² e %.");
         td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Quadro de quadras", "Número de lotes e área por categoria de cada quadra.");
         td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Quadro de lotes (lote a lote)",
-            "Quadra, lote, categoria, rua da frente, frente, lados, fundos, área e observações de cada lote – todas as quadras, uma quadra ou um quadro por quadra.");
+            "Lote, categoria, via, área, perímetro e observações de cada lote – todas as quadras, uma quadra ou um quadro por quadra.");
         td.AddCommandLink(TaskDialogCommandLinkId.CommandLink4, "Tabela do Revit (lista de lotes)", "Tabela nativa: quadra, lote, categoria e área, atualizada pelo Revit.");
         var r = td.Show();
         if (r == TaskDialogResult.CommandLink4) return Schedule(uidoc);
