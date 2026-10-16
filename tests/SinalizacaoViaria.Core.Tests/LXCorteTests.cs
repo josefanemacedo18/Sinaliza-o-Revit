@@ -4,6 +4,7 @@ using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Core.Model;
+using SinalizacaoViaria.Core.Parcelamento;
 
 namespace SinalizacaoViaria.Core.Tests;
 
@@ -287,5 +288,49 @@ public class LXCorteTests
             Assert.InRange(maxY, Pos.Y - ctx.Mm(6), Pos.Y);
             Assert.True(minX >= Pos.X - 1e-9);
         }
+    }
+}
+
+/// <summary>Rodada LX (correção): o chanfro do lote se mantém em qualquer modo de divisão e é cotado no detalhamento.</summary>
+public class LXChanfroTests
+{
+    private static BuildContext Ctx(LoteamentoDefinition lot, IEnumerable<QuadraDefinition> quadras)
+    {
+        var all = quadras.Cast<MarkingDefinition>().Append(lot).ToList();
+        return new BuildContext { Catalog = CatalogService.LoadDefault(), ViewScale = 500, AllDefinitions = () => all, Lookup = id => all.FirstOrDefault(x => x.Id == id) };
+    }
+
+    [Theory]
+    [InlineData(ModoDivisao.Testada)]
+    [InlineData(ModoDivisao.Linhas)]
+    public void Chanfro_MantemSeEmQualquerModoDeDivisao_ECotadoUmaVezNoDetalhe(ModoDivisao modo)
+    {
+        var (_, lot, _, quadras) = LVCorrecoesTests.Cruz();
+        foreach (var q in quadras) { q.Chanfro = true; q.ChanfroFace = 3; q.Divisao = modo; }
+        var ch = quadras.SelectMany(LotDivider.Chanfros).ToList();
+        Assert.Equal(4, ch.Count);
+        // O triângulo sai dos lotes da quina (área da quadra descontada em 4 chanfros) e a face é uma divisa do lote.
+        foreach (var q in quadras)
+        {
+            var div = LotDivider.Divide(q, lot);
+            var mine = LotDivider.Chanfros(q);
+            Assert.Equal(mine.Count, div.Chanfros.Count);
+            foreach (var c in mine)
+            {
+                Assert.DoesNotContain(div.Parcelas, p => PolygonOps.TotalArea(PolygonOps.Intersect(new[] { p.Forma }, new[] { c.Triangulo })) > 0.01);
+                Assert.Contains(div.Parcelas, p => p.Forma.Outer.Any(v => v.DistanceTo(c.A) < 0.05) && p.Forma.Outer.Any(v => v.DistanceTo(c.B) < 0.05));
+            }
+        }
+        // Detalhamento: cada chanfro cotado uma vez (3,00 m), com ou sem divisas.
+        foreach (var divisas in new[] { false, true })
+        {
+            var det = new LoteamentoDetalheDefinition { LoteamentoId = lot.Id, Cotas = true, Divisas = divisas };
+            var g = LotDrawing.Detalhe(det, Ctx(lot, quadras));
+            var faces = g.Annotations.OfType<AnnotationText>().Count(t => t.Text == "3,00" && Math.Abs(t.Rotation) > 1e-9 || t.Text == "3,00");
+            Assert.Equal(4, faces);
+        }
+        // Chanfro desligado: nada de cota nem de corte.
+        foreach (var q in quadras) q.Chanfro = false;
+        Assert.Empty(quadras.SelectMany(LotDivider.Chanfros));
     }
 }

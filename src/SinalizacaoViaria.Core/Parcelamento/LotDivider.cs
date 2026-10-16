@@ -412,6 +412,16 @@ public static class LotDivider
         if (q.Divisao == ModoDivisao.Linhas)
         {
             PorLinhas(res, q, quad, chains);
+            // Chanfro das quinas também nos lotes por linhas: a face sai de cada lote que ocupa a quina (as linhas são lidas
+            // com as quinas vivas; o chanfro vale enquanto estiver ligado na quadra, seja qual for o modo de divisão).
+            var cl = Chanfros(q, chains, c => c.TestadaId);
+            if (cl.Count > 0)
+            {
+                res.Chanfros.AddRange(cl);
+                foreach (var p in res.Parcelas)
+                    if (Largest(PolygonOps.Difference(new[] { p.Forma }, cl.Select(c => c.Triangulo))) is { } cutP && cutP.Area < p.Forma.Area - 1e-6)
+                        p.Forma = new Polygon2(CleanRing(cutP.Outer), cutP.Holes);
+            }
             return Fecha(res, q, categorias, frenteMinimaLote, areaMinimaLote);
         }
         if (chainOf.Count == 0)

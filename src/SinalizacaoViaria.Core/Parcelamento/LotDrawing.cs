@@ -162,7 +162,8 @@ public static class LotDrawing
                         var text = LotReport.M(len);
                         // A face do chanfro é sempre cotada, do lado de fora (na calçada): curta, a cota não cabe dentro do lote.
                         var chanfro = div.Chanfros.Any(c => c.EFace(a, b, 0.05));
-                        if (!chanfro && chord < DetailGenerator.LineWidthFactor(text) * h * mm * 1.2) continue;
+                        if (chanfro) continue;      // a face do chanfro é cotada à parte (uma vez, com a linha), vendo a quadra
+                        if (chord < DetailGenerator.LineWidthFactor(text) * h * mm * 1.2) continue;
                         var dir = (b - a).Normalized();
                         var inward = dir.PerpLeft;
                         var rot = Readable(dir);
@@ -175,6 +176,22 @@ public static class LotDrawing
                     }
                 }
             }
+            // Chanfros das quinas: a face é desenhada (linha de divisa) e cotada, vinda da quadra – não depende de lote nenhum.
+            if (d.Cotas || d.Divisas)
+                foreach (var ch in div.Chanfros)
+                {
+                    if (d.Divisas) geo.Annotations.Add(new AnnotationLine(new[] { ch.A, ch.B }, MarkingColor.Preta));
+                    if (!d.Cotas) continue;
+                    var h = th * 0.85;
+                    var text = LotReport.M(ch.Face);
+                    var dir = (ch.B - ch.A).Normalized();
+                    var rot = Readable(dir);
+                    var up = Vec2.FromAngle(rot).PerpLeft;
+                    var mid = (ch.A + ch.B) / 2;
+                    var outward = (ch.Vertice - mid).Normalized();       // para a calçada (fora do lote)
+                    var pos = up.Dot(outward) > 0 ? mid + outward * (0.8 * mm + h * mm) : mid + outward * (0.8 * mm);
+                    geo.Annotations.Add(new AnnotationText(pos, text, h) { Rotation = rot });
+                }
             if (d.Quadra) QuadraLabel(geo, q, div, th, mm, firstText);
         }
         // Sobra da gleba em volta das vias: área verde do loteamento (sem letra de quadra nem cotas – o contorno é o da gleba e o

@@ -2782,7 +2782,10 @@ quiser (as linhas ficam guardadas). Quadras com o limite por linhas não são al
   ("chanfro 3,00 m" na observação) e no memorial ("Chanfro: 3,00 m para a esquina da Rua A com a Rua B"); as frentes e a
   numeração continuam as mesmas. **A calçada acompanha**: ao aplicar, as interseções em volta são refeitas e o passeio da
   esquina ocupa o triângulo (sem vão entre o lote e a calçada). Reconhecer as quadras de novo mantém a quina viva no contorno
-  gravado (o chanfro é refeito na divisão), sem chanfrar duas vezes.
+  gravado (o chanfro é refeito na divisão), sem chanfrar duas vezes. O chanfro pertence à **quadra**: vale em qualquer modo
+  de divisão (**inclusive Lotes por Linhas**, em que a face também sai dos lotes da quina) e é refeito a cada divisão – gerar
+  o detalhamento, o quadro ou o memorial não o desfaz. No **Detalhamento dos lotes** a face de cada chanfro é **cotada uma
+  vez**, do lado de fora, e desenhada como divisa quando *Divisas* está ligado, mesmo que nenhum lote a tenha como lado.
 * **Miolo** (o que fica atrás dos lotes em quadras fundas ou irregulares):
   * **Vai para os lotes** (padrão): cada lote segue até a divisa de fundos (ou até a fileira oposta) enquanto a faixa dele está
     livre na largura toda – sem lotes em L. Pedaços menores que o lote mínimo vão para o vizinho com a maior divisa; o que
