@@ -5,7 +5,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
 ## Estado em 2026-10-19
 
 - **Ramo:** `claude/dreamy-gates-a3nrta`. Sem PR aberto (o fluxo do projeto é commit e push direto no ramo).
-- **Último ciclo concluído:** EV5. Antes dele, EV1–EV4.
+- **Último ciclo concluído:** EV6, volumes pelo método das seções (Core, sem interface no Revit). Antes: EV5 e EV1–EV4.
   - EV5: casos degenerados das primitivas; elementos do traçado e do greide (CSV no Perfil da Via); V09–V11 no validador;
     procedimento de versão.
   - EV1–EV4:
@@ -19,7 +19,9 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
 - **Testes:**
   - linha de base: 2 704/2 704;
   - depois de EV3/EV4: 2 730/2 730;
-  - depois de EV5: **2 754/2 754** (suíte completa); mais 2 testes do validador (classe 28/28), total 2 756.
+  - depois de EV5: 2 754/2 754;
+  - depois de EV6: **2 765/2 765** (suíte completa, 14 min 28 s).
+- **CI (Windows):** verde no commit de EV1–EV4 (run 100). Os seguintes foram enviados; confira o resultado em Actions.
 - **Não verificado:** execução dentro do Revit 2027 (sem Revit no ambiente). O comando novo usa só APIs já usadas no
   projeto (`TaskDialog`, `FilteredElementCollector`, `ExtensibleStorageFilter`, `Selection.SetElementIds`) e
   `TransactionMode.ReadOnly`.
@@ -29,7 +31,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
 ROADMAP **F5b**: elementos do eixo das vias comuns.
 - O eixo vem de linhas do Revit (retas e arcos, ou cantos arredondados por `PathReference`).
 - Gerar a mesma tabela (tangentes, arcos com R, Δ, estacas) a partir do caminho resolvido, com testes de eixo conhecido.
-- Depois: **F7** (volumes por estaca × malha) e **F3** (catálogo por documento, que resolve K1).
+- Depois: **F7b** (tabela por estaca no quantitativo de terraplenagem do Revit) e **F3** (catálogo por documento, que resolve K1).
 
 Decisão pendente do autor: subir a versão do plugin (`Directory.Build.props`, hoje 2.0.0) para marcar esta etapa
 (sugestão: 2.1.0). Não foi feito sem pedido.

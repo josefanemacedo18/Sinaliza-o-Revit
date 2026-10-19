@@ -3,6 +3,21 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-19 – EV6: volumes por seções transversais (Core)
+
+### Terraplenagem (fase VII)
+- `SectionVolumes` (Core) calcula volumes pelo **método das seções transversais**:
+  - áreas de corte e aterro em seções perpendiculares ao eixo a cada N m, com a última sempre no fim;
+  - volume pela média das áreas × distância;
+  - acumulados (curva de massas) e CSV pt-BR.
+- É um cálculo independente da malha de `Grading.Volumes`. Num caso de 2 000 m³ os dois métodos concordam com diferença abaixo de 2 %.
+- Limitações documentadas, não corrigidas:
+  - sem correção de curvatura (Pappus);
+  - a média das áreas superestima volumes de variação não linear (teste com o erro esperado h²/12·∫A'').
+- Defeito encontrado e corrigido antes de entrar: com a seção exatamente na ponta da plataforma, o teste dentro/fora era ambíguo e o último trecho perdia metade do volume (1 700 em vez de 2 000 m³). As pontas agora são amostradas 1 mm para dentro.
+- **Ainda sem interface no Revit.** O quantitativo de terraplenagem continua pela malha.
+- +9 testes `EVSectionVolumesTests`. Suíte completa: **2 765/2 765** (14 min 28 s).
+
 ## 2026-10-19 – EV5: geometria em casos degenerados e elementos do eixo
 
 ### Integridade geométrica (fase IV)

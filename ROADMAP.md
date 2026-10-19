@@ -28,6 +28,7 @@ Cada etapa só é marcada como concluída com compilação limpa, suíte verde e
 | EV5 / F5 | Elementos do traçado (TS/SC/CS/ST) e do greide (PIV, L, K, PCV/PTV, alto/baixo), com CSV; Perfil da Via grava o CSV do greide | `EVAlignmentElementsTests`, MANUAL §24.5 |
 | EV5 / F15 | Procedimento de versão documentado (ARCHITECTURE §7) | — |
 | EV5 / F10 (parte) | Validador: quadras sobrepostas (V09), quadra fora da gleba (V10), interseção sem duas vias (V11) | `EVModelIntegrityTests` |
+| EV6 / F7 (Core) | Volumes pelo método das seções transversais, conferidos com a malha | `EVSectionVolumesTests` |
 
 ## Próximas etapas (em ordem)
 
@@ -35,7 +36,7 @@ Cada etapa só é marcada como concluída com compilação limpa, suíte verde e
 |---|---|---|---|
 | F5b | V – alinhamentos | Elementos do eixo das **vias** (desenhado no Revit: retas e arcos de raio de canto), não só do traçado por PIs dos nós viários | testes com eixos de retas + arcos conhecidos |
 | F3 | III – arquitetura | Catálogo por documento (resolve K1); avaliar trocar `DependencyOrder` pelo `ModelGraph` **só com Autoteste no Revit** | Autoteste do usuário sem regressão |
-| F7 | VII – terraplenagem | Volumes por estaca (seções) ao lado da malha, com a diferença entre métodos | teste com sólido de volume conhecido |
+| F7b | VII – terraplenagem | Tabela por estaca no quantitativo de terraplenagem do Revit (seções sobre a superfície de projeto e o Toposolid), ao lado da malha | Autoteste com os dois volumes |
 | F10 | X – compatibilização | Verificações que precisam da geometria gerada (lotes sobre a calçada, obra × via, pintura fora do pavimento): exigem rodar os geradores no validador ou no Autoteste | testes por código Vxx |
 | F8 | VIII – drenagem | Rede (trechos e PVs ligados) só geométrica: declividade, cobrimento e sentido, com regras configuráveis **e fonte citada**; sem dimensionamento hidráulico até haver especificação | testes de geometria; nada de vazão sem método citado |
 | F11 | XI – tráfego | Separar no relatório o que é simulação e o que é animação; registrar parâmetros e sementes usados | relatório reprodutível |

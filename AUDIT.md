@@ -104,7 +104,7 @@ Legenda de estado:
 | VI | Pavimento (asfalto, bloquete, concreto, terra) e camadas no perfil | VALIDADA (Core) | rodadas AD3/LX2 |
 | VI | Corredor 3D (pisos no greide, obras hospedadas) | VALIDADA (Core) / Revit não validado | rodadas K/L/VT |
 | VII | Terreno (TIN, Toposolid nativo) | VALIDADA (Core) / Revit não validado | `Tin`, `TerrainMesh`, `Grading` |
-| VII | Terraplenagem: corte/aterro, taludes, bermas, volumes | VALIDADA (Core) | `Grading.Volumes` (método no §6.7) |
+| VII | Terraplenagem: corte/aterro, taludes, bermas, volumes | VALIDADA (Core); desde EV6 também o método das seções (Core, sem interface no Revit), conferido com a malha | `Grading.Volumes`, `SectionVolumes` (§6.7) |
 | VII | Interseções (T, cruz, oblíquas, tipos II–IV), rotatórias, nós em desnível | VALIDADA (Core) | rodadas S2, V2, AB2, AE3 |
 | VIII | Dispositivos de drenagem superficial (bocas de lobo, grelhas, PV, sarjetão, canaletas) – geometria | VALIDADA (Core) | `DrainageGenerator`, `SarjetaoGenerator` |
 | VIII | Rede de drenagem (tubos, poços ligados, declividades) | AUSENTE | não há modelo de rede |
@@ -143,7 +143,7 @@ Legenda de estado:
 ## 6. Notas por domínio
 
 - **§6.5 Alinhamento.** Quando o raio pedido não cabe entre os PIs vizinhos, ele é **reduzido com aviso** (`Tracado.Build`). As espirais são simétricas e o desenvolvimento é limitado a 95 % do arco. A integração é numérica (passo ≤ 1,5° de deflexão). Ver `Tracado.cs`.
-- **§6.7 Volumes de terraplenagem.** O método é a **amostragem estratificada em malha**: um ponto fixo, sorteado de forma determinística, por célula; o volume é Σ(Δz·área da célula); a malha é limitada a ~250 mil amostras. Está em `Grading.Volumes`, `Grading.cs:1262`. O próprio código explica a escolha: com o centro da célula, o erro chegava a 4 % em vias alinhadas à malha. **Não é o método das seções médias**; não há comparação automática entre métodos.
+- **§6.7 Volumes de terraplenagem.** O método é a **amostragem estratificada em malha**: um ponto fixo, sorteado de forma determinística, por célula; o volume é Σ(Δz·área da célula); a malha é limitada a ~250 mil amostras. Está em `Grading.Volumes`, `Grading.cs:1262`. O próprio código explica a escolha: com o centro da célula, o erro chegava a 4 % em vias alinhadas à malha. Desde EV6 existe no Core o **método das seções transversais** (`SectionVolumes`: seções perpendiculares ao eixo, média das áreas, sem correção de curvatura). Ele é conferido com a malha num teste (diferença < 2 %), mas ainda não aparece no quantitativo do Revit.
 - **§6.8 Drenagem.** Só geometria e encaixe (rebaixo de sarjeta, caixa, grelha, tubo de ligação), com as referências citadas no código (DNIT 030/2004-ES, NBR 10160). **Nenhum dimensionamento hidráulico** é feito ou afirmado.
 - **§6.11 Tráfego.**
   - A análise usa formulações do tipo HCM e Webster.
