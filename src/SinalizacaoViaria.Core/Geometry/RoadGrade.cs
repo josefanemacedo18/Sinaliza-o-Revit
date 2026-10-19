@@ -70,6 +70,25 @@ public sealed class RoadGrade
 
     private static double Slope(GradePoint a, GradePoint b) => b.S - a.S > 1e-9 ? (b.Z - a.Z) / (b.S - a.S) : 0;
 
+    /// <summary>
+    /// Comprimento efetivo (m) da curva vertical no PIV interno <paramref name="i"/> da lista ordenada: a pedida (ou a padrão)
+    /// ou, no mínimo, K = 10 m por % de variação de rampa (sem "quinas" no greide); limitada a 98 % do menor vão vizinho para
+    /// que as curvas de PIVs vizinhos nunca se sobreponham (a sobreposição criava degraus e calombos na pista). O K = 10 é um
+    /// piso de suavização da geometria, não um critério normativo de visibilidade. <paramref name="wanted"/> = antes do limite.
+    /// </summary>
+    internal double CurveLength(IReadOnlyList<GradePoint> p, int i, out double wanted)
+    {
+        var g1 = Slope(p[i - 1], p[i]);
+        var g2 = Slope(p[i], p[i + 1]);
+        wanted = Math.Max(p[i].Curve ?? DefaultCurve, 10 * Math.Abs(g2 - g1) * 100);
+        return Math.Min(wanted, 0.98 * Math.Min(p[i].S - p[i - 1].S, p[i + 1].S - p[i].S));
+    }
+
+    /// <summary>PIVs em ordem de estação (a lista gravada pode estar fora de ordem).</summary>
+    public IReadOnlyList<GradePoint> SortedPoints() => Sorted();
+
+    internal static double SlopeOf(GradePoint a, GradePoint b) => Slope(a, b);
+
     /// <summary>Cota do greide (m, relativa) na estação <paramref name="s"/> – tangentes e parábolas nos PIVs.</summary>
     public double Z(double s)
     {
@@ -82,10 +101,7 @@ public sealed class RoadGrade
         {
             var g1 = Slope(p[i - 1], p[i]);
             var g2 = Slope(p[i], p[i + 1]);
-            // Curva pedida ou, no mínimo, K = 10 m por % de variação de rampa (sem "quinas" no greide); limitada para que as
-            // curvas de PIVs vizinhos nunca se sobreponham (a sobreposição criava degraus e calombos na pista).
-            var want = Math.Max(p[i].Curve ?? DefaultCurve, 10 * Math.Abs(g2 - g1) * 100);
-            var lv = Math.Min(want, 0.98 * Math.Min(p[i].S - p[i - 1].S, p[i + 1].S - p[i].S));
+            var lv = CurveLength(p, i, out _);
             if (lv < 0.01) continue;
             var x0 = p[i].S - lv / 2;
             if (s < x0 || s > p[i].S + lv / 2) continue;

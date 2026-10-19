@@ -197,7 +197,11 @@ public sealed class Polyline2
         return new Polyline2(res, Closed);
     }
 
-    /// <summary>Projeção do ponto na polilinha: estaca e distância com sinal (+ à esquerda do sentido).</summary>
+    /// <summary>
+    /// Projeção do ponto na polilinha: estaca e distância com sinal (+ à esquerda do sentido). Polilinha sem segmentos (vazia
+    /// ou de um ponto) não tem projeção: estaca 0 e distância <see cref="double.MaxValue"/> – nas buscas pelo mais próximo,
+    /// um eixo degenerado nunca é escolhido.
+    /// </summary>
     public (double Station, double Signed) Project(Vec2 p)
     {
         double best = double.MaxValue, bestS = 0, sign = 1;

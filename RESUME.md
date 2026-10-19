@@ -5,7 +5,10 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
 ## Estado em 2026-10-19
 
 - **Ramo:** `claude/dreamy-gates-a3nrta`. Sem PR aberto (o fluxo do projeto é commit e push direto no ramo).
-- **Último ciclo concluído:** EV1–EV4.
+- **Último ciclo concluído:** EV5. Antes dele, EV1–EV4.
+  - EV5: casos degenerados das primitivas; elementos do traçado e do greide (CSV no Perfil da Via); V09–V11 no validador;
+    procedimento de versão.
+  - EV1–EV4:
   - Auditoria.
   - Documentos de controle.
   - Proteção de dados de versão mais nova e base de migrações.
@@ -13,20 +16,23 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
   - `ModelGraph`, `ModelValidator`, `PolygonChecks`.
   - Comando **Validar Modelo**.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros (Linux, `-p:EnableWindowsTargeting=true`).
-- **Testes:** linha de base 2 704/2 704; depois de EV3/EV4, **2 730/2 730** (+26 de `EVModelIntegrityTests`).
+- **Testes:**
+  - linha de base: 2 704/2 704;
+  - depois de EV3/EV4: 2 730/2 730;
+  - depois de EV5: **2 754/2 754** (suíte completa); mais 2 testes do validador (classe 28/28), total 2 756.
 - **Não verificado:** execução dentro do Revit 2027 (sem Revit no ambiente). O comando novo usa só APIs já usadas no
   projeto (`TaskDialog`, `FilteredElementCollector`, `ExtensibleStorageFilter`, `Selection.SetElementIds`) e
   `TransactionMode.ReadOnly`.
 
 ## Próxima tarefa
 
-ROADMAP **F4** (fase IV): testes de borda das primitivas geométricas.
-- `Polyline2`: pontos coincidentes, polilinha de 1 e 2 pontos, estaqueamento além das pontas, offset em volta de 180°.
-- `Tracado.Build`: PIs coincidentes, PIs colineares, deflexão próxima de 180°, raio maior que o que cabe.
-- Critério: nenhum NaN/∞ na saída e mensagens claras quando a entrada é inválida. Corrigir só o que falhar, com teste
-  de regressão.
+ROADMAP **F5b**: elementos do eixo das vias comuns.
+- O eixo vem de linhas do Revit (retas e arcos, ou cantos arredondados por `PathReference`).
+- Gerar a mesma tabela (tangentes, arcos com R, Δ, estacas) a partir do caminho resolvido, com testes de eixo conhecido.
+- Depois: **F7** (volumes por estaca × malha) e **F3** (catálogo por documento, que resolve K1).
 
-Depois, **F5**: relatório de elementos do traçado (TS/SC/CS/ST) e do greide (PIV/PCV/PTV/K).
+Decisão pendente do autor: subir a versão do plugin (`Directory.Build.props`, hoje 2.0.0) para marcar esta etapa
+(sugestão: 2.1.0). Não foi feito sem pedido.
 
 ## Como retomar
 

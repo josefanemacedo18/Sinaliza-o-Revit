@@ -44,7 +44,7 @@ como substituída.
 ## D-005 – Validação do modelo somente leitura, com severidade e confiança
 - **Contexto:** a missão pede verificações com severidade, confiança e indicação de revisão humana, sem decisões
   automáticas irreversíveis.
-- **Decisão:** `ModelValidator.Validate` (Core) devolve achados V01–V08. `CmdValidarModelo` usa
+- **Decisão:** `ModelValidator.Validate` (Core) devolve achados V01–V11. `CmdValidarModelo` usa
   `TransactionMode.ReadOnly`: não altera o modelo, grava um TXT e só oferece selecionar os elementos.
 - **Consequências:** nenhuma correção automática. Corrigir é decisão do usuário, com as ferramentas existentes
   (Editar, Atualizar, apagar).

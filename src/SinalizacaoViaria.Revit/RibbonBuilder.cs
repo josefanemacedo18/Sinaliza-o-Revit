@@ -159,7 +159,8 @@ public static class RibbonBuilder
             Data(typeof(CmdAlternar2D3D), "Alternar 2D/3D", "alternar", "Converte as marcas selecionadas entre modelo 3D e detalhe 2D."));
         Large(edit, typeof(CmdValidarModelo), "Validar Modelo", "validar",
             "Confere o projeto sem alterar nada: dados ilegíveis ou de versão mais nova, cópias divergentes, referências quebradas " +
-            "(detalhes, vias, loteamento), dependências circulares, linhas de referência apagadas e contornos inválidos de quadras e glebas. " +
+            "(detalhes, vias, loteamento), dependências circulares, linhas de referência apagadas, contornos inválidos de quadras e glebas, " +
+            "quadras sobrepostas ou fora da gleba e interseções sem duas vias. " +
             "Cada achado traz severidade, confiança e se pede revisão humana; o relatório é gravado em TXT.");
         Stack(edit,
             Data(typeof(CmdConfiguracoes), "Configurações", "config", "Preferências do plugin (ímã de conexão, pisos do Revit, interseções automáticas...)."),

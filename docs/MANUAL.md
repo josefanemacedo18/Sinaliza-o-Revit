@@ -742,6 +742,9 @@ sempre sua, com Editar, Atualizar ou apagando o elemento.
 | V06 | linha de referência (eixo, limite da quadra, linha de lote, gleba) apagada | sem traçado guardado, redesenhe a linha e use Editar; com traçado guardado, a marca continua, mas não acompanha mais a linha |
 | V07 | contorno de quadra, gleba ou área remanescente inválido (poucos vértices, área nula, lados que se cruzam) | corrija o contorno ou as linhas do limite |
 | V08 | linha de corte sem o perfil transversal | sai sozinha na próxima atualização |
+| V09 | quadras do mesmo loteamento sobrepostas (mais de 0,5 m²) | a área seria contada duas vezes nos lotes e no quadro: corrija o contorno de uma delas |
+| V10 | quadra com parte fora da gleba (mais de 0,5 m²) | confira o contorno da quadra ou da gleba (confiança média: pode ser só um contorno desatualizado) |
+| V11 | interseção com menos de duas vias existentes | apague a interseção ou refaça a conexão |
 
 O resumo aparece numa janela (com **Selecionar os elementos com erro ou aviso** e **Abrir o relatório**). O relatório
 completo é gravado em `%AppData%\SinalizaBIM\validacao-AAAAMMDD-HHMMSS.txt`. A validação confere os **dados**; a
@@ -2076,6 +2079,14 @@ via vira obra. É o "perfil longitudinal" do projeto rodoviário.
 5. **Aplicar**: o greide passa a valer para a via inteira (pista, calçadas, linhas, dispositivos), as obras são criadas nos
    trechos indicados (com os últimos parâmetros de Viaduto/Ponte, Túnel e Trincheira) e o **Toposolid é cortado/aterrado**
    com taludes até o terreno natural.
+6. **Elementos do greide**: a cada aplicação, os PIVs do greide final vão para `%AppData%\SinalizaBIM\greide-<via>.csv`
+   (planilha, ";" e vírgula decimal). Para cada PIV: estaca (n+resto, estacas de 20 m), cota, rampas i1 e i2, variação A,
+   comprimento **efetivo** e **pedido** da curva vertical, **K = L/|A|**, convexa/côncava, **PCV** e **PTV** com as cotas, e o
+   **ponto alto/baixo** quando ele cai dentro da curva. O caminho aparece no resumo.
+
+> O comprimento efetivo pode diferir do pedido. Para não haver "quina", a curva é no mínimo K = 10 m por %, um piso de
+> suavização da geometria, **não um critério de visibilidade**. E ela nunca passa de 98 % do menor vão entre PIVs
+> vizinhos. Verificar distâncias de visibilidade e K mínimos da norma do órgão continua sendo do projetista.
 
 ### 24.6 Muro de arrimo e talude
 * **Muro de arrimo**: **flexão**, **gravidade**, **contrafortes**, **gabião**, **terra armada** e **cortina atirantada**, com

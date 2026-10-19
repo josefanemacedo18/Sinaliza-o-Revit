@@ -21,8 +21,8 @@ public sealed record CopiaGravada(string MarkingId, string Json, string Elemento
 
 /// <summary>
 /// Validação do modelo do plugin, sem alterar nada: lê as cópias gravadas nos elementos e aponta dados ilegíveis, versões
-/// mais novas, cópias divergentes, referências quebradas, ciclos de dependência, elementos do Revit ausentes e contornos
-/// inválidos. Cada verificação tem código, severidade, confiança e se pede revisão humana (ver TESTS.md / AUDIT.md).
+/// mais novas, cópias divergentes, referências quebradas, ciclos de dependência, elementos do Revit ausentes, contornos
+/// inválidos e a compatibilização do parcelamento e das interseções (quadras sobrepostas ou fora da gleba, nó sem duas vias). Cada verificação tem código, severidade, confiança e se pede revisão humana (ver TESTS.md / AUDIT.md).
 /// </summary>
 public static class ModelValidator
 {
@@ -79,6 +79,8 @@ public static class ModelValidator
             CheckShapes(d, res);
         }
 
+        CheckLayout(defs, res);
+
         // Corte só de dados (sem desenho na planta) sem o perfil que o usa.
         var perfis = defs.Values.OfType<SectionProfileDefinition>().Select(p => p.SectionId).ToHashSet();
         foreach (var s in defs.Values.OfType<SectionDimensionDefinition>().Where(s => DetailGenerator.SectionDataOnly(s) && !perfis.Contains(s.Id)))
@@ -99,6 +101,9 @@ public static class ModelValidator
         ["V06"] = "linha ou elemento do Revit referenciado foi apagado",
         ["V07"] = "contorno inválido (poucos vértices, área nula, lados que se cruzam)",
         ["V08"] = "linha de corte sem o perfil transversal",
+        ["V09"] = "quadras do mesmo loteamento sobrepostas",
+        ["V10"] = "quadra fora da gleba do loteamento",
+        ["V11"] = "interseção com menos de duas vias existentes",
     };
 
     /// <summary>Relatório em texto (o mesmo que a camada Revit grava em TXT).</summary>
@@ -153,6 +158,57 @@ public static class ModelValidator
             res.Add(new("V06", Severidade.Aviso, Confianca.Alta, true,
                 $"{d.DisplayCode}: {faltam} linha(s) do limite/divisão apagada(s) – o contorno guardado continua valendo até ser redesenhado.",
                 new[] { d.Id }));
+    }
+
+    /// <summary>Área (m²) abaixo da qual sobreposições e excessos são ruído numérico de contornos que só se encostam.</summary>
+    public const double AreaTolerance = 0.5;
+
+    /// <summary>Compatibilização do parcelamento e das interseções (V09–V11).</summary>
+    private static void CheckLayout(Dictionary<string, MarkingDefinition> defs, List<Achado> res)
+    {
+        static Polygon2? Valid(IReadOnlyList<Vec2> ring) => PolygonChecks.Problem(ring) == null ? new Polygon2(ring) : null;
+        foreach (var lot in defs.Values.OfType<LoteamentoDefinition>())
+        {
+            var quadras = defs.Values.OfType<QuadraDefinition>().Where(q => q.LoteamentoId == lot.Id)
+                .Select(q => (Q: q, P: Valid(q.Contorno))).Where(x => x.P != null).OrderBy(x => x.Q.Nome, StringComparer.Ordinal).ToList();
+            for (var i = 0; i < quadras.Count; i++)
+                for (var j = i + 1; j < quadras.Count; j++)
+                {
+                    var a = quadras[i];
+                    var b = quadras[j];
+                    if (!BoundsOverlap(a.P!, b.P!)) continue;
+                    var area = PolygonOps.TotalArea(PolygonOps.Intersect(new[] { a.P! }, new[] { b.P! }));
+                    if (area > AreaTolerance)
+                        res.Add(new("V09", Severidade.Erro, Confianca.Alta, true,
+                            $"Quadras {a.Q.Nome} e {b.Q.Nome} se sobrepõem em {area:0.##} m² – os lotes e o quadro de áreas contam essa área duas vezes.",
+                            new[] { a.Q.Id, b.Q.Id }));
+                }
+            if (Valid(lot.Gleba) is not { } gleba) continue;
+            foreach (var (q, p) in quadras)
+            {
+                var fora = PolygonOps.TotalArea(PolygonOps.Difference(new[] { p! }, new[] { gleba }));
+                if (fora > AreaTolerance)
+                    res.Add(new("V10", Severidade.Aviso, Confianca.Media, true,
+                        $"Quadra {q.Nome}: {fora:0.##} m² fora da gleba de {lot.Nome} (contorno da quadra ou da gleba desatualizado?).",
+                        new[] { q.Id, lot.Id }));
+            }
+        }
+        foreach (var n in defs.Values.OfType<IntersectionDefinition>())
+        {
+            // Sem Distinct: uma via que passa duas vezes pelo nó (laço) conta duas vezes, como na geração.
+            var vias = n.RoadIds.Count(id => !string.IsNullOrWhiteSpace(id) && defs.ContainsKey(id));
+            if (vias < 2)
+                res.Add(new("V11", Severidade.Aviso, Confianca.Alta, true,
+                    $"{n.DisplayCode}: só {vias} via(s) existente(s) no cruzamento – a interseção não liga mais duas vias (apagar ou refazer a conexão).",
+                    new[] { n.Id }));
+        }
+    }
+
+    private static bool BoundsOverlap(Polygon2 a, Polygon2 b)
+    {
+        var (a0, a1) = a.Bounds;
+        var (b0, b1) = b.Bounds;
+        return a0.X <= b1.X && b0.X <= a1.X && a0.Y <= b1.Y && b0.Y <= a1.Y;
     }
 
     private static void CheckShapes(MarkingDefinition d, List<Achado> res)

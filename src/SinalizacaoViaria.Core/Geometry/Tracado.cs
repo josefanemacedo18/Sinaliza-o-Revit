@@ -15,6 +15,31 @@ public static class Tracado
     /// </summary>
     public static Polyline2 Build(IReadOnlyList<Pi> pis, double step = 0.75, List<string>? warnings = null)
     {
+        var curves = Solve(pis, warnings);
+        var n = pis.Count;
+        var pts = new List<Vec2> { pis[0].P };
+        for (int i = 1; i + 1 < n; i++)
+        {
+            var (r, ls, delta, t) = curves[i];
+            if (r <= 0) { pts.Add(pis[i].P); continue; }
+            var din = (pis[i].P - pis[i - 1].P).Normalized();
+            var ts = pis[i].P - din * t;
+            pts.Add(ts);
+            pts.AddRange(Transition(ts, din, r, ls, delta, step).Skip(1));
+        }
+        pts.Add(pis[^1].P);
+        // Remove pontos coincidentes.
+        var clean = new List<Vec2> { pts[0] };
+        foreach (var p in pts.Skip(1)) if (p.DistanceTo(clean[^1]) > 1e-4) clean.Add(p);
+        return new Polyline2(clean);
+    }
+
+    /// <summary>
+    /// Curva de cada PI interno como o eixo é gerado: raio (R) e espiral (Ls) efetivos – já reduzidos para caber –, deflexão Δ
+    /// (rad, + à esquerda) e tangente externa T. R = 0 = sem curva (vértice reto, PIs coincidentes ou alinhados).
+    /// </summary>
+    internal static (double R, double Ls, double Delta, double T)[] Solve(IReadOnlyList<Pi> pis, List<string>? warnings = null)
+    {
         if (pis.Count < 2) throw new ArgumentException("São precisos ao menos dois pontos.");
         var n = pis.Count;
         // Tangentes externas de cada curva (T) e fator de redução para caber.
@@ -51,21 +76,7 @@ public static class Tracado
             if (ok) break;
             if (pass == 0) warnings?.Add("Curvas reduzidas para caber entre os pontos do traçado.");
         }
-        var pts = new List<Vec2> { pis[0].P };
-        for (int i = 1; i + 1 < n; i++)
-        {
-            var (r, ls, delta, t) = curves[i];
-            if (r <= 0) { pts.Add(pis[i].P); continue; }
-            var din = (pis[i].P - pis[i - 1].P).Normalized();
-            var ts = pis[i].P - din * t;
-            pts.Add(ts);
-            pts.AddRange(Transition(ts, din, r, ls, delta, step).Skip(1));
-        }
-        pts.Add(pis[^1].P);
-        // Remove pontos coincidentes.
-        var clean = new List<Vec2> { pts[0] };
-        foreach (var p in pts.Skip(1)) if (p.DistanceTo(clean[^1]) > 1e-4) clean.Add(p);
-        return new Polyline2(clean);
+        return curves;
     }
 
     /// <summary>Tangente externa T = (R + p)·tg(Δ/2) + k da curva com espirais simétricas.</summary>

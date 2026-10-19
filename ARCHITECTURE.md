@@ -21,7 +21,7 @@ cada módulo estão em [AUDIT.md](AUDIT.md); as decisões e seus motivos, em [DE
 │   Parcelamento LotDivider · DivisaoPorLinhas · LotDrawing · LotReport · LotMemorial · Masterplan                   │
 │   Traffic      TrafficNetwork · TrafficAnalysis · TrafficSimulation · cenários · soluções · diagnóstico           │
 │   Quantities / Reports (DocxWriter, Memorial) / Geo (TM local, SIRGAS) / Catalog (MBST, JSON embutido)            │
-│   Model        ModelGraph (dependências) · ModelValidator (verificações com severidade e confiança)               │
+│   Model        ModelGraph (dependências) · ModelValidator (V01–V11, severidade e confiança)                       │
 └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -98,4 +98,15 @@ coberto pelo **Autoteste** (`CmdAutoteste`), que roda só dentro do Revit e gera
 
 `dotnet build src/SinalizacaoViaria.Revit -c Release` produz `Instalar/Revit2027/SinalizaBIM.dll` +
 `SinalizaBIM.addin`. São dois arquivos, sem dependências soltas; o runtime .NET 10 vem com o Revit 2027. O CI
-(`.github/workflows/build.yml`, Windows) testa, compila e publica esse pacote como artefato.
+(`.github/workflows/build.yml`, Windows) testa, compila e publica esse pacote como artefato `SinalizaBIM-Revit2027`.
+
+### Procedimento de versão (release)
+
+1. Atualizar `<Version>` em `Directory.Build.props` (hoje 2.0.0). A versão aparece em **Normas / Sobre** e no assembly.
+2. `dotnet test tests/SinalizacaoViaria.Core.Tests -c Release`: tudo verde. Registrar o resultado em TESTS.md.
+3. `dotnet build src/SinalizacaoViaria.Revit -c Release` (no Linux, `-p:EnableWindowsTargeting=true`), com 0 avisos.
+   Conferir que `Instalar/Revit2027` tem exatamente a DLL e o `.addin`.
+4. Entrada no CHANGELOG.md, commit e push. O CI tem de ficar verde e publicar o artefato.
+5. **Validação no Revit 2027** (manual, fora do CI), numa **cópia** de projeto ou num arquivo vazio: carregar sem erro, rodar
+   **Autoteste → Rápido** e **Validar Modelo**, e guardar os dois relatórios com a versão. Sem essa etapa a versão continua
+   "implementada, mas não validada no Revit" (AUDIT §5).

@@ -262,6 +262,38 @@ public class EVModelIntegrityTests
     }
 
     [Fact]
+    public void Validacao_QuadrasSobrepostasEForaDaGleba()
+    {
+        var lot = new LoteamentoDefinition { Id = "lot", Nome = "Jardim", Gleba = Ring(0, 0, 100, 0, 100, 100, 0, 100) };
+        var a = new QuadraDefinition { Id = "qa", LoteamentoId = "lot", Nome = "A", Contorno = Ring(10, 10, 50, 10, 50, 50, 10, 50) };
+        var b = new QuadraDefinition { Id = "qb", LoteamentoId = "lot", Nome = "B", Contorno = Ring(40, 40, 80, 40, 80, 80, 40, 80) };
+        // Encostada em A (lado comum) não é sobreposição; C passa da gleba em 10 × 20 m.
+        var c = new QuadraDefinition { Id = "qc", LoteamentoId = "lot", Nome = "C", Contorno = Ring(50, 10, 110, 10, 110, 30, 50, 30) };
+        var res = ModelValidator.Validate(Copies(lot, a, b, c));
+        var v09 = Assert.Single(res, x => x.Codigo == "V09");
+        Assert.Equal(new[] { "qa", "qb" }, v09.Ids);
+        Assert.Contains("100 m²", v09.Mensagem);
+        Assert.Equal(Severidade.Erro, v09.Severidade);
+        var v10 = Assert.Single(res, x => x.Codigo == "V10");
+        Assert.Equal("qc", v10.Ids[0]);
+        Assert.Contains("200 m²", v10.Mensagem);
+        Assert.Equal(Confianca.Media, v10.Confianca);
+        // Quadras de outro loteamento não se comparam com estas.
+        var outro = new QuadraDefinition { Id = "qx", LoteamentoId = "outro", Nome = "X", Contorno = a.Contorno };
+        Assert.Single(ModelValidator.Validate(Copies(lot, a, b, c, outro)), x => x.Codigo == "V09");
+    }
+
+    [Fact]
+    public void Validacao_IntersecaoSemDuasVias()
+    {
+        Assert.DoesNotContain(ModelValidator.Validate(Copies(Road("r1"), Road("r2"), Node("n", "r1", "r2"))), a => a.Codigo == "V11");
+        var res = ModelValidator.Validate(Copies(Road("r1"), Node("n", "r1", "r2-apagada")));
+        Assert.Contains(res, a => a.Codigo == "V11" && a.Ids.Contains("n"));
+        // Via que passa duas vezes pelo mesmo nó (laço) conta como duas.
+        Assert.DoesNotContain(ModelValidator.Validate(Copies(Road("r1"), Node("n", "r1", "r1"))), a => a.Codigo == "V11");
+    }
+
+    [Fact]
     public void Validacao_CorteSoDeDadosSemPerfil()
     {
         var sec = new SectionDimensionDefinition { Id = "sec", Profile = true, PlanChain = false };

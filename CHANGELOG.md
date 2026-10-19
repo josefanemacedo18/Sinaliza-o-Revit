@@ -3,6 +3,37 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-19 – EV5: geometria em casos degenerados e elementos do eixo
+
+### Integridade geométrica (fase IV)
+- `EVGeometryEdgeTests` (14 testes) cobrem:
+  - polilinha vazia, de um ponto, com pontos repetidos e fechada com o ponto final repetido;
+  - estacas fora do trecho;
+  - offset em volta de 180° e em ângulo agudo (limite de esquadria);
+  - traçado com PIs coincidentes, colineares, deflexão de 179°, 179,99° e 180°, raio que não cabe e espiral maior que o arco.
+- Resultado: nenhum NaN/∞, e as pontas foram preservadas.
+- `Polyline2.Project` sem segmentos devolve distância `double.MaxValue`. Agora isso é **contrato documentado e testado**, não acaso: um eixo degenerado nunca é "o mais próximo". Não foi mudado porque tem 141 chamadas.
+
+### Alinhamentos (fase V)
+- `AlignmentElements` (Core) gera os relatórios a partir das **mesmas rotinas** da geometria:
+  - curvas horizontais do traçado por PIs: deflexão, R e Ls efetivos e pedidos, T, estacas TS/SC/CS/ST, extensão;
+  - PIVs do greide: i1, i2, A, L efetivo e pedido, K, PCV/PTV, ponto alto/baixo.
+  - Exporta CSV pt-BR e estacas "n+resto".
+- `Tracado.Build` foi separado em `Solve` (curvas) + desenho, e `RoadGrade.CurveLength` foi extraído de `Z(s)`. A geometria não mudou: a suíte inteira passa.
+- Revit: **Perfil da Via** grava `greide-<via>.csv` com os elementos do greide aplicado.
+- Nenhum critério normativo novo: o piso K = 10 do greide já existia e passa a estar documentado como suavização, não como norma.
+- +10 testes `EVAlignmentElementsTests`, com valores calculados à mão: curva circular Δ = 90°, convexa ±2 %, côncava com piso K, vão curto, consistência com `Z(s)` e `Tracado.Build`.
+
+### Compatibilização (fase X)
+- Validar Modelo ganha três verificações (+2 testes):
+  - V09: quadras do mesmo loteamento sobrepostas (erro);
+  - V10: quadra fora da gleba (aviso, confiança média);
+  - V11: interseção com menos de duas vias existentes (aviso).
+- Tolerância de 0,5 m² para não apontar contornos que só se encostam.
+
+### Testes
+- Suíte completa: **2 754/2 754** (13 min 38 s) com os refatoramentos de `Tracado`/`RoadGrade`. Depois disso, +2 testes do validador (V09–V11), rodados na classe `EVModelIntegrityTests`: 28/28.
+
 ## 2026-10-19 – EV1 a EV4: auditoria, documentos de controle, estabilização e validação do modelo
 
 ### Segurança de dados

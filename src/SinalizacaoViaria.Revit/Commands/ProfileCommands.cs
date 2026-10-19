@@ -182,6 +182,19 @@ public sealed class CmdPerfilVia : CommandBase
         results.AddRange(RoadWorks.SetGrade(uidoc, road.GroupId, grade, created));
         TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { road.Pavement }.Concat(created).ToList());
         var summary = res.Summary() + (created.Count > 0 ? $"\n{created.Count} obra(s) criada(s) na via." : "\nNenhuma obra necessária: a via fica em aterro/corte no terreno.");
+        // Elementos do greide aplicado (PIV, rampas, L, K, PCV/PTV, ponto alto/baixo) – um CSV por via, refeito a cada aplicação.
+        try
+        {
+            Directory.CreateDirectory(PluginPaths.Root);
+            var key = string.Concat((road.GroupId ?? road.Pavement.Id).Where(char.IsLetterOrDigit));
+            var path = Path.Combine(PluginPaths.Root, $"greide-{key}.csv");
+            File.WriteAllText(path, AlignmentElements.VerticalCsv(AlignmentElements.Vertical(grade)), new System.Text.UTF8Encoding(true));
+            summary += $"\nElementos do greide (PIV, rampas, L, K, PCV/PTV): {path}";
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Perfil da via – elementos do greide", ex);
+        }
         results.Insert(0, new RenderResult());
         results[0].Warnings.Add(summary);
         results[0].Warnings.AddRange(res.Warnings);

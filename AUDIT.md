@@ -97,8 +97,8 @@ Legenda de estado:
 | IV | Primitivas 2D (Vec2, Polyline2 com estaqueamento/offset, Polygon2, booleanas Clipper2) | VALIDADA (Core), indiretamente | usadas por milhares de testes; poucos testes diretos de casos degenerados |
 | IV | Validação de polígono (autointerseção, área nula) | VALIDADA (Core) desde EV4 | `PolygonChecks`, testes de casos degenerados |
 | IV | Sólidos 3D (varredura com greide, tesselação) | VALIDADA (Core) | `Solid3D`, testes das rodadas H/I |
-| V | Alinhamento horizontal por PIs (curva circular + clotoides) | VALIDADA (Core), parcial | `Tracado.Build`; sem relatório de elementos (TS/SC/CS/ST) → EV5 |
-| V | Perfil vertical (PIVs, curvas parabólicas, rampas, superelevação, caimentos) | VALIDADA (Core) | `RoadGrade`, testes; sem verificação de distância de visibilidade (não inventar critério) |
+| V | Alinhamento horizontal por PIs (curva circular + clotoides) | VALIDADA (Core); relatório de elementos (TS/SC/CS/ST) desde EV5. Usado nos ramos dos nós viários; o eixo das vias comuns vem do desenho no Revit | `Tracado`, `AlignmentElements`, `EVAlignmentElementsTests` |
+| V | Perfil vertical (PIVs, curvas parabólicas, rampas, superelevação, caimentos) | VALIDADA (Core); elementos (PCV/PTV, K, alto/baixo) e CSV desde EV5; sem verificação de distância de visibilidade (não inventar critério) | `RoadGrade`, `AlignmentElements` |
 | V | Projeto de greide automático (acompanhar terreno, compensado) | VALIDADA (Core) | `RoadProfileDesigner`, testes rodadas J/K/AL3 |
 | VI | Seção transversal da via (faixas, ciclofaixas, calçadas, canteiros, larguras variáveis) | VALIDADA (Core) | `RoadSetup*`, centenas de testes |
 | VI | Pavimento (asfalto, bloquete, concreto, terra) e camadas no perfil | VALIDADA (Core) | rodadas AD3/LX2 |
@@ -113,7 +113,7 @@ Legenda de estado:
 | IX | Regras mínimas configuráveis (frente 5 m e área 125 m² por padrão, editáveis) | VALIDADA (Core) | `LoteamentoDefinition.Minimos`; **sem aprovação legal automática** |
 | IX | Quadros de áreas, de quadras e de lotes; memorial `.docx` | VALIDADA (Core) | `LotReport`, `LotMemorial`, `DocxWriter` |
 | X | Verificações no Revit (pintura × pisos, continuidade, terreno × via) | IMPLEMENTADA, NÃO VALIDADA aqui | `AutoTestChecks.cs` |
-| X | Validação do modelo com severidade, confiança e revisão humana | VALIDADA (Core) desde EV4; o comando Revit está IMPLEMENTADO, NÃO VALIDADO aqui | `ModelValidator` V01–V08, `CmdValidarModelo` |
+| X | Validação do modelo com severidade, confiança e revisão humana | VALIDADA (Core) desde EV4/EV5; o comando Revit está IMPLEMENTADO, NÃO VALIDADO aqui | `ModelValidator` V01–V11, `CmdValidarModelo` |
 | XI | Análise de capacidade, atraso e nível de serviço; Webster | VALIDADA (Core), não calibrada | `TrafficAnalysis`, testes S3/T8/AA2 |
 | XI | Microssimulação (IDM, brechas, semáforos, pedestres) | VALIDADA (Core: invariantes como sem colisão e fila coerente); **não calibrada com dados de campo** | testes V4/W5/AA2 |
 | XI | Animação | IMPLEMENTADA (é reprodução dos quadros simulados, não substitui a simulação) | `SimFrame`, `TrafficMap` |
@@ -137,7 +137,8 @@ Legenda de estado:
 | R7 | **Corrigido:** `PolygonChecks` + V07 |
 | R10 | **Corrigido:** 0 avisos; pacotes fixados |
 | R13 | **Corrigido:** ARCHITECTURE.md |
-| R8, R9, R11, R12, R14 | Abertos: ver KNOWN_ISSUES e ROADMAP |
+| R9 | **Corrigido** (EV5): testes de casos degenerados das primitivas (`EVGeometryEdgeTests`) |
+| R8, R11, R12, R14 | Abertos: ver KNOWN_ISSUES e ROADMAP |
 
 ## 6. Notas por domínio
 

@@ -12,6 +12,6 @@ Itens abertos, com a evidência e o motivo de ainda não estarem corrigidos. Os 
 | K5 | Drenagem só geométrica: não há rede (tubos, PVs ligados, declividades) nem dimensionamento hidráulico | Funcional | AUDIT §6.8 | ROADMAP F8. Nenhum dimensionamento é afirmado |
 | K6 | Microssimulação de tráfego não calibrada com dados de campo | Os resultados são estimativa de estudo | AUDIT §6.11 | Calibração exige contagens reais do usuário |
 | K7 | Volumes de terraplenagem por amostragem em malha; não há comparação com o método das seções médias | Diferença de método, não erro conhecido | `Grading.Volumes` | ROADMAP F7: relatório por estaca e comparação de métodos |
-| K8 | Alinhamento horizontal sem relatório de elementos (TS/SC/CS/ST, R, Ls, Δ) e sem verificação de distância de visibilidade | Funcional | `Tracado.Build` devolve só a polilinha | ROADMAP F5. Critérios só com norma citada |
+| K8 | Não há verificação de distância de visibilidade nem de raio/K mínimos normativos. O relatório de elementos existe para o traçado por PIs e para o greide (EV5), mas não para o eixo desenhado das vias comuns | Funcional | `AlignmentElements` | ROADMAP F5b. Critérios só com norma citada |
 | K9 | Tolerâncias geométricas definidas em cada módulo, sem política central | Baixo | ARCHITECTURE §4 | Documentado. Unificar sem caso de falha seria refatoração por vaidade |
 | K10 | Pacote do Revit referenciado pela primeira versão 2027.0.0: recursos da API de atualizações 2027.x não podem ser usados | Por projeto | `.csproj` | Decisão D-002 (carrega em todas as 2027.x) |
