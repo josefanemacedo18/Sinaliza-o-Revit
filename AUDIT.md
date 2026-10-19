@@ -37,8 +37,18 @@ provável a partir de fatos) ou **HIPÓTESE** (risco plausível ainda não demon
 
 - **FATO:** o plugin compila contra as referências 2027.0.0 do NuGet Nice3point, com o framework-alvo `net10.0-windows`.
 - **INFERÊNCIA:** o Revit 2027 carrega add-ins .NET 10, porque o pacote de referência 2027 exige `net10.0` e a compilação passa. Isso não prova o carregamento em execução.
-- **INFERÊNCIA:** o usuário relatou defeitos observados no Revit em rodadas anteriores (por exemplo, o chanfro do lote, o corte transversal), o que indica que o plugin carrega e funciona no Revit dele.
-- **NÃO VERIFICADO:** não há relatório do Autoteste nem log do Revit no repositório. **Este documento não afirma compatibilidade em execução com o Revit 2027.**
+- **FATO (2026-10-19, relatório do usuário em `docs/evidencias/2026-10-19-autoteste-rapido.txt`):** o Revit 2027.0 (build
+  27.0.4.412) carregou a DLL 2.0.0.0 de 2026-10-19 (com EV1–EV4) e rodou o **Autoteste rápido**: 8 etapas, 4 OK, 4 com
+  aviso, **0 erros**, em 3 min 12 s. As etapas cobrem preparação, loteamento (gleba, quadras e lotes; lote personalizado; unir
+  lotes), vias (local, coletora, avenida) e interseção em cruz.
+- **FATO:** **Validar Modelo** rodou no mesmo Revit, somente leitura, num projeto com 4 marcas e 48 elementos
+  (`docs/evidencias/2026-10-19-validacao-modelo.txt`). Teve 1 achado V06, que levou ao ajuste da severidade (ver CHANGELOG
+  EW1).
+- **LIMITE DA EVIDÊNCIA:** modo rápido, com 162 etapas não executadas; um build do Revit; um projeto. As demais
+  ferramentas (obras, drenagem, tráfego, detalhamento, pranchas) continuam sem execução registrada no Revit 2027.
+- **Avisos do Revit no relatório** (todos nas etapas com interseção; as vias isoladas não tiveram nenhum):
+  - "A linha no croqui está ligeiramente fora da linha central": reproduzido no núcleo e corrigido (EW2);
+  - "Pisos realçados se sobrepõem": não reproduzido no núcleo (ver KNOWN_ISSUES K11).
 
 ## 3. Arquitetura observada
 
@@ -88,7 +98,7 @@ Legenda de estado:
 | Fase | Funcionalidade | Estado | Evidência |
 |---|---|---|---|
 | II | Compilação do Core e do plugin, empacotamento em DLL única | VALIDADA (Core); a DLL é gerada | builds sem avisos, CI verde, `Instalar/Revit2027` |
-| II | Inicialização no Revit (faixa de opções, DMU) | IMPLEMENTADA, NÃO VALIDADA aqui | `App.OnStartup`; sem Revit no ambiente |
+| II | Inicialização no Revit (faixa de opções, DMU) | VALIDADA no Revit 2027.0 (build 27.0.4.412) pelo Autoteste rápido do usuário | `docs/evidencias/2026-10-19-autoteste-rapido.txt` |
 | III | Definições paramétricas persistentes (JSON polimórfico, Extensible Storage) | VALIDADA (Core: serialização); Revit não validado | testes de ida e volta JSON em várias rodadas |
 | III | Identidade persistente (GUID) e cópias independentes | VALIDADA (Core) / IMPLEMENTADA (Revit `CopyHandler`) | `CloneWithNewId`, testes |
 | III | Grafo de dependências sem ciclos | VALIDADA (Core) desde EV4; usado na validação, ainda não na regeneração (D-004) | `ModelGraph`, `EVModelIntegrityTests` |
@@ -97,7 +107,7 @@ Legenda de estado:
 | IV | Primitivas 2D (Vec2, Polyline2 com estaqueamento/offset, Polygon2, booleanas Clipper2) | VALIDADA (Core), indiretamente | usadas por milhares de testes; poucos testes diretos de casos degenerados |
 | IV | Validação de polígono (autointerseção, área nula) | VALIDADA (Core) desde EV4 | `PolygonChecks`, testes de casos degenerados |
 | IV | Sólidos 3D (varredura com greide, tesselação) | VALIDADA (Core) | `Solid3D`, testes das rodadas H/I |
-| V | Alinhamento horizontal por PIs (curva circular + clotoides) | VALIDADA (Core); relatório de elementos (TS/SC/CS/ST) desde EV5. Usado nos ramos dos nós viários; o eixo das vias comuns vem do desenho no Revit | `Tracado`, `AlignmentElements`, `EVAlignmentElementsTests` |
+| V | Alinhamento horizontal por PIs (curva circular + clotoides) e eixo das vias comuns | VALIDADA (Core). Relatório de elementos do traçado (TS/SC/CS/ST) desde EV5 e do eixo das vias comuns (tangentes, curvas, cantos) desde EW3, em CSV no Perfil da Via | `Tracado`, `AlignmentElements`, `EVAlignmentElementsTests`, `EWAxisElementsTests` |
 | V | Perfil vertical (PIVs, curvas parabólicas, rampas, superelevação, caimentos) | VALIDADA (Core); elementos (PCV/PTV, K, alto/baixo) e CSV desde EV5; sem verificação de distância de visibilidade (não inventar critério) | `RoadGrade`, `AlignmentElements` |
 | V | Projeto de greide automático (acompanhar terreno, compensado) | VALIDADA (Core) | `RoadProfileDesigner`, testes rodadas J/K/AL3 |
 | VI | Seção transversal da via (faixas, ciclofaixas, calçadas, canteiros, larguras variáveis) | VALIDADA (Core) | `RoadSetup*`, centenas de testes |
@@ -113,7 +123,7 @@ Legenda de estado:
 | IX | Regras mínimas configuráveis (frente 5 m e área 125 m² por padrão, editáveis) | VALIDADA (Core) | `LoteamentoDefinition.Minimos`; **sem aprovação legal automática** |
 | IX | Quadros de áreas, de quadras e de lotes; memorial `.docx` | VALIDADA (Core) | `LotReport`, `LotMemorial`, `DocxWriter` |
 | X | Verificações no Revit (pintura × pisos, continuidade, terreno × via) | IMPLEMENTADA, NÃO VALIDADA aqui | `AutoTestChecks.cs` |
-| X | Validação do modelo com severidade, confiança e revisão humana | VALIDADA (Core) desde EV4/EV5; o comando Revit está IMPLEMENTADO, NÃO VALIDADO aqui | `ModelValidator` V01–V11, `CmdValidarModelo` |
+| X | Validação do modelo com severidade, confiança e revisão humana | VALIDADA (Core) desde EV4/EV5; o comando rodou no Revit 2027 (relatório do usuário, 2026-10-19) | `ModelValidator` V01–V11, `CmdValidarModelo`, `docs/evidencias` |
 | XI | Análise de capacidade, atraso e nível de serviço; Webster | VALIDADA (Core), não calibrada | `TrafficAnalysis`, testes S3/T8/AA2 |
 | XI | Microssimulação (IDM, brechas, semáforos, pedestres) | VALIDADA (Core: invariantes como sem colisão e fila coerente); **não calibrada com dados de campo** | testes V4/W5/AA2 |
 | XI | Animação | IMPLEMENTADA (é reprodução dos quadros simulados, não substitui a simulação) | `SimFrame`, `TrafficMap` |
@@ -121,7 +131,7 @@ Legenda de estado:
 | XII | Cenários de projeto (geometria) e otimização geral | AUSENTE / PARCIAL (greide compensado, tempos semafóricos) | — |
 | XIII | Janelas WPF com prévia ao vivo (Core) | IMPLEMENTADA, NÃO VALIDADA aqui | `UI/*.xaml` |
 | XIV | Transações, rollback, `FailuresPreprocessor` | IMPLEMENTADA, NÃO VALIDADA aqui | §3 |
-| XV | Autoteste dentro do Revit (relatório) | IMPLEMENTADA, NÃO VALIDADA aqui | `AutoTest*.cs` |
+| XV | Autoteste dentro do Revit (relatório) | VALIDADA no Revit 2027 (modo rápido, 2026-10-19) | `AutoTest*.cs`, `docs/evidencias` |
 | — | Sinalização horizontal e vertical (MBST), dispositivos, mobiliário, acessibilidade (NBR 9050/16537) | VALIDADA (Core) | maior parte da suíte |
 | — | Detalhamento, pranchas, quantitativos, memorial | VALIDADA (Core) / Revit não validado | rodadas AF/AH/AI |
 | — | Georreferência e calibração de imagem | VALIDADA (Core) | `Geo/*`, testes X1 |

@@ -8,8 +8,9 @@ public readonly record struct BoundarySegment(Vec2 Start, Vec2 End, Vec2? Mid = 
 {
     public bool IsArc => Mid != null;
 
-    /// <summary>Centro e raio do arco (só para arcos).</summary>
-    public (Vec2 Center, double Radius) Circle => BoundaryFit.CircleThrough(Start, Mid!.Value, End) ?? ((Start + End) * 0.5, Start.DistanceTo(End) / 2);
+    /// <summary>Centro e raio do arco (só para arcos; numa reta, o ponto médio e meia corda – sem exceção, o ToString do record lê esta propriedade).</summary>
+    public (Vec2 Center, double Radius) Circle =>
+        (Mid is { } m ? BoundaryFit.CircleThrough(Start, m, End) : null) ?? ((Start + End) * 0.5, Start.DistanceTo(End) / 2);
 
     /// <summary>Pontos do trecho (sem o ponto final) com flecha máxima <paramref name="maxChordError"/> nos arcos.</summary>
     public IEnumerable<Vec2> Sample(double maxChordError)

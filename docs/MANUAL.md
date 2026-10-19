@@ -739,7 +739,7 @@ sempre sua, com Editar, Atualizar ou apagando o elemento.
 | V03 | elementos da mesma marca com definições diferentes | selecione a marca e use **Atualizar** (regrava todas iguais) |
 | V04 | detalhe, interseção, rotatória, balão ou quadra apontando para algo que não existe mais | apague o detalhe órfão ou refaça a ligação; sinalização filha e recortes voltam ao atualizar |
 | V05 | dependência circular entre marcas | edite uma delas para desfazer o ciclo |
-| V06 | linha de referência (eixo, limite da quadra, linha de lote, gleba) apagada | sem traçado guardado, redesenhe a linha e use Editar; com traçado guardado, a marca continua, mas não acompanha mais a linha |
+| V06 | linha de referência (eixo, limite da quadra, linha de lote, gleba) apagada | sem traçado guardado, redesenhe a linha e use Editar; com traçado guardado, a marca continua, mas não acompanha mais a linha. As linhas usadas só para **criar a gleba** aparecem como informação: depois de criado, o loteamento usa o contorno guardado e não precisa delas |
 | V07 | contorno de quadra, gleba ou área remanescente inválido (poucos vértices, área nula, lados que se cruzam) | corrija o contorno ou as linhas do limite |
 | V08 | linha de corte sem o perfil transversal | sai sozinha na próxima atualização |
 | V09 | quadras do mesmo loteamento sobrepostas (mais de 0,5 m²) | a área seria contada duas vezes nos lotes e no quadro: corrija o contorno de uma delas |
@@ -787,6 +787,11 @@ entram no relatório, salvo em `%AppData%\SinalizaBIM\autoteste-AAAAMMDD-HHMMSS.
 Revit fechar no meio, o arquivo mostra onde parou). Tudo acontece dentro de um único Desfazer: no fim escolha
 **Desfazer tudo** (recomendado) ou **Manter** para olhar as vistas "SV Autoteste" (planta e 3D). O teste rápido leva
 até ~3 minutos; o completo, de 10 a 40 minutos; o progresso aparece na barra de status do Revit.
+
+**Avisos do Revit no relatório.** Cada etapa traz o total de avisos por tipo, por exemplo `Σ 140 × "Pisos realçados se
+sobrepõem"`. Cada aviso mostra os elementos com o id e o início do id da marca. **[mesma marca]** indica que os elementos
+são de uma mesma marca, sinal de piso duplicado numa regeneração. Envie esse relatório: ele separa duplicação de
+sobreposição real.
 
 ## 10. Quantitativos
 
@@ -2079,10 +2084,11 @@ via vira obra. É o "perfil longitudinal" do projeto rodoviário.
 5. **Aplicar**: o greide passa a valer para a via inteira (pista, calçadas, linhas, dispositivos), as obras são criadas nos
    trechos indicados (com os últimos parâmetros de Viaduto/Ponte, Túnel e Trincheira) e o **Toposolid é cortado/aterrado**
    com taludes até o terreno natural.
-6. **Elementos do greide**: a cada aplicação, os PIVs do greide final vão para `%AppData%\SinalizaBIM\greide-<via>.csv`
+6. **Elementos do greide e do eixo**: a cada aplicação, os PIVs do greide final vão para `%AppData%\SinalizaBIM\greide-<via>.csv`
    (planilha, ";" e vírgula decimal). Para cada PIV: estaca (n+resto, estacas de 20 m), cota, rampas i1 e i2, variação A,
    comprimento **efetivo** e **pedido** da curva vertical, **K = L/|A|**, convexa/côncava, **PCV** e **PTV** com as cotas, e o
-   **ponto alto/baixo** quando ele cai dentro da curva. O caminho aparece no resumo.
+   **ponto alto/baixo** quando ele cai dentro da curva. Os elementos em planta vão para `eixo-<via>.csv`: tangentes, curvas
+   circulares (raio, deflexão, sentido, T) e cantos vivos, com as estacas de início e fim. Os dois caminhos aparecem no resumo.
 
 > O comprimento efetivo pode diferir do pedido. Para não haver "quina", a curva é no mínimo K = 10 m por %, um piso de
 > suavização da geometria, **não um critério de visibilidade**. E ela nunca passa de 98 % do menor vão entre PIVs

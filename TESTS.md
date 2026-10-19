@@ -25,6 +25,8 @@ Não compile enquanto a suíte roda com `--no-build`: a compilação troca as DL
 | 2026-10-19 | EV5 | 2 754 | 2 754 aprovados, 0 falhas | 13 min 38 s (Linux) | +14 `EVGeometryEdgeTests`, +10 `EVAlignmentElementsTests` |
 | 2026-10-19 | EV5 (V09–V11) | 2 756 | classe `EVModelIntegrityTests` 28/28 | — | só o validador mudou depois da suíte completa |
 | 2026-10-19 | EV6 | 2 765 | 2 765 aprovados, 0 falhas | 14 min 28 s (Linux) | +9 `EVSectionVolumesTests`, +2 do validador (V09–V11) |
+| 2026-10-19 | EW1/EW2 | 2 771 | 2 771 aprovados, 0 falhas | 21 min 50 s (Linux) | +1 V06 da gleba, +5 `EWRevitWarningsTests` |
+| 2026-10-19 | EW3 | 2 775 | classes de alinhamento 19/19 | — | +4 `EWAxisElementsTests` (código novo e isolado depois da suíte completa) |
 
 Compilação na linha de base:
 - Core e plugin: 0 avisos.
@@ -52,6 +54,8 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
 | `EVGeometryEdgeTests` | polilinha vazia/1 ponto/pontos repetidos/fechada, estacas fora do trecho, offset em 180° e ângulo agudo, projeção sem segmentos; traçado com PIs coincidentes, colineares, deflexão 179–180°, raio que não cabe, espiral maior que o arco |
 | `EVAlignmentElementsTests` | elementos do traçado (TS/SC/CS/ST, curva circular calculada à mão, espirais, reduzida, sem curva) e do greide (convexa ±2 %, côncava com piso K, vão curto, extremo fora da curva, consistência com `Z(s)`), CSV e estacas |
 | `EVSectionVolumesTests` | volumes por seções: corte/aterro constantes, terreno linear (exato) e quadrático (erro h²/12 esperado), última seção no fim, eixo em curva, conferência com a malha de `Grading.Volumes`, CSV |
+| `EWAxisElementsTests` | elementos do eixo das vias comuns: canto arredondado (R, Δ, T, estacas conferidos à mão), canto vivo, curva reversa, reta, CSV |
+| `EWRevitWarningsTests` | retas quase alinhadas aos eixos (resíduo × inclinação de projeto, quina, arcos), reprodução no cruzamento local × local (antes > 0, depois 0, área igual), `BoundarySegment.ToString` numa reta |
 | `EVModelIntegrityTests` | leitura versionada (atual, migração, mais nova, ilegível), ida e volta JSON de **todos** os tipos de definição, grafo de dependências (ordem, ciclos, quebradas, recorte fraco), validador do modelo (V01–V11) e contornos degenerados (gravata, espinho, toque em vértice, colineares, NaN, tolerância em metros) |
 
 ## O que os testes NÃO cobrem
@@ -64,6 +68,13 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
   calibração.
 - Normas: os valores normativos vêm do catálogo e das referências citadas no código. Os testes verificam que os
   valores são aplicados, não que a norma esteja correta.
+
+## Execuções no Revit (evidência)
+
+| Data | Revit | DLL | Execução | Resultado | Arquivo |
+|---|---|---|---|---|---|
+| 2026-10-19 | 2027.0 (build 27.0.4.412) | 2.0.0.0 (EV1–EV4) | Autoteste **rápido** (8 etapas; 162 não executadas) | 4 OK, 4 avisos (Revit: sobreposição de pisos e retas fora do eixo; loteamento: sobras de testada), 0 erros | `docs/evidencias/2026-10-19-autoteste-rapido.txt` |
+| 2026-10-19 | idem | idem | Validar Modelo (4 marcas, 48 elementos) | 1 aviso V06 (linhas da gleba apagadas; recalibrado para informação) | `docs/evidencias/2026-10-19-validacao-modelo.txt` |
 
 ## Validação manual no Revit (roteiro mínimo)
 

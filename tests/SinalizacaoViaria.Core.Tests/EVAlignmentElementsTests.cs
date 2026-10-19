@@ -171,3 +171,67 @@ public class EVAlignmentElementsTests
         Assert.Contains("3+10,00 (70,00)", lines[2]);    // PCV
     }
 }
+
+/// <summary>EW / F5b: elementos do eixo das vias comuns, reconhecidos na polilinha gerada (cantos arredondados, cantos vivos).</summary>
+public class EWAxisElementsTests
+{
+    private static Polyline2 Eixo(double radius, params (double X, double Y)[] p) =>
+        new(CurveTools.FilletCorners(p.Select(q => new Vec2(q.X, q.Y)).ToList(), radius));
+
+    [Fact]
+    public void CantoArredondado_TangenteCurvaTangente()
+    {
+        // PIs (0,0)–(100,0)–(100,100) com raio 30: T = 30, curva de 70 a 70 + 15π (corda: 0,005 m de flecha).
+        var axis = Eixo(30, (0, 0), (100, 0), (100, 100));
+        var els = AlignmentElements.FromAxis(axis);
+        Assert.Equal(new[] { TipoElementoEixo.Tangente, TipoElementoEixo.Curva, TipoElementoEixo.Tangente }, els.Select(e => e.Tipo));
+        var c = els[1];
+        Assert.Equal(70, c.Inicio, 6);
+        Assert.Equal(30, c.Raio, 6);
+        Assert.Equal(90, c.DeflexaoGraus, 6);
+        Assert.Equal("esquerda", c.Sentido);
+        Assert.Equal(30, c.TangenteExterna, 6);
+        Assert.InRange(c.Comprimento, 15 * Math.PI - 0.01, 15 * Math.PI);
+        Assert.Equal(axis.Length, els[^1].Fim, 9);
+        Assert.Equal(70, els[0].Comprimento, 6);
+        Assert.Equal(70, els[2].Comprimento, 2);
+    }
+
+    [Fact]
+    public void CantoVivo_ViraVerticeSemCurva()
+    {
+        var els = AlignmentElements.FromAxis(new Polyline2(new[] { new Vec2(0, 0), new Vec2(50, 0), new Vec2(50, -50) }));
+        Assert.Equal(new[] { TipoElementoEixo.Tangente, TipoElementoEixo.Vertice, TipoElementoEixo.Tangente }, els.Select(e => e.Tipo));
+        Assert.Equal(-90, els[1].DeflexaoGraus, 9);
+        Assert.Equal("direita", els[1].Sentido);
+        Assert.Equal(50, els[1].Inicio, 9);
+    }
+
+    [Fact]
+    public void CurvaReversa_DuasCurvasComTangenteEntreElas()
+    {
+        var els = AlignmentElements.FromAxis(Eixo(30, (0, 0), (100, 0), (100, 100), (200, 100)));
+        var curvas = els.Where(e => e.Tipo == TipoElementoEixo.Curva).ToList();
+        Assert.Equal(2, curvas.Count);
+        Assert.Equal(90, curvas[0].DeflexaoGraus, 6);
+        Assert.Equal(-90, curvas[1].DeflexaoGraus, 6);
+        Assert.All(curvas, c => Assert.Equal(30, c.Raio, 6));
+        // Tangente entre as curvas: 100 − 30 − 30 = 40 m.
+        var meio = els[els.IndexOf(curvas[0]) + 1];
+        Assert.Equal(TipoElementoEixo.Tangente, meio.Tipo);
+        Assert.Equal(40, meio.Comprimento, 2);
+    }
+
+    [Fact]
+    public void Reta_SoUmaTangente_E_Csv()
+    {
+        var els = AlignmentElements.FromAxis(Polyline2.FromSegment(new Vec2(0, 0), new Vec2(120, 0)));
+        var t = Assert.Single(els);
+        Assert.Equal(120, t.Comprimento, 9);
+        var csv = AlignmentElements.AxisCsv(AlignmentElements.FromAxis(Eixo(30, (0, 0), (100, 0), (100, 100))));
+        var lines = csv.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        Assert.StartsWith("Elemento;Início;Fim;Início (m);Fim (m);Comprimento (m);Raio (m);Deflexão (°);Sentido;T (m)", lines[0]);
+        Assert.StartsWith("curva circular;3+10,00;", lines[2]);
+        Assert.Contains(";30,000;90,0000;esquerda;30,000", lines[2]);
+    }
+}

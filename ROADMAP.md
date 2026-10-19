@@ -29,12 +29,15 @@ Cada etapa só é marcada como concluída com compilação limpa, suíte verde e
 | EV5 / F15 | Procedimento de versão documentado (ARCHITECTURE §7) | — |
 | EV5 / F10 (parte) | Validador: quadras sobrepostas (V09), quadra fora da gleba (V10), interseção sem duas vias (V11) | `EVModelIntegrityTests` |
 | EV6 / F7 (Core) | Volumes pelo método das seções transversais, conferidos com a malha | `EVSectionVolumesTests` |
+| EW1 | Primeira evidência no Revit 2027 (Autoteste rápido, Validar Modelo); versão 2.1.0; V06 da gleba recalibrado | `docs/evidencias`, `EVModelIntegrityTests` |
+| EW2 | Retas quase alinhadas aos eixos exatas no contorno dos pisos (aviso do Revit reproduzido e corrigido); Autoteste identifica os pisos dos avisos | `EWRevitWarningsTests`, DECISIONS D-008 |
+| EW3 / F5b | Elementos do eixo das vias comuns (tangentes, curvas, cantos), CSV no Perfil da Via | `EWAxisElementsTests` |
 
 ## Próximas etapas (em ordem)
 
 | # | Fase da missão | Etapa | Critério de aceite |
 |---|---|---|---|
-| F5b | V – alinhamentos | Elementos do eixo das **vias** (desenhado no Revit: retas e arcos de raio de canto), não só do traçado por PIs dos nós viários | testes com eixos de retas + arcos conhecidos |
+| K11 | XIV – Revit | "Pisos realçados se sobrepõem" nas interseções: com o próximo Autoteste (que agora identifica os pisos), decidir entre duplicação na regeneração e sobreposição real, e corrigir | Autoteste sem esse aviso |
 | F3 | III – arquitetura | Catálogo por documento (resolve K1); avaliar trocar `DependencyOrder` pelo `ModelGraph` **só com Autoteste no Revit** | Autoteste do usuário sem regressão |
 | F7b | VII – terraplenagem | Tabela por estaca no quantitativo de terraplenagem do Revit (seções sobre a superfície de projeto e o Toposolid), ao lado da malha | Autoteste com os dois volumes |
 | F10 | X – compatibilização | Verificações que precisam da geometria gerada (lotes sobre a calçada, obra × via, pintura fora do pavimento): exigem rodar os geradores no validador ou no Autoteste | testes por código Vxx |

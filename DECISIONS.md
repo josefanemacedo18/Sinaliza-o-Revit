@@ -61,3 +61,14 @@ como substituída.
 - **Decisão:** as verificações novas (`PolygonChecks`) são código próprio. O Clipper2 continua a única biblioteca de
   terceiros.
 - **Consequências:** nada muda na distribuição nem nas licenças.
+
+## D-008 – Retas quase alinhadas aos eixos ficam exatas no contorno dos pisos
+- **Contexto:** o Autoteste no Revit 2027 (2026-10-19) mostrou centenas de avisos "A linha no croqui está ligeiramente
+  fora da linha central" nos pisos das interseções. No núcleo, as retas estavam inclinadas por resíduo numérico dos
+  recortes (até 0,17 mm).
+- **Decisão:** `AxisSnap.Snap` no contorno ajustado antes de criar as curvas do Revit:
+  - vértices ligados por retas com menos de 1° de inclinação recebem a mesma coordenada (a da reta mais longa do grupo);
+  - só quando nenhum vértice anda mais de 0,5 mm.
+- **Consequências:** o aviso some nos casos de resíduo, e a geometria muda menos de 0,5 mm. Retas realmente inclinadas
+  pelo projeto (por exemplo, uma via a 0,05° num trecho longo) continuam inclinadas e podem continuar com o aviso, que
+  nesse caso é verdadeiro. Os limites são do plugin, não de norma.

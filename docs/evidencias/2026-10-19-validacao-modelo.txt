@@ -1,0 +1,20 @@
+VALIDAÇÃO DO MODELO – Projeto1
+19/10/2026 16:01 · 4 marca(s) em 48 elemento(s) · nada foi alterado no projeto.
+Erros: 0 · Avisos: 1 · Informações: 0 · Pedem revisão humana: 1
+
+[AVISO] V06 (confiança alta, revisão humana) LOTEAMENTO: 4 linha(s) do limite/divisão apagada(s) – o contorno guardado continua valendo até ser redesenhado.
+        Id: 32bdaa9deef04c40b4d289ae572bbac3
+
+Verificações:
+  V01 – dados da definição ilegíveis (JSON inválido ou tipo desconhecido)
+  V02 – definição gravada por versão mais nova do plugin (somente leitura)
+  V03 – elementos da mesma marca com definições diferentes
+  V04 – referência a marca inexistente (detalhe, via, loteamento, sinalização filha, recorte)
+  V05 – dependência circular entre marcas
+  V06 – linha ou elemento do Revit referenciado foi apagado
+  V07 – contorno inválido (poucos vértices, área nula, lados que se cruzam)
+  V08 – linha de corte sem o perfil transversal
+  V09 – quadras do mesmo loteamento sobrepostas
+  V10 – quadra fora da gleba do loteamento
+  V11 – interseção com menos de duas vias existentes
+Não verificado aqui: geometria gerada no Revit (use o Autoteste), normas de projeto e aprovação legal.

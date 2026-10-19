@@ -1,0 +1,97 @@
+﻿SINALIZABIM – RELATÓRIO DO AUTOTESTE
+Data: 19/10/2026 16:05   Duração: 00:03:12
+Modo: RÁPIDO (amostra de até 3 etapas por bloco, limite de 3 min; 162 etapa(s) não executadas)
+Revit: Autodesk Revit 2027 2027.0 (build 27.0.4.412)
+Plugin: 2.0.0.0 – DLL de 19/10/2026 15:56
+Projeto: Projeto1   Marcas existentes antes do teste: 4
+Área de teste: origem X = 3800 m, Y = -300 m (coordenadas internas), nível Terreno (cota 0,00 m)
+Coordenadas nas mensagens: locais, em metros a partir da origem da área de teste.
+
+RESUMO: 8 etapas: 4 OK, 4 com aviso, 0 com erro (00:03:12).
+
+DETALHES
+
+=== Preparação ===
+[OK] Área de teste, nível e vistas  (1602 ms, 0 elemento(s))
+    · 228 elemento(s) de modelo no projeto; área de teste a partir de X = 3800 m, Y = -300 m.
+
+=== Loteamento ===
+[AVISO] Gleba com três vias → quadras reconhecidas e lotes 12 × 30 (subdivisões do Toposolid ou pisos planos)  (101559 ms, 183 elemento(s))
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos), MER-0 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos), LFO-2 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos), MER-0 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos), LFO-2 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos), MER-0 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos), LFO-2 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos), MER-0 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos), MER-0 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos), LFO-2 (Pisos)
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2917980
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2917982
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2917984
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2917986
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2917988
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2917990
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2917992
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2917994
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – LEG (Pisos), <Croqui> 2918196
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – LEG (Pisos), <Croqui> 2918202
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – LEG (Pisos), <Croqui> 2918209
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – LEG (Pisos), <Croqui> 2918280
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – LEG (Pisos), <Croqui> 2918324
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – LEG (Pisos), <Croqui> 2918328
+    ⚠ … e mais 164 aviso(s)
+    · 12 marca(s) na via; eixo 240 m.
+    · 12 marca(s) na via; eixo 180 m.
+    · 14 marca(s) na via; eixo 180 m.
+    · 6 quadra(s), 68 área(s): 0 subdivisão(ões) do Toposolid e 68 piso(s) plano(s).
+[AVISO] Lote personalizado (frente 20 m) e área verde – vizinhos e numeração refeitos  (883 ms, 14 elemento(s))
+    ⚠ Quadra E, testada T1: sobra de 2,00 m (menor que a frente mínima de 5,00 m ou que a área mínima de 125,00 m²) somada ao último lote.
+    ⚠ Quadra E: a testada T3 ficou toda com os lotes de esquina.
+    · Lote personalizado: 819,00 m².
+[AVISO] Unir lotes (dois vizinhos viram um) e quadro de lotes da quadra  (2380 ms, 107 elemento(s))
+    ⚠ Quadra E, testada T1: sobra de 2,00 m (menor que a frente mínima de 5,00 m ou que a área mínima de 125,00 m²) somada ao último lote.
+    ⚠ Quadra E: a testada T3 ficou toda com os lotes de esquina.
+    · Lote unido: 982,80 m².
+
+=== Vias ===
+[OK] Via – Via local – 1 faixa por sentido, estacionamento e calçadas  (4856 ms, 12 elemento(s))
+    · 12 marca(s) na via; eixo 240 m.
+[OK] Via – Via coletora – 2 faixas por sentido e calçadas  (4731 ms, 14 elemento(s))
+    · 14 marca(s) na via; eixo 240 m.
+[OK] Via – Avenida – canteiro central, 2 + 2 faixas, estacionamento e calçadas  (6916 ms, 19 elemento(s))
+    · 18 marca(s) na via; eixo 240 m.
+
+=== Conexões ===
+[AVISO] Interseção em cruz (automática)  (69396 ms, 44 elemento(s))
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos), LFO-2 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos), MER-0 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos), LFO-2 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos), MER-0 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos), LFO-2 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos), MER-0 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos), MER-0 (Pisos)
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos), LFO-2 (Pisos)
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2928874
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2928876
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2928878
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2928880
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2928882
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2928884
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2928886
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – INTERSECAO (Pisos), <Croqui> 2928888
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – LEG (Pisos), <Croqui> 2929106
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – LEG (Pisos), <Croqui> 2929110
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – LEG (Pisos), <Croqui> 2929112
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – LEG (Pisos), <Croqui> 2929119
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – LEG (Pisos), <Croqui> 2929176
+    ⚠ Aviso do Revit: A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões. – LEG (Pisos), <Croqui> 2929217
+    ⚠ … e mais 108 aviso(s)
+    · 12 marca(s) na via; eixo 240 m.
+    · 12 marca(s) na via; eixo 240 m.
+    · Interseção com 2 via(s), raio 6,0 m.

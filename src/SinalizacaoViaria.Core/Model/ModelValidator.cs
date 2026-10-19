@@ -147,17 +147,25 @@ public static class ModelValidator
                         new[] { d.Id }));
             }
         }
-        IEnumerable<string> extra = d switch
+        // Limite e linhas dos lotes das quadras por linhas são relidos a cada atualização: apagá-los muda o resultado.
+        if (d is QuadraDefinition q)
         {
-            QuadraDefinition q => q.LimiteElementos.Concat(q.Divisao == ModoDivisao.Linhas ? q.LinhasLotes.Select(l => l.Elemento) : Enumerable.Empty<string>()),
-            LoteamentoDefinition l => l.GlebaElementos,
-            _ => Enumerable.Empty<string>(),
-        };
-        var faltam = extra.Where(id => !string.IsNullOrWhiteSpace(id) && !exists(PathReference.OwnerOf(id))).Distinct().Count();
-        if (faltam > 0)
-            res.Add(new("V06", Severidade.Aviso, Confianca.Alta, true,
-                $"{d.DisplayCode}: {faltam} linha(s) do limite/divisão apagada(s) – o contorno guardado continua valendo até ser redesenhado.",
-                new[] { d.Id }));
+            var faltam = q.LimiteElementos.Concat(q.Divisao == ModoDivisao.Linhas ? q.LinhasLotes.Select(x => x.Elemento) : Enumerable.Empty<string>())
+                .Where(id => !string.IsNullOrWhiteSpace(id) && !exists(PathReference.OwnerOf(id))).Distinct().Count();
+            if (faltam > 0)
+                res.Add(new("V06", Severidade.Aviso, Confianca.Alta, true,
+                    $"{d.DisplayCode}: {faltam} linha(s) do limite/divisão apagada(s) – o contorno guardado continua valendo até ser redesenhado.",
+                    new[] { d.Id }));
+        }
+        // As linhas da gleba só servem para criar o loteamento: depois vale o contorno guardado (nada é relido delas).
+        if (d is LoteamentoDefinition lot)
+        {
+            var faltam = lot.GlebaElementos.Where(id => !string.IsNullOrWhiteSpace(id) && !exists(PathReference.OwnerOf(id))).Distinct().Count();
+            if (faltam > 0)
+                res.Add(new("V06", Severidade.Info, Confianca.Alta, false,
+                    $"{d.DisplayCode}: {faltam} linha(s) usadas para criar a gleba foram apagadas – sem efeito (o loteamento usa o contorno guardado).",
+                    new[] { d.Id }));
+        }
     }
 
     /// <summary>Área (m²) abaixo da qual sobreposições e excessos são ruído numérico de contornos que só se encostam.</summary>

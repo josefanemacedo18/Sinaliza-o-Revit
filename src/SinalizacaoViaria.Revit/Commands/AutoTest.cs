@@ -374,12 +374,30 @@ internal sealed partial class AutoTestRunner
         catch { /* nunca interrompe o Revit */ }
     }
 
+    /// <summary>
+    /// Elementos do aviso: código da marca, id do elemento e início do id da marca – e "[mesma marca]" quando todos são da
+    /// mesma marca (pisos duplicados de uma regeneração), para distinguir de marcas diferentes que se sobrepõem.
+    /// </summary>
     private static string Who(Document doc, ICollection<ElementId> ids)
     {
         if (ids.Count == 0) return "";
-        var names = ids.Take(3).Select(doc.GetElement).Where(e => e != null)
-            .Select(e => MarkingStorage.Read(e!) is { } r ? $"{r.Definition.DisplayCode} ({e!.Category?.Name})" : $"{e!.Category?.Name} {e.Id}").Distinct();
-        return " – " + string.Join(", ", names) + (ids.Count > 3 ? $" e mais {ids.Count - 3}" : "");
+        var els = ids.Select(doc.GetElement).Where(e => e != null).ToList();
+        var marks = els.Select(e => MarkingStorage.Read(e!)).ToList();
+        var names = els.Take(3).Select((e, i) => marks[i] is { } r
+            ? $"{r.Definition.DisplayCode} ({e!.Category?.Name}) #{e.Id} [marca {r.MarkingId[..Math.Min(6, r.MarkingId.Length)]}]"
+            : $"{e!.Category?.Name} #{e.Id}");
+        var same = els.Count > 1 && marks.All(m => m != null) && marks.Select(m => m!.MarkingId).Distinct().Count() == 1 ? " [mesma marca]" : "";
+        return " – " + string.Join(", ", names) + (ids.Count > 3 ? $" e mais {ids.Count - 3}" : "") + same;
+    }
+
+    /// <summary>Avisos do Revit da etapa agrupados pelo texto (quantos de cada tipo e quantos entre elementos da mesma marca).</summary>
+    private static IEnumerable<string> RevitWarningSummary(IEnumerable<string> warnings)
+    {
+        const string prefix = "Aviso do Revit: ";
+        return warnings.Where(w => w.StartsWith(prefix))
+            .GroupBy(w => { var t = w[prefix.Length..]; var k = t.IndexOf(" – ", StringComparison.Ordinal); return k < 0 ? t : t[..k]; })
+            .OrderByDescending(g => g.Count())
+            .Select(g => $"Σ {g.Count()} × \"{g.Key}\"" + (g.Count(w => w.EndsWith("[mesma marca]")) is var n and > 0 ? $" ({n} entre elementos da mesma marca)" : ""));
     }
 
     // ------------------------------------------------------------------ ajudas
@@ -484,6 +502,7 @@ internal sealed partial class AutoTestRunner
             sb.AppendLine($"[{s.Status}] {s.Name}  ({s.Ms} ms, {s.Elements} elemento(s))");
             foreach (var e in s.Errors.Take(40)) sb.AppendLine("    ✖ " + e);
             if (s.Errors.Count > 40) sb.AppendLine($"    ✖ … e mais {s.Errors.Count - 40} erro(s)");
+            foreach (var g in RevitWarningSummary(s.Warnings)) sb.AppendLine("    " + g);
             foreach (var w in s.Warnings.Take(25)) sb.AppendLine("    ⚠ " + w);
             if (s.Warnings.Count > 25) sb.AppendLine($"    ⚠ … e mais {s.Warnings.Count - 25} aviso(s)");
             foreach (var i in s.Info) sb.AppendLine("    · " + i);

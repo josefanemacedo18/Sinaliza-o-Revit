@@ -189,7 +189,9 @@ public sealed class CmdPerfilVia : CommandBase
             var key = string.Concat((road.GroupId ?? road.Pavement.Id).Where(char.IsLetterOrDigit));
             var path = Path.Combine(PluginPaths.Root, $"greide-{key}.csv");
             File.WriteAllText(path, AlignmentElements.VerticalCsv(AlignmentElements.Vertical(grade)), new System.Text.UTF8Encoding(true));
-            summary += $"\nElementos do greide (PIV, rampas, L, K, PCV/PTV): {path}";
+            var axisPath = Path.Combine(PluginPaths.Root, $"eixo-{key}.csv");
+            File.WriteAllText(axisPath, AlignmentElements.AxisCsv(AlignmentElements.FromAxis(road.Axis)), new System.Text.UTF8Encoding(true));
+            summary += $"\nElementos do greide (PIV, rampas, L, K, PCV/PTV): {path}\nElementos do eixo (tangentes, curvas, raios, estacas): {axisPath}";
         }
         catch (Exception ex)
         {

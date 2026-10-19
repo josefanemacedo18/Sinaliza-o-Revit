@@ -249,6 +249,27 @@ public class EVModelIntegrityTests
     }
 
     [Fact]
+    public void Validacao_LinhasApagadas_GlebaSoInformaQuadraPorLinhasAvisa()
+    {
+        // Relatório real (docs/evidencias/2026-10-19-validacao-modelo.txt): as 4 linhas usadas para criar a gleba foram apagadas.
+        // Elas não são relidas depois – informação, sem revisão humana. Já as linhas de uma quadra "por linhas" são relidas.
+        var lot = new LoteamentoDefinition { Id = "lot", Gleba = Ring(0, 0, 100, 0, 100, 100, 0, 100), GlebaElementos = { "g1", "g2", "g3", "g4" } };
+        var q = new QuadraDefinition
+        {
+            Id = "q", LoteamentoId = "lot", Contorno = Ring(10, 10, 40, 10, 40, 40, 10, 40), Divisao = ModoDivisao.Linhas,
+            LinhasLotes = { new LinhaDeLote { Elemento = "lin-1" } },
+        };
+        var res = ModelValidator.Validate(Copies(lot, q), _ => false);
+        var gleba = Assert.Single(res, a => a.Codigo == "V06" && a.Ids[0] == "lot");
+        Assert.Equal(Severidade.Info, gleba.Severidade);
+        Assert.False(gleba.RevisaoHumana);
+        Assert.Contains("4 linha(s)", gleba.Mensagem);
+        var quadra = Assert.Single(res, a => a.Codigo == "V06" && a.Ids[0] == "q");
+        Assert.Equal(Severidade.Aviso, quadra.Severidade);
+        Assert.True(quadra.RevisaoHumana);
+    }
+
+    [Fact]
     public void Validacao_QuadraEmGravataEGlebaValida()
     {
         var lot = new LoteamentoDefinition { Id = "lot", Gleba = Ring(0, 0, 100, 0, 100, 100, 0, 100) };

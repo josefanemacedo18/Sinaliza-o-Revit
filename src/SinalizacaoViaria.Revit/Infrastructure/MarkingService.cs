@@ -1528,6 +1528,15 @@ public sealed class MarkingService
             }
             catch (Exception ex) { Log.Error("Contorno com arcos", ex); }
         }
+        if (!raw)
+        {
+            // Retas "quase" alinhadas aos eixos (resíduo de recorte) ficam exatas: o Revit avisa "ligeiramente fora da linha
+            // central" em cada uma. Depois, pontos que ficaram perto demais saem (curva curta).
+            var ring2 = pts.Select(p => new Vec2(UnitConv.M(p.X), UnitConv.M(p.Y))).ToList();
+            var snapped = AxisSnap.Snap(ring2.Select((p, i) => new Core.Geometry.BoundarySegment(p, ring2[(i + 1) % ring2.Count])).ToList());
+            pts = Sanitize(snapped.Select(x => new XYZ(UnitConv.Ft(x.Start.X), UnitConv.Ft(x.Start.Y), zFt)).ToList(), tol);
+            if (pts.Count < 3) return null;
+        }
         var loop = new CurveLoop();
         for (int i = 0; i < pts.Count; i++)
             loop.Append(Line.CreateBound(pts[i], pts[(i + 1) % pts.Count]));
@@ -1544,7 +1553,8 @@ public sealed class MarkingService
 
     private CurveLoop? FittedLoop(List<Vec2> ring, double zFt, double shortFt)
     {
-        var segs = BoundaryFit.Fit(ring, BoundaryTolerance, UnitConv.M(shortFt), _arcCenters);
+        // Retas quase alinhadas aos eixos ficam exatas (ver AxisSnap): sem o aviso "ligeiramente fora da linha central".
+        var segs = AxisSnap.Snap(BoundaryFit.Fit(ring, BoundaryTolerance, UnitConv.M(shortFt), _arcCenters));
         if (segs.Count < 2 || segs.Count == 2 && !segs.Any(x => x.IsArc)) return null;
         XYZ P(Vec2 v) => new(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), zFt);
         var loop = new CurveLoop();

@@ -32,6 +32,21 @@ public sealed record ElementoVertical(int Piv, double Estaca, double Cota, doubl
     public double? VariacaoPct => RampaEntradaPct is { } a && RampaSaidaPct is { } b ? b - a : null;
 }
 
+/// <summary>Tipo de trecho do eixo reconhecido na polilinha.</summary>
+public enum TipoElementoEixo { Tangente, Curva, Vertice }
+
+/// <summary>
+/// Trecho do eixo de uma via como ele foi gerado (polilinha resolvida): tangente, curva circular (raio, deflexão, tangente
+/// externa T = R·tg(Δ/2)) ou vértice sem curva (canto vivo, só a deflexão). Estacas em metros desde o início do eixo.
+/// </summary>
+public sealed record ElementoEixo(TipoElementoEixo Tipo, double Inicio, double Fim, double Raio, double DeflexaoGraus)
+{
+    public double Comprimento => Fim - Inicio;
+    /// <summary>Tangente externa da curva (m); 0 nos demais.</summary>
+    public double TangenteExterna => Tipo == TipoElementoEixo.Curva ? Raio * Math.Tan(Math.Abs(DeflexaoGraus) * Math.PI / 360) : 0;
+    public string Sentido => DeflexaoGraus > 0 ? "esquerda" : DeflexaoGraus < 0 ? "direita" : "";
+}
+
 /// <summary>
 /// Relatório de elementos do eixo: curvas horizontais do traçado por PIs e PIVs do greide. Os valores saem das MESMAS rotinas
 /// que geram a geometria (sem cálculo paralelo que possa divergir). Não verifica critérios normativos (raio mínimo,
@@ -73,6 +88,73 @@ public static class AlignmentElements
         }
         length = st + pis[^2].P.DistanceTo(pis[^1].P) - tPrev;
         return res;
+    }
+
+    /// <summary>
+    /// Elementos do eixo de uma via a partir da polilinha gerada (retas, curvas discretizadas – cantos arredondados ou arcos do
+    /// Revit – e cantos vivos). Vértice com giro abaixo de <paramref name="straightDeg"/> é reto; giros seguidos no mesmo
+    /// sentido formam uma curva (raio pela corda e pelo giro total); um giro isolado é canto vivo. Curvas compostas (raios
+    /// diferentes seguidos, no mesmo sentido) saem como uma curva só, com o raio equivalente.
+    /// </summary>
+    public static List<ElementoEixo> FromAxis(Polyline2 axis, double straightDeg = 0.02)
+    {
+        var p = axis.Points;
+        var res = new List<ElementoEixo>();
+        if (p.Count < 2) return res;
+        var n = p.Count;
+        var turn = new double[n];
+        for (int k = 1; k + 1 < n; k++)
+        {
+            var d1 = (p[k] - p[k - 1]).Normalized();
+            var d2 = (p[k + 1] - p[k]).Normalized();
+            turn[k] = Math.Atan2(d1.Cross(d2), d1.Dot(d2));
+        }
+        var eps = straightDeg * Math.PI / 180;
+        var tangentStart = 0.0;
+        void Tangent(double end)
+        {
+            if (end - tangentStart > 1e-6) res.Add(new(TipoElementoEixo.Tangente, tangentStart, end, 0, 0));
+        }
+        var k0 = 1;
+        while (k0 + 1 < n)
+        {
+            if (Math.Abs(turn[k0]) < eps) { k0++; continue; }
+            var sign = Math.Sign(turn[k0]);
+            var k1 = k0;
+            while (k1 + 2 < n && Math.Abs(turn[k1 + 1]) >= eps && Math.Sign(turn[k1 + 1]) == sign) k1++;
+            var s0 = axis.StationOfVertex(k0);
+            var s1 = axis.StationOfVertex(k1);
+            var delta = 0.0;
+            for (var k = k0; k <= k1; k++) delta += turn[k];
+            Tangent(s0);
+            if (k1 == k0)
+                res.Add(new(TipoElementoEixo.Vertice, s0, s0, 0, delta * 180 / Math.PI));
+            else
+            {
+                // Arco circular: o giro total entre as tangentes é o ângulo central, e a corda início–fim dá o raio
+                // (R = c / 2·sen(Δ/2)) – vale com qualquer número de cordas na discretização.
+                var half = Math.Sin(Math.Abs(delta) / 2);
+                var r = half > 1e-9 ? p[k0].DistanceTo(p[k1]) / (2 * half) : 0;
+                res.Add(new(TipoElementoEixo.Curva, s0, s1, r, delta * 180 / Math.PI));
+            }
+            tangentStart = s1;
+            k0 = k1 + 1;
+        }
+        Tangent(axis.Length);
+        return res;
+    }
+
+    /// <summary>CSV pt-BR dos elementos do eixo de uma via.</summary>
+    public static string AxisCsv(IEnumerable<ElementoEixo> els)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Elemento;Início;Fim;Início (m);Fim (m);Comprimento (m);Raio (m);Deflexão (°);Sentido;T (m)");
+        foreach (var e in els)
+            sb.AppendLine(string.Join(";", e.Tipo switch { TipoElementoEixo.Curva => "curva circular", TipoElementoEixo.Vertice => "vértice sem curva", _ => "tangente" },
+                Estaca(e.Inicio), Estaca(e.Fim), N(e.Inicio, 3), N(e.Fim, 3), N(e.Comprimento, 3),
+                e.Tipo == TipoElementoEixo.Curva ? N(e.Raio, 3) : "", e.Tipo == TipoElementoEixo.Tangente ? "" : N(e.DeflexaoGraus, 4), e.Sentido,
+                e.Tipo == TipoElementoEixo.Curva ? N(e.TangenteExterna, 3) : ""));
+        return sb.ToString();
     }
 
     /// <summary>PIVs do greide (o primeiro e o último sem curva).</summary>

@@ -3,6 +3,45 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-19 – EW: primeira evidência no Revit 2027, versão 2.1.0 e avisos do Revit
+
+### Evidência
+- Relatórios do usuário guardados em `docs/evidencias/`.
+  - Autoteste rápido no Revit 2027.0 (build 27.0.4.412): 8 etapas, 4 OK, 4 com aviso, 0 erros.
+  - Validar Modelo: 1 achado.
+- AUDIT §2 e a matriz foram atualizados: inicialização, Autoteste e Validar Modelo **rodaram no Revit**. O modo completo ainda não foi rodado.
+
+### Versão
+- `Directory.Build.props`: **2.1.0** (antes 2.0.0), aprovado pelo usuário.
+
+### Validar Modelo
+- V06 recalibrado com o relatório real. As linhas usadas para **criar a gleba** não são relidas depois, então apagá-las não tem efeito: agora é **informação**, sem revisão humana. Linhas do limite e dos lotes de quadras "por linhas" continuam como **aviso**, porque são relidas.
+
+### Avisos do Revit "A linha no croqui está ligeiramente fora da linha central"
+- Reproduzido no núcleo: no cruzamento local × local, o pavimento da interseção tinha 24 retas inclinadas de 0,0008° a 0,067° (desvio de até 0,17 mm), resíduo das operações de recorte.
+- `AxisSnap` (Core) deixa exatas as retas quase alinhadas aos eixos, movendo vértices no máximo 0,5 mm e só em retas com menos de 1° de inclinação. Retas inclinadas de projeto não são mexidas.
+- Aplicado no contorno dos pisos no Revit (`MarkingService.FittedLoop` e o caminho só com retas).
+- No cruzamento de teste: 24 → 0 retas quase alinhadas; contornos válidos; área igual (< 1 cm²).
+- Defeito achado de passagem: `BoundarySegment.Circle` lia `Mid!.Value` numa reta e o `ToString` do record lançava `InvalidOperationException`. Corrigido, com teste.
+- +6 testes `EWRevitWarningsTests`.
+
+### Elementos do eixo das vias comuns (F5b)
+- `AlignmentElements.FromAxis` reconhece na polilinha gerada do eixo de qualquer via (cantos arredondados ou arcos do Revit):
+  - tangentes;
+  - curvas circulares: raio pela corda e pelo giro total, deflexão, sentido e T;
+  - cantos vivos.
+- Exporta CSV pt-BR com estacas.
+- **Perfil da Via** grava também `eixo-<via>.csv`.
+- +4 testes `EWAxisElementsTests` (canto arredondado com R = 30 conferido à mão, canto vivo, curva reversa, reta).
+
+### Avisos do Revit "Pisos realçados se sobrepõem"
+- **Não reproduzidos no núcleo** (KNOWN_ISSUES K11). O Autoteste agora identifica cada elemento do aviso (id do elemento e da marca), marca "[mesma marca]" quando são pisos de uma mesma marca e soma os avisos por tipo em cada etapa.
+- O próximo relatório decide se são pisos duplicados na regeneração ou sobreposição real.
+
+### Testes
+- Suíte completa: **2 771/2 771** (21 min 50 s), com EW1 e EW2.
+- Depois dela, +4 testes do eixo (classes EW/EV de alinhamento 19/19): total 2 775.
+
 ## 2026-10-19 – EV6: volumes por seções transversais (Core)
 
 ### Terraplenagem (fase VII)
