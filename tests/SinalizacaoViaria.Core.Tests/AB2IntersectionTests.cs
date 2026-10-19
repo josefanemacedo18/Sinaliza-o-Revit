@@ -449,7 +449,7 @@ public class AB2IntersectionTests
         var axis = new Polyline2(pav.PathRef.Points);
         var (fill, curb, core) = RoadGenerator.MedianOpenings(pav, axis);
         Assert.InRange(PolygonOps.TotalArea(fill), (op.End - op.Start) * 3.0 - 0.05, (op.End - op.Start) * 3.0 + 0.05);
-        Assert.Empty(PolygonOps.Intersect(fill, curb.Concat(core)).Where(p => p.Area > 1e-3));
+        Assert.DoesNotContain(PolygonOps.Intersect(fill, curb.Concat(core)), p => p.Area > 1e-3);
         Assert.Empty(s.Warnings);
     }
 

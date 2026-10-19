@@ -2,7 +2,7 @@ using System.IO;
 
 namespace SinalizacaoViaria.Revit.Infrastructure;
 
-/// <summary>Registro simples de erros em %AppData%\SinalizaBIM\log.txt.</summary>
+/// <summary>Registro simples de erros em %AppData%\SinalizaBIM\log.txt (o anterior, ao passar de 2 MB, em log.1.txt).</summary>
 public static class Log
 {
     private static readonly object Gate = new();
@@ -32,7 +32,9 @@ public static class Log
             {
                 Directory.CreateDirectory(PluginPaths.Root);
                 var file = Path.Combine(PluginPaths.Root, "log.txt");
-                if (File.Exists(file) && new FileInfo(file).Length > 2_000_000) File.Delete(file);
+                // Rotação: o log cheio vira log.1.txt (o anterior a ele sai) – o histórico recente dos erros não se perde.
+                if (File.Exists(file) && new FileInfo(file).Length > 2_000_000)
+                    File.Move(file, Path.Combine(PluginPaths.Root, "log.1.txt"), overwrite: true);
                 File.AppendAllText(file, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {msg}{Environment.NewLine}");
             }
         }

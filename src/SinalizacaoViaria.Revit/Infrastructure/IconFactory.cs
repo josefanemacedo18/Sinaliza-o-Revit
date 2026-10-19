@@ -401,6 +401,13 @@ public static class IconFactory
                 dc.DrawRectangle(B(Asphalt), null, new Rect(11, 2, 10, 5));
                 dc.DrawGeometry(null, P(Blue, 3), Poly(new Point(10, 17), new Point(15, 22), new Point(23, 11)));
                 break;
+            case "validar":
+                // Escudo com a marca de conferido e um ponto de alerta.
+                dc.DrawGeometry(B(White), P(Asphalt, 1.5), Close(Poly(new Point(16, 3), new Point(27, 7), new Point(26, 17),
+                    new Point(16, 29), new Point(6, 17), new Point(5, 7))));
+                dc.DrawGeometry(null, P(Blue, 3), Poly(new Point(10, 15), new Point(15, 20), new Point(22, 10)));
+                dc.DrawEllipse(B(Red), null, new Point(25, 25), 4, 4);
+                break;
             case "atualizar":
                 dc.DrawGeometry(null, P(Blue, 3), Arc(new Point(16, 16), 10, 20, 290));
                 dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(22, 3), new Point(29, 9), new Point(20, 11))));

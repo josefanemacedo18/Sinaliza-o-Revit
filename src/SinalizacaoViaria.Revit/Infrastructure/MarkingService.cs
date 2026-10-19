@@ -506,6 +506,21 @@ public sealed class MarkingService
         public void Dispose() => _renderDepth--;
     }
 
+    /// <summary>Contornos degenerados deixados de fora ao montar pisos de pintura (avisados no fim da marca).</summary>
+    private int _skippedContours;
+
+    /// <summary>
+    /// Definição gravada por uma versão mais nova do plugin: os elementos ficam como estão (regerar com esta versão perderia
+    /// os dados que ela não conhece) e o motivo vai para os avisos.
+    /// </summary>
+    private static bool KeepNewer(MarkingDefinition def, List<StoredMarking> existing, RenderResult result)
+    {
+        if (!DefinitionVersioning.IsNewer(def)) return false;
+        result.Elements.AddRange(existing.Select(e => e.Element.Id));
+        result.Warnings.Add(DefinitionVersioning.NewerMessage(def));
+        return true;
+    }
+
     /// <summary>Cria ou regenera todos os elementos da marca.</summary>
     public RenderResult Render(MarkingDefinition def)
     {
@@ -513,6 +528,7 @@ public sealed class MarkingService
         _definitions = null;
         _present = null;
         var existing = MarkingStorage.ById(_doc, def.Id);
+        if (KeepNewer(def, existing, result)) return result;
         // Loteamento: dados num elemento próprio; quadra: um lote por subdivisão do Toposolid (ou piso plano).
         if (def is LoteamentoDefinition or QuadraDefinition) return LotService.Render(_doc, def, existing);
         // Só o corte transversal: nada na planta – a cota fica num elemento de dados, só para o perfil ler a linha de corte.
@@ -685,6 +701,9 @@ public sealed class MarkingService
                 if (failed.Count > 0)
                     result.Warnings.Add($"{info.Code}: {failed.Count} parte(s) não puderam virar Piso do Revit e foram geradas como forma direta" +
                                         (reason != null ? $" ({reason})." : "."));
+                if (_skippedContours > 0)
+                    result.Warnings.Add($"{info.Code}: {_skippedContours} contorno(s) degenerado(s) da pintura ficaram de fora do piso (detalhes no log).");
+                _skippedContours = 0;
                 solidPieces = geo.Pieces.Where(p => !floorPieces.Contains(p)).Concat(failed).ToList();
             }
         }
@@ -987,6 +1006,7 @@ public sealed class MarkingService
     {
         var result = new RenderResult();
         var existing = MarkingStorage.ById(_doc, def.Id).Where(r => r.Element.OwnerViewId == view.Id).ToList();
+        if (KeepNewer(def, existing, result)) return result;
         if (existing.Count == 0) return Render(def);
         if (def is IPlacedAnnotation placed) FollowManualMove(def, placed, existing);
         var newScale = (double)view.Scale;
@@ -1586,7 +1606,13 @@ public sealed class MarkingService
         if (typeId == ElementId.InvalidElementId) return null;
         var loops = new List<CurveLoop>();
         foreach (var sh in shapes)
-            try { loops.AddRange(ToCurveLoops(sh, level.ProjectElevation)); } catch { /* contorno degenerado */ }
+            try { loops.AddRange(ToCurveLoops(sh, level.ProjectElevation)); }
+            catch (Exception ex)
+            {
+                // Contorno degenerado (lado nulo, laço): a peça fica de fora do piso – contado e avisado, não some em silêncio.
+                _skippedContours++;
+                Log.Info($"Piso {color}: contorno degenerado ignorado ({sh.Area:0.###} m²) – {ex.Message}");
+            }
         if (loops.Count == 0) return null;
         Floor? f = null;
         try

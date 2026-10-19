@@ -26,7 +26,7 @@ Convenções usadas em todo o plugin:
 | **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive **tachas e tachões** e guard rail) |
 | **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · **Pranchas** · **Memorial Descritivo** · Quantitativos |
 | **Tráfego** | **Simulador de Tráfego** (capacidade, nível de serviço, microssimulação animada e diagnóstico do projeto – seção 26) |
-| **Editar** | Editar · Apagar Trecho · Atualizar Todas · Selecionar Conjunto · Alternar 2D/3D · Configurações · Catálogo · Normas |
+| **Editar** | Editar · Apagar Trecho · **Validar Modelo** · Atualizar Todas · Selecionar Conjunto · Alternar 2D/3D · Configurações · Catálogo · Normas |
 
 Guia **SinalizaBIM Infra**:
 
@@ -725,9 +725,35 @@ desfazer a marca (pavimento, calçadas, placas e dispositivos não entram).
 > regeneração a marca volta para o caminho. Para reposicionar, edite as linhas de referência ou use
 > **Editar**.
 
+### 9.3 Validar Modelo (conferência sem alterar nada)
+
+**Editar → Validar Modelo** lê as definições gravadas em todos os elementos do plugin e aponta problemas. É **somente
+leitura**: o projeto não é alterado (nem entra no Desfazer). Cada achado traz a **severidade** (erro, aviso,
+informação), a **confiança** (alta: verificado nos dados; média: provável) e se pede **revisão humana**. A correção é
+sempre sua, com Editar, Atualizar ou apagando o elemento.
+
+| Código | O que confere | O que fazer |
+|---|---|---|
+| V01 | dados da marca ilegíveis (JSON corrompido ou tipo desconhecido) | a marca não pode ser editada: refaça-a |
+| V02 | marca gravada por uma versão **mais nova** do SinalizaBIM | atualize o plugin; esta versão não a altera para não perder dados |
+| V03 | elementos da mesma marca com definições diferentes | selecione a marca e use **Atualizar** (regrava todas iguais) |
+| V04 | detalhe, interseção, rotatória, balão ou quadra apontando para algo que não existe mais | apague o detalhe órfão ou refaça a ligação; sinalização filha e recortes voltam ao atualizar |
+| V05 | dependência circular entre marcas | edite uma delas para desfazer o ciclo |
+| V06 | linha de referência (eixo, limite da quadra, linha de lote, gleba) apagada | sem traçado guardado, redesenhe a linha e use Editar; com traçado guardado, a marca continua, mas não acompanha mais a linha |
+| V07 | contorno de quadra, gleba ou área remanescente inválido (poucos vértices, área nula, lados que se cruzam) | corrija o contorno ou as linhas do limite |
+| V08 | linha de corte sem o perfil transversal | sai sozinha na próxima atualização |
+
+O resumo aparece numa janela (com **Selecionar os elementos com erro ou aviso** e **Abrir o relatório**). O relatório
+completo é gravado em `%AppData%\SinalizaBIM\validacao-AAAAMMDD-HHMMSS.txt`. A validação confere os **dados**; a
+geometria gerada no Revit é conferida pelo Autoteste.
+
+**Marcas de versão mais nova.** Um projeto aberto com um SinalizaBIM mais antigo que o que o criou mostra essas marcas
+como estão. Editar, Atualizar e o ajuste de escala não as alteram (aparece um aviso), para não apagar o que a versão
+nova gravou.
+
 ---
 
-### 9.3 Autoteste (diagnóstico de todas as ferramentas)
+### 9.4 Autoteste (diagnóstico de todas as ferramentas)
 
 O Autoteste **saiu da faixa de opções** (era fácil clicar sem querer e o Revit ficava muito tempo ocupado). Ele agora
 fica em **SinalizaBIM → Configurações → Autoteste (diagnóstico)…** e abre com o **teste rápido**: só os blocos Vias,

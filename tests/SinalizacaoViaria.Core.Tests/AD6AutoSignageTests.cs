@@ -16,7 +16,7 @@ public class AD6AutoSignageTests
 {
     private static readonly Catalogo Cat = CatalogService.LoadDefault();
 
-    private static RoadSetup Main(double speed = 50)
+    private static RoadSetup MainRoad(double speed = 50)
     {
         var s = RoadTemplates.All[1].Create();          // coletora, 2 + 2 faixas
         s.Speed = speed;
@@ -68,7 +68,7 @@ public class AD6AutoSignageTests
     [Fact]
     public void Via_nova_em_cruz_com_PARE_R1_so_na_secundaria_sem_duplicatas_e_regenera_ao_editar()
     {
-        var w = Cross(Main(), Secondary());
+        var w = Cross(MainRoad(), Secondary());
         var L = w.Nodes.Single().Layout;
         Assert.Equal(0, L.Main);                         // a coletora é a principal
         var signs = w.Defs.OfType<SignDefinition>().ToList();
@@ -96,7 +96,7 @@ public class AD6AutoSignageTests
 
         // Edição da via (velocidade 50 → 60): a sinalização é refeita com os mesmos ids, nada duplicado.
         var ids0 = r19.Where(s => s.GroupId == "grupo0").Select(s => s.Id).OrderBy(x => x).ToList();
-        var w2 = Cross(Main(60), Secondary());
+        var w2 = Cross(MainRoad(60), Secondary());
         var signs2 = w2.Defs.OfType<SignDefinition>().ToList();
         var r19b = signs2.Where(s => s.Code == "R-19" && s.GroupId == "grupo0").ToList();
         Assert.Equal(ids0, r19b.Select(s => s.Id).OrderBy(x => x).ToList());
@@ -162,7 +162,7 @@ public class AD6AutoSignageTests
         Assert.DoesNotContain(kept, d => d.Id == r19.Id);
         Assert.Equal(regen.Count - 1, kept.Count);
         // Placa da interseção editada (sem id igual): a gerada perto dela, com o mesmo código, também sai.
-        var w = Cross(Main(), Secondary());
+        var w = Cross(MainRoad(), Secondary());
         var r1 = w.Defs.OfType<SignDefinition>().First(x => x.Code == "R-1");
         var moved = (SignDefinition)MarkingDefinition.FromJson(r1.ToJson())!;
         moved.Id = "outro";

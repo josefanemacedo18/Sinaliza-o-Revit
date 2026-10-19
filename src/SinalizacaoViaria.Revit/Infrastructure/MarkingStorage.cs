@@ -38,6 +38,8 @@ public static class MarkingStorage
 
     public static void Write(Element e, MarkingDefinition def, MarkingColor color)
     {
+        // Dados de uma versão mais nova do plugin: regravar perderia os campos que esta versão não conhece.
+        if (DefinitionVersioning.IsNewer(def)) throw new InvalidOperationException(DefinitionVersioning.NewerMessage(def));
         var schema = GetSchema();
         var entity = new Entity(schema);
         entity.Set(FId, def.Id);
@@ -58,17 +60,55 @@ public static class MarkingStorage
         try
         {
             var id = entity.Get<string>(FId);
-            var json = entity.Get<string>(FDef);
-            var def = MarkingDefinition.FromJson(json);
-            if (def == null) return null;
+            var lida = DefinitionVersioning.Load(entity.Get<string>(FDef));
+            if (lida.Definition == null)
+            {
+                Log.Error($"Leitura de definição do elemento {e.Id}", new InvalidDataException(lida.Erro));
+                return null;
+            }
+            if (lida.Estado == EstadoVersao.MaisNova && Newer.Add(id))
+                Log.Info($"Elemento {e.Id}: definição v{lida.StoredVersion} (versão mais nova do plugin) – somente leitura.");
             MarkingColors.TryParse(entity.Get<string>(FColor), out var color);
-            return new StoredMarking(e, id, color, def);
+            return new StoredMarking(e, id, color, lida.Definition);
         }
         catch (Exception ex)
         {
             Log.Error($"Leitura de definição do elemento {e.Id}", ex);
             return null;
         }
+    }
+
+    /// <summary>Marcas de versão mais nova já avisadas no log (uma linha por marca na sessão).</summary>
+    private static readonly HashSet<string> Newer = new();
+
+    /// <summary>JSON gravado em cada elemento, sem interpretar – para a validação do modelo (cópias divergentes, dados ilegíveis).</summary>
+    public static List<CopiaGravada> Copies(Document doc) => Copies(doc, out _);
+
+    /// <inheritdoc cref="Copies(Document)"/>
+    /// <param name="elements">Elementos de cada marca (para selecionar os envolvidos num achado).</param>
+    public static List<CopiaGravada> Copies(Document doc, out Dictionary<string, List<ElementId>> elements)
+    {
+        var res = new List<CopiaGravada>();
+        elements = new Dictionary<string, List<ElementId>>();
+        var schema = Schema.Lookup(SchemaGuid);
+        if (schema == null) return res;
+        foreach (var e in new FilteredElementCollector(doc).WhereElementIsNotElementType().WherePasses(new ExtensibleStorageFilter(SchemaGuid)))
+        {
+            try
+            {
+                var entity = e.GetEntity(schema);
+                if (entity == null || !entity.IsValid()) continue;
+                var id = entity.Get<string>(FId) ?? "";
+                res.Add(new CopiaGravada(id, entity.Get<string>(FDef) ?? "", $"{e.Id} ({e.Name})"));
+                if (!elements.TryGetValue(id, out var list)) elements[id] = list = new List<ElementId>();
+                list.Add(e.Id);
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Validação – leitura do elemento {e.Id}", ex);
+            }
+        }
+        return res;
     }
 
     public static bool IsMarking(Element e) => Read(e) != null;

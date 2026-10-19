@@ -517,7 +517,13 @@ internal sealed class TerrainFailures : IFailuresPreprocessor
         var error = false;
         foreach (var f in a.GetFailureMessages())
         {
-            if (f.GetSeverity() == FailureSeverity.Warning) { a.DeleteWarning(f); continue; }
+            if (f.GetSeverity() == FailureSeverity.Warning)
+            {
+                // Avisos do Revit sobre o terreno são suprimidos (seriam uma janela por obra), mas ficam no log.
+                Log.Info($"Terreno – aviso do Revit suprimido: {f.GetDescriptionText()}");
+                a.DeleteWarning(f);
+                continue;
+            }
             Errors.Add(f.GetDescriptionText());
             error = true;
         }

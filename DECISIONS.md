@@ -1,0 +1,63 @@
+# DECISIONS – Registro de decisões técnicas
+
+Formato: contexto, decisão, consequências. Decisões novas vão no fim. Uma decisão revogada não é apagada: é marcada
+como substituída.
+
+## D-001 – Núcleo independente do Revit, compilado dentro da DLL do plugin
+- **Contexto:** a lógica geométrica e normativa precisa ser testável sem o Revit, e a instalação deve ser "copiar 2 arquivos".
+- **Decisão:** `SinalizacaoViaria.Core` (net10.0) não referencia a API do Revit. O projeto do plugin compila os fontes do
+  Core por `<Compile Include>`, e o resultado é uma única `SinalizaBIM.dll`. O Clipper2 é incorporado como código-fonte.
+- **Consequências:** `dotnet test` roda em qualquer SO. A DLL não tem dependências soltas. Toda regra nova entra no Core
+  com teste, e a camada Revit fica fina.
+
+## D-002 – Compilar contra a API 2027.0.0
+- **Contexto:** o assembly `RevitAPI` muda de versão a cada atualização 2027.x, e o .NET exige versão referenciada menor
+  ou igual à carregada.
+- **Decisão:** referenciar `Nice3point.Revit.Api.*` **2027.0.0**, só para compilação (`ExcludeAssets="runtime"`).
+- **Consequências:** a DLL carrega em qualquer 2027.x (inferência; ver AUDIT §2). APIs novas das atualizações não
+  podem ser usadas.
+
+## D-003 – Versão de dados e migrações das definições
+- **Contexto:** as definições (JSON) ficam gravadas nos modelos dos usuários por anos. Antes, um JSON de versão mais
+  nova era lido e regravado como v1, e os campos desconhecidos se perdiam. Também não havia como migrar formatos antigos.
+- **Decisão:**
+  - `DefinitionVersioning.Load` lê com estado: Atual, Migrada, MaisNova ou Inválida. Ela aplica passos registrados
+    (N → N+1) até `CurrentVersion` e nunca lança exceção.
+  - Definição **mais nova** é somente leitura: `MarkingService.Render`/`RescaleInPlace` mantêm os elementos como estão,
+    com aviso, e `MarkingStorage.Write` recusa gravá-la.
+  - JSON sem `version` conta como v1.
+- **Consequências:** mudar o formato exige três coisas: incrementar `CurrentVersion`, registrar o passo em
+  `DefinitionVersioning.Passos` e criar um teste de migração. O teste de ida e volta cobre todos os tipos registrados.
+  O esquema do Extensible Storage (GUID `7C1E9A52-…`) **não muda**: só o JSON interno é versionado, porque esquemas do
+  Revit são imutáveis.
+
+## D-004 – Grafo de dependências derivado, não persistido
+- **Contexto:** as dependências já estão gravadas nas definições (`TargetId`, `RoadIds`, `ChildIds`, `LoteamentoId`,
+  `SourceId`…). Um segundo registro persistido poderia divergir delas.
+- **Decisão:** `ModelGraph` é **calculado** a partir das definições lidas. Os recortes (`ExclusionZone.SourceId`) são
+  referência fraca: não entram em ciclos nem na ordem, porque a via guarda o recorte da interseção que a cita. As
+  filhas (`ChildIds`) dependem do nó que as lista.
+- **Consequências:** não há o que migrar nem sincronizar. O grafo serve à validação e à ordem de regeneração. O fluxo de
+  regeneração existente (`MarkingService.DependencyOrder`, `RenderDependents`) **não foi trocado** nesta etapa, porque
+  funciona e é coberto pelo Autoteste. Trocar exige validação no Revit.
+
+## D-005 – Validação do modelo somente leitura, com severidade e confiança
+- **Contexto:** a missão pede verificações com severidade, confiança e indicação de revisão humana, sem decisões
+  automáticas irreversíveis.
+- **Decisão:** `ModelValidator.Validate` (Core) devolve achados V01–V08. `CmdValidarModelo` usa
+  `TransactionMode.ReadOnly`: não altera o modelo, grava um TXT e só oferece selecionar os elementos.
+- **Consequências:** nenhuma correção automática. Corrigir é decisão do usuário, com as ferramentas existentes
+  (Editar, Atualizar, apagar).
+
+## D-006 – Erros tratados registrados, nunca engolidos quando afetam o resultado
+- **Contexto:** a auditoria encontrou capturas silenciosas que escondiam perda de geometria ou valor padrão assumido.
+- **Decisão:** quando a captura muda o resultado (contorno degenerado fora do piso, Norte assumido 0°, avisos do Revit
+  suprimidos), ela passa a registrar no log e, se houver perda visível, a avisar o usuário. Leituras de propriedades
+  opcionais continuam silenciosas.
+- **Consequências:** `log.txt` gira para `log.1.txt` ao passar de 2 MB, em vez de ser apagado.
+
+## D-007 – Sem bibliotecas geométricas externas novas
+- **Contexto:** a missão restringe novas dependências.
+- **Decisão:** as verificações novas (`PolygonChecks`) são código próprio. O Clipper2 continua a única biblioteca de
+  terceiros.
+- **Consequências:** nada muda na distribuição nem nas licenças.

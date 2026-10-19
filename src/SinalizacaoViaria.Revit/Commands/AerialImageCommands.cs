@@ -199,7 +199,7 @@ public sealed class CmdImportarImagem : CommandBase
                 _ => throw new UserMessageException("Imagem em metros do projeto precisa de uma origem geográfica: use antes a Imagem de Satélite (ou calibre por 2 pontos)."),
             };
             double north = 0;
-            try { north = doc.ActiveProjectLocation.GetProjectPosition(XYZ.Zero).Angle; } catch { }
+            try { north = doc.ActiveProjectLocation.GetProjectPosition(XYZ.Zero).Angle; } catch (Exception ex) { Log.Error("Imagem – Norte do projeto não lido (usado 0°)", ex); }
             geo = new GeoReference { Latitude = lat, Longitude = lon, NorthAngle = north, OriginX = ViewCenter(uidoc, view).X, OriginY = ViewCenter(uidoc, view).Y };
         }
 
@@ -357,7 +357,7 @@ public sealed class CmdCalibrarImagem : CommandBase
             if (geo == null)
             {
                 double north = 0;
-                try { north = doc.ActiveProjectLocation.GetProjectPosition(XYZ.Zero).Angle; } catch { }
+                try { north = doc.ActiveProjectLocation.GetProjectPosition(XYZ.Zero).Angle; } catch (Exception ex) { Log.Error("Imagem – Norte do projeto não lido (usado 0°)", ex); }
                 geo = new GeoReference { Latitude = la1, Longitude = lo1, NorthAngle = north, OriginX = p1.X, OriginY = p1.Y };
             }
             sim = Similarity.FromGeo(geo, p1, p2, (la1, lo1), (la2, lo2), rotate);
