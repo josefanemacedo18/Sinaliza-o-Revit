@@ -138,9 +138,15 @@ public sealed class Polygon2
     private static IReadOnlyList<Vec2>? SimplifyRing(IReadOnlyList<Vec2> ring, double minEdge, double collinearTol)
     {
         var pts = new List<Vec2>(ring.Count);
-        foreach (var p in ring)
+        for (int k = 0; k < ring.Count; k++)
         {
-            if (pts.Count == 0 || pts[^1].DistanceTo(p) >= minEdge) pts.Add(p);
+            var p = ring[k];
+            if (pts.Count == 0 || pts[^1].DistanceTo(p) >= minEdge) { pts.Add(p); continue; }
+            // Dois vértices colados: fica o da ponta do lado mais comprido. Na quina entre uma reta longa e uma curva
+            // discretizada (bordo do ramo × círculo da zona da rotatória, a 9 mm), ficava o ponto da curva e a reta de 18 m
+            // saía 0,03° fora do eixo (aviso do Revit – Autoteste completo de 2026-10-20).
+            if (pts.Count >= 2 && p.DistanceTo(ring[(k + 1) % ring.Count]) > pts[^2].DistanceTo(pts[^1]) && pts[^2].DistanceTo(p) >= minEdge)
+                pts[^1] = p;
         }
         while (pts.Count > 2 && pts[0].DistanceTo(pts[^1]) < minEdge) pts.RemoveAt(pts.Count - 1);
 

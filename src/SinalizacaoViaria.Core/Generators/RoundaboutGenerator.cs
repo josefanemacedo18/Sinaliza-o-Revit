@@ -851,6 +851,11 @@ public static class RoundaboutGenerator
             var crosswalk = leg.Crosswalk ?? d.Crosswalks;
             var signs = leg.Signs ?? d.Signs;
 
+            // Travessia deste ramo (mesma estaca do arranjo): o triângulo "dê a preferência" fica antes dela e o zebrado da
+            // gota pintada é recortado sob ela.
+            var cwT = g.CrosswalkT > rou ? g.CrosswalkT : rou + Math.Max(2, d.CrosswalkDistance);
+            var cwHalfW = Math.Clamp(d.CrosswalkWidth, 2, 10) / 2;
+            HatchMarkingDefinition? splitterHatch = null;
             if (d.Markings)
             {
                 var o0 = inner;
@@ -871,7 +876,18 @@ public static class RoundaboutGenerator
                 {
                     Add(new LinearMarkingDefinition { Code = "LDP", Variant = "0,40 m (0,60 × 0,60 m)", PathRef = PathReference.FromPoints(edgePts, z) });
                     var sym = DesignRules.YieldSymbolLength(v);
-                    Add(new SymbolMarkingDefinition { Code = "SDP", Length = sym, Position = g.At(c, rou + 1.6 + sym / 2, (o0 + o1) / 2), Direction = -g.Dir, Z = z });
+                    // O triângulo começa 1,60 m além do anel e pelo menos 1 m além dos dentes da linha (que acompanham a borda
+                    // do anel). O símbolo sai da posição no sentido da direção: a posição é a ponta mais longe do anel – antes
+                    // ficava no meio e o triângulo entrava nos dentes (Autoteste de 2026-10-20: LDP × SDP em todas as entradas).
+                    var lineFar = edgePts.Max(p => (p - c).Dot(g.Dir)) + 0.30;
+                    var symStart = Math.Max(rou + 1.6, lineFar + 1.0);
+                    // Com travessia perto (minirrotatória: 5 m), o triângulo encolhe para caber antes dela, 0,5 m livre.
+                    var room = crosswalk ? cwT - cwHalfW - 0.5 - symStart : double.MaxValue;
+                    var symLen = Math.Min(sym, room);
+                    if (symLen >= 1.0)
+                        Add(new SymbolMarkingDefinition { Code = "SDP", Length = symLen, Position = g.At(c, symStart + symLen, (o0 + o1) / 2), Direction = -g.Dir, Z = z });
+                    else
+                        L.Warnings.Add($"Ramo a {leg.AngleDeg:0}°: sem espaço para o triângulo \"dê a preferência\" entre a linha e a faixa de pedestres – omitido.");
                 }
                 // Ilha física: a linha dupla amarela (fluxos opostos) chega à ponta da ilha – sem zebrado branco estreito
                 // sobreposto à linha amarela (MBST Vol. IV: a canalização entre fluxos opostos é amarela).
@@ -879,7 +895,7 @@ public static class RoundaboutGenerator
                 {
                     // Gota pintada: zebrado com linha de canalização – amarelo entre fluxos opostos, branco em mão única.
                     var col = leg.TwoWay ? MarkingColor.Amarela : MarkingColor.Branca;
-                    Add(new HatchMarkingDefinition
+                    splitterHatch = Add(new HatchMarkingDefinition
                     {
                         Code = "ZPA", BarWidth = 0.50, Gap = DesignRules.ChannelHatchGap(v), BorderWidth = 0.20, BarColor = col, BorderColor = col,
                         ReferenceDirection = -g.Dir, AxisPoint = g.At(c, rou, 0),
@@ -916,6 +932,9 @@ public static class RoundaboutGenerator
                 var b = g.At(c, tc, End(lo + 0.3, -1));
                 var cwk = Add(new LinearMarkingDefinition { Code = "FTP-1", WidthOverride = Math.Clamp(d.CrosswalkWidth, 2, 10), Overlay = true,
                     PathRef = PathReference.FromPoints(new[] { a, b }, z) });
+                // Zebrado da gota pintada interrompido sob a faixa (+10 cm), como as linhas sob as marcas "por cima".
+                if (splitterHatch != null)
+                    splitterHatch.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = PolygonOps.Strip(new[] { a, b }, 2 * (cwHalf + 0.1))[0].Outer.ToList() });
                 foreach (var isl in L.Refuges.Append(g.Splitter).Where(p => p != null).Distinct())
                     if (DetailGenerator.SegmentIntervals(isl!, a, b).Any())
                         cwk.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = isl!.Outer.ToList() });

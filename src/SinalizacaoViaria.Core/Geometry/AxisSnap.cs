@@ -33,7 +33,7 @@ public static class AxisSnap
         bool? inputSimple = null;
         for (var pass = 0; pass < 3; pass++)
         {
-            var next = SnapOnce(cur, maxOffset, maxAngleDeg, out var changed);
+            var next = SnapOnce(cur, maxOffset, maxAngleDeg, true, out var changed);
             if (!changed) break;
             if (!Simple(next) && (inputSimple ??= Simple(ring))) break;
             cur = next;
@@ -51,6 +51,23 @@ public static class AxisSnap
         return Snap(segs, maxOffset, maxAngleDeg).Select(s => s.Start).ToList();
     }
 
+    /// <summary>
+    /// Mesmo ajuste para uma linha aberta (eixo de via, caminho): as pontas ficam presas só às próprias retas. Serve para os
+    /// eixos lidos de pisos ou de linhas, que saem com resíduo de micrômetros nas pontas e virariam linhas de modelo e
+    /// contornos que o Revit avisa.
+    /// </summary>
+    public static List<Vec2> SnapPath(IReadOnlyList<Vec2> path, double maxOffset = MaxOffset, double maxAngleDeg = MaxAngleDeg)
+    {
+        if (path.Count < 2) return path.ToList();
+        var segs = path.Select((v, i) => new BoundarySegment(v, path[(i + 1) % path.Count])).ToList();
+        for (var pass = 0; pass < 3; pass++)
+        {
+            segs = SnapOnce(segs, maxOffset, maxAngleDeg, false, out var changed);
+            if (!changed) break;
+        }
+        return segs.Select(s => s.Start).ToList();
+    }
+
     /// <summary>Retas que o Revit avisaria: desalinhadas de <paramref name="exactDeg"/> a <paramref name="maxAngleDeg"/> de uma das <see cref="Directions"/>.</summary>
     public static int CountNearAxis(IEnumerable<BoundarySegment> ring, double maxAngleDeg = MaxAngleDeg, double exactDeg = 1e-9) =>
         ring.Count(s => OffAxisDeg(s) is { } off && off > exactDeg && off <= maxAngleDeg);
@@ -66,30 +83,32 @@ public static class AxisSnap
         return Math.Min(a, 45 - a);
     }
 
-    private static List<BoundarySegment> SnapOnce(List<BoundarySegment> ring, double maxOffset, double maxAngleDeg, out bool changed)
+    private static List<BoundarySegment> SnapOnce(List<BoundarySegment> ring, double maxOffset, double maxAngleDeg, bool closed, out bool changed)
     {
         changed = false;
         var n = ring.Count;
-        if (n < 3) return ring;
+        if (n < (closed ? 3 : 2)) return ring;
         var v = ring.Select(s => s.Start).ToArray();
         // Restrições de cada vértice: normal da direção e valor (n·p) da reta alvo do grupo.
         var cons = new List<(Vec2 N, double D)>[n];
-        foreach (var dir in Directions)
+        var h = Math.Sqrt(0.5);
+        // Direções exatas (sem o resíduo de cos/sin): uma reta já alinhada não pode andar nem um fio.
+        foreach (var u in new[] { new Vec2(1, 0), new Vec2(h, h), new Vec2(0, 1), new Vec2(-h, h) })
         {
-            var rad = dir * Math.PI / 180;
-            var u = new Vec2(Math.Cos(rad), Math.Sin(rad));
             var nrm = new Vec2(-u.Y, u.X);
             var g = new Groups(n);
             for (var i = 0; i < n; i++)
             {
-                if (ring[i].IsArc) continue;
+                if (ring[i].IsArc || !closed && i == n - 1) continue;
                 var j = (i + 1) % n;
                 var d = v[j] - v[i];
                 var len = d.Length;
                 if (len < 1e-12) continue;
                 var sin = Math.Abs(d.Dot(nrm)) / len;
                 var off = Math.Asin(Math.Min(1, sin)) * 180 / Math.PI;
-                if (Math.Abs(d.Dot(u)) > 0 && off > 1e-9 && off <= maxAngleDeg) g.Union(i, j, i, len);
+                // As retas já exatas entram também: o vértice de uma quina entre uma reta exata e outra que vai ser alinhada
+                // fica no encontro das duas – antes andava só na direção da segunda e entortava a primeira (zebrados a 45°).
+                if (Math.Abs(d.Dot(u)) > 0 && off <= maxAngleDeg) g.Union(i, j, i, len);
             }
             if (g.Segments.Count == 0) continue;
             var target = new Dictionary<int, (double Len, double Value)>();
@@ -122,7 +141,8 @@ public static class AxisSnap
                 else p = new Vec2((d1 * n2.Y - n1.Y * d2) / det, (n1.X * d2 - d1 * n2.X) / det);
             }
             // Numa quina de 45° o encontro pode andar até √2 × o limite; além disso, não mexe.
-            if (p.DistanceTo(v[i]) <= maxOffset * 1.5 && p.DistanceTo(v[i]) > 0) { res[i] = p; changed = true; }
+            var moved = p.DistanceTo(v[i]);
+            if (moved <= maxOffset * 1.5 && moved > 1e-12) { res[i] = p; changed = true; }
         }
         var outRing = new List<BoundarySegment>(n);
         for (var i = 0; i < n; i++) outRing.Add(new BoundarySegment(res[i], res[(i + 1) % n], ring[i].Mid));

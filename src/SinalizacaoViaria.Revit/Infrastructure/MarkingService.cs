@@ -1520,10 +1520,12 @@ public sealed class MarkingService
     /// <summary>
     /// Contorno do Revit com linhas e arcos inteiros (ver <see cref="BoundaryFit"/>): cada reta vira uma linha só e cada
     /// curva vira arcos – o esboço do piso fica limpo e leve. <paramref name="raw"/>: vértices mantidos um a um (pontos de
-    /// apoio da edição de forma sobre o terreno). <paramref name="snap"/>: retas quase alinhadas aos eixos ficam exatas (padrão:
-    /// só fora do modo <paramref name="raw"/>).
+    /// apoio da edição de forma sobre o terreno). Nos dois modos as retas quase alinhadas aos eixos ficam exatas; no modo
+    /// <paramref name="raw"/> o vértice anda no máximo 0,5 mm – a edição de forma lê as cotas na posição final de cada
+    /// vértice, então os pontos de apoio continuam valendo (Autoteste de 2026-10-20 09:44: 34 avisos de retas a 0,0002° –
+    /// deslocamento de 0,0 mm – em pisos que acompanham o terreno, que pulavam o alinhamento).
     /// </summary>
-    private CurveLoop? ToCurveLoop(IReadOnlyList<Vec2> ring, double zFt, bool raw = false, bool? snap = null)
+    private CurveLoop? ToCurveLoop(IReadOnlyList<Vec2> ring, double zFt, bool raw = false)
     {
         var tol = _doc.Application.ShortCurveTolerance * 1.5;
         var pts = new List<XYZ>();
@@ -1544,12 +1546,12 @@ public sealed class MarkingService
             }
             catch (Exception ex) { Log.Error("Contorno com arcos", ex); }
         }
-        if (snap ?? !raw)
         {
             // Retas "quase" alinhadas aos eixos (resíduo de recorte) ficam exatas: o Revit avisa "ligeiramente fora da linha
             // central" em cada uma. Depois, pontos que ficaram perto demais saem (curva curta).
             var ring2 = pts.Select(p => new Vec2(UnitConv.M(p.X), UnitConv.M(p.Y))).ToList();
-            var snapped = AxisSnap.Snap(ring2.Select((p, i) => new Core.Geometry.BoundarySegment(p, ring2[(i + 1) % ring2.Count])).ToList(), SnapOffset);
+            var snapped = AxisSnap.Snap(ring2.Select((p, i) => new Core.Geometry.BoundarySegment(p, ring2[(i + 1) % ring2.Count])).ToList(),
+                raw ? AxisSnap.MaxOffset : SnapOffset);
             pts = Sanitize(snapped.Select(x => new XYZ(UnitConv.Ft(x.Start.X), UnitConv.Ft(x.Start.Y), zFt)).ToList(), tol);
             if (pts.Count < 3) return null;
         }
@@ -1560,7 +1562,7 @@ public sealed class MarkingService
     }
 
     /// <summary>Só retas (sem o ajuste de arcos), mas com o alinhamento aos eixos: contorno com furos cujos arcos se tocariam.</summary>
-    private CurveLoop? ToCurveLoopLines(IReadOnlyList<Vec2> ring, double zFt) => ToCurveLoop(ring, zFt, raw: true, snap: true);
+    private CurveLoop? ToCurveLoopLines(IReadOnlyList<Vec2> ring, double zFt) => ToCurveLoop(ring, zFt, raw: true);
 
     /// <summary>Desvio máximo do contorno ajustado (m) – configurável em Configurações (0 = retas uma a uma, como antes).</summary>
     private static double BoundaryTolerance => Math.Max(0, PluginContext.Settings.BoundaryTolerance);
@@ -1675,13 +1677,29 @@ public sealed class MarkingService
         var ft = types.FirstOrDefault(t => t.Name == name);
         if (ft != null)
         {
-            // Tipos criados por versões anteriores podem ter herdado a camada variável do tipo base.
+            // Tipos criados por versões anteriores podem ter herdado a camada variável do tipo base – ou a espessura dele,
+            // quando o Revit recusou a estrutura: o piso saía mais grosso que o nome e invadia os de baixo (Autoteste de
+            // 2026-10-20: pares iguais de 10 750 cm³ nas rotatórias).
             try
             {
                 var cs0 = ft.GetCompoundStructure();
-                if (cs0 != null && cs0.VariableLayerIndex >= 0) { cs0.VariableLayerIndex = -1; ft.SetCompoundStructure(cs0); }
+                if (cs0 != null)
+                {
+                    var fix = false;
+                    if (cs0.VariableLayerIndex >= 0) { cs0.VariableLayerIndex = -1; fix = true; }
+                    var width = UnitConv.M(cs0.GetWidth());
+                    if (FloorTypeNames.Mismatch(name, width))
+                    {
+                        var keep = Math.Max(0, cs0.StructuralMaterialIndex);
+                        for (int i = cs0.LayerCount - 1; i >= 0; i--) if (i != keep && cs0.LayerCount > 1) cs0.DeleteLayer(i);
+                        cs0.SetLayerWidth(0, UnitConv.Ft(thicknessM));
+                        fix = true;
+                        Log.Info($"Tipo de piso \"{name}\": estrutura de {width * 100:0.#} cm corrigida para {thicknessM * 100:0.#} cm.");
+                    }
+                    if (fix) ft.SetCompoundStructure(cs0);
+                }
             }
-            catch (Exception ex) { Log.Error("FloorType (camada variável)", ex); }
+            catch (Exception ex) { Log.Error("FloorType (estrutura do tipo existente)", ex); }
         }
         if (ft == null)
         {

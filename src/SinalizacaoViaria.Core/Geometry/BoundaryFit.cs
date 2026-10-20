@@ -547,10 +547,18 @@ public static class BoundaryFit
         for (int i = 0; i < n; i++)
             for (int k = -6; k <= 6; k++)
                 if (k != 0) local[i] = Math.Max(local[i], turn[((i + k) % n + n) % n]);
-        var keep = new List<Vec2>(n);
-        for (int i = 0; i < n; i++)
+        // A volta começa no canto mais vivo, que sempre fica: o primeiro ponto era conferido com o último do anel original e o
+        // último com o primeiro já removido – os dois saíam juntos e a reta seguinte pegava o começo da curva (fim da reta de
+        // 17 m no bordo do ramo da rotatória a 19 mm de altura, 0,06° fora do eixo – Autoteste completo de 2026-10-20).
+        var first = 0;
+        for (int i = 1; i < n; i++) if (turn[i] > turn[first]) first = i;
+        var kept = new bool[n];
+        var count = 0;
+        var last = first;
+        for (int k = 0; k < n; k++)
         {
-            var a = keep.Count > 0 ? keep[^1] : pts[^1];
+            var i = (first + k) % n;
+            var a = pts[last];
             var b = pts[i];
             var c = pts[(i + 1) % n];
             var ac = c - a;
@@ -558,10 +566,13 @@ public static class BoundaryFit
             // Só pontos entre os vizinhos (sem ida e volta), quase sobre a reta deles e que giram bem menos que os vizinhos:
             // ponto de corte no meio de uma corda. Os pontos de uma curva fina (todos girando igual) ficam.
             var isolated = turn[i] <= 0.35 * local[i] || turn[i] < 1e-6;
-            if (isolated && len > 1e-9 && Math.Abs((b - a).Cross(ac)) / len <= lim && (b - a).Dot(ac) > 0 && (c - b).Dot(ac) > 0 && n - (i - keep.Count) > 3)
+            if (k > 0 && isolated && len > 1e-9 && Math.Abs((b - a).Cross(ac)) / len <= lim && (b - a).Dot(ac) > 0 && (c - b).Dot(ac) > 0 && n - (k - count) > 3)
                 continue;
-            keep.Add(b);
+            kept[i] = true;
+            count++;
+            last = i;
         }
+        var keep = pts.Where((_, i) => kept[i]).ToList();
         return keep.Count >= 3 ? keep : pts;
     }
 

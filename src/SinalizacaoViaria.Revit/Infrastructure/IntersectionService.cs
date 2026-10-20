@@ -431,7 +431,15 @@ public sealed class IntersectionService
         var layout = RoundaboutGenerator.Layout(rb);
         results.Add(_service.Render(rb));
         foreach (var old in rb.ChildIds) _service.Delete(old);
+        var known = layout.Warnings.Count;
         var children = RoundaboutGenerator.Children(rb, layout, rb.Output, rb.Z);
+        // Avisos da sinalização dos ramos (ex.: sem espaço para o triângulo antes da faixa) – os do arranjo já vieram no Render.
+        if (layout.Warnings.Count > known)
+        {
+            var extra = new RenderResult();
+            extra.Warnings.AddRange(layout.Warnings.Skip(known).Distinct());
+            results.Add(extra);
+        }
         foreach (var c in children)
         {
             c.Hierarchy = rb.Hierarchy;

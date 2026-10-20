@@ -99,3 +99,16 @@ como substituída.
   alinhadas, ficam como estão (o Revit não avisa e a inclinação é de projeto). Os limites são do plugin e da ajuda do
   Revit, não de norma.
 
+
+## D-011 – Tipos de piso do plugin com estrutura diferente do nome são corrigidos ao serem usados
+- **Contexto:** no 2º Autoteste completo (2026-10-20 09:44) os pisos de uma mesma rotatória continuaram sobrepostos em 149
+  pares, quase todos com o mesmo volume (10 750 cm³), o que não se reproduz no núcleo com a espessura do nome do tipo. O
+  plugin reaproveita os tipos pelo nome ("SV - Concreto 15 cm"); um tipo criado por versão antiga, quando o Revit recusou a
+  estrutura nova, ficou com a estrutura do tipo base – mais grosso que o nome – e invade os pisos de baixo.
+- **Decisão:** ao usar um tipo existente cujo nome segue o padrão do plugin ("SV - … N cm") e cuja estrutura difere da
+  espessura do nome em mais de 0,5 mm, o plugin deixa só a camada estrutural com a espessura do nome e registra a correção no
+  log. Tipos com outros nomes nunca são mexidos. A Preparação do Autoteste lista os tipos nessa situação antes de começar.
+- **Consequências:** os pisos que já usam o tipo mudam de espessura junto (passam à espessura que o nome declara), também nas
+  marcas que não estão sendo refeitas; materiais das camadas removidas saem do tipo. É uma alteração de tipos do próprio
+  plugin no modelo, feita só quando o plugin cria ou refaz pisos com aquele tipo, e reversível pelo histórico do Revit
+  (Desfazer). Hipótese a confirmar no próximo Autoteste.

@@ -638,6 +638,9 @@ Painel **Representação no Revit** (em todas as janelas):
   viram um piso só. Se você trocar o tipo de um piso, a troca é mantida quando a via é regenerada.
   **Contorno editado à mão é preservado**: se você editar o contorno de um piso (ou movê-lo), o plugin não o
   refaz nas regenerações seguintes – para voltar ao contorno gerado, apague o piso e use **Atualizar**.
+  Um tipo *SV - …* já existente cuja estrutura não bate com a espessura do nome (criado por versão antiga) é corrigido
+  quando o plugin o usa: fica só a camada estrutural, com a espessura do nome, e a correção vai para o log. Os pisos que já
+  usam o tipo mudam junto (Desfazer volta). Tipos com outros nomes nunca são mexidos.
   Se o Revit recusar algum contorno, aquela parte é gerada como forma direta e o motivo aparece no aviso.
   **Contornos leves, com linhas e arcos inteiros**: ao editar o esboço de um piso, cada
   trecho reto é **uma linha só** e cada curva vira **arcos** (Arco do Revit) – sem as dezenas de "tracinhos" das versões
@@ -1856,7 +1859,9 @@ A ilha **pintada** (preset *Mini*) é uma **LCA** contínua de 0,20 m (largura e
 0,25–0,50 m em volta, zebrado interno opcional; ilhas separadoras **pintadas** em amarelo (fluxos opostos) ou
 branco (mão única, por ramo), **setas curvas IMC** no anel (uma por faixa, logo após cada entrada), LBO externa
 entre as aberturas dos ramos, **LMS-1/LMS-2** entre as faixas do anel, LDP de 0,40 m com SDP de 3,60 / 6,00 m pela
-velocidade de aproximação e **LFO-3** nas aproximações de mão dupla. Placas: **R-2 + R-33** nas entradas (quando o
+velocidade de aproximação e **LFO-3** nas aproximações de mão dupla. O SDP começa pelo menos 1 m depois da LDP e, com
+travessia, termina 0,5 m antes da faixa de pedestres; se não couber (travessia muito perto da entrada), é omitido e a etapa
+avisa. A faixa de pedestres recorta o zebrado da ilha pintada. Placas: **R-2 + R-33** nas entradas (quando o
 raio da ilha é pequeno) ou **R-24a na ilha** (DER-SP projetos-tipo 15/16 – escolha em *Placas de sentido*),
 **A-12 com "A … m"** (distância pela desaceleração de 2 m/s² do MBST Vol. II) e **marcadores de alinhamento** na ilha.
 

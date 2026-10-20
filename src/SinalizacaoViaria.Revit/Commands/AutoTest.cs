@@ -8,6 +8,7 @@ using Autodesk.Revit.UI;
 using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Geometry;
+using SinalizacaoViaria.Core.Model;
 using SinalizacaoViaria.Revit.Infrastructure;
 using SinalizacaoViaria.Revit.UI;
 
@@ -452,7 +453,7 @@ internal sealed partial class AutoTestRunner
                 var (ra, rb) = (MarkingStorage.Read(ea), MarkingStorage.Read(eb));
                 kinds.Add((ra?.Definition.DisplayCode ?? ea.Category?.Name ?? "?", rb?.Definition.DisplayCode ?? eb.Category?.Name ?? "?",
                     ra != null && rb != null && ra.MarkingId == rb.MarkingId, v * 0.0283168));
-                if (examples.Count < 5) examples.Add($"{Who(_doc, new[] { ea.Id, eb.Id })[3..]} ({v * 28316.8:0} cm³)");
+                if (examples.Count < 5) examples.Add($"{Who(_doc, new[] { ea.Id, eb.Id })[3..]} ({v * 28316.8:0} cm³; {Heights(ea)} × {Heights(eb)})");
             }
             catch { unknown++; }
         }
@@ -460,6 +461,16 @@ internal sealed partial class AutoTestRunner
                + $"{apart} sem volume em comum (aviso de passagem), {gone} com piso apagado ou refeito, {unknown} sem conferência.");
         if (WarningSummary.PersistentPairsNote(kinds) is { } byKind) s.Note(byKind);
         if (still > 0) s.WarnFirst($"{still} par(es) de pisos continuam sobrepostos no modelo: {string.Join("; ", examples)}{(still > examples.Count ? "; …" : "")}.");
+    }
+
+    /// <summary>Cotas do piso (base e topo, m) e a espessura do tipo × a do nome – para ver se a sobreposição vem da altura.</summary>
+    private static string Heights(Element e)
+    {
+        var bb = e.get_BoundingBox(null);
+        var z = bb == null ? "?" : $"z {UnitConv.M(bb.Min.Z):0.000}–{UnitConv.M(bb.Max.Z):0.000}";
+        if (e is Floor f && f.Document.GetElement(f.GetTypeId()) is FloorType ft && ft.GetCompoundStructure() is { } cs)
+            return $"{z}, tipo {UnitConv.M(cs.GetWidth()) * 100:0.#} cm{(FloorTypeNames.Mismatch(ft.Name, UnitConv.M(cs.GetWidth())) ? $" ≠ nome \"{ft.Name}\"" : "")}";
+        return z;
     }
 
     private static Solid? SolidOf(Element e, Dictionary<long, Solid?> cache)

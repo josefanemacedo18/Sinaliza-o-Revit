@@ -285,6 +285,8 @@ public static class FloorRoads
             chain = Extend(chain, polys, false, junctions);
             // Eixo no meio da pista: cada ponto (fora dos encontros e das pontas) vai para o meio entre os dois bordos.
             chain = Recenter(chain, polys, junctions);
+            // Resíduo de micrômetros do centramento: reta quase horizontal/vertical/45° fica exata (aviso do Revit).
+            chain = AxisSnap.SnapPath(chain);
             var axis = new Polyline2(chain);
             if (axis.Length < minWidth * 2) continue;
             var samples = new List<(double, double)>();
@@ -503,20 +505,37 @@ public static class FloorRoads
     {
         if (pts.Count < 3) return pts;
         var line = new Polyline2(pts);
-        var res = new List<Vec2> { pts[0] };
-        // Pontos a cada ~2 m (curvas bem descritas), mantendo os extremos.
-        var step = Math.Max(2, line.Length / 400);
-        for (var s = step; s < line.Length - step / 2; s += step)
+        Vec2 Mid(double s)
         {
             var p = line.PointAt(s);
-            if (junctions.Any(j => j.DistanceTo(p) < 15)) { res.Add(p); continue; }
+            if (junctions.Any(j => j.DistanceTo(p) < 15)) return p;
             var d = line.TangentAt(s);
             var n = new Vec2(-d.Y, d.X);
             var l = Ray(p, n, polys);
             var r = Ray(p, n * -1, polys);
-            res.Add(l > 0 && r > 0 ? p + n * ((l - r) / 2) : p);
+            return l > 0 && r > 0 ? p + n * ((l - r) / 2) : p;
         }
+        var res = new List<Vec2> { pts[0] };
+        // Pontos a cada ~2 m (curvas bem descritas), mantendo os extremos.
+        var step = Math.Max(2, line.Length / 400);
+        for (var s = step; s < line.Length - step / 2; s += step) res.Add(Mid(s));
         res.Add(pts[^1]);
+        // Ponta livre: segue reta a partir dos dois pontos já centrados mais próximos. O prolongamento sai da ponta do eixo
+        // cordal, que escorrega uns centímetros para a quina – num piso retangular de 200 m a reta do eixo ficava 0,014° fora
+        // da horizontal (Autoteste completo de 2026-10-20); o raio pela normal na ponta sairia pelo bordo transversal.
+        Vec2 End(Vec2 p, Vec2 a, Vec2 b)
+        {
+            if (junctions.Any(j => j.DistanceTo(p) < 15)) return p;
+            var u = a - b;
+            if (u.Length < 1e-9) return p;
+            u = u.Normalized();
+            return a + u * (p - a).Dot(u);
+        }
+        if (res.Count >= 4)
+        {
+            res[0] = End(res[0], res[1], res[2]);
+            res[^1] = End(res[^1], res[^2], res[^3]);
+        }
         return Simplify(res, 0.05);
     }
 

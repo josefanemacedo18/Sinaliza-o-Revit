@@ -3,6 +3,7 @@ using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
+using SinalizacaoViaria.Core.Model;
 using SinalizacaoViaria.Revit.Infrastructure;
 
 namespace SinalizacaoViaria.Revit.Commands;
@@ -74,6 +75,17 @@ internal sealed partial class AutoTestRunner
             _origin = n == 0 ? new Vec2(0, 0) : new Vec2(Math.Ceiling((maxX + 400) / 100) * 100, Math.Floor(minY / 100) * 100);
             if (Math.Abs(_origin.X) > 25000) s.Warn($"A área de teste ficou a {_origin.X / 1000:0.0} km da origem do Revit (modelo muito extenso): a precisão pode cair.");
             s.Note($"{n} elemento(s) de modelo no projeto; área de teste a partir de X = {_origin.X:0} m, Y = {_origin.Y:0} m.");
+            // Tipos de piso do plugin cuja estrutura não bate com a espessura do nome (versões antigas): corrigidos ao serem usados.
+            var wrong = new List<string>();
+            foreach (var ft in new FilteredElementCollector(_doc).OfClass(typeof(FloorType)).Cast<FloorType>())
+                try
+                {
+                    if (ft.GetCompoundStructure() is { } cs && FloorTypeNames.Mismatch(ft.Name, UnitConv.M(cs.GetWidth())))
+                        wrong.Add($"{ft.Name} ({UnitConv.M(cs.GetWidth()) * 100:0.#} cm)");
+                }
+                catch { /* tipo sem estrutura */ }
+            if (wrong.Count > 0)
+                s.Warn($"{wrong.Count} tipo(s) de piso do plugin com a estrutura diferente da espessura do nome – o plugin corrige cada um ao usá-lo: {string.Join("; ", wrong.Take(8))}{(wrong.Count > 8 ? "; …" : "")}.");
 
             using var t = new Transaction(_doc, "SV Autoteste - vistas");
             t.Start();

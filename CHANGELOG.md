@@ -3,6 +3,62 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-20 – EZ: 2º Autoteste completo – retas fora do eixo restantes, sinalização das rotatórias e tipos de piso
+
+Fases da missão: IV (motor geométrico) e XIV (regras da API do Revit), as duas em andamento. Quadro das 15 fases no ROADMAP.
+
+### Evidência
+- 2º Autoteste **completo** do usuário com a DLL do EY (20/10 07:59), em `docs/evidencias/2026-10-20-autoteste-completo-2.txt`:
+  - 178 etapas: 106 OK, 72 com aviso e **0 com erro**, em 1 h 41 min – o erro das placas do EY não voltou;
+  - retas fora do eixo: de 1 385 avisos para **85**, em 17 etapas;
+  - 3 153 avisos de pisos sobrepostos: 2 053 de passagem (piso apagado ou refeito no fim da etapa), 39 sem volume em
+    comum, 439 sem conferência e **622 que continuam**, agora listados por tipo.
+- Pares persistentes por tipo (todas as etapas): ROTATORIA × ROTATORIA da mesma marca 149, FTP-1 × ROTATORIA 107,
+  MER-0 × SARJETA 57, LBO × ROTATORIA 44, LDP × SDP 34, INTERSECAO × INTERSECAO 33, FTP-1 × LCO 12, LRE × MER-0 12 e
+  outros com menos de 10.
+
+### Retas fora do eixo (EZ1)
+Cada grupo das 85 retas reproduzido no núcleo e corrigido:
+- **Zebrados a 45° das canalizações** (MTL 14, MAP 13, MAC, ZPA, MER-45; deslocamento de 0,0 mm): alinhar a reta de 45°
+  movia o vértice da quina só na direção dela e entortava a horizontal vizinha, que já era exata. As retas exatas entram
+  agora no grupo e o vértice vai ao encontro das duas (`AxisSnap`).
+- **Pisos que acompanham o terreno** (vértices mantidos um a um): passam também pelo alinhamento, com no máximo 0,5 mm por
+  vértice – a edição de forma lê as cotas na posição final.
+- **Rotatórias** (2 a 9 retas de 17 a 28 m por etapa, a 0,03°–0,12°, ponta a 10–44 mm):
+  - `BoundaryFit.Significant` conferia o primeiro ponto do anel com o último ainda não decidido e o último com o primeiro
+    já removido; os dois saíam juntos e a reta do bordo do ramo ia até o começo da curva de entrada. A volta começa agora
+    no canto mais vivo, que sempre fica;
+  - `Polygon2.Simplified`: de dois vértices a menos que a aresta mínima, ficava o primeiro – na quina do bordo do ramo com o
+    círculo da zona (9 mm) ficava o ponto do círculo e a reta de 18 m saía inclinada. Fica agora o da ponta do lado mais
+    comprido.
+- **Via reconhecida em pisos comuns** (18 retas a 0,014° nos pisos da via e o aviso na própria linha do eixo): as pontas
+  livres do eixo cordal escorregam uns centímetros para a quina e o prolongamento seguia daí. As pontas seguem agora reto a
+  partir dos pontos já centrados, e o eixo lido passa pelo alinhamento de linhas abertas (`AxisSnap.SnapPath`).
+
+### Sinalização das entradas das rotatórias (EZ2)
+- O triângulo "dê a preferência" (SDP) saía da posição no sentido do anel e entrava nos dentes da linha (LDP × SDP em
+  todas as entradas). Agora começa 1 m depois da linha e, com travessia, termina 0,5 m antes da faixa de pedestres; sem
+  espaço, é omitido com aviso na etapa.
+- Na minirrotatória, com a travessia a 5 m, a faixa de pedestres passava sobre o zebrado da gota pintada (FTP-1 × ZPA): a
+  faixa recorta o zebrado.
+- Rotatórias (mini, 1 faixa, compacta, 2 faixas) sem pintura sobre pintura nas entradas, no núcleo.
+
+### Tipos de piso do plugin
+- Hipótese para os 149 pares ROTATORIA × ROTATORIA da mesma marca (pares iguais de 10 750 cm³): tipo "SV - … cm" criado por
+  versão antiga com a estrutura do tipo base, mais grossa que o nome, invadindo os pisos de baixo.
+- Um tipo existente do plugin cuja estrutura difere da espessura do nome (mais de 0,5 mm) passa a ser corrigido quando é
+  usado (fica a camada estrutural, com a espessura do nome; registro no log). DECISIONS D-011.
+- Autoteste: a Preparação avisa os tipos com estrutura diferente do nome; os exemplos de pisos sobrepostos trazem as cotas
+  de base e topo e a espessura do tipo.
+- A confirmar no próximo Autoteste.
+
+### Testes
+- `EZRevitFullRun2Tests` (25): zebrados e canalizações sem retas fora do eixo, contorno da pista de todas as rotatórias
+  sem retas fora do eixo, fim de reta na volta do anel, vértices colados na simplificação, eixo exato da via reconhecida,
+  alinhamento de linhas abertas, sinalização das entradas das rotatórias sem pintura sobre pintura, leitura da espessura no
+  nome do tipo de piso.
+- Suíte completa: **2 825 aprovados, 0 falhas** (14 min 46 s). Plugin: 0 avisos, 0 erros.
+
 ## 2026-10-20 – EY: Autoteste completo no Revit 2027 – placas, retas fora do eixo e pisos sobrepostos
 
 ### Evidência

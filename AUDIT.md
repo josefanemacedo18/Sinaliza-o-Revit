@@ -52,8 +52,12 @@ provável a partir de fatos) ou **HIPÓTESE** (risco plausível ainda não demon
   2.1.0 com EX rodou o Autoteste **completo**: 178 etapas (loteamento, vias, conexões, rotatórias, cul-de-sacs,
   sinalização horizontal e vertical, calçadas, drenagem, largura e recuos, segurança viária, tráfego), 97 OK, 80 com
   aviso e **1 com erro** (perfil de 2 peças das placas recusado pelo Revit; corrigido em EY), em 1 h 42 min.
+- **FATO (2026-10-20 09:44, `docs/evidencias/2026-10-20-autoteste-completo-2.txt`):** a DLL do EY (07:59) rodou o 2º
+  Autoteste **completo**: 178 etapas, 106 OK, 72 com aviso e **0 erros**, em 1 h 41 min. A correção das placas (EY1) foi
+  confirmada no Revit; as retas fora do eixo caíram de 1 385 para 85 (as 85 corrigidas no núcleo em EZ); 622 pares de pisos
+  continuam sobrepostos, agora listados por tipo (K11).
 - **LIMITE DA EVIDÊNCIA:** um build do Revit; um projeto; obras de arte e pranchas não estão no roteiro do Autoteste. As
-  correções de EY do lado do Revit ainda não rodaram no Revit.
+  correções de EZ (retas restantes, sinalização das rotatórias, correção dos tipos de piso) ainda não rodaram no Revit.
 - **Avisos do Revit nos relatórios** (todos nas etapas com interseção ou loteamento; as vias isoladas não tiveram nenhum):
   - "A linha no croqui está ligeiramente fora da linha central": reproduzido no núcleo e corrigido nos pisos das marcas
     (EW2: no 2º relatório, de centenas para 62). Os 62 restantes não diziam em que pisos; EX levou o alinhamento aos
@@ -149,7 +153,7 @@ Legenda de estado:
 | XII | Cenários de projeto (geometria) e otimização geral | AUSENTE / PARCIAL (greide compensado, tempos semafóricos) | — |
 | XIII | Janelas WPF com prévia ao vivo (Core) | IMPLEMENTADA, NÃO VALIDADA aqui | `UI/*.xaml` |
 | XIV | Transações, rollback, `FailuresPreprocessor` | IMPLEMENTADA, NÃO VALIDADA aqui | §3 |
-| XV | Autoteste dentro do Revit (relatório) | VALIDADA no Revit 2027: modo rápido (DLL 2.0.0 e 2.1.0) e **completo** (2026-10-20, 178 etapas), com o resumo por elemento e a conferência das sobreposições do EX funcionando. Desde EY: todos os pares persistentes por tipo e a medida das retas fora do eixo (ainda não rodado no Revit) | `AutoTest*.cs`, `WarningSummary`, `docs/evidencias` |
+| XV | Autoteste dentro do Revit (relatório) | VALIDADA no Revit 2027: modo rápido (DLL 2.0.0 e 2.1.0) e **completo** duas vezes (2026-10-20, 178 etapas; o 2º sem erro), com o resumo por elemento, a conferência das sobreposições, os pares persistentes por tipo e a medida das retas fora do eixo funcionando. Desde EZ: cotas e espessura do tipo nos exemplos de sobreposição e aviso de tipos de piso com estrutura diferente do nome (ainda não rodado no Revit) | `AutoTest*.cs`, `WarningSummary`, `docs/evidencias` |
 | — | Sinalização horizontal e vertical (MBST), dispositivos, mobiliário, acessibilidade (NBR 9050/16537) | VALIDADA (Core) | maior parte da suíte |
 | — | Detalhamento, pranchas, quantitativos, memorial | VALIDADA (Core) / Revit não validado | rodadas AF/AH/AI |
 | — | Georreferência e calibração de imagem | VALIDADA (Core) | `Geo/*`, testes X1 |
