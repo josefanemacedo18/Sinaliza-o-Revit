@@ -74,7 +74,7 @@ public sealed class CmdEditar : CommandBase
         // Rampa de uma interseção: as medidas são as da interseção (todas as rampas dela mudam juntas, com os mesmos ajustes
         // que evitam falhas de modelagem) – editar uma rampa solta seria desfeito na próxima atualização da interseção.
         if (stored.Definition is RampDefinition { GroupId: { } rg }
-            && MarkingStorage.Definitions(uidoc.Document).OfType<IntersectionDefinition>().FirstOrDefault(i => i.Id == rg) is { } parent)
+            && MarkingStorage.Definitions<IntersectionDefinition>(uidoc.Document).FirstOrDefault(i => i.Id == rg) is { } parent)
         {
             var work = (IntersectionDefinition)MarkingDefinition.FromJson(parent.ToJson())!;
             var fw = new FormWindow("Rampas da interseção", "Rampas das travessias",
@@ -88,14 +88,14 @@ public sealed class CmdEditar : CommandBase
         }
         // Orelha gerada pela interseção: as medidas são as da interseção (gerais e por esquina) – refeita com ela.
         if (stored.Definition is CurbExtensionDefinition { GroupId: { } eg }
-            && MarkingStorage.Definitions(uidoc.Document).OfType<IntersectionDefinition>().FirstOrDefault(i => i.Id == eg) is { } earParent)
+            && MarkingStorage.Definitions<IntersectionDefinition>(uidoc.Document).FirstOrDefault(i => i.Id == eg) is { } earParent)
             return IntersectionEarEdit.Run(uidoc, earParent, stored.Definition as CurbExtensionDefinition);
         // Recuo da via (baia, faixa auxiliar): edita só este recuo e regenera a via.
         if (stored.Definition is RecessMarkingDefinition rec) return RecessCommand.EditExisting(uidoc, rec);
         // Elemento de uma via: escolher o que editar (só ele, a via inteira ou o pavimento/raios).
         if (stored.Definition.GroupId is { } gid && stored.Definition is not (IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition))
         {
-            var members = MarkingStorage.Definitions(uidoc.Document).Where(d => d.GroupId == gid).ToList();
+            var members = MarkingStorage.InGroup(uidoc.Document, gid);
             var pavement = members.OfType<RoadPavementDefinition>().FirstOrDefault();
             var hasRetornos = RoadTemplates.FromJson(pavement?.SetupJson)?.Retornos.Count > 0;
             // Extensão de calçada da via (ou a travessia, rampas, mobiliário e piso tátil dela): edita a extensão.
@@ -244,7 +244,7 @@ public sealed class CmdEditar : CommandBase
         res.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões", s =>
         {
             var r = new List<RenderResult>();
-            var pavs = MarkingStorage.Definitions(uidoc.Document).OfType<RoadPavementDefinition>().ToDictionary(p => p.Id);
+            var pavs = MarkingStorage.Definitions<RoadPavementDefinition>(uidoc.Document).ToDictionary(p => p.Id);
             foreach (var it in s.DependentOn(new[] { work }))
             {
                 it.CornerRadius = Hierarquia.NodeRadius(it.RoadIds.Select(id => pavs.GetValueOrDefault(id)).Where(p => p != null)!);
@@ -368,17 +368,17 @@ public sealed class CmdAtualizarTodas : CommandBase
             var service = new MarkingService(doc, uidoc.ActiveView);
             foreach (var d in MarkingService.DependencyOrder(defs.Where(d => d is not (IntersectionDefinition or RoundaboutDefinition)))) results.Add(service.Render(d));
             var inter = new IntersectionService(doc, service);
-            foreach (var it in MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().Where(In))
+            foreach (var it in MarkingStorage.Definitions<IntersectionDefinition>(doc).Where(In))
             {
                 try { results.AddRange(inter.Refresh(it).Where(r => r.Warnings.Count > 0)); }
                 catch (Exception ex) { Log.Error("Refresh interseção", ex); }
             }
-            foreach (var rb in MarkingStorage.Definitions(doc).OfType<RoundaboutDefinition>().Where(In))
+            foreach (var rb in MarkingStorage.Definitions<RoundaboutDefinition>(doc).Where(In))
             {
                 try { results.AddRange(inter.Refresh(rb).Where(r => r.Warnings.Count > 0)); }
                 catch (Exception ex) { Log.Error("Refresh rotatória", ex); }
             }
-            foreach (var cds in MarkingStorage.Definitions(doc).OfType<CulDeSacDefinition>().Where(c => c.RoadId != null && In(c)).ToList())
+            foreach (var cds in MarkingStorage.Definitions<CulDeSacDefinition>(doc).Where(c => c.RoadId != null && In(c)).ToList())
             {
                 try { results.AddRange(inter.Refresh(cds).Where(r => r.Warnings.Count > 0)); }
                 catch (Exception ex) { Log.Error("Refresh cul-de-sac", ex); }

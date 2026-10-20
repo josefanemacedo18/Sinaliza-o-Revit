@@ -106,7 +106,7 @@ internal static class RampCutter
     {
         var doc = uidoc.Document;
         var path = PathResolver.Resolve(doc, ramp.Path)?.Main;
-        var candidates = MarkingStorage.Definitions(doc).OfType<LinearMarkingDefinition>().Where(d => CutCodes.Contains(d.Code)).ToList();
+        var candidates = MarkingStorage.Definitions<LinearMarkingDefinition>(doc).Where(d => CutCodes.Contains(d.Code)).ToList();
         var touched = new List<MarkingDefinition>();
         var service = new MarkingService(doc, uidoc.ActiveView);
         Polygon2? footprint = ramp.CutSidewalk && path != null && path.Points.Count >= 2 ? RampGenerator.Footprint(ramp, path) : null;

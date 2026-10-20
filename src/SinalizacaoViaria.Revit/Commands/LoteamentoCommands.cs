@@ -104,7 +104,7 @@ internal static class LotCommands
         if (same) return new List<RenderResult>();
         var doc = uidoc.Document;
         var quinas = antes.Concat(depois).Select(c => c.Vertice).ToList();
-        var its = MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().Where(it => quinas.Any(v => v.DistanceTo(it.Node) <= 60)).ToList();
+        var its = MarkingStorage.Definitions<IntersectionDefinition>(doc).Where(it => quinas.Any(v => v.DistanceTo(it.Node) <= 60)).ToList();
         var results = new List<RenderResult>();
         if (its.Count == 0) return results;
         using var scope = MarkingService.RenderScope();
@@ -652,7 +652,7 @@ public sealed class CmdDetalharLotes : CommandBase
         var doc = uidoc.Document;
         var view = DetailHelpers.RequireDetailView(uidoc);
         var lot = LotCommands.RequireLot(doc);
-        var existing = MarkingStorage.Definitions(doc).OfType<LoteamentoDetalheDefinition>()
+        var existing = MarkingStorage.Definitions<LoteamentoDetalheDefinition>(doc)
             .FirstOrDefault(d => d.LoteamentoId == lot.Id && d.Output.ViewId == view.UniqueId);
         var det = existing ?? new LoteamentoDetalheDefinition { LoteamentoId = lot.Id };
         var service = new MarkingService(doc, view, interactive: false);

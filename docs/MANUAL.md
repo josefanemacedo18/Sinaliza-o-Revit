@@ -793,8 +793,25 @@ Cada erro do plugin (inclusive os que antes só iam para o log), cada erro/aviso
 entram no relatório, salvo em `%AppData%\SinalizaBIM\autoteste-AAAAMMDD-HHMMSS.txt` (gravado a cada etapa – se o
 Revit fechar no meio, o arquivo mostra onde parou). Tudo acontece dentro de um único Desfazer: no fim escolha
 **Desfazer tudo** (recomendado) ou **Manter** para olhar as vistas "SV Autoteste" (planta e 3D). O teste rápido leva
-até ~3 minutos; o completo, de 10 a 40 minutos num projeto pequeno (1 h 42 min no Autoteste completo de 2026-10-20, com 178
-etapas); o progresso aparece na barra de status do Revit.
+até ~3 minutos. O completo levou 1 h 41 min nos Autotestes de 2026-10-20 (178 etapas). Desde então o plugin lê as marcas
+do projeto sem interpretar o que não precisa e o teste roda as vias e conexões antes dos catálogos, para ficar bem mais
+rápido – o tempo real aparece no próprio relatório. O progresso aparece na barra de status do Revit.
+
+**Arquivo de dados (envie junto com o relatório).** Ao lado do relatório fica `autoteste-AAAAMMDD-HHMMSS-dados.jsonl`
+(uma linha por registro, gravado a cada etapa). Ele traz tudo o que o relatório resume: todos os erros, avisos e notas sem o
+limite de 25, cada par de pisos sobrepostos (códigos, marcas, tipo, espessura, cotas, volume e centro), cada reta fora do
+eixo com as pontas, e o JSON das marcas citadas. Só entra o que o teste criou. Com ele os defeitos são reproduzidos fora do
+Revit, sem precisar de outro Autoteste completo.
+
+**Modelo final.** A última etapa, também no teste rápido, confere **todos** os pisos que o teste criou no modelo como ficou:
+pares com volume em comum e retas do esboço que o Revit avisaria como fora do eixo (de 0,000000001° a 0,2° da horizontal,
+da vertical ou de 45°). Ela não depende dos avisos, que o teste descarta a cada transação. Grava no arquivo de dados o
+contorno de cada piso e o JSON de todas as definições do teste.
+
+**Tempo.** Cada etapa traz a nota "Tempo:", com o que pesou: gerar marcas, geometria do núcleo, ler as marcas do projeto
+(varreduras, elementos e JSON), gravar a transação, atualizador, interseções, recortes e avisos do Revit. Os trechos se
+sobrepõem (gerar inclui a geometria). O fim do relatório soma o tempo por trecho, lista as 15 etapas mais lentas e o tempo
+por bloco.
 
 **Avisos do Revit no relatório.** Cada etapa traz o total de avisos por tipo e em que elementos, contando todos (o relatório
 detalha só os 25 primeiros), por exemplo `Σ 62 × "A linha no croqui está ligeiramente fora da linha central…" – em

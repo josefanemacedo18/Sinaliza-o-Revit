@@ -48,21 +48,37 @@ public sealed class MarkingService
     private Dictionary<string, MarkingDefinition> Definitions =>
         _definitions ??= MarkingStorage.Definitions(_doc).GroupBy(d => d.Id).ToDictionary(g => g.Key, g => g.First());
 
+    private Dictionary<string, MarkingDefinition?>? _byId;
+
+    /// <summary>
+    /// Definição pelo id para os geradores (via, interseção e detalhe consultam as marcas ligadas): do cache geral se ele já
+    /// existe; senão só a marca pedida é interpretada. Depois de 8 consultas o cache geral, que lê tudo de uma vez, compensa.
+    /// </summary>
+    private MarkingDefinition? Lookup(string id)
+    {
+        if (_definitions != null) return _definitions.GetValueOrDefault(id);
+        _byId ??= new Dictionary<string, MarkingDefinition?>();
+        if (_byId.TryGetValue(id, out var d)) return d;
+        if (_byId.Count >= 8) return Definitions.GetValueOrDefault(id);
+        return _byId[id] = MarkingStorage.Definition(_doc, id);
+    }
+
     private readonly Dictionary<string, MarkingGeometry?> _geometryCache = new();
 
     /// <summary>Invalida o cache de definições (após gravar outras marcas na mesma transação).</summary>
     public void Invalidate()
     {
         _definitions = null;
+        _nodeParents = null;
+        _byId = null;
         _present = null;
         _geometryCache.Clear();
     }
 
-    private Dictionary<string, List<StoredMarking>>? _present;
+    private Dictionary<string, List<(Element Element, MarkingColor Color)>>? _present;
 
     /// <summary>Elementos existentes de cada marca (por id).</summary>
-    private Dictionary<string, List<StoredMarking>> Present =>
-        _present ??= MarkingStorage.All(_doc).GroupBy(r => r.MarkingId).ToDictionary(g => g.Key, g => g.ToList());
+    private Dictionary<string, List<(Element Element, MarkingColor Color)>> Present => _present ??= MarkingStorage.Elements(_doc);
 
     /// <summary>
     /// Geometria para quantitativos: só o que existe no modelo. Cores cujos elementos foram apagados saem, e pisos
@@ -97,7 +113,7 @@ public sealed class MarkingService
 
     /// <summary>Contexto de geração com o projeto inteiro (marcas, geometrias e eixos) – listas e prévias dos detalhes.</summary>
     public BuildContext ProjectContext(View? view) => PluginContext.BuildContext(false, view?.Scale ?? 100,
-        id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList(), OtherGeometry, d => PathResolver.Resolve(_doc, d.Path)?.Main);
+        Lookup, () => Definitions.Values.ToList(), OtherGeometry, d => PathResolver.Resolve(_doc, d.Path)?.Main);
 
     /// <summary>Geometria das demais marcas (cotas de seção, quadros de quantitativos) – sem detalhes, para não haver recursão.</summary>
     private MarkingGeometry? OtherGeometry(MarkingDefinition d)
@@ -120,7 +136,10 @@ public sealed class MarkingService
     {
         var ids = markingIds.ToHashSet();
         _definitions = null;
-        var deps = Definitions.Values.Where(d => d is IAnnotationDefinition a && !ids.Contains(d.Id)
+        _nodeParents = null;
+        _byId = null;
+        // Só os detalhes e anotações do projeto são interpretados (o tipo vem do começo do JSON gravado).
+        var deps = MarkingStorage.Definitions<IAnnotationDefinition>(_doc).Cast<MarkingDefinition>().Where(d => d is IAnnotationDefinition a && !ids.Contains(d.Id)
             && (a.TargetId != null ? ids.Contains(a.TargetId) : includeLegends && d is IProjectWideAnnotation)).ToList();
         var res = new List<RenderResult>();
         foreach (var d in DependencyOrder(deps))
@@ -145,6 +164,7 @@ public sealed class MarkingService
 
     public MarkingGeometry BuildGeometry(MarkingDefinition def, out double baseZ, List<string>? warnings = null, View? view = null)
     {
+        using var perf = Perf.Measure("Geometria do núcleo (BuildGeometry)");
         var geo = BuildGeometryCore(def, out baseZ, warnings, view);
         // Nó no relevo: rampas, ilhas, meios-fios e dispositivos acompanham vértice a vértice as FACES DOS PISOS do nó
         // (retalhamento comum) – encostam na calçada e na sarjeta em volta sem fresta nem degrau; fora da malha, a superfície do
@@ -190,7 +210,7 @@ public sealed class MarkingService
         // constrói no Toposolid (criado automaticamente quando o projeto não tem um).
         var native = true;
         var ctx = PluginContext.BuildContext(def.Output.Drape && def.Output.Mode == OutputMode.Modelo3D,
-            _scaleOverride ?? view?.Scale ?? 100, id => Definitions.GetValueOrDefault(id), () => Definitions.Values.ToList(), OtherGeometry,
+            _scaleOverride ?? view?.Scale ?? 100, Lookup, () => Definitions.Values.ToList(), OtherGeometry,
             d => PathResolver.Resolve(_doc, d.Path)?.Main, ground, native, d => PathResolver.Resolve(_doc, d.Path)?.Z ?? 0);
         if (def.Path == null)
         {
@@ -420,13 +440,23 @@ public sealed class MarkingService
     /// <summary>Nó (interseção, rotatória, cul-de-sac) dono da marca – ele mesmo ou o pai das marcas filhas.</summary>
     internal MarkingDefinition? NodeOwner(MarkingDefinition def) =>
         def is IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition ? def
-            : Definitions.Values.FirstOrDefault(o => o is IntersectionDefinition i && i.ChildIds.Contains(def.Id) || o is RoundaboutDefinition r && r.ChildIds.Contains(def.Id));
+            : NodeParents.FirstOrDefault(o => o is IntersectionDefinition i && i.ChildIds.Contains(def.Id) || o is RoundaboutDefinition r && r.ChildIds.Contains(def.Id));
+
+    private List<MarkingDefinition>? _nodeParents;
+
+    /// <summary>
+    /// Interseções e rotatórias (donas das marcas filhas). Toda marca 3D gerada pergunta se é filha de um nó: sem o cache geral,
+    /// só os nós são interpretados – antes cada geração interpretava o projeto inteiro só para responder "não".
+    /// </summary>
+    private List<MarkingDefinition> NodeParents => _nodeParents ??= _definitions != null
+        ? _definitions.Values.Where(o => o is IntersectionDefinition or RoundaboutDefinition).ToList()
+        : MarkingStorage.Definitions(_doc, typeof(IntersectionDefinition), typeof(RoundaboutDefinition));
 
     public NodeSurface? NodeFor(MarkingDefinition def)
     {
-        var defs = Definitions;
         var owner = NodeOwner(def);
         if (owner == null) return null;
+        var defs = Definitions;
         IEnumerable<string?> ids = owner switch
         {
             IntersectionDefinition it => it.RoadIds,
@@ -524,8 +554,11 @@ public sealed class MarkingService
     /// <summary>Cria ou regenera todos os elementos da marca.</summary>
     public RenderResult Render(MarkingDefinition def)
     {
+        using var perf = Perf.Measure("Gerar marcas (Render)");
         var result = new RenderResult();
         _definitions = null;
+        _nodeParents = null;
+        _byId = null;
         _present = null;
         var existing = MarkingStorage.ById(_doc, def.Id);
         if (KeepNewer(def, existing, result)) return result;
@@ -1000,7 +1033,7 @@ public sealed class MarkingService
     private void PruneExclusions(MarkingDefinition def)
     {
         if (def.Exclusions.Count == 0) return;
-        var ids = MarkingStorage.All(_doc).Select(r => r.MarkingId).ToHashSet();
+        var ids = MarkingStorage.Ids(_doc);
         def.Exclusions.RemoveAll(z => !string.IsNullOrEmpty(z.SourceId) && !ids.Contains(z.SourceId!));
     }
 

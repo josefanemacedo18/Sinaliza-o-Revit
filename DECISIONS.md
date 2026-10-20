@@ -127,3 +127,23 @@ como substituída.
   (pisos sem chave, de versões antigas: só se o tipo não for um tipo do plugin, e então para a cor inteira).
 - **Consequências:** a troca de tipo feita pelo usuário continua mantida nas novas gerações, agora sem estender a peças de
   outra espessura; os pisos que tinham herdado um tipo errado voltam ao tipo da espessura certa na próxima geração.
+
+## D-013 – Ler as marcas sem interpretar o que não precisa, sem cache entre consultas
+- **Contexto:** cada consulta às marcas do projeto (por id, por tipo, por conjunto) interpretava o JSON de todos os
+  elementos do plugin (~60 µs cada). Como gerar, conectar, recortar e atualizar consultam dezenas de vezes por operação, o
+  tempo de uma operação crescia com o projeto. No 3º Autoteste completo: 1 h 41 min, e um cul-de-sac de 30 elementos levava
+  46 s no meio do teste contra 5 s de uma via no começo.
+- **Alternativas descartadas:**
+  - Cache das definições interpretadas por documento. As definições são objetos mutáveis que os comandos alteram antes de
+    gerar. Um cache compartilhado devolveria um objeto alterado e não gravado (geração com falha, transação desfeita), e o
+    Revit não avisa quando uma transação é desfeita.
+  - Cópia profunda a partir do cache: custa o mesmo que interpretar.
+- **Decisão:** cada consulta continua lendo o documento, mas só interpreta o JSON necessário. Antes, três filtros baratos:
+  - o id da marca (campo próprio do esquema);
+  - o tipo (começo do JSON, `DefinitionKinds`);
+  - um filtro de texto pelo id procurado (`Mentioning`).
+  Na dúvida, interpreta. O resultado é idêntico ao da leitura completa (`FBAutotestSpeedTests`).
+- **Consequências:**
+  - O ganho é proporcional à fração de marcas descartadas; o tempo por trecho do Autoteste mede o que sobrou.
+  - Uma migração que renomear o discriminador deixa o nome antigo desconhecido, e ele cai na leitura completa.
+  - Um discriminador nunca pode ser reaproveitado para outro tipo.

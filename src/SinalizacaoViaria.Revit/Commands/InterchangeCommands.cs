@@ -242,7 +242,7 @@ internal static class InterchangeBuilder
     /// <summary>Par de vias do plugin cujos eixos se cruzam mais perto do clique (a principal é a de maior hierarquia/largura).</summary>
     private static (PickedRoad Main, PickedRoad Cross)? FindCrossing(Document doc, Vec2 click)
     {
-        var roads = MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>().Where(p => p.GroupId != null)
+        var roads = MarkingStorage.Definitions<RoadPavementDefinition>(doc).Where(p => p.GroupId != null)
             .Select(p => RoadWorks.Road(doc, p)).Where(r => r != null).Cast<PickedRoad>()
             .Where(r => Math.Abs(r.Axis.Project(click).Signed) < r.Pavement.TotalLeft + r.Pavement.TotalRight + 30).ToList();
         (PickedRoad, PickedRoad)? best = null;
@@ -318,7 +318,7 @@ internal static class InterchangeBuilder
                 foreach (var uid in def.PathRef.ElementIds)
                     if (doc.GetElement(uid) is { } e) try { doc.Delete(e.Id); } catch { /* já removida */ }
             // Interseções e rotatórias nos terminais que dependiam dos ramos.
-            foreach (var it in MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().Where(i => i.Node.DistanceTo(d.Position) < 900).ToList())
+            foreach (var it in MarkingStorage.Definitions<IntersectionDefinition>(doc).Where(i => i.Node.DistanceTo(d.Position) < 900).ToList())
                 try { sv.Refresh(it); } catch { /* removida */ }
             t.Commit();
         }

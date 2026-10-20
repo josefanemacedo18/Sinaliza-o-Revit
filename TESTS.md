@@ -31,6 +31,7 @@ Não compile enquanto a suíte roda com `--no-build`: a compilação troca as DL
 | 2026-10-20 | EY | 2 800 | 2 800 aprovados, 0 falhas | 14 min 34 s (Linux) | +15 `EYRevitFullRunTests` |
 | 2026-10-20 | EZ | 2 825 | 2 825 aprovados, 0 falhas | 14 min 46 s (Linux) | +25 `EZRevitFullRun2Tests` |
 | 2026-10-20 | FA | 2 843 | 2 843 aprovados, 0 falhas | 20 min 18 s (Linux) | +18 `FARevitFullRun3Tests` |
+| 2026-10-20 | FB | 2 856 | 2 856 aprovados, 0 falhas | 20 min 59 s (Linux) | +13 `FBAutotestSpeedTests` |
 
 Compilação na linha de base:
 - Core e plugin: 0 avisos.
@@ -59,6 +60,7 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
 | `EVAlignmentElementsTests` | elementos do traçado (TS/SC/CS/ST, curva circular calculada à mão, espirais, reduzida, sem curva) e do greide (convexa ±2 %, côncava com piso K, vão curto, extremo fora da curva, consistência com `Z(s)`), CSV e estacas |
 | `EVSectionVolumesTests` | volumes por seções: corte/aterro constantes, terreno linear (exato) e quadrático (erro h²/12 esperado), última seção no fim, eixo em curva, conferência com a malha de `Grading.Volumes`, CSV |
 | `EWAxisElementsTests` | elementos do eixo das vias comuns: canto arredondado (R, Δ, T, estacas conferidos à mão), canto vivo, curva reversa, reta, CSV |
+| `FBAutotestSpeedTests` | leitura das marcas pelo tipo no começo do JSON (`DefinitionKinds`) igual ao teste de tipo da leitura completa, para todas as definições (JSON compacto e indentado, classes e interfaces); texto inesperado nunca descartado; ids de conjunto, recorte, marca, elemento e via hospedeira no JSON sem escape (filtro de texto de `MarkingStorage.Mentioning`) |
 | `EYRevitFullRunTests` | perfis das 168 placas aceitáveis pelo Revit (pictograma que se toca, peça menor que a tolerância, furo encostado), retas fora do eixo pelo critério do Revit nas cenas de cruzamento, T, esconso, rotatórias e cul-de-sac, alinhamento a 45° e fora da janela, nenhum piso sobreposto em todos os modelos de via, ciclofaixas e canteiros, faixa de pedestres recortando as vagas, notas do Autoteste |
 | `EXRevitWarningsTests` | alinhamento de anéis de pontos (lote com resíduo em coordenadas grandes, lote inclinado de projeto intacto), lotes reais do cruzamento sem deformação, Marca dos lotes com um, dois e homônimos loteamentos (cenário do Autoteste repetido sem marca repetida), resumo dos avisos do Autoteste por texto e por elemento |
 | `EWRevitWarningsTests` | retas quase alinhadas aos eixos (resíduo × inclinação de projeto, quina, arcos), reprodução no cruzamento local × local (antes > 0, depois 0, área igual), `BoundarySegment.ToString` numa reta |
@@ -90,6 +92,8 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
 
 1. Copiar `Instalar/Revit2027/*` para `%AppData%\Autodesk\Revit\Addins\2027` e abrir o Revit 2027.
 2. Verificar que a guia **SinalizaBIM** aparece, sem erro ao iniciar. O log fica em `%AppData%\SinalizaBIM\log.txt`.
-3. Num arquivo de teste (nunca no projeto real), rodar **Autoteste → Rápido** e guardar o relatório.
+3. Num arquivo de teste (nunca no projeto real), rodar **Autoteste → Rápido** e guardar o relatório **e** o arquivo de
+   dados `autoteste-…-dados.jsonl` da mesma pasta (todos os avisos, pares de pisos sobrepostos, retas fora do eixo,
+   contornos dos pisos e definições – o bastante para reproduzir no núcleo sem repetir o teste).
 4. Rodar **Editar → Validar Modelo** num projeto existente: não altera nada (comando somente leitura) e grava
    `validacao-*.txt`.

@@ -220,7 +220,7 @@ internal sealed partial class AutoTestRunner
         Step("Edição", "Editar linha (LFO-2 → LFO-1) na via local", s =>
         {
             var gid = _roads.GetValueOrDefault("modelo 0")?.GroupId;
-            var line = MarkingStorage.Definitions(_doc).OfType<LinearMarkingDefinition>().FirstOrDefault(l => l.GroupId == gid && l.Code.StartsWith("LFO"));
+            var line = MarkingStorage.Definitions<LinearMarkingDefinition>(_doc).FirstOrDefault(l => l.GroupId == gid && l.Code.StartsWith("LFO"));
             if (line == null) { s.Error("A via local não tem linha de eixo LFO."); return; }
             var a0 = Area(line);
             line.Code = "LFO-1";
@@ -237,7 +237,7 @@ internal sealed partial class AutoTestRunner
         });
         Step("Edição", "Editar rotatória (mais uma faixa)", s =>
         {
-            var rb = MarkingStorage.Definitions(_doc).OfType<RoundaboutDefinition>().FirstOrDefault(r => !_before.Contains(r.Id));
+            var rb = MarkingStorage.Definitions<RoundaboutDefinition>(_doc).FirstOrDefault(r => !_before.Contains(r.Id));
             if (rb == null) { s.Error("Nenhuma rotatória do teste."); return; }
             rb.Lanes = Math.Min(3, rb.Lanes + 1);
             Take(s, IntersectionRunner.Run(_uidoc, "SV Autoteste - editar rotatória", sv => sv.Refresh(rb)));
@@ -264,7 +264,7 @@ internal sealed partial class AutoTestRunner
         Step("Edição", "Apagar Trecho – linha de eixo de uma via (clique numa peça)", s =>
         {
             var gid = _roads.GetValueOrDefault("modelo 1")?.GroupId;
-            var line = MarkingStorage.Definitions(_doc).OfType<LinearMarkingDefinition>().FirstOrDefault(l => l.GroupId == gid && l.Code.StartsWith("L") && !l.Code.StartsWith("LBO"));
+            var line = MarkingStorage.Definitions<LinearMarkingDefinition>(_doc).FirstOrDefault(l => l.GroupId == gid && l.Code.StartsWith("L") && !l.Code.StartsWith("LBO"));
             if (line == null || Stored(line.Id) is not { } st) { s.Error("A via coletora não tem linha de eixo."); return; }
             TrimAndCheck(s, st, geo => geo.Pieces.Count == 0 ? new List<Polygon2>() :
                 new[] { geo.Pieces[geo.Pieces.Count / 2] }.Select(p => TrimTools.ZoneFor(p, p.Shape.Centroid, 3)).Where(z => z != null).Cast<Polygon2>().ToList());
@@ -382,7 +382,7 @@ internal sealed partial class AutoTestRunner
         var lineId = _made.GetValueOrDefault("LFO-1") ?? _made.Values.FirstOrDefault();
         Step("Detalhamento", "Detalhar placas (5)", s =>
         {
-            var signs = MarkingStorage.Definitions(_doc).OfType<SignDefinition>().Where(x => !_before.Contains(x.Id)).Take(5).ToList();
+            var signs = MarkingStorage.Definitions<SignDefinition>(_doc).Where(x => !_before.Contains(x.Id)).Take(5).ToList();
             if (signs.Count == 0) { s.Warn("Nenhuma placa do teste para detalhar."); return; }
             Commit(s, signs.Select((x, k) => Prep(new SignPlanDetailDefinition { SignId = x.Id, Number = $"P{k + 1:00}" })), "detalhar placas");
         });

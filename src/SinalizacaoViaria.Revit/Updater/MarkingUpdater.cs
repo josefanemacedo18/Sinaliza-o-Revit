@@ -64,6 +64,7 @@ public sealed class MarkingUpdater : IUpdater
     public void Execute(UpdaterData data)
     {
         if (_paused > 0) return;
+        using var perf = Perf.Measure("Atualizador automático (DMU)");
         var doc = data.GetDocument();
         try
         {
@@ -108,7 +109,8 @@ public sealed class MarkingUpdater : IUpdater
             var changed = new HashSet<string>(modified.Select(e => e.UniqueId));
             if (changed.Count == 0) return;
 
-            var affected = MarkingStorage.Definitions(doc)
+            // Só as marcas cujo JSON cita algum elemento alterado chegam a ser interpretadas.
+            var affected = MarkingStorage.Mentioning(doc, changed.ToArray())
                 .Where(d => d.Path?.ElementIds.Any(id => changed.Contains(Core.Definitions.PathReference.OwnerOf(id))) == true)
                 .ToList();
             if (affected.Count == 0) return;
@@ -144,7 +146,7 @@ public sealed class MarkingUpdater : IUpdater
                     if (moved.Count > 0)
                     {
                         var ids = affected.Select(d => d.Id).ToHashSet();
-                        affected.AddRange(MarkingStorage.Definitions(doc).Where(d => d.GroupId != null && moved.Contains(d.GroupId) && !ids.Contains(d.Id)));
+                        affected.AddRange(MarkingStorage.Mentioning(doc, moved.ToArray()).Where(d => d.GroupId != null && moved.Contains(d.GroupId) && !ids.Contains(d.Id)));
                         service.Invalidate();
                     }
                 }
@@ -260,20 +262,26 @@ public sealed class MarkingUpdater : IUpdater
 
     private static void RemoveOrphanDetails(Document doc)
     {
-        var all = MarkingStorage.All(doc);
+        // Uma definição por marca (os elementos de uma marca gravam o mesmo JSON) e os elementos de cada uma.
+        var elements = MarkingStorage.Elements(doc);
+        var defs = MarkingStorage.Definitions(doc);
         // Detalhes podem apontar para marcas ou para outros detalhes (perfil transversal → cota de seção).
-        var ids = all.Select(r => r.MarkingId).ToHashSet();
-        var orphans = all.Where(r => r.Definition is Core.Definitions.IAnnotationDefinition { TargetId: { } t } && !ids.Contains(t))
-            .Select(r => r.Element.Id).ToList();
+        var ids = elements.Keys.ToHashSet();
+        List<ElementId> Of(MarkingDefinition d, Func<Element, bool>? only = null) =>
+            elements.GetValueOrDefault(d.Id)?.Where(x => only == null || only(x.Element)).Select(x => x.Element.Id).ToList() ?? new List<ElementId>();
+        var orphanDefs = defs.Where(d => d is Core.Definitions.IAnnotationDefinition { TargetId: { } t } && !ids.Contains(t)).ToList();
+        var orphans = orphanDefs.SelectMany(d => Of(d)).ToList();
         // Só o corte transversal: a cota sem desenho (elemento de dados) existe para o perfil – perfil apagado, ela sai também.
-        var profiled = all.Select(r => r.Definition).OfType<Core.Definitions.SectionProfileDefinition>().Select(p => p.SectionId).ToHashSet();
-        orphans.AddRange(all.Where(r => r.Element is Autodesk.Revit.DB.ExtensibleStorage.DataStorage && r.Definition is Core.Definitions.SectionDimensionDefinition s
-            && Core.Generators.DetailGenerator.SectionDataOnly(s) && !profiled.Contains(s.Id)).Select(r => r.Element.Id));
+        var profiled = defs.OfType<Core.Definitions.SectionProfileDefinition>().Select(p => p.SectionId).ToHashSet();
+        orphans.AddRange(defs.OfType<Core.Definitions.SectionDimensionDefinition>()
+            .Where(s => Core.Generators.DetailGenerator.SectionDataOnly(s) && !profiled.Contains(s.Id))
+            .SelectMany(s => Of(s, e => e is Autodesk.Revit.DB.ExtensibleStorage.DataStorage)));
         foreach (var id in orphans)
             try { doc.Delete(id); } catch { /* já removido */ }
         // Recortes de uma marca apagada (boca de lobo, grelha, rampa...): o piso/meio-fio/calçada volta a ser contínuo.
-        var stale = all.Select(r => r.Definition).GroupBy(d => d.Id).Select(g => g.First())
-            .Where(d => d.Exclusions.Any(z => !string.IsNullOrEmpty(z.SourceId) && !z.SourceId!.Contains(':') && !ids.Contains(z.SourceId!)))
+        var gone = orphanDefs.Select(d => d.Id).ToHashSet();
+        var stale = defs
+            .Where(d => !gone.Contains(d.Id) && d.Exclusions.Any(z => !string.IsNullOrEmpty(z.SourceId) && !z.SourceId!.Contains(':') && !ids.Contains(z.SourceId!)))
             .ToList();
         if (stale.Count == 0) return;
         var service = new MarkingService(doc, null, interactive: false);

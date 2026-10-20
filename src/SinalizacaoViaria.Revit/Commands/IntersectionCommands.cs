@@ -374,7 +374,7 @@ internal static class IntersectionRunner
         t.Start();
         var service = new MarkingService(doc, uidoc.ActiveView);
         var results = action(new IntersectionService(doc, service));
-        t.Commit();
+        using (Perf.Measure("Revit: gravar a transação (Commit)")) t.Commit();
         return results;
     }
 }
@@ -415,7 +415,7 @@ public sealed class CmdIntersecao : CommandBase
                 : "Nenhum cruzamento de vias perto do ponto clicado (até 60 m).");
             return Result.Cancelled;
         }
-        var count = MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().Count();
+        var count = MarkingStorage.Definitions<IntersectionDefinition>(doc).Count();
         var warnings = results.Where(r => r.Warnings.Count > 0).ToList();
         if (warnings.Count > 0) Report("Interseções", warnings);
         else TaskDialog.Show(AppTitle, $"Interseções ajustadas. O projeto tem {count} interseção(ões).");
@@ -627,7 +627,7 @@ public sealed class CmdRotatoria : CommandBase
     internal static List<RenderResult> Place(UIDocument uidoc, RoundaboutDefinition d) =>
         IntersectionRunner.Run(uidoc, "SV - Rotatória", s =>
         {
-            foreach (var it in MarkingStorage.Definitions(uidoc.Document).OfType<IntersectionDefinition>().Where(i => i.Node.DistanceTo(d.Center) < d.OuterRadius + 5).ToList())
+            foreach (var it in MarkingStorage.Definitions<IntersectionDefinition>(uidoc.Document).Where(i => i.Node.DistanceTo(d.Center) < d.OuterRadius + 5).ToList())
                 s.Remove(it);
             return s.Refresh(d);
         });

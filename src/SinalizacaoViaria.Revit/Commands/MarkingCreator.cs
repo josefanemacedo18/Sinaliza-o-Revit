@@ -44,12 +44,12 @@ public static class MarkingCreator
         {
             Log.Error("RenderDependents", ex);
         }
-        t.Commit();
+        using (Perf.Measure("Revit: gravar a transação (Commit)")) t.Commit();
         // Pintura sobre pista de terra: avisa (a tinta não adere ao leito natural).
         try
         {
             var paint = ordered.Where(Core.Automation.TerraPaint.IsPaint).ToList();
-            if (paint.Count > 0 && MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>().Any(p => p.Material == TipoPavimento.Terra))
+            if (paint.Count > 0 && MarkingStorage.Definitions<RoadPavementDefinition>(doc).Any(p => p.Material == TipoPavimento.Terra))
             {
                 var roads = new IntersectionService(doc, service).Roads();
                 var warn = Core.Automation.TerraPaint.Warnings(paint, roads,

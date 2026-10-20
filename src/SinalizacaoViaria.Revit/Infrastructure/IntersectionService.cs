@@ -50,6 +50,7 @@ public sealed class IntersectionService
     /// </summary>
     public List<IntersectionRoad> Roads(bool createMissing = false)
     {
+        using var perf = Perf.Measure("Vias do projeto (IntersectionService.Roads)");
         var res = new List<IntersectionRoad>();
         var all = MarkingStorage.Definitions(_doc);
         var pavs = all.OfType<RoadPavementDefinition>().ToList();
@@ -79,7 +80,7 @@ public sealed class IntersectionService
     {
         created = null;
         var roads = Roads(createMissing: true).Where(r => Math.Abs(RoadZ(r, center) - z) < 3).ToList();
-        foreach (var it in MarkingStorage.Definitions(_doc).OfType<IntersectionDefinition>().Where(i => i.Node.DistanceTo(center) < template.OuterRadius + 5).ToList())
+        foreach (var it in MarkingStorage.Definitions<IntersectionDefinition>(_doc).Where(i => i.Node.DistanceTo(center) < template.OuterRadius + 5).ToList())
             Remove(it);
         var rb = (RoundaboutDefinition)template.CloneWithNewId();
         rb.ChildIds.Clear();
@@ -118,8 +119,8 @@ public sealed class IntersectionService
             var best = nodes.Where(n => n.Node.DistanceTo(p) <= maxDistance).OrderBy(n => n.Node.DistanceTo(p)).Take(1).ToList();
             nodes = best;
         }
-        var existing = MarkingStorage.Definitions(_doc).OfType<IntersectionDefinition>().ToList();
-        var roundabouts = MarkingStorage.Definitions(_doc).OfType<RoundaboutDefinition>().ToList();
+        var existing = MarkingStorage.Definitions<IntersectionDefinition>(_doc).ToList();
+        var roundabouts = MarkingStorage.Definitions<RoundaboutDefinition>(_doc).ToList();
         foreach (var (node, ids) in nodes)
         {
             if (roundabouts.Any(r => r.Center.DistanceTo(node) < r.OuterRadius + 5)) continue;
@@ -186,6 +187,7 @@ public sealed class IntersectionService
     public List<RenderResult> AutoIntersectGroups(IEnumerable<string> groupIds, IntersectionDefinition template, out HashSet<string> processed,
         bool radiusByHierarchy = false)
     {
+        using var perf = Perf.Measure("Interseções automáticas (AutoIntersectGroups)");
         processed = new HashSet<string>();
         var results = new List<RenderResult>();
         var set = groupIds.Where(g => !string.IsNullOrEmpty(g)).ToHashSet();
@@ -193,8 +195,8 @@ public sealed class IntersectionService
         var roads = Roads(createMissing: true);
         var idx = roads.Select((r, i) => (r, i)).Where(x => x.r.Def.GroupId != null && set.Contains(x.r.Def.GroupId)).Select(x => x.i).ToHashSet();
         if (idx.Count == 0) return results;
-        var existing = MarkingStorage.Definitions(_doc).OfType<IntersectionDefinition>().ToList();
-        var roundabouts = MarkingStorage.Definitions(_doc).OfType<RoundaboutDefinition>().ToList();
+        var existing = MarkingStorage.Definitions<IntersectionDefinition>(_doc).ToList();
+        var roundabouts = MarkingStorage.Definitions<RoundaboutDefinition>(_doc).ToList();
         foreach (var (node, ids) in IntersectionGenerator.FindNodes(roads).Where(n => n.Roads.Any(idx.Contains)))
         {
             if (roundabouts.Any(r => r.Center.DistanceTo(node) < r.OuterRadius + 5)) continue;   // o nó já é uma rotatória
@@ -241,7 +243,7 @@ public sealed class IntersectionService
         if (pav.GroupId == null) return new RoadEdgeProfile { RoadId = pav.Id };
         try
         {
-            var members = MarkingStorage.Definitions(_doc).Where(d => d.GroupId == pav.GroupId && d.Id != pav.Id).ToList();
+            var members = MarkingStorage.InGroup(_doc, pav.GroupId).Where(d => d.Id != pav.Id).ToList();
             return EdgeProfile.FromRoadSides(pav, members, new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs });
         }
         catch (Exception ex)
@@ -256,7 +258,7 @@ public sealed class IntersectionService
         if (pav.GroupId == null) return new();
         try
         {
-            var members = MarkingStorage.Definitions(_doc).Where(d => d.GroupId == pav.GroupId && d.Id != pav.Id).ToList();
+            var members = MarkingStorage.InGroup(_doc, pav.GroupId).Where(d => d.Id != pav.Id).ToList();
             return EdgeProfile.FromRoad(pav, members, new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs });
         }
         catch (Exception ex)
@@ -290,7 +292,7 @@ public sealed class IntersectionService
         if (setup == null || !RoadFeatures.HasAny(setup)) return results;
         var axis = PathResolver.Resolve(_doc, pav.Path)?.Main;
         if (axis == null || axis.Points.Count < 2) return results;
-        var members = MarkingStorage.Definitions(_doc).Where(d => d.GroupId != null && d.GroupId == pav.GroupId).ToList();
+        var members = pav.GroupId == null ? new List<MarkingDefinition>() : MarkingStorage.InGroup(_doc, pav.GroupId);
         var fs = RoadFeatures.Build(setup, pav, axis, pav.PathRef.Z, pav.Output, pav.GroupId, PluginContext.Catalog);
         // O que o usuário editou à mão fica como está (e não é gerado outro igual no lugar).
         var manual = members.Where(m => m.Id.StartsWith(fs.Prefix) && m.EditadoManualmente).ToList();
@@ -311,6 +313,7 @@ public sealed class IntersectionService
 
     public List<RenderResult> Refresh(IntersectionDefinition it)
     {
+        using var perf = Perf.Measure("Refazer interseções, rotatórias e cul-de-sacs");
         var results = new List<RenderResult>();
         // O greide de uma via não vale para o nó (nem para os filhos: faixas, retenções, rampas): o nó segue a superfície
         // costurada das vias que chegam nele (NodeSurface), calculada na geração.
@@ -391,6 +394,7 @@ public sealed class IntersectionService
     /// <summary>Recalcula uma rotatória: geometria, sinalização (filhos) e recorte das vias ligadas aos ramos.</summary>
     public List<RenderResult> Refresh(RoundaboutDefinition rb)
     {
+        using var perf = Perf.Measure("Refazer interseções, rotatórias e cul-de-sacs");
         var results = new List<RenderResult>();
         rb.Output.Grade = null;
         // Rotatória ligada às vias: acompanha o nó (eixos movidos) e ganha/perde ramos conforme as vias que chegam.
@@ -418,7 +422,7 @@ public sealed class IntersectionService
         {
             // Os mesmos elementos das vias ligadas (meio-fio, sarjeta, grama, passeio) em volta da rotatória.
             var ids = rb.Legs.Select(l => l.RoadId).Where(i => i != null).ToHashSet();
-            var pavs = MarkingStorage.Definitions(_doc).OfType<RoadPavementDefinition>().Where(p => ids.Contains(p.Id)).ToList();
+            var pavs = MarkingStorage.Definitions<RoadPavementDefinition>(_doc).Where(p => ids.Contains(p.Id)).ToList();
             rb.EdgeProfile = EdgeProfile.Best(pavs.Select(ProfileOf));
             if (rb.EdgeProfile.Count > 0) rb.SidewalkWidth = Math.Max(0, EdgeProfile.OuterWidth(rb.EdgeProfile) - rb.CurbWidth);
             else if (SectionMatch.From(pavs, RoadSetup.CurbWidth) is { } sec)
@@ -449,12 +453,12 @@ public sealed class IntersectionService
         results.Add(_service.Render(rb));
 
         _service.Invalidate();
-        var all = MarkingStorage.Definitions(_doc);
         var roadIds = rb.Legs.Select(l => l.RoadId).Where(i => i != null).ToHashSet();
-        var groups = all.OfType<RoadPavementDefinition>().Where(p => roadIds.Contains(p.Id)).Select(p => p.GroupId).Where(g => g != null).ToHashSet();
+        var groups = MarkingStorage.Definitions<RoadPavementDefinition>(_doc).Where(p => roadIds.Contains(p.Id)).Select(p => p.GroupId).Where(g => g != null).ToHashSet();
         foreach (var g in rb.Legs.Select(l => l.GroupId)) if (g != null) groups.Add(g);
-        var liveIds = all.Select(x => x.Id).ToHashSet();
-        foreach (var m in all.Where(d => d.GroupId != null && groups.Contains(d.GroupId) || d.Exclusions.Any(e => e.SourceId == rb.Id)))
+        var liveIds = MarkingStorage.Ids(_doc);
+        // Só as marcas que citam um dos conjuntos ou a rotatória são interpretadas (o critério exato vem a seguir).
+        foreach (var m in MarkingStorage.Mentioning(_doc, groups.Append(rb.Id).ToArray()).Where(d => d.GroupId != null && groups.Contains(d.GroupId) || d.Exclusions.Any(e => e.SourceId == rb.Id)))
         {
             if (m.Id == rb.Id || children.Any(c => c.Id == m.Id)) continue;
             m.Exclusions.RemoveAll(e => e.SourceId == rb.Id);
@@ -478,7 +482,7 @@ public sealed class IntersectionService
     public List<RoundaboutDefinition> RoundaboutsDependentOn(IEnumerable<MarkingDefinition> changed)
     {
         var groups = changed.Select(d => d.GroupId).Where(g => g != null).ToHashSet();
-        var all = MarkingStorage.Definitions(_doc);
+        var all = MarkingStorage.Definitions(_doc, typeof(RoadPavementDefinition), typeof(RoundaboutDefinition));
         var roadIds = all.OfType<RoadPavementDefinition>().Where(p => groups.Contains(p.GroupId)).Select(p => p.Id).ToHashSet();
         return all.OfType<RoundaboutDefinition>().Where(r => r.Legs.Any(l => l.RoadId != null && roadIds.Contains(l.RoadId)
             || l.GroupId != null && groups.Contains(l.GroupId))).ToList();
@@ -490,7 +494,7 @@ public sealed class IntersectionService
         foreach (var c in it.ChildIds) _service.Delete(c);
         _service.Delete(it.Id);
         _service.Invalidate();
-        foreach (var m in MarkingStorage.Definitions(_doc).Where(d => d.Exclusions.Any(e => e.SourceId == it.Id)))
+        foreach (var m in MarkingStorage.Mentioning(_doc, it.Id).Where(d => d.Exclusions.Any(e => e.SourceId == it.Id)))
         {
             m.Exclusions.RemoveAll(e => e.SourceId == it.Id);
             try { _service.Render(m); }
@@ -504,7 +508,7 @@ public sealed class IntersectionService
         foreach (var c in rb.ChildIds) _service.Delete(c);
         _service.Delete(rb.Id);
         _service.Invalidate();
-        foreach (var m in MarkingStorage.Definitions(_doc).Where(d => d.Exclusions.Any(e => e.SourceId == rb.Id)))
+        foreach (var m in MarkingStorage.Mentioning(_doc, rb.Id).Where(d => d.Exclusions.Any(e => e.SourceId == rb.Id)))
         {
             m.Exclusions.RemoveAll(e => e.SourceId == rb.Id);
             try { _service.Render(m); }
@@ -517,7 +521,7 @@ public sealed class IntersectionService
     {
         _service.Delete(c.Id);
         _service.Invalidate();
-        foreach (var m in MarkingStorage.Definitions(_doc).Where(d => d.Exclusions.Any(e => e.SourceId == c.Id)))
+        foreach (var m in MarkingStorage.Mentioning(_doc, c.Id).Where(d => d.Exclusions.Any(e => e.SourceId == c.Id)))
         {
             m.Exclusions.RemoveAll(e => e.SourceId == c.Id);
             try { _service.Render(m); }
@@ -531,6 +535,7 @@ public sealed class IntersectionService
     /// </summary>
     public List<RenderResult> Refresh(CulDeSacDefinition c)
     {
+        using var perf = Perf.Measure("Refazer interseções, rotatórias e cul-de-sacs");
         var results = new List<RenderResult>();
         c.Output.Grade = null;
         var roads = Roads();
@@ -549,7 +554,7 @@ public sealed class IntersectionService
         }
         results.Add(_service.Render(c));
         _service.Invalidate();
-        foreach (var m in MarkingStorage.Definitions(_doc).Where(d => d.GroupId != null && d.GroupId == road.Def.GroupId || d.Exclusions.Any(e => e.SourceId == c.Id)))
+        foreach (var m in MarkingStorage.Mentioning(_doc, road.Def.GroupId, c.Id).Where(d => d.GroupId != null && d.GroupId == road.Def.GroupId || d.Exclusions.Any(e => e.SourceId == c.Id)))
         {
             if (m.Id == c.Id || m is IAnnotationDefinition) continue;
             m.Exclusions.RemoveAll(e => e.SourceId == c.Id);
@@ -564,14 +569,14 @@ public sealed class IntersectionService
     public List<CulDeSacDefinition> CulDeSacsDependentOn(IEnumerable<MarkingDefinition> changed)
     {
         var groups = changed.Select(d => d.GroupId).Where(g => g != null).ToHashSet();
-        var all = MarkingStorage.Definitions(_doc);
+        var all = MarkingStorage.Definitions(_doc, typeof(RoadPavementDefinition), typeof(CulDeSacDefinition));
         var roadIds = all.OfType<RoadPavementDefinition>().Where(p => groups.Contains(p.GroupId)).Select(p => p.Id).ToHashSet();
         return all.OfType<CulDeSacDefinition>().Where(c => c.RoadId != null && roadIds.Contains(c.RoadId)).ToList();
     }
 
     /// <summary>Rotatórias cujo centro está na ponta (ou sobre o eixo) da via indicada.</summary>
     public List<RoundaboutDefinition> RoundaboutsTouching(IntersectionRoad road) =>
-        MarkingStorage.Definitions(_doc).OfType<RoundaboutDefinition>()
+        MarkingStorage.Definitions<RoundaboutDefinition>(_doc)
             .Where(rb => IntersectionGenerator.Project(road.Axis, rb.Center).Distance < 3).ToList();
 
     /// <summary>
@@ -581,6 +586,7 @@ public sealed class IntersectionService
     public List<RenderResult> Connect(RoadPavementDefinition road, TipoConexao mode, FimLivre ends,
         IntersectionDefinition itTemplate, RoundaboutDefinition rbTemplate, CulDeSacDefinition cdsTemplate, bool radiusByHierarchy)
     {
+        using var perf = Perf.Measure("Conectar via (ímã, interseções, pontas)");
         var results = new List<RenderResult>();
         if (PluginContext.Settings.AutoConnect && road.GroupId != null)
         {
@@ -599,7 +605,7 @@ public sealed class IntersectionService
         else if (mode == TipoConexao.Rotatoria)
         {
             var idx = roads.IndexOf(me);
-            var existingRb = MarkingStorage.Definitions(_doc).OfType<RoundaboutDefinition>().ToList();
+            var existingRb = MarkingStorage.Definitions<RoundaboutDefinition>(_doc).ToList();
             foreach (var (node, ids) in IntersectionGenerator.FindNodes(roads).Where(n => n.Roads.Contains(idx)))
             {
                 if (existingRb.Any(r => r.Center.DistanceTo(node) < r.OuterRadius + 5)) continue;
@@ -624,7 +630,7 @@ public sealed class IntersectionService
     /// <summary>Cul-de-sac na ponta indicada da via (substitui um existente na mesma ponta).</summary>
     public List<RenderResult> AddCulDeSac(IntersectionRoad road, bool atEnd, CulDeSacDefinition template)
     {
-        foreach (var old in MarkingStorage.Definitions(_doc).OfType<CulDeSacDefinition>().Where(c => c.RoadId == road.Def.Id && c.AtRoadEnd == atEnd).ToList())
+        foreach (var old in MarkingStorage.Definitions<CulDeSacDefinition>(_doc).Where(c => c.RoadId == road.Def.Id && c.AtRoadEnd == atEnd).ToList())
             Remove(old);
         var c = (CulDeSacDefinition)template.CloneWithNewId();
         c.RoadId = road.Def.Id;
@@ -638,7 +644,7 @@ public sealed class IntersectionService
     public List<RenderResult> ConvertToRoundabout(Vec2 node, RoundaboutDefinition template, List<IntersectionRoad>? roads = null)
     {
         roads ??= Roads(createMissing: true);
-        foreach (var it in MarkingStorage.Definitions(_doc).OfType<IntersectionDefinition>().Where(i => i.Node.DistanceTo(node) < template.OuterRadius + 5).ToList())
+        foreach (var it in MarkingStorage.Definitions<IntersectionDefinition>(_doc).Where(i => i.Node.DistanceTo(node) < template.OuterRadius + 5).ToList())
             Remove(it);
         var rb = (RoundaboutDefinition)template.CloneWithNewId();
         rb.ChildIds.Clear();
@@ -661,7 +667,7 @@ public sealed class IntersectionService
         var set = groupIds.Where(g => !string.IsNullOrEmpty(g)).ToHashSet();
         if (set.Count == 0) return moved;
         var roads = Roads();
-        var rbs = MarkingStorage.Definitions(_doc).OfType<RoundaboutDefinition>().Select(r => (r.Center, r.OuterRadius)).ToList();
+        var rbs = MarkingStorage.Definitions<RoundaboutDefinition>(_doc).Select(r => (r.Center, r.OuterRadius)).ToList();
         foreach (var me in roads.Where(r => r.Def.GroupId != null && set.Contains(r.Def.GroupId)))
         {
             if (me.Def.Path == null) continue;
@@ -688,7 +694,7 @@ public sealed class IntersectionService
         var movedRoads = roads.Where(r => r.Def.GroupId != null && set.Contains(r.Def.GroupId)).ToList();
         if (movedRoads.Count == 0) return res;
         var movedIds = movedRoads.Select(r => r.Def.Id).ToHashSet();
-        foreach (var it in MarkingStorage.Definitions(_doc).OfType<IntersectionDefinition>().Where(i => i.RoadIds.Any(movedIds.Contains)))
+        foreach (var it in MarkingStorage.Definitions<IntersectionDefinition>(_doc).Where(i => i.RoadIds.Any(movedIds.Contains)))
         {
             foreach (var r in roads.Where(r => it.RoadIds.Contains(r.Def.Id) && !movedIds.Contains(r.Def.Id)))
             {
@@ -752,7 +758,7 @@ public sealed class IntersectionService
             line.PathRef.SmoothRadius = Math.Max(sr, need);
             if (need > sr + 1e-6)
             {
-                foreach (var m in MarkingStorage.Definitions(_doc).Where(d => d.GroupId == road.Def.GroupId && d.Path != null && d.Id != road.Def.Id))
+                foreach (var m in MarkingStorage.InGroup(_doc, road.Def.GroupId).Where(d => d.Path != null && d.Id != road.Def.Id))
                 {
                     m.Path!.SmoothRadius = need;
                     results.Add(_service.Render(m));
@@ -776,7 +782,7 @@ public sealed class IntersectionService
         var set = groups.ToHashSet();
         var results = new List<RenderResult>();
         _service.Invalidate();
-        foreach (var d in MarkingService.DependencyOrder(MarkingStorage.Definitions(_doc).Where(d => d.GroupId != null && set.Contains(d.GroupId))))
+        foreach (var d in MarkingService.DependencyOrder(MarkingStorage.Mentioning(_doc, set.ToArray()).Where(d => d.GroupId != null && set.Contains(d.GroupId))))
         {
             try { results.Add(_service.Render(d)); }
             catch (Exception ex) { Log.Error("Regenerar via", ex); }
@@ -788,7 +794,7 @@ public sealed class IntersectionService
     public List<IntersectionDefinition> DependentOn(IEnumerable<MarkingDefinition> changed)
     {
         var groups = changed.Select(d => d.GroupId).Where(g => g != null).ToHashSet();
-        var all = MarkingStorage.Definitions(_doc);
+        var all = MarkingStorage.Definitions(_doc, typeof(RoadPavementDefinition), typeof(IntersectionDefinition));
         var roadIds = all.OfType<RoadPavementDefinition>().Where(p => groups.Contains(p.GroupId)).Select(p => p.Id).ToHashSet();
         return all.OfType<IntersectionDefinition>().Where(i => i.RoadIds.Any(roadIds.Contains)).ToList();
     }

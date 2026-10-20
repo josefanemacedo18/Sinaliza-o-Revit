@@ -19,14 +19,16 @@ internal static class CopyHandler
             .Select(MarkingStorage.Read).Where(r => r != null).Cast<StoredMarking>().ToList();
         if (addedMarkings.Count == 0) return;
 
-        var others = MarkingStorage.All(doc).Where(r => !addedSet.Contains(r.Element.Id)).ToList();
+        // Só o id e a cor dos demais elementos: interpretar o JSON de todo o projeto a cada elemento novo pesava em cada transação.
+        var others = MarkingStorage.Elements(doc);
         foreach (var group in addedMarkings.GroupBy(r => r.MarkingId))
         {
-            var originals = others.Where(o => o.MarkingId == group.Key).ToList();
-            if (originals.Count == 0) continue; // elemento realmente novo (criado pelo plugin)
+            var originals = others.GetValueOrDefault(group.Key)?.Where(o => !addedSet.Contains(o.Element.Id)).ToList();
+            if (originals == null || originals.Count == 0) continue; // elemento realmente novo (criado pelo plugin)
 
             var copy = group.First();
-            var original = originals.FirstOrDefault(o => o.Color == copy.Color && o.Element.GetType() == copy.Element.GetType()) ?? originals[0];
+            var original = originals.FirstOrDefault(o => o.Color == copy.Color && o.Element.GetType() == copy.Element.GetType());
+            if (original.Element == null) original = originals[0];
             var (delta, dz) = Offset(doc, original.Element, copy.Element);
 
             var def = MarkingDefinition.FromJson(copy.Definition.ToJson())!;

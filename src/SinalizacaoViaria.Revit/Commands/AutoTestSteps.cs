@@ -43,7 +43,7 @@ internal sealed partial class AutoTestRunner
     }
 
     private IntersectionDefinition? ItNear(Vec2 p, double r = 8) =>
-        MarkingStorage.Definitions(_doc).OfType<IntersectionDefinition>().Where(i => i.Node.DistanceTo(p) < r).OrderBy(i => i.Node.DistanceTo(p)).FirstOrDefault();
+        MarkingStorage.Definitions<IntersectionDefinition>(_doc).Where(i => i.Node.DistanceTo(p) < r).OrderBy(i => i.Node.DistanceTo(p)).FirstOrDefault();
 
     private IntersectionService Svc() => new(_doc, new MarkingService(_doc, _uidoc.ActiveView));
 
@@ -191,7 +191,7 @@ internal sealed partial class AutoTestRunner
             rb.ApplyPreset(TipoRotatoria.UmaFaixa);
             var node = ItNear(P(1055, 100), 12)?.Node ?? P(1055, 100);
             Take(s, IntersectionRunner.Run(_uidoc, "SV Autoteste - conexão rotatória", sv => sv.ConvertToRoundabout(node, rb)));
-            if (!MarkingStorage.Definitions(_doc).OfType<RoundaboutDefinition>().Any(r => r.Center.DistanceTo(node) < 10)) s.Error("A rotatória não foi criada no nó.");
+            if (!MarkingStorage.Definitions<RoundaboutDefinition>(_doc).Any(r => r.Center.DistanceTo(node) < 10)) s.Error("A rotatória não foi criada no nó.");
             if (ItNear(node, 10) != null) s.Error("A interseção antiga continua no nó depois de virar rotatória.");
         });
         Step("Conexões", "Avenida × via local (hierarquias diferentes)", s =>
@@ -260,13 +260,13 @@ internal sealed partial class AutoTestRunner
                 if (road == null || RoadOf(road.Pavement) is not { } ir) return;
                 var d = new CulDeSacDefinition { Type = v, Output = Out() };
                 Take(s, IntersectionRunner.Run(_uidoc, "SV Autoteste - cul-de-sac", sv => sv.AddCulDeSac(ir, true, d)));
-                if (!MarkingStorage.Definitions(_doc).OfType<CulDeSacDefinition>().Any(c => c.RoadId == ir.Def.Id)) s.Error("O cul-de-sac não foi criado na ponta da via.");
+                if (!MarkingStorage.Definitions<CulDeSacDefinition>(_doc).Any(c => c.RoadId == ir.Def.Id)) s.Error("O cul-de-sac não foi criado na ponta da via.");
             });
         }
         Step("Conexões", "Via nova com cul-de-sac automático na ponta livre", s =>
         {
             var road = MakeRoad(s, "cul-de-sac automático", T(1), 0, true, RelevoVia.Plana, FimLivre.CulDeSac, (1150, 1250), (1150, 1360));
-            if (road != null && !MarkingStorage.Definitions(_doc).OfType<CulDeSacDefinition>().Any(c => c.RoadId == road.Pavement.Id))
+            if (road != null && !MarkingStorage.Definitions<CulDeSacDefinition>(_doc).Any(c => c.RoadId == road.Pavement.Id))
                 s.Error("A opção \"cul-de-sac nas pontas livres\" não criou o balão.");
         });
     }
@@ -291,7 +291,9 @@ internal sealed partial class AutoTestRunner
                     idx++;
                     var x = col * 45.0;
                     var y = 1000 + row * 5.0;
-                    var len = type.Transversal ? 6.0 : 30.0;
+                    // Piso tátil: cada relevo é um sólido – 30 m de PTA levavam ~3 min no Autoteste completo de 2026-10-20 (171 s);
+                    // 6 m conferem o mesmo desenho.
+                    var len = type.Transversal || type.Codigo is "PTA" or "PTD" ? 6.0 : 30.0;
                     defs.Add(new LinearMarkingDefinition { Code = type.Codigo, Variant = v, Output = Out(), PathRef = Pts((x, y), (x + len, y)) });
                 }
                 Commit(s, defs, "linha " + type.Codigo);

@@ -91,6 +91,14 @@ internal sealed class StepReport(string group, string name)
     public List<ElementId[]> FloorOverlaps { get; } = new();
     /// <summary>Retas dos avisos "ligeiramente fora da linha central": código da marca, desalinhamento (°) e comprimento (m).</summary>
     public List<(string Code, double OffDeg, double Length)> OffAxis { get; } = new();
+    /// <summary>Tempo por trecho do plugin nesta etapa (Perf) e marcas lidas do projeto (varreduras, elementos, JSON).</summary>
+    public Dictionary<string, (double Ms, long Count)> Perf { get; set; } = new();
+    public (long Scans, long Elements, long Parses) Reads { get; set; }
+    /// <summary>Tempo das conferências do próprio Autoteste no fim da etapa (pisos sobrepostos).</summary>
+    public long CheckMs { get; set; }
+    /// <summary>Registros detalhados para o arquivo de dados (sobreposições, retas fora do eixo) e marcas citadas neles.</summary>
+    public List<object> Records { get; } = new();
+    public HashSet<string> Marks { get; } = new();
 
     public string Status => Errors.Count > 0 ? "ERRO" : Warnings.Count > 0 ? "AVISO" : "OK";
 
@@ -137,7 +145,8 @@ internal sealed partial class AutoTestRunner
         _uidoc = uidoc;
         _doc = uidoc.Document;
         _opt = opt;
-        _before = MarkingStorage.Definitions(_doc).Select(d => d.Id).ToHashSet();
+        _before = MarkingStorage.Ids(_doc);
+        _maxIdBefore = MaxId(_doc);
         Directory.CreateDirectory(PluginPaths.Root);
         ReportPath = Path.Combine(PluginPaths.Root, $"autoteste-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
     }
@@ -145,6 +154,8 @@ internal sealed partial class AutoTestRunner
     public (string Summary, string Text) Run()
     {
         _clock.Start();
+        Perf.Reset();
+        Perf.On = true;
         Log.Capture = _logs;
         Notify.Sink = _dialogs;
         _app.Application.FailuresProcessing += OnFailures;
@@ -154,19 +165,22 @@ internal sealed partial class AutoTestRunner
         {
             tg.Start();
             Setup();
+            DataStart();
+            // Vias, conexões e recuos primeiro, com o projeto ainda pequeno; catálogos (muitas marcas avulsas) depois.
             if (_opt.Loteamento) Loteamento();
             if (_opt.Roads) Roads();
             if (_opt.Connections) Connections();
+            if (_opt.Roads || _opt.Sidewalks) RoundT();
+            if (_opt.Sidewalks) Sidewalks();
             if (_opt.Horizontal) Horizontal();
             if (_opt.Vertical) Vertical();
-            if (_opt.Sidewalks) Sidewalks();
-            if (_opt.Roads || _opt.Sidewalks) RoundT();
             if (_opt.Terrain || _opt.Works) Terrain();
             if (_opt.Works) Works();
             if (_opt.Editing) Editing();
             if (_opt.Detailing) Detailing();
             if (_opt.Traffic) Traffic();
             if (_opt.Checks) Checks();
+            FinalModel();
         }
         catch (Exception ex)
         {
@@ -182,12 +196,14 @@ internal sealed partial class AutoTestRunner
             Status("");
         }
         _clock.Stop();
+        DataEnd();
+        Perf.On = false;
         var text = Report();
         Save(text);
         var td = new TaskDialog(CommandBase.AppTitle)
         {
             MainInstruction = "Autoteste concluído – " + Summary(),
-            MainContent = $"Relatório salvo em:\n{ReportPath}\n\nO que fazer com os elementos criados na área de teste?",
+            MainContent = $"Relatório salvo em:\n{ReportPath}\n\nDados completos (envie junto com o relatório):\n{DataPath}\n\nO que fazer com os elementos criados na área de teste?",
         };
         td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Desfazer tudo (recomendado)", "O projeto volta exatamente ao que era antes do teste.");
         td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Manter os elementos para inspeção",
@@ -327,17 +343,20 @@ internal sealed partial class AutoTestRunner
             });
     }
 
-    private void Step(string group, string name, Action<StepReport> body)
+    /// <param name="always">Roda também no modo rápido fora da amostra e do limite de tempo (conferência final).</param>
+    private void Step(string group, string name, Action<StepReport> body, bool always = false)
     {
         // Modo rápido: amostra de cada bloco e limite de tempo (o arquivo não fica pesado nem trava).
-        if (_steps.Count(x => x.Group == group) >= _opt.StepsPerGroup) { _skipped++; return; }
-        if (_clock.Elapsed.TotalSeconds > _opt.BudgetSeconds) { _skipped++; return; }
+        if (!always && _steps.Count(x => x.Group == group) >= _opt.StepsPerGroup) { _skipped++; return; }
+        if (!always && _clock.Elapsed.TotalSeconds > _opt.BudgetSeconds) { _skipped++; return; }
         var s = new StepReport(group, name);
         _steps.Add(s);
         _cur = s;
         Status($"SinalizaBIM – Autoteste ({_steps.Count}): {group} › {name}");
         var logs0 = _logs.Count;
         var dlg0 = _dialogs.Count;
+        var perf0 = Perf.Snapshot();
+        var reads0 = MarkingStorage.Stats.Snapshot();
         var sw = Stopwatch.StartNew();
         try { body(s); }
         catch (Exception ex) { s.Error($"Exceção {ex.GetType().Name}: {ex.Message}\n      {Log.Where(ex)}"); }
@@ -345,14 +364,21 @@ internal sealed partial class AutoTestRunner
         {
             sw.Stop();
             s.Ms = sw.ElapsedMilliseconds;
+            var reads1 = MarkingStorage.Stats.Snapshot();
+            s.Reads = (reads1.Scans - reads0.Scans, reads1.Elements - reads0.Elements, reads1.Parses - reads0.Parses);
+            s.Perf = Delta(perf0, Perf.Snapshot());
             foreach (var l in _logs.Skip(logs0)) s.Error("Erro tratado pelo plugin (só ia para o log): " + l);
             foreach (var d in _dialogs.Skip(dlg0)) s.Message("Mensagem ao usuário: " + d.Replace("\n", " | "));
+            var chk = Stopwatch.StartNew();
             if (s.FloorOverlaps.Count > 0)
                 try { OverlapCheck(s); }
                 catch (Exception ex) { s.Note($"Pisos sobrepostos não conferidos no fim da etapa ({ex.Message})."); }
+            s.CheckMs = chk.ElapsedMilliseconds;
             if (WarningSummary.OffAxisNote(s.OffAxis) is { } off) s.Note(off);
-            if (s.Ms > 60000) s.Warn($"Lento: {s.Ms / 1000.0:0} s.");
+            if (TimeNote(s) is { } tn) s.Note(tn);
+            if (s.Ms > 60000 && !always) s.Warn($"Lento: {s.Ms / 1000.0:0} s.");
             _cur = null;
+            try { DataStep(s); } catch { /* opcional */ }
             // Relatório parcial gravado a cada etapa: se o Revit fechar no meio, dá para saber onde parou.
             try { Save(Report()); } catch { /* opcional */ }
         }
@@ -361,6 +387,7 @@ internal sealed partial class AutoTestRunner
     /// <summary>Falhas do Revit durante o teste: avisos anotados e descartados; erros anotados e a transação desfeita.</summary>
     private void OnFailures(object? sender, FailuresProcessingEventArgs e)
     {
+        using var perf = Perf.Measure("Autoteste: avisos do Revit (OnFailures)");
         try
         {
             var fa = e.GetFailuresAccessor();
@@ -376,7 +403,7 @@ internal sealed partial class AutoTestRunner
                     if (defId == BuiltInFailures.OverlapFailures.FloorsOverlap.Guid)
                         _cur?.FloorOverlaps.Add(f.GetFailingElementIds().ToArray());
                     else if (defId == BuiltInFailures.InaccurateFailures.InaccurateSketchLine.Guid && _cur != null)
-                        OffAxisLines(fa.GetDocument(), f.GetFailingElementIds(), _cur);
+                        OffAxisLines(fa.GetDocument(), f.GetFailingElementIds(), _cur, Loc);
                     fa.DeleteWarning(f);
                 }
                 else
@@ -410,16 +437,21 @@ internal sealed partial class AutoTestRunner
     /// Retas do esboço citadas no aviso "ligeiramente fora da linha central": desalinhamento em relação à direção conferida
     /// mais próxima (0°, 45°, 90°, 135° – ajuda do Revit) e comprimento, para calibrar o alinhamento do núcleo.
     /// </summary>
-    private static void OffAxisLines(Document doc, ICollection<ElementId> ids, StepReport s)
+    private static void OffAxisLines(Document doc, ICollection<ElementId> ids, StepReport s, Func<XYZ, double[]> loc)
     {
         var els = ids.Select(doc.GetElement).Where(e => e != null).ToList();
-        var code = els.Select(e => MarkingStorage.Read(e!)).FirstOrDefault(r => r != null)?.Definition.DisplayCode ?? "?";
+        var mark = els.Select(e => MarkingStorage.Read(e!)).FirstOrDefault(r => r != null);
+        var code = mark?.Definition.DisplayCode ?? "?";
+        if (mark != null) s.Marks.Add(mark.MarkingId);
         foreach (var e in els)
             if (e is CurveElement { GeometryCurve: Line l })
             {
                 var d = l.Direction;
                 var seg = new Core.Geometry.BoundarySegment(Vec2.Zero, new Vec2(d.X, d.Y));
-                if (Core.Geometry.AxisSnap.OffAxisDeg(seg) is { } off) s.OffAxis.Add((code, off, UnitConv.M(l.Length)));
+                if (Core.Geometry.AxisSnap.OffAxisDeg(seg) is not { } off) continue;
+                s.OffAxis.Add((code, off, UnitConv.M(l.Length)));
+                s.Records.Add(new { tipo = "fora-do-eixo", linha = e!.Id.Value, marca = mark?.MarkingId, codigo = code, desvioGraus = off,
+                    comprimento = Math.Round(UnitConv.M(l.Length), 4), de = loc(l.GetEndPoint(0)).Take(2).ToArray(), ate = loc(l.GetEndPoint(1)).Take(2).ToArray() });
             }
     }
 
@@ -447,9 +479,13 @@ internal sealed partial class AutoTestRunner
             if (SolidOf(ea, solids) is not { } sa || SolidOf(eb, solids) is not { } sb) { unknown++; continue; }
             try
             {
-                var v = BooleanOperationsUtils.ExecuteBooleanOperation(sa, sb, BooleanOperationsType.Intersect)?.Volume ?? 0;
+                var inter = BooleanOperationsUtils.ExecuteBooleanOperation(sa, sb, BooleanOperationsType.Intersect);
+                var v = inter?.Volume ?? 0;
                 if (v <= 1e-4) { apart++; continue; }
                 still++;
+                double[]? center = null;
+                try { center = Loc(inter!.ComputeCentroid()); } catch { /* sem centro */ }
+                s.Records.Add(new { tipo = "sobreposicao", volumeCm3 = Math.Round(v * 28316.8, 1), centro = center, a = ElementInfo(ea, s), b = ElementInfo(eb, s) });
                 var (ra, rb) = (MarkingStorage.Read(ea), MarkingStorage.Read(eb));
                 kinds.Add((ra?.Definition.DisplayCode ?? ea.Category?.Name ?? "?", rb?.Definition.DisplayCode ?? eb.Category?.Name ?? "?",
                     ra != null && rb != null && ra.MarkingId == rb.MarkingId, v * 0.0283168));
@@ -521,7 +557,7 @@ internal sealed partial class AutoTestRunner
 
     private List<MarkingDefinition> TestDefs() => MarkingStorage.Definitions(_doc).Where(d => !_before.Contains(d.Id)).ToList();
 
-    private HashSet<string> Present() => MarkingStorage.All(_doc).Select(r => r.MarkingId).ToHashSet();
+    private HashSet<string> Present() => MarkingStorage.Ids(_doc);
 
     /// <summary>Anota os resultados (elementos, avisos) e confere que cada definição gerou elementos.</summary>
     private void Take(StepReport s, IEnumerable<RenderResult> rs, IEnumerable<MarkingDefinition>? defs = null)
@@ -572,6 +608,7 @@ internal sealed partial class AutoTestRunner
         sb.AppendLine($"Projeto: {_doc.Title}   Marcas existentes antes do teste: {_before.Count}");
         sb.AppendLine($"Área de teste: origem X = {_origin.X:0} m, Y = {_origin.Y:0} m (coordenadas internas), nível {_level?.Name} (cota {_z0:0.00} m)");
         sb.AppendLine("Coordenadas nas mensagens: locais, em metros a partir da origem da área de teste.");
+        sb.AppendLine($"Dados completos (todos os avisos, pares sobrepostos, retas fora do eixo, contornos dos pisos e definições): {DataPath}");
         sb.AppendLine();
         sb.AppendLine("RESUMO: " + Summary());
         var bad = _steps.Where(s => s.Errors.Count > 0).ToList();
@@ -595,6 +632,7 @@ internal sealed partial class AutoTestRunner
             if (s.Warnings.Count > 25) sb.AppendLine($"    ⚠ … e mais {s.Warnings.Count - 25} aviso(s)");
             foreach (var i in s.Info) sb.AppendLine("    · " + i);
         }
+        TimeSummary(sb);
         return sb.ToString();
     }
 

@@ -38,20 +38,20 @@ internal static class RoadWorks
     {
         var gid = d is IHostedStructure { HostRoad: { } h } ? h : d.GroupId;
         if (gid == null) return null;
-        var pav = d as RoadPavementDefinition ?? MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>().FirstOrDefault(p => p.GroupId == gid);
+        var pav = d as RoadPavementDefinition ?? MarkingStorage.Definitions<RoadPavementDefinition>(doc).FirstOrDefault(p => p.GroupId == gid);
         if (pav?.GroupId == null) return null;
         var path = PathResolver.Resolve(doc, pav.Path);
         return path?.Main == null ? null : new PickedRoad(pav, path.Main, path.Z);
     }
 
     public static PickedRoad? RoadByGroup(Document doc, string gid) =>
-        MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>().FirstOrDefault(p => p.GroupId == gid) is { } pav ? Road(doc, pav) : null;
+        MarkingStorage.Definitions<RoadPavementDefinition>(doc).FirstOrDefault(p => p.GroupId == gid) is { } pav ? Road(doc, pav) : null;
 
     public static List<MarkingDefinition> Members(Document doc, string gid) =>
-        MarkingStorage.Definitions(doc).Where(d => d.GroupId == gid).ToList();
+        MarkingStorage.InGroup(doc, gid);
 
     public static List<MarkingDefinition> Hosted(Document doc, string? gid) =>
-        gid == null ? new() : MarkingStorage.Definitions(doc).Where(d => d is IHostedStructure h && h.HostRoad == gid).ToList();
+        gid == null ? new() : MarkingStorage.Mentioning(doc, gid).Where(d => d is IHostedStructure h && h.HostRoad == gid).ToList();
 
     /// <summary>Estações do trecho clicado (dois pontos sobre a via). Nulo = cancelado.</summary>
     public static (double S0, double S1)? PickStretch(UIDocument uidoc, PickedRoad road, string what)
@@ -262,7 +262,7 @@ internal static class RoadWorks
         {
             var sv = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
             roads = sv.Roads();
-            its = MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().ToList();
+            its = MarkingStorage.Definitions<IntersectionDefinition>(doc).ToList();
             mine = roads.FindIndex(r => r.Def.Id == road.Pavement.Id);
             if (mine >= 0)
             {

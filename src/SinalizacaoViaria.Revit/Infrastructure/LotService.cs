@@ -27,13 +27,13 @@ public static class LotService
         return new string(name.Select(c => bad.Contains(c) ? '-' : c).ToArray()).Trim();
     }
 
-    public static List<LoteamentoDefinition> Loteamentos(Document doc) => MarkingStorage.Definitions(doc).OfType<LoteamentoDefinition>().ToList();
+    public static List<LoteamentoDefinition> Loteamentos(Document doc) => MarkingStorage.Definitions<LoteamentoDefinition>(doc).ToList();
 
     public static LoteamentoDefinition? Loteamento(Document doc, string? id) =>
         Loteamentos(doc).FirstOrDefault(l => l.Id == id);
 
     public static List<QuadraDefinition> Quadras(Document doc, string lotId) =>
-        MarkingStorage.Definitions(doc).OfType<QuadraDefinition>().Where(q => q.LoteamentoId == lotId).OrderBy(q => q.Nome, StringComparer.OrdinalIgnoreCase).ToList();
+        MarkingStorage.Definitions<QuadraDefinition>(doc).Where(q => q.LoteamentoId == lotId).OrderBy(q => q.Nome, StringComparer.OrdinalIgnoreCase).ToList();
 
     /// <summary>Chave do lote gravada no comentário do elemento ("[T1:3]"); nula se o elemento não for um lote.</summary>
     public static string? KeyOf(Element e)

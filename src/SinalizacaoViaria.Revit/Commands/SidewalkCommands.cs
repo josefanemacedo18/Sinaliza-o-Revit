@@ -50,14 +50,18 @@ internal static class FootprintCutter
     public static int Apply(UIDocument uidoc, MarkingDefinition source, IReadOnlyList<Polygon2> footprints, Func<MarkingDefinition, bool> filter,
         Vec2? near = null, double radius = 50)
     {
+        using var perf = Perf.Measure("Recortes sob contornos (FootprintCutter)");
         var doc = uidoc.Document;
         var service = new MarkingService(doc, uidoc.ActiveView);
         var touched = new List<MarkingDefinition>();
+        var area = Bounds(footprints);
         bool Close(MarkingDefinition d)
         {
-            if (near is not { } c || d.Path == null) return true;
+            if (d.Path == null) return true;
             var axis = PathResolver.Resolve(doc, d.Path)?.Main;
-            return axis == null || axis.Points.Count < 2 || CurbFinder.Project(axis, c).Distance <= radius;
+            if (axis == null || axis.Points.Count < 2) return true;
+            if (near is { } c && CurbFinder.Project(axis, c).Distance > radius) return false;
+            return area == null || Reaches(axis, area.Value);
         }
         foreach (var d in MarkingStorage.Definitions(doc))
         {
@@ -81,6 +85,25 @@ internal static class FootprintCutter
         if (touched.Count > 0) MarkingCreator.Commit(uidoc, touched, "SV - Recortar marcas");
         return touched.Count;
     }
+
+    /// <summary>
+    /// Afastamento máximo entre o desenho de uma marca e o caminho dela (pavimento e calçadas de uma avenida larga, linhas
+    /// deslocadas do eixo). Marca cujo caminho fica mais longe que isso do recorte não é tocada – e não precisa ter a geometria
+    /// montada: antes cada recorte montava a geometria de todas as marcas do projeto.
+    /// </summary>
+    private const double Reach = 60;
+
+    private static (Vec2 Min, Vec2 Max)? Bounds(IEnumerable<Polygon2> shapes)
+    {
+        var pts = shapes.SelectMany(s => s.Outer).ToList();
+        if (pts.Count == 0) return null;
+        return (new Vec2(pts.Min(p => p.X), pts.Min(p => p.Y)), new Vec2(pts.Max(p => p.X), pts.Max(p => p.Y)));
+    }
+
+    /// <summary>O caminho passa a menos de <see cref="Reach"/> da caixa (teste pela caixa do caminho – conservador).</summary>
+    private static bool Reaches(Polyline2 path, (Vec2 Min, Vec2 Max) box) =>
+        path.Points.Min(p => p.X) - Reach <= box.Max.X && path.Points.Max(p => p.X) + Reach >= box.Min.X
+        && path.Points.Min(p => p.Y) - Reach <= box.Max.Y && path.Points.Max(p => p.Y) + Reach >= box.Min.Y;
 
     private static IReadOnlyList<Polygon2> One(Polygon2? p) => p == null ? Array.Empty<Polygon2>() : new[] { p };
 
@@ -157,16 +180,19 @@ internal static class FootprintCutter
     /// <summary>Linha nova (ou editada) passando sob marcas sobrepostas existentes: recebe os recortes delas.</summary>
     public static void CutByOverlays(UIDocument uidoc, MarkingDefinition line)
     {
+        using var perf = Perf.Measure("Recortes sob contornos (FootprintCutter)");
         var doc = uidoc.Document;
         var service = new MarkingService(doc, uidoc.ActiveView);
         var copy = MarkingDefinition.FromJson(line.ToJson())!;
         copy.Exclusions.Clear();
         var shapes = service.BuildGeometry(copy, out _).Pieces.Select(p => p.Shape).ToList();
         if (shapes.Count == 0) return;
+        var area = Bounds(shapes)!.Value;
         var changed = false;
         foreach (var o in MarkingStorage.Definitions(doc).Where(d => d.Overlay && d.Id != line.Id))
         {
             if (line.Exclusions.Any(z => z.SourceId == o.Id)) continue;
+            if (o.Path != null && PathResolver.Resolve(doc, o.Path)?.Main is { Points.Count: >= 2 } op && !Reaches(op, area)) continue;
             foreach (var fp in OverlayFootprint(service.BuildGeometry(o, out _)))
             {
                 if (PolygonOps.Intersect(shapes, new[] { fp }).Sum(p => p.Area) <= 1e-4) continue;
@@ -495,7 +521,7 @@ public sealed class CmdOrelha : CommandBase
         if (pick != null)
         {
             var p = UnitConv.ToVec2(pick);
-            if (MarkingStorage.Definitions(uidoc.Document).OfType<IntersectionDefinition>().Any())
+            if (MarkingStorage.Definitions<IntersectionDefinition>(uidoc.Document).Any())
             {
                 var r = IntersectionEarEdit.AtCorner(uidoc, p);
                 if (r != null) return r.Value;
@@ -522,7 +548,7 @@ internal static class IntersectionEarEdit
         var doc = uidoc.Document;
         var svc = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
         var roads = svc.Roads();
-        foreach (var it in (only != null ? new[] { only } : MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().ToArray())
+        foreach (var it in (only != null ? new[] { only } : MarkingStorage.Definitions<IntersectionDefinition>(doc).ToArray())
                      .OrderBy(i => i.Node.DistanceTo(p)))
         {
             if (only == null && it.Node.DistanceTo(p) > 60) break;

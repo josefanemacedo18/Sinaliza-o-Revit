@@ -3,6 +3,69 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-20 – FB: Autoteste completo mais rápido e com todos os dados numa rodada só
+
+Fase da missão: XV (desempenho e testes) – atual; IV e XIV seguem em andamento, com o Autoteste como evidência.
+
+### Por que o Autoteste completo demorava (3º completo: 1 h 41 min, 178 etapas)
+- O tempo de uma mesma operação crescia com o projeto: uma via local levava 5 s no começo e um cul-de-sac de 30 elementos,
+  46 s no meio; uma linha de 3 elementos, 5 s. Causa: ler as marcas do projeto interpretava o JSON de **todos** os elementos
+  do plugin a cada consulta. Cada geração consultava a própria marca (`ById`). Toda marca 3D perguntava se era filha de uma
+  interseção, interpretando o projeto inteiro. Interseções, atualizador e recortes consultavam dezenas de vezes por
+  operação. Medido no núcleo: ~60 µs por JSON (147 definições de vias, 2 940 leituras em 183 ms).
+- Os recortes sob contornos (faixa de pedestres, MAC, extensão de calçada, drenagem) montavam a geometria de todas as marcas
+  do projeto para achar as que passam sob o contorno.
+- O piso tátil de alerta de 30 m (cada relevo é um sólido) levou 171 s numa etapa só.
+
+### Leitura das marcas (FB1)
+- `MarkingStorage` lê o id gravado em cada elemento e só interpreta o JSON quando precisa:
+  - `ById` e `Definition`: só a marca pedida;
+  - `Definitions`: só o primeiro elemento de cada marca;
+  - `Ids` e `Elements`: nenhum JSON.
+- O tipo da definição é lido do começo do JSON (`DefinitionKinds`: o discriminador "tipo", que o System.Text.Json grava
+  primeiro). `Definitions<T>` e `Definitions(doc, tipos…)` interpretam só as marcas dos tipos pedidos: interseções,
+  rotatórias, vias, anotações. São 50 chamadas trocadas.
+- `InGroup` e `Mentioning` interpretam só o JSON que cita o id do conjunto, da marca ou do elemento alterado: membros da via,
+  recortes de uma interseção, marcas que o atualizador precisa refazer.
+- Na dúvida (texto num formato inesperado), a marca é interpretada como antes. O resultado é o mesmo da leitura completa
+  (DECISIONS D-013).
+- `MarkingService`:
+  - a pergunta "é filha de um nó?" lê só as interseções e as rotatórias;
+  - a consulta por id dos geradores lê só a marca pedida (depois de 8 consultas, o cache geral);
+  - os detalhes dependentes leem só as anotações.
+- Cópias (`CopyHandler`) e a limpeza do atualizador ao apagar marcas (`RemoveOrphanDetails`) não interpretam mais o projeto
+  inteiro.
+- Recortes sob contornos (`FootprintCutter`): a marca cujo caminho fica a mais de 60 m do contorno não tem a geometria
+  montada.
+
+### Autoteste (FB2)
+- Nova ordem: vias, conexões e "Largura e recuos" (as etapas mais pesadas) logo depois do loteamento, com o projeto ainda
+  pequeno; calçadas e catálogos de sinalização horizontal e vertical depois.
+- Piso tátil (PTA/PTD) do catálogo com 6 m em vez de 30 m – o mesmo desenho.
+- Tempo por trecho do plugin em cada etapa (`Perf`): gerar marcas, geometria do núcleo, leitura das marcas (varreduras,
+  elementos, JSON), gravação da transação, atualizador, interseções, recortes e avisos do Revit. No fim do relatório: o tempo
+  por trecho, as 15 etapas mais lentas e o tempo por bloco.
+
+### Tudo numa rodada só (FB3)
+- Arquivo de dados `autoteste-…-dados.jsonl` ao lado do relatório, gravado a cada etapa:
+  - todos os erros, avisos e notas, sem o limite de 25 do relatório;
+  - cada par de pisos sobrepostos: códigos, marcas, classe, cor, tipo, espessura, cotas, volume e centro;
+  - cada reta fora do eixo, com as pontas;
+  - o JSON de cada marca citada.
+- Nova etapa final, "Modelo final", que roda também no modo rápido:
+  - confere **todos** os pisos do teste no modelo como ficou – pares com volume em comum e retas do esboço fora do eixo –,
+    sem depender dos avisos, que o teste descarta a cada transação;
+  - grava o contorno de cada piso e o JSON de todas as definições do teste.
+- Com esse arquivo, os defeitos que restarem podem ser reproduzidos no núcleo, fora do Revit, sem rodar o Autoteste de novo.
+
+### Testes
+- `FBAutotestSpeedTests` (13):
+  - o tipo de todas as definições é lido do começo do JSON, compacto e indentado;
+  - `MayBe` bate com o teste de tipo da leitura completa, em classes e interfaces;
+  - texto inesperado nunca é descartado;
+  - ids de conjunto, recorte, marca, elemento e via hospedeira saem no JSON sem escape.
+- Suíte completa: **2 856 aprovados, 0 falhas** (20 min 59 s). Plugin: 0 avisos, 0 erros.
+
 ## 2026-10-20 – FA: 3º Autoteste completo – forma direta na rotatória oval, tipos de piso na nova geração e recuos
 
 Fases da missão: IV (motor geométrico) e XIV (regras da API do Revit), as duas em andamento; VI (corredores e seções)

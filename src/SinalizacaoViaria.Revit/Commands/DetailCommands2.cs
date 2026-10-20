@@ -416,7 +416,7 @@ internal static class SectionTool
         PluginContext.SaveSettings();
         var results = new List<RenderResult>();
         var letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-        var used = MarkingStorage.Definitions(uidoc.Document).OfType<SectionDimensionDefinition>().Select(x => x.SectionLetter).ToHashSet();
+        var used = MarkingStorage.Definitions<SectionDimensionDefinition>(uidoc.Document).Select(x => x.SectionLetter).ToHashSet();
         while (true)
         {
             Vec2 start, end;
@@ -505,7 +505,7 @@ internal static class SectionTool
     private static (Vec2 Start, Vec2 End)? PerpendicularCut(Document doc, Vec2 p, double margin)
     {
         (double Dist, Vec2 A, Vec2 B)? best = null;
-        foreach (var pav in MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>())
+        foreach (var pav in MarkingStorage.Definitions<RoadPavementDefinition>(doc))
         {
             var axis = PathResolver.Resolve(doc, pav.Path)?.Main;
             if (axis == null || axis.Length < 0.5) continue;

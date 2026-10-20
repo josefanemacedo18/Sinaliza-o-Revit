@@ -118,7 +118,7 @@ public class CmdSinalizarVia : CommandBase
     private static RoadPavementDefinition? EmptyRoadway(Document doc, PathReference path)
     {
         var key = RoadSectionInference.PathKey(path);
-        return MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>()
+        return MarkingStorage.Definitions<RoadPavementDefinition>(doc)
             .FirstOrDefault(p => RoadSectionInference.PathKey(p.PathRef) == key && RoadTemplates.FromJson(p.SetupJson)?.SoPavimento == true);
     }
 
@@ -369,7 +369,7 @@ internal static class RoadAxisInput
         }
         var svc = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
         var existing = snap ? svc.Roads() : new List<IntersectionRoad>();
-        var rbs = snap ? MarkingStorage.Definitions(doc).OfType<RoundaboutDefinition>().Select(r => (r.Center, r.OuterRadius)).ToList() : new();
+        var rbs = snap ? MarkingStorage.Definitions<RoundaboutDefinition>(doc).Select(r => (r.Center, r.OuterRadius)).ToList() : new();
         (XYZ, string?) Snap(XYZ p)
         {
             if (!snap) return (p, null);

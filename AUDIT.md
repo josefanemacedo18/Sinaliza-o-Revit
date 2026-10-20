@@ -62,8 +62,12 @@ provável a partir de fatos) ou **HIPÓTESE** (risco plausível ainda não demon
   de base e topo, que mostraram a causa dos maiores (tipo do primeiro piso de cada cor aplicado a todas as peças na nova
   geração – D-012).
 - **LIMITE DA EVIDÊNCIA:** um build do Revit; um projeto; obras de arte e pranchas não estão no roteiro do Autoteste. As
-  correções de FA (tipo de piso por espessura, golas das árvores, ajuste conferido, espinhos, recuos, forma direta) ainda não
-  rodaram no Revit.
+  correções de FA (tipo de piso por espessura, golas das árvores, ajuste conferido, espinhos, recuos, forma direta) e a
+  leitura mais rápida das marcas de FB (D-013) ainda não rodaram no Revit.
+- **Desempenho (FB, medido nos relatórios):** no 3º completo, a mesma operação ficava mais lenta à medida que o projeto
+  crescia: uma via de 12 elementos levava 5 s no começo e um cul-de-sac de 30 elementos, 46 s no meio do teste. A causa era a
+  leitura de todas as definições a cada consulta; foi corrigida no código sem mudar o resultado (`FBAutotestSpeedTests`). O
+  ganho real só será conhecido no próximo Autoteste completo, que traz o tempo por trecho do plugin em cada etapa.
 - **Avisos do Revit nos relatórios** (todos nas etapas com interseção ou loteamento; as vias isoladas não tiveram nenhum):
   - "A linha no croqui está ligeiramente fora da linha central": reproduzido no núcleo e corrigido nos pisos das marcas
     (EW2: no 2º relatório, de centenas para 62). Os 62 restantes não diziam em que pisos; EX levou o alinhamento aos

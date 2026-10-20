@@ -213,7 +213,7 @@ internal sealed class TrafficHost : ITrafficHost
 
     public string ApplyToIntersection(string nodeKey, ControleNo? control, SignalPlanDef? plan)
     {
-        var def = MarkingStorage.Definitions(Doc).OfType<IntersectionDefinition>().FirstOrDefault(d => d.Id == nodeKey);
+        var def = MarkingStorage.Definitions<IntersectionDefinition>(Doc).FirstOrDefault(d => d.Id == nodeKey);
         if (def == null)
             return "Este nó não é uma interseção do plugin (rotatória, balão ou cruzamento sem interseção modelada): use as ferramentas Interseção/Rotatória.";
         if (control is { } c)
@@ -279,7 +279,7 @@ internal sealed class TrafficHost : ITrafficHost
             }
             foreach (var (key, plan) in p.OtherPlans)
             {
-                var d2 = MarkingStorage.Definitions(doc).OfType<IntersectionDefinition>().FirstOrDefault(d => d.Id == key);
+                var d2 = MarkingStorage.Definitions<IntersectionDefinition>(doc).FirstOrDefault(d => d.Id == key);
                 if (d2 == null) continue;
                 TrafficPackageModel.ApplyPlan(d2, plan);
                 IntersectionRunner.Run(_uidoc, "Solução – plano semafórico", s => s.Refresh(d2));

@@ -171,7 +171,7 @@ internal static class RecessCommand
     public static Result EditExisting(UIDocument uidoc, RecessMarkingDefinition rec)
     {
         var doc = uidoc.Document;
-        var members = MarkingStorage.Definitions(doc).Where(d => d.GroupId == rec.GroupId).ToList();
+        var members = MarkingStorage.InGroup(doc, rec.GroupId);
         var pav = members.OfType<RoadPavementDefinition>().FirstOrDefault()
                   ?? throw new UserMessageException("A via deste recuo não foi encontrada.");
         var setup = RoadTemplates.FromJson(pav.SetupJson) ?? throw new UserMessageException("A via não guardou a seção transversal: edite a via inteira.");
@@ -189,7 +189,7 @@ internal static class RecessCommand
     private static Result Apply(UIDocument uidoc, RoadPavementDefinition pav, RoadSetup setup, string title)
     {
         var doc = uidoc.Document;
-        var members = MarkingStorage.Definitions(doc).Where(d => d.GroupId == pav.GroupId).ToList();
+        var members = MarkingStorage.InGroup(doc, pav.GroupId);
         var output = pav.Output.Clone();
         var axis = PathResolver.Resolve(doc, pav.PathRef)?.Main;
         var results = RoadRegen.Regenerate(uidoc, pav, members, setup, output, axis);

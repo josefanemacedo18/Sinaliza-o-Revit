@@ -245,7 +245,7 @@ public sealed class CmdHierarquia : CommandBase
         results.AddRange(IntersectionRunner.Run(uidoc, "SV - Conexões", s =>
         {
             var r = new List<RenderResult>();
-            var pavs = MarkingStorage.Definitions(doc).OfType<RoadPavementDefinition>().ToDictionary(p => p.Id);
+            var pavs = MarkingStorage.Definitions<RoadPavementDefinition>(doc).ToDictionary(p => p.Id);
             foreach (var it in s.DependentOn(defs))
             {
                 it.CornerRadius = Hierarquia.NodeRadius(it.RoadIds.Select(id => pavs.GetValueOrDefault(id)).Where(p => p != null)!);
@@ -465,7 +465,7 @@ internal static class RoadAccessCommand
     public static List<RenderResult> Regenerate(UIDocument uidoc, RoadPavementDefinition pav, RoadSetup setup)
     {
         var doc = uidoc.Document;
-        var members = MarkingStorage.Definitions(doc).Where(d => d.GroupId == pav.GroupId).ToList();
+        var members = MarkingStorage.InGroup(doc, pav.GroupId);
         var axis = PathResolver.Resolve(doc, pav.PathRef)?.Main;
         return RoadRegen.Regenerate(uidoc, pav, members, setup, pav.Output.Clone(), axis);
     }

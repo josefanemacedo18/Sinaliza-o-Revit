@@ -247,7 +247,7 @@ internal static class SheetBuilder
     public static List<RenderResult> AfterEdit(UIDocument uidoc, SheetSegmentDefinition edited)
     {
         var doc = uidoc.Document;
-        var set = MarkingStorage.Definitions(doc).OfType<SheetSegmentDefinition>().Where(s => s.SetId == edited.SetId && s.Id != edited.Id).ToList();
+        var set = MarkingStorage.Definitions<SheetSegmentDefinition>(doc).Where(s => s.SetId == edited.SetId && s.Id != edited.Id).ToList();
         set.Add(edited);
         SheetSegmentDefinition.Link(set);
         var res = new List<RenderResult>();

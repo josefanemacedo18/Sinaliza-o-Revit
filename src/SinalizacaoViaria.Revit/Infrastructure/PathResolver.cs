@@ -16,6 +16,7 @@ public static class PathResolver
     public static ResolvedPath? Resolve(Document doc, PathReference? path)
     {
         if (path == null) return null;
+        using var perf = Perf.Measure("Resolver caminhos (PathResolver)");
         var warnings = new List<string>();
 
         if (path.IsAssociative)

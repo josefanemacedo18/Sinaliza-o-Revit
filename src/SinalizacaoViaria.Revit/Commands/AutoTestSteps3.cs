@@ -104,9 +104,9 @@ internal sealed partial class AutoTestRunner
             r.Estaca = 60;
             r.Profundidade = 2.0;
             setup.Recuos.Add(r);
-            var members = MarkingStorage.Definitions(_doc).Where(d => d.GroupId == pav.GroupId).ToList();
+            var members = MarkingStorage.InGroup(_doc, pav.GroupId);
             Take(s, RoadRegen.Regenerate(_uidoc, pav, members, setup, pav.Output.Clone(), PathResolver.Resolve(_doc, pav.PathRef)?.Main));
-            if (!MarkingStorage.Definitions(_doc).OfType<RecessMarkingDefinition>().Any(x => x.GroupId == pav.GroupId))
+            if (!MarkingStorage.Definitions<RecessMarkingDefinition>(_doc).Any(x => x.GroupId == pav.GroupId))
                 s.Error("A baia não foi criada na via existente.");
         });
         Step("Largura e recuos", "Via reconhecida em pisos comuns do Revit (T feito com dois pisos, pista já modelada)", s =>
