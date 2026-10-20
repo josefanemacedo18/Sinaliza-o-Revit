@@ -501,6 +501,25 @@ public static class BoundaryFit
     }
 
     /// <summary>
+    /// Um anel como o plugin manda ao Revit: ajustado em retas e arcos, com as retas quase alinhadas aos eixos exatas
+    /// (<see cref="AxisSnap"/>) e sem autointerseção. Se o ajuste se cruza ou se toca, tenta com metade e um quarto da
+    /// tolerância; nulo = use as retas originais. O plugin usava o primeiro ajuste sem conferir (na rotatória com by-pass, um
+    /// anel de 86 trechos da calçada se cruzava).
+    /// </summary>
+    public static List<BoundarySegment>? FitRing(IReadOnlyList<Vec2> ring, double tolerance, double minEdge, IReadOnlyList<Vec2>? centers,
+        double snapOffset)
+    {
+        foreach (var tol in new[] { tolerance, tolerance / 2, tolerance / 4 })
+        {
+            var segs = AxisSnap.Snap(Fit(ring, tol, minEdge, centers), Math.Max(AxisSnap.MaxOffset, Math.Min(snapOffset, Math.Max(tol, AxisSnap.MaxOffset))));
+            if (segs.Count < 2 || segs.Count == 2 && !segs.Any(x => x.IsArc)) return null;
+            if (segs.Any(x => x.Start.DistanceTo(x.End) <= minEdge)) continue;
+            if (IsSimple(new[] { segs }, 1e-5)) return segs;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Ajusta o polígono inteiro (contorno externo e furos). Se o ajuste criar autointerseção ou toque entre anéis (peças
     /// muito estreitas), tenta com tolerância menor e, por fim, devolve as retas originais.
     /// </summary>

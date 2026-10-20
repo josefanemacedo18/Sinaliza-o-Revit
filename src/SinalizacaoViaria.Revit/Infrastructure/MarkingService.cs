@@ -635,8 +635,8 @@ public sealed class MarkingService
             var oldFloors = existing.Where(r => r.Element is Floor).ToList();
             if (floorPieces.Count > 0 || oldFloors.Count > 0)
             {
-                // Tipo de piso escolhido pelo usuário em pisos anteriores (por cor) é mantido.
-                var userTypes = oldFloors.GroupBy(r => r.Color).ToDictionary(g => g.Key, g => g.First().Element.GetTypeId());
+                // Tipo de piso trocado pelo usuário em pisos anteriores é mantido (ver UserFloorTypes).
+                var userTypes = UserFloorTypes(oldFloors);
                 // Pisos editados à mão (contorno alterado ou movidos) são preservados: a edição do usuário prevalece.
                 var edited = oldFloors.Where(r => FloorEdited((Floor)r.Element)).ToList();
                 var locked = edited.Select(r => r.Color).ToHashSet();
@@ -671,7 +671,7 @@ public sealed class MarkingService
                             var plane0 = list[0].Plane;
                             if (plane0 == null && terrain != null) { rest.AddRange(list); continue; }
                             var multi = CreateMultiFloor(list.Select(x => x.Shape).ToList(), grp.Key.Color, grp.Key.Elevation, grp.Key.Thickness, plane0,
-                                baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(grp.Key.Color), ref reason);
+                                baseZ + def.Output.ElevationOffset, UserType(userTypes, grp.Key.Color, grp.Key.Thickness), ref reason);
                             if (multi == null) { rest.AddRange(list); continue; }
                             try { multi.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set($"SV {info.Code}"); } catch { /* opcional */ }
                             Tag(multi, def, info, grp.Key.Color, StyleService.ColorName(grp.Key.Color), FloorArea(multi, list.Sum(x => x.Shape.Area)), geo, primary);
@@ -683,7 +683,7 @@ public sealed class MarkingService
                     foreach (var (shape, plane) in parts)
                     {
                         var piece = new MarkingPiece(shape, grp.Key.Color) { Elevation = grp.Key.Elevation, Thickness = grp.Key.Thickness, Layer = grp.Key.Layer };
-                        var floors = CreateFloors(piece, baseZ + def.Output.ElevationOffset, userTypes.GetValueOrDefault(grp.Key.Color), ref reason, terrain, plane);
+                        var floors = CreateFloors(piece, baseZ + def.Output.ElevationOffset, UserType(userTypes, grp.Key.Color, grp.Key.Thickness), ref reason, terrain, plane);
                         if (floors.Count == 0) { failed.Add(piece); continue; }
                         foreach (var f in floors)
                         {
@@ -739,6 +739,7 @@ public sealed class MarkingService
                         ds.ApplicationId = "SinalizacaoViaria";
                         ds.ApplicationDataId = def.Id;
                     }
+                    DropInvalidShapes(ds, all, info.Code, result.Warnings);
                     try
                     {
                         ds.SetShape(all);
@@ -773,6 +774,12 @@ public sealed class MarkingService
                     ds.ApplicationId = "SinalizacaoViaria";
                     ds.ApplicationDataId = def.Id;
                 }
+                DropInvalidShapes(ds, solids, $"{info.Code} {StyleService.ColorName(g.Key)}", result.Warnings);
+                if (solids.Count == 0)
+                {
+                    if (ds.IsValidObject && !existing.Any(r => r.Element.Id == ds.Id)) SafeDelete(ds.Id);
+                    continue;
+                }
                 try
                 {
                     ds.SetShape(solids);
@@ -784,6 +791,7 @@ public sealed class MarkingService
                     var cleaned = g.Select(p => p.Solid != null || p.Profile != null ? p
                         : PolygonOps.Clean(new[] { p.Shape }, 0.01).Select(c => c.Simplified(0.02) ?? c).Select(c => p with { Shape = c }).FirstOrDefault() ?? p).ToList();
                     var retry = BuildSolids(cleaned, baseZ + def.Output.ElevationOffset + lift, thickness, sampler, Styles.Material(g.Key), new List<string>(), def.Output.ElevationOffset + lift);
+                    DropInvalidShapes(ds, retry, $"{info.Code} {StyleService.ColorName(g.Key)} (limpo)", new List<string>());
                     var ok = false;
                     if (retry.Count > 0)
                         try { ds.SetShape(retry); ok = true; } catch (Exception ex2) { Log.Error($"SetShape (limpo) {info.Code}", ex2); }
@@ -1387,6 +1395,44 @@ public sealed class MarkingService
     }
 
     /// <summary>Poliedro (rampas, abas) via TessellatedShapeBuilder – sólido quando possível, senão malha.</summary>
+    /// <summary>
+    /// Tira da lista os objetos que a forma direta não aceita (<c>DirectShape.IsValidShape</c>, um a um) e avisa quantos e onde
+    /// (m). Um objeto recusado fazia o Revit recusar a forma inteira e a cor toda da marca sumia
+    /// (ilha da rotatória oval, Autoteste de 2026-10-20 15:12).
+    /// </summary>
+    private static void DropInvalidShapes(DirectShape ds, List<GeometryObject> objs, string what, List<string> warnings)
+    {
+        var where = new List<string>();
+        for (int i = objs.Count - 1; i >= 0; i--)
+        {
+            bool ok;
+            try { ok = ds.IsValidShape(new List<GeometryObject> { objs[i] }); }
+            catch { ok = false; }
+            if (ok) continue;
+            where.Add(Where(objs[i]));
+            objs.RemoveAt(i);
+        }
+        if (where.Count == 0) return;
+        Log.Info($"Forma direta {what}: {where.Count} objeto(s) inválidos para o Revit ficaram de fora – em {string.Join("; ", where)}.");
+        warnings.Add($"{what}: {where.Count} sólido(s) inválidos para forma direta ficaram de fora (em {string.Join("; ", where.Take(3))}{(where.Count > 3 ? "; …" : "")}).");
+    }
+
+    /// <summary>Centro do objeto em planta (m, coordenadas internas), para localizar a peça descartada.</summary>
+    private static string Where(GeometryObject g)
+    {
+        try
+        {
+            XYZ? c = g switch
+            {
+                Solid so when so.GetBoundingBox() is { } bb => bb.Transform.OfPoint((bb.Min + bb.Max) / 2),
+                Mesh me when me.Vertices.Count > 0 => me.Vertices.Aggregate(XYZ.Zero, (a, v) => a + v) / me.Vertices.Count,
+                _ => null,
+            };
+            return c == null ? g.GetType().Name : $"{UnitConv.M(c.X):0.0}; {UnitConv.M(c.Y):0.0}";
+        }
+        catch { return g.GetType().Name; }
+    }
+
     private static IList<GeometryObject> PolyhedronGeometry(Polyhedron p, double zBaseFt, ElementId materialId)
     {
         var b = new TessellatedShapeBuilder { Target = TessellatedShapeBuilderTarget.AnyGeometry, Fallback = TessellatedShapeBuilderFallback.Mesh };
@@ -1468,7 +1514,13 @@ public sealed class MarkingService
                 var lu = u.GetLength();
                 var lv = v.GetLength();
                 if (lu <= tol) { changed = true; continue; }
-                if (lu > 1e-9 && lv > 1e-9 && u.DotProduct(v) / (lu * lv) < -0.9995) { changed = true; continue; }   // espinho
+                if (lu > 1e-9 && lv > 1e-9 && u.DotProduct(v) / (lu * lv) < -0.9995)
+                {
+                    // Espinho: a ponta é cortada no pé da perpendicular sobre o lado mais longo (ver ProfileCleanup.SpikeFoot).
+                    changed = true;
+                    if (ProfileCleanup.SpikeFoot(new Vec2(a.X, a.Y), new Vec2(b.X, b.Y), new Vec2(c.X, c.Y), tol) is { } f) res.Add(new XYZ(f.X, f.Y, b.Z));
+                    continue;
+                }
                 res.Add(b);
             }
             pts = res;
@@ -1578,9 +1630,10 @@ public sealed class MarkingService
 
     private CurveLoop? FittedLoop(List<Vec2> ring, double zFt, double shortFt)
     {
-        // Retas quase alinhadas aos eixos ficam exatas (ver AxisSnap): sem o aviso "ligeiramente fora da linha central".
-        var segs = AxisSnap.Snap(BoundaryFit.Fit(ring, BoundaryTolerance, UnitConv.M(shortFt), _arcCenters), SnapOffset);
-        if (segs.Count < 2 || segs.Count == 2 && !segs.Any(x => x.IsArc)) return null;
+        // Retas quase alinhadas aos eixos ficam exatas (ver AxisSnap): sem o aviso "ligeiramente fora da linha central"; ajuste
+        // que se cruza tenta tolerância menor e, por fim, volta às retas (BoundaryFit.FitRing).
+        var segs = BoundaryFit.FitRing(ring, BoundaryTolerance, UnitConv.M(shortFt), _arcCenters, SnapOffset);
+        if (segs == null) return null;
         XYZ P(Vec2 v) => new(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), zFt);
         var loop = new CurveLoop();
         foreach (var s in segs)
@@ -1678,8 +1731,7 @@ public sealed class MarkingService
         if (ft != null)
         {
             // Tipos criados por versões anteriores podem ter herdado a camada variável do tipo base – ou a espessura dele,
-            // quando o Revit recusou a estrutura: o piso saía mais grosso que o nome e invadia os de baixo (Autoteste de
-            // 2026-10-20: pares iguais de 10 750 cm³ nas rotatórias).
+            // quando o Revit recusou a estrutura: o piso sairia mais grosso que o nome e invadiria os de baixo (D-011).
             try
             {
                 var cs0 = ft.GetCompoundStructure();
@@ -1754,6 +1806,44 @@ public sealed class MarkingService
     /// Cria o(s) piso(s) da peça (topo na cota da peça). Tenta o contorno original, depois limpo de lascas e, por fim,
     /// dividido sem furos. Lista vazia se o Revit recusar todas as tentativas (<paramref name="reason"/> recebe o motivo).
     /// </summary>
+    /// <summary>
+    /// Tipos de piso que o usuário trocou nos pisos anteriores da marca, por cor e pela espessura do tipo que o plugin tinha
+    /// dado (nula = qualquer espessura da cor). Trocado = o tipo atual difere do gravado na chave do piso ao criá-lo; piso sem
+    /// chave (versões antigas) conta como trocado só se o tipo não for um tipo do plugin. Antes valia o tipo do primeiro piso
+    /// de cada cor para todas as peças dela: numa nova geração, a gola da árvore da ilha (12 cm) recebia o tipo de 15 cm do
+    /// meio-fio e afundava 3 cm na ilha – 150 pares sobrepostos nas rotatórias (Autoteste de 2026-10-20 15:12).
+    /// </summary>
+    private Dictionary<(MarkingColor Color, double? Thickness), ElementId> UserFloorTypes(IEnumerable<StoredMarking> oldFloors)
+    {
+        var res = new Dictionary<(MarkingColor, double?), ElementId>();
+        foreach (var r in oldFloors)
+        {
+            try
+            {
+                var current = r.Element.GetTypeId();
+                double? thickness = null;
+                if (FloorSignature.ReadKey(r.Element) is { } key)
+                {
+                    var parts = key.Split('|');
+                    if (parts.Length < 5 || !long.TryParse(parts[4], out var created) || created == current.Value) continue;
+                    thickness = FloorTypeNames.Thickness(_doc.GetElement(new ElementId(created))?.Name);
+                }
+                else if (FloorTypeNames.Thickness(_doc.GetElement(current)?.Name) != null) continue;
+                res.TryAdd((r.Color, thickness), current);
+            }
+            catch (Exception ex) { Log.Error("Tipo de piso do usuário", ex); }
+        }
+        return res;
+    }
+
+    /// <summary>Tipo trocado pelo usuário para a peça (mesma cor e espessura, ou da cor inteira); nulo = o do plugin.</summary>
+    private static ElementId? UserType(Dictionary<(MarkingColor Color, double? Thickness), ElementId> types, MarkingColor color, double thickness)
+    {
+        foreach (var ((c, t), id) in types)
+            if (c == color && t is { } tt && Math.Abs(tt - FloorTypeNames.Rounded(thickness)) <= 0.0005) return id;
+        return types.GetValueOrDefault((color, null));
+    }
+
     private List<Floor> CreateFloors(MarkingPiece piece, double baseZm, ElementId? userType, ref string? reason, ISurface? terrain = null,
         Plane3? plane = null)
     {
@@ -1850,7 +1940,7 @@ public sealed class MarkingService
     private List<(Polygon2 Shape, Plane3? Plane)> FloorParts(MarkingDefinition def, IEnumerable<Polygon2> shapes, ISurface? terrain, double baseZ,
         bool paint = false)
     {
-        var merged = PolygonOps.Union(shapes).Where(p => p.Area > 0.01).ToList();
+        var merged = ElementPlan.FloorUnion(shapes).Where(p => p.Area > 0.01).ToList();
         var parts = new List<(Polygon2 Shape, Plane3? Plane)>();
         foreach (var m in merged)
         {

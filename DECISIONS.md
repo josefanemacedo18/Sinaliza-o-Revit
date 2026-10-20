@@ -112,3 +112,18 @@ como substituída.
   marcas que não estão sendo refeitas; materiais das camadas removidas saem do tipo. É uma alteração de tipos do próprio
   plugin no modelo, feita só quando o plugin cria ou refaz pisos com aquele tipo, e reversível pelo histórico do Revit
   (Desfazer). Hipótese a confirmar no próximo Autoteste.
+- **Atualização (FA, 3º Autoteste completo):** a hipótese não se confirmou – a Preparação não achou nenhum tipo nessa
+  situação e as cotas dos exemplos mostraram tipos de 15 cm iguais ao nome. A causa dos 150 pares era outra (D-012). A
+  correção fica como proteção para modelos com tipos de versões antigas.
+
+## D-012 – Tipo de piso do usuário só onde ele trocou, e por espessura
+- **Contexto:** na nova geração de uma marca, o plugin guardava, por cor, o tipo do primeiro piso existente e o aplicava a
+  todas as peças daquela cor – para manter o tipo que o usuário tivesse trocado. Mas o primeiro piso quase sempre tinha o
+  tipo do próprio plugin, e cores com espessuras diferentes (concreto do meio-fio 15 cm, da gola da árvore 12 cm, da sarjeta
+  0,5 cm) passavam todas a 15 cm: pisos mais grossos que o pedido, invadindo os de baixo (3º Autoteste completo: 150 pares
+  nas rotatórias e os de faixa de pedestres, bordo e pavimento sobre a sarjeta).
+- **Decisão:** a chave de reaproveitamento já grava o tipo que o plugin deu ao piso ao criá-lo. Conta como escolha do
+  usuário só o piso cujo tipo atual difere desse; a escolha vale para as peças da mesma cor e da espessura do tipo original
+  (pisos sem chave, de versões antigas: só se o tipo não for um tipo do plugin, e então para a cor inteira).
+- **Consequências:** a troca de tipo feita pelo usuário continua mantida nas novas gerações, agora sem estender a peças de
+  outra espessura; os pisos que tinham herdado um tipo errado voltam ao tipo da espessura certa na próxima geração.

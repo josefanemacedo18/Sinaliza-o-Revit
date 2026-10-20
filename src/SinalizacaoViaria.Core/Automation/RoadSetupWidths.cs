@@ -509,7 +509,10 @@ public sealed partial class RoadSetup
                 var dep = RecessDepth(r, s);
                 if (dep < 1e-6) continue;
                 var zone = r.Tipo is TipoRecuo.FaixaAceleracao or TipoRecuo.FaixaDesaceleracao ? z.Lane : z.Bay;
-                total += Warp(zone, dep, z.Walk && r.CalcadaRecua ? 0 : dep, d);
+                // A faixa livre da calçada absorve o recuo até ficar sem largura; o que passar disso empurra o alinhamento.
+                // Antes ela ficava com largura negativa e a grama passava por cima dela e do lote (faixa de desaceleração de
+                // 3,5 m numa calçada de 2,8 m livres – Autoteste de 2026-10-20 15:12).
+                total += Warp(zone, dep, z.Walk && r.CalcadaRecua ? Math.Max(0, dep - (zone.F1 - zone.F0)) : dep, d);
             }
             return total;
         };
@@ -636,7 +639,9 @@ public sealed partial class RoadSetup
             var z = Zones(r.LadoEsquerdo ? Left : Right);
             if (!z.Walk) continue;
             var free = z.General.F1 - z.General.F0 - r.Profundidade;
-            if (free < 1.20 - 1e-6)
+            if (free < -1e-3)
+                Warnings.Add($"{RecuoVia.Rotulo(r.Tipo)} na estaca {PontoLargura.FormatEstaca(r.Estaca)}: o recuo de {r.Profundidade:0.00} m é maior que a faixa livre da calçada ({z.General.F1 - z.General.F0:0.00} m) – a calçada some no trecho e o alinhamento avança {-free:0.00} m sobre o lote.");
+            else if (free < 1.20 - 1e-6)
                 Warnings.Add($"{RecuoVia.Rotulo(r.Tipo)} na estaca {PontoLargura.FormatEstaca(r.Estaca)}: o recuo de {r.Profundidade:0.00} m deixa a faixa livre da calçada com {Math.Max(0, free):0.00} m (NBR 9050: 1,20 m) – desloque a calçada ou reduza a profundidade.");
         }
 

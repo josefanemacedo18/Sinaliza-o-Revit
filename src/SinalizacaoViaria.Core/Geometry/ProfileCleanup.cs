@@ -22,7 +22,8 @@ public static class ProfileCleanup
 
     /// <summary>
     /// Mesmo preparo de <c>MarkingService.ToCurveLoop3D</c> no plano do perfil: pontos seguidos mais próximos que
-    /// <paramref name="tol"/> saem (inclusive o fechamento) e "espinhos" (lado que volta sobre o anterior) são removidos.
+    /// <paramref name="tol"/> saem (inclusive o fechamento) e a ponta dos "espinhos" (lado que volta sobre o anterior) é
+    /// cortada (<see cref="SpikeFoot"/>).
     /// </summary>
     public static List<Vec2> Prepare(IReadOnlyList<Vec2> ring, double tol = RevitDedup)
     {
@@ -45,12 +46,39 @@ public static class ProfileCleanup
                 var lu = u.Length;
                 var lv = v.Length;
                 if (lu <= tol) { changed = true; continue; }
-                if (lu > 1e-9 && lv > 1e-9 && u.Dot(v) / (lu * lv) < -0.9995) { changed = true; continue; }
+                if (lu > 1e-9 && lv > 1e-9 && u.Dot(v) / (lu * lv) < -0.9995)
+                {
+                    changed = true;
+                    if (SpikeFoot(a, b, c, tol) is { } f) res.Add(f);
+                    continue;
+                }
                 res.Add(b);
             }
             pts = res;
         }
         return pts;
+    }
+
+    /// <summary>
+    /// Ponta de espinho (o lado <paramref name="b"/>→<paramref name="c"/> volta sobre <paramref name="a"/>→<paramref name="b"/>):
+    /// fica o pé da perpendicular do vizinho mais próximo sobre o lado mais longo, que mantém a direção; nulo = o ponto sai.
+    /// Tirar só a ponta ligava os vizinhos por uma reta inclinada – numa lasca de 1,7 m da calçada do by-pass da rotatória, a
+    /// reta de 22 m do bordo saía 0,11° fora do eixo (Autoteste de 2026-10-20 15:12).
+    /// </summary>
+    public static Vec2? SpikeFoot(Vec2 a, Vec2 b, Vec2 c, double tol)
+    {
+        Vec2 foot;
+        if (a.DistanceTo(b) >= b.DistanceTo(c))
+        {
+            var d = (b - a).Normalized();
+            foot = a + d * (c - a).Dot(d);
+        }
+        else
+        {
+            var d = (b - c).Normalized();
+            foot = c + d * (a - c).Dot(d);
+        }
+        return foot.DistanceTo(a) > tol && foot.DistanceTo(c) > tol ? foot : null;
     }
 
     /// <summary>Primeiro motivo para o Revit recusar o perfil depois do preparo (nulo = aceito).</summary>

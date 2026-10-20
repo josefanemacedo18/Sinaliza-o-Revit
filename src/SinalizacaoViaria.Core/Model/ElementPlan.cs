@@ -97,6 +97,26 @@ public static class ElementPlan
     /// por parte contínua, pintura num piso por cor com todos os traços como contornos, demais peças numa forma direta por
     /// cor (ou uma só, nas placas).
     /// </summary>
+    /// <summary>
+    /// União das peças de um piso. Peças encostadas que não coincidem na grade das operações booleanas (0,1 mm) – depois de
+    /// uma rotação, por exemplo – saem como um contorno que se toca ou em partes separadas por frestas; essas partes são
+    /// fechadas com 0,5 mm (as frestas somem e o furo volta a ser furo). As demais ficam como a união deu.
+    /// </summary>
+    public static List<Polygon2> FloorUnion(IEnumerable<Polygon2> shapes)
+    {
+        var list = shapes.ToList();
+        var union = PolygonOps.Union(list);
+        if (!union.Any(SelfTouching)) return union;
+        var healed = PolygonOps.Offset(PolygonOps.Offset(union, ClosingGap), -ClosingGap);
+        return healed.Any(SelfTouching) ? union : healed;
+    }
+
+    /// <summary>Fresta fechada pela <see cref="FloorUnion"/> (m).</summary>
+    public const double ClosingGap = 0.0005;
+
+    private static bool SelfTouching(Polygon2 p) =>
+        PolygonChecks.Problem(p.Outer, 1e-5) != null || p.Holes.Any(h => PolygonChecks.Problem(h, 1e-5) != null);
+
     public static List<PlannedElement> Plan(MarkingDefinition def, MarkingGeometry geo, bool physicalAsFloors = true, bool paintAsFloors = true,
         bool singleElement = true)
     {
@@ -107,7 +127,7 @@ public static class ElementPlan
         var floorPieces = pieces.Where(p => physicalAsFloors && FloorEligible(def, p) || paint && PaintFloorEligible(p)).ToList();
         foreach (var grp in floorPieces.GroupBy(FloorKey))
         {
-            var parts = PolygonOps.Union(grp.Select(p => p.Shape)).Where(p => p.Area > 0.01).ToList();
+            var parts = FloorUnion(grp.Select(p => p.Shape)).Where(p => p.Area > 0.01).ToList();
             if (MarkingColors.IsPaint(grp.Key.Color) && parts.Count > 1) res.Add(new PlannedElement(true, grp.Key.Color, parts));
             else res.AddRange(parts.Select(p => new PlannedElement(true, grp.Key.Color, new[] { p })));
         }

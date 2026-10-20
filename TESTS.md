@@ -30,6 +30,7 @@ Não compile enquanto a suíte roda com `--no-build`: a compilação troca as DL
 | 2026-10-20 | EX | 2 785 | 2 785 aprovados, 0 falhas | 14 min 49 s (Linux) | +10 `EXRevitWarningsTests` |
 | 2026-10-20 | EY | 2 800 | 2 800 aprovados, 0 falhas | 14 min 34 s (Linux) | +15 `EYRevitFullRunTests` |
 | 2026-10-20 | EZ | 2 825 | 2 825 aprovados, 0 falhas | 14 min 46 s (Linux) | +25 `EZRevitFullRun2Tests` |
+| 2026-10-20 | FA | 2 843 | 2 843 aprovados, 0 falhas | 20 min 18 s (Linux) | +18 `FARevitFullRun3Tests` |
 
 Compilação na linha de base:
 - Core e plugin: 0 avisos.
@@ -83,6 +84,7 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
 | 2026-10-19 | idem | 2.1.0.0 (EW1–EW3) | Autoteste **rápido** (7 etapas; 171 não executadas) | 4 OK, 3 avisos (Revit: 239 sobreposições, 88 Marcas duplicadas, 62 retas fora do eixo; loteamento: sobras de testada), 0 erros | `docs/evidencias/2026-10-19-autoteste-rapido-2.1.0.txt` |
 | 2026-10-20 | idem | 2.1.0.0 (EX) | Autoteste **completo** (178 etapas, 1 h 42 min) | 97 OK, 80 avisos (Revit: 3 091 sobreposições, 614 pares persistentes; 1 385 retas fora do eixo), **1 erro** (perfis de placas; corrigido em EY) | `docs/evidencias/2026-10-20-autoteste-completo.txt`, `2026-10-20-log-autoteste-completo.txt` |
 | 2026-10-20 | idem | 2.1.0.0 (EY, DLL de 07:59) | Autoteste **completo** (178 etapas, 1 h 41 min) | 106 OK, 72 avisos (Revit: 3 153 sobreposições, 622 pares persistentes, listados por tipo; 85 retas fora do eixo – corrigidas no núcleo em EZ), **0 erros** | `docs/evidencias/2026-10-20-autoteste-completo-2.txt` |
+| 2026-10-20 | idem | 2.1.0.0 (EZ, DLL de 13:28) | Autoteste **completo** (178 etapas, 1 h 41 min) | 110 OK, 67 avisos (Revit: 3 135 sobreposições, 590 pares persistentes com cotas; 8 retas fora do eixo), **1 erro** (forma direta da rotatória oval; corrigido em FA) | `docs/evidencias/2026-10-20-autoteste-completo-3.txt`, `2026-10-20-log-autoteste-completo-3.txt` |
 
 ## Validação manual no Revit (roteiro mínimo)
 

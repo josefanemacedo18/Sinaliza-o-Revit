@@ -1,0 +1,16 @@
+2026-10-20 14:06:28 ERRO [SetShape ROTATORIA] Autodesk.Revit.Exceptions.ArgumentException: At least one member of pGeomArr does not satisfy DirectShape validation criteria.
+Parameter name: pGeomArr
+   at Autodesk.Revit.DB.DirectShape.SetShape(IList`1 pGeomArr)
+   at SinalizacaoViaria.Revit.Infrastructure.MarkingService.Render(MarkingDefinition def)
+2026-10-20 14:06:28 ERRO [SetShape (limpo) ROTATORIA] Autodesk.Revit.Exceptions.ArgumentException: At least one member of pGeomArr does not satisfy DirectShape validation criteria.
+Parameter name: pGeomArr
+   at Autodesk.Revit.DB.DirectShape.SetShape(IList`1 pGeomArr)
+   at SinalizacaoViaria.Revit.Infrastructure.MarkingService.Render(MarkingDefinition def)
+2026-10-20 14:07:25 ERRO [SetShape ROTATORIA] Autodesk.Revit.Exceptions.ArgumentException: At least one member of pGeomArr does not satisfy DirectShape validation criteria.
+Parameter name: pGeomArr
+   at Autodesk.Revit.DB.DirectShape.SetShape(IList`1 pGeomArr)
+   at SinalizacaoViaria.Revit.Infrastructure.MarkingService.Render(MarkingDefinition def)
+2026-10-20 14:07:25 ERRO [SetShape (limpo) ROTATORIA] Autodesk.Revit.Exceptions.ArgumentException: At least one member of pGeomArr does not satisfy DirectShape validation criteria.
+Parameter name: pGeomArr
+   at Autodesk.Revit.DB.DirectShape.SetShape(IList`1 pGeomArr)
+   at SinalizacaoViaria.Revit.Infrastructure.MarkingService.Render(MarkingDefinition def)

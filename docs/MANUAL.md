@@ -210,6 +210,8 @@ No quadro **Recuos do meio-fio** adicione, por estaca e lado:
 
 Os valores iniciais vêm da **velocidade da via** (DNIT – Manual de Projeto de Interseções; AASHTO; indicativos).
 *Calçada recua* = o alinhamento fica e a calçada estreita (aviso NBR 9050); desmarcado, a calçada inteira se desloca.
+Se o recuo for maior que a faixa livre da calçada, ela some no trecho e o alinhamento avança o que faltar sobre o lote
+(aviso com o valor) – sarjeta, meio-fio e grama nunca passam por cima da calçada nem do lote.
 O simulador de tráfego lê as baias (ônibus param fora da faixa) e as faixas auxiliares (§ 26).
 
 **Recuo numa via já criada.** **Conexões → Recuo na Via (baia / faixa auxiliar)**: clique junto ao bordo da via, no
@@ -641,6 +643,8 @@ Painel **Representação no Revit** (em todas as janelas):
   Um tipo *SV - …* já existente cuja estrutura não bate com a espessura do nome (criado por versão antiga) é corrigido
   quando o plugin o usa: fica só a camada estrutural, com a espessura do nome, e a correção vai para o log. Os pisos que já
   usam o tipo mudam junto (Desfazer volta). Tipos com outros nomes nunca são mexidos.
+  O tipo que você trocou num piso vale, na nova geração, para as peças da mesma cor **e da mesma espessura** daquele piso
+  (trocar o tipo da calçada não muda o meio-fio nem a sarjeta, que são do mesmo concreto mas têm outra espessura).
   Se o Revit recusar algum contorno, aquela parte é gerada como forma direta e o motivo aparece no aviso.
   **Contornos leves, com linhas e arcos inteiros**: ao editar o esboço de um piso, cada
   trecho reto é **uma linha só** e cada curva vira **arcos** (Arco do Revit) – sem as dezenas de "tracinhos" das versões

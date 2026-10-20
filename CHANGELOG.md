@@ -3,6 +3,65 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-20 – FA: 3º Autoteste completo – forma direta na rotatória oval, tipos de piso na nova geração e recuos
+
+Fases da missão: IV (motor geométrico) e XIV (regras da API do Revit), as duas em andamento; VI (corredores e seções)
+avançou com os recuos.
+
+### Evidência
+- 3º Autoteste **completo** com a DLL do EZ, em `docs/evidencias/2026-10-20-autoteste-completo-3.txt` (log do período em
+  `2026-10-20-log-autoteste-completo-3.txt`):
+  - 178 etapas: 110 OK, 67 com aviso e **1 com erro** (rotatória oval: o Revit recusou a forma direta), em 1 h 41 min;
+  - retas fora do eixo: de 85 para **8**, todas na rotatória com by-pass; LDP × SDP: de 34 pares para 0;
+  - 3 135 avisos de pisos sobrepostos, 590 pares que continuam;
+  - a Preparação não achou tipo de piso com estrutura diferente do nome.
+- As cotas dos exemplos (novas no EZ) mostraram a causa dos 150 pares ROTATORIA × ROTATORIA: os dois pisos têm tipo de 15 cm
+  igual ao nome, mas um vai de 0,121 a 0,271 m – a hipótese do tipo antigo (D-011) não se confirmou.
+
+### Tipo de piso na nova geração (FA2)
+- Ao gerar de novo uma marca, o tipo do primeiro piso de cada cor valia para todas as peças dela, como se o usuário o
+  tivesse escolhido. Na ilha da rotatória, a gola das árvores (concreto de 12 cm) recebia o tipo de 15 cm do meio-fio e
+  afundava 3 cm na ilha (150 pares, 5,2 m³); a sarjeta (0,5 cm) recebia 15 cm e invadia pavimento, faixa de pedestres e
+  bordo (FTP-1 × ROTATORIA, LBO × ROTATORIA, INTERSECAO × INTERSECAO).
+- Agora só conta como escolha do usuário o tipo que difere do gravado na chave do piso ao criá-lo, e só para as peças da
+  mesma cor e da mesma espessura do piso trocado. DECISIONS D-012.
+
+### Rotatória oval: forma direta recusada (FA1)
+- As golas das árvores da ilha eram quatro vigas encostadas; giradas, não coincidiam na grade das booleanas e a união saía
+  como um contorno que se toca (ou em duas peças). A gola agora é uma peça só (moldura com furo) e a união dos pisos fecha
+  frestas de até 1 mm quando a parte se toca (`ElementPlan.FloorUnion`).
+- O plugin usava o primeiro ajuste em retas e arcos do contorno sem conferir: um anel da calçada do by-pass se cruzava.
+  `BoundaryFit.FitRing` confere e tenta tolerâncias menores antes de voltar às retas.
+- Forma direta: cada objeto é conferido (`DirectShape.IsValidShape`) e o recusado sai com aviso e posição, em vez de o
+  Revit recusar a cor inteira da marca.
+
+### Retas fora do eixo restantes (FA4)
+- As 8 retas da rotatória com by-pass (22,6 m a 0,11°) vinham da limpeza de "espinhos": a ponta de uma lasca de 1,7 m da
+  calçada era tirada e os vizinhos eram ligados por uma reta inclinada. A ponta agora é cortada no pé da perpendicular sobre
+  o lado mais longo, que mantém a direção (`ProfileCleanup.SpikeFoot`, também no preparo do contorno do plugin).
+
+### Recuos: baias e faixas de aceleração/desaceleração (FA3)
+- Recuo maior que a faixa livre da calçada (faixa de desaceleração de 3,5 m, calçada com 2,8 m livres): a calçada ficava com
+  largura negativa e a grama passava por cima dela e 0,7 m além do lote. A faixa livre agora absorve até sumir e o resto
+  empurra o alinhamento, com aviso ("a calçada some no trecho e o alinhamento avança … m sobre o lote").
+- Sarjeta, meio-fio e grama, que só se deslocam, passam a ter as bordas na normal do eixo (como a calçada, que também
+  estreita): antes, deslocadas e engrossadas na normal da linha inclinada, faziam no fim sem transição da faixa de
+  desaceleração uma perna transversal sobre as vizinhas, e lascas nas transições.
+- A faixa que some só é gerada onde tem 1 cm ou mais; as bordas de uma faixa variável são amostradas onde o deslocamento ou
+  a largura variam.
+- No núcleo, as duas etapas de recuos do Autoteste ficam sem nenhum piso sobreposto (antes 1,6 m³ e 0,3 m³, os mesmos
+  volumes do Revit).
+
+### Ainda não corrigido (próximo ciclo)
+- Pinturas cortadas por outras: MAC desenhada sobre a extensão de calçada, linha de retenção × vagas (LRE × MER-0), faixa de
+  pedestres × zebrado da ilha pintada nas interseções (FTP-1 × ZPA-A) e × linha de continuidade (FTP-1 × LCO), vaga ×
+  sarjeta (MER-0 × SARJETA, 4 cm³ cada). KNOWN_ISSUES K11.
+
+### Testes
+- `FARevitFullRun3Tests` (18): pisos das 8 rotatórias na posição do Autoteste sem contorno que se toca nem reta fora do eixo,
+  gola em peça única com furo, união das peças giradas, espinho, as duas etapas de recuos sem sobreposição, espessura do tipo.
+- Suíte completa: **2 843 aprovados, 0 falhas** (20 min 18 s). Plugin: 0 avisos, 0 erros.
+
 ## 2026-10-20 – EZ: 2º Autoteste completo – retas fora do eixo restantes, sinalização das rotatórias e tipos de piso
 
 Fases da missão: IV (motor geométrico) e XIV (regras da API do Revit), as duas em andamento. Quadro das 15 fases no ROADMAP.

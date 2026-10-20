@@ -27,6 +27,19 @@ internal sealed class FurnitureBuilder
         Geo.Pieces.Add(new MarkingPiece(poly, c) { Thickness = h, Elevation = z0 });
     }
 
+    /// <summary>
+    /// Moldura (extrusão vertical de um retângulo com furo) centrada em (x, y), com lados de largura <paramref name="w"/>: uma
+    /// peça só. Quatro caixas encostadas, depois da rotação e da grade das operações booleanas, se juntavam num contorno que
+    /// se toca (ou em duas peças) – o Revit recusa (gola das árvores da ilha da rotatória, Autoteste de 2026-10-20 15:12).
+    /// </summary>
+    public void Frame(double x, double y, double sx, double sy, double w, double z0, double h, MarkingColor c)
+    {
+        var outer = new[] { W(x - sx / 2, y - sy / 2), W(x + sx / 2, y - sy / 2), W(x + sx / 2, y + sy / 2), W(x - sx / 2, y + sy / 2) };
+        double ix = sx / 2 - w, iy = sy / 2 - w;
+        var hole = new[] { W(x - ix, y - iy), W(x + ix, y - iy), W(x + ix, y + iy), W(x - ix, y + iy) };
+        Geo.Pieces.Add(new MarkingPiece(new Polygon2(outer, new[] { hole }), c) { Thickness = h, Elevation = z0 });
+    }
+
     /// <summary>Caixa com cantos arredondados em planta.</summary>
     public void RoundedBox(double x, double y, double sx, double sy, double r, double z0, double h, MarkingColor c)
     {
@@ -143,11 +156,7 @@ public static class UrbanDesigns
         // Canteiro: guia de concreto + terra, com a grelha/gola do tronco.
         if (pit > 0.3)
         {
-            var o = pit / 2;
-            v.Box(0, o - 0.04, pit, 0.08, 0, 0.12, MarkingColor.Concreto);
-            v.Box(0, -o + 0.04, pit, 0.08, 0, 0.12, MarkingColor.Concreto);
-            v.Box(o - 0.04, 0, 0.08, pit - 0.16, 0, 0.12, MarkingColor.Concreto);
-            v.Box(-o + 0.04, 0, 0.08, pit - 0.16, 0, 0.12, MarkingColor.Concreto);
+            v.Frame(0, 0, pit, pit, 0.08, 0, 0.12, MarkingColor.Concreto);
             v.Box(0, 0, pit - 0.16, pit - 0.16, 0, 0.08, MarkingColor.Grama);
         }
         var trunkH = Math.Max(1.6, H * 0.42);

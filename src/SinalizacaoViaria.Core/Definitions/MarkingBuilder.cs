@@ -1,3 +1,4 @@
+using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Catalog;
 using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
@@ -368,7 +369,12 @@ public static class MarkingBuilder
     /// </summary>
     private static MarkingGeometry? VariableLinear(LinearMarkingDefinition d, Polyline2 path, LateralProfile lat, BuildContext ctx)
     {
-        if (!lat.HasWiden || d.Reverse || d.Code is "SARJETAO" or "PTA" or "PTD" or "LRV") return null;
+        if (d.Reverse || d.Code is "SARJETAO" or "PTA" or "PTD" or "LRV") return null;
+        // Faixas físicas (sarjeta, meio-fio, grama, calçada) que só se deslocam também: as bordas medidas na normal do EIXO
+        // ficam comuns às vizinhas. Deslocar a linha e engrossar na normal dela fazia, na transição, uma perna transversal da
+        // largura da faixa sobre as vizinhas (fim da faixa de desaceleração e bocas de baia: 0,5 a 1 m² de pisos sobrepostos
+        // por faixa, Autoteste de 2026-10-20 15:12).
+        if (!lat.HasWiden && !RoadSectionInference.IsPhysical(d.Code)) return null;
         var type = ctx.Catalog.Linear(d.Code);
         if (type == null || type.Unidades) return null;
         var variant = ResolveVariant(type, d.Variant, d.Speed);
@@ -377,21 +383,56 @@ public static class MarkingBuilder
         var w = d.WidthOverride is > 0 ? d.WidthOverride.Value : f.Largura;
         var c = d.Offset + (d.InvertSides ? -f.Deslocamento : f.Deslocamento);
         var (shift, widen, breaks) = lat.For(path);
-        var samples = LateralProfile.Samples(breaks, path.Length, x => shift(x) + widen(x), lat.Smooth);
+        var samples = BandSamples(breaks, path.Length, shift, widen, lat.Smooth);
         var s0 = Math.Max(0, d.StartSetback);
         var s1 = path.Length - Math.Max(0, d.EndSetback);
         var geo = new MarkingGeometry { PathLength = path.Length };
         if (s1 - s0 < 1e-3) { geo.Warnings.Add("Os recuos são maiores que o comprimento do caminho."); return geo; }
         var color = d.ColorOverride ?? f.Cor ?? type.Cor;
         var thick = f.Espessura > 0 ? f.Espessura : type.Espessura;
+        // Faixa que some no trecho (calçada tomada por um recuo maior que ela): só os trechos com 1 cm ou mais – antes ficava uma
+        // lasca de 1 cm centrada no bordo, metade sobre a faixa vizinha (98 m de calçada × grama na faixa de desaceleração).
+        // O corte é pelas estacas onde a largura passa de 1 cm (as bordas continuam as mesmas das vizinhas).
+        const double MinWidth = 0.01;
+        double Wd(double x) => w + widen(x);
+        var visible = new List<(double A, double B)>();
+        {
+            var xs = new List<double> { s0 };
+            xs.AddRange(samples.Where(x => x > s0 + 1e-9 && x < s1 - 1e-9));
+            xs.Add(s1);
+            double? open = Wd(s0) >= MinWidth ? s0 : null;
+            for (int i = 0; i + 1 < xs.Count; i++)
+            {
+                double a = xs[i], b = xs[i + 1], wa = Wd(a), wb = Wd(b);
+                if (wa >= MinWidth == wb >= MinWidth) continue;
+                var xc = a + (b - a) * (MinWidth - wa) / (wb - wa);
+                if (open is { } o) { if (xc > o + 1e-3) visible.Add((o, xc)); open = null; }
+                else open = xc;
+            }
+            if (open is { } last && s1 > last + 1e-3) visible.Add((last, s1));
+        }
         foreach (var (c0, c1) in LinearPatternGenerator.Chunk(s0, s1, ctx.MaxPieceLength))
-            geo.AddRange(RoadGenerator.VariableBand(path, c0, c1, x => c + shift(x) - Math.Max(0.01, w + widen(x)) / 2,
-                x => c + shift(x) + Math.Max(0.01, w + widen(x)) / 2, samples), color, thick, false);
+            foreach (var (a, b) in visible)
+            {
+                var lo = Math.Max(c0, a);
+                var hi = Math.Min(c1, b);
+                if (hi - lo < 1e-3) continue;
+                geo.AddRange(RoadGenerator.VariableBand(path, lo, hi, x => c + shift(x) - Math.Max(MinWidth, Wd(x)) / 2,
+                    x => c + shift(x) + Math.Max(MinWidth, Wd(x)) / 2, samples), color, thick, false);
+            }
         geo.PaintedLength = s1 - s0;
         if (d.Height is { } top) ApplyTopLevel(geo, top);
         DeepenForLevels(geo, d);
         return geo;
     }
+
+    /// <summary>
+    /// Estacas das bordas de uma faixa variável: onde o deslocamento OU a largura variam. Pela soma dos dois, uma calçada que
+    /// estreita do lado de dentro (deslocamento e largura se compensam) não recebia os pontos intermediários das transições
+    /// suaves, e a borda dela deixava de coincidir com a da grama vizinha (que só se desloca).
+    /// </summary>
+    private static List<double> BandSamples(IReadOnlyList<double> breaks, double length, Func<double, double> shift, Func<double, double> widen, bool smooth) =>
+        LateralProfile.Samples(breaks, length, shift, smooth).Concat(LateralProfile.Samples(breaks, length, widen, smooth)).Distinct().OrderBy(x => x).ToList();
 
     /// <summary>Zebrado em faixa de largura variável (faixa de segurança/canteiro pintado de uma via de largura variável).</summary>
     private static MarkingGeometry? VariableHatchStrip(HatchMarkingDefinition d, Polyline2 path, LateralProfile lat, BuildContext ctx)
@@ -405,7 +446,7 @@ public static class MarkingBuilder
         var borderColor = d.BorderColor ?? preset.CorBorda;
         var off = d.StripOffset + StripShift(d, path, width);
         var (shift, widen, breaks) = lat.For(path);
-        var samples = LateralProfile.Samples(breaks, path.Length, x => shift(x) + widen(x), lat.Smooth);
+        var samples = BandSamples(breaks, path.Length, shift, widen, lat.Smooth);
         double Lo(double x) => off + shift(x) - Math.Max(0.02, width + widen(x)) / 2;
         double Hi(double x) => off + shift(x) + Math.Max(0.02, width + widen(x)) / 2;
         if (border > 0 && width > 2 * border)

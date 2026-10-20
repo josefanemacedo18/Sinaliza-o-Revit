@@ -1,0 +1,1377 @@
+﻿SINALIZABIM – RELATÓRIO DO AUTOTESTE
+Data: 20/10/2026 15:12   Duração: 01:41:15
+Modo: COMPLETO
+Revit: Autodesk Revit 2027 2027.0 (build 27.0.4.412)
+Plugin: 2.1.0.0 – DLL de 20/10/2026 13:28
+Projeto: Projeto1   Marcas existentes antes do teste: 5
+Área de teste: origem X = 3800 m, Y = -1200 m (coordenadas internas), nível Terreno (cota 0,00 m)
+Coordenadas nas mensagens: locais, em metros a partir da origem da área de teste.
+
+RESUMO: 178 etapas: 110 OK, 67 com aviso, 1 com erro (01:41:15).
+
+ETAPAS COM ERRO:
+  ✖ Conexões › Rotatória – Oval: ROTATORIA: o Revit recusou a geometria (At least one member of pGeomArr does not satisfy DirectShape validation criteria. (+2)
+
+DETALHES
+
+=== Preparação ===
+[OK] Área de teste, nível e vistas  (585 ms, 0 elemento(s))
+    · 203 elemento(s) de modelo no projeto; área de teste a partir de X = 3800 m, Y = -1200 m.
+
+=== Loteamento ===
+[AVISO] Gleba com três vias → quadras reconhecidas e lotes 12 × 30 (subdivisões do Toposolid ou pisos planos)  (98444 ms, 183 elemento(s))
+    Σ 249 × "Pisos realçadas se sobrepõem." (25 entre elementos da mesma marca) – em SARJETA 85, ORELHA 67, INTERSECAO 57, MER-0 51, CALCADA 47, GRAMADO 44, MEIO-FIO 40, LBO 21
+    ⚠ 15 par(es) de pisos continuam sobrepostos no modelo: MER-0 (Pisos) #2934438 [marca 88010f], SARJETA (Pisos) #2936163 [marca 4eaa9f] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2934817 [marca 1316a1], SARJETA (Pisos) #2936091 [marca 938a4b] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2934876 [marca 1316a1], SARJETA (Pisos) #2936019 [marca 5a2660] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2934935 [marca 524317], SARJETA (Pisos) #2935950 [marca 3dd909] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2934935 [marca 524317], SARJETA (Pisos) #2936163 [marca 4eaa9f] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #2932289 [marca cf8c46], PAV-ASF (Pisos) #2932895 [marca efd258]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #2932296 [marca 8e7666], MER-0 (Pisos) #2933025 [marca 1316a1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #2932296 [marca 8e7666], MER-0 (Pisos) #2933164 [marca 524317]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2932459 [marca 0c3039], MER-0 (Pisos) #2933025 [marca 1316a1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2932459 [marca 0c3039], MER-0 (Pisos) #2933164 [marca 524317]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2932642 [marca 88010f], MER-0 (Pisos) #2933025 [marca 1316a1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2932642 [marca 88010f], MER-0 (Pisos) #2933164 [marca 524317]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2932829 [marca 3b3fdc], LFO-2 (Pisos) #2932902 [marca 44015f]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2932829 [marca 3b3fdc], MER-0 (Pisos) #2933025 [marca 1316a1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2932829 [marca 3b3fdc], MER-0 (Pisos) #2933164 [marca 524317]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2932836 [marca 84fac1], LFO-2 (Pisos) #2932902 [marca 44015f]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2932836 [marca 84fac1], MER-0 (Pisos) #2933025 [marca 1316a1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2932836 [marca 84fac1], MER-0 (Pisos) #2933164 [marca 524317]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2932843 [marca 444a69], LFO-2 (Pisos) #2932902 [marca 44015f]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2932843 [marca 444a69], MER-0 (Pisos) #2933025 [marca 1316a1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2932843 [marca 444a69], MER-0 (Pisos) #2933164 [marca 524317]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2932850 [marca 70853c], MER-0 (Pisos) #2933025 [marca 1316a1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2932850 [marca 70853c], MER-0 (Pisos) #2933164 [marca 524317]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2932857 [marca fe00b6], MER-0 (Pisos) #2933025 [marca 1316a1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2932857 [marca fe00b6], MER-0 (Pisos) #2933164 [marca 524317]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2932864 [marca 0987d8], MER-0 (Pisos) #2933025 [marca 1316a1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2932864 [marca 0987d8], MER-0 (Pisos) #2933164 [marca 524317]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2932871 [marca 4540e8], LFO-2 (Pisos) #2932902 [marca 44015f]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2932871 [marca 4540e8], MER-0 (Pisos) #2933025 [marca 1316a1]
+    ⚠ … e mais 231 aviso(s)
+    · 12 marca(s) na via; eixo 240 m.
+    · 12 marca(s) na via; eixo 180 m.
+    · 14 marca(s) na via; eixo 180 m.
+    · 6 quadra(s), 68 área(s): 0 subdivisão(ões) do Toposolid e 68 piso(s) plano(s).
+    · Pisos sobrepostos conferidos no fim da etapa: 249 par(es) dos avisos – 15 ainda com volume em comum, 1 sem volume em comum (aviso de passagem), 218 com piso apagado ou refeito, 15 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: MER-0 × SARJETA 10 (0 m³); INTERSECAO × INTERSECAO [mesma marca] 2 (0,0104 m³); FTP-1 × LCO 2 (0,0001 m³); ORELHA × ORELHA [mesma marca] 1 (0 m³).
+[AVISO] Lote personalizado (frente 20 m) e área verde – vizinhos e numeração refeitos  (908 ms, 14 elemento(s))
+    ⚠ Quadra E, testada T1: sobra de 2,00 m (menor que a frente mínima de 5,00 m ou que a área mínima de 125,00 m²) somada ao último lote.
+    ⚠ Quadra E: a testada T3 ficou toda com os lotes de esquina.
+    · Lote personalizado: 819,00 m².
+[AVISO] Unir lotes (dois vizinhos viram um) e quadro de lotes da quadra  (1768 ms, 107 elemento(s))
+    ⚠ Quadra E, testada T1: sobra de 2,00 m (menor que a frente mínima de 5,00 m ou que a área mínima de 125,00 m²) somada ao último lote.
+    ⚠ Quadra E: a testada T3 ficou toda com os lotes de esquina.
+    · Lote unido: 982,80 m².
+[OK] Nome de via, detalhamento, quadro na Legenda, filtros, masterplan e memorial  (4393 ms, 458 elemento(s))
+    · Masterplan: "SV - Masterplan – Autoteste".
+    · A vista usa o modelo "RT_00.00.Organizar": os filtros foram aplicados nele (valem para todas as vistas com esse modelo).
+
+=== Vias ===
+[OK] Via – Via local – 1 faixa por sentido, estacionamento e calçadas  (5305 ms, 12 elemento(s))
+    · 12 marca(s) na via; eixo 240 m.
+[OK] Via – Via coletora – 2 faixas por sentido e calçadas  (5393 ms, 14 elemento(s))
+    · 14 marca(s) na via; eixo 240 m.
+[OK] Via – Avenida – canteiro central, 2 + 2 faixas, estacionamento e calçadas  (7547 ms, 19 elemento(s))
+    · 18 marca(s) na via; eixo 240 m.
+[OK] Via – Corredor de ônibus – faixa exclusiva junto ao canteiro central  (12217 ms, 29 elemento(s))
+    · 22 marca(s) na via; eixo 240 m.
+[OK] Via – Faixa preferencial de ônibus junto à calçada  (13778 ms, 22 elemento(s))
+    · 16 marca(s) na via; eixo 240 m.
+[OK] Via – Via com ciclofaixa segregada e faixa de segurança  (13391 ms, 18 elemento(s))
+    · 16 marca(s) na via; eixo 240 m.
+[OK] Via – Via com canteiros laterais (via marginal / estacionamento)  (10178 ms, 24 elemento(s))
+    · 22 marca(s) na via; eixo 240 m.
+[OK] Via – Rodovia de pista simples com acostamentos  (2665 ms, 6 elemento(s))
+    · 5 marca(s) na via; eixo 240 m.
+[OK] Via – Rodovia de pista dupla – canteiro central com barreira New Jersey  (4692 ms, 8 elemento(s))
+    · 7 marca(s) na via; eixo 240 m.
+[OK] Via – Via de mão única – 3 faixas e calçadas  (6289 ms, 13 elemento(s))
+    · 13 marca(s) na via; eixo 240 m.
+[OK] Via em curva (raio 60 m) e em S  (9974 ms, 19 elemento(s))
+    · 14 marca(s) na via; eixo 288 m.
+[AVISO] Pista (só a parte dos veículos) ligada a outra via  (23042 ms, 78 elemento(s))
+    Σ 23 × "Pisos realçadas se sobrepõem." (1 entre elementos da mesma marca) – em LBO 10, SARJETA 8, ORELHA 6, GRAMADO 4, MER-0 4, CALCADA 3, LFO-2 3, MEIO-FIO 2
+    ⚠ 6 par(es) de pisos continuam sobrepostos no modelo: INTERSECAO (Pisos) #2954423 [marca 80d744], ORELHA (Pisos) #2954752 [marca bcef26] (513 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); FTP-1 (Pisos) #2954505 [marca d893ea], SARJETA (Pisos) #2954794 [marca 58dca0] (123 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); ORELHA (Pisos) #2954752 [marca bcef26], ORELHA (Pisos) #2954772 [marca bcef26] [mesma marca] (2193 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); ORELHA (Pisos) #2954752 [marca bcef26], GRAMADO (Pisos) #2955364 [marca 6bef87] (15 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); SARJETA (Pisos) #2954794 [marca 58dca0], MER-0 (Pisos) #2955004 [marca c5cfec] (4 cm³; z 0,001–0,006, tipo 0,5 cm × z 0,001–0,004, tipo 0,3 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #2942380 [marca deb9ca], PAV-ASF (Pisos) #2954284 [marca c53ee1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #2942387 [marca 6afde4], LFO-2 (Pisos) #2954291 [marca 7d8ba4]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2942550 [marca c5cfec], LBO (Pisos) #2954374 [marca 6380f2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2942550 [marca c5cfec], LBO (Pisos) #2954381 [marca a35272]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2942920 [marca 0c3049], LBO (Pisos) #2954374 [marca 6380f2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2942920 [marca 0c3049], LBO (Pisos) #2954381 [marca a35272]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2942927 [marca 5a7c3b], LBO (Pisos) #2954374 [marca 6380f2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2942927 [marca 5a7c3b], LBO (Pisos) #2954381 [marca a35272]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2942934 [marca 6bef87], LFO-2 (Pisos) #2954291 [marca 7d8ba4]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2942934 [marca 6bef87], LBO (Pisos) #2954374 [marca 6380f2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2942934 [marca 6bef87], LBO (Pisos) #2954381 [marca a35272]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2942941 [marca 10f562], LFO-2 (Pisos) #2954291 [marca 7d8ba4]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2942941 [marca 10f562], LBO (Pisos) #2954374 [marca 6380f2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2942941 [marca 10f562], LBO (Pisos) #2954381 [marca a35272]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2954423 [marca 80d744], ORELHA (Pisos) #2954752 [marca bcef26]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – FTP-1 (Pisos) #2954505 [marca d893ea], SARJETA (Pisos) #2954794 [marca 58dca0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2954752 [marca bcef26], ORELHA (Pisos) #2954772 [marca bcef26] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2954752 [marca bcef26], GRAMADO (Pisos) #2955364 [marca 6bef87]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2954772 [marca bcef26], SARJETA (Pisos) #2954794 [marca 58dca0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2954785 [marca bcef26], SARJETA (Pisos) #2954794 [marca 58dca0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2954794 [marca 58dca0], MER-0 (Pisos) #2955004 [marca c5cfec]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2954839 [marca 1b5b10], SARJETA (Pisos) #2954852 [marca 0ca2cd]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2954852 [marca 0ca2cd], MER-0 (Pisos) #2955083 [marca c5cfec]
+    ⚠ Rampas: calçada de 2,50 m não comporta a rampa de 1,80 m e a faixa livre de 1,20 m – feito o rebaixamento total da calçada (NBR 9050, 6.12.7.3.3) (2 travessias).
+    ⚠ … e mais 2 aviso(s)
+    · Pisos sobrepostos conferidos no fim da etapa: 23 par(es) dos avisos – 6 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 14 com piso apagado ou refeito, 3 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: MER-0 × SARJETA 2 (0 m³); ORELHA × ORELHA [mesma marca] 1 (0,0022 m³); INTERSECAO × ORELHA 1 (0,0005 m³); FTP-1 × SARJETA 1 (0,0001 m³); GRAMADO × ORELHA 1 (0 m³).
+
+=== Conexões ===
+[AVISO] Interseção em cruz (automática)  (90170 ms, 44 elemento(s))
+    Σ 150 × "Pisos realçadas se sobrepõem." (4 entre elementos da mesma marca) – em ORELHA 69, SARJETA 69, MER-0 36, GRAMADO 26, MEIO-FIO 26, CALCADA 25, LCO 16, INTERSECAO 10
+    ⚠ 12 par(es) de pisos continuam sobrepostos no modelo: MER-0 (Pisos) #2957805 [marca 9d6e9e], SARJETA (Pisos) #2959598 [marca b5277b] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2957884 [marca 9d6e9e], SARJETA (Pisos) #2959670 [marca fa7f0f] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2957963 [marca 2d1ed3], SARJETA (Pisos) #2959805 [marca 64a4b4] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2958042 [marca 2d1ed3], SARJETA (Pisos) #2959739 [marca ebc859] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2958382 [marca ac40d2], SARJETA (Pisos) #2959739 [marca ebc859] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #2955691 [marca c479b4], PAV-ASF (Pisos) #2956297 [marca bd3901]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #2955698 [marca 3c4aa8], LFO-2 (Pisos) #2956304 [marca 6ae07d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2955861 [marca 9d6e9e], MER-0 (Pisos) #2956467 [marca ac40d2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2955861 [marca 9d6e9e], MER-0 (Pisos) #2956650 [marca 15f460]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2956044 [marca 2d1ed3], MER-0 (Pisos) #2956467 [marca ac40d2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2956044 [marca 2d1ed3], MER-0 (Pisos) #2956650 [marca 15f460]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2956231 [marca f4ad6f], LFO-2 (Pisos) #2956304 [marca 6ae07d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2956231 [marca f4ad6f], MER-0 (Pisos) #2956467 [marca ac40d2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2956231 [marca f4ad6f], MER-0 (Pisos) #2956650 [marca 15f460]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2956238 [marca 20a774], LFO-2 (Pisos) #2956304 [marca 6ae07d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2956238 [marca 20a774], MER-0 (Pisos) #2956467 [marca ac40d2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2956238 [marca 20a774], MER-0 (Pisos) #2956650 [marca 15f460]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2956245 [marca 986c57], LFO-2 (Pisos) #2956304 [marca 6ae07d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2956245 [marca 986c57], MER-0 (Pisos) #2956467 [marca ac40d2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2956245 [marca 986c57], MER-0 (Pisos) #2956650 [marca 15f460]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2956252 [marca cbff0d], MER-0 (Pisos) #2956467 [marca ac40d2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2956252 [marca cbff0d], MER-0 (Pisos) #2956650 [marca 15f460]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2956259 [marca 0e3194], MER-0 (Pisos) #2956467 [marca ac40d2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2956259 [marca 0e3194], MER-0 (Pisos) #2956650 [marca 15f460]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2956266 [marca e8105b], MER-0 (Pisos) #2956467 [marca ac40d2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2956266 [marca e8105b], MER-0 (Pisos) #2956650 [marca 15f460]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2956273 [marca f3923e], LFO-2 (Pisos) #2956304 [marca 6ae07d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2956273 [marca f3923e], MER-0 (Pisos) #2956467 [marca ac40d2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2956273 [marca f3923e], MER-0 (Pisos) #2956650 [marca 15f460]
+    ⚠ … e mais 128 aviso(s)
+    · 12 marca(s) na via; eixo 240 m.
+    · 12 marca(s) na via; eixo 240 m.
+    · Interseção com 2 via(s), raio 6,0 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 150 par(es) dos avisos – 12 ainda com volume em comum, 1 sem volume em comum (aviso de passagem), 129 com piso apagado ou refeito, 8 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: MER-0 × SARJETA 8 (0 m³); FTP-1 × LCO 2 (0,0001 m³); INTERSECAO × ORELHA 1 (0,0003 m³); ORELHA × ORELHA [mesma marca] 1 (0 m³).
+[AVISO] Entroncamento em T  (75190 ms, 38 elemento(s))
+    Σ 75 × "Pisos realçadas se sobrepõem." (2 entre elementos da mesma marca) – em ORELHA 35, SARJETA 32, MER-0 19, CALCADA 14, MEIO-FIO 14, GRAMADO 13, LCO 7, INTERSECAO 4
+    ⚠ 6 par(es) de pisos continuam sobrepostos no modelo: MER-0 (Pisos) #2961696 [marca d13efb], SARJETA (Pisos) #2963038 [marca 1c287c] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2961775 [marca d13efb], SARJETA (Pisos) #2963112 [marca be4240] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); GRAMADO (Pisos) #2962056 [marca 1fd82d], ORELHA (Pisos) #2962981 [marca edfaed] (42 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); MER-0 (Pisos) #2962219 [marca 50429a], SARJETA (Pisos) #2963038 [marca 1c287c] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2962298 [marca 815e64], SARJETA (Pisos) #2963112 [marca be4240] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #2960124 [marca 7261b9], PAV-ASF (Pisos) #2960730 [marca 26401f]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #2960131 [marca f9e8c1], LFO-2 (Pisos) #2960737 [marca 0eff81]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #2960131 [marca f9e8c1], MER-0 (Pisos) #2960820 [marca 50429a]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2960294 [marca d13efb], MER-0 (Pisos) #2960820 [marca 50429a]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2960294 [marca d13efb], MER-0 (Pisos) #2960915 [marca 815e64]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2960664 [marca 381d80], MER-0 (Pisos) #2960820 [marca 50429a]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2960664 [marca 381d80], MER-0 (Pisos) #2960915 [marca 815e64]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2960671 [marca 264885], MER-0 (Pisos) #2960820 [marca 50429a]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2960671 [marca 264885], MER-0 (Pisos) #2960915 [marca 815e64]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2960678 [marca 1fd82d], LFO-2 (Pisos) #2960737 [marca 0eff81]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2960678 [marca 1fd82d], MER-0 (Pisos) #2960820 [marca 50429a]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2960678 [marca 1fd82d], MER-0 (Pisos) #2960915 [marca 815e64]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2960685 [marca d54214], LFO-2 (Pisos) #2960737 [marca 0eff81]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2960685 [marca d54214], MER-0 (Pisos) #2960820 [marca 50429a]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2960685 [marca d54214], MER-0 (Pisos) #2960915 [marca 815e64]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2961059 [marca de020f], ORELHA (Pisos) #2961411 [marca 93153f]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2961411 [marca 93153f], GRAMADO (Pisos) #2962056 [marca 1fd82d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2961448 [marca 93153f], SARJETA (Pisos) #2961468 [marca dee4a0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2961468 [marca dee4a0], MER-0 (Pisos) #2961696 [marca d13efb]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2961468 [marca dee4a0], MER-0 (Pisos) #2962219 [marca 50429a]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2961501 [marca ca8a97], ORELHA (Pisos) #2961531 [marca ca8a97] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2961511 [marca ca8a97], SARJETA (Pisos) #2961542 [marca fec5ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2961531 [marca ca8a97], SARJETA (Pisos) #2961542 [marca fec5ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2961542 [marca fec5ef], MER-0 (Pisos) #2961775 [marca d13efb]
+    ⚠ … e mais 55 aviso(s)
+    · 12 marca(s) na via; eixo 240 m.
+    · 12 marca(s) na via; eixo 120 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 75 par(es) dos avisos – 6 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 66 com piso apagado ou refeito, 3 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: MER-0 × SARJETA 4 (0 m³); GRAMADO × ORELHA 1 (0 m³); ORELHA × ORELHA [mesma marca] 1 (0 m³).
+[AVISO] Cruzamento esconso (≈52°)  (126494 ms, 58 elemento(s))
+    Σ 154 × "Pisos realçadas se sobrepõem." (3 entre elementos da mesma marca) – em SARJETA 75, ORELHA 62, MER-0 40, CALCADA 27, MEIO-FIO 24, LCO 21, GRAMADO 20, INTERSECAO 12
+    ⚠ 16 par(es) de pisos continuam sobrepostos no modelo: MER-0 (Pisos) #2965263 [marca f32791], SARJETA (Pisos) #2967024 [marca 344cc5] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2965322 [marca f32791], SARJETA (Pisos) #2967103 [marca 40df47] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2965381 [marca 90938e], SARJETA (Pisos) #2967259 [marca 454aec] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2965440 [marca 90938e], SARJETA (Pisos) #2967183 [marca 27ec49] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2965716 [marca cc8fac], SARJETA (Pisos) #2967103 [marca 40df47] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #2963289 [marca 61bf91], PAV-ASF (Pisos) #2963791 [marca 95f064]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #2963296 [marca 6b79f6], MER-0 (Pisos) #2964060 [marca c56a3c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2963427 [marca f32791], LFO-2 (Pisos) #2963798 [marca 07e9db]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2963427 [marca f32791], MER-0 (Pisos) #2963921 [marca cc8fac]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2963427 [marca f32791], MER-0 (Pisos) #2964060 [marca c56a3c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2963574 [marca 90938e], MER-0 (Pisos) #2963921 [marca cc8fac]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2963574 [marca 90938e], MER-0 (Pisos) #2964060 [marca c56a3c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2963725 [marca 068fd3], MER-0 (Pisos) #2963921 [marca cc8fac]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2963725 [marca 068fd3], MER-0 (Pisos) #2964060 [marca c56a3c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2963732 [marca b5c55f], MER-0 (Pisos) #2963921 [marca cc8fac]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2963732 [marca b5c55f], MER-0 (Pisos) #2964060 [marca c56a3c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2963739 [marca d2f466], MER-0 (Pisos) #2963921 [marca cc8fac]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2963739 [marca d2f466], MER-0 (Pisos) #2964060 [marca c56a3c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2963746 [marca abd15e], LFO-2 (Pisos) #2963798 [marca 07e9db]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2963746 [marca abd15e], MER-0 (Pisos) #2963921 [marca cc8fac]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2963746 [marca abd15e], MER-0 (Pisos) #2964060 [marca c56a3c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2963753 [marca 87c3ad], LFO-2 (Pisos) #2963798 [marca 07e9db]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2963753 [marca 87c3ad], MER-0 (Pisos) #2963921 [marca cc8fac]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2963753 [marca 87c3ad], MER-0 (Pisos) #2964060 [marca c56a3c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2963760 [marca 2735d2], LFO-2 (Pisos) #2963798 [marca 07e9db]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2963760 [marca 2735d2], MER-0 (Pisos) #2963921 [marca cc8fac]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2963760 [marca 2735d2], MER-0 (Pisos) #2964060 [marca c56a3c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2963767 [marca cfd993], LFO-2 (Pisos) #2963798 [marca 07e9db]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2963767 [marca cfd993], MER-0 (Pisos) #2963921 [marca cc8fac]
+    ⚠ … e mais 134 aviso(s)
+    · 12 marca(s) na via; eixo 190 m.
+    · 12 marca(s) na via; eixo 178 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 154 par(es) dos avisos – 16 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 129 com piso apagado ou refeito, 9 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: MER-0 × SARJETA 8 (0 m³); FTP-1 × LCO 4 (0,0014 m³); INTERSECAO × INTERSECAO [mesma marca] 3 (0,0069 m³); INTERSECAO × ORELHA 1 (0,0004 m³).
+[AVISO] Ferramenta Conexão: interseção esconsa → rotatória  (85959 ms, 259 elemento(s))
+    Σ 70 × "Pisos realçadas se sobrepõem." (46 entre elementos da mesma marca) – em ROTATORIA 70, FTP-1 14, LBO 5, SARJETA 4, PAV-ASF 1
+    ⚠ 34 par(es) de pisos continuam sobrepostos no modelo: ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971925 [marca 3aaacf] [mesma marca] (10753 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971936 [marca 3aaacf] [mesma marca] (10748 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971947 [marca 3aaacf] [mesma marca] (10748 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971958 [marca 3aaacf] [mesma marca] (10752 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971969 [marca 3aaacf] [mesma marca] (10751 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968566 [marca 3aaacf], ROTATORIA (Pisos) #2971679 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968609 [marca 3aaacf], ROTATORIA (Pisos) #2971756 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968618 [marca 3aaacf], ROTATORIA (Pisos) #2971773 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968636 [marca 3aaacf], ROTATORIA (Pisos) #2971908 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971925 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971936 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971947 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971958 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971969 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971980 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971991 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2971998 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2972005 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2972012 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2972019 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968645 [marca 3aaacf], ROTATORIA (Pisos) #2972026 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968650 [marca 3aaacf], ROTATORIA (Pisos) #2971578 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968657 [marca 3aaacf], ROTATORIA (Pisos) #2971637 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968666 [marca 3aaacf], ROTATORIA (Pisos) #2971578 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968716 [marca 3aaacf], ROTATORIA (Pisos) #2971637 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968743 [marca 3aaacf], ROTATORIA (Pisos) #2971578 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968752 [marca 3aaacf], ROTATORIA (Pisos) #2971637 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968759 [marca 3aaacf], ROTATORIA (Pisos) #2971790 [marca 3aaacf] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ROTATORIA (Pisos) #2968766 [marca 3aaacf], ROTATORIA (Pisos) #2971831 [marca 3aaacf] [mesma marca]
+    ⚠ … e mais 52 aviso(s)
+    · Pisos sobrepostos conferidos no fim da etapa: 70 par(es) dos avisos – 34 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 36 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: ROTATORIA × ROTATORIA [mesma marca] 15 (0,5215 m³); FTP-1 × ROTATORIA 13 (0,0024 m³); LBO × ROTATORIA 5 (0,0466 m³); PAV-ASF × ROTATORIA 1 (0 m³).
+[AVISO] Avenida × via local (hierarquias diferentes)  (167112 ms, 105 elemento(s))
+    Σ 194 × "Pisos realçadas se sobrepõem." (4 entre elementos da mesma marca) – em ORELHA 77, SARJETA 76, MER-0 52, CALCADA 37, GRAMADO 36, LCO 36, MEIO-FIO 31, INTERSECAO 17
+    ⚠ 18 par(es) de pisos continuam sobrepostos no modelo: INTERSECAO (Pisos) #2975145 [marca 5a8761], ORELHA (Pisos) #2978911 [marca bf5828] (222 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); MER-0 (Pisos) #2976462 [marca 25a806], SARJETA (Pisos) #2978884 [marca cfba85] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2976565 [marca 25a806], SARJETA (Pisos) #2978982 [marca 5dee88] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2976855 [marca 083cd1], SARJETA (Pisos) #2979155 [marca b329c3] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #2976958 [marca 083cd1], SARJETA (Pisos) #2979063 [marca e86c81] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #2973492 [marca 3612af], PAV-ASF (Pisos) #2974542 [marca 58d315]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #2973499 [marca 3612af], PAV-ASF (Pisos) #2974542 [marca 58d315]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #2973506 [marca 152928], MER-0 (Pisos) #2974688 [marca f2870b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #2973506 [marca 152928], MER-0 (Pisos) #2974843 [marca a2c665]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #2973513 [marca db90b7], MER-0 (Pisos) #2974688 [marca f2870b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #2973513 [marca db90b7], MER-0 (Pisos) #2974843 [marca a2c665]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LMS-2 (Pisos) #2973520 [marca d74862], MER-0 (Pisos) #2974688 [marca f2870b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LMS-2 (Pisos) #2973520 [marca d74862], MER-0 (Pisos) #2974843 [marca a2c665]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2973739 [marca 25a806], LFO-2 (Pisos) #2974549 [marca 5545c7]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2973739 [marca 25a806], MER-0 (Pisos) #2974688 [marca f2870b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2973739 [marca 25a806], MER-0 (Pisos) #2974843 [marca a2c665]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LMS-2 (Pisos) #2973982 [marca 1a53e6], MER-0 (Pisos) #2974688 [marca f2870b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LMS-2 (Pisos) #2973982 [marca 1a53e6], MER-0 (Pisos) #2974843 [marca a2c665]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2974201 [marca 083cd1], LFO-2 (Pisos) #2974549 [marca 5545c7]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2974201 [marca 083cd1], MER-0 (Pisos) #2974688 [marca f2870b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2974201 [marca 083cd1], MER-0 (Pisos) #2974843 [marca a2c665]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2974452 [marca 8a6003], MER-0 (Pisos) #2974688 [marca f2870b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2974452 [marca 8a6003], MER-0 (Pisos) #2974843 [marca a2c665]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2974459 [marca 5bb084], MER-0 (Pisos) #2974688 [marca f2870b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2974459 [marca 5bb084], MER-0 (Pisos) #2974843 [marca a2c665]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2974466 [marca 826cb7], MER-0 (Pisos) #2974688 [marca f2870b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2974466 [marca 826cb7], MER-0 (Pisos) #2974843 [marca a2c665]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2974473 [marca 12df14], MER-0 (Pisos) #2974688 [marca f2870b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2974473 [marca 12df14], MER-0 (Pisos) #2974843 [marca a2c665]
+    ⚠ … e mais 172 aviso(s)
+    · 18 marca(s) na via; eixo 320 m.
+    · 12 marca(s) na via; eixo 200 m.
+    · Via principal da interseção: não definida; controle Pare.
+    · Pisos sobrepostos conferidos no fim da etapa: 194 par(es) dos avisos – 18 ainda com volume em comum, 2 sem volume em comum (aviso de passagem), 166 com piso apagado ou refeito, 8 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: MER-0 × SARJETA 8 (0 m³); GRAMADO × ORELHA 4 (0,0004 m³); LCO × SARJETA 3 (0,0003 m³); INTERSECAO × ORELHA 1 (0,0002 m³); ORELHA × ORELHA [mesma marca] 1 (0 m³); LCO × ORELHA 1 (0 m³).
+[AVISO] Coletora × coletora (base das variações)  (119180 ms, 84 elemento(s))
+    Σ 92 × "Pisos realçadas se sobrepõem." (12 entre elementos da mesma marca) – em INTERSECAO 38, CALCADA 30, LBO 26, GRAMADO 20, LFO-1 15, LCO 12, MEIO-FIO 10, LMS-2 8
+    ⚠ 1 par(es) de pisos continuam sobrepostos no modelo: INTERSECAO (Pisos) #2980435 [marca 603170], INTERSECAO (Pisos) #2982465 [marca 603170] [mesma marca] (2942 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm).
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #2979595 [marca 4b80fc], PAV-ASF (Pisos) #2980021 [marca 06c96c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-1 (Pisos) #2979602 [marca 78209c], LFO-1 (Pisos) #2980028 [marca 0a5e34]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-1 (Pisos) #2979602 [marca 78209c], LBO (Pisos) #2980174 [marca 118a17]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-1 (Pisos) #2979602 [marca 78209c], LBO (Pisos) #2980320 [marca beec68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LMS-2 (Pisos) #2979609 [marca d3a1ba], LFO-1 (Pisos) #2980028 [marca 0a5e34]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LMS-2 (Pisos) #2979609 [marca d3a1ba], LBO (Pisos) #2980174 [marca 118a17]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #2979772 [marca 58f63a], LFO-1 (Pisos) #2980028 [marca 0a5e34]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #2979772 [marca 58f63a], LBO (Pisos) #2980174 [marca 118a17]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #2979772 [marca 58f63a], LBO (Pisos) #2980320 [marca beec68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LMS-2 (Pisos) #2979779 [marca 862d2d], LFO-1 (Pisos) #2980028 [marca 0a5e34]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LMS-2 (Pisos) #2979779 [marca 862d2d], LBO (Pisos) #2980174 [marca 118a17]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #2979942 [marca 70c8c1], LFO-1 (Pisos) #2980028 [marca 0a5e34]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #2979942 [marca 70c8c1], LBO (Pisos) #2980174 [marca 118a17]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #2979942 [marca 70c8c1], LBO (Pisos) #2980320 [marca beec68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2979955 [marca c6fdd5], LFO-1 (Pisos) #2980028 [marca 0a5e34]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2979955 [marca c6fdd5], LBO (Pisos) #2980174 [marca 118a17]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2979955 [marca c6fdd5], LBO (Pisos) #2980320 [marca beec68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2979962 [marca 05c85f], LFO-1 (Pisos) #2980028 [marca 0a5e34]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2979962 [marca 05c85f], LBO (Pisos) #2980174 [marca 118a17]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2979962 [marca 05c85f], LBO (Pisos) #2980320 [marca beec68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2979969 [marca 5ed544], LFO-1 (Pisos) #2980028 [marca 0a5e34]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2979969 [marca 5ed544], LBO (Pisos) #2980174 [marca 118a17]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2979969 [marca 5ed544], LBO (Pisos) #2980320 [marca beec68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2979976 [marca fc0fc6], LFO-1 (Pisos) #2980028 [marca 0a5e34]
+    ⚠ … e mais 70 aviso(s)
+    · 14 marca(s) na via; eixo 240 m.
+    · 14 marca(s) na via; eixo 200 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 92 par(es) dos avisos – 1 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 88 com piso apagado ou refeito, 3 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: INTERSECAO × INTERSECAO [mesma marca] 1 (0,0029 m³).
+[AVISO] Interseção – controle Pare  (49447 ms, 128 elemento(s))
+    ⚠ Rampas: travessia recuada mais 1,60 m (além do recuo pedido) para a rampa ficar inteira no trecho reto do meio-fio, fora da curva da esquina (4 travessias).
+[AVISO] Interseção – controle DePreferencia  (49758 ms, 125 elemento(s))
+    Σ 2 × "Pisos realçadas se sobrepõem." – em LMS-2 2, SDP 2
+    ⚠ 2 par(es) de pisos continuam sobrepostos no modelo: LMS-2 (Pisos) #2981788 [marca 128871], SDP (Pisos) #2984318 [marca 71ee2e] (145 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); LMS-2 (Pisos) #2981906 [marca f6be8f], SDP (Pisos) #2984420 [marca 0a88d7] (145 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm).
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LMS-2 (Pisos) #2981788 [marca 128871], SDP (Pisos) #2984318 [marca 71ee2e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LMS-2 (Pisos) #2981906 [marca f6be8f], SDP (Pisos) #2984420 [marca 0a88d7]
+    ⚠ Rampas: travessia recuada mais 1,60 m (além do recuo pedido) para a rampa ficar inteira no trecho reto do meio-fio, fora da curva da esquina (4 travessias).
+    · Pisos sobrepostos conferidos no fim da etapa: 2 par(es) dos avisos – 2 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 0 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: LMS-2 × SDP 2 (0,0003 m³).
+[AVISO] Interseção – controle Semaforo  (47949 ms, 124 elemento(s))
+    ⚠ Rampas: travessia recuada mais 1,60 m (além do recuo pedido) para a rampa ficar inteira no trecho reto do meio-fio, fora da curva da esquina (4 travessias).
+[AVISO] Interseção – controle Nenhum  (47542 ms, 119 elemento(s))
+    ⚠ Rampas: travessia recuada mais 1,60 m (além do recuo pedido) para a rampa ficar inteira no trecho reto do meio-fio, fora da curva da esquina (4 travessias).
+[AVISO] Interseção – ilhas divisórias Fisica  (61812 ms, 158 elemento(s))
+    Σ 15 × "Pisos realçadas se sobrepõem." (11 entre elementos da mesma marca) – em INTERSECAO 13, FTP-1 4, ZPA-A 2
+    ⚠ 6 par(es) de pisos continuam sobrepostos no modelo: INTERSECAO (Pisos) #2986433 [marca 603170], INTERSECAO (Pisos) #2986479 [marca 603170] [mesma marca] (153 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2986455 [marca 603170], INTERSECAO (Pisos) #2986581 [marca 603170] [mesma marca] (42 cm³; z 0,001–0,151, tipo 15 cm × z -0,144–0,006, tipo 15 cm); INTERSECAO (Pisos) #2986517 [marca 603170], INTERSECAO (Pisos) #2986727 [marca 603170] [mesma marca] (116 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2986537 [marca 603170], INTERSECAO (Pisos) #2986701 [marca 603170] [mesma marca] (266 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); FTP-1 (Pisos) #2986972 [marca 28c736], ZPA-A (Pisos) #2987208 [marca 26d87f] (52 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986356 [marca 603170], INTERSECAO (Pisos) #2986558 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986356 [marca 603170], INTERSECAO (Pisos) #2986570 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986356 [marca 603170], INTERSECAO (Pisos) #2986581 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986356 [marca 603170], INTERSECAO (Pisos) #2986593 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986433 [marca 603170], INTERSECAO (Pisos) #2986479 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986433 [marca 603170], INTERSECAO (Pisos) #2986558 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986444 [marca 603170], INTERSECAO (Pisos) #2986570 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986455 [marca 603170], INTERSECAO (Pisos) #2986581 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986467 [marca 603170], INTERSECAO (Pisos) #2986593 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986517 [marca 603170], INTERSECAO (Pisos) #2986727 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986537 [marca 603170], INTERSECAO (Pisos) #2986701 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986754 [marca 603170], FTP-1 (Pisos) #2987045 [marca 23730d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2986772 [marca 603170], FTP-1 (Pisos) #2986972 [marca 28c736]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – FTP-1 (Pisos) #2986972 [marca 28c736], ZPA-A (Pisos) #2987208 [marca 26d87f]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – FTP-1 (Pisos) #2987045 [marca 23730d], ZPA-A (Pisos) #2987166 [marca efb2ea]
+    ⚠ Rampas: travessia recuada mais 1,60 m (além do recuo pedido) para a rampa ficar inteira no trecho reto do meio-fio, fora da curva da esquina (4 travessias).
+    ⚠ Lento: 62 s.
+    · Pisos sobrepostos conferidos no fim da etapa: 15 par(es) dos avisos – 6 ainda com volume em comum, 2 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 7 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: INTERSECAO × INTERSECAO [mesma marca] 4 (0,0006 m³); FTP-1 × ZPA-A 2 (0,0001 m³).
+[AVISO] Interseção – ilhas de conversão à direita Fisica  (60637 ms, 143 elemento(s))
+    Σ 13 × "Pisos realçadas se sobrepõem." (13 entre elementos da mesma marca) – em INTERSECAO 13
+    ⚠ 5 par(es) de pisos continuam sobrepostos no modelo: INTERSECAO (Pisos) #2988662 [marca 603170], INTERSECAO (Pisos) #2988704 [marca 603170] [mesma marca] (331 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2988662 [marca 603170], INTERSECAO (Pisos) #2988895 [marca 603170] [mesma marca] (14 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2988671 [marca 603170], INTERSECAO (Pisos) #2988915 [marca 603170] [mesma marca] (16 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2988680 [marca 603170], INTERSECAO (Pisos) #2988963 [marca 603170] [mesma marca] (10 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2988694 [marca 603170], INTERSECAO (Pisos) #2988939 [marca 603170] [mesma marca] (15 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm).
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988602 [marca 603170], INTERSECAO (Pisos) #2988854 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988602 [marca 603170], INTERSECAO (Pisos) #2988865 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988602 [marca 603170], INTERSECAO (Pisos) #2988877 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988602 [marca 603170], INTERSECAO (Pisos) #2988886 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988662 [marca 603170], INTERSECAO (Pisos) #2988704 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988662 [marca 603170], INTERSECAO (Pisos) #2988854 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988662 [marca 603170], INTERSECAO (Pisos) #2988895 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988671 [marca 603170], INTERSECAO (Pisos) #2988865 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988671 [marca 603170], INTERSECAO (Pisos) #2988915 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988680 [marca 603170], INTERSECAO (Pisos) #2988877 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988680 [marca 603170], INTERSECAO (Pisos) #2988963 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988694 [marca 603170], INTERSECAO (Pisos) #2988886 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2988694 [marca 603170], INTERSECAO (Pisos) #2988939 [marca 603170] [mesma marca]
+    ⚠ Rampas: travessia recuada mais 2,20 m (além do recuo pedido) para a rampa ficar inteira no trecho reto do meio-fio, fora da curva da esquina (4 travessias).
+    ⚠ Lento: 61 s.
+    · Pisos sobrepostos conferidos no fim da etapa: 13 par(es) dos avisos – 5 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 8 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: INTERSECAO × INTERSECAO [mesma marca] 5 (0,0004 m³).
+[AVISO] Interseção – ilhas divisórias Pintada  (60954 ms, 151 elemento(s))
+    Σ 15 × "Pisos realçadas se sobrepõem." (11 entre elementos da mesma marca) – em INTERSECAO 11, FTP-1 4, ZPA-A 4
+    ⚠ 8 par(es) de pisos continuam sobrepostos no modelo: INTERSECAO (Pisos) #2990957 [marca 603170], INTERSECAO (Pisos) #2991003 [marca 603170] [mesma marca] (153 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2990979 [marca 603170], INTERSECAO (Pisos) #2991105 [marca 603170] [mesma marca] (42 cm³; z 0,001–0,151, tipo 15 cm × z -0,144–0,006, tipo 15 cm); INTERSECAO (Pisos) #2991041 [marca 603170], INTERSECAO (Pisos) #2991251 [marca 603170] [mesma marca] (116 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2991061 [marca 603170], INTERSECAO (Pisos) #2991225 [marca 603170] [mesma marca] (266 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); FTP-1 (Pisos) #2991391 [marca 836e03], ZPA-A (Pisos) #2991703 [marca ba0e65] (210 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2990922 [marca 603170], INTERSECAO (Pisos) #2991082 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2990922 [marca 603170], INTERSECAO (Pisos) #2991094 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2990922 [marca 603170], INTERSECAO (Pisos) #2991105 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2990922 [marca 603170], INTERSECAO (Pisos) #2991117 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2990957 [marca 603170], INTERSECAO (Pisos) #2991003 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2990957 [marca 603170], INTERSECAO (Pisos) #2991082 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2990968 [marca 603170], INTERSECAO (Pisos) #2991094 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2990979 [marca 603170], INTERSECAO (Pisos) #2991105 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2990991 [marca 603170], INTERSECAO (Pisos) #2991117 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2991041 [marca 603170], INTERSECAO (Pisos) #2991251 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2991061 [marca 603170], INTERSECAO (Pisos) #2991225 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – FTP-1 (Pisos) #2991391 [marca 836e03], ZPA-A (Pisos) #2991703 [marca ba0e65]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – FTP-1 (Pisos) #2991391 [marca 836e03], ZPA-A (Pisos) #2991734 [marca f1d1cd]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – FTP-1 (Pisos) #2991514 [marca 88d90c], ZPA-A (Pisos) #2991637 [marca 6f1f3b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – FTP-1 (Pisos) #2991514 [marca 88d90c], ZPA-A (Pisos) #2991672 [marca 4d87fa]
+    ⚠ Rampas: travessia recuada mais 1,60 m (além do recuo pedido) para a rampa ficar inteira no trecho reto do meio-fio, fora da curva da esquina (4 travessias).
+    ⚠ Lento: 61 s.
+    · Pisos sobrepostos conferidos no fim da etapa: 15 par(es) dos avisos – 8 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 7 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: FTP-1 × ZPA-A 4 (0,0008 m³); INTERSECAO × INTERSECAO [mesma marca] 4 (0,0006 m³).
+[AVISO] Interseção – ilhas de conversão à direita Pintada  (61952 ms, 139 elemento(s))
+    Σ 13 × "Pisos realçadas se sobrepõem." (13 entre elementos da mesma marca) – em INTERSECAO 13
+    ⚠ 5 par(es) de pisos continuam sobrepostos no modelo: INTERSECAO (Pisos) #2993097 [marca 603170], INTERSECAO (Pisos) #2993139 [marca 603170] [mesma marca] (331 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2993097 [marca 603170], INTERSECAO (Pisos) #2993330 [marca 603170] [mesma marca] (14 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2993106 [marca 603170], INTERSECAO (Pisos) #2993350 [marca 603170] [mesma marca] (16 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2993115 [marca 603170], INTERSECAO (Pisos) #2993398 [marca 603170] [mesma marca] (10 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2993129 [marca 603170], INTERSECAO (Pisos) #2993374 [marca 603170] [mesma marca] (15 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm).
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993082 [marca 603170], INTERSECAO (Pisos) #2993289 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993082 [marca 603170], INTERSECAO (Pisos) #2993300 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993082 [marca 603170], INTERSECAO (Pisos) #2993312 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993082 [marca 603170], INTERSECAO (Pisos) #2993321 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993097 [marca 603170], INTERSECAO (Pisos) #2993139 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993097 [marca 603170], INTERSECAO (Pisos) #2993289 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993097 [marca 603170], INTERSECAO (Pisos) #2993330 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993106 [marca 603170], INTERSECAO (Pisos) #2993300 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993106 [marca 603170], INTERSECAO (Pisos) #2993350 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993115 [marca 603170], INTERSECAO (Pisos) #2993312 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993115 [marca 603170], INTERSECAO (Pisos) #2993398 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993129 [marca 603170], INTERSECAO (Pisos) #2993321 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2993129 [marca 603170], INTERSECAO (Pisos) #2993374 [marca 603170] [mesma marca]
+    ⚠ Rampas: travessia recuada mais 2,20 m (além do recuo pedido) para a rampa ficar inteira no trecho reto do meio-fio, fora da curva da esquina (4 travessias).
+    ⚠ Lento: 62 s.
+    · Pisos sobrepostos conferidos no fim da etapa: 13 par(es) dos avisos – 5 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 8 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: INTERSECAO × INTERSECAO [mesma marca] 5 (0,0004 m³).
+[AVISO] Interseção – bolsões de conversão à esquerda  (64249 ms, 182 elemento(s))
+    Σ 18 × "Pisos realçadas se sobrepõem." (16 entre elementos da mesma marca) – em INTERSECAO 16, LFO-1 2, PEM-E 2
+    ⚠ 5 par(es) de pisos continuam sobrepostos no modelo: INTERSECAO (Pisos) #2995568 [marca 603170], INTERSECAO (Pisos) #2995761 [marca 603170] [mesma marca] (527 cm³; z 0,001–0,151, tipo 15 cm × z -0,144–0,006, tipo 15 cm); INTERSECAO (Pisos) #2995580 [marca 603170], INTERSECAO (Pisos) #2995775 [marca 603170] [mesma marca] (506 cm³; z 0,001–0,151, tipo 15 cm × z -0,144–0,006, tipo 15 cm); INTERSECAO (Pisos) #2995614 [marca 603170], INTERSECAO (Pisos) #2995816 [marca 603170] [mesma marca] (24 cm³; z 0,001–0,151, tipo 15 cm × z -0,144–0,006, tipo 15 cm); LFO-1 (Pisos) #2996174 [marca ed718b], PEM-E (Pisos) #2996207 [marca 269b73] (85 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); LFO-1 (Pisos) #2996434 [marca 7753ff], PEM-E (Pisos) #2996467 [marca 86b397] (85 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm).
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995464 [marca 603170], INTERSECAO (Pisos) #2995731 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995464 [marca 603170], INTERSECAO (Pisos) #2995745 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995464 [marca 603170], INTERSECAO (Pisos) #2995761 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995464 [marca 603170], INTERSECAO (Pisos) #2995775 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995464 [marca 603170], INTERSECAO (Pisos) #2995790 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995464 [marca 603170], INTERSECAO (Pisos) #2995803 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995464 [marca 603170], INTERSECAO (Pisos) #2995816 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995464 [marca 603170], INTERSECAO (Pisos) #2995830 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995559 [marca 603170], INTERSECAO (Pisos) #2995731 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995568 [marca 603170], INTERSECAO (Pisos) #2995761 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995580 [marca 603170], INTERSECAO (Pisos) #2995775 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995592 [marca 603170], INTERSECAO (Pisos) #2995790 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995603 [marca 603170], INTERSECAO (Pisos) #2995803 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995614 [marca 603170], INTERSECAO (Pisos) #2995816 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995623 [marca 603170], INTERSECAO (Pisos) #2995830 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2995632 [marca 603170], INTERSECAO (Pisos) #2995830 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-1 (Pisos) #2996174 [marca ed718b], PEM-E (Pisos) #2996207 [marca 269b73]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-1 (Pisos) #2996434 [marca 7753ff], PEM-E (Pisos) #2996467 [marca 86b397]
+    ⚠ Rampas: travessia recuada mais 1,60 m (além do recuo pedido) para a rampa ficar inteira no trecho reto do meio-fio, fora da curva da esquina (4 travessias).
+    ⚠ Lento: 64 s.
+    · Pisos sobrepostos conferidos no fim da etapa: 18 par(es) dos avisos – 5 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 13 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: INTERSECAO × INTERSECAO [mesma marca] 3 (0,0011 m³); LFO-1 × PEM-E 2 (0,0002 m³).
+[AVISO] Interseção – raio pequeno (3 m), sem faixas  (36705 ms, 83 elemento(s))
+    Σ 4 × "Pisos realçadas se sobrepõem." (4 entre elementos da mesma marca) – em INTERSECAO 4
+    ⚠ 4 par(es) de pisos continuam sobrepostos no modelo: INTERSECAO (Pisos) #2997797 [marca 603170], INTERSECAO (Pisos) #2997936 [marca 603170] [mesma marca] (85 cm³; z -0,049–0,001, tipo 5 cm × z -0,144–0,006, tipo 15 cm); INTERSECAO (Pisos) #2997816 [marca 603170], INTERSECAO (Pisos) #2997936 [marca 603170] [mesma marca] (11 cm³; z 0,001–0,151, tipo 15 cm × z -0,144–0,006, tipo 15 cm); INTERSECAO (Pisos) #2997860 [marca 603170], INTERSECAO (Pisos) #2997980 [marca 603170] [mesma marca] (328 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #2997898 [marca 603170], INTERSECAO (Pisos) #2998020 [marca 603170] [mesma marca] (319 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm).
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2997797 [marca 603170], INTERSECAO (Pisos) #2997936 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2997816 [marca 603170], INTERSECAO (Pisos) #2997936 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2997860 [marca 603170], INTERSECAO (Pisos) #2997980 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2997898 [marca 603170], INTERSECAO (Pisos) #2998020 [marca 603170] [mesma marca]
+    · Pisos sobrepostos conferidos no fim da etapa: 4 par(es) dos avisos – 4 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 0 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: INTERSECAO × INTERSECAO [mesma marca] 4 (0,0007 m³).
+[AVISO] Interseção – raio grande (15 m), faixas e rampas  (48304 ms, 143 elemento(s))
+    Σ 13 × "Pisos realçadas se sobrepõem." (13 entre elementos da mesma marca) – em INTERSECAO 13
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999163 [marca 603170], INTERSECAO (Pisos) #2999378 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999163 [marca 603170], INTERSECAO (Pisos) #2999395 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999163 [marca 603170], INTERSECAO (Pisos) #2999431 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999163 [marca 603170], INTERSECAO (Pisos) #2999450 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999163 [marca 603170], INTERSECAO (Pisos) #2999469 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999163 [marca 603170], INTERSECAO (Pisos) #2999486 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999163 [marca 603170], INTERSECAO (Pisos) #2999503 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999279 [marca 603170], INTERSECAO (Pisos) #2999414 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999295 [marca 603170], INTERSECAO (Pisos) #2999431 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999312 [marca 603170], INTERSECAO (Pisos) #2999450 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999329 [marca 603170], INTERSECAO (Pisos) #2999469 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999345 [marca 603170], INTERSECAO (Pisos) #2999486 [marca 603170] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #2999361 [marca 603170], INTERSECAO (Pisos) #2999503 [marca 603170] [mesma marca]
+    ⚠ Rampas: travessia recuada mais 1,60 m (além do recuo pedido) para a rampa ficar inteira no trecho reto do meio-fio, fora da curva da esquina (4 travessias).
+    · Pisos sobrepostos conferidos no fim da etapa: 13 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 13 sem conferência.
+[AVISO] Rotatória – Mini  (86171 ms, 220 elemento(s))
+    Σ 139 × "Pisos realçadas se sobrepõem." (14 entre elementos da mesma marca) – em MEIO-FIO 41, SARJETA 41, MER-0 40, CALCADA 36, GRAMADO 36, ROTATORIA 29, ZPA 5, FTP-1 4
+    ⚠ 16 par(es) de pisos continuam sobrepostos no modelo: ROTATORIA (Pisos) #3002333 [marca e07b89], ROTATORIA (Pisos) #3003461 [marca e07b89] [mesma marca] (56 cm³; z 0,001–0,151, tipo 15 cm × z -0,144–0,006, tipo 15 cm); ROTATORIA (Pisos) #3002383 [marca e07b89], ROTATORIA (Pisos) #3003485 [marca e07b89] [mesma marca] (56 cm³; z 0,001–0,151, tipo 15 cm × z -0,144–0,006, tipo 15 cm); ROTATORIA (Pisos) #3002397 [marca e07b89], ROTATORIA (Pisos) #3003539 [marca e07b89] [mesma marca] (56 cm³; z 0,001–0,151, tipo 15 cm × z -0,144–0,006, tipo 15 cm); ROTATORIA (Pisos) #3002404 [marca e07b89], ROTATORIA (Pisos) #3003515 [marca e07b89] [mesma marca] (135 cm³; z 0,001–0,151, tipo 15 cm × z -0,144–0,006, tipo 15 cm); ROTATORIA (Pisos) #3002404 [marca e07b89], MEIO-FIO (Pisos) #3003927 [marca 7af536] (11 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #3001178 [marca 115167], PAV-ASF (Pisos) #3001704 [marca 90d190]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3001185 [marca c65885], MER-0 (Pisos) #3001850 [marca 4144d9]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3001185 [marca c65885], MER-0 (Pisos) #3002005 [marca 06fdcc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3001324 [marca b870f6], LFO-2 (Pisos) #3001711 [marca aef6f3]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3001324 [marca b870f6], MER-0 (Pisos) #3001850 [marca 4144d9]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3001324 [marca b870f6], MER-0 (Pisos) #3002005 [marca 06fdcc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3001479 [marca feddce], LFO-2 (Pisos) #3001711 [marca aef6f3]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3001479 [marca feddce], MER-0 (Pisos) #3001850 [marca 4144d9]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3001479 [marca feddce], MER-0 (Pisos) #3002005 [marca 06fdcc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3001638 [marca f5f133], MER-0 (Pisos) #3001850 [marca 4144d9]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3001638 [marca f5f133], MER-0 (Pisos) #3002005 [marca 06fdcc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3001645 [marca 7af536], MER-0 (Pisos) #3001850 [marca 4144d9]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3001645 [marca 7af536], MER-0 (Pisos) #3002005 [marca 06fdcc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3001652 [marca a0c1d6], MER-0 (Pisos) #3001850 [marca 4144d9]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3001652 [marca a0c1d6], MER-0 (Pisos) #3002005 [marca 06fdcc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3001659 [marca 080b85], MER-0 (Pisos) #3001850 [marca 4144d9]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3001659 [marca 080b85], MER-0 (Pisos) #3002005 [marca 06fdcc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3001666 [marca ff5380], MER-0 (Pisos) #3001850 [marca 4144d9]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3001666 [marca ff5380], MER-0 (Pisos) #3002005 [marca 06fdcc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3001673 [marca a184bb], MER-0 (Pisos) #3001850 [marca 4144d9]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3001673 [marca a184bb], MER-0 (Pisos) #3002005 [marca 06fdcc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3001680 [marca 14aace], MER-0 (Pisos) #3001850 [marca 4144d9]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3001680 [marca 14aace], MER-0 (Pisos) #3002005 [marca 06fdcc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3001687 [marca e31c33], MER-0 (Pisos) #3001850 [marca 4144d9]
+    ⚠ … e mais 117 aviso(s)
+    · 12 marca(s) na via; eixo 200 m.
+    · 12 marca(s) na via; eixo 200 m.
+    · Raio externo 8,5 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 139 par(es) dos avisos – 16 ainda com volume em comum, 8 sem volume em comum (aviso de passagem), 105 com piso apagado ou refeito, 10 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: ROTATORIA × ROTATORIA [mesma marca] 5 (0,0004 m³); LBO × ROTATORIA 4 (0,0044 m³); FTP-1 × ZPA 4 (0,0034 m³); PAV-ASF × ROTATORIA 1 (0,0001 m³); MEIO-FIO × ROTATORIA 1 (0 m³); ZPA × ZPA [mesma marca] 1 (0 m³).
+[AVISO] Rotatória – Compacta  (99333 ms, 276 elemento(s))
+    Σ 170 × "Pisos realçadas se sobrepõem." (45 entre elementos da mesma marca) – em ROTATORIA 65, MER-0 40, SARJETA 40, MEIO-FIO 39, CALCADA 37, GRAMADO 36, LBO 5, FTP-1 4
+    ⚠ 28 par(es) de pisos continuam sobrepostos no modelo: ROTATORIA (Pisos) #3006468 [marca 2ff1be], ROTATORIA (Pisos) #3008199 [marca 2ff1be] [mesma marca] (10753 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3006468 [marca 2ff1be], ROTATORIA (Pisos) #3008210 [marca 2ff1be] [mesma marca] (10754 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3006468 [marca 2ff1be], ROTATORIA (Pisos) #3008221 [marca 2ff1be] [mesma marca] (7872 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3006468 [marca 2ff1be], ROTATORIA (Pisos) #3008232 [marca 2ff1be] [mesma marca] (2879 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3006468 [marca 2ff1be], ROTATORIA (Pisos) #3008239 [marca 2ff1be] [mesma marca] (10752 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #3005226 [marca 411adf], PAV-ASF (Pisos) #3005752 [marca 732973]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3005233 [marca 0423cd], MER-0 (Pisos) #3005898 [marca da3a2e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3005233 [marca 0423cd], MER-0 (Pisos) #3006053 [marca 31af68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3005372 [marca 9562e8], LFO-2 (Pisos) #3005759 [marca fbcf4d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3005372 [marca 9562e8], MER-0 (Pisos) #3005898 [marca da3a2e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3005372 [marca 9562e8], MER-0 (Pisos) #3006053 [marca 31af68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3005527 [marca c3d8c5], LFO-2 (Pisos) #3005759 [marca fbcf4d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3005527 [marca c3d8c5], MER-0 (Pisos) #3005898 [marca da3a2e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3005527 [marca c3d8c5], MER-0 (Pisos) #3006053 [marca 31af68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3005686 [marca b8afae], MER-0 (Pisos) #3005898 [marca da3a2e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3005686 [marca b8afae], MER-0 (Pisos) #3006053 [marca 31af68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3005693 [marca bd89c2], MER-0 (Pisos) #3005898 [marca da3a2e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3005693 [marca bd89c2], MER-0 (Pisos) #3006053 [marca 31af68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3005700 [marca 00a50f], MER-0 (Pisos) #3005898 [marca da3a2e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3005700 [marca 00a50f], MER-0 (Pisos) #3006053 [marca 31af68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3005707 [marca abd492], MER-0 (Pisos) #3005898 [marca da3a2e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3005707 [marca abd492], MER-0 (Pisos) #3006053 [marca 31af68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3005714 [marca 04ad85], MER-0 (Pisos) #3005898 [marca da3a2e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3005714 [marca 04ad85], MER-0 (Pisos) #3006053 [marca 31af68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3005721 [marca 091962], MER-0 (Pisos) #3005898 [marca da3a2e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3005721 [marca 091962], MER-0 (Pisos) #3006053 [marca 31af68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3005728 [marca 55836c], MER-0 (Pisos) #3005898 [marca da3a2e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3005728 [marca 55836c], MER-0 (Pisos) #3006053 [marca 31af68]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3005735 [marca b72514], MER-0 (Pisos) #3005898 [marca da3a2e]
+    ⚠ … e mais 152 aviso(s)
+    · 12 marca(s) na via; eixo 200 m.
+    · 12 marca(s) na via; eixo 200 m.
+    · Raio externo 13,0 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 170 par(es) dos avisos – 28 ainda com volume em comum, 6 sem volume em comum (aviso de passagem), 105 com piso apagado ou refeito, 31 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: ROTATORIA × ROTATORIA [mesma marca] 17 (0,5191 m³); LBO × ROTATORIA 5 (0,0288 m³); FTP-1 × ROTATORIA 4 (0,0008 m³); PAV-ASF × ROTATORIA 1 (0 m³); ROTATORIA × SARJETA 1 (0 m³).
+[AVISO] Rotatória – UmaFaixa  (114455 ms, 284 elemento(s))
+    Σ 182 × "Pisos realçadas se sobrepõem." (45 entre elementos da mesma marca) – em ROTATORIA 77, MER-0 40, MEIO-FIO 39, SARJETA 39, CALCADA 36, GRAMADO 36, FTP-1 18, LBO 6
+    ⚠ 42 par(es) de pisos continuam sobrepostos no modelo: ROTATORIA (Pisos) #3011243 [marca 92532e], ROTATORIA (Pisos) #3013544 [marca 92532e] [mesma marca] (10753 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3011243 [marca 92532e], ROTATORIA (Pisos) #3013555 [marca 92532e] [mesma marca] (10748 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3011243 [marca 92532e], ROTATORIA (Pisos) #3013566 [marca 92532e] [mesma marca] (10748 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3011243 [marca 92532e], ROTATORIA (Pisos) #3013577 [marca 92532e] [mesma marca] (10752 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3011243 [marca 92532e], ROTATORIA (Pisos) #3013588 [marca 92532e] [mesma marca] (10751 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #3010002 [marca a2457a], PAV-ASF (Pisos) #3010528 [marca 960d89]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3010009 [marca 1855c8], MER-0 (Pisos) #3010674 [marca 326f15]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3010009 [marca 1855c8], MER-0 (Pisos) #3010829 [marca f17fed]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3010148 [marca 505378], LFO-2 (Pisos) #3010535 [marca 0bac74]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3010148 [marca 505378], MER-0 (Pisos) #3010674 [marca 326f15]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3010148 [marca 505378], MER-0 (Pisos) #3010829 [marca f17fed]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3010303 [marca b0903e], LFO-2 (Pisos) #3010535 [marca 0bac74]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3010303 [marca b0903e], MER-0 (Pisos) #3010674 [marca 326f15]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3010303 [marca b0903e], MER-0 (Pisos) #3010829 [marca f17fed]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3010462 [marca ed2ce7], MER-0 (Pisos) #3010674 [marca 326f15]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3010462 [marca ed2ce7], MER-0 (Pisos) #3010829 [marca f17fed]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3010469 [marca 4076ce], MER-0 (Pisos) #3010674 [marca 326f15]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3010469 [marca 4076ce], MER-0 (Pisos) #3010829 [marca f17fed]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3010476 [marca 48d741], MER-0 (Pisos) #3010674 [marca 326f15]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3010476 [marca 48d741], MER-0 (Pisos) #3010829 [marca f17fed]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3010483 [marca 26cb1c], MER-0 (Pisos) #3010674 [marca 326f15]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3010483 [marca 26cb1c], MER-0 (Pisos) #3010829 [marca f17fed]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3010490 [marca 9dcd3f], MER-0 (Pisos) #3010674 [marca 326f15]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3010490 [marca 9dcd3f], MER-0 (Pisos) #3010829 [marca f17fed]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3010497 [marca 7f868c], MER-0 (Pisos) #3010674 [marca 326f15]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3010497 [marca 7f868c], MER-0 (Pisos) #3010829 [marca f17fed]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3010504 [marca faa8cd], MER-0 (Pisos) #3010674 [marca 326f15]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3010504 [marca faa8cd], MER-0 (Pisos) #3010829 [marca f17fed]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3010511 [marca 600db7], MER-0 (Pisos) #3010674 [marca 326f15]
+    ⚠ … e mais 164 aviso(s)
+    · 12 marca(s) na via; eixo 200 m.
+    · 12 marca(s) na via; eixo 200 m.
+    · Raio externo 17,0 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 182 par(es) dos avisos – 42 ainda com volume em comum, 3 sem volume em comum (aviso de passagem), 105 com piso apagado ou refeito, 32 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: FTP-1 × ROTATORIA 18 (0,0028 m³); ROTATORIA × ROTATORIA [mesma marca] 14 (0,5189 m³); LBO × ROTATORIA 5 (0,0476 m³); PAV-ASF × ROTATORIA 2 (0 m³); MEIO-FIO × ROTATORIA 2 (0 m³); ROTATORIA × SARJETA 1 (0 m³).
+[AVISO] Rotatória – DuasFaixas  (134069 ms, 303 elemento(s))
+    Σ 171 × "Pisos realçadas se sobrepõem." (48 entre elementos da mesma marca) – em ROTATORIA 66, MER-0 40, SARJETA 38, CALCADA 36, GRAMADO 36, MEIO-FIO 36, FTP-1 10, LBO 5
+    ⚠ 32 par(es) de pisos continuam sobrepostos no modelo: ROTATORIA (Pisos) #3016569 [marca 6136e9], ROTATORIA (Pisos) #3019233 [marca 6136e9] [mesma marca] (10753 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3016569 [marca 6136e9], ROTATORIA (Pisos) #3019244 [marca 6136e9] [mesma marca] (2879 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3016569 [marca 6136e9], ROTATORIA (Pisos) #3019251 [marca 6136e9] [mesma marca] (7870 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3016569 [marca 6136e9], ROTATORIA (Pisos) #3019262 [marca 6136e9] [mesma marca] (10745 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3016569 [marca 6136e9], ROTATORIA (Pisos) #3019273 [marca 6136e9] [mesma marca] (10752 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #3015328 [marca 259e1d], PAV-ASF (Pisos) #3015854 [marca f61079]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3015335 [marca 4f8d5f], MER-0 (Pisos) #3016000 [marca 165b3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3015335 [marca 4f8d5f], MER-0 (Pisos) #3016155 [marca 6850ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3015474 [marca 1e1ada], LFO-2 (Pisos) #3015861 [marca 4883a8]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3015474 [marca 1e1ada], MER-0 (Pisos) #3016000 [marca 165b3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3015474 [marca 1e1ada], MER-0 (Pisos) #3016155 [marca 6850ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3015629 [marca e0ce3d], LFO-2 (Pisos) #3015861 [marca 4883a8]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3015629 [marca e0ce3d], MER-0 (Pisos) #3016000 [marca 165b3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3015629 [marca e0ce3d], MER-0 (Pisos) #3016155 [marca 6850ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3015788 [marca 4a3a03], MER-0 (Pisos) #3016000 [marca 165b3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3015788 [marca 4a3a03], MER-0 (Pisos) #3016155 [marca 6850ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3015795 [marca 04ca13], MER-0 (Pisos) #3016000 [marca 165b3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3015795 [marca 04ca13], MER-0 (Pisos) #3016155 [marca 6850ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3015802 [marca 95013b], MER-0 (Pisos) #3016000 [marca 165b3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3015802 [marca 95013b], MER-0 (Pisos) #3016155 [marca 6850ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3015809 [marca a136bf], MER-0 (Pisos) #3016000 [marca 165b3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3015809 [marca a136bf], MER-0 (Pisos) #3016155 [marca 6850ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3015816 [marca 9f31af], MER-0 (Pisos) #3016000 [marca 165b3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3015816 [marca 9f31af], MER-0 (Pisos) #3016155 [marca 6850ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3015823 [marca 6851be], MER-0 (Pisos) #3016000 [marca 165b3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3015823 [marca 6851be], MER-0 (Pisos) #3016155 [marca 6850ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3015830 [marca b2cbee], MER-0 (Pisos) #3016000 [marca 165b3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3015830 [marca b2cbee], MER-0 (Pisos) #3016155 [marca 6850ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3015837 [marca c6fa97], MER-0 (Pisos) #3016000 [marca 165b3d]
+    ⚠ … e mais 153 aviso(s)
+    · 12 marca(s) na via; eixo 200 m.
+    · 12 marca(s) na via; eixo 200 m.
+    · Raio externo 25,1 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 171 par(es) dos avisos – 32 ainda com volume em comum, 1 sem volume em comum (aviso de passagem), 105 com piso apagado ou refeito, 33 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: ROTATORIA × ROTATORIA [mesma marca] 16 (0,5211 m³); FTP-1 × ROTATORIA 10 (0,0017 m³); LBO × ROTATORIA 5 (0,0723 m³); PAV-ASF × ROTATORIA 1 (0 m³).
+[AVISO] Rotatória – Turbo  (146388 ms, 308 elemento(s))
+    Σ 173 × "Pisos realçadas se sobrepõem." (50 entre elementos da mesma marca) – em ROTATORIA 68, MER-0 40, SARJETA 37, CALCADA 36, GRAMADO 36, MEIO-FIO 36, FTP-1 12, LBO 5
+    ⚠ 36 par(es) de pisos continuam sobrepostos no modelo: ROTATORIA (Pisos) #3022261 [marca 4767e5], ROTATORIA (Pisos) #3024934 [marca 4767e5] [mesma marca] (10753 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3022261 [marca 4767e5], ROTATORIA (Pisos) #3024945 [marca 4767e5] [mesma marca] (2879 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3022261 [marca 4767e5], ROTATORIA (Pisos) #3024952 [marca 4767e5] [mesma marca] (7870 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3022261 [marca 4767e5], ROTATORIA (Pisos) #3024963 [marca 4767e5] [mesma marca] (10745 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3022261 [marca 4767e5], ROTATORIA (Pisos) #3024974 [marca 4767e5] [mesma marca] (10752 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #3021020 [marca 1251a7], PAV-ASF (Pisos) #3021546 [marca 170864]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3021027 [marca 90643f], MER-0 (Pisos) #3021692 [marca a2ec65]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3021027 [marca 90643f], MER-0 (Pisos) #3021847 [marca 405db0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3021166 [marca 51e287], LFO-2 (Pisos) #3021553 [marca 28ca5d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3021166 [marca 51e287], MER-0 (Pisos) #3021692 [marca a2ec65]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3021166 [marca 51e287], MER-0 (Pisos) #3021847 [marca 405db0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3021321 [marca 45d569], LFO-2 (Pisos) #3021553 [marca 28ca5d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3021321 [marca 45d569], MER-0 (Pisos) #3021692 [marca a2ec65]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3021321 [marca 45d569], MER-0 (Pisos) #3021847 [marca 405db0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3021480 [marca 80d31f], MER-0 (Pisos) #3021692 [marca a2ec65]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3021480 [marca 80d31f], MER-0 (Pisos) #3021847 [marca 405db0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3021487 [marca c39ad7], MER-0 (Pisos) #3021692 [marca a2ec65]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3021487 [marca c39ad7], MER-0 (Pisos) #3021847 [marca 405db0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3021494 [marca e6937e], MER-0 (Pisos) #3021692 [marca a2ec65]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3021494 [marca e6937e], MER-0 (Pisos) #3021847 [marca 405db0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3021501 [marca e3b44e], MER-0 (Pisos) #3021692 [marca a2ec65]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3021501 [marca e3b44e], MER-0 (Pisos) #3021847 [marca 405db0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3021508 [marca df721c], MER-0 (Pisos) #3021692 [marca a2ec65]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3021508 [marca df721c], MER-0 (Pisos) #3021847 [marca 405db0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3021515 [marca 4a072a], MER-0 (Pisos) #3021692 [marca a2ec65]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3021515 [marca 4a072a], MER-0 (Pisos) #3021847 [marca 405db0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3021522 [marca 3a0156], MER-0 (Pisos) #3021692 [marca a2ec65]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3021522 [marca 3a0156], MER-0 (Pisos) #3021847 [marca 405db0]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3021529 [marca a7e3e5], MER-0 (Pisos) #3021692 [marca a2ec65]
+    ⚠ … e mais 155 aviso(s)
+    · 12 marca(s) na via; eixo 200 m.
+    · 12 marca(s) na via; eixo 200 m.
+    · Raio externo 24,0 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 173 par(es) dos avisos – 36 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 105 com piso apagado ou refeito, 32 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: ROTATORIA × ROTATORIA [mesma marca] 19 (1,5602 m³); FTP-1 × ROTATORIA 12 (0,0018 m³); LBO × ROTATORIA 5 (0,0689 m³).
+[ERRO] Rotatória – Oval  (155177 ms, 284 elemento(s))
+    ✖ ROTATORIA: o Revit recusou a geometria (At least one member of pGeomArr does not satisfy DirectShape validation criteria.
+Parameter name: pGeomArr).
+    ✖ Erro tratado pelo plugin (só ia para o log): [SetShape ROTATORIA] ArgumentException: At least one member of pGeomArr does not satisfy DirectShape validation criteria.
+Parameter name: pGeomArr
+      at SinalizacaoViaria.Revit.Infrastructure.MarkingService.Render(MarkingDefinition def)
+    ✖ Erro tratado pelo plugin (só ia para o log): [SetShape (limpo) ROTATORIA] ArgumentException: At least one member of pGeomArr does not satisfy DirectShape validation criteria.
+Parameter name: pGeomArr
+      at SinalizacaoViaria.Revit.Infrastructure.MarkingService.Render(MarkingDefinition def)
+    Σ 173 × "Pisos realçadas se sobrepõem." (46 entre elementos da mesma marca) – em ROTATORIA 68, MER-0 40, SARJETA 39, GRAMADO 37, CALCADA 36, MEIO-FIO 36, FTP-1 10, LBO 5
+    ⚠ 30 par(es) de pisos continuam sobrepostos no modelo: ROTATORIA (Pisos) #3027991 [marca c6f9ce], ROTATORIA (Pisos) #3030489 [marca c6f9ce] [mesma marca] (10753 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3027991 [marca c6f9ce], ROTATORIA (Pisos) #3030500 [marca c6f9ce] [mesma marca] (10750 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3027991 [marca c6f9ce], ROTATORIA (Pisos) #3030511 [marca c6f9ce] [mesma marca] (5374 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3027991 [marca c6f9ce], ROTATORIA (Pisos) #3030520 [marca c6f9ce] [mesma marca] (5377 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3027991 [marca c6f9ce], ROTATORIA (Pisos) #3030529 [marca c6f9ce] [mesma marca] (10752 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #3026679 [marca 83979b], PAV-ASF (Pisos) #3027205 [marca d93030]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3026686 [marca 58ed8c], MER-0 (Pisos) #3027351 [marca c7eca2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3026686 [marca 58ed8c], MER-0 (Pisos) #3027506 [marca 6f436b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3026825 [marca 574be4], LFO-2 (Pisos) #3027212 [marca 385f64]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3026825 [marca 574be4], MER-0 (Pisos) #3027351 [marca c7eca2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3026825 [marca 574be4], MER-0 (Pisos) #3027506 [marca 6f436b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3026980 [marca ed96b0], LFO-2 (Pisos) #3027212 [marca 385f64]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3026980 [marca ed96b0], MER-0 (Pisos) #3027351 [marca c7eca2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3026980 [marca ed96b0], MER-0 (Pisos) #3027506 [marca 6f436b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3027139 [marca 7c7004], MER-0 (Pisos) #3027351 [marca c7eca2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3027139 [marca 7c7004], MER-0 (Pisos) #3027506 [marca 6f436b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3027146 [marca c3badc], MER-0 (Pisos) #3027351 [marca c7eca2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3027146 [marca c3badc], MER-0 (Pisos) #3027506 [marca 6f436b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3027153 [marca 6df3ba], MER-0 (Pisos) #3027351 [marca c7eca2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3027153 [marca 6df3ba], MER-0 (Pisos) #3027506 [marca 6f436b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3027160 [marca 18595a], MER-0 (Pisos) #3027351 [marca c7eca2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3027160 [marca 18595a], MER-0 (Pisos) #3027506 [marca 6f436b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3027167 [marca 2d6d03], MER-0 (Pisos) #3027351 [marca c7eca2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3027167 [marca 2d6d03], MER-0 (Pisos) #3027506 [marca 6f436b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3027174 [marca 15a2fb], MER-0 (Pisos) #3027351 [marca c7eca2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3027174 [marca 15a2fb], MER-0 (Pisos) #3027506 [marca 6f436b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3027181 [marca 57d41f], MER-0 (Pisos) #3027351 [marca c7eca2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3027181 [marca 57d41f], MER-0 (Pisos) #3027506 [marca 6f436b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3027188 [marca 7a0656], MER-0 (Pisos) #3027351 [marca c7eca2]
+    ⚠ … e mais 155 aviso(s)
+    · 12 marca(s) na via; eixo 200 m.
+    · 12 marca(s) na via; eixo 200 m.
+    · Raio externo 19,8 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 173 par(es) dos avisos – 30 ainda com volume em comum, 1 sem volume em comum (aviso de passagem), 105 com piso apagado ou refeito, 37 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: ROTATORIA × ROTATORIA [mesma marca] 15 (0,5189 m³); FTP-1 × ROTATORIA 10 (0,0019 m³); LBO × ROTATORIA 5 (0,0483 m³).
+[AVISO] Rotatória – ComBypass  (176085 ms, 319 elemento(s))
+    Σ 230 × "Pisos realçadas se sobrepõem." (72 entre elementos da mesma marca) – em ROTATORIA 125, SARJETA 44, MER-0 40, MEIO-FIO 38, GRAMADO 37, CALCADA 36, FTP-1 31, LBO 6
+    Σ 8 × "A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões." – em ROTATORIA 8
+    ⚠ 61 par(es) de pisos continuam sobrepostos no modelo: ROTATORIA (Pisos) #3033817 [marca 8ddaec], ROTATORIA (Pisos) #3034141 [marca 8ddaec] [mesma marca] (71 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); ROTATORIA (Pisos) #3033824 [marca 8ddaec], ROTATORIA (Pisos) #3034055 [marca 8ddaec] [mesma marca] (1643 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); ROTATORIA (Pisos) #3033840 [marca 8ddaec], ROTATORIA (Pisos) #3036712 [marca 8ddaec] [mesma marca] (14 cm³; z 0,001–0,151, tipo 15 cm × z -0,144–0,006, tipo 15 cm); ROTATORIA (Pisos) #3033901 [marca 8ddaec], ROTATORIA (Pisos) #3034141 [marca 8ddaec] [mesma marca] (339 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); ROTATORIA (Pisos) #3033909 [marca 8ddaec], ROTATORIA (Pisos) #3034055 [marca 8ddaec] [mesma marca] (171 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #3032645 [marca b36d61], PAV-ASF (Pisos) #3033171 [marca c8f9bd]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3032652 [marca 402cee], MER-0 (Pisos) #3033317 [marca 6dcd7b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3032652 [marca 402cee], MER-0 (Pisos) #3033472 [marca f1eadf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3032791 [marca be2f94], LFO-2 (Pisos) #3033178 [marca e991c1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3032791 [marca be2f94], MER-0 (Pisos) #3033317 [marca 6dcd7b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3032791 [marca be2f94], MER-0 (Pisos) #3033472 [marca f1eadf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3032946 [marca a4d4a0], LFO-2 (Pisos) #3033178 [marca e991c1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3032946 [marca a4d4a0], MER-0 (Pisos) #3033317 [marca 6dcd7b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3032946 [marca a4d4a0], MER-0 (Pisos) #3033472 [marca f1eadf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3033105 [marca 0ae29f], MER-0 (Pisos) #3033317 [marca 6dcd7b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3033105 [marca 0ae29f], MER-0 (Pisos) #3033472 [marca f1eadf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3033112 [marca dcbcc9], MER-0 (Pisos) #3033317 [marca 6dcd7b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3033112 [marca dcbcc9], MER-0 (Pisos) #3033472 [marca f1eadf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3033119 [marca cd053c], MER-0 (Pisos) #3033317 [marca 6dcd7b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3033119 [marca cd053c], MER-0 (Pisos) #3033472 [marca f1eadf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3033126 [marca 3ef184], MER-0 (Pisos) #3033317 [marca 6dcd7b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3033126 [marca 3ef184], MER-0 (Pisos) #3033472 [marca f1eadf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3033133 [marca d0909a], MER-0 (Pisos) #3033317 [marca 6dcd7b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3033133 [marca d0909a], MER-0 (Pisos) #3033472 [marca f1eadf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3033140 [marca d7549a], MER-0 (Pisos) #3033317 [marca 6dcd7b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3033140 [marca d7549a], MER-0 (Pisos) #3033472 [marca f1eadf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3033147 [marca eb99a2], MER-0 (Pisos) #3033317 [marca 6dcd7b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3033147 [marca eb99a2], MER-0 (Pisos) #3033472 [marca f1eadf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3033154 [marca 185a90], MER-0 (Pisos) #3033317 [marca 6dcd7b]
+    ⚠ … e mais 221 aviso(s)
+    · 12 marca(s) na via; eixo 200 m.
+    · 12 marca(s) na via; eixo 200 m.
+    · Raio externo 17,0 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 230 par(es) dos avisos – 61 ainda com volume em comum, 9 sem volume em comum (aviso de passagem), 105 com piso apagado ou refeito, 55 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: FTP-1 × ROTATORIA 26 (0,0039 m³); ROTATORIA × ROTATORIA [mesma marca] 25 (0,5259 m³); LBO × ROTATORIA 5 (0,0358 m³); ROTATORIA × SARJETA 4 (0 m³); MEIO-FIO × ROTATORIA 1 (0 m³).
+    · Retas fora do eixo lidas no Revit: 8 – em ROTATORIA 8; desalinhamento 0,1034° a 0,1175° (mediana 0,1138°); comprimento mediano 22,65 m; a ponta andaria 44,3 mm na mediana e 45,0 mm no máximo; 0 até 0,5 mm e 0 até 5 mm.
+[AVISO] Rotatória – Personalizada  (170936 ms, 289 elemento(s))
+    Σ 180 × "Pisos realçadas se sobrepõem." (48 entre elementos da mesma marca) – em ROTATORIA 75, SARJETA 42, MER-0 40, MEIO-FIO 38, CALCADA 36, GRAMADO 36, FTP-1 14, LBO 5
+    ⚠ 43 par(es) de pisos continuam sobrepostos no modelo: ROTATORIA (Pisos) #3040609 [marca edd01a], ROTATORIA (Pisos) #3042076 [marca edd01a] [mesma marca] (10753 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3040609 [marca edd01a], ROTATORIA (Pisos) #3042087 [marca edd01a] [mesma marca] (5378 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3040609 [marca edd01a], ROTATORIA (Pisos) #3042096 [marca edd01a] [mesma marca] (2494 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3040609 [marca edd01a], ROTATORIA (Pisos) #3042103 [marca edd01a] [mesma marca] (5374 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ROTATORIA (Pisos) #3040609 [marca edd01a], ROTATORIA (Pisos) #3042112 [marca edd01a] [mesma marca] (5375 cm³; z 0,001–0,151, tipo 15 cm × z 0,121–0,271, tipo 15 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #3039368 [marca 838cc5], PAV-ASF (Pisos) #3039894 [marca 54c544]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3039375 [marca cf707b], MER-0 (Pisos) #3040040 [marca 6f61d1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3039375 [marca cf707b], MER-0 (Pisos) #3040195 [marca d19875]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3039514 [marca ca6488], LFO-2 (Pisos) #3039901 [marca 0d847a]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3039514 [marca ca6488], MER-0 (Pisos) #3040040 [marca 6f61d1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3039514 [marca ca6488], MER-0 (Pisos) #3040195 [marca d19875]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3039669 [marca 03281a], LFO-2 (Pisos) #3039901 [marca 0d847a]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3039669 [marca 03281a], MER-0 (Pisos) #3040040 [marca 6f61d1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3039669 [marca 03281a], MER-0 (Pisos) #3040195 [marca d19875]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3039828 [marca 77c2aa], MER-0 (Pisos) #3040040 [marca 6f61d1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3039828 [marca 77c2aa], MER-0 (Pisos) #3040195 [marca d19875]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3039835 [marca c977c4], MER-0 (Pisos) #3040040 [marca 6f61d1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3039835 [marca c977c4], MER-0 (Pisos) #3040195 [marca d19875]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3039842 [marca 3854b1], MER-0 (Pisos) #3040040 [marca 6f61d1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3039842 [marca 3854b1], MER-0 (Pisos) #3040195 [marca d19875]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3039849 [marca 83ac57], MER-0 (Pisos) #3040040 [marca 6f61d1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3039849 [marca 83ac57], MER-0 (Pisos) #3040195 [marca d19875]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3039856 [marca a077c2], MER-0 (Pisos) #3040040 [marca 6f61d1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3039856 [marca a077c2], MER-0 (Pisos) #3040195 [marca d19875]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3039863 [marca 2c10c0], MER-0 (Pisos) #3040040 [marca 6f61d1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3039863 [marca 2c10c0], MER-0 (Pisos) #3040195 [marca d19875]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3039870 [marca 022682], MER-0 (Pisos) #3040040 [marca 6f61d1]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3039870 [marca 022682], MER-0 (Pisos) #3040195 [marca d19875]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3039877 [marca 98c48a], MER-0 (Pisos) #3040040 [marca 6f61d1]
+    ⚠ … e mais 158 aviso(s)
+    · 12 marca(s) na via; eixo 200 m.
+    · 12 marca(s) na via; eixo 200 m.
+    · Raio externo 14,5 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 180 par(es) dos avisos – 43 ainda com volume em comum, 3 sem volume em comum (aviso de passagem), 105 com piso apagado ou refeito, 29 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: ROTATORIA × ROTATORIA [mesma marca] 24 (0,5194 m³); FTP-1 × ROTATORIA 14 (0,002 m³); LBO × ROTATORIA 5 (0,0356 m³).
+[AVISO] Cul-de-sac – Circular  (46697 ms, 30 elemento(s))
+    Σ 1 × "Pisos realçadas se sobrepõem." (1 entre elementos da mesma marca) – em CDS-CIRC 1
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3044285 [marca 3333dc], CDS-CIRC (Pisos) #3044306 [marca 3333dc] [mesma marca]
+    · 12 marca(s) na via; eixo 90 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 1 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 1 sem conferência.
+[AVISO] Cul-de-sac – ExcentricoEsquerda  (46090 ms, 30 elemento(s))
+    Σ 2 × "Pisos realçadas se sobrepõem." (2 entre elementos da mesma marca) – em CDS-EXC 2
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-EXC (Pisos) #3044979 [marca ed3150], CDS-EXC (Pisos) #3045026 [marca ed3150] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-EXC (Pisos) #3045026 [marca ed3150], CDS-EXC (Pisos) #3045045 [marca ed3150] [mesma marca]
+    · 12 marca(s) na via; eixo 90 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 2 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 2 sem conferência.
+[AVISO] Cul-de-sac – ExcentricoDireita  (46830 ms, 30 elemento(s))
+    Σ 2 × "Pisos realçadas se sobrepõem." (2 entre elementos da mesma marca) – em CDS-EXC 2
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-EXC (Pisos) #3045693 [marca 7d3aef], CDS-EXC (Pisos) #3045744 [marca 7d3aef] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-EXC (Pisos) #3045744 [marca 7d3aef], CDS-EXC (Pisos) #3045764 [marca 7d3aef] [mesma marca]
+    · 12 marca(s) na via; eixo 90 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 2 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 2 sem conferência.
+[AVISO] Cul-de-sac – Martelo  (46991 ms, 30 elemento(s))
+    Σ 2 × "Pisos realçadas se sobrepõem." (2 entre elementos da mesma marca) – em CDS-T 2
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-T (Pisos) #3046420 [marca f1150f], CDS-T (Pisos) #3046506 [marca f1150f] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-T (Pisos) #3046506 [marca f1150f], CDS-T (Pisos) #3046539 [marca f1150f] [mesma marca]
+    · 12 marca(s) na via; eixo 90 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 2 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 2 sem conferência.
+[AVISO] Cul-de-sac – EmY  (46734 ms, 30 elemento(s))
+    Σ 2 × "Pisos realçadas se sobrepõem." (2 entre elementos da mesma marca) – em CDS-Y 2
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-Y (Pisos) #3047318 [marca 65f878], CDS-Y (Pisos) #3047413 [marca 65f878] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-Y (Pisos) #3047413 [marca 65f878], CDS-Y (Pisos) #3047448 [marca 65f878] [mesma marca]
+    · 12 marca(s) na via; eixo 90 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 2 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 2 sem conferência.
+[AVISO] Cul-de-sac – EmLEsquerda  (46067 ms, 30 elemento(s))
+    Σ 2 × "Pisos realçadas se sobrepõem." (2 entre elementos da mesma marca) – em CDS-L 2
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-L (Pisos) #3048212 [marca 11955b], CDS-L (Pisos) #3048275 [marca 11955b] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-L (Pisos) #3048275 [marca 11955b], CDS-L (Pisos) #3048300 [marca 11955b] [mesma marca]
+    · 12 marca(s) na via; eixo 90 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 2 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 2 sem conferência.
+[AVISO] Cul-de-sac – EmLDireita  (45828 ms, 30 elemento(s))
+    Σ 2 × "Pisos realçadas se sobrepõem." (2 entre elementos da mesma marca) – em CDS-L 2
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-L (Pisos) #3048990 [marca 6f360c], CDS-L (Pisos) #3049060 [marca 6f360c] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-L (Pisos) #3049060 [marca 6f360c], CDS-L (Pisos) #3049087 [marca 6f360c] [mesma marca]
+    · 12 marca(s) na via; eixo 90 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 2 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 2 sem conferência.
+[AVISO] Cul-de-sac – Gota  (48311 ms, 30 elemento(s))
+    Σ 2 × "Pisos realçadas se sobrepõem." (2 entre elementos da mesma marca) – em CDS-GOTA 2
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-GOTA (Pisos) #3049801 [marca d064a7], CDS-GOTA (Pisos) #3049893 [marca d064a7] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-GOTA (Pisos) #3049893 [marca d064a7], CDS-GOTA (Pisos) #3049927 [marca d064a7] [mesma marca]
+    · 12 marca(s) na via; eixo 90 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 2 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 2 sem conferência.
+[AVISO] Via nova com cul-de-sac automático na ponta livre  (114445 ms, 14 elemento(s))
+    Σ 66 × "Pisos realçadas se sobrepõem." (10 entre elementos da mesma marca) – em CDS-CIRC 66, CALCADA 20, GRAMADO 16, MEIO-FIO 12, SARJETA 8
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050674 [marca f4cbed], CDS-CIRC (Pisos) #3050773 [marca f4cbed] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050773 [marca f4cbed], CDS-CIRC (Pisos) #3050808 [marca f4cbed] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3051003 [marca 26e99d], CDS-CIRC (Pisos) #3051102 [marca 26e99d] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3051102 [marca 26e99d], CDS-CIRC (Pisos) #3051137 [marca 26e99d] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050674 [marca f4cbed], MEIO-FIO (Pisos) #3051470 [marca 33dfc9]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050674 [marca f4cbed], GRAMADO (Pisos) #3051477 [marca 7d167d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050674 [marca f4cbed], CALCADA (Pisos) #3051484 [marca 4dfe3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050674 [marca f4cbed], MEIO-FIO (Pisos) #3051498 [marca c58d27]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050674 [marca f4cbed], GRAMADO (Pisos) #3051505 [marca 0c186b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050674 [marca f4cbed], CALCADA (Pisos) #3051512 [marca a5bd53]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050705 [marca f4cbed], CALCADA (Pisos) #3051484 [marca 4dfe3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050705 [marca f4cbed], CALCADA (Pisos) #3051512 [marca a5bd53]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050737 [marca f4cbed], GRAMADO (Pisos) #3051477 [marca 7d167d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050737 [marca f4cbed], CALCADA (Pisos) #3051484 [marca 4dfe3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050737 [marca f4cbed], GRAMADO (Pisos) #3051505 [marca 0c186b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050737 [marca f4cbed], CALCADA (Pisos) #3051512 [marca a5bd53]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050773 [marca f4cbed], SARJETA (Pisos) #3051463 [marca 3cdfe4]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050773 [marca f4cbed], MEIO-FIO (Pisos) #3051470 [marca 33dfc9]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050773 [marca f4cbed], GRAMADO (Pisos) #3051477 [marca 7d167d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050773 [marca f4cbed], CALCADA (Pisos) #3051484 [marca 4dfe3d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050773 [marca f4cbed], SARJETA (Pisos) #3051491 [marca 33e001]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050773 [marca f4cbed], MEIO-FIO (Pisos) #3051498 [marca c58d27]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050773 [marca f4cbed], GRAMADO (Pisos) #3051505 [marca 0c186b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050773 [marca f4cbed], CALCADA (Pisos) #3051512 [marca a5bd53]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CDS-CIRC (Pisos) #3050808 [marca f4cbed], SARJETA (Pisos) #3051463 [marca 3cdfe4]
+    ⚠ … e mais 42 aviso(s)
+    · 14 marca(s) na via; eixo 110 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 66 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 60 com piso apagado ou refeito, 6 sem conferência.
+
+=== Sinalização horizontal ===
+[OK] Linha LFO-1 – Linha simples contínua – divisão de fluxos opostos  (4888 ms, 3 elemento(s))
+    · 3 variante(s).
+[OK] Linha LFO-2 – Linha simples seccionada – divisão de fluxos opostos  (5018 ms, 3 elemento(s))
+    · 3 variante(s).
+[OK] Linha LFO-3 – Linha dupla contínua – divisão de fluxos opostos  (3905 ms, 4 elemento(s))
+    · 2 variante(s).
+[OK] Linha LFO-4 – Linha dupla contínua/seccionada – divisão de fluxos opostos  (5534 ms, 6 elemento(s))
+    · 3 variante(s).
+[OK] Linha LFO-5 – Linha seccionada de transição (aproximação de proibição de ultrapassagem)  (8841 ms, 9 elemento(s))
+    · 6 variante(s).
+[OK] Linha LMS-1 – Linha simples contínua – divisão de fluxos de mesmo sentido  (4122 ms, 2 elemento(s))
+    · 2 variante(s).
+[OK] Linha LMS-2 – Linha simples seccionada – divisão de fluxos de mesmo sentido  (4756 ms, 3 elemento(s))
+    · 3 variante(s).
+[OK] Linha LBO – Linha de bordo  (5742 ms, 3 elemento(s))
+    · 3 variante(s).
+[OK] Linha LCO – Linha de continuidade  (3939 ms, 2 elemento(s))
+    · 2 variante(s).
+[OK] Linha MFE – Marcação de faixa exclusiva  (4985 ms, 3 elemento(s))
+    · 3 variante(s).
+[OK] Linha MFR – Marcação de faixa reversível  (2862 ms, 1 elemento(s))
+    · 1 variante(s).
+[OK] Linha LCA – Linha de canalização  (4783 ms, 3 elemento(s))
+    · 3 variante(s).
+[OK] Linha LPP – Linha de indicação de proibição de estacionamento e/ou parada  (3860 ms, 2 elemento(s))
+    · 2 variante(s).
+[OK] Linha MER-L – Marca delimitadora de estacionamento regulamentado – só a linha de delimitação (sem divisórias entre vagas)  (2908 ms, 1 elemento(s))
+    · 1 variante(s).
+[OK] Linha MVE – Marca delimitadora de parada de veículos específicos  (3798 ms, 2 elemento(s))
+    · 2 variante(s).
+[OK] Linha LRE – Linha de retenção  (5823 ms, 4 elemento(s))
+    · 4 variante(s).
+[OK] Linha MCF – Cruzamento rodoferroviário – linha de retenção dupla  (4877 ms, 4 elemento(s))
+    · 3 variante(s).
+[OK] Linha LDP – Linha de "Dê a preferência"  (5011 ms, 4 elemento(s))
+    · 3 variante(s).
+[OK] Linha FTP-1 – Faixa de travessia de pedestres – zebrada  (6313 ms, 5 elemento(s))
+    · 4 variante(s).
+[OK] Linha FTP-2 – Faixa de travessia de pedestres – paralela  (4958 ms, 6 elemento(s))
+    · 3 variante(s).
+[OK] Linha MCC – Marcação de cruzamento rodocicloviário  (4126 ms, 3 elemento(s))
+    · 2 variante(s).
+[OK] Linha LRV – Linhas de estímulo à redução de velocidade  (4501 ms, 4 elemento(s))
+    · 2 variante(s).
+[OK] Linha CIC-LD – Linha de delimitação de ciclofaixa  (5274 ms, 3 elemento(s))
+    · 3 variante(s).
+[OK] Linha CIC-FD – Pintura de fundo de ciclofaixa (vermelha)  (4367 ms, 2 elemento(s))
+    · 2 variante(s).
+[OK] Linha TAC-A – Tachas refletivas amarelas (bidirecionais)  (5226 ms, 6 elemento(s))
+    · 3 variante(s).
+[OK] Linha TAC-B – Tachas refletivas brancas (monodirecionais)  (3478 ms, 2 elemento(s))
+    · 2 variante(s).
+[OK] Linha TACHAO – Tachões refletivos  (4308 ms, 4 elemento(s))
+    · 2 variante(s).
+[AVISO] Linha PTA – Piso tátil de alerta  (171259 ms, 7 elemento(s))
+    ⚠ Lento: 171 s.
+    · 3 variante(s).
+[OK] Linha PTD – Piso tátil direcional  (13358 ms, 5 elemento(s))
+    · 2 variante(s).
+[OK] Linha CALCADA – Calçada – pavimento (faixa livre / de acesso)  (2703 ms, 1 elemento(s))
+    · 1 variante(s).
+[OK] Linha MEIO-FIO – Meio-fio (guia)  (2403 ms, 1 elemento(s))
+    · 1 variante(s).
+[OK] Linha GRAMADO – Canteiro / faixa gramada  (2514 ms, 1 elemento(s))
+    · 1 variante(s).
+[OK] Linha MEIO-FIO-12 – Meio-fio 0,12 × 0,12 m  (2407 ms, 1 elemento(s))
+    · 1 variante(s).
+[OK] Linha MEIO-FIO-ALTO – Meio-fio alto 0,15 × 0,20 m  (2922 ms, 1 elemento(s))
+    · 1 variante(s).
+[OK] Linha MEIO-FIO-REB – Meio-fio rebaixado (guia rebaixada)  (2860 ms, 1 elemento(s))
+    · 1 variante(s).
+[OK] Linha MEIO-FIO-SARJ – Meio-fio com sarjeta conjugada  (4396 ms, 4 elemento(s))
+    · 2 variante(s).
+[OK] Linha SARJETA – Sarjeta de concreto  (5217 ms, 3 elemento(s))
+    · 3 variante(s).
+[OK] Linha PLATAFORMA – Plataforma elevada (ciclovia, faixa ou estacionamento em nível próprio)  (2477 ms, 1 elemento(s))
+    · 1 variante(s).
+[OK] Linha SARJETAO – Sarjetão (travessia de águas)  (4295 ms, 3 elemento(s))
+    · 3 variante(s).
+[AVISO] Linha FCA-AZ – Faixa de caminhada azul  (5761 ms, 6 elemento(s))
+    ⚠ FCA-AZ: largura 0,10 m fora do intervalo de referência (0,80–4,00 m).
+    · 2 variante(s).
+[AVISO] Linha FCA-VD – Faixa de caminhada verde  (5464 ms, 6 elemento(s))
+    ⚠ FCA-VD: largura 0,10 m fora do intervalo de referência (0,80–4,00 m).
+    · 2 variante(s).
+[OK] Linha ONI-FD – Pintura de fundo de faixa de ônibus  (3100 ms, 1 elemento(s))
+    · 1 variante(s).
+[OK] Linha FCA – Faixa de caminhada – pintura de fundo  (2956 ms, 1 elemento(s))
+    · 1 variante(s).
+[OK] Linha FCA-BD – Faixa de caminhada – borda  (2811 ms, 1 elemento(s))
+    · 1 variante(s).
+[OK] Linha CIC-LC – Linha central de ciclofaixa bidirecional  (4398 ms, 2 elemento(s))
+    · 2 variante(s).
+[OK] Zebrados e marcações de área – catálogo  (15840 ms, 13 elemento(s))
+[OK] Zebrado em faixa ao longo de linha e zebrado com furo  (5724 ms, 6 elemento(s))
+[OK] Setas e símbolos – catálogo  (26374 ms, 24 elemento(s))
+[AVISO] Legendas – catálogo  (50691 ms, 75 elemento(s))
+    ⚠ Legenda com 4,88 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 4,06 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 3,79 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 5,69 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 5,61 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 6,78 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 6,04 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 4,04 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 5,27 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 4,57 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 5,67 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 7,74 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 6,14 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 4,79 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 4,45 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Legenda com 4,99 m de largura – verifique se cabe na faixa de rolamento.
+[AVISO] Vagas de estacionamento – catálogo  (63843 ms, 39 elemento(s))
+    Σ 5 × "Pisos realçadas se sobrepõem." (5 entre elementos da mesma marca) – em PCD-90 4, PCD-0 1
+    ⚠ 1 par(es) de pisos continuam sobrepostos no modelo: PCD-0 (Pisos) #3064726 [marca aa5fbd], PCD-0 (Pisos) #3065055 [marca aa5fbd] [mesma marca] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm).
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PCD-90 (Pisos) #3063403 [marca 8a48a2], PCD-90 (Pisos) #3064247 [marca 8a48a2] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PCD-90 (Pisos) #3063403 [marca 8a48a2], PCD-90 (Pisos) #3064427 [marca 8a48a2] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PCD-90 (Pisos) #3063996 [marca 8a48a2], PCD-90 (Pisos) #3064427 [marca 8a48a2] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PCD-90 (Pisos) #3064198 [marca 8a48a2], PCD-90 (Pisos) #3064247 [marca 8a48a2] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PCD-0 (Pisos) #3064726 [marca aa5fbd], PCD-0 (Pisos) #3065055 [marca aa5fbd] [mesma marca]
+    ⚠ Legenda com 3,67 m de largura – verifique se cabe na faixa de rolamento.
+    ⚠ Lento: 64 s.
+    · Pisos sobrepostos conferidos no fim da etapa: 5 par(es) dos avisos – 1 ainda com volume em comum, 4 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 0 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: PCD-0 × PCD-0 [mesma marca] 1 (0 m³).
+[OK] Inscrições repetidas (símbolo e texto)  (7215 ms, 5 elemento(s))
+[AVISO] Área de conflito (MAC) na interseção  (20594 ms, 2 elemento(s))
+    Σ 16 × "Pisos realçadas se sobrepõem." – em MAC 14, ORELHA 8, LCO 4, SARJETA 4, FTP-1 2
+    ⚠ 14 par(es) de pisos continuam sobrepostos no modelo: ORELHA (Pisos) #2959544 [marca 2819a9], MAC (Pisos) #3072025 [marca a7554c] (1682 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,004, tipo 0,3 cm); ORELHA (Pisos) #2959571 [marca 2819a9], MAC (Pisos) #3072025 [marca a7554c] (232 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,004, tipo 0,3 cm); SARJETA (Pisos) #2959598 [marca b5277b], MAC (Pisos) #3072025 [marca a7554c] (458 cm³; z 0,001–0,006, tipo 0,5 cm × z 0,001–0,004, tipo 0,3 cm); ORELHA (Pisos) #2959623 [marca e70587], MAC (Pisos) #3072025 [marca a7554c] (1684 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,004, tipo 0,3 cm); ORELHA (Pisos) #2959641 [marca e70587], MAC (Pisos) #3072025 [marca a7554c] (232 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,004, tipo 0,3 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LCO (Pisos) #2959400 [marca 33516e], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LCO (Pisos) #2959447 [marca 8a3b6d], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2959544 [marca 2819a9], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2959571 [marca 2819a9], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2959598 [marca b5277b], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2959623 [marca e70587], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2959641 [marca e70587], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2959670 [marca fa7f0f], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2959694 [marca 5742e4], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2959721 [marca 5742e4], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2959739 [marca ebc859], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2959763 [marca 0aeb73], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #2959789 [marca 0aeb73], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2959805 [marca 64a4b4], MAC (Pisos) #3072025 [marca a7554c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – FTP-1 (Pisos) #2959122 [marca 88ea68], LCO (Pisos) #3072288 [marca 33516e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – FTP-1 (Pisos) #2959122 [marca 88ea68], LCO (Pisos) #3072311 [marca 8a3b6d]
+    · Pisos sobrepostos conferidos no fim da etapa: 16 par(es) dos avisos – 14 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 2 com piso apagado ou refeito, 0 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: MAC × ORELHA 8 (0,0077 m³); MAC × SARJETA 4 (0,0018 m³); FTP-1 × LCO 2 (0,0001 m³).
+[AVISO] Canalização – TransicaoLargura  (3094 ms, 1 elemento(s))
+    ⚠ MTL: transição de 105,0 m para d = 3,50 m a 60 km/h.
+[AVISO] Canalização – Obstaculo  (3707 ms, 1 elemento(s))
+    ⚠ MAO: transição de 105,0 m para d = 3,50 m a 60 km/h.
+[AVISO] Canalização – Acostamento  (3041 ms, 1 elemento(s))
+    ⚠ MAP: transição de 40,0 m para d = 3,50 m a 60 km/h.
+[OK] Ciclovia / faixa – CiclofaixaUnidirecional  (8842 ms, 5 elemento(s))
+[OK] Ciclovia / faixa – CiclofaixaBidirecional  (15358 ms, 11 elemento(s))
+[OK] Ciclovia / faixa – Ciclovia  (14293 ms, 13 elemento(s))
+[OK] Ciclovia / faixa – FaixaCaminhada  (8542 ms, 6 elemento(s))
+[OK] Via das travessias (modelo local)  (31599 ms, 12 elemento(s))
+    · 12 marca(s) na via; eixo 400 m.
+[AVISO] Faixa de pedestres FTP-1 (sobre a via)  (18390 ms, 3 elemento(s))
+    Σ 7 × "Pisos realçadas se sobrepõem." – em MER-0 6, LRE 4, FTP-1 3, LFO-2 1
+    ⚠ 2 par(es) de pisos continuam sobrepostos no modelo: LRE (Pisos) #3076625 [marca d6f6a2], MER-0 (Pisos) #3077205 [marca fb7ecf] (120 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); LRE (Pisos) #3076632 [marca 971478], MER-0 (Pisos) #3077267 [marca 294f40] (120 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm).
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3075641 [marca 5e5262], FTP-1 (Pisos) #3076578 [marca ae3c01]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3075912 [marca fb7ecf], FTP-1 (Pisos) #3076578 [marca ae3c01]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3075912 [marca fb7ecf], LRE (Pisos) #3076625 [marca d6f6a2]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3076211 [marca 294f40], FTP-1 (Pisos) #3076578 [marca ae3c01]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3076211 [marca 294f40], LRE (Pisos) #3076632 [marca 971478]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LRE (Pisos) #3076625 [marca d6f6a2], MER-0 (Pisos) #3077205 [marca fb7ecf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LRE (Pisos) #3076632 [marca 971478], MER-0 (Pisos) #3077267 [marca 294f40]
+    · Pisos sobrepostos conferidos no fim da etapa: 7 par(es) dos avisos – 2 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 5 com piso apagado ou refeito, 0 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: LRE × MER-0 2 (0,0002 m³).
+[AVISO] Faixa de pedestres FTP-2 (sobre a via)  (18263 ms, 3 elemento(s))
+    Σ 9 × "Pisos realçadas se sobrepõem." – em LRE 7, MER-0 7, FTP-2 2, LFO-2 2
+    ⚠ 4 par(es) de pisos continuam sobrepostos no modelo: LRE (Pisos) #3076625 [marca d6f6a2], MER-0 (Pisos) #3078136 [marca fb7ecf] (120 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); LRE (Pisos) #3076632 [marca 971478], MER-0 (Pisos) #3078199 [marca 294f40] (120 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); LRE (Pisos) #3077591 [marca 15b205], LFO-2 (Pisos) #3077606 [marca 5e5262] (60 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); LRE (Pisos) #3077591 [marca 15b205], MER-0 (Pisos) #3078262 [marca 294f40] (120 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm).
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3076647 [marca 5e5262], LRE (Pisos) #3077591 [marca 15b205]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3076914 [marca fb7ecf], FTP-2 (Pisos) #3077573 [marca 6f5dd6]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3076914 [marca fb7ecf], LRE (Pisos) #3077584 [marca fec076]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3077267 [marca 294f40], FTP-2 (Pisos) #3077573 [marca 6f5dd6]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3077267 [marca 294f40], LRE (Pisos) #3077591 [marca 15b205]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LRE (Pisos) #3076625 [marca d6f6a2], MER-0 (Pisos) #3078136 [marca fb7ecf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LRE (Pisos) #3076632 [marca 971478], MER-0 (Pisos) #3078199 [marca 294f40]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LRE (Pisos) #3077591 [marca 15b205], LFO-2 (Pisos) #3077606 [marca 5e5262]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LRE (Pisos) #3077591 [marca 15b205], MER-0 (Pisos) #3078262 [marca 294f40]
+    · Pisos sobrepostos conferidos no fim da etapa: 9 par(es) dos avisos – 4 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 5 com piso apagado ou refeito, 0 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: LRE × MER-0 3 (0,0004 m³); LFO-2 × LRE 1 (0,0001 m³).
+[AVISO] Faixa de pedestres MCC (sobre a via)  (19011 ms, 5 elemento(s))
+    Σ 7 × "Pisos realçadas se sobrepõem." – em LRE 7, MER-0 6, LFO-2 1
+    ⚠ 5 par(es) de pisos continuam sobrepostos no modelo: LRE (Pisos) #3076625 [marca d6f6a2], MER-0 (Pisos) #3079193 [marca fb7ecf] (120 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); LRE (Pisos) #3076632 [marca 971478], MER-0 (Pisos) #3079280 [marca 294f40] (120 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); LRE (Pisos) #3077591 [marca 15b205], LFO-2 (Pisos) #3078676 [marca 5e5262] (60 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); LRE (Pisos) #3077591 [marca 15b205], MER-0 (Pisos) #3079280 [marca 294f40] (120 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); LRE (Pisos) #3078662 [marca 43bc2e], MER-0 (Pisos) #3079367 [marca 294f40] (120 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm).
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3077873 [marca fb7ecf], LRE (Pisos) #3078655 [marca 363a05]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3078262 [marca 294f40], LRE (Pisos) #3078662 [marca 43bc2e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LRE (Pisos) #3076625 [marca d6f6a2], MER-0 (Pisos) #3079193 [marca fb7ecf]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LRE (Pisos) #3076632 [marca 971478], MER-0 (Pisos) #3079280 [marca 294f40]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LRE (Pisos) #3077591 [marca 15b205], LFO-2 (Pisos) #3078676 [marca 5e5262]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LRE (Pisos) #3077591 [marca 15b205], MER-0 (Pisos) #3079280 [marca 294f40]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LRE (Pisos) #3078662 [marca 43bc2e], MER-0 (Pisos) #3079367 [marca 294f40]
+    · Pisos sobrepostos conferidos no fim da etapa: 7 par(es) dos avisos – 5 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 2 com piso apagado ou refeito, 0 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: LRE × MER-0 4 (0,0005 m³); LFO-2 × LRE 1 (0,0001 m³).
+[OK] Setas sobre a via (pintura sobre o piso)  (5630 ms, 3 elemento(s))
+[AVISO] Cruzamento rodoferroviário  (55694 ms, 36 elemento(s))
+    Σ 28 × "Pisos realçadas se sobrepõem." – em LRE 13, MCF 13, MER-0 10, LFO-3 8, SARJETA 8, CSA 2, LFO-2 2
+    ⚠ 28 par(es) de pisos continuam sobrepostos no modelo: LFO-2 (Pisos) #3079681 [marca 1bcdb5], MCF (Pisos) #3080427 [marca ffff9e] (60 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); LFO-2 (Pisos) #3079681 [marca 1bcdb5], LRE (Pisos) #3080560 [marca c2007c] (60 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); MER-0 (Pisos) #3079884 [marca dfe19c], MCF (Pisos) #3080420 [marca ffff9e] (120 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); MER-0 (Pisos) #3079884 [marca dfe19c], MCF (Pisos) #3080427 [marca ffff9e] (120 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); MER-0 (Pisos) #3079884 [marca dfe19c], LRE (Pisos) #3080434 [marca ad109f] (120 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3079681 [marca 1bcdb5], MCF (Pisos) #3080427 [marca ffff9e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3079681 [marca 1bcdb5], LRE (Pisos) #3080560 [marca c2007c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3079884 [marca dfe19c], MCF (Pisos) #3080420 [marca ffff9e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3079884 [marca dfe19c], MCF (Pisos) #3080427 [marca ffff9e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3079884 [marca dfe19c], LRE (Pisos) #3080434 [marca ad109f]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3079884 [marca dfe19c], LRE (Pisos) #3080441 [marca 0213ae]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3079884 [marca dfe19c], CSA (Pisos) #3080448 [marca 554dbd]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3080111 [marca 27dbdd], MCF (Pisos) #3080539 [marca df33e6]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3080111 [marca 27dbdd], MCF (Pisos) #3080546 [marca df33e6]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3080111 [marca 27dbdd], LRE (Pisos) #3080553 [marca 0cfe8b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3080111 [marca 27dbdd], LRE (Pisos) #3080560 [marca c2007c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3080111 [marca 27dbdd], CSA (Pisos) #3080567 [marca 3c8b85]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3080342 [marca 46d24e], MCF (Pisos) #3080420 [marca ffff9e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3080342 [marca 46d24e], MCF (Pisos) #3080427 [marca ffff9e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3080342 [marca 46d24e], LRE (Pisos) #3080434 [marca ad109f]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3080342 [marca 46d24e], LRE (Pisos) #3080441 [marca 0213ae]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3080370 [marca 796661], MCF (Pisos) #3080539 [marca df33e6]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3080370 [marca 796661], MCF (Pisos) #3080546 [marca df33e6]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3080370 [marca 796661], LRE (Pisos) #3080553 [marca 0cfe8b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3080370 [marca 796661], LRE (Pisos) #3080560 [marca c2007c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-3 (Pisos) #3080406 [marca 7ab4d0], MCF (Pisos) #3080539 [marca df33e6]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-3 (Pisos) #3080406 [marca 7ab4d0], MCF (Pisos) #3080546 [marca df33e6]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-3 (Pisos) #3080406 [marca 7ab4d0], LRE (Pisos) #3080553 [marca 0cfe8b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-3 (Pisos) #3080406 [marca 7ab4d0], LRE (Pisos) #3080560 [marca c2007c]
+    ⚠ … e mais 4 aviso(s)
+    · 12 marca(s) na via; eixo 300 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 28 par(es) dos avisos – 28 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 0 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: MCF × SARJETA 4 (0,0014 m³); LRE × SARJETA 4 (0,0014 m³); MCF × MER-0 4 (0,0008 m³); LFO-3 × MCF 4 (0,0005 m³); LFO-3 × LRE 4 (0,0005 m³); LRE × MER-0 4 (0,0005 m³); CSA × MER-0 2 (0,0017 m³); LFO-2 × LRE 1 (0,0001 m³); LFO-2 × MCF 1 (0,0001 m³).
+
+=== Sinalização vertical ===
+[OK] Dispositivos físicos – catálogo  (29047 ms, 35 elemento(s))
+[AVISO] Placas – catálogo completo (168)  (212467 ms, 168 elemento(s))
+    ⚠ Lento: 212 s.
+    · 168 placa(s).
+[AVISO] Placas – tipos de suporte  (8805 ms, 6 elemento(s))
+    ⚠ Placa aérea com altura livre de 2,10 m – o MBST/DER exigem no mínimo 5,50 m sobre a pista.
+[OK] Mobiliário urbano – catálogo (por ponto)  (21155 ms, 37 elemento(s))
+[OK] Mobiliário urbano ao longo de linha  (3017 ms, 2 elemento(s))
+[OK] Famílias do Revit classificadas como elementos urbanos  (664 ms, 0 elemento(s))
+    · 0 família(s) classificada(s) no projeto.
+
+=== Calçadas ===
+[OK] Via das calçadas (modelo local)  (28849 ms, 12 elemento(s))
+    · 12 marca(s) na via; eixo 300 m.
+[OK] Via da moderação (modelo local)  (32603 ms, 12 elemento(s))
+    · 12 marca(s) na via; eixo 400 m.
+[OK] Rampa – RebaixamentoComAbas  (14804 ms, 3 elemento(s))
+    · Calçada/meio-fio recortados em 3 elemento(s).
+[OK] Rampa – RebaixamentoSemAbas  (15310 ms, 3 elemento(s))
+    · Calçada/meio-fio recortados em 3 elemento(s).
+[OK] Rampa – AcessoVeiculos  (13924 ms, 1 elemento(s))
+    · Calçada/meio-fio recortados em 3 elemento(s).
+[OK] Rampa – RebaixamentoTotal  (16133 ms, 3 elemento(s))
+    · Calçada/meio-fio recortados em 3 elemento(s).
+[AVISO] Extensão de calçada (avanço sobre o estacionamento)  (11378 ms, 2 elemento(s))
+    Σ 5 × "Pisos realçadas se sobrepõem." – em ORELHA 5, MER-0 3, SARJETA 2
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3081209 [marca fa183d], ORELHA (Pisos) #3082887 [marca b72d80]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3081209 [marca fa183d], ORELHA (Pisos) #3082900 [marca b72d80]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3081667 [marca cff6e9], ORELHA (Pisos) #3082887 [marca b72d80]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3081667 [marca cff6e9], ORELHA (Pisos) #3082900 [marca b72d80]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #3082900 [marca b72d80], MER-0 (Pisos) #3082965 [marca fa183d]
+    · Pisos sobrepostos conferidos no fim da etapa: 5 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 4 com piso apagado ou refeito, 1 sem conferência.
+[OK] Área de calçada – Calcada  (3375 ms, 1 elemento(s))
+[OK] Área de calçada – Canteiro  (3856 ms, 2 elemento(s))
+[OK] Área de calçada – Ciclovia  (2839 ms, 1 elemento(s))
+[OK] Área de calçada – Deck  (3518 ms, 2 elemento(s))
+[OK] Área de calçada – Pavimento  (3641 ms, 1 elemento(s))
+[OK] Área de calçada – FaixaServico  (3415 ms, 1 elemento(s))
+[AVISO] Canteiro na calçada – Gramado  (12708 ms, 7 elemento(s))
+    Σ 4 × "Pisos realçadas se sobrepõem." – em CANT-GRAMA 4, CALCADA 2, GRAMADO 2
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3082845 [marca 81db47], CANT-GRAMA (Pisos) #3083264 [marca b12449]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3082845 [marca 81db47], CANT-GRAMA (Pisos) #3083275 [marca b12449]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3082859 [marca 47d984], CANT-GRAMA (Pisos) #3083264 [marca b12449]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3082859 [marca 47d984], CANT-GRAMA (Pisos) #3083275 [marca b12449]
+    · Pisos sobrepostos conferidos no fim da etapa: 4 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 4 com piso apagado ou refeito, 0 sem conferência.
+[AVISO] Canteiro na calçada – Jardineira  (13468 ms, 7 elemento(s))
+    Σ 4 × "Pisos realçadas se sobrepõem." – em JARDINEIRA 4, CALCADA 2, GRAMADO 2
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3083329 [marca 81db47], JARDINEIRA (Pisos) #3083371 [marca 136e42]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3083329 [marca 81db47], JARDINEIRA (Pisos) #3083384 [marca 136e42]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3083340 [marca 47d984], JARDINEIRA (Pisos) #3083371 [marca 136e42]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3083340 [marca 47d984], JARDINEIRA (Pisos) #3083384 [marca 136e42]
+    · Pisos sobrepostos conferidos no fim da etapa: 4 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 4 com piso apagado ou refeito, 0 sem conferência.
+[AVISO] Canteiro na calçada – GrelhaArvore  (12951 ms, 7 elemento(s))
+    Σ 2 × "Pisos realçadas se sobrepõem." – em GRELHA-ARV 2, CALCADA 1, GRAMADO 1
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3083453 [marca 81db47], GRELHA-ARV (Pisos) #3083501 [marca 5e5c06]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3083468 [marca 47d984], GRELHA-ARV (Pisos) #3083501 [marca 5e5c06]
+    · Pisos sobrepostos conferidos no fim da etapa: 2 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 2 com piso apagado ou refeito, 0 sem conferência.
+[OK] Moderação de tráfego – OndulacaoA  (3866 ms, 2 elemento(s))
+[OK] Moderação de tráfego – OndulacaoB  (3381 ms, 2 elemento(s))
+[OK] Moderação de tráfego – FaixaElevada  (20789 ms, 4 elemento(s))
+[OK] Moderação de tráfego – LombadaInvertida  (23804 ms, 1 elemento(s))
+[OK] Moderação de tráfego – Almofada  (3513 ms, 2 elemento(s))
+[OK] Piso tátil (rota com mudança de direção)  (8366 ms, 2 elemento(s))
+[OK] Via férrea – Lastro  (13941 ms, 4 elemento(s))
+[OK] Via férrea – Laje  (10657 ms, 3 elemento(s))
+[AVISO] Via férrea – Embutida  (4258 ms, 2 elemento(s))
+    ⚠ Via embutida: o usual é trilho de canaleta (Ri-60) para manter o friso livre.
+[OK] Drenagem – BocaDeLoboSimples  (23606 ms, 5 elemento(s))
+[OK] Drenagem – BocaDeLoboDupla  (27072 ms, 5 elemento(s))
+[OK] Drenagem – BocaDeLoboGrelha  (19600 ms, 4 elemento(s))
+[OK] Drenagem – BocaDeLoboCombinada  (26092 ms, 5 elemento(s))
+[OK] Drenagem – GrelhaSarjeta  (20700 ms, 4 elemento(s))
+[OK] Drenagem – GrelhaQuadrada  (13853 ms, 3 elemento(s))
+[OK] Drenagem – GrelhaContinua  (12202 ms, 3 elemento(s))
+[OK] Drenagem – PocoDeVisita  (15611 ms, 4 elemento(s))
+[AVISO] Drenagem – série de grelhas ao longo do meio-fio  (21410 ms, 4 elemento(s))
+    Σ 1 × "Pisos realçadas se sobrepõem." – em MER-0 1, ORELHA 1
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – ORELHA (Pisos) #3082900 [marca b72d80], MER-0 (Pisos) #3085538 [marca fa183d]
+    · 1 grelha(s) na série.
+    · Pisos sobrepostos conferidos no fim da etapa: 1 par(es) dos avisos – 0 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 1 sem conferência.
+
+=== Largura e recuos ===
+[OK] Via com largura variável (10,00 → 10,50 m entre meios-fios) e estreitamento do lote  (33040 ms, 14 elemento(s))
+    · 14 marca(s) na via; eixo 260 m.
+[AVISO] Baia de ônibus, faixa de desaceleração e de aceleração  (54639 ms, 28 elemento(s))
+    Σ 12 × "Pisos realçadas se sobrepõem." – em CALCADA 6, GRAMADO 6, MEIO-FIO 6, SARJETA 6
+    ⚠ 12 par(es) de pisos continuam sobrepostos no modelo: SARJETA (Pisos) #3088046 [marca a8b531], MEIO-FIO (Pisos) #3088069 [marca d23e35] (3482 cm³; z 0,001–0,006, tipo 0,5 cm × z 0,001–0,151, tipo 15 cm); SARJETA (Pisos) #3088046 [marca a8b531], GRAMADO (Pisos) #3088092 [marca 4cdaba] (5202 cm³; z 0,001–0,006, tipo 0,5 cm × z 0,001–0,151, tipo 15 cm); SARJETA (Pisos) #3088046 [marca a8b531], CALCADA (Pisos) #3088115 [marca 65d689] (1962 cm³; z 0,001–0,006, tipo 0,5 cm × z 0,001–0,151, tipo 15 cm); MEIO-FIO (Pisos) #3088069 [marca d23e35], GRAMADO (Pisos) #3088092 [marca 4cdaba] (120991 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); MEIO-FIO (Pisos) #3088069 [marca d23e35], CALCADA (Pisos) #3088115 [marca 65d689] (29477 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3088046 [marca a8b531], MEIO-FIO (Pisos) #3088069 [marca d23e35]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3088046 [marca a8b531], GRAMADO (Pisos) #3088092 [marca 4cdaba]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3088046 [marca a8b531], CALCADA (Pisos) #3088115 [marca 65d689]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3088069 [marca d23e35], GRAMADO (Pisos) #3088092 [marca 4cdaba]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3088069 [marca d23e35], CALCADA (Pisos) #3088115 [marca 65d689]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3088092 [marca 4cdaba], CALCADA (Pisos) #3088115 [marca 65d689]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3088137 [marca 87958a], MEIO-FIO (Pisos) #3088152 [marca 1ee676]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3088137 [marca 87958a], GRAMADO (Pisos) #3088167 [marca 9c3978]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3088137 [marca 87958a], CALCADA (Pisos) #3088182 [marca 1d3f89]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3088152 [marca 1ee676], GRAMADO (Pisos) #3088167 [marca 9c3978]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3088152 [marca 1ee676], CALCADA (Pisos) #3088182 [marca 1d3f89]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3088167 [marca 9c3978], CALCADA (Pisos) #3088182 [marca 1d3f89]
+    ⚠ Baia de ônibus na estaca 2+0,00: o recuo de 3,00 m deixa a faixa livre da calçada com 0,00 m (NBR 9050: 1,20 m) – desloque a calçada ou reduza a profundidade.
+    ⚠ Faixa de desaceleração (saída) na estaca 7+0,00: o recuo de 3,50 m deixa a faixa livre da calçada com 0,00 m (NBR 9050: 1,20 m) – desloque a calçada ou reduza a profundidade.
+    ⚠ Faixa de aceleração (entrada) na estaca 13+0,00: o recuo de 3,50 m deixa a faixa livre da calçada com 0,00 m (NBR 9050: 1,20 m) – desloque a calçada ou reduza a profundidade.
+    ⚠ Legenda com 3,79 m de largura – verifique se cabe na faixa de rolamento.
+    · 21 marca(s) na via; eixo 380 m.
+    · Pisos sobrepostos conferidos no fim da etapa: 12 par(es) dos avisos – 12 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 0 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: CALCADA × GRAMADO 2 (2,1627 m³); GRAMADO × MEIO-FIO 2 (0,2155 m³); CALCADA × MEIO-FIO 2 (0,059 m³); GRAMADO × SARJETA 2 (0,0104 m³); MEIO-FIO × SARJETA 2 (0,0064 m³); CALCADA × SARJETA 2 (0,0039 m³).
+[AVISO] Calçada com inclinação transversal e níveis do alinhamento (edificações antigas mais altas)  (29053 ms, 40 elemento(s))
+    ⚠ Calçada (direita), estaca 0+0,00: inclinação transversal de -6,0% – a NBR 9050 admite até 3 %. Use faixa de acesso para vencer o desnível do lote.
+    ⚠ Calçada (direita), estaca 3+0,00: inclinação transversal de 8,0% – a NBR 9050 admite até 3 %. Use faixa de acesso para vencer o desnível do lote.
+    ⚠ Calçada (esquerda), estaca 0+0,00: inclinação transversal de -6,0% – a NBR 9050 admite até 3 %. Use faixa de acesso para vencer o desnível do lote.
+    ⚠ Calçada (esquerda), estaca 3+0,00: inclinação transversal de 8,0% – a NBR 9050 admite até 3 %. Use faixa de acesso para vencer o desnível do lote.
+    · 12 marca(s) na via; eixo 200 m.
+[AVISO] Arterial × coletora com linha de continuidade (LCO) na interseção  (410621 ms, 91 elemento(s))
+    Σ 103 × "Pisos realçadas se sobrepõem." (3 entre elementos da mesma marca) – em ORELHA 39, SARJETA 38, MER-0 24, CALCADA 21, GRAMADO 20, LCO 18, MEIO-FIO 17, INTERSECAO 13
+    ⚠ 10 par(es) de pisos continuam sobrepostos no modelo: INTERSECAO (Pisos) #3090382 [marca 992791], INTERSECAO (Pisos) #3090437 [marca 992791] [mesma marca] (2296 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); MER-0 (Pisos) #3091717 [marca 0d296a], SARJETA (Pisos) #3093342 [marca e3f15c] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #3091816 [marca 0d296a], SARJETA (Pisos) #3093262 [marca e7623d] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); GRAMADO (Pisos) #3092093 [marca 5fdcf5], ORELHA (Pisos) #3093209 [marca 5f7ee3] (41 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); MER-0 (Pisos) #3092213 [marca 3d0b20], SARJETA (Pisos) #3093262 [marca e7623d] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #3089008 [marca 66bd4a], PAV-ASF (Pisos) #3089994 [marca 313e2c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #3089022 [marca 194191], LFO-2 (Pisos) #3090001 [marca fe5db8]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #3089022 [marca 194191], MER-0 (Pisos) #3090100 [marca 3d0b20]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LBO (Pisos) #3089022 [marca 194191], MER-0 (Pisos) #3090211 [marca d7da77]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3089669 [marca 0d296a], MER-0 (Pisos) #3090100 [marca 3d0b20]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3089669 [marca 0d296a], MER-0 (Pisos) #3090211 [marca d7da77]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3089904 [marca 9100f4], LFO-2 (Pisos) #3090001 [marca fe5db8]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3089904 [marca 9100f4], MER-0 (Pisos) #3090100 [marca 3d0b20]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3089904 [marca 9100f4], MER-0 (Pisos) #3090211 [marca d7da77]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3089918 [marca 6545f2], LFO-2 (Pisos) #3090001 [marca fe5db8]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3089918 [marca 6545f2], MER-0 (Pisos) #3090100 [marca 3d0b20]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3089918 [marca 6545f2], MER-0 (Pisos) #3090211 [marca d7da77]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3089953 [marca c0ec6d], MER-0 (Pisos) #3090100 [marca 3d0b20]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3089953 [marca c0ec6d], MER-0 (Pisos) #3090211 [marca d7da77]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3089960 [marca 453df6], MER-0 (Pisos) #3090100 [marca 3d0b20]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3089960 [marca 453df6], MER-0 (Pisos) #3090211 [marca d7da77]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3089967 [marca 5fdcf5], MER-0 (Pisos) #3090100 [marca 3d0b20]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3089967 [marca 5fdcf5], MER-0 (Pisos) #3090211 [marca d7da77]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3089974 [marca d3a265], LFO-2 (Pisos) #3090001 [marca fe5db8]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3089974 [marca d3a265], MER-0 (Pisos) #3090100 [marca 3d0b20]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3089974 [marca d3a265], MER-0 (Pisos) #3090211 [marca d7da77]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3090382 [marca 992791], INTERSECAO (Pisos) #3090437 [marca 992791] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3090382 [marca 992791], ORELHA (Pisos) #3091042 [marca 84f893]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LCO (Pisos) #3090909 [marca 34371e], ORELHA (Pisos) #3090993 [marca 15aa76]
+    ⚠ … e mais 81 aviso(s)
+    · 18 marca(s) na via; eixo 300 m.
+    · 12 marca(s) na via; eixo 140 m.
+    · Interseção criada; linha de continuidade: Automatica, via principal …
+    · Pisos sobrepostos conferidos no fim da etapa: 103 par(es) dos avisos – 10 ainda com volume em comum, 2 sem volume em comum (aviso de passagem), 88 com piso apagado ou refeito, 3 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: MER-0 × SARJETA 4 (0 m³); LCO × SARJETA 2 (0,0002 m³); GRAMADO × ORELHA 2 (0,0002 m³); INTERSECAO × INTERSECAO [mesma marca] 1 (0,0023 m³); LCO × ORELHA 1 (0 m³).
+[AVISO] Via nova emendada na ponta de outra em ângulo (emenda concordada)  (170326 ms, 25 elemento(s))
+    Σ 38 × "Pisos realçadas se sobrepõem." (5 entre elementos da mesma marca) – em INTERSECAO 33, GRAMADO 10, MEIO-FIO 7, SARJETA 7, CALCADA 6, MER-0 3, LFO-2 1, PAV-ASF 1
+    ⚠ 3 par(es) de pisos continuam sobrepostos no modelo: INTERSECAO (Pisos) #3094116 [marca 3b25a0], INTERSECAO (Pisos) #3094180 [marca 3b25a0] [mesma marca] (1248 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #3094086 [marca 3b25a0], MEIO-FIO (Pisos) #3094907 [marca e71138] (5 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm); INTERSECAO (Pisos) #3094165 [marca 3b25a0], CALCADA (Pisos) #3094893 [marca d1b4ef] (48 cm³; z 0,001–0,151, tipo 15 cm × z 0,001–0,151, tipo 15 cm).
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #3093563 [marca ee854c], PAV-ASF (Pisos) #3093833 [marca cc6d2b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3093570 [marca a840a7], LFO-2 (Pisos) #3093840 [marca c23a1d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3093696 [marca 7e26d1], MER-0 (Pisos) #3093977 [marca 11b0c4]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094056 [marca 3b25a0], INTERSECAO (Pisos) #3094211 [marca 3b25a0] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094056 [marca 3b25a0], INTERSECAO (Pisos) #3094226 [marca 3b25a0] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094075 [marca 3b25a0], INTERSECAO (Pisos) #3094211 [marca 3b25a0] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094086 [marca 3b25a0], INTERSECAO (Pisos) #3094226 [marca 3b25a0] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094116 [marca 3b25a0], INTERSECAO (Pisos) #3094180 [marca 3b25a0] [mesma marca]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094075 [marca 3b25a0], SARJETA (Pisos) #3094767 [marca af875c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094075 [marca 3b25a0], MEIO-FIO (Pisos) #3094774 [marca a0343d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094075 [marca 3b25a0], GRAMADO (Pisos) #3094781 [marca 33925f]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094086 [marca 3b25a0], MEIO-FIO (Pisos) #3094802 [marca e71138]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094086 [marca 3b25a0], GRAMADO (Pisos) #3094809 [marca 1ad0fc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094086 [marca 3b25a0], CALCADA (Pisos) #3094816 [marca 2aedad]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094097 [marca 3b25a0], SARJETA (Pisos) #3094767 [marca af875c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094097 [marca 3b25a0], MEIO-FIO (Pisos) #3094774 [marca a0343d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094097 [marca 3b25a0], GRAMADO (Pisos) #3094781 [marca 33925f]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094116 [marca 3b25a0], GRAMADO (Pisos) #3094809 [marca 1ad0fc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094116 [marca 3b25a0], CALCADA (Pisos) #3094816 [marca 2aedad]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094165 [marca 3b25a0], SARJETA (Pisos) #3094767 [marca af875c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094165 [marca 3b25a0], MEIO-FIO (Pisos) #3094774 [marca a0343d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094165 [marca 3b25a0], CALCADA (Pisos) #3094788 [marca d1b4ef]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094180 [marca 3b25a0], GRAMADO (Pisos) #3094809 [marca 1ad0fc]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – INTERSECAO (Pisos) #3094180 [marca 3b25a0], CALCADA (Pisos) #3094816 [marca 2aedad]
+    ⚠ … e mais 15 aviso(s)
+    · 12 marca(s) na via; eixo 80 m.
+    · 12 marca(s) na via; eixo 85 m.
+    · Emenda criada com 1 linha(s) contínua(s) na curva.
+    · Pisos sobrepostos conferidos no fim da etapa: 38 par(es) dos avisos – 3 ainda com volume em comum, 5 sem volume em comum (aviso de passagem), 26 com piso apagado ou refeito, 4 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: INTERSECAO × INTERSECAO [mesma marca] 1 (0,0012 m³); CALCADA × INTERSECAO 1 (0 m³); INTERSECAO × MEIO-FIO 1 (0 m³).
+[AVISO] Várias linhas selecionadas viram várias vias (malha com T e cruz)  (619159 ms, 70 elemento(s))
+    Σ 227 × "Pisos realçadas se sobrepõem." (6 entre elementos da mesma marca) – em ORELHA 104, SARJETA 104, MER-0 56, MEIO-FIO 40, CALCADA 39, GRAMADO 39, LCO 23, INTERSECAO 12
+    ⚠ 13 par(es) de pisos continuam sobrepostos no modelo: MER-0 (Pisos) #3096812 [marca e762b2], SARJETA (Pisos) #3098383 [marca 5ab55d] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #3097286 [marca 9e6b07], SARJETA (Pisos) #3098452 [marca d449d2] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #3097286 [marca 9e6b07], SARJETA (Pisos) #3098524 [marca 543389] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #3097385 [marca 2cf2af], SARJETA (Pisos) #3098596 [marca a733d3] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); MER-0 (Pisos) #3097436 [marca 2cf2af], SARJETA (Pisos) #3098383 [marca 5ab55d] (4 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,006, tipo 0,5 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #3094963 [marca 912cc6], PAV-ASF (Pisos) #3095487 [marca dbfdce]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3094970 [marca 698649], MER-0 (Pisos) #3095605 [marca 9e6b07]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3094970 [marca 698649], MER-0 (Pisos) #3095732 [marca 2cf2af]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3095109 [marca e762b2], MER-0 (Pisos) #3095605 [marca 9e6b07]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3095109 [marca e762b2], MER-0 (Pisos) #3095732 [marca 2cf2af]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3095264 [marca 73ea36], MER-0 (Pisos) #3095605 [marca 9e6b07]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3095264 [marca 73ea36], MER-0 (Pisos) #3095732 [marca 2cf2af]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3095423 [marca 71c3f0], MER-0 (Pisos) #3095605 [marca 9e6b07]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3095423 [marca 71c3f0], MER-0 (Pisos) #3095732 [marca 2cf2af]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3095430 [marca 3ca16a], MER-0 (Pisos) #3095605 [marca 9e6b07]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3095430 [marca 3ca16a], MER-0 (Pisos) #3095732 [marca 2cf2af]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3095437 [marca 97b333], LFO-2 (Pisos) #3095494 [marca baeae5]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3095437 [marca 97b333], MER-0 (Pisos) #3095605 [marca 9e6b07]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3095437 [marca 97b333], MER-0 (Pisos) #3095732 [marca 2cf2af]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3095444 [marca 7a451a], LFO-2 (Pisos) #3095494 [marca baeae5]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3095444 [marca 7a451a], MER-0 (Pisos) #3095605 [marca 9e6b07]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3095444 [marca 7a451a], MER-0 (Pisos) #3095732 [marca 2cf2af]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3095451 [marca 17d769], LFO-2 (Pisos) #3095494 [marca baeae5]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3095451 [marca 17d769], MER-0 (Pisos) #3095605 [marca 9e6b07]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3095451 [marca 17d769], MER-0 (Pisos) #3095732 [marca 2cf2af]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3095458 [marca f02236], LFO-2 (Pisos) #3095494 [marca baeae5]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3095458 [marca f02236], MER-0 (Pisos) #3095605 [marca 9e6b07]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3095458 [marca f02236], MER-0 (Pisos) #3095732 [marca 2cf2af]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3095465 [marca 07ef0a], LFO-2 (Pisos) #3095494 [marca baeae5]
+    ⚠ … e mais 208 aviso(s)
+    · Pisos sobrepostos conferidos no fim da etapa: 227 par(es) dos avisos – 13 ainda com volume em comum, 2 sem volume em comum (aviso de passagem), 200 com piso apagado ou refeito, 12 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: MER-0 × SARJETA 9 (0 m³); FTP-1 × LCO 2 (0,0001 m³); GRAMADO × ORELHA 1 (0 m³); ORELHA × ORELHA [mesma marca] 1 (0 m³).
+[AVISO] Recuo (baia) acrescentado numa via já criada  (40202 ms, 51 elemento(s))
+    Σ 6 × "Pisos realçadas se sobrepõem." – em GRAMADO 5, CALCADA 3, MEIO-FIO 3, SARJETA 1
+    Σ 1 × "A espessura deste piso pode estar ligeiramente imprecisa devido a extrema edição da forma. As cotas para este elemento nos cortes e detalhes podem não indicar com precisão a espessura mostrada nas propriedades do tipo." – em CALCADA 1
+    ⚠ 5 par(es) de pisos continuam sobrepostos no modelo: SARJETA (Pisos) #3101222 [marca 428467], MEIO-FIO (Pisos) #3101237 [marca 5b505f] (394 cm³; z 0,001–0,006, tipo 0,5 cm × z 0,001–0,151, tipo 15 cm); MEIO-FIO (Pisos) #3101237 [marca 5b505f], GRAMADO (Pisos) #3101275 [marca e95e1e] (15024 cm³; z 0,001–0,151, tipo 15 cm × z -0,059–0,171, tipo 20,6 cm); GRAMADO (Pisos) #3101266 [marca e95e1e], CALCADA (Pisos) #3101332 [marca a19a1a] (5644 cm³; z -0,057–0,208, tipo 20,6 cm × z -0,169–0,340, tipo 35 cm); GRAMADO (Pisos) #3101266 [marca e95e1e], CALCADA (Pisos) #3101340 [marca a19a1a] (151304 cm³; z -0,057–0,208, tipo 20,6 cm × z -0,159–0,340, tipo 35 cm); GRAMADO (Pisos) #3101275 [marca e95e1e], CALCADA (Pisos) #3101354 [marca a19a1a] (104523 cm³; z -0,059–0,171, tipo 20,6 cm × z -0,199–0,201, tipo 35 cm).
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3101222 [marca 428467], MEIO-FIO (Pisos) #3101237 [marca 5b505f]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3101237 [marca 5b505f], GRAMADO (Pisos) #3101266 [marca e95e1e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3101237 [marca 5b505f], GRAMADO (Pisos) #3101275 [marca e95e1e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3101266 [marca e95e1e], CALCADA (Pisos) #3101332 [marca a19a1a]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3101266 [marca e95e1e], CALCADA (Pisos) #3101340 [marca a19a1a]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3101275 [marca e95e1e], CALCADA (Pisos) #3101354 [marca a19a1a]
+    ⚠ Aviso do Revit: A espessura deste piso pode estar ligeiramente imprecisa devido a extrema edição da forma. As cotas para este elemento nos cortes e detalhes podem não indicar com precisão a espessura mostrada nas propriedades do tipo. – CALCADA (Pisos) #3101340 [marca a19a1a]
+    ⚠ Calçada (direita), estaca 0+0,00: inclinação transversal de -6,0% – a NBR 9050 admite até 3 %. Use faixa de acesso para vencer o desnível do lote.
+    ⚠ Calçada (direita), estaca 3+0,00: inclinação transversal de 8,0% – a NBR 9050 admite até 3 %. Use faixa de acesso para vencer o desnível do lote.
+    ⚠ Calçada (esquerda), estaca 0+0,00: inclinação transversal de -6,0% – a NBR 9050 admite até 3 %. Use faixa de acesso para vencer o desnível do lote.
+    ⚠ Calçada (esquerda), estaca 3+0,00: inclinação transversal de 8,0% – a NBR 9050 admite até 3 %. Use faixa de acesso para vencer o desnível do lote.
+    ⚠ Baia de ônibus na estaca 3+0,00: o recuo de 2,00 m deixa a faixa livre da calçada com 0,00 m (NBR 9050: 1,20 m) – desloque a calçada ou reduza a profundidade.
+    ⚠ Legenda com 3,79 m de largura – verifique se cabe na faixa de rolamento.
+    · Pisos sobrepostos conferidos no fim da etapa: 6 par(es) dos avisos – 5 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 1 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: CALCADA × GRAMADO 3 (0,2615 m³); GRAMADO × MEIO-FIO 1 (0,015 m³); MEIO-FIO × SARJETA 1 (0,0004 m³).
+[AVISO] Via reconhecida em pisos comuns do Revit (T feito com dois pisos, pista já modelada)  (53997 ms, 22 elemento(s))
+    Σ 62 × "Pisos realçadas se sobrepõem." – em MER-0 21, CALCADA 20, GRAMADO 20, MEIO-FIO 20, SARJETA 20, LFO-2 11, Pisos 1
+    ⚠ 62 par(es) de pisos continuam sobrepostos no modelo: Pisos #3102045, Pisos #3102052 (689999 cm³; z -0,230–0,000, tipo 23 cm × z -0,230–0,000, tipo 23 cm); LFO-2 (Pisos) #3102066 [marca c0238d], MER-0 (Pisos) #3102645 [marca 1f1b08] (238 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); LFO-2 (Pisos) #3102066 [marca c0238d], MER-0 (Pisos) #3102720 [marca f7bb9d] (362 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); MER-0 (Pisos) #3102360 [marca 941d10], LFO-2 (Pisos) #3102582 [marca 6d8e53] (9 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); MER-0 (Pisos) #3102360 [marca 941d10], MER-0 (Pisos) #3102645 [marca 1f1b08] (30 cm³; z 0,001–0,004, tipo 0,3 cm × z 0,001–0,004, tipo 0,3 cm); ….
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – Pisos #3102045, Pisos #3102052
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3102066 [marca c0238d], MER-0 (Pisos) #3102645 [marca 1f1b08]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3102066 [marca c0238d], MER-0 (Pisos) #3102720 [marca f7bb9d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3102360 [marca 941d10], LFO-2 (Pisos) #3102582 [marca 6d8e53]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3102360 [marca 941d10], MER-0 (Pisos) #3102645 [marca 1f1b08]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3102360 [marca 941d10], MER-0 (Pisos) #3102720 [marca f7bb9d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3102546 [marca 4a79c8], MER-0 (Pisos) #3102645 [marca 1f1b08]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #3102546 [marca 4a79c8], MER-0 (Pisos) #3102720 [marca f7bb9d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3102553 [marca 94bfc1], MER-0 (Pisos) #3102645 [marca 1f1b08]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #3102553 [marca 94bfc1], MER-0 (Pisos) #3102720 [marca f7bb9d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3102560 [marca 87f9c7], MER-0 (Pisos) #3102645 [marca 1f1b08]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #3102560 [marca 87f9c7], MER-0 (Pisos) #3102720 [marca f7bb9d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3102567 [marca c067dc], LFO-2 (Pisos) #3102582 [marca 6d8e53]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3102567 [marca c067dc], MER-0 (Pisos) #3102645 [marca 1f1b08]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #3102567 [marca c067dc], MER-0 (Pisos) #3102720 [marca f7bb9d]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3102066 [marca c0238d], SARJETA (Pisos) #3102812 [marca eb7b6c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3102066 [marca c0238d], MEIO-FIO (Pisos) #3102819 [marca 36e2f6]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3102066 [marca c0238d], GRAMADO (Pisos) #3102826 [marca 630721]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3102066 [marca c0238d], CALCADA (Pisos) #3102833 [marca eafaa5]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3102066 [marca c0238d], SARJETA (Pisos) #3102840 [marca 81760e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3102066 [marca c0238d], MEIO-FIO (Pisos) #3102847 [marca 1a6a8b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #3102066 [marca c0238d], GRAMADO (Pisos) #3102854 [marca 702c6b]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3102360 [marca 941d10], SARJETA (Pisos) #3102812 [marca eb7b6c]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #3102360 [marca 941d10], MEIO-FIO (Pisos) #3102819 [marca 36e2f6]
+    ⚠ … e mais 39 aviso(s)
+    · Via de 200 m com pista de 7,00 m (seção ajustada: 7,00 m).
+    · Via de 90 m com pista de 6,00 m (seção ajustada: 6,00 m).
+    · Pisos sobrepostos conferidos no fim da etapa: 62 par(es) dos avisos – 62 ainda com volume em comum, 0 sem volume em comum (aviso de passagem), 0 com piso apagado ou refeito, 0 sem conferência.
+    · Pares que continuam sobrepostos, por tipo: CALCADA × GRAMADO 4 (0,594 m³); CALCADA × MEIO-FIO 4 (0,162 m³); GRAMADO × MEIO-FIO 4 (0,0495 m³); CALCADA × SARJETA 4 (0,0108 m³); CALCADA × MER-0 4 (0,0033 m³); GRAMADO × SARJETA 4 (0,0033 m³); MEIO-FIO × SARJETA 4 (0,0009 m³); GRAMADO × MER-0 4 (0,0007 m³); MER-0 × SARJETA 4 (0,0004 m³); MEIO-FIO × MER-0 4 (0,0002 m³); LFO-2 × MER-0 3 (0,0006 m³); CALCADA × CALCADA 2 (0,972 m³); GRAMADO × GRAMADO 2 (0,0907 m³); MEIO-FIO × MEIO-FIO 2 (0,0067 m³); SARJETA × SARJETA 2 (0,0009 m³); GRAMADO × LFO-2 2 (0,0001 m³); CALCADA × LFO-2 2 (0,0001 m³); LFO-2 × SARJETA 2 (0,0001 m³); MER-0 × MER-0 2 (0,0001 m³); LFO-2 × MEIO-FIO 2 (0 m³); Pisos × Pisos 1 (0,69 m³).
+
+=== Segurança viária ===
+[OK] Sonorizador longitudinal – Fresado  (5106 ms, 1 elemento(s))
+[OK] Sonorizador longitudinal – TermoplasticoRelevo  (3969 ms, 1 elemento(s))
+[OK] Sonorizador longitudinal – BarrasRelevo  (3960 ms, 1 elemento(s))
+[OK] Sonorizador longitudinal – Tachas  (3501 ms, 2 elemento(s))
+[AVISO] Área de escape (caixa de retenção, faixa de serviço, berma, sinalização)  (2343 ms, 5 elemento(s))
+    ⚠ Caixa de retenção com 150 m – para 110 km/h, rampa 5% e seixo rolado (R = 0,25) são necessários 159 m (L = V²/254(R+G)).
+    · Comprimento necessário 159 m; caixa 150 m.
+
+=== Tráfego ===
+[OK] Rede do projeto  (6446 ms, 0 elemento(s))
+    · Sinalização interpretada: 184 aplicada(s), 171 não associada(s); 0 trecho(s) fechado(s), 0 faixa(s) fechada(s), 0 conversão(ões) proibida(s).
+    · 66 via(s), 146 nó(s) (125 entradas), 201 trecho(s), 353 placa(s), 81 travessia(s), 0 cruzamento(s) em desnível.
+[OK] Análise HCM e diagnóstico  (217 ms, 0 elemento(s))
+    · Demanda 53290 veh/h, sem caminho 0 veh/h, velocidade média 18,5 km/h, 210 diagnóstico(s).
+    · I01 Pare: nível C, atraso 24,0 s, 4 aproximação(ões)
+    · I02 Pare: nível F, atraso 80,4 s, 4 aproximação(ões)
+    · I03 Pare: nível A, atraso 4,0 s, 3 aproximação(ões)
+    · I04 Pare: nível A, atraso 6,8 s, 4 aproximação(ões)
+    · I05 Pare: nível A, atraso 4,0 s, 3 aproximação(ões)
+    · I06 Pare: nível F, atraso 38,1 s, 4 aproximação(ões)
+    · I07 PreferenciaDireita: nível F, atraso 300,0 s, 4 aproximação(ões)
+    · I08 Pare: nível F, atraso 20,7 s, 3 aproximação(ões)
+    · I09 Pare: nível A, atraso 7,3 s, 4 aproximação(ões)
+    · I10 Pare: nível A, atraso 3,5 s, 3 aproximação(ões)
+    · R01 Rotatoria: nível A, atraso 4,9 s, 4 aproximação(ões)
+    · R02 Rotatoria: nível A, atraso 5,6 s, 4 aproximação(ões)
+    · R03 Rotatoria: nível A, atraso 4,9 s, 4 aproximação(ões)
+    · R04 Rotatoria: nível A, atraso 4,9 s, 4 aproximação(ões)
+    · R05 Rotatoria: nível A, atraso 4,6 s, 4 aproximação(ões)
+    · R06 Rotatoria: nível A, atraso 4,6 s, 4 aproximação(ões)
+    · R07 Rotatoria: nível A, atraso 4,9 s, 4 aproximação(ões)
+    · R08 Rotatoria: nível A, atraso 4,9 s, 4 aproximação(ões)
+    · R09 Rotatoria: nível A, atraso 4,9 s, 4 aproximação(ões)
+    · I11 PreferenciaDireita: nível F, atraso 44,7 s, 3 aproximação(ões)
+    · Crítico: I01: aproximação V02 – local (sentido contrário) em nível F
+    · Crítico: I02: aproximação V01 – local (sentido do eixo) em nível F
+    · Crítico: I02: aproximação V01 – local (sentido contrário) em nível F
+    · Crítico: I02: fila alcança o cruzamento anterior
+    · Crítico: I06: aproximação V23 – local (sentido do eixo) em nível F
+    · Crítico: I06: aproximação V23 – local (sentido contrário) em nível F
+    · Crítico: I07: aproximação V24 – coletora (sentido do eixo) em nível F
+    · Crítico: I07: aproximação V24 – coletora (sentido contrário) em nível F
+    · Crítico: I07: aproximação V25 – coletora (sentido do eixo) em nível F
+    · Crítico: I07: aproximação V25 – coletora (sentido contrário) em nível F
+    · Crítico: I08: aproximação V58 – local (sentido contrário) em nível F
+    · Crítico: I11: aproximação P02 – via inferida (piso (reconhecido pela sinalização sobre ele)) (sentido contrário) em nível F
+[OK] Microssimulação (5 min)  (1309 ms, 0 elemento(s))
+    · 3205 veículos gerados, 3135 viagens concluídas, 373 na rede, 5 sem entrar, tempo médio 31 s, 360 quadros.
+    · Contatos entre veículos: 0; setas acesas em 26351 posições de veículo.
+[OK] Mapa com a planta real do projeto  (11 ms, 0 elemento(s))
+    · Pavimento: 392, Calcada: 2413, Canteiro: 897, Pintura: 96129, Fisico: 1560
+[OK] Semáforos: recomendação de tempos, onda verde e travessia no meio da quadra  (323 ms, 0 elemento(s))
+    · I01: ciclo 150 → 150 s, atraso 74,6 → 74,6 s.
+    · I02: ciclo 150 → 150 s, atraso 79,1 → 79,1 s.
+    · I03: ciclo 45 → 45 s, atraso 14,2 → 14,2 s.
+    · Travessia semaforizada em V51 – local (sentido do eixo): capacidade 1260 → 882 veh/h.
+[OK] Soluções testadas para o pior cruzamento  (15228 ms, 0 elemento(s))
+    · ✔ Proibir as conversões à esquerda: microssimulação (1 rodadas, média [melhor–pior]): atraso local 193,4 [193,4–193,4] → 86,3 [86,3–86,3] s/veh; rede 55,3 [55,3–55,3] → 45,7 [45,7–45,7] s/veh. HCM: atraso local 300,0 → 300,0 s/veh (F → F); rede 441,7 → 441,7 veh·h/h, 18 → 18 km/h; críticos 12 → 12.
+    · ✖ Bolsões de conversão à esquerda: microssimulação (1 rodadas, média [melhor–pior]): atraso local 193,4 [193,4–193,4] → 196,1 [196,1–196,1] s/veh; rede 55,3 [55,3–55,3] → 55,9 [55,9–55,9] s/veh. HCM: atraso local 300,0 → 300,0 s/veh (F → F); rede 441,7 → 441,7 veh·h/h, 18 → 18 km/h; críticos 12 → 12.
+    · ✖ Semaforizar o cruzamento: microssimulação (1 rodadas, média [melhor–pior]): atraso local 193,4 [193,4–193,4] → 221,0 [221,0–221,0] s/veh; rede 55,3 [55,3–55,3] → 56,1 [56,1–56,1] s/veh. HCM: atraso local 300,0 → 68,2 s/veh (F → E); rede 441,7 → 210,0 veh·h/h, 18 → 28 km/h; críticos 12 → 8.
+    · ✖ Rotatória: microssimulação (1 rodadas, média [melhor–pior]): atraso local 193,4 [193,4–193,4] → 260,3 [260,3–260,3] s/veh; rede 55,3 [55,3–55,3] → 58,8 [58,8–58,8] s/veh. HCM: atraso local 300,0 → 31,7 s/veh (F → D); rede 441,7 → 173,4 veh·h/h, 18 → 30 km/h; críticos 12 → 8.
+[OK] Cenários: PARE × rotatória × semáforo coordenado, contagem e comparação  (108 ms, 0 elemento(s))
+    · 4 cenário(s) comparados; acidentes previstos no projeto 35,5/ano; custo anual R$ 24,98 mi.
+[OK] Gravar plano semafórico e resultados no modelo  (3763 ms, 0 elemento(s))
+    · Nenhum semáforo no projeto de teste para gravar o plano.
+    · Resultados do cenário "Autoteste" gravados em 818 elemento(s): parâmetros SV_NivelServico e SV_Trafego (use em tabelas e filtros de vista).
+[AVISO] Mapa de níveis de serviço na planta  (62766 ms, 0 elemento(s))
+    ⚠ Lento: 63 s.
+    · Mapa desenhado na vista "SV Autoteste – planta 133124": 201 trecho(s) coloridos, 20 nó(s) com o nível de serviço. Um novo desenho substitui o anterior nesta vista.

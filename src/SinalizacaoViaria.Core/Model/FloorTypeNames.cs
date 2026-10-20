@@ -23,6 +23,9 @@ public static partial class FloorTypeNames
         return double.TryParse(m.Groups[1].Value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var cm) ? cm / 100 : null;
     }
 
+    /// <summary>Espessura (m) arredondada ao milímetro, como no nome do tipo que o plugin escolhe para ela.</summary>
+    public static double Rounded(double thicknessM) => Math.Round(thicknessM * 1000) / 1000;
+
     /// <summary>A estrutura (m) difere da espessura do nome em mais de meio milímetro.</summary>
     public static bool Mismatch(string? name, double structureWidthM) =>
         Thickness(name) is { } t && Math.Abs(structureWidthM - t) > 0.0005;
