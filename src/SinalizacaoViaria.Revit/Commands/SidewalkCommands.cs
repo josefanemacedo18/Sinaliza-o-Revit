@@ -126,8 +126,14 @@ internal static class FootprintCutter
             }
         }
         if (def.Overlay) ApplyOverlay(uidoc, def);
-        else if (PaintedLine(def)) CutByOverlays(uidoc, def);
+        else if (UnderOverlay(def)) CutByOverlays(uidoc, def);
     }
+
+    /// <summary>
+    /// Marca interrompida pelas marcas "por cima": linhas pintadas e as vagas de estacionamento – a faixa de pedestres passava
+    /// sobre as vagas (Autoteste de 2026-10-20: MER-0 × FTP-1 sobrepostos).
+    /// </summary>
+    public static bool UnderOverlay(MarkingDefinition d) => PaintedLine(d) || d is ParkingMarkingDefinition;
 
     /// <summary>Linha longitudinal pintada (eixo, bordo, divisão) – interrompida pelas marcas que se sobrepõem.</summary>
     public static bool PaintedLine(MarkingDefinition d) =>
@@ -145,7 +151,7 @@ internal static class FootprintCutter
     public static int ApplyOverlay(UIDocument uidoc, MarkingDefinition def)
     {
         var geo = new MarkingService(uidoc.Document, uidoc.ActiveView).BuildGeometry(def, out _);
-        return Apply(uidoc, def, OverlayFootprint(geo), PaintedLine);
+        return Apply(uidoc, def, OverlayFootprint(geo), UnderOverlay);
     }
 
     /// <summary>Linha nova (ou editada) passando sob marcas sobrepostas existentes: recebe os recortes delas.</summary>

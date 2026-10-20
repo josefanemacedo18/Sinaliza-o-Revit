@@ -110,7 +110,7 @@ centros, mais próximo).
 | Faixa exclusiva (ônibus) | Linha MFE contínua na divisa com as faixas comuns + legenda repetida (ÔNIBUS). Opcional: **pintura colorida de fundo** em toda a faixa (vermelha, azul, verde, amarela, laranja ou marrom – como na ciclofaixa e na faixa de caminhada), entre as linhas de bordo (código ONI-FD). |
 | Faixa preferencial (ônibus) | Linha MFE seccionada + legenda repetida; mesma opção de fundo colorido. |
 | Ciclofaixa | Linha CIC-LD, pintura vermelha, bicicletas e setas repetidas; segregação física opcional. |
-| Faixa de estacionamento | Vagas do tipo escolhido (paralelas, em ângulo, PcD, carga e descarga...) com linha de fundo no lado da pista. Opção **Só delimitado**: em vez das vagas, só a **linha tracejada** que delimita a faixa na divisa com a pista (código **MER-L**, sem divisórias entre vagas), com **largura, traço e espaço** ajustáveis (padrão 0,10 m, 1 × 1 m – código e padrão [a confirmar] no MBST Vol. IV); a linha para 5 m antes das travessias e na interseção, como as vagas. |
+| Faixa de estacionamento | Vagas do tipo escolhido (paralelas, em ângulo, PcD, carga e descarga...) com linha de fundo no lado da pista (sem ela quando desse lado há o meio-fio de um canteiro ou calçada – a linha ficaria sobre o meio-fio). As faixas de pedestres recortam as vagas sob elas. Opção **Só delimitado**: em vez das vagas, só a **linha tracejada** que delimita a faixa na divisa com a pista (código **MER-L**, sem divisórias entre vagas), com **largura, traço e espaço** ajustáveis (padrão 0,10 m, 1 × 1 m – código e padrão [a confirmar] no MBST Vol. IV); a linha para 5 m antes das travessias e na interseção, como as vagas. |
 | Acostamento | LBO no bordo da faixa. |
 | Faixa de segurança / transição | Zebrado com linhas de canalização (buffer entre fluxos, ciclofaixa etc.). |
 | Canteiro lateral físico / pintado | Meios-fios + grama (0,15 m) ou zebrado. |
@@ -786,15 +786,23 @@ Cada erro do plugin (inclusive os que antes só iam para o log), cada erro/aviso
 entram no relatório, salvo em `%AppData%\SinalizaBIM\autoteste-AAAAMMDD-HHMMSS.txt` (gravado a cada etapa – se o
 Revit fechar no meio, o arquivo mostra onde parou). Tudo acontece dentro de um único Desfazer: no fim escolha
 **Desfazer tudo** (recomendado) ou **Manter** para olhar as vistas "SV Autoteste" (planta e 3D). O teste rápido leva
-até ~3 minutos; o completo, de 10 a 40 minutos; o progresso aparece na barra de status do Revit.
+até ~3 minutos; o completo, de 10 a 40 minutos num projeto pequeno (1 h 42 min no Autoteste completo de 2026-10-20, com 178
+etapas); o progresso aparece na barra de status do Revit.
 
 **Avisos do Revit no relatório.** Cada etapa traz o total de avisos por tipo e em que elementos, contando todos (o relatório
 detalha só os 25 primeiros), por exemplo `Σ 62 × "A linha no croqui está ligeiramente fora da linha central…" – em
 QUADRA-B 40, LEG 22`. Cada aviso detalhado mostra os elementos com o id e o início do id da marca. **[mesma marca]** indica
 que os elementos são de uma mesma marca, sinal de piso duplicado numa regeneração. Quando há avisos "Pisos realçados se
 sobrepõem", o fim da etapa confere cada par no modelo como ficou: quantos **ainda têm volume em comum** (sobreposição
-real, vira aviso da etapa com exemplos) e quantos **não têm mais** (aviso de passagem: a via é criada inteira e a
-interseção recorta as vias depois, em outra transação). Envie esse relatório.
+real, vira o primeiro aviso da etapa, com exemplos) e quantos **não têm mais** (aviso de passagem: a via é criada inteira e
+a interseção recorta as vias depois, em outra transação); uma nota lista **todos** os pares que ficaram, por tipo
+("MEIO-FIO × MER-0 2 (0,071 m³)"). Para os avisos "ligeiramente fora da linha central", uma nota mede as retas citadas
+(desalinhamento, comprimento e quanto a ponta teria de andar para a reta ficar exata). Envie esse relatório.
+
+**Retas alinhadas.** Pela ajuda do Revit, o aviso "ligeiramente fora da linha central" vale para retas a até 0,2° da
+horizontal, da vertical **ou de 45°**. O plugin deixa exatas essas retas no contorno dos pisos, movendo cada vértice no
+máximo o mesmo desvio já aceito no ajuste do contorno (Configurações › desvio máximo dos contornos, padrão 5 mm) – nunca
+quando isso faria a peça se tocar. Retas mais inclinadas que 0,2° são de projeto e ficam como estão.
 
 ## 10. Quantitativos
 

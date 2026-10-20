@@ -229,7 +229,9 @@ public static class SignGenerator
                 var offset = layer switch { 0 => 0.0, 1 => PlateThickness, _ => PlateThickness + 0.002 + (layer - 2) * 0.0005 };
                 var depth = layer == 0 ? PlateThickness : layer == 1 ? 0.002 : 0.0005;
                 var origin = backPlane + toDriver * offset;
-                geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(origin, right, shape, toDriver, depth), color));
+                // Pictograma que se toca (vértice repetido, lasca da grade das booleanas) o Revit recusa: vai em partes limpas.
+                foreach (var part in ProfileCleanup.Parts(shape))
+                    geo.Pieces.Add(ProfileSolid.Piece(new ProfileSolid(origin, right, part, toDriver, depth), color));
             }
 
         // Altura do conjunto de placas (da base da mais baixa ao topo da mais alta).

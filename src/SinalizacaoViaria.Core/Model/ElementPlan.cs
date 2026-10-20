@@ -37,6 +37,33 @@ public static class ElementPlan
     public static bool PaintFloorEligible(MarkingPiece p) =>
         p.Solid == null && p.Profile == null && MarkingColors.IsPaint(p.Color) && p.Shape.Area > 0.0004 && p.Thickness >= 0.0015;
 
+    /// <summary>Códigos de linhas e símbolos que costumam ficar sobre uma pintura de fundo (ciclofaixa, faixa de caminhada).</summary>
+    public static readonly IReadOnlyList<string> OverlayCodes = new[] { "CIC-LD", "CIC-LC", "FCA-BD", "MCC", "SIC", "CIC-SETA", "SPE", "LCA" };
+
+    /// <summary>Marca pintada que fica sobre uma pintura de fundo: no Revit sobe a espessura da pintura (sem faces coincidentes).</summary>
+    public static bool IsOverlayPaint(MarkingDefinition d) => d switch
+    {
+        LinearMarkingDefinition l => OverlayCodes.Contains(l.Code),
+        RepeatedMarkingDefinition r => r.SymbolCode != null && OverlayCodes.Contains(r.SymbolCode),
+        SymbolMarkingDefinition s => OverlayCodes.Contains(s.Code),
+        TextMarkingDefinition => true,
+        _ => false,
+    };
+
+    /// <summary>
+    /// Peças com a altura que têm no Revit quando a sinalização vira piso (<c>MarkingService</c>): a pintura com a espessura
+    /// <paramref name="paintThickness"/> (padrão 3 mm, a espessura mínima das Configurações) e, nas marcas sobre fundo, logo
+    /// acima dele. Para conferir sobreposições no núcleo (<see cref="PieceOverlaps"/>).
+    /// </summary>
+    public static List<MarkingPiece> RevitPieces(MarkingDefinition def, MarkingGeometry geo, double paintThickness = 0.003)
+    {
+        if (!PaintDefinition(def)) return geo.Pieces.ToList();
+        var lift = IsOverlayPaint(def) ? paintThickness : 0;
+        var pt = Math.Max(0.002, paintThickness);
+        return geo.Pieces.Select(p => p.Solid == null && p.Profile == null && MarkingColors.IsPaint(p.Color)
+            ? p with { Elevation = p.Elevation + lift, Thickness = pt } : p).ToList();
+    }
+
     /// <summary>
     /// Marcas que viram UM elemento só, com todos os materiais (placa: poste, chapa, orla, fundo e legenda) – seleciona-se e
     /// gira-se a placa inteira.

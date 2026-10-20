@@ -32,14 +32,16 @@ Cada etapa só é marcada como concluída com compilação limpa, suíte verde e
 | EW1 | Primeira evidência no Revit 2027 (Autoteste rápido, Validar Modelo); versão 2.1.0; V06 da gleba recalibrado | `docs/evidencias`, `EVModelIntegrityTests` |
 | EW2 | Retas quase alinhadas aos eixos exatas no contorno dos pisos (aviso do Revit reproduzido e corrigido); Autoteste identifica os pisos dos avisos | `EWRevitWarningsTests`, DECISIONS D-008 |
 | EW3 / F5b | Elementos do eixo das vias comuns (tangentes, curvas, cantos), CSV no Perfil da Via | `EWAxisElementsTests` |
+| EY | Autoteste completo (178 etapas): perfis de placas aceitos pelo Revit; retas alinhadas pelo critério do Revit (0,2°, com 45°); sobreposições reproduzidas no núcleo (`PieceOverlaps`) e corrigidas (vagas × canteiro lateral, ciclofaixa, canteiros com árvore, faixa × vagas); relatório com todos os pares persistentes e a medida das retas | `EYRevitFullRunTests`, DECISIONS D-010 |
 | EX | Segundo Autoteste (2.1.0): Marca dos lotes única com vários loteamentos; alinhamento aos eixos também nos lotes, áreas remanescentes, acabamentos do terreno e contornos só de retas; resumo de avisos por elemento e conferência das sobreposições no fim da etapa | `EXRevitWarningsTests`, DECISIONS D-009 |
 
 ## Próximas etapas (em ordem)
 
 | # | Fase da missão | Etapa | Critério de aceite |
 |---|---|---|---|
-| K11 | XIV – Revit | "Pisos realçados se sobrepõem" nas interseções: o Autoteste agora confere no fim da etapa quantos pares ainda têm volume em comum. Se forem só de passagem, criar via e recorte sem a gravação intermediária sobreposta; se persistirem, reproduzir e corrigir | Autoteste sem par sobreposto no fim da etapa |
-| K12 | XIV – Revit | Confirmar no próximo Autoteste que os 62 avisos "ligeiramente fora da linha central" sumiram (o resumo agora diz em que pisos) | Autoteste sem esse aviso |
+| K11 | XIV – Revit | Pares persistentes restantes: com a lista por tipo do próximo Autoteste, reproduzir cada tipo no núcleo (`PieceOverlaps`) e corrigir | Autoteste sem par persistente |
+| K13 | IV – geometria | Ajuste topológico do contorno: cada borda compartilhada entre pisos da mesma marca ajustada uma vez (sem lascas entre vizinhos) | sondagem do núcleo sem pares a mais depois do ajuste |
+| K12 | XIV – Revit | Confirmar no próximo Autoteste que as retas fora do eixo sumiram (a nota mede as que restarem) | Autoteste sem esse aviso, ou só retas de projeto |
 | F3 | III – arquitetura | Catálogo por documento (resolve K1); avaliar trocar `DependencyOrder` pelo `ModelGraph` **só com Autoteste no Revit** | Autoteste do usuário sem regressão |
 | F7b | VII – terraplenagem | Tabela por estaca no quantitativo de terraplenagem do Revit (seções sobre a superfície de projeto e o Toposolid), ao lado da malha | Autoteste com os dois volumes |
 | F10 | X – compatibilização | Verificações que precisam da geometria gerada (lotes sobre a calçada, obra × via, pintura fora do pavimento): exigem rodar os geradores no validador ou no Autoteste | testes por código Vxx |

@@ -2,34 +2,31 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-20 (fim do ciclo EX)
+## Estado em 2026-10-20 (fim do ciclo EY)
 
 - **Ramo:** `claude/dreamy-gates-a3nrta`. Sem PR aberto (o fluxo do projeto é commit e push direto no ramo).
-- **Versão do plugin:** 2.1.0 (`Directory.Build.props`), aprovada pelo usuário.
-- **Ciclos concluídos:** EV1–EV6, EW1–EW3 e EX:
-  - Marca dos lotes única com mais de um loteamento (D-009);
-  - alinhamento aos eixos também nos lotes, áreas remanescentes, acabamentos do terreno e contorno só de retas;
-  - Autoteste com resumo dos avisos por elemento e conferência das sobreposições no fim da etapa.
-- **Revit:** dois Autotestes **rápidos** registrados (DLL 2.0.0 e 2.1.0), ambos com 0 erros, e um Validar Modelo.
+- **Versão do plugin:** 2.1.0 (`Directory.Build.props`).
+- **Ciclos concluídos:** EV1–EV6, EW1–EW3, EX e EY (Autoteste completo):
+  - perfis de placas aceitos pelo Revit (`ProfileCleanup`);
+  - retas alinhadas pelo critério do Revit, até 0,2° e incluindo 45° (D-010);
+  - sobreposições reproduzidas no núcleo (`PieceOverlaps`) e corrigidas: vagas, ciclofaixas, canteiros e faixa × vagas;
+  - relatório com todos os pares persistentes e a medida das retas.
+- **Revit:** dois Autotestes rápidos e um **completo** (178 etapas, 1 erro, corrigido em EY), mais um Validar Modelo.
   - Relatórios em `docs/evidencias/`.
-  - O modo **completo** ainda não foi rodado.
-  - As mudanças de EX do lado do Revit ainda não rodaram no Revit.
+  - As mudanças de EY do lado do Revit ainda não rodaram no Revit.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros.
-- **Testes:** suíte completa 2 785/2 785 (EX: +10 `EXRevitWarningsTests`).
+- **Testes:** suíte completa 2 800/2 800 (EY: +15 `EYRevitFullRunTests`).
 
 ## Próxima tarefa
 
-1. **Aguardar o próximo Autoteste do usuário** com a DLL do EX, de preferência o **completo**, numa cópia do projeto.
-   Conferir no relatório:
-   - "Marca" duplicada: deve sumir (D-009);
-   - "ligeiramente fora da linha central": o resumo diz em que pisos ficaram (K12). Se ainda houver, reproduzir no núcleo
-     com o código dos pisos;
-   - "Pisos realçadas se sobrepõem": a linha "Pisos sobrepostos conferidos no fim da etapa" decide o K11.
-     - Se os pares não se sobrepõem mais (de passagem): criar a via e o recorte da interseção sem a gravação intermediária
-       sobreposta (`CmdSinalizarVia.Create` → `IntersectionRunner.Run`).
-     - Se continuam sobrepostos: reproduzir no núcleo com os códigos e as marcas do relatório e corrigir.
-2. **F7b:** tabela de volumes por estaca no quantitativo de terraplenagem do Revit (`SectionVolumes` já está no Core).
-3. **F3:** catálogo de placas personalizadas por documento (resolve K1).
+1. **Novo Autoteste completo do usuário com a DLL do EY**, numa cópia, terminando com **Desfazer tudo**. Conferir:
+   - placas sem erro (EY1);
+   - a nota "Retas fora do eixo lidas no Revit" de cada etapa: o que sobrar mostra desalinhamento e deslocamento (K12);
+   - a nota "Pares que continuam sobrepostos, por tipo": reproduzir cada tipo no núcleo com `PieceOverlaps` e corrigir (K11).
+2. **K13**: ajuste topológico do contorno. Cada borda compartilhada entre pisos da mesma marca é ajustada uma vez, sem lascas
+   entre vizinhos. Medir com a sondagem do EY (pares a mais depois do ajuste).
+3. **F7b:** tabela de volumes por estaca no quantitativo de terraplenagem do Revit.
+4. **F3:** catálogo de placas personalizadas por documento (resolve K1).
 
 ## Como retomar
 

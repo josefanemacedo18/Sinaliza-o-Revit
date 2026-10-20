@@ -88,11 +88,15 @@ internal sealed class StepReport(string group, string name)
     public List<string> Info { get; } = new();
     /// <summary>Elementos de cada aviso "Pisos realçados se sobrepõem" – conferidos no fim da etapa (ver AutoTest.OverlapCheck).</summary>
     public List<ElementId[]> FloorOverlaps { get; } = new();
+    /// <summary>Retas dos avisos "ligeiramente fora da linha central": código da marca, desalinhamento (°) e comprimento (m).</summary>
+    public List<(string Code, double OffDeg, double Length)> OffAxis { get; } = new();
 
     public string Status => Errors.Count > 0 ? "ERRO" : Warnings.Count > 0 ? "AVISO" : "OK";
 
     public void Error(string m) { if (!Errors.Contains(m)) Errors.Add(m); }
     public void Warn(string m) { if (!Warnings.Contains(m) && !Errors.Contains(m)) Warnings.Add(m); }
+    /// <summary>Aviso no topo da lista (o relatório detalha só os 25 primeiros).</summary>
+    public void WarnFirst(string m) { if (!Warnings.Contains(m) && !Errors.Contains(m)) Warnings.Insert(0, m); }
     public void Note(string m) => Info.Add(m);
 
     /// <summary>Mensagem do plugin: erros explícitos viram ERRO, o resto aviso.</summary>
@@ -345,6 +349,7 @@ internal sealed partial class AutoTestRunner
             if (s.FloorOverlaps.Count > 0)
                 try { OverlapCheck(s); }
                 catch (Exception ex) { s.Note($"Pisos sobrepostos não conferidos no fim da etapa ({ex.Message})."); }
+            if (WarningSummary.OffAxisNote(s.OffAxis) is { } off) s.Note(off);
             if (s.Ms > 60000) s.Warn($"Lento: {s.Ms / 1000.0:0} s.");
             _cur = null;
             // Relatório parcial gravado a cada etapa: se o Revit fechar no meio, dá para saber onde parou.
@@ -366,8 +371,11 @@ internal sealed partial class AutoTestRunner
                 if (f.GetSeverity() == FailureSeverity.Warning)
                 {
                     _cur?.Warn("Aviso do Revit: " + text);
-                    if (f.GetFailureDefinitionId().Guid == BuiltInFailures.OverlapFailures.FloorsOverlap.Guid)
+                    var defId = f.GetFailureDefinitionId().Guid;
+                    if (defId == BuiltInFailures.OverlapFailures.FloorsOverlap.Guid)
                         _cur?.FloorOverlaps.Add(f.GetFailingElementIds().ToArray());
+                    else if (defId == BuiltInFailures.InaccurateFailures.InaccurateSketchLine.Guid && _cur != null)
+                        OffAxisLines(fa.GetDocument(), f.GetFailingElementIds(), _cur);
                     fa.DeleteWarning(f);
                 }
                 else
@@ -398,6 +406,23 @@ internal sealed partial class AutoTestRunner
     }
 
     /// <summary>
+    /// Retas do esboço citadas no aviso "ligeiramente fora da linha central": desalinhamento em relação à direção conferida
+    /// mais próxima (0°, 45°, 90°, 135° – ajuda do Revit) e comprimento, para calibrar o alinhamento do núcleo.
+    /// </summary>
+    private static void OffAxisLines(Document doc, ICollection<ElementId> ids, StepReport s)
+    {
+        var els = ids.Select(doc.GetElement).Where(e => e != null).ToList();
+        var code = els.Select(e => MarkingStorage.Read(e!)).FirstOrDefault(r => r != null)?.Definition.DisplayCode ?? "?";
+        foreach (var e in els)
+            if (e is CurveElement { GeometryCurve: Line l })
+            {
+                var d = l.Direction;
+                var seg = new Core.Geometry.BoundarySegment(Vec2.Zero, new Vec2(d.X, d.Y));
+                if (Core.Geometry.AxisSnap.OffAxisDeg(seg) is { } off) s.OffAxis.Add((code, off, UnitConv.M(l.Length)));
+            }
+    }
+
+    /// <summary>
     /// Confere no fim da etapa os pares de pisos dos avisos "Pisos realçados se sobrepõem". O Revit avisa quando a transação
     /// grava; a via é criada inteira e a interseção recorta as vias depois, em outra transação – então parte dos avisos pode
     /// ser de passagem. Aqui mede, no modelo como ficou, quantos pares ainda têm volume em comum (sobreposição real).
@@ -412,6 +437,7 @@ internal sealed partial class AutoTestRunner
         var solids = new Dictionary<long, Solid?>();
         int still = 0, apart = 0, gone = 0, unknown = 0;
         var examples = new List<string>();
+        var kinds = new List<(string A, string B, bool Same, double VolumeM3)>();
         foreach (var (a, b) in pairs)
         {
             var ea = _doc.GetElement(new ElementId(a));
@@ -423,13 +449,17 @@ internal sealed partial class AutoTestRunner
                 var v = BooleanOperationsUtils.ExecuteBooleanOperation(sa, sb, BooleanOperationsType.Intersect)?.Volume ?? 0;
                 if (v <= 1e-4) { apart++; continue; }
                 still++;
+                var (ra, rb) = (MarkingStorage.Read(ea), MarkingStorage.Read(eb));
+                kinds.Add((ra?.Definition.DisplayCode ?? ea.Category?.Name ?? "?", rb?.Definition.DisplayCode ?? eb.Category?.Name ?? "?",
+                    ra != null && rb != null && ra.MarkingId == rb.MarkingId, v * 0.0283168));
                 if (examples.Count < 5) examples.Add($"{Who(_doc, new[] { ea.Id, eb.Id })[3..]} ({v * 28316.8:0} cm³)");
             }
             catch { unknown++; }
         }
         s.Note($"Pisos sobrepostos conferidos no fim da etapa: {pairs.Count} par(es) dos avisos – {still} ainda com volume em comum, "
                + $"{apart} sem volume em comum (aviso de passagem), {gone} com piso apagado ou refeito, {unknown} sem conferência.");
-        if (still > 0) s.Warn($"{still} par(es) de pisos continuam sobrepostos no modelo: {string.Join("; ", examples)}{(still > examples.Count ? "; …" : "")}.");
+        if (WarningSummary.PersistentPairsNote(kinds) is { } byKind) s.Note(byKind);
+        if (still > 0) s.WarnFirst($"{still} par(es) de pisos continuam sobrepostos no modelo: {string.Join("; ", examples)}{(still > examples.Count ? "; …" : "")}.");
     }
 
     private static Solid? SolidOf(Element e, Dictionary<long, Solid?> cache)

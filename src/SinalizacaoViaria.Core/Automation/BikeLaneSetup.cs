@@ -148,12 +148,18 @@ public sealed partial class BikeLaneSetup
             // O símbolo fica atravessado na faixa: nunca maior que a largura útil (entre as linhas).
             var usable = Math.Max(0.5, innerL + innerR - 0.10);
             var symLen = Math.Min(SymbolLength, walk ? w * 0.9 : Math.Max(0.6, Math.Min(SymbolLength, usable)));
-            // Faixa única: símbolos centrados entre as linhas (não no eixo da faixa, que inclui a linha).
-            foreach (var (off, rev) in two ? new[] { (w / 4, true), (-w / 4, false) } : new[] { ((innerL - innerR) / 2, false) })
+            // Faixa única: símbolos centrados entre as linhas (não no eixo da faixa, que inclui a linha). Dois sentidos: cada
+            // símbolo no meio do seu lado, entre a linha central e a de bordo – antes ficava em ±w/4 com 90 % de w/2 e encostava
+            // na linha de bordo (Autoteste de 2026-10-20: CIC-LD × SIC sobrepostos).
+            var lc = Type == TipoCiclo.CiclofaixaBidirecional ? 0.05 : 0.0;
+            var halves = two
+                ? new[] { ((lc + innerL) / 2, true, innerL - lc), (-(lc + innerR) / 2, false, innerR - lc) }
+                : new[] { ((innerL - innerR) / 2, false, usable) };
+            foreach (var (off, rev, room) in halves)
             {
                 Add(new RepeatedMarkingDefinition
                 {
-                    SymbolCode = symbol, Length = two ? Math.Min(symLen, w / 2 * 0.9) : symLen, Offset = off, Spacing = SymbolSpacing,
+                    SymbolCode = symbol, Length = two ? Math.Min(symLen, Math.Max(0.3, room * 0.9)) : symLen, Offset = off, Spacing = SymbolSpacing,
                     Reverse = rev, StartOffset = start, EndSetback = EndSetback + 3,
                 });
                 if (!walk && Arrows && ArrowLength > 0.1)

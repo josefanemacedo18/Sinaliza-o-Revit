@@ -1208,7 +1208,7 @@ public sealed class MarkingService
     {
         var res = new List<GeometryObject>();
         var options = new SolidOptions(materialId, ElementId.InvalidElementId);
-        int failures = 0;
+        int failures = 0, tiny = 0;
         var zBaseFt = UnitConv.Ft(zMeters);
         var above = UnitConv.Ft(Math.Max(0.001, aboveSurfaceM));
         var draped = sampler is { IsAvailable: true };
@@ -1232,7 +1232,8 @@ public sealed class MarkingService
                     if (draped && sampler!.LiftsSolids && sampler.TrySample(UnitConv.Ft(c.X), UnitConv.Ft(c.Y), zBaseFt, out var sz, out _)) z = sz + above;
                     if (piece.Round is { } round && RoundGeometry(round, z + lift, options) is { } exact) { res.Add(exact); continue; }
                     if (piece.Solid is { } poly) res.AddRange(PolyhedronGeometry(poly, z + lift, materialId));
-                    else res.Add(ProfileSolidGeometry(piece.Profile!, z + lift, options));
+                    else if (ProfileSolids(piece.Profile!, z + lift, options) is { Count: > 0 } ps) res.AddRange(ps);
+                    else tiny++;
                     continue;
                 }
                 // Sobre superfícies: a peça inteira num plano ajustado ao terreno; dividida só onde o terreno dobra
@@ -1267,6 +1268,7 @@ public sealed class MarkingService
             }
         }
         if (failures > 0) warnings.Add($"{failures} peça(s) não puderam ser modeladas (geometria muito pequena ou inválida).");
+        if (tiny > 0) warnings.Add($"{tiny} peça(s) menores que a tolerância do Revit (cerca de 1 mm) ficaram de fora.");
         return res;
     }
 
@@ -1407,6 +1409,19 @@ public sealed class MarkingService
         return r.GetGeometricalObjects();
     }
 
+    /// <summary>
+    /// Sólidos do perfil: o próprio; se o Revit recusa o contorno (que se toca, ou menor que a tolerância), as partes limpas
+    /// do <see cref="ProfileCleanup"/>. Vazio = peça menor que a tolerância (nada a modelar); recusa das partes propaga.
+    /// </summary>
+    private List<Solid> ProfileSolids(ProfileSolid p, double zBaseFt, SolidOptions options)
+    {
+        try { return new List<Solid> { ProfileSolidGeometry(p, zBaseFt, options) }; }
+        catch (Exception)
+        {
+            return ProfileCleanup.Parts(p.Profile).Select(part => ProfileSolidGeometry(p with { Profile = part }, zBaseFt, options)).ToList();
+        }
+    }
+
     /// <summary>Sólido de perfil vertical: contorno no plano (XDir, Z) extrudado ao longo de ExtrudeDir.</summary>
     private Solid ProfileSolidGeometry(ProfileSolid p, double zBaseFt, SolidOptions options)
     {
@@ -1534,7 +1549,7 @@ public sealed class MarkingService
             // Retas "quase" alinhadas aos eixos (resíduo de recorte) ficam exatas: o Revit avisa "ligeiramente fora da linha
             // central" em cada uma. Depois, pontos que ficaram perto demais saem (curva curta).
             var ring2 = pts.Select(p => new Vec2(UnitConv.M(p.X), UnitConv.M(p.Y))).ToList();
-            var snapped = AxisSnap.Snap(ring2.Select((p, i) => new Core.Geometry.BoundarySegment(p, ring2[(i + 1) % ring2.Count])).ToList());
+            var snapped = AxisSnap.Snap(ring2.Select((p, i) => new Core.Geometry.BoundarySegment(p, ring2[(i + 1) % ring2.Count])).ToList(), SnapOffset);
             pts = Sanitize(snapped.Select(x => new XYZ(UnitConv.Ft(x.Start.X), UnitConv.Ft(x.Start.Y), zFt)).ToList(), tol);
             if (pts.Count < 3) return null;
         }
@@ -1550,13 +1565,19 @@ public sealed class MarkingService
     /// <summary>Desvio máximo do contorno ajustado (m) – configurável em Configurações (0 = retas uma a uma, como antes).</summary>
     private static double BoundaryTolerance => Math.Max(0, PluginContext.Settings.BoundaryTolerance);
 
+    /// <summary>
+    /// Quanto um vértice pode andar para a reta ficar exatamente alinhada: o mesmo desvio já aceito no ajuste do contorno
+    /// (o ajuste é que desloca as pontas das retas em 1 a 4 mm), nunca menos que os 0,5 mm dos resíduos de recorte.
+    /// </summary>
+    private static double SnapOffset => Math.Max(AxisSnap.MaxOffset, BoundaryTolerance);
+
     /// <summary>Centros exatos das curvas da marca em criação (ver <see cref="MarkingGeometry.ArcCenters"/>).</summary>
     private IReadOnlyList<Vec2> _arcCenters = Array.Empty<Vec2>();
 
     private CurveLoop? FittedLoop(List<Vec2> ring, double zFt, double shortFt)
     {
         // Retas quase alinhadas aos eixos ficam exatas (ver AxisSnap): sem o aviso "ligeiramente fora da linha central".
-        var segs = AxisSnap.Snap(BoundaryFit.Fit(ring, BoundaryTolerance, UnitConv.M(shortFt), _arcCenters));
+        var segs = AxisSnap.Snap(BoundaryFit.Fit(ring, BoundaryTolerance, UnitConv.M(shortFt), _arcCenters), SnapOffset);
         if (segs.Count < 2 || segs.Count == 2 && !segs.Any(x => x.IsArc)) return null;
         XYZ P(Vec2 v) => new(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), zFt);
         var loop = new CurveLoop();
@@ -1577,17 +1598,8 @@ public sealed class MarkingService
         return loop.IsOpen() ? null : loop;
     }
 
-    private static readonly string[] OverlayCodes = { "CIC-LD", "CIC-LC", "FCA-BD", "MCC", "SIC", "CIC-SETA", "SPE", "LCA" };
-
-    /// <summary>Marca pintada que costuma ficar sobre uma pintura de fundo.</summary>
-    private static bool IsOverlay(MarkingDefinition d) => d switch
-    {
-        LinearMarkingDefinition l => OverlayCodes.Contains(l.Code),
-        RepeatedMarkingDefinition r => r.SymbolCode != null && OverlayCodes.Contains(r.SymbolCode),
-        SymbolMarkingDefinition s => OverlayCodes.Contains(s.Code),
-        TextMarkingDefinition or RepeatedMarkingDefinition => true,
-        _ => false,
-    };
+    /// <summary>Marca pintada que costuma ficar sobre uma pintura de fundo (ver <see cref="ElementPlan.IsOverlayPaint"/>).</summary>
+    private static bool IsOverlay(MarkingDefinition d) => ElementPlan.IsOverlayPaint(d);
 
     // ------------------------------------------------------------------ pisos
 

@@ -468,7 +468,16 @@ public static class SidewalkGenerator
                 foreach (var sh in shapes) spots.Add((sh.Centroid, axis.TangentAt(0)));
             }
             var top = d.Type == TipoCanteiroCalcada.Jardineira ? d.SurfaceHeight + d.BorderHeight - 0.05 : d.SurfaceHeight;
-            AddTrees(geo, ctx.Catalog, spots, top);
+            // As peças planas da árvore (grama e proteção em volta do tronco) ficam só sobre a terra: passando por cima da
+            // borda, que é mais alta, os pisos se sobrepunham (Autoteste de 2026-10-20: CANT-GRAMA e JARDINEIRA).
+            var trees = new MarkingGeometry();
+            AddTrees(trees, ctx.Catalog, spots, top);
+            foreach (var p in trees.Pieces)
+            {
+                if (p.Solid != null || p.Profile != null || p.Round != null || p.Color is not (MarkingColor.Grama or MarkingColor.Concreto)) { geo.Pieces.Add(p); continue; }
+                foreach (var part in PolygonOps.Intersect(new[] { p.Shape }, core).Where(x => x.Area > 1e-4))
+                    geo.Pieces.Add(p with { Shape = part });
+            }
         }
         geo.PathLength = path.Length;
         geo.UnitCount = d.Spacing <= 0 ? 1 : shapes.Count;

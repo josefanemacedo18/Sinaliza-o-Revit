@@ -84,3 +84,18 @@ como substituída.
 - **Consequências:** a Marca deixa de se repetir sem mudar nada em projetos com um loteamento só. As marcas de um loteamento
   gerado quando era o único só ganham o prefixo quando ele for regenerado; até lá continuam únicas, porque o novo loteamento
   já nasce com prefixo. Etiquetas que mostram a Marca passam a mostrar o prefixo quando houver mais de um loteamento.
+
+## D-010 – Alinhamento das retas pelo critério documentado do Revit e com o desvio do ajuste do contorno
+- **Contexto:** o Autoteste completo (2026-10-20) ainda teve 1 385 avisos "ligeiramente fora da linha central". A ajuda do
+  Revit 2027 ("Element Is Slightly Off Axis") diz que o aviso vale para retas desalinhadas de 1×10⁻⁹ a 0,2° da horizontal,
+  da vertical ou de 45°. No núcleo, as retas avisadas saíam do ajuste do contorno em retas e arcos, que desloca as pontas
+  em 1 a 4 mm (retas de 15 m nas rotatórias a 0,005°).
+- **Decisão:** `AxisSnap` passa a conferir 0°, 45°, 90° e 135°, só dentro dos 0,2° do Revit (antes 1°, só X e Y). No
+  `MarkingService`, cada vértice pode andar até o desvio máximo do ajuste do contorno (Configurações, padrão 5 mm); nos
+  lotes, áreas remanescentes e acabamentos do terreno, sem ajuste de arcos, continua 0,5 mm. Um alinhamento que faria um
+  contorno válido se tocar não é aplicado.
+- **Consequências:** o desvio total de um vértice em relação à geometria gerada pode chegar a duas vezes a tolerância do
+  ajuste (5 mm do ajuste + 5 mm do alinhamento) – invisível na escala do projeto. Retas entre 0,2° e 1°, que antes eram
+  alinhadas, ficam como estão (o Revit não avisa e a inclinação é de projeto). Os limites são do plugin e da ajuda do
+  Revit, não de norma.
+

@@ -48,15 +48,22 @@ provável a partir de fatos) ou **HIPÓTESE** (risco plausível ainda não demon
   rodou o Autoteste rápido no mesmo Revit: 7 etapas, 4 OK, 3 com aviso, **0 erros**, em 3 min 6 s (a interseção em cruz
   ficou fora pelo limite de tempo do modo rápido). O projeto já tinha 216 marcas, entre elas o loteamento do Autoteste
   anterior, mantido para inspeção.
-- **LIMITE DA EVIDÊNCIA:** modo rápido (162 e 171 etapas não executadas); um build do Revit; um projeto. As demais
-  ferramentas (obras, drenagem, tráfego, detalhamento, pranchas) continuam sem execução registrada no Revit 2027.
+- **FATO (2026-10-20, `docs/evidencias/2026-10-20-autoteste-completo.txt` e o trecho do log no mesmo diretório):** a DLL
+  2.1.0 com EX rodou o Autoteste **completo**: 178 etapas (loteamento, vias, conexões, rotatórias, cul-de-sacs,
+  sinalização horizontal e vertical, calçadas, drenagem, largura e recuos, segurança viária, tráfego), 97 OK, 80 com
+  aviso e **1 com erro** (perfil de 2 peças das placas recusado pelo Revit; corrigido em EY), em 1 h 42 min.
+- **LIMITE DA EVIDÊNCIA:** um build do Revit; um projeto; obras de arte e pranchas não estão no roteiro do Autoteste. As
+  correções de EY do lado do Revit ainda não rodaram no Revit.
 - **Avisos do Revit nos relatórios** (todos nas etapas com interseção ou loteamento; as vias isoladas não tiveram nenhum):
   - "A linha no croqui está ligeiramente fora da linha central": reproduzido no núcleo e corrigido nos pisos das marcas
     (EW2: no 2º relatório, de centenas para 62). Os 62 restantes não diziam em que pisos; EX levou o alinhamento aos
     caminhos que ainda não o tinham (lotes, áreas remanescentes, acabamentos do terreno, contorno só de retas) – a
     confirmar (KNOWN_ISSUES K12);
   - "Os elementos têm valores de 'Marca' duplicados" (65 + 12 + 11 no 2º relatório): defeito real com dois loteamentos no
-    projeto, corrigido em EX (DECISIONS D-009);
+    projeto, corrigido em EX (DECISIONS D-009). No completo não houve o aviso, mas o projeto tinha só 6 marcas antes do
+    teste (sem um segundo loteamento): a correção não foi exercitada;
+  - no completo: 1 385 retas fora do eixo (causa achada em EY: critério de 0,2° com 45° e pontas deslocadas pelo ajuste
+    do contorno; KNOWN_ISSUES K12) e 3 091 avisos de pisos sobrepostos, dos quais 614 pares persistem (K11, K13);
   - "Pisos realçados se sobrepõem" (239 no 2º relatório, 23 entre elementos da mesma marca): padrão de sobreposição de
     passagem entre vias que se cruzam, não reproduzido no núcleo; o Autoteste agora mede no fim da etapa se os pares ainda
     se sobrepõem (KNOWN_ISSUES K11).
@@ -142,7 +149,7 @@ Legenda de estado:
 | XII | Cenários de projeto (geometria) e otimização geral | AUSENTE / PARCIAL (greide compensado, tempos semafóricos) | — |
 | XIII | Janelas WPF com prévia ao vivo (Core) | IMPLEMENTADA, NÃO VALIDADA aqui | `UI/*.xaml` |
 | XIV | Transações, rollback, `FailuresPreprocessor` | IMPLEMENTADA, NÃO VALIDADA aqui | §3 |
-| XV | Autoteste dentro do Revit (relatório) | VALIDADA no Revit 2027 (modo rápido, 2026-10-19, DLL 2.0.0 e 2.1.0). Desde EX: resumo dos avisos por elemento e conferência das sobreposições no fim da etapa (ainda não rodado no Revit) | `AutoTest*.cs`, `WarningSummary`, `docs/evidencias` |
+| XV | Autoteste dentro do Revit (relatório) | VALIDADA no Revit 2027: modo rápido (DLL 2.0.0 e 2.1.0) e **completo** (2026-10-20, 178 etapas), com o resumo por elemento e a conferência das sobreposições do EX funcionando. Desde EY: todos os pares persistentes por tipo e a medida das retas fora do eixo (ainda não rodado no Revit) | `AutoTest*.cs`, `WarningSummary`, `docs/evidencias` |
 | — | Sinalização horizontal e vertical (MBST), dispositivos, mobiliário, acessibilidade (NBR 9050/16537) | VALIDADA (Core) | maior parte da suíte |
 | — | Detalhamento, pranchas, quantitativos, memorial | VALIDADA (Core) / Revit não validado | rodadas AF/AH/AI |
 | — | Georreferência e calibração de imagem | VALIDADA (Core) | `Geo/*`, testes X1 |

@@ -3,6 +3,69 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-20 – EY: Autoteste completo no Revit 2027 – placas, retas fora do eixo e pisos sobrepostos
+
+### Evidência
+- Autoteste **completo** do usuário com a DLL 2.1.0 do EX, guardado em `docs/evidencias/2026-10-20-autoteste-completo.txt`,
+  com o trecho do log do período em `2026-10-20-log-autoteste-completo.txt`:
+  - 178 etapas: 97 OK, 80 com aviso e **1 com erro**, em 1 h 42 min;
+  - 3 091 avisos de pisos sobrepostos em 52 etapas e 1 385 de retas fora do eixo em 57 etapas.
+- A conferência do EX funcionou. Dos 3 091 pares sobrepostos:
+  - **2 023** tinham um dos pisos já apagado ou refeito no fim da etapa (aviso de passagem);
+  - 29 já não tinham volume em comum;
+  - 425 ficaram sem conferência;
+  - **614 continuam sobrepostos**.
+- Os 62 avisos de retas fora do eixo da etapa do loteamento eram de SARJETA, CALCADA, ORELHA, INTERSECAO e LEG, não dos lotes:
+  a hipótese do EX não se confirmou.
+
+### Placas – o único erro (EY1)
+- O Revit recusou o perfil de peças do catálogo de placas ("Curve loops do not satisfy the input requirements" e "Perfil
+  inválido").
+- Reproduzido no núcleo com o mesmo preparo do contorno: 19 perfis (de 1 501) se tocam.
+  - Exemplos: o pictograma do R-13 e do A-31 passa duas vezes pelo mesmo vértice.
+  - Outros voltam sobre si com lascas de 0,1 mm, a grade das booleanas.
+- `ProfileCleanup` (Core):
+  - aponta o problema;
+  - devolve partes limpas (pescoços e lascas menores que 1 mm saem);
+  - descarta peças menores que a tolerância do Revit.
+- O gerador de placas usa as partes limpas, e o `MarkingService` tenta as partes quando o Revit recusa um perfil.
+  - Peça menor que a tolerância vira aviso ("ficaram de fora"), não erro no log.
+
+### Retas fora do eixo (EY3)
+- Pela ajuda do Revit 2027, o aviso vale para retas a até 0,2° da horizontal, da vertical **ou de 45°**.
+- O ajuste do contorno em retas e arcos desloca as pontas das retas em 1 a 4 mm, por exemplo retas de 15 m a 0,005° nas
+  rotatórias.
+- `AxisSnap` passa a conferir 0°, 45°, 90° e 135°, só dentro dos 0,2°.
+  - No `MarkingService` usa o desvio do ajuste do contorno (padrão 5 mm).
+  - Não aplica um alinhamento que faria um contorno válido se tocar.
+  - DECISIONS D-010.
+- Nas cenas de teste (cruzamento, T, esconso, três rotatórias, cul-de-sac): de 87 retas que o Revit avisaria para 2.
+
+### Pisos sobrepostos que persistem (EY2)
+- `PieceOverlaps` (Core) mede a sobreposição como o Autoteste no Revit: área em planta × altura em comum.
+  - `ElementPlan.RevitPieces` dá às pinturas a mesma altura que o Revit dá, inclusive as marcas sobre pintura de fundo.
+- Reproduzidos, com os mesmos volumes do relatório, e corrigidos:
+  - **Via com canteiros laterais**: a linha de fundo das vagas ficava metade dentro do meio-fio do canteiro (MER-0 ×
+    MEIO-FIO). Agora não há linha de fundo quando a divisa é meio-fio de canteiro ou calçada.
+  - **Ciclofaixa bidirecional e ciclovia**: o símbolo da bicicleta encostava na linha de bordo (CIC-LD × SIC). Agora cada
+    símbolo fica no meio do seu lado, entre a linha central e a de bordo.
+  - **Canteiros com árvore** (gramado e jardineira): a grama e a proteção do tronco passavam sobre a borda, mais alta
+    (3 328 e 8 320 cm³, iguais aos do Revit). Agora ficam só sobre a terra.
+  - **Faixa de pedestres sobre vagas** (MER-0 × FTP-1): o recorte das marcas "por cima" inclui as vagas.
+- Todos os 10 modelos de via, as 4 ciclofaixas e os 3 canteiros ficam sem nenhum par sobreposto no núcleo.
+- Sem correção ainda:
+  - lascas entre pisos vizinhos da mesma interseção ou rotatória, criadas pelo ajuste do contorno piso a piso (K13);
+  - os tipos persistentes que o relatório não detalhou.
+
+### Autoteste
+- Todos os pares que continuam sobrepostos são listados por tipo, com o volume, numa nota sempre visível.
+  - O aviso com exemplos vai para o topo da etapa; antes ficava escondido no "… e mais N avisos" em 26 de 39 etapas.
+- As retas dos avisos "fora da linha central" são medidas: desalinhamento, comprimento e quanto a ponta teria de andar.
+
+### Testes
+- +15 `EYRevitFullRunTests`.
+- Suíte completa: **2 800/2 800** (14 min 34 s), sem regressão nos testes antigos de placas, ciclofaixas, vagas e canteiros.
+
 ## 2026-10-20 – EX: segundo Autoteste (2.1.0), Marca única dos lotes, alinhamento nos lotes e sobreposições conferidas
 
 ### Evidência

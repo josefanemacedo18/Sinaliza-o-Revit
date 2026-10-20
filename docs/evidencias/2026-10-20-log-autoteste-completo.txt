@@ -1,0 +1,15 @@
+Trecho do log do plugin (%AppData%\SinalizaBIM\log.txt) durante o Autoteste completo de 2026-10-20 00:03–01:45 – as únicas entradas do período.
+
+2026-10-20 01:07:16 ERRO [CreateExtrusionGeometry] Autodesk.Revit.Exceptions.ArgumentException: Curve loops do not satisfy the input requirements.
+Parameter name: profileLoops
+   at Autodesk.Revit.DB.GeometryCreationUtilities.CreateExtrusionGeometry(IList`1 profileLoops, XYZ extrusionDir, Double extrusionDist, SolidOptions solidOptions)
+   at SinalizacaoViaria.Revit.Infrastructure.MarkingService.ProfileSolidGeometry(ProfileSolid p, Double zBaseFt, SolidOptions options)
+   at SinalizacaoViaria.Revit.Infrastructure.MarkingService.BuildSolids(IEnumerable`1 pieces, Double zMeters, Double thickness, ISurface sampler, ElementId materialId, List`1 warnings, Double aboveSurfaceM)
+2026-10-20 01:09:00 ERRO [CreateExtrusionGeometry] Autodesk.Revit.Exceptions.ArgumentException: Curve loops do not satisfy the input requirements.
+Parameter name: profileLoops
+   at Autodesk.Revit.DB.GeometryCreationUtilities.CreateExtrusionGeometry(IList`1 profileLoops, XYZ extrusionDir, Double extrusionDist, SolidOptions solidOptions)
+   at SinalizacaoViaria.Revit.Infrastructure.MarkingService.ProfileSolidGeometry(ProfileSolid p, Double zBaseFt, SolidOptions options)
+   at SinalizacaoViaria.Revit.Infrastructure.MarkingService.BuildSolids(IEnumerable`1 pieces, Double zMeters, Double thickness, ISurface sampler, ElementId materialId, List`1 warnings, Double aboveSurfaceM)
+2026-10-20 01:10:06 ERRO [CreateExtrusionGeometry] System.InvalidOperationException: Perfil inválido.
+   at SinalizacaoViaria.Revit.Infrastructure.MarkingService.ProfileSolidGeometry(ProfileSolid p, Double zBaseFt, SolidOptions options)
+   at SinalizacaoViaria.Revit.Infrastructure.MarkingService.BuildSolids(IEnumerable`1 pieces, Double zMeters, Double thickness, ISurface sampler, ElementId materialId, List`1 warnings, Double aboveSurfaceM)

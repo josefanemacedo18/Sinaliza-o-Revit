@@ -757,7 +757,9 @@ public sealed partial class RoadSetup
                             CurbOffset = -b,
                             RightSide = sigma > 0,
                             StallWidth = parallel ? w : null,
-                            BackLine = true,
+                            // Linha de fundo (centrada na divisa do lado da pista): sem ela quando a divisa é o meio-fio de um canteiro
+                            // ou calçada – metade da linha ficava dentro do meio-fio (Autoteste de 2026-10-20, "Via com canteiros laterais").
+                            BackLine = !(i > 0 && side[i - 1].Tipo is TipoElementoSecao.CanteiroFisico or TipoElementoSecao.Calcada),
                             StartOffset = StartSetback,
                             FlipAngle = reverseTraffic,
                         });
