@@ -788,10 +788,13 @@ Revit fechar no meio, o arquivo mostra onde parou). Tudo acontece dentro de um �
 **Desfazer tudo** (recomendado) ou **Manter** para olhar as vistas "SV Autoteste" (planta e 3D). O teste rápido leva
 até ~3 minutos; o completo, de 10 a 40 minutos; o progresso aparece na barra de status do Revit.
 
-**Avisos do Revit no relatório.** Cada etapa traz o total de avisos por tipo, por exemplo `Σ 140 × "Pisos realçados se
-sobrepõem"`. Cada aviso mostra os elementos com o id e o início do id da marca. **[mesma marca]** indica que os elementos
-são de uma mesma marca, sinal de piso duplicado numa regeneração. Envie esse relatório: ele separa duplicação de
-sobreposição real.
+**Avisos do Revit no relatório.** Cada etapa traz o total de avisos por tipo e em que elementos, contando todos (o relatório
+detalha só os 25 primeiros), por exemplo `Σ 62 × "A linha no croqui está ligeiramente fora da linha central…" – em
+QUADRA-B 40, LEG 22`. Cada aviso detalhado mostra os elementos com o id e o início do id da marca. **[mesma marca]** indica
+que os elementos são de uma mesma marca, sinal de piso duplicado numa regeneração. Quando há avisos "Pisos realçados se
+sobrepõem", o fim da etapa confere cada par no modelo como ficou: quantos **ainda têm volume em comum** (sobreposição
+real, vira aviso da etapa com exemplos) e quantos **não têm mais** (aviso de passagem: a via é criada inteira e a
+interseção recorta as vias depois, em outra transação). Envie esse relatório.
 
 ## 10. Quantitativos
 
@@ -2886,7 +2889,10 @@ No Revit, cada categoria tem:
   mostrar na vista ativa e se os filtros aplicam as cores. Se a vista usa um modelo de vista, os filtros vão para o modelo.
 
 Parâmetros de cada lote: **SV_Quadra**, **SV_Lote** (número), **SV_CategoriaLote**, **SV_AreaLote** (m², projeção horizontal),
-além de Comentários "SV lote H 12 [T1:3]" e Marca "H-12" – prontos para etiquetas e tabelas.
+além de Comentários "SV lote H 12 [T1:3]" e Marca "H-12" – prontos para etiquetas e tabelas. Com **mais de um loteamento**
+no projeto, a Marca ganha o nome do loteamento na frente ("Jardim H-12"; entre loteamentos de mesmo nome, também o início do
+id, "Jardim-23ef H-12") para não se repetir – o Revit avisa marcas repetidas. A área remanescente segue a mesma regra. Os
+quadros, o memorial e o SV_Codigo continuam com "H-12".
 
 ### 27.5 Lotes no relevo e no 3D
 

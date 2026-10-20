@@ -86,6 +86,8 @@ internal sealed class StepReport(string group, string name)
     public List<string> Errors { get; } = new();
     public List<string> Warnings { get; } = new();
     public List<string> Info { get; } = new();
+    /// <summary>Elementos de cada aviso "Pisos realçados se sobrepõem" – conferidos no fim da etapa (ver AutoTest.OverlapCheck).</summary>
+    public List<ElementId[]> FloorOverlaps { get; } = new();
 
     public string Status => Errors.Count > 0 ? "ERRO" : Warnings.Count > 0 ? "AVISO" : "OK";
 
@@ -340,6 +342,9 @@ internal sealed partial class AutoTestRunner
             s.Ms = sw.ElapsedMilliseconds;
             foreach (var l in _logs.Skip(logs0)) s.Error("Erro tratado pelo plugin (só ia para o log): " + l);
             foreach (var d in _dialogs.Skip(dlg0)) s.Message("Mensagem ao usuário: " + d.Replace("\n", " | "));
+            if (s.FloorOverlaps.Count > 0)
+                try { OverlapCheck(s); }
+                catch (Exception ex) { s.Note($"Pisos sobrepostos não conferidos no fim da etapa ({ex.Message})."); }
             if (s.Ms > 60000) s.Warn($"Lento: {s.Ms / 1000.0:0} s.");
             _cur = null;
             // Relatório parcial gravado a cada etapa: se o Revit fechar no meio, dá para saber onde parou.
@@ -361,6 +366,8 @@ internal sealed partial class AutoTestRunner
                 if (f.GetSeverity() == FailureSeverity.Warning)
                 {
                     _cur?.Warn("Aviso do Revit: " + text);
+                    if (f.GetFailureDefinitionId().Guid == BuiltInFailures.OverlapFailures.FloorsOverlap.Guid)
+                        _cur?.FloorOverlaps.Add(f.GetFailingElementIds().ToArray());
                     fa.DeleteWarning(f);
                 }
                 else
@@ -390,14 +397,54 @@ internal sealed partial class AutoTestRunner
         return " – " + string.Join(", ", names) + (ids.Count > 3 ? $" e mais {ids.Count - 3}" : "") + same;
     }
 
-    /// <summary>Avisos do Revit da etapa agrupados pelo texto (quantos de cada tipo e quantos entre elementos da mesma marca).</summary>
-    private static IEnumerable<string> RevitWarningSummary(IEnumerable<string> warnings)
+    /// <summary>
+    /// Confere no fim da etapa os pares de pisos dos avisos "Pisos realçados se sobrepõem". O Revit avisa quando a transação
+    /// grava; a via é criada inteira e a interseção recorta as vias depois, em outra transação – então parte dos avisos pode
+    /// ser de passagem. Aqui mede, no modelo como ficou, quantos pares ainda têm volume em comum (sobreposição real).
+    /// </summary>
+    private void OverlapCheck(StepReport s)
     {
-        const string prefix = "Aviso do Revit: ";
-        return warnings.Where(w => w.StartsWith(prefix))
-            .GroupBy(w => { var t = w[prefix.Length..]; var k = t.IndexOf(" – ", StringComparison.Ordinal); return k < 0 ? t : t[..k]; })
-            .OrderByDescending(g => g.Count())
-            .Select(g => $"Σ {g.Count()} × \"{g.Key}\"" + (g.Count(w => w.EndsWith("[mesma marca]")) is var n and > 0 ? $" ({n} entre elementos da mesma marca)" : ""));
+        var pairs = new HashSet<(long A, long B)>();
+        foreach (var g in s.FloorOverlaps)
+            for (int i = 0; i < g.Length; i++)
+                for (int j = i + 1; j < g.Length; j++)
+                    pairs.Add(g[i].Value < g[j].Value ? (g[i].Value, g[j].Value) : (g[j].Value, g[i].Value));
+        var solids = new Dictionary<long, Solid?>();
+        int still = 0, apart = 0, gone = 0, unknown = 0;
+        var examples = new List<string>();
+        foreach (var (a, b) in pairs)
+        {
+            var ea = _doc.GetElement(new ElementId(a));
+            var eb = _doc.GetElement(new ElementId(b));
+            if (ea == null || eb == null) { gone++; continue; }
+            if (SolidOf(ea, solids) is not { } sa || SolidOf(eb, solids) is not { } sb) { unknown++; continue; }
+            try
+            {
+                var v = BooleanOperationsUtils.ExecuteBooleanOperation(sa, sb, BooleanOperationsType.Intersect)?.Volume ?? 0;
+                if (v <= 1e-4) { apart++; continue; }
+                still++;
+                if (examples.Count < 5) examples.Add($"{Who(_doc, new[] { ea.Id, eb.Id })[3..]} ({v * 28316.8:0} cm³)");
+            }
+            catch { unknown++; }
+        }
+        s.Note($"Pisos sobrepostos conferidos no fim da etapa: {pairs.Count} par(es) dos avisos – {still} ainda com volume em comum, "
+               + $"{apart} sem volume em comum (aviso de passagem), {gone} com piso apagado ou refeito, {unknown} sem conferência.");
+        if (still > 0) s.Warn($"{still} par(es) de pisos continuam sobrepostos no modelo: {string.Join("; ", examples)}{(still > examples.Count ? "; …" : "")}.");
+    }
+
+    private static Solid? SolidOf(Element e, Dictionary<long, Solid?> cache)
+    {
+        if (cache.TryGetValue(e.Id.Value, out var s)) return s;
+        try
+        {
+            if (e.get_Geometry(new Options { DetailLevel = ViewDetailLevel.Fine }) is { } ge)
+                foreach (var o in ge)
+                    if (o is Solid x && x.Volume > 1e-9)
+                        s = s == null ? x : BooleanOperationsUtils.ExecuteBooleanOperation(s, x, BooleanOperationsType.Union);
+        }
+        catch { s = null; }
+        cache[e.Id.Value] = s;
+        return s;
     }
 
     // ------------------------------------------------------------------ ajudas
@@ -502,7 +549,7 @@ internal sealed partial class AutoTestRunner
             sb.AppendLine($"[{s.Status}] {s.Name}  ({s.Ms} ms, {s.Elements} elemento(s))");
             foreach (var e in s.Errors.Take(40)) sb.AppendLine("    ✖ " + e);
             if (s.Errors.Count > 40) sb.AppendLine($"    ✖ … e mais {s.Errors.Count - 40} erro(s)");
-            foreach (var g in RevitWarningSummary(s.Warnings)) sb.AppendLine("    " + g);
+            foreach (var g in WarningSummary.Lines(s.Warnings)) sb.AppendLine("    " + g);
             foreach (var w in s.Warnings.Take(25)) sb.AppendLine("    ⚠ " + w);
             if (s.Warnings.Count > 25) sb.AppendLine($"    ⚠ … e mais {s.Warnings.Count - 25} aviso(s)");
             foreach (var i in s.Info) sb.AppendLine("    · " + i);

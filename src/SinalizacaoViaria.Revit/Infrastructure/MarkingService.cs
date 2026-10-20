@@ -1505,9 +1505,10 @@ public sealed class MarkingService
     /// <summary>
     /// Contorno do Revit com linhas e arcos inteiros (ver <see cref="BoundaryFit"/>): cada reta vira uma linha só e cada
     /// curva vira arcos – o esboço do piso fica limpo e leve. <paramref name="raw"/>: vértices mantidos um a um (pontos de
-    /// apoio da edição de forma sobre o terreno).
+    /// apoio da edição de forma sobre o terreno). <paramref name="snap"/>: retas quase alinhadas aos eixos ficam exatas (padrão:
+    /// só fora do modo <paramref name="raw"/>).
     /// </summary>
-    private CurveLoop? ToCurveLoop(IReadOnlyList<Vec2> ring, double zFt, bool raw = false)
+    private CurveLoop? ToCurveLoop(IReadOnlyList<Vec2> ring, double zFt, bool raw = false, bool? snap = null)
     {
         var tol = _doc.Application.ShortCurveTolerance * 1.5;
         var pts = new List<XYZ>();
@@ -1528,7 +1529,7 @@ public sealed class MarkingService
             }
             catch (Exception ex) { Log.Error("Contorno com arcos", ex); }
         }
-        if (!raw)
+        if (snap ?? !raw)
         {
             // Retas "quase" alinhadas aos eixos (resíduo de recorte) ficam exatas: o Revit avisa "ligeiramente fora da linha
             // central" em cada uma. Depois, pontos que ficaram perto demais saem (curva curta).
@@ -1543,7 +1544,8 @@ public sealed class MarkingService
         return loop;
     }
 
-    private CurveLoop? ToCurveLoopLines(IReadOnlyList<Vec2> ring, double zFt) => ToCurveLoop(ring, zFt, raw: true);
+    /// <summary>Só retas (sem o ajuste de arcos), mas com o alinhamento aos eixos: contorno com furos cujos arcos se tocariam.</summary>
+    private CurveLoop? ToCurveLoopLines(IReadOnlyList<Vec2> ring, double zFt) => ToCurveLoop(ring, zFt, raw: true, snap: true);
 
     /// <summary>Desvio máximo do contorno ajustado (m) – configurável em Configurações (0 = retas uma a uma, como antes).</summary>
     private static double BoundaryTolerance => Math.Max(0, PluginContext.Settings.BoundaryTolerance);

@@ -85,6 +85,7 @@ public static class LotService
         var hosts = TerrainModel.Hosts(doc);
         var hostFoot = hosts.ToDictionary(h => h.Id, h => Footprint(doc, h));
         var height = Math.Max(0.005, lot.AlturaLote);
+        var prefixo = LotMarks.Prefixo(lot, Loteamentos(doc));
         for (int i = 0; i < rem.Count; i++)
         {
             var shape = rem[i];
@@ -123,7 +124,7 @@ public static class LotService
             }
             if (e == null) continue;
             try { e.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set($"SV área remanescente {numero}"); } catch { /* opcional */ }
-            try { e.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(numero); } catch { /* opcional */ }
+            try { e.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(LotMarks.Remanescente(prefixo, numero)); } catch { /* opcional */ }
             SharedParameters.Set(e, SharedParameters.Lote, numero);
             SharedParameters.Set(e, SharedParameters.CategoriaLote, cat.Nome);
             SharedParameters.Set(e, SharedParameters.AreaLote, UnitConv.Ft2(shape.Area));
@@ -139,7 +140,9 @@ public static class LotService
     private static RenderResult RenderQuadra(Document doc, QuadraDefinition q, List<StoredMarking> existing)
     {
         var res = new RenderResult();
-        var lot = Loteamento(doc, q.LoteamentoId);
+        var todos = Loteamentos(doc);
+        var lot = todos.FirstOrDefault(l => l.Id == q.LoteamentoId);
+        var prefixo = lot != null ? LotMarks.Prefixo(lot, todos) : "";
         var cats = lot?.Categorias ?? CategoriaLote.Padrao();
         // Lotes por linhas: limite e linhas relidos do documento (as linhas podem ter sido movidas ou editadas).
         if (q.Divisao == ModoDivisao.Linhas) res.Warnings.AddRange(AtualizaLinhas(doc, q));
@@ -198,7 +201,7 @@ public static class LotService
                 res.Warnings.Add($"Quadra {q.Nome}, lote {p.Numero}: não foi possível criar o lote{(floorReason != null ? $" ({floorReason})" : "")}.");
                 continue;
             }
-            TagLot(e, q, p, cat);
+            TagLot(e, q, p, cat, prefixo);
             MarkingStorage.Write(e, q, MarkingColor.Terra);
             res.Elements.Add(e.Id);
         }
@@ -207,10 +210,11 @@ public static class LotService
         return res;
     }
 
-    private static void TagLot(Element e, QuadraDefinition q, Parcela p, CategoriaLote cat)
+    /// <summary>Parâmetros do lote; a Marca é única no projeto mesmo com vários loteamentos (ver <see cref="LotMarks"/>).</summary>
+    private static void TagLot(Element e, QuadraDefinition q, Parcela p, CategoriaLote cat, string prefixo)
     {
         try { e.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set($"{Tag} {q.Nome} {p.Numero} [{p.Chave}]"); } catch { /* opcional */ }
-        try { e.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set($"{q.Nome}-{p.Numero}"); } catch { /* opcional */ }
+        try { e.get_Parameter(BuiltInParameter.ALL_MODEL_MARK)?.Set(LotMarks.Lote(prefixo, q.Nome, p.Numero)); } catch { /* opcional */ }
         SharedParameters.Set(e, SharedParameters.Quadra, q.Nome);
         SharedParameters.Set(e, SharedParameters.Lote, p.Numero);
         SharedParameters.Set(e, SharedParameters.CategoriaLote, cat.Nome);
@@ -313,17 +317,7 @@ public static class LotService
         var res = new List<CurveLoop>();
         var clean = shape.Simplified(0.005, 1e-6) ?? shape;
         foreach (var ring in new[] { clean.Outer }.Concat(clean.Holes))
-        {
-            var pts = ring.Select(v => new XYZ(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), zFt)).ToList();
-            var kept = new List<XYZ>();
-            foreach (var p in pts)
-                if (kept.Count == 0 || kept[^1].DistanceTo(p) > tol) kept.Add(p);
-            while (kept.Count > 2 && kept[0].DistanceTo(kept[^1]) <= tol) kept.RemoveAt(kept.Count - 1);
-            if (kept.Count < 3) continue;
-            var loop = new CurveLoop();
-            for (int i = 0; i < kept.Count; i++) loop.Append(Line.CreateBound(kept[i], kept[(i + 1) % kept.Count]));
-            res.Add(loop);
-        }
+            if (PlanLoops.Lines(ring, zFt, tol) is { } loop) res.Add(loop);
         return res;
     }
 

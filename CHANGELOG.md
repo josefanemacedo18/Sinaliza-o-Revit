@@ -3,6 +3,47 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-20 – EX: segundo Autoteste (2.1.0), Marca única dos lotes, alinhamento nos lotes e sobreposições conferidas
+
+### Evidência
+- Autoteste rápido com a DLL 2.1.0 guardado em `docs/evidencias/2026-10-19-autoteste-rapido-2.1.0.txt`: 7 etapas, 4 OK,
+  3 com aviso, **0 erros**. A interseção em cruz ficou fora pelo limite de tempo do modo rápido.
+- Avisos do Revit:
+  - etapa do loteamento: 239 × "Pisos realçadas se sobrepõem" (23 entre elementos da mesma marca), 65 × "Marca"
+    duplicada, 62 × "ligeiramente fora da linha central" (eram centenas antes do EW2);
+  - lote personalizado e união de lotes: 12 e 11 × "Marca" duplicada;
+  - vias isoladas: nenhum.
+
+### "Marca" duplicada dos lotes (defeito real)
+- Causa: a Marca de cada lote era "{quadra}-{número}". O projeto tinha dois loteamentos com as mesmas quadras (o do
+  Autoteste anterior, mantido para inspeção, e o novo), então "B-3" se repetia.
+- `LotMarks` (Core): com um loteamento só, continua "B-3"; com dois ou mais, o nome do loteamento vai na frente ("Jardim
+  B-3") e, entre homônimos, também o início do id ("Autoteste-23ef B-3"). Vale para a área remanescente. SV_Codigo, quadros e
+  memorial não mudam. DECISIONS D-009.
+
+### "Ligeiramente fora da linha central" fora dos pisos das marcas
+- Três caminhos ainda montavam contornos sem o alinhamento aos eixos do EW2:
+  - lotes e áreas remanescentes (`LotService.Loops`);
+  - acabamentos do terreno (`TerrainService.ApplyFinishes`);
+  - o contorno só de retas do `MarkingService`, usado quando os arcos de um furo tocariam o contorno.
+- Agora todos passam pelo `AxisSnap`: `AxisSnap.SnapRing` (Core) e o helper `PlanLoops` (Revit). Os pisos que acompanham o
+  terreno (pontos de apoio da edição de forma) continuam com os vértices como estão.
+- Defeito achado de passagem: nos acabamentos do terreno, uma reta menor que 0,01 pé era pulada e o contorno ficava aberto;
+  o Revit recusava a subdivisão (registrado no log). Agora os pontos próximos saem antes de montar o contorno.
+- **Não confirmado** que os 62 avisos vinham desses caminhos: a cena do núcleo (cruzamento na origem) gera lotes já exatos.
+  O próximo relatório diz em que pisos ficaram (KNOWN_ISSUES K12).
+
+### Autoteste
+- O resumo de cada tipo de aviso diz em que elementos, contando todos e não só os 25 detalhados: "Σ 62 × "…" – em QUADRA-B
+  40, LEG 22" (`WarningSummary`, Core, com testes).
+- No fim de cada etapa com avisos "Pisos realçadas se sobrepõem", cada par é conferido no modelo como ficou, pelo volume em
+  comum dos sólidos. O relatório separa os pares que **ainda se sobrepõem** (viram aviso da etapa, com exemplos) dos que
+  **não se sobrepõem mais** (aviso de passagem) e dos pisos apagados ou refeitos. É a medida que decide o K11.
+
+### Testes
+- +10 `EXRevitWarningsTests`.
+- Suíte completa: **2 785/2 785** (14 min 49 s).
+
 ## 2026-10-19 – EW: primeira evidência no Revit 2027, versão 2.1.0 e avisos do Revit
 
 ### Evidência

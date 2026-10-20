@@ -730,14 +730,8 @@ public static class TerrainService
                     try
                     {
                         var z = host.get_BoundingBox(null)?.Max.Z ?? 0;
-                        var loop = new CurveLoop();
-                        var ring = part.Outer;
-                        for (int i = 0; i < ring.Count; i++)
-                        {
-                            var a = new XYZ(UnitConv.Ft(ring[i].X), UnitConv.Ft(ring[i].Y), z);
-                            var b = new XYZ(UnitConv.Ft(ring[(i + 1) % ring.Count].X), UnitConv.Ft(ring[(i + 1) % ring.Count].Y), z);
-                            if (a.DistanceTo(b) > 0.01) loop.Append(Line.CreateBound(a, b));
-                        }
+                        // Pontos a menos de 0,01 pé saem antes de montar o contorno (pular só a reta curta deixava o anel aberto).
+                        if (PlanLoops.Lines(part.Outer, z, 0.01) is not { } loop) continue;
                         var sub = host.CreateSubDivision(doc, new List<CurveLoop> { loop });
                         sub.GetParameter(ParameterTypeId.ToposolidSubdivideMaterial)?.Set(styles.Material(color));
                         sub.GetParameter(ParameterTypeId.ToposolidSubdivideHeight)?.Set(UnitConv.Ft(0.02));

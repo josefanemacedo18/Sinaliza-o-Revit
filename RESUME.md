@@ -2,37 +2,32 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-19 (fim do ciclo EW)
+## Estado em 2026-10-20 (fim do ciclo EX)
 
 - **Ramo:** `claude/dreamy-gates-a3nrta`. Sem PR aberto (o fluxo do projeto é commit e push direto no ramo).
 - **Versão do plugin:** 2.1.0 (`Directory.Build.props`), aprovada pelo usuário.
-- **Ciclos concluídos:** EV1–EV6 (auditoria, segurança de dados, validação do modelo, geometria, alinhamentos, volumes) e
-  EW1–EW3:
-  - evidência do Revit;
-  - V06 da gleba recalibrado;
-  - retas quase alinhadas aos eixos exatas nos pisos;
-  - Autoteste identifica os pisos dos avisos;
-  - elementos do eixo das vias comuns.
-- **Revit:** primeira execução registrada.
-  - Revit 2027.0, build 27.0.4.412.
-  - Autoteste **rápido**: 0 erros.
-  - Validar Modelo: 1 informação depois da recalibração.
+- **Ciclos concluídos:** EV1–EV6, EW1–EW3 e EX:
+  - Marca dos lotes única com mais de um loteamento (D-009);
+  - alinhamento aos eixos também nos lotes, áreas remanescentes, acabamentos do terreno e contorno só de retas;
+  - Autoteste com resumo dos avisos por elemento e conferência das sobreposições no fim da etapa.
+- **Revit:** dois Autotestes **rápidos** registrados (DLL 2.0.0 e 2.1.0), ambos com 0 erros, e um Validar Modelo.
   - Relatórios em `docs/evidencias/`.
   - O modo **completo** ainda não foi rodado.
+  - As mudanças de EX do lado do Revit ainda não rodaram no Revit.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros.
-- **Testes:**
-  - suíte completa 2 771/2 771 (EW1/EW2);
-  - +4 do eixo, verdes na classe;
-  - total 2 775.
+- **Testes:** suíte completa 2 785/2 785 (EX: +10 `EXRevitWarningsTests`).
 
 ## Próxima tarefa
 
-1. **Aguardar o próximo Autoteste do usuário**, com a DLL 2.1.0. Ele identifica cada piso dos avisos "Pisos realçados se
-   sobrepõem" (id do elemento e da marca) e marca "[mesma marca]".
-   - Se forem pares da mesma marca: são duplicados da regeneração. Corrigir em `MarkingService.Render`, apagando os pisos
-     antigos que não serão reaproveitados **antes** de criar os novos, ou conferindo o `pool`.
-   - Se forem marcas diferentes: é sobreposição real. Reproduzir no núcleo com a cena do Autoteste.
-   - Conferir também se o aviso "ligeiramente fora da linha central" sumiu (EW2).
+1. **Aguardar o próximo Autoteste do usuário** com a DLL do EX, de preferência o **completo**, numa cópia do projeto.
+   Conferir no relatório:
+   - "Marca" duplicada: deve sumir (D-009);
+   - "ligeiramente fora da linha central": o resumo diz em que pisos ficaram (K12). Se ainda houver, reproduzir no núcleo
+     com o código dos pisos;
+   - "Pisos realçadas se sobrepõem": a linha "Pisos sobrepostos conferidos no fim da etapa" decide o K11.
+     - Se os pares não se sobrepõem mais (de passagem): criar a via e o recorte da interseção sem a gravação intermediária
+       sobreposta (`CmdSinalizarVia.Create` → `IntersectionRunner.Run`).
+     - Se continuam sobrepostos: reproduzir no núcleo com os códigos e as marcas do relatório e corrigir.
 2. **F7b:** tabela de volumes por estaca no quantitativo de terraplenagem do Revit (`SectionVolumes` já está no Core).
 3. **F3:** catálogo de placas personalizadas por documento (resolve K1).
 

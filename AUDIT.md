@@ -44,11 +44,22 @@ provável a partir de fatos) ou **HIPÓTESE** (risco plausível ainda não demon
 - **FATO:** **Validar Modelo** rodou no mesmo Revit, somente leitura, num projeto com 4 marcas e 48 elementos
   (`docs/evidencias/2026-10-19-validacao-modelo.txt`). Teve 1 achado V06, que levou ao ajuste da severidade (ver CHANGELOG
   EW1).
-- **LIMITE DA EVIDÊNCIA:** modo rápido, com 162 etapas não executadas; um build do Revit; um projeto. As demais
+- **FATO (2026-10-19 23:19, `docs/evidencias/2026-10-19-autoteste-rapido-2.1.0.txt`):** a DLL **2.1.0** (com EW1–EW3)
+  rodou o Autoteste rápido no mesmo Revit: 7 etapas, 4 OK, 3 com aviso, **0 erros**, em 3 min 6 s (a interseção em cruz
+  ficou fora pelo limite de tempo do modo rápido). O projeto já tinha 216 marcas, entre elas o loteamento do Autoteste
+  anterior, mantido para inspeção.
+- **LIMITE DA EVIDÊNCIA:** modo rápido (162 e 171 etapas não executadas); um build do Revit; um projeto. As demais
   ferramentas (obras, drenagem, tráfego, detalhamento, pranchas) continuam sem execução registrada no Revit 2027.
-- **Avisos do Revit no relatório** (todos nas etapas com interseção; as vias isoladas não tiveram nenhum):
-  - "A linha no croqui está ligeiramente fora da linha central": reproduzido no núcleo e corrigido (EW2);
-  - "Pisos realçados se sobrepõem": não reproduzido no núcleo (ver KNOWN_ISSUES K11).
+- **Avisos do Revit nos relatórios** (todos nas etapas com interseção ou loteamento; as vias isoladas não tiveram nenhum):
+  - "A linha no croqui está ligeiramente fora da linha central": reproduzido no núcleo e corrigido nos pisos das marcas
+    (EW2: no 2º relatório, de centenas para 62). Os 62 restantes não diziam em que pisos; EX levou o alinhamento aos
+    caminhos que ainda não o tinham (lotes, áreas remanescentes, acabamentos do terreno, contorno só de retas) – a
+    confirmar (KNOWN_ISSUES K12);
+  - "Os elementos têm valores de 'Marca' duplicados" (65 + 12 + 11 no 2º relatório): defeito real com dois loteamentos no
+    projeto, corrigido em EX (DECISIONS D-009);
+  - "Pisos realçados se sobrepõem" (239 no 2º relatório, 23 entre elementos da mesma marca): padrão de sobreposição de
+    passagem entre vias que se cruzam, não reproduzido no núcleo; o Autoteste agora mede no fim da etapa se os pares ainda
+    se sobrepõem (KNOWN_ISSUES K11).
 
 ## 3. Arquitetura observada
 
@@ -131,7 +142,7 @@ Legenda de estado:
 | XII | Cenários de projeto (geometria) e otimização geral | AUSENTE / PARCIAL (greide compensado, tempos semafóricos) | — |
 | XIII | Janelas WPF com prévia ao vivo (Core) | IMPLEMENTADA, NÃO VALIDADA aqui | `UI/*.xaml` |
 | XIV | Transações, rollback, `FailuresPreprocessor` | IMPLEMENTADA, NÃO VALIDADA aqui | §3 |
-| XV | Autoteste dentro do Revit (relatório) | VALIDADA no Revit 2027 (modo rápido, 2026-10-19) | `AutoTest*.cs`, `docs/evidencias` |
+| XV | Autoteste dentro do Revit (relatório) | VALIDADA no Revit 2027 (modo rápido, 2026-10-19, DLL 2.0.0 e 2.1.0). Desde EX: resumo dos avisos por elemento e conferência das sobreposições no fim da etapa (ainda não rodado no Revit) | `AutoTest*.cs`, `WarningSummary`, `docs/evidencias` |
 | — | Sinalização horizontal e vertical (MBST), dispositivos, mobiliário, acessibilidade (NBR 9050/16537) | VALIDADA (Core) | maior parte da suíte |
 | — | Detalhamento, pranchas, quantitativos, memorial | VALIDADA (Core) / Revit não validado | rodadas AF/AH/AI |
 | — | Georreferência e calibração de imagem | VALIDADA (Core) | `Geo/*`, testes X1 |

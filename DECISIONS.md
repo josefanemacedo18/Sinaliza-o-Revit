@@ -72,3 +72,15 @@ como substituída.
 - **Consequências:** o aviso some nos casos de resíduo, e a geometria muda menos de 0,5 mm. Retas realmente inclinadas
   pelo projeto (por exemplo, uma via a 0,05° num trecho longo) continuam inclinadas e podem continuar com o aviso, que
   nesse caso é verdadeiro. Os limites são do plugin, não de norma.
+
+## D-009 – Marca dos lotes única no projeto, com o nome do loteamento quando há mais de um
+- **Contexto:** o 2º Autoteste no Revit 2027 (2026-10-19) teve 65 + 12 + 11 avisos "Os elementos têm valores de 'Marca'
+  duplicados": a Marca de cada lote era "{quadra}-{número}" e o projeto tinha dois loteamentos (o do Autoteste anterior,
+  mantido para inspeção, e o novo), com as mesmas quadras.
+- **Decisão:** `LotMarks` (Core). Com um loteamento só, a Marca continua "B-3". Com dois ou mais, ganha o nome do
+  loteamento na frente ("Jardim B-3"); entre loteamentos de mesmo nome (sem diferenciar maiúsculas), também o início do id,
+  crescendo de 4 em 4 caracteres até diferir ("Jardim-23ef B-3"). A área remanescente segue a mesma regra. O SV_Codigo, os
+  quadros e o memorial continuam com "B-3".
+- **Consequências:** a Marca deixa de se repetir sem mudar nada em projetos com um loteamento só. As marcas de um loteamento
+  gerado quando era o único só ganham o prefixo quando ele for regenerado; até lá continuam únicas, porque o novo loteamento
+  já nasce com prefixo. Etiquetas que mostram a Marca passam a mostrar o prefixo quando houver mais de um loteamento.

@@ -1,0 +1,93 @@
+﻿SINALIZABIM – RELATÓRIO DO AUTOTESTE
+Data: 19/10/2026 23:19   Duração: 00:03:06
+Modo: RÁPIDO (amostra de até 3 etapas por bloco, limite de 3 min; 171 etapa(s) não executadas)
+Revit: Autodesk Revit 2027 2027.0 (build 27.0.4.412)
+Plugin: 2.1.0.0 – DLL de 19/10/2026 16:47
+Projeto: Projeto1   Marcas existentes antes do teste: 216
+Área de teste: origem X = 4900 m, Y = -1200 m (coordenadas internas), nível Terreno (cota 0,00 m)
+Coordenadas nas mensagens: locais, em metros a partir da origem da área de teste.
+
+RESUMO: 7 etapas: 4 OK, 3 com aviso, 0 com erro (00:03:06).
+
+DETALHES
+
+=== Preparação ===
+[OK] Área de teste, nível e vistas  (3403 ms, 0 elemento(s))
+    · 7152 elemento(s) de modelo no projeto; área de teste a partir de X = 4900 m, Y = -1200 m.
+
+=== Loteamento ===
+[AVISO] Gleba com três vias → quadras reconhecidas e lotes 12 × 30 (subdivisões do Toposolid ou pisos planos)  (152742 ms, 183 elemento(s))
+    Σ 239 × "Pisos realçadas se sobrepõem." (23 entre elementos da mesma marca)
+    Σ 65 × "Os elementos têm valores de “Marca” duplicados."
+    Σ 62 × "A linha no croqui está ligeiramente fora da linha central e pode causar imprecisões."
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – PAV-ASF (Pisos) #2932239 [marca 74c332], PAV-ASF (Pisos) #2932845 [marca a0c16a]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #2932246 [marca 7773e2], MER-0 (Pisos) #2932975 [marca df34aa]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – LFO-2 (Pisos) #2932246 [marca 7773e2], MER-0 (Pisos) #2933114 [marca a89ba3]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2932409 [marca ffbcfd], MER-0 (Pisos) #2932975 [marca df34aa]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2932409 [marca ffbcfd], MER-0 (Pisos) #2933114 [marca a89ba3]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2932592 [marca 555654], MER-0 (Pisos) #2932975 [marca df34aa]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MER-0 (Pisos) #2932592 [marca 555654], MER-0 (Pisos) #2933114 [marca a89ba3]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2932779 [marca 326c31], LFO-2 (Pisos) #2932852 [marca ed151e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2932779 [marca 326c31], MER-0 (Pisos) #2932975 [marca df34aa]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2932779 [marca 326c31], MER-0 (Pisos) #2933114 [marca a89ba3]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2932786 [marca 631527], LFO-2 (Pisos) #2932852 [marca ed151e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2932786 [marca 631527], MER-0 (Pisos) #2932975 [marca df34aa]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2932786 [marca 631527], MER-0 (Pisos) #2933114 [marca a89ba3]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2932793 [marca d36273], LFO-2 (Pisos) #2932852 [marca ed151e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2932793 [marca d36273], MER-0 (Pisos) #2932975 [marca df34aa]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2932793 [marca d36273], MER-0 (Pisos) #2933114 [marca a89ba3]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2932800 [marca a14110], MER-0 (Pisos) #2932975 [marca df34aa]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – CALCADA (Pisos) #2932800 [marca a14110], MER-0 (Pisos) #2933114 [marca a89ba3]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2932807 [marca 587265], MER-0 (Pisos) #2932975 [marca df34aa]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – SARJETA (Pisos) #2932807 [marca 587265], MER-0 (Pisos) #2933114 [marca a89ba3]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2932814 [marca f57ade], MER-0 (Pisos) #2932975 [marca df34aa]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – MEIO-FIO (Pisos) #2932814 [marca f57ade], MER-0 (Pisos) #2933114 [marca a89ba3]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2932821 [marca 4cfc43], LFO-2 (Pisos) #2932852 [marca ed151e]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2932821 [marca 4cfc43], MER-0 (Pisos) #2932975 [marca df34aa]
+    ⚠ Aviso do Revit: Pisos realçadas se sobrepõem. – GRAMADO (Pisos) #2932821 [marca 4cfc43], MER-0 (Pisos) #2933114 [marca a89ba3]
+    ⚠ … e mais 347 aviso(s)
+    · 12 marca(s) na via; eixo 240 m.
+    · 12 marca(s) na via; eixo 180 m.
+    · 14 marca(s) na via; eixo 180 m.
+    · 6 quadra(s), 68 área(s): 0 subdivisão(ões) do Toposolid e 68 piso(s) plano(s).
+[AVISO] Lote personalizado (frente 20 m) e área verde – vizinhos e numeração refeitos  (1306 ms, 14 elemento(s))
+    Σ 12 × "Os elementos têm valores de “Marca” duplicados."
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925062 [marca 23efbb], QUADRA-B (Pisos) #2940736 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925069 [marca 23efbb], QUADRA-B (Pisos) #2940743 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925076 [marca 23efbb], QUADRA-B (Pisos) #2940750 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925083 [marca 23efbb], QUADRA-B (Pisos) #2940757 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925090 [marca 23efbb], QUADRA-B (Pisos) #2940764 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925097 [marca 23efbb], QUADRA-B (Pisos) #2940771 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925104 [marca 23efbb], QUADRA-B (Pisos) #2940778 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925111 [marca 23efbb], QUADRA-B (Pisos) #2940785 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925118 [marca 23efbb], QUADRA-B (Pisos) #2940792 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925125 [marca 23efbb], QUADRA-B (Pisos) #2940799 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925132 [marca 23efbb], QUADRA-B (Pisos) #2940806 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925139 [marca 23efbb], QUADRA-B (Pisos) #2940820 [marca cf3865]
+    ⚠ Quadra B, testada T1: sobra de 2,00 m (menor que a frente mínima de 5,00 m ou que a área mínima de 125,00 m²) somada ao último lote.
+    ⚠ Quadra B: a testada T3 ficou toda com os lotes de esquina.
+    · Lote personalizado: 819,00 m².
+[AVISO] Unir lotes (dois vizinhos viram um) e quadro de lotes da quadra  (2542 ms, 107 elemento(s))
+    Σ 11 × "Os elementos têm valores de “Marca” duplicados."
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925062 [marca 23efbb], QUADRA-B (Pisos) #2940852 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925069 [marca 23efbb], QUADRA-B (Pisos) #2940859 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925076 [marca 23efbb], QUADRA-B (Pisos) #2940866 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925083 [marca 23efbb], QUADRA-B (Pisos) #2940873 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925090 [marca 23efbb], QUADRA-B (Pisos) #2940880 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925097 [marca 23efbb], QUADRA-B (Pisos) #2940887 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925104 [marca 23efbb], QUADRA-B (Pisos) #2940894 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925111 [marca 23efbb], QUADRA-B (Pisos) #2940901 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925118 [marca 23efbb], QUADRA-B (Pisos) #2940908 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925125 [marca 23efbb], QUADRA-B (Pisos) #2940915 [marca cf3865]
+    ⚠ Aviso do Revit: Os elementos têm valores de “Marca” duplicados. – QUADRA-B (Pisos) #2925132 [marca 23efbb], QUADRA-B (Pisos) #2940929 [marca cf3865]
+    ⚠ Quadra B, testada T1: sobra de 2,00 m (menor que a frente mínima de 5,00 m ou que a área mínima de 125,00 m²) somada ao último lote.
+    ⚠ Quadra B: a testada T3 ficou toda com os lotes de esquina.
+    · Lote unido: 982,80 m².
+
+=== Vias ===
+[OK] Via – Via local – 1 faixa por sentido, estacionamento e calçadas  (7000 ms, 12 elemento(s))
+    · 12 marca(s) na via; eixo 240 m.
+[OK] Via – Via coletora – 2 faixas por sentido e calçadas  (7827 ms, 14 elemento(s))
+    · 14 marca(s) na via; eixo 240 m.
+[OK] Via – Avenida – canteiro central, 2 + 2 faixas, estacionamento e calçadas  (11143 ms, 19 elemento(s))
+    · 18 marca(s) na via; eixo 240 m.

@@ -52,6 +52,14 @@ public static class AxisSnap
         return res;
     }
 
+    /// <summary>Mesmo ajuste de <see cref="Snap"/> para um anel de pontos (só retas): devolve os vértices ajustados.</summary>
+    public static List<Vec2> SnapRing(IReadOnlyList<Vec2> ring, double maxOffset = MaxOffset, double maxAngleDeg = MaxAngleDeg)
+    {
+        if (ring.Count < 3) return ring.ToList();
+        var segs = ring.Select((v, i) => new BoundarySegment(v, ring[(i + 1) % ring.Count])).ToList();
+        return Snap(segs, maxOffset, maxAngleDeg).Select(s => s.Start).ToList();
+    }
+
     /// <summary>Retas do contorno inclinadas menos que <paramref name="maxAngleDeg"/> em relação a X ou Y, mas não alinhadas.</summary>
     public static int CountNearAxis(IEnumerable<BoundarySegment> ring, double maxAngleDeg = MaxAngleDeg, double exact = 1e-9)
     {
