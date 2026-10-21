@@ -55,6 +55,14 @@ internal static class FootprintCutter
         var service = new MarkingService(doc, uidoc.ActiveView);
         var touched = new List<MarkingDefinition>();
         var area = Bounds(footprints);
+        // Centros exatos das curvas de quem recorta (extensão de calçada, canteiro…): a borda curva deixada na marca usa o
+        // mesmo arco do piso dele no contorno que vai ao Revit (D-015) – antes cada piso ajustava o seu e ficava uma lasca.
+        List<Vec2>? centers = null;
+        if (footprints.Count > 0)
+        {
+            try { centers = service.BuildGeometry(source, out _).ArcCenters.ToList() is { Count: > 0 } c ? c : null; }
+            catch (Exception ex) { Log.Error($"Centros dos arcos de {source.DisplayCode}", ex); }
+        }
         bool Close(MarkingDefinition d)
         {
             if (d.Path == null) return true;
@@ -76,7 +84,7 @@ internal static class FootprintCutter
                 foreach (var fp in footprints)
                 {
                     if (PolygonOps.Intersect(shapes, new[] { fp }).Sum(p => p.Area) <= 1e-4) continue;
-                    d.Exclusions.Add(new ExclusionZone { SourceId = source.Id, Points = fp.Outer.ToList() });
+                    d.Exclusions.Add(new ExclusionZone { SourceId = source.Id, Points = fp.Outer.ToList(), ArcCenters = centers });
                     hits = true;
                 }
             }

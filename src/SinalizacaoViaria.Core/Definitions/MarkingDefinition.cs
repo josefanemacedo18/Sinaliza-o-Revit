@@ -584,6 +584,11 @@ public sealed class ExclusionZone
     public bool Manual { get; set; }
     /// <summary>Desativado: o recorte fica guardado, mas a marca volta a aparecer inteira (liga/desliga).</summary>
     public bool Enabled { get; set; } = true;
+    /// <summary>
+    /// Centros exatos das curvas de quem fez o recorte (extensão de calçada, canteiro…): a borda curva que o recorte deixa na
+    /// marca usa o mesmo arco do piso vizinho no contorno que vai ao Revit. Nulo = arcos ajustados pelos pontos.
+    /// </summary>
+    public List<Vec2>? ArcCenters { get; set; }
 }
 
 public enum TipoSuporte

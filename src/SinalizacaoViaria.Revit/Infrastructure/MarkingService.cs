@@ -247,7 +247,7 @@ public sealed class MarkingService
 
         // Zebrado por contorno: todos os contornos juntos – o interno vira furo (anel em volta de uma rotatória).
         if (def is HatchMarkingDefinition { IsStrip: false } hatch)
-            return MarkingBuilder.BuildHatch(hatch, path.Chains.Where(c => c.Points.Count >= 3).ToList(), ctx);
+            return MarkingBuilder.BuildHatchArea(hatch, path.Chains.Where(c => c.Points.Count >= 3).ToList(), ctx);
 
         var graded = Graded(def) && path.Main != null;
         var geo = new MarkingGeometry();

@@ -234,6 +234,10 @@ public static class MarkingBuilder
         if (holes.Count == 0) return geo;
         var res = new MarkingGeometry { PaintedLength = geo.PaintedLength, PathLength = geo.PathLength, UnitCount = geo.UnitCount };
         res.Warnings.AddRange(geo.Warnings);
+        // Os centros exatos da marca continuam (antes se perdiam no recorte) e os de quem recortou entram para a borda nova.
+        res.ArcCenters.AddRange(geo.ArcCenters);
+        foreach (var c in zones.Where(z => z.Enabled && z.ArcCenters != null).SelectMany(z => z.ArcCenters!))
+            if (res.ArcCenters.All(x => x.DistanceTo(c) > 1e-6)) res.ArcCenters.Add(c);
         foreach (var p in geo.Pieces)
         {
             if (p.Profile != null || p.Solid != null)
@@ -607,6 +611,17 @@ public static class MarkingBuilder
     /// Zebrado em faixa ao longo do caminho (canteiro pintado, faixa de segurança): dividido em trechos
     /// para que as barras mantenham o ângulo em relação ao eixo mesmo em curvas; contorno contínuo.
     /// </summary>
+    /// <summary>
+    /// Zebrado por contorno com todos os contornos do caminho (o interno vira furo) e com os recortes da marca – o caminho usado
+    /// no Revit. Antes os recortes ficavam de fora: o zebrado da gota pintada passava sob a faixa de pedestres que o recorta
+    /// (FTP-1 × ZPA no 4º Autoteste completo), embora o núcleo, pelo <see cref="Build"/>, recortasse.
+    /// </summary>
+    public static MarkingGeometry BuildHatchArea(HatchMarkingDefinition d, IReadOnlyList<Polyline2> contours, BuildContext ctx)
+    {
+        var geo = BuildHatch(d, contours, ctx);
+        return d.Exclusions.All(z => !z.Enabled) ? geo : ApplyExclusions(geo, d.Exclusions);
+    }
+
     public static MarkingGeometry BuildHatchStrip(HatchMarkingDefinition d, HachuraDef preset, Polyline2 path, BuildContext ctx)
     {
         var geo = new MarkingGeometry();

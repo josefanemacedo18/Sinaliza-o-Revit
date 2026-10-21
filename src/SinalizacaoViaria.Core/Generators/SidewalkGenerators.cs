@@ -77,16 +77,7 @@ public static class SidewalkGenerator
             }
             default:
             {
-                var R = Math.Max(0.1, radius);
-                double Lt(double r) => D <= 2 * r ? Math.Sqrt(4 * r * D - D * D) : 2 * r;
-                var lt = Lt(R);
-                if (lt > avail)
-                {
-                    var L = 2 * avail;
-                    R = D <= L / 2 ? (L * L / 4 + D * D) / (4 * D) : L / 4;
-                    lt = Math.Min(Lt(R), avail);
-                    warnings?.Add($"Extensão de calçada curta para o raio pedido: raio de transição reduzido para {R:0.00} m.");
-                }
+                var (R, lt) = CurveHalf(radius, D, avail, warnings);
                 var theta = D <= 2 * R ? Math.Acos(1 - D / (2 * R)) : Math.PI / 2;
                 const int n = 10;
                 for (int i = 0; i <= n; i++)
@@ -102,6 +93,53 @@ public static class SidewalkGenerator
                 return half;
             }
         }
+    }
+
+    /// <summary>Raio e comprimento da meia transição em curva (dois arcos de raio R, em S), reduzidos se não couberem.</summary>
+    private static (double R, double Lt) CurveHalf(double radius, double D, double avail, List<string>? warnings)
+    {
+        var R = Math.Max(0.1, radius);
+        double Lt(double r) => D <= 2 * r ? Math.Sqrt(4 * r * D - D * D) : 2 * r;
+        var lt = Lt(R);
+        if (lt > avail)
+        {
+            var L = 2 * avail;
+            R = D <= L / 2 ? (L * L / 4 + D * D) / (4 * D) : L / 4;
+            lt = Math.Min(Lt(R), avail);
+            warnings?.Add($"Extensão de calçada curta para o raio pedido: raio de transição reduzido para {R:0.00} m.");
+        }
+        return (R, lt);
+    }
+
+    /// <summary>
+    /// Centros das curvas das transições da orelha (dois arcos de raio R em cada ponta "Curva": em (0, R) e (lt, D − R) no
+    /// perfil). Só com o meio-fio reto e o avanço pelo perfil: aí o perfil vai para a planta sem deformar e os arcos do
+    /// contorno (face, meio-fio, recorte das marcas vizinhas) são concêntricos a esses centros.
+    /// </summary>
+    public static List<Vec2> EarArcCenters(CurbExtensionDefinition d, Polyline2 path)
+    {
+        var res = new List<Vec2>();
+        if (d.OuterFace != null || path.Points.Count < 2 || path.Length < 1.0) return res;
+        var dir = (path.Points[^1] - path.Points[0]).Normalized();
+        for (int i = 0; i + 1 < path.Points.Count; i++)
+        {
+            var seg = path.Points[i + 1] - path.Points[i];
+            if (seg.Length > 1e-9 && Math.Abs(seg.Normalized().Cross(dir)) > 1e-9) return res;   // meio-fio curvo
+        }
+        var L = path.Length;
+        var D = Math.Max(0.1, d.Depth);
+        var map = StationMap(path, d.SidewalkOnLeft);
+        void Add(TipoTransicao kind, double radius, bool atEnd)
+        {
+            if (kind is TipoTransicao.Reta or TipoTransicao.Chanfro) return;
+            var (R, lt) = CurveHalf(radius, D, L / 2, null);
+            double X(double x) => atEnd ? L - x : x;
+            res.Add(map(new Vec2(X(0), R)));
+            res.Add(map(new Vec2(X(lt), D - R)));
+        }
+        Add(d.Transition, d.Radius, false);
+        Add(d.EndTransition ?? d.Transition, d.EndRadius ?? d.Radius, true);
+        return res;
     }
 
     private static Func<Vec2, Vec2> StationMap(Polyline2 path, bool sidewalkOnLeft)
@@ -241,7 +279,7 @@ public static class SidewalkGenerator
         var L = path.Length;
         if (L < 1.0) return Fail("Trecho da extensão de calçada muito curto (mínimo 1 m ao longo do meio-fio).");
         var geo = new MarkingGeometry();
-        if (d.ArcCenters != null) geo.ArcCenters.AddRange(d.ArcCenters);
+        geo.ArcCenters.AddRange(d.ArcCenters ?? EarArcCenters(d, path));
         var fp = EarFootprint(d, path);
         if (fp == null) return Fail("Não foi possível montar o contorno da extensão de calçada.");
         EarProfile(d, L, geo.Warnings);
