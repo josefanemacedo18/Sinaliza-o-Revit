@@ -78,6 +78,18 @@ public static class CustomSigns
         }
     }
 
+    /// <summary>
+    /// Placas que a lista de um projeto mostra: as do catálogo normativo e as personalizadas desse projeto
+    /// (<paramref name="projectCodes"/>). O catálogo em uso acumula as personalizadas dos projetos abertos na sessão – assim a
+    /// placa de qualquer marca é achada pelo código –, mas sem este filtro as placas de um projeto apareciam na lista de
+    /// outro e podiam ser usadas sem estar guardadas nele (K1).
+    /// </summary>
+    public static IEnumerable<PlacaDef> ForProject(IEnumerable<PlacaDef> placas, IEnumerable<string> projectCodes)
+    {
+        var codes = new HashSet<string>(projectCodes, StringComparer.OrdinalIgnoreCase);
+        return placas.Where(p => !p.Personalizada || codes.Contains(p.Codigo));
+    }
+
     /// <summary>Junta a placa à lista do projeto (substitui a de mesmo código).</summary>
     public static List<PlacaDef> Upsert(IEnumerable<PlacaDef> list, PlacaDef p)
     {

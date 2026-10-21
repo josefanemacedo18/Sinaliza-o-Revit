@@ -42,8 +42,13 @@ public static class CustomSignStore
         }
     }
 
-    /// <summary>Acrescenta as placas personalizadas do projeto ao catálogo em uso.</summary>
-    public static void Apply(Document doc) => CustomSigns.Apply(PluginContext.Catalog, Load(doc));
+    /// <summary>Acrescenta as placas personalizadas do projeto ao catálogo em uso e devolve os códigos delas (para as listas).</summary>
+    public static List<string> Apply(Document doc)
+    {
+        var signs = Load(doc);
+        CustomSigns.Apply(PluginContext.Catalog, signs);
+        return signs.Select(p => p.Codigo).ToList();
+    }
 
     /// <summary>Guarda as placas no projeto (substitui as de mesmo código). Usa a transação aberta ou abre uma.</summary>
     public static void Save(Document doc, IEnumerable<PlacaDef> signs)

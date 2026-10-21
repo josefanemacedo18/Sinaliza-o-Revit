@@ -14,6 +14,8 @@ public partial class SignWindow : Window
 {
     private readonly Catalogo _cat = PluginContext.Catalog;
     private readonly SignDefinition? _existing;
+    /// <summary>Placas personalizadas deste projeto (as de outros projetos abertos na sessão ficam fora da lista – K1).</summary>
+    private readonly HashSet<string>? _projectCodes;
     private bool _loading = true;
 
     public SignDefinition? Result { get; private set; }
@@ -40,8 +42,15 @@ public partial class SignWindow : Window
         _ => c.ToString(),
     };
 
-    public SignWindow(SignDefinition? existing = null)
+    /// <param name="projectCustomCodes">Placas personalizadas do projeto aberto (<see cref="CustomSignStore.Apply"/>); nulo = todas.</param>
+    public SignWindow(SignDefinition? existing = null, IEnumerable<string>? projectCustomCodes = null)
     {
+        if (projectCustomCodes != null)
+        {
+            _projectCodes = new HashSet<string>(projectCustomCodes, StringComparer.OrdinalIgnoreCase);
+            // A placa da marca em edição continua na lista, mesmo que tenha vindo de outro projeto antes da correção.
+            if (existing?.Code is { Length: > 0 } code) _projectCodes.Add(code);
+        }
         InitializeComponent();
         _existing = existing;
         CbCategory.Items.Add(new Option<CategoriaPlaca?>("Todas as categorias", null));
@@ -98,7 +107,8 @@ public partial class SignWindow : Window
         var cat = (CbCategory.SelectedItem as Option<CategoriaPlaca?>)?.Value;
         var q = TbSearch?.Text?.Trim() ?? "";
         LbTypes.Items.Clear();
-        foreach (var p in _cat.Placas.Where(p => (cat == null || p.Categoria == cat) && (q.Length == 0
+        var placas = _projectCodes == null ? _cat.Placas : CustomSigns.ForProject(_cat.Placas, _projectCodes);
+        foreach (var p in placas.Where(p => (cat == null || p.Categoria == cat) && (q.Length == 0
                      || p.Codigo.Contains(q, StringComparison.OrdinalIgnoreCase) || p.Nome.Contains(q, StringComparison.OrdinalIgnoreCase)
                      || p.Descricao.Contains(q, StringComparison.OrdinalIgnoreCase))))
             LbTypes.Items.Add(p);
@@ -238,6 +248,7 @@ public partial class SignWindow : Window
         var w = new CustomSignWindow(_cat) { Owner = this };
         if (w.ShowDialog() != true || w.Result == null) return;
         CustomSigns.Apply(_cat, new[] { w.Result });
+        _projectCodes?.Add(w.Result.Codigo);
         NewCustomSigns.RemoveAll(x => string.Equals(x.Codigo, w.Result.Codigo, StringComparison.OrdinalIgnoreCase));
         NewCustomSigns.Add(w.Result);
         CbCategory.SelectedIndex = 0;

@@ -312,8 +312,8 @@ public sealed class CmdEditar : CommandBase
     /// <summary>Edição da placa: as placas personalizadas do projeto entram na lista e as criadas na janela ficam guardadas.</summary>
     private static SignDefinition? EditSign(Document doc, SignDefinition sg)
     {
-        CustomSignStore.Apply(doc);
-        var w = new SignWindow(sg);
+        var codes = CustomSignStore.Apply(doc);
+        var w = new SignWindow(sg, codes);
         var ok = UiHelpers.ShowModal(w) == true;
         if (w.NewCustomSigns.Count > 0) CustomSignStore.Save(doc, w.NewCustomSigns);
         return ok ? w.Result : null;

@@ -127,9 +127,11 @@ public sealed class MarkingService
         return g;
     }
 
-    /// <summary>Ordena para gerar primeiro as marcas e depois os detalhes/anotações que dependem delas.</summary>
-    public static List<MarkingDefinition> DependencyOrder(IEnumerable<MarkingDefinition> defs) =>
-        defs.OrderBy(d => d is IProjectWideAnnotation ? 2 : d is IAnnotationDefinition ? 1 : 0).ToList();
+    /// <summary>
+    /// Ordena para gerar primeiro as marcas e depois os detalhes/anotações que dependem delas; dentro de cada grupo, pelo grafo
+    /// de dependências (<see cref="Core.Model.ModelGraph.RegenerationSort"/>).
+    /// </summary>
+    public static List<MarkingDefinition> DependencyOrder(IEnumerable<MarkingDefinition> defs) => Core.Model.ModelGraph.RegenerationSort(defs);
 
     /// <summary>Regenera os detalhes/anotações que apontam para as marcas indicadas (e os quadros de legenda).</summary>
     public List<RenderResult> RenderDependents(IEnumerable<string> markingIds, bool includeLegends)

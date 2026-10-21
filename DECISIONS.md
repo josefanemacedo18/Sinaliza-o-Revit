@@ -37,9 +37,16 @@ como substituída.
 - **Decisão:** `ModelGraph` é **calculado** a partir das definições lidas. Os recortes (`ExclusionZone.SourceId`) são
   referência fraca: não entram em ciclos nem na ordem, porque a via guarda o recorte da interseção que a cita. As
   filhas (`ChildIds`) dependem do nó que as lista.
-- **Consequências:** não há o que migrar nem sincronizar. O grafo serve à validação e à ordem de regeneração. O fluxo de
-  regeneração existente (`MarkingService.DependencyOrder`, `RenderDependents`) **não foi trocado** nesta etapa, porque
-  funciona e é coberto pelo Autoteste. Trocar exige validação no Revit.
+- **Consequências:** não há o que migrar nem sincronizar. O grafo serve à validação e à ordem de regeneração.
+- **Atualização (Fase III, 2026-10-21):** `MarkingService.DependencyOrder` passou a usar `ModelGraph.RegenerationSort`. A
+  chave é (grupo, profundidade de dependência dentro do conjunto, ordem de entrada), em que o grupo é: marcas, depois
+  detalhes, depois anotações do projeto todo.
+  - Sem dependências dentro de um grupo, o resultado é idêntico ao de antes (teste de equivalência).
+  - A ordem só muda onde antes podia sair errada: filha antes do nó; detalhe de um detalhe antes do detalhe.
+  - Os recortes continuam fora da ordem.
+  - Não foi substituído por `RegenerationOrder` (Kahn sobre o projeto todo), que reordenaria grupos e conjuntos inteiros
+    sem necessidade.
+  - Validação no Revit pendente (Releases/Fase03).
 
 ## D-005 – Validação do modelo somente leitura, com severidade e confiança
 - **Contexto:** a missão pede verificações com severidade, confiança e indicação de revisão humana, sem decisões

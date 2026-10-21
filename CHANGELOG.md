@@ -3,6 +3,29 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-21 – Fase III concluída: ordem de regeneração pelo grafo e placas personalizadas por projeto (versão 2.2.0)
+
+Fase da missão: III (arquitetura integrada) – concluída. Entrega: `Releases/Fase03` (não executada no Revit 2027).
+
+### Ordem de regeneração pelo grafo de dependências (D-004)
+- `ModelGraph.RegenerationSort`: grupo (marcas, detalhes, anotações do projeto), depois a profundidade de dependência
+  dentro do conjunto (referências fortes), depois a ordem de entrada. `MarkingService.DependencyOrder` usa essa ordem na
+  criação de marcas, na atualização de um conjunto, nas interseções e nos detalhes dependentes.
+- Sem dependências dentro de um grupo, o resultado é o mesmo de antes. Muda só onde a ordem antiga podia gerar algo antes
+  do que ele lê: filha de um nó antes do nó; detalhe de um detalhe antes do detalhe. Ciclos não travam (a ordem de entrada
+  decide) e os recortes não ordenam.
+
+### Placas personalizadas só no projeto que as tem (K1)
+- Com dois projetos abertos na mesma sessão, as placas personalizadas de um apareciam na lista de placas do outro e podiam
+  ser usadas lá sem estar guardadas no projeto. O catálogo da sessão continua acumulando as placas, para que a placa de
+  qualquer marca seja encontrada pelo código. Mas a janela de placas agora lista só as do catálogo normativo e as do
+  projeto aberto (`CustomSigns.ForProject`).
+- A placa da marca em edição continua na lista mesmo que tenha vindo de outro projeto.
+
+### Testes
+- `Fase03ArquiteturaTests` (7): equivalência com a ordem antiga sem dependências, nó antes das filhas, detalhe de detalhe,
+  ciclo, ids repetidos e vazios, recorte que não ordena, filtro das placas por projeto.
+
 ## 2026-10-21 – FC: 4º Autoteste completo – rotatória oval, pinturas sobre a sarjeta, T de via reconhecida e arcos das esquinas
 
 Fase da missão: IV/XIV (geometria e regras da API do Revit) – atual; XV (testes e evidência) junto.

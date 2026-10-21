@@ -182,6 +182,49 @@ public sealed class ModelGraph
         return order;
     }
 
+    /// <summary>
+    /// Ordem para gerar um conjunto de definições (criação, atualização, dependentes): primeiro as marcas, depois os detalhes
+    /// e por fim as anotações do projeto todo, como sempre foi; dentro de cada grupo, cada definição depois das do próprio
+    /// conjunto que ela referencia (referências fortes – nó antes das filhas, marca antes do detalhe do detalhe); empate pela
+    /// ordem de entrada. Sem dependências dentro de um grupo o resultado é o de antes (D-004). Num ciclo, a ordem de entrada
+    /// decide.
+    /// </summary>
+    public static List<MarkingDefinition> RegenerationSort(IEnumerable<MarkingDefinition> definitions)
+    {
+        var list = definitions.ToList();
+        var byId = new Dictionary<string, List<int>>();
+        for (int i = 0; i < list.Count; i++)
+            if (!string.IsNullOrEmpty(list[i].Id))
+            {
+                if (!byId.TryGetValue(list[i].Id, out var l)) byId[list[i].Id] = l = new List<int>();
+                l.Add(i);
+            }
+        // Referências de cada item a outros itens do conjunto (dependente → referenciados).
+        var refs = new List<int>[list.Count];
+        for (int i = 0; i < list.Count; i++) refs[i] = new List<int>();
+        foreach (var d in list)
+            foreach (var e in References(d).Where(e => e.Forte))
+                if (byId.TryGetValue(e.Dependente, out var deps) && byId.TryGetValue(e.Referenciado, out var targets))
+                    foreach (var a in deps)
+                        foreach (var b in targets)
+                            if (a != b && !refs[a].Contains(b)) refs[a].Add(b);
+        var depth = new int[list.Count];
+        var state = new byte[list.Count];   // 0 = não visto, 1 = na pilha, 2 = pronto
+        int Depth(int i)
+        {
+            if (state[i] == 2) return depth[i];
+            if (state[i] == 1) return 0;   // ciclo: não aprofunda
+            state[i] = 1;
+            var dd = 0;
+            foreach (var j in refs[i]) dd = Math.Max(dd, Depth(j) + 1);
+            state[i] = 2;
+            return depth[i] = dd;
+        }
+        for (int i = 0; i < list.Count; i++) Depth(i);
+        static int Group(MarkingDefinition d) => d is IProjectWideAnnotation ? 2 : d is IAnnotationDefinition ? 1 : 0;
+        return Enumerable.Range(0, list.Count).OrderBy(i => Group(list[i])).ThenBy(i => depth[i]).ThenBy(i => i).Select(i => list[i]).ToList();
+    }
+
     /// <summary>Dependente → conjunto do que ele referencia (só fortes, destinos existentes ou não).</summary>
     private Dictionary<string, HashSet<string>> Forward()
     {
