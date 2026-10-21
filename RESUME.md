@@ -2,39 +2,32 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-21 (fim do ciclo FC)
+## Estado em 2026-10-21 (Fase III concluída; Fase IV em andamento)
 
 - **Ramo:** `claude/dreamy-gates-a3nrta`. Sem PR aberto (o fluxo do projeto é commit e push direto no ramo).
-- **Versão do plugin:** 2.1.0 (`Directory.Build.props`).
-- **Fases da missão:** quadro no ROADMAP. ✅ I, II, IX, XI; 🔄 III, IV (atual), V, VI, VII, X, XII, XIV (atual), XV;
-  ⬜ VIII, XIII.
-- **Ciclo FC (4º Autoteste completo, DLL do FB: 180 etapas em 36 min, 1 erro, 323 pares no modelo final):** tudo
-  reproduzido no núcleo pelo arquivo de dados (`FCRevitFullRun4Tests` e as fixtures em `tests/…/Fixtures`):
-  - rotatória oval sem as lascas que viravam arestas abaixo da tolerância na extrusão;
-  - LBO e faixas de pedestres das rotatórias fora da sarjeta do perfil das vias; pisos da via recortados 1 mm além da zona;
-  - via reconhecida em pisos com pavimento "Nenhum": a definição do pavimento fica como dado e o T é formado (D-014);
-  - cruzamento rodoferroviário só nas faixas de rolamento (`RailCrossingSetup.FitTo`);
-  - arcos das esquinas no centro exato apesar dos cortes sobre as cordas do Clipper (D-015); `AxisSnap` desliza a ponta
-    do arco pela reta alinhada até a circunferência;
-  - lombada invertida não recorta mais a sarjeta (a reta de 218 m fora do eixo); conferência final sem o ruído de 0°.
-- **Ciclos anteriores:** EV1–EV6, EW1–EW3, EX, EY, EZ, FA e FB (leitura das marcas sem interpretar o que não precisa,
-  D-013; tempo por trecho e arquivo de dados completo no Autoteste).
+- **Versão do plugin:** 2.2.0 (`Directory.Build.props`), entregue em `Releases/Fase03` (commit `87cf484`, SHA-256 no
+  `RELEASE.md`). `Instalar/Revit2027` tem a mesma DLL. Não executada no Revit 2027.
+- **Fases da missão:** quadro no ROADMAP. ✅ I, II, III, IX, XI; 🔄 IV (atual), V, VI, VII, X, XII, XIV, XV; ⬜ VIII, XIII.
+- **Entregas por fase (G0):** `tools/release.sh <fase> "<suíte>"` compila de um commit limpo, confere `Versão+commit` na
+  DLL e grava `Releases/FaseNN` com o manifesto; índice em `Releases/README.md`. Cada fase sobe o número do meio da versão.
+- **Fase III:** ordem de regeneração pelo grafo (`ModelGraph.RegenerationSort`, D-004) e placas personalizadas só na lista
+  do projeto que as tem (K1, `CustomSigns.ForProject`). `Fase03ArquiteturaTests` (7).
+- **Fase IV em andamento (não commitada no momento deste registro):** centros exatos dos arcos da extensão de calçada
+  (`SidewalkGenerator.EarArcCenters`) e do recorte que ela deixa nas marcas vizinhas (`ExclusionZone.ArcCenters`,
+  `FootprintCutter`) – MER-0 × ORELHA; zebrado por contorno no Revit com os recortes da marca
+  (`MarkingBuilder.BuildHatchArea`) – FTP-1 × ZPA. Testes em `Fase04GeometriaTests`.
 - **Revit:** dois Autotestes rápidos e quatro **completos**, mais um Validar Modelo. Relatórios em `docs/evidencias/`. As
-  mudanças do FC ainda não rodaram no Revit.
+  mudanças do FC e das fases III/IV ainda não rodaram no Revit.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros.
-- **Testes:** suíte completa 2 869/2 869 (FC: +13 `FCRevitFullRun4Tests`).
+- **Testes:** suíte completa 2 876/2 876 (Fase III).
 
 ## Próxima tarefa
 
-1. **5º Autoteste completo com a DLL do FC**, numa cópia, terminando com **Desfazer tudo**. Enviar o relatório
-   `autoteste-….txt` **e** o arquivo `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`). Conferir:
-   - rotatória oval sem erro; etapa "Modelo final" com retas fora do eixo (esperado zero) e os pares restantes por tipo;
-   - queda de FTP-1/LBO × ROTATORIA, INTERSECAO × INTERSECAO, os pares do T da via reconhecida e do cruzamento
-     rodoferroviário;
-   - reproduzir no núcleo cada par restante pelo arquivo de dados.
-2. **K11 – abertos:** MER-0 × ORELHA (1 par, 55 L) e FTP-1 × ZPA (4 pares) – reproduzir pelo arquivo de dados.
-3. **K13**: emenda em curva (2,8 L nas transições das pontas) e rotatórias; depois, ajuste topológico do contorno.
-4. **F7b:** tabela de volumes por estaca no quantitativo de terraplenagem do Revit.
+1. **Fase IV:** concluir K11 (MER-0 × ORELHA, FTP-1 × ZPA) e K13 (emenda em curva e rotatórias), suíte completa,
+   versão 2.3.0 e `tools/release.sh 4`.
+2. **Fases seguintes, na ordem do ROADMAP:** V (K8), VI, VII (F7b), VIII (F8), X (F10), XII (F12), XIII, XIV, XV.
+3. **No Revit (quando houver):** 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer
+   tudo**; enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`).
 
 ## Como retomar
 
