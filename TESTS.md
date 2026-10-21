@@ -74,6 +74,15 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
   Isso é coberto pelo **Autoteste** (`CmdAutoteste`), que roda dentro do Revit (janela Sobre/Relatórios) e grava um
   relatório. Os relatórios enviados pelo usuário estão em `docs/evidencias/` (tabela abaixo); **neste ambiente não há
   Revit**, então cada correção do lado do Revit só fica confirmada no relatório seguinte.
+- **Por que o Revit não roda aqui (verificado em 2026-10-21):** o ambiente de desenvolvimento é um contêiner Linux x86-64;
+  o Revit 2027 é um aplicativo Windows com licença e interface, sem modo de linha de comando. O CI do GitHub
+  (`windows-latest`) compila e roda os testes do núcleo no Windows a cada push, mas também não tem Revit. A alternativa
+  sem interface seria o Autodesk Platform Services – Design Automation for Revit, que exige conta e credenciais da
+  Autodesk que este projeto não tem. Por isso o que depende da API fica assim:
+  - o núcleo (geometria, regras, geradores) é testado aqui e no CI;
+  - o que o Revit faria com a geometria é emulado nos testes (contorno ajustado em retas e arcos, critério de retas fora do
+    eixo, sobreposição de pisos), a partir dos dados gravados pelo Autoteste quando existem (`FCRevitFullRun4Tests`);
+  - cada entrega em `Releases/` diz "não executado no Revit 2027" até um Autoteste confirmá-la.
 - Precisão do tráfego contra dados de campo: os testes verificam coerência (sem colisões, filas, conservação), não a
   calibração.
 - Normas: os valores normativos vêm do catálogo e das referências citadas no código. Os testes verificam que os

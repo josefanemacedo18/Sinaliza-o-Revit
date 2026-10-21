@@ -102,11 +102,14 @@ coberto pelo **Autoteste** (`CmdAutoteste`), que roda só dentro do Revit e gera
 
 ### Procedimento de versão (release)
 
-1. Atualizar `<Version>` em `Directory.Build.props` (hoje 2.0.0). A versão aparece em **Normas / Sobre** e no assembly.
+1. Atualizar `<Version>` em `Directory.Build.props` (cada entrega de fase sobe o número do meio: 2.2.0, 2.3.0…). A versão
+   aparece em **Normas / Sobre** e no assembly; a versão informativa leva também o commit (`2.2.0+<sha>`).
 2. `dotnet test tests/SinalizacaoViaria.Core.Tests -c Release`: tudo verde. Registrar o resultado em TESTS.md.
-3. `dotnet build src/SinalizacaoViaria.Revit -c Release` (no Linux, `-p:EnableWindowsTargeting=true`), com 0 avisos.
-   Conferir que `Instalar/Revit2027` tem exatamente a DLL e o `.addin`.
-4. Entrada no CHANGELOG.md, commit e push. O CI tem de ficar verde e publicar o artefato.
-5. **Validação no Revit 2027** (manual, fora do CI), numa **cópia** de projeto ou num arquivo vazio: carregar sem erro, rodar
+3. Entrada no CHANGELOG.md e commit do código (árvore limpa).
+4. `tools/release.sh <fase> "<resultado da suíte>"`: compila (0 avisos), copia a DLL e o `.addin` para
+   `Releases/FaseNN` sem sobrescrever entregas anteriores e grava o `RELEASE.md` (commit, SHA-256, testes, o que não foi
+   verificado). Ver `Releases/README.md`.
+5. Commit de `Releases/` e de `Instalar/Revit2027` e push. O CI tem de ficar verde e publicar o artefato.
+6. **Validação no Revit 2027** (manual, fora do CI), numa **cópia** de projeto ou num arquivo vazio: carregar sem erro, rodar
    **Autoteste → Rápido** e **Validar Modelo**, e guardar os dois relatórios com a versão. Sem essa etapa a versão continua
    "implementada, mas não validada no Revit" (AUDIT §5).
