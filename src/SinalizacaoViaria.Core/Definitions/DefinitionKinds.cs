@@ -6,9 +6,10 @@ namespace SinalizacaoViaria.Core.Definitions;
 /// Tipo de uma definição gravada lido do começo do JSON, sem interpretar o resto: o System.Text.Json grava o discriminador
 /// (a propriedade "tipo" de <see cref="MarkingDefinition"/>) como primeira propriedade. Serve para varrer o projeto atrás de
 /// um tipo (interseções, rotatórias, vias) sem desserializar milhares de marcas de outros tipos – cada desserialização custa
-/// ~60 µs e o plugin varre o projeto dezenas de vezes por operação. Na dúvida (texto num formato inesperado, discriminador desconhecido) a resposta é "pode ser": quem
-/// chama interpreta o JSON e confere o tipo como antes. Se uma migração (<see cref="DefinitionVersioning"/>) renomear um
-/// discriminador, o nome antigo fica desconhecido aqui e cai nesse caminho seguro; só não pode ser reaproveitado para outro tipo.
+/// ~60 µs e o plugin varre o projeto dezenas de vezes por operação. Na dúvida (texto num formato inesperado, discriminador
+/// desconhecido) a resposta é "pode ser": quem chama interpreta o JSON e confere o tipo como antes. Se uma migração
+/// (<see cref="DefinitionVersioning"/>) renomear um discriminador, o nome antigo fica desconhecido aqui e cai nesse caminho
+/// seguro; só não pode ser reaproveitado para outro tipo.
 /// </summary>
 public static class DefinitionKinds
 {

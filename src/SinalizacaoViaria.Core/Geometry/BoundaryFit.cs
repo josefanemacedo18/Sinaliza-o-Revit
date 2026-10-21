@@ -96,30 +96,66 @@ public static class BoundaryFit
         var circles = spans.Select(sp => sp.Arc ? ArcCircle(p, sp.A, sp.B, centers, tolerance) : null).ToList();
         var hinted = circles.Where(c => c != null && centers != null && centers.Any(h => h.DistanceTo(c.Value.Center) < 1e-9)).Select(c => c!.Value.Center).ToList();
         bool Exact((Vec2 Center, double Radius)? c) => c is { } x && hinted.Any(h => h.DistanceTo(x.Center) < 1e-9);
+        // Arcos seguidos em volta do mesmo centro exato (ou separados só por um degrau de poucos mm, numa emenda de faixas): um
+        // raio só. Com raios a décimos de mm um do outro, a junção ficava sobre um só deles e o outro, refeito pelas pontas e
+        // pelo meio, escorregava centímetros.
+        for (int i = 0; i < spans.Count && spans.Count > 1; i++)
+        {
+            var k = (i + 1) % spans.Count;
+            if (!spans[k].Arc && spans.Count > 2 && p[spans[k].A].DistanceTo(p[spans[k].B]) < 0.05) k = (k + 1) % spans.Count;
+            if (circles[i] is not { } c1 || circles[k] is not { } c2 || !Exact(c1) || c1.Center.DistanceTo(c2.Center) > 1e-9) continue;
+            if (c1.Radius == c2.Radius || Math.Abs(c1.Radius - c2.Radius) > tolerance) continue;
+            var ds = new List<double>();
+            foreach (var sp in new[] { spans[i], spans[k] })
+                for (int q = sp.B - sp.A >= 2 ? sp.A + 1 : sp.A; q <= (sp.B - sp.A >= 2 ? sp.B - 1 : sp.B); q++) ds.Add(p[q].DistanceTo(c1.Center));
+            var r = EnvelopeRadius(ds);
+            if (ds.All(d => d <= r + tolerance && d >= r - Inward(r, tolerance))) circles[i] = circles[k] = (c1.Center, r);
+        }
         var joints = new Vec2[spans.Count];
         for (int i = 0; i < spans.Count; i++)
         {
             var v = p[spans[i].A];
             var prev = circles[(i - 1 + spans.Count) % spans.Count];
             var cur = circles[i];
+            // Reta → arco exato: no encontro da reta com a circunferência (a reta continua reta; a ponta de um corte sobre a
+            // corda vai para o arco).
+            var lineBefore = p[spans[(i - 1 + spans.Count) % spans.Count].A];
+            var lineAfter = p[spans[i].B % n];
             joints[i] = (prev, cur) switch
             {
-                (null, { } c) => Project(c, v),
-                ({ } c, null) => Project(c, v),
+                (null, { } c) => (Exact(cur) ? LineMeet(c, lineBefore, v) : null) ?? Project(c, v),
+                ({ } c, null) => (Exact(prev) ? LineMeet(c, lineAfter, v) : null) ?? Project(c, v),
                 // Dois arcos: no encontro das circunferências; se elas quase se tangenciam (encontro longe), sobre a do traçado.
                 ({ } c1, { } c2) => Meet(c1, c2, v) is { } mt && mt.DistanceTo(v) <= tolerance ? mt
                     : Exact(cur) ? Project(c2, v) : Exact(prev) ? Project(c1, v) : v,
                 _ => v,
             };
-            if (joints[i].DistanceTo(v) > tolerance) joints[i] = v;
+            var ec = Exact(cur) ? cur : Exact(prev) ? prev : null;
+            var lim = ec is { } e ? Inward(e.Radius, tolerance) : tolerance;
+            // Reta → arco: o que conta é a distância radial do vértice à curva; ao longo de uma reta que corta a curva inclinada
+            // a junção anda mais (até 4 ×: a 40° da normal, 20 mm para dentro viram 30 mm na reta).
+            var onLine = ec is { } e2 && (prev == null || cur == null) && v.DistanceTo(e2.Center) is var dv
+                && dv <= e2.Radius + tolerance && dv >= e2.Radius - lim;
+            // Encontro longe (reta quase tangente à curva): a projeção na circunferência exata; senão, o vértice.
+            if (joints[i].DistanceTo(v) > (onLine ? 4 * lim : lim))
+                joints[i] = ec is { } e3 && Project(e3, v) is var pj && pj.DistanceTo(v) <= lim ? pj : v;
         }
-        // Reta com a ponta movida: todos os pontos dela continuam a até a tolerância (senão a junção fica no vértice).
+        // Reta com a ponta movida: todos os pontos dela continuam a até a tolerância (senão a junção fica no vértice). As
+        // pontas antigas podem ficar além das novas, na mesma reta (a junção andou por ela até a circunferência).
         for (int i = 0; i < spans.Count; i++)
         {
             if (circles[i] != null) continue;
-            var seg = new BoundarySegment(joints[i], joints[(i + 1) % spans.Count]);
+            var (j0, j1) = (joints[i], joints[(i + 1) % spans.Count]);
+            // Degrau de poucos mm entre dois arcos da mesma circunferência (corte sobre a corda): as duas junções caem no mesmo
+            // ponto e a reta some (Merge).
+            if (j0.DistanceTo(j1) < minEdge && circles[(i - 1 + spans.Count) % spans.Count] is { } ca && circles[(i + 1) % spans.Count] is { } cb
+                && ca.Center.DistanceTo(cb.Center) < 1e-9 && Exact(ca)) continue;
+            var seg = new BoundarySegment(j0, j1);
             var ok = true;
-            for (int k = spans[i].A; k <= spans[i].B && ok; k++) ok = Distance(seg, p[k]) <= tolerance;
+            for (int k = spans[i].A; k <= spans[i].B && ok; k++)
+                ok = (k == spans[i].A || k == spans[i].B) && j0.DistanceTo(j1) > 1e-9
+                    ? Math.Abs((p[k] - j0).Cross((j1 - j0).Normalized())) <= tolerance
+                    : Distance(seg, p[k]) <= tolerance;
             if (!ok) { joints[i] = p[spans[i].A]; joints[(i + 1) % spans.Count] = p[spans[i].B % n]; }
         }
         var res = new List<BoundarySegment>();
@@ -151,11 +187,15 @@ public static class BoundaryFit
         {
             var lineEnd = Longest(k, n, j => FitsLine(p, k, j, tolerance), 1);
             var arcEnd = k + 2 <= n && FitsArc(p, k, k + 2, tolerance, minEdge, centers) ? Longest(k, n, j => FitsArc(p, k, j, tolerance, minEdge, centers), 2) : -1;
+            // A busca supõe que "cabe" é monotônico; um corte sobre a corda (rampa, limite da zona) faz o arco não caber até
+            // ele e caber de novo no ponto seguinte, onde a reta do corte encontra a curva.
+            if (arcEnd > k) arcEnd = Further(arcEnd, n, j => FitsArc(p, k, j, tolerance, minEdge, centers));
             // Arco na circunferência do traçado em vez de um mais comprido que entorta para pegar pontos de transição.
             if (arcEnd > k && centers is { Count: > 0 } && ArcCircle(p, k, arcEnd, centers, tolerance) is { } ac && !centers.Any(h => h.DistanceTo(ac.Center) < 1e-9)
                 && FitsArc(p, k, k + 2, tolerance, minEdge, centers, true))
             {
-                var hintEnd = Longest(k, n, j => FitsArc(p, k, j, tolerance, minEdge, centers, true), 2);
+                var hintEnd = Further(Longest(k, n, j => FitsArc(p, k, j, tolerance, minEdge, centers, true), 2), n,
+                    j => FitsArc(p, k, j, tolerance, minEdge, centers, true));
                 if (hintEnd - k >= 0.6 * (arcEnd - k)) arcEnd = hintEnd;
             }
             if (arcEnd > lineEnd) { spans.Add((k, arcEnd, true)); k = arcEnd; }
@@ -247,6 +287,20 @@ public static class BoundaryFit
     }
 
     /// <summary>
+    /// Raio do envelope externo: mediana dos afastamentos a até 2 mm do maior (os vértices da curva; os cortes sobre as cordas
+    /// ficam para dentro), no milímetro quando ela está a até 0,45 mm dele (raio de projeto; o arredondamento das operações
+    /// booleanas deixa vértices até 0,7 mm para fora).
+    /// </summary>
+    private static double EnvelopeRadius(IReadOnlyCollection<double> ds)
+    {
+        var hi = ds.Max();
+        var top = ds.Where(x => x >= hi - 0.002).OrderBy(x => x).ToList();
+        var med = top.Count % 2 == 1 ? top[top.Count / 2] : (top[top.Count / 2 - 1] + top[top.Count / 2]) / 2;
+        var rm = Math.Round(med * 1000) / 1000;
+        return Math.Abs(rm - med) <= 0.00045 ? rm : med;
+    }
+
+    /// <summary>
     /// Circunferência de mínimos quadrados (distância geométrica) pelos vértices <c>p[i..j]</c>: o centro e o raio saem de
     /// todos os pontos da curva (Gauss–Newton a partir da circunferência pelas pontas e o meio).
     /// </summary>
@@ -302,24 +356,53 @@ public static class BoundaryFit
         var bestDev = double.MaxValue;
         foreach (var hc in centers)
         {
-            // Raio que minimiza o maior desvio dos pontos de dentro (as pontas costumam ser cortes sobre a corda); as pontas
-            // também ficam na tolerância.
-            var (k0, k1) = j - i >= 4 ? (i + 1, j - 1) : (i, j);
-            double lo = double.MaxValue, hi = 0;
-            for (int k = k0; k <= k1; k++) { var dk = p[k].DistanceTo(hc); lo = Math.Min(lo, dk); hi = Math.Max(hi, dk); }
-            var rr = (lo + hi) / 2;
-            var dev = Math.Max(Math.Abs(p[i].DistanceTo(hc) - rr), Math.Abs(p[j].DistanceTo(hc) - rr));
-            dev = Math.Max(dev, (hi - lo) / 2);
+            // Raio pelo envelope externo dos pontos (os vértices da curva discretizada ficam na circunferência; os cortes de
+            // recortes caem sobre as cordas, para dentro até a flecha delas – Inward): no milímetro quando está perto dele
+            // (raio de projeto). Pisos vizinhos da mesma curva, recortados com vértices diferentes, saíam com raios a décimos
+            // de mm (ou, com os cortes, a milímetros) um do outro, sobrepostos ao longo da curva inteira.
+            var ds = new List<double>(j - i - 1);
+            for (int k = i + 1; k < j; k++) ds.Add(p[k].DistanceTo(hc));
+            double lo = ds.Min(), hi = ds.Max();
+            var (di, dj) = (p[i].DistanceTo(hc), p[j].DistanceTo(hc));
+            bool Ok(double d, double r) => d <= r + tol && d >= r - Inward(r, tol);
+            double Dev(double r) => !Ok(di, r) || !Ok(dj, r) || !Ok(lo, r) || !Ok(hi, r) ? double.MaxValue : Math.Abs(hi - r);
+            var rr = new[] { EnvelopeRadius(ds), (lo + hi) / 2 }.Where(r => Dev(r) <= tol).DefaultIfEmpty(0).First();
+            var dev = rr > 0 ? Dev(rr) : double.MaxValue;
             if (rr > MaxRadius || dev > tol) continue;
             // O arco em volta do centro do traçado gira o mesmo que o traçado (uma reta não "cabe" num círculo distante).
             // Giro esperado entre a primeira e a última corda: o ângulo, em volta do centro, entre os meios delas.
             var sweep = Sweep(hc, p[i], p[(i + j) / 2], p[j]);
             var inner = Math.Abs(Math.Atan2((p[i + 1] - hc).Cross(p[j - 1] - hc), (p[i + 1] - hc).Dot(p[j - 1] - hc)));
             var want = (Math.Abs(sweep) + inner) / 2;
-            if (Math.Sign(turn) != Math.Sign(sweep) || Math.Abs(Math.Abs(turn) - want) > Math.Max(3 * Math.PI / 180, 0.35 * want)) continue;
+            // Folga de meia corda da curva discretizada: a primeira (ou a última) corda pode ser um pedaço de corda, cortado por
+            // um recorte, que gira com a corda inteira.
+            var slack = Math.Acos(1 - Math.Min(Inward(rr, tol), 0.0025 * rr) / rr);
+            if (Math.Sign(turn) != Math.Sign(sweep) || Math.Abs(Math.Abs(turn) - want) > Math.Max(3 * Math.PI / 180, 0.35 * want) + slack) continue;
             if (dev < bestDev) { bestDev = dev; best = (hc, rr); }
         }
         return best ?? cf;
+    }
+
+    /// <summary>
+    /// Quanto um ponto pode ficar para dentro da circunferência exata: um corte (rampa, limite da zona) cai sobre a
+    /// corda da curva discretizada, até a flecha dela – o Clipper divide os arcos com 0,2 % do raio (12 mm num raio de 6 m,
+    /// 20 mm num de 10 m).
+    /// </summary>
+    private static double Inward(double r, double tol) => Math.Max(tol, Math.Min(0.03, 0.0025 * r));
+
+    /// <summary>Encontro da reta (por <paramref name="far"/> e <paramref name="v"/>) com a circunferência, o mais perto de <paramref name="v"/>.</summary>
+    private static Vec2? LineMeet((Vec2 Center, double Radius) c, Vec2 far, Vec2 v)
+    {
+        var d = v - far;
+        if (d.Length < 1e-9) return null;
+        var u = d.Normalized();
+        var f = far - c.Center;
+        var b = f.Dot(u);
+        var disc = b * b - (f.Dot(f) - c.Radius * c.Radius);
+        if (disc < 0) return null;
+        var sq = Math.Sqrt(disc);
+        var (q1, q2) = (far + u * (-b + sq), far + u * (-b - sq));
+        return q1.DistanceTo(v) <= q2.DistanceTo(v) ? q1 : q2;
     }
 
     /// <summary>Ponto da circunferência mais perto de <paramref name="v"/>.</summary>
@@ -697,6 +780,18 @@ public static class BoundaryFit
 
     // ------------------------------------------------------------------ ajuste
 
+    /// <summary>Continua depois de <see cref="Longest"/> enquanto um dos dois pontos seguintes ainda cabe.</summary>
+    private static int Further(int end, int n, Func<int, bool> fits)
+    {
+        for (var found = true; found;)
+        {
+            found = false;
+            for (int d = 1; d <= 2 && end + d <= n; d++)
+                if (fits(end + d)) { end += d; found = true; break; }
+        }
+        return end;
+    }
+
     /// <summary>Maior <c>j</c> em (k, n] com o teste verdadeiro: avança dobrando o passo e refina por bissecção.</summary>
     private static int Longest(int k, int n, Func<int, bool> fits, int minStep)
     {
@@ -746,7 +841,13 @@ public static class BoundaryFit
         var m = (i + j) / 2;
         if (ArcCircle(p, i, j, centers, tol, hintOnly) is not { } circle) return false;
         var (c, r) = circle;
-        if (Math.Abs(p[i].DistanceTo(c) - r) > tol) return false;
+        var exact = centers != null && centers.Any(h => h.DistanceTo(c) < 1e-9);
+        bool Off(int k)
+        {
+            var e = p[k].DistanceTo(c) - r;
+            return exact ? e > tol || -e > Inward(r, tol) : Math.Abs(e) > tol;
+        }
+        if (Off(i)) return false;
         if (r > MaxRadius || r < Math.Max(0.01, minEdge)) return false;
         if (p[i].DistanceTo(p[j]) < minEdge) return false;
         var sweep = Sweep(c, p[i], p[m], p[j]);
@@ -756,7 +857,7 @@ public static class BoundaryFit
         double total = 0;
         for (int k = i + 1; k <= j; k++)
         {
-            if (Math.Abs(p[k].DistanceTo(c) - r) > tol) return false;
+            if (Off(k)) return false;
             var a = Math.Atan2(p[k].Y - c.Y, p[k].X - c.X);
             var d = a - prev;
             while (d <= -Math.PI) d += 2 * Math.PI;

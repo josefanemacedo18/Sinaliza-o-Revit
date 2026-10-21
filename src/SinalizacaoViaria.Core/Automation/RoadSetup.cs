@@ -531,18 +531,15 @@ public sealed partial class RoadSetup
         });
 
         // ------------------------------------------------ pavimento (sempre registrado: guarda a seção para interseções)
-        RoadPavementDefinition? pavement = null;
-        if (Pavement != TipoPavimento.Nenhum)
-        {
-            var pav = Add(PavementDefinition());
-            pav.SetupJson = RoadTemplates.ToJson(this);
-            if (existingPavementId != null) pav.Id = existingPavementId;
-            pavement = pav;
-        }
+        // Pista já modelada (pavimento "Nenhum"): a definição fica só como dado, sem piso – é ela que liga a via às outras
+        // (interseções, rotatórias) e guarda a seção para editar a via depois.
+        var pavement = Add(PavementDefinition());
+        pavement.SetupJson = RoadTemplates.ToJson(this);
+        if (existingPavementId != null) pavement.Id = existingPavementId;
         if (SoPavimento)
         {
             // Pista vazia: só a superfície – a largura variável vale para ela; nada mais é gerado.
-            if (pavement != null) ApplyVariation(res, axis, new Dictionary<MarkingDefinition, (int, double, double)>(), AddVar);
+            ApplyVariation(res, axis, new Dictionary<MarkingDefinition, (int, double, double)>(), AddVar);
             return res;
         }
         // Retornos: alargamentos e bolsões laterais entram como recuos derivados (só nesta geração – a seção gravada guarda o retorno).
@@ -620,7 +617,7 @@ public sealed partial class RoadSetup
             }));
         ApplyTravessias(res, pavement, axisLine, path.Z, AddVar, crossings);
         // Extensões de calçada, travessias no meio da quadra, mobiliário e piso tátil: refeitos a partir do eixo.
-        if (axisLine != null && pavement != null && RoadFeatures.HasAny(this))
+        if (axisLine != null && RoadFeatures.HasAny(this))
         {
             ExtensionBreaks(res, pavement);
             var fs = RoadFeatures.Build(this, pavement, axisLine, path.Z, output, groupId, catalog);

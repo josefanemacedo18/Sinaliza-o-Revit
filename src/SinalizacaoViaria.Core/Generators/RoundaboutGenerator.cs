@@ -127,10 +127,14 @@ public static class RoundaboutGenerator
     public static List<Polygon2> RoadCuts(RoundaboutDefinition d, RoundaboutLayout L, MarkingDefinition m)
     {
         var res = new List<Polygon2>();
-        if (m is RoadPavementDefinition) { res.Add(L.Zone); return res; }
+        // Pisos da via recortados 1 mm além da zona: o pavimento e as calçadas da rotatória chegam até a borda dela com
+        // diferenças de 0,1 a 0,5 mm (arcos discretizados por caminhos diferentes) – o Revit acusava "pisos sobrepostos"
+        // (PAV-ASF × ROTATORIA, CALCADA × ROTATORIA no 4º Autoteste completo).
+        var zone = Grow(L.Zone, 0.001);
+        if (m is RoadPavementDefinition) { res.Add(zone); return res; }
         if (IntersectionGenerator.IsPhysical(m))
         {
-            res.Add(L.Zone);
+            res.Add(zone);
             res.AddRange(L.MedianPassages);
             // A ilha separadora continua o canteiro da via até 0,30 m além da zona: o canteiro da via sai debaixo dela.
             res.AddRange(L.SplitterCurb.Concat(L.SplitterCore));
@@ -619,10 +623,12 @@ public static class RoundaboutGenerator
                 foreach (var p in geo.Pieces.Where(p => p.Color == pavColor && p.Profile == null && p.Solid == null && p.Elevation < -1e-6).ToList())
                 {
                     geo.Pieces.Remove(p);
-                    foreach (var r in PolygonOps.Difference(new[] { p.Shape }, inside))
+                    // Sem as lascas de milímetros que a diferença deixa junto às bordas curvas: viravam formas diretas com
+                    // arestas menores que a tolerância e o Revit recusava a extrusão (rotatória oval, 4º Autoteste completo).
+                    foreach (var r in PolygonOps.Heal(PolygonOps.Difference(new[] { p.Shape }, inside), 0.003))
                     {
                         var ss = r.Simplified();
-                        if (ss != null && ss.Area > 1e-4) geo.Pieces.Add(p with { Shape = ss });
+                        if (ss != null && ss.Area > 0.01) geo.Pieces.Add(p with { Shape = ss });
                     }
                 }
             }
@@ -762,6 +768,18 @@ public static class RoundaboutGenerator
         return a / 2;
     }
 
+    /// <summary>
+    /// Largura da sarjeta dentro da pista, junto ao meio-fio (m), e se ela contorna também a ilha central. Com o perfil das vias
+    /// ligadas, as faixas internas dele (sarjeta) correm por toda a borda da pista na zona – cantos, ilhas divisórias e
+    /// galgável; sem o perfil, a sarjeta própria da rotatória acompanha só os meios-fios.
+    /// </summary>
+    public static (double Width, bool AroundIsland) InsideGutter(RoundaboutDefinition d, RoundaboutLayout L)
+    {
+        var profile = d.MatchRoadSection ? d.EdgeProfile : new List<Automation.EdgeBand>();
+        if (profile.Count > 0 && L.Curb.Count > 0) return (profile.Where(b => b.Inside).Sum(b => b.Width), true);
+        return (d.GutterWidth > 0.05 ? d.GutterWidth : 0, false);
+    }
+
     /// <summary>Sinalização da rotatória (marcas independentes): dê a preferência, divisão de faixas, zebrados, travessias e placas.</summary>
     public static List<MarkingDefinition> Children(RoundaboutDefinition d, RoundaboutLayout L, OutputSettings output, double z)
     {
@@ -797,11 +815,14 @@ public static class RoundaboutGenerator
         }
 
         // ---- anel: linha entre faixas, linha de bordo interna (junto à ilha/galgável) e externa (entre os ramos)
+        // As linhas de bordo ficam além da sarjeta, como nas vias (RoadSetup): a 0,15 m do meio-fio caíam sobre a sarjeta de
+        // 0,30 m do perfil das vias (LBO × ROTATORIA, 44 pares e 0,39 m³ no 4º Autoteste completo).
+        var (gutter, gutterAtIsland) = InsideGutter(d, L);
         if (d.Markings && d.Lanes > 1 && !d.TurboDividers)
             for (int q = 1; q < d.Lanes; q++)
                 ClosedLine(string.IsNullOrWhiteSpace(d.RingLaneLine) ? "LMS-2" : d.RingLaneLine, Grow(L.Island, apronW + q * d.LaneWidth));
         if (d.Markings && d.InnerEdgeLine && !painted)
-            ClosedLine("LBO", Grow(L.ApronOuter, 0.15));
+            ClosedLine("LBO", Grow(L.ApronOuter, 0.15 + (gutterAtIsland ? gutter : 0)));
         var reach = L.Zone.Outer.Max(p => p.DistanceTo(c)) + 10;
         if (d.Markings && d.OuterEdgeLine && d.Integration != IntegracaoRotatoria.SomenteIlha)
         {
@@ -810,10 +831,10 @@ public static class RoundaboutGenerator
             var real = d.Integration == IntegracaoRotatoria.Completa ? CurbEdgeChains(d, L, c) : null;
             if (real != null)
                 foreach (var (pts, sgn) in real)
-                    Add(new LinearMarkingDefinition { Code = "LBO", Offset = sgn * 0.15, PathRef = PathReference.FromPoints(pts, z, false) });
+                    Add(new LinearMarkingDefinition { Code = "LBO", Offset = sgn * (0.15 + gutter), PathRef = PathReference.FromPoints(pts, z, false) });
             else
             {
-                var inward = SignedArea(L.Outer.Outer) >= 0 ? 0.15 : -0.15;
+                var inward = (SignedArea(L.Outer.Outer) >= 0 ? 1 : -1) * (0.15 + gutter);
                 foreach (var (pts, closed) in RingEdgeChains(L, c, reach))
                     Add(new LinearMarkingDefinition { Code = "LBO", Offset = inward, PathRef = PathReference.FromPoints(pts, z, closed) });
             }
@@ -859,8 +880,9 @@ public static class RoundaboutGenerator
             if (d.Markings)
             {
                 var o0 = inner;
-                // No anel pequeno (mini/compacta sobre via larga) a linha não pode atravessar o anel até o outro ramo.
-                var o1 = Math.Min(hw - 0.3, 0.8 * rou);
+                // No anel pequeno (mini/compacta sobre via larga) a linha não pode atravessar o anel até o outro ramo. Do lado
+                // do meio-fio ela para antes da linha de bordo, que fica além da sarjeta.
+                var o1 = Math.Min(hw - 0.3 - gutter, 0.8 * rou);
                 if (o1 < o0 + 1) o1 = o0 + 1;
                 double T(double o) => L.ToOuter(c + g.Left * o, g.Dir) + 0.4;
                 // A linha acompanha a borda do anel (reta entre as pontas, ela entrava no anel nas entradas largas).
@@ -921,7 +943,9 @@ public static class RoundaboutGenerator
                 // Pontas da faixa: os dois cantos da pintura dentro da pista – junto ao meio-fio curvo do by-pass a ponta reta
                 // a 0,30 m do meio-fio (medida no eixo da faixa) ainda saía da pista num dos cantos.
                 var cwHalf = Math.Clamp(d.CrosswalkWidth, 2, 10) / 2;
+                // Sem a sarjeta: os cantos da faixa junto ao meio-fio curvo caíam sobre ela (FTP-1 × ROTATORIA no 4º Autoteste).
                 var road = L.Pavement.Concat(L.Refuges).Concat(L.Apron).ToList();
+                if (gutter > 0.01) road = PolygonOps.Offset(PolygonOps.Union(road), -(gutter + 0.02), true);
                 double End(double o0, double sgn)
                 {
                     var o = o0;
@@ -935,9 +959,11 @@ public static class RoundaboutGenerator
                 // Zebrado da gota pintada interrompido sob a faixa (+10 cm), como as linhas sob as marcas "por cima".
                 if (splitterHatch != null)
                     splitterHatch.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = PolygonOps.Strip(new[] { a, b }, 2 * (cwHalf + 0.1))[0].Outer.ToList() });
+                // Ilhas sob a faixa: recortadas com a sarjeta em volta delas (a pintura não passa sobre a sarjeta da passagem).
                 foreach (var isl in L.Refuges.Append(g.Splitter).Where(p => p != null).Distinct())
                     if (DetailGenerator.SegmentIntervals(isl!, a, b).Any())
-                        cwk.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = isl!.Outer.ToList() });
+                        foreach (var z0 in gutterAtIsland && gutter > 0.01 ? PolygonOps.Offset(new[] { isl! }, gutter + 0.02, true) : new List<Polygon2> { isl! })
+                            cwk.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = z0.Outer.ToList() });
                 if ((leg.Sidewalk > 0.5 || d.SidewalkWidth > 0.5) && d.Integration == IntegracaoRotatoria.Completa)
                     foreach (var (sgn, o, frame) in new[] { (1.0, hi, g.RampHi), (-1.0, lo, g.RampLo) })
                     {

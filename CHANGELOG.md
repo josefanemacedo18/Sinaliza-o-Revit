@@ -3,6 +3,74 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-21 – FC: 4º Autoteste completo – rotatória oval, pinturas sobre a sarjeta, T de via reconhecida e arcos das esquinas
+
+Fase da missão: IV/XIV (geometria e regras da API do Revit) – atual; XV (testes e evidência) junto.
+
+### O que o 4º Autoteste completo mostrou (DLL do FB, 2026-10-21 09:35)
+- 180 etapas em **36 min** (o 3º levou 1 h 41 min): 111 OK, 68 com aviso, 1 erro. Evidência:
+  `docs/evidencias/2026-10-21-autoteste-completo-4.txt`.
+- Erro: rotatória oval – `CreateExtrusionGeometry` recusou um contorno.
+- Etapa "Modelo final": 323 pares de pisos sobrepostos (3,10 m³) e 3 retas fora do eixo (duas de 0°, ruído da conferência).
+  Maiores: FTP-1 × ROTATORIA 108, LBO × ROTATORIA 44 (0,39 m³), ROTATORIA × ROTATORIA 36, INTERSECAO × INTERSECAO 13;
+  CALCADA × CALCADA 0,97 m³, CALCADA × GRAMADO 0,59 m³ e (piso comum) × (piso comum) 0,69 m³ no T da via reconhecida em
+  pisos; LRE/MCF/CSA × MER-0/SARJETA no cruzamento rodoferroviário.
+- Tudo reproduzido no núcleo com as definições e os contornos do arquivo de dados (`FCRevitFullRun4Tests`, fixtures
+  `fc-autoteste4-rotatorias.json` e `fc-autoteste4-intersecoes.json`).
+
+### Rotatórias (FC2, FC3)
+- Oval: a diferença entre o pavimento e as peças deixava lascas de milímetros junto às bordas curvas, que viravam formas
+  diretas com arestas abaixo da tolerância (extrusão recusada). As lascas são limpas (`Heal`) antes.
+- Linhas de bordo (LBO) e faixas de pedestres (FTP-1) ficavam sobre a sarjeta de 0,30 m que o perfil das vias leva para a
+  rotatória. Agora a LBO fica além da sarjeta, como nas vias; a faixa de pedestres para antes dela e as ilhas sob a faixa
+  são recortadas com a sarjeta em volta.
+- Pisos da via recortados 1 mm além da zona da rotatória (PAV-ASF × ROTATORIA, diferenças de 0,1–0,5 mm nas bordas).
+
+### Via reconhecida em pisos com pavimento "Nenhum" (FC3)
+- A via não registrava a definição do pavimento e não se ligava à outra: sem interseção, calçadas, meios-fios e linhas das
+  duas vias se cruzavam (61 pares). A definição agora sempre existe; com "Nenhum" ela fica só como dado (sem piso), e o T é
+  formado (DECISIONS D-014). O atualizador apaga esse dado quando a via some.
+- O Autoteste desenhava o piso do ramo do T sobre o da via principal (pisos do usuário sobrepostos); o ramo começa no bordo.
+
+### Cruzamento rodoferroviário (FC3)
+- LRE, MCF e CSA iam do eixo ao bordo da pista inteira, passando sobre vagas, sarjeta e linhas centrais. Agora cobrem só as
+  faixas de rolamento contíguas ao eixo (`RailCrossingSetup.FitTo` lê a seção da via), a 0,20 m do eixo e da faixa seguinte.
+
+### Interseções: pisos da mesma curva no mesmo arco (FC3)
+- Causa dos 13 pares INTERSECAO × INTERSECAO (0,6–4,6 L cada): o canto da pista sai do Clipper com flecha de 0,2 % do
+  raio (12 mm em R = 6 m, 20 mm em R = 10 m). Os recortes (rampas, limite da zona) caem sobre essas cordas. Com 5 mm de
+  tolerância, o ajuste de arcos recusava o centro exato da esquina e cada piso caía num círculo próprio – ~2 mm sobrepostos
+  ao longo da curva inteira.
+- `BoundaryFit`, com o centro exato do traçado:
+  - aceita pontos para dentro da circunferência até a flecha das cordas (0,25 % do raio, máx. 3 cm);
+  - toma o raio pelo envelope externo dos vértices, no milímetro quando está a até 0,45 mm dele;
+  - leva a junção reta → arco ao encontro da reta com a circunferência (a reta continua reta); com a reta quase tangente
+    (encontro longe), à projeção na circunferência;
+  - um degrau de poucos mm entre dois arcos da mesma circunferência some;
+  - a busca do fim do arco continua depois da bissecção (um corte na corda faz o arco "não caber" e caber de novo);
+  - folga de meia corda na conferência do giro;
+  - arcos seguidos em volta do mesmo centro ficam com um raio só.
+- `AxisSnap`: a ponta de um arco desliza pela reta alinhada até a circunferência dele, em vez de ser empurrada para o lado;
+  longe dela, o arco fica com o mesmo raio. Antes o arco era refeito pelo ponto do meio antigo e o centro andava centímetros.
+- Emenda em curva: o centro da curva do eixo entra nos centros exatos e a curva tem flecha de 1 mm.
+- Emulação no núcleo do que vai ao Revit (contorno ajustado amostrado de volta): de 2,7–11,5 L por interseção para
+  0–31 cm³ nos cruzamentos e T; 2,8 L na emenda em curva (KNOWN_ISSUES K13).
+
+### Reta fora do eixo e conferência final (FC4)
+- A lombada invertida recortava a sarjeta com 1 cm de folga e deixava uma reta de 218 m a 1 cm fora do eixo. Ela não recorta
+  mais os elementos físicos da via.
+- A conferência final do Autoteste não conta mais desalinhamentos abaixo do ruído numérico (deslocamento da ponta < 0,1 µm).
+
+### Testes
+- `FCRevitFullRun4Tests`: rotatórias (8 tipos) sem pintura sobre a sarjeta nem pisos sobrepostos; formas diretas da oval que o
+  Revit aceita; T da via reconhecida (sem pares entre marcas e < 1 cm² depois do ajuste); cruzamento rodoferroviário; as 8
+  interseções do 4º Autoteste com os pisos da mesma curva no mesmo arco; `AxisSnap` mantendo o raio.
+- `V4Tests` (pavimento "Nenhum" registrado sem peças) e `EWRevitWarningsTests` atualizados: arco com o mesmo raio depois
+  do alinhamento; o cruzamento local × local já sai do ajuste sem retas quase alinhadas (elas vinham da junção projetada na
+  direção do centro, que girava a reta).
+- Suíte completa: em execução neste commit (resultado no próximo). Antes dela: `FCRevitFullRun4Tests`, `AI3BoundaryArcTests` e
+  `EWRevitWarningsTests` 30/30.
+
 ## 2026-10-20 – FB: Autoteste completo mais rápido e com todos os dados numa rodada só
 
 Fase da missão: XV (desempenho e testes) – atual; IV e XIV seguem em andamento, com o Autoteste como evidência.

@@ -1349,7 +1349,9 @@ A **terra** tem material e cor próprios (*SV - Pavimento de terra*), entra no q
 sobre uma pista de terra gera um aviso (a tinta não adere ao leito natural – prefira a sinalização vertical). O topo do pavimento fica no
 nível do eixo; a sinalização fica por cima e as calçadas/meios-fios 0,15 m acima. Canteiros físicos e
 sarjetas ficam sem pavimento. O pavimento também **registra a seção da via** (larguras da pista e das
-calçadas), usada pelas interseções e rotatórias – por isso "Nenhum" desativa o ajuste automático.
+calçadas), usada pelas interseções e rotatórias. Com **Nenhum** (pista já modelada) a seção continua registrada, só como
+dado, sem piso: a via se liga às outras nas interseções e rotatórias do mesmo jeito, e a interseção não cria pavimento
+por cima da pista existente.
 
 ## 19. Interseções
 
@@ -1373,9 +1375,9 @@ A ferramenta **Conexões** (opção *Todas as interseções do projeto*, ou clic
 * **Somente o cruzamento que eu clicar** – aplica os parâmetros apenas ao cruzamento mais próximo do
   ponto clicado.
 
-Vias criadas por versões anteriores (ou com pavimento *Nenhum*) funcionam também: a seção transversal
-é reconstruída a partir dos meios-fios, calçadas e linhas do grupo, e o pavimento é criado
-automaticamente. A interseção:
+Vias criadas por versões anteriores funcionam também: a seção transversal é reconstruída a partir dos meios-fios,
+calçadas e linhas do grupo, e o pavimento é criado automaticamente. Uma via com pavimento *Nenhum* criada antes da
+versão de 2026-10-21 passa a guardar a seção ao ser gerada de novo (Atualizar). A interseção:
 
 * torna o pavimento contínuo no miolo e arredonda as **esquinas** com o **raio** informado (na face do
   meio-fio), com **meio-fio curvo** – qualquer raio a partir de 0,5 m gera a curva inteira (a área refeita

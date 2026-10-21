@@ -78,6 +78,8 @@ public sealed class IntersectionLayout
     public Polyline2? BendAxis { get; set; }
     /// <summary>O eixo da via i corre no sentido contrário ao da emenda.</summary>
     public bool[] BendReversed { get; set; } = new bool[2];
+    /// <summary>Centro da curva do eixo da emenda (as faixas de largura constante são concêntricas a ela).</summary>
+    public Vec2? BendCenter { get; set; }
     public Polygon2 Zone { get; set; } = Polygon2.Rectangle(Vec2.Zero, Vec2.Zero);
     /// <summary>Área refeita pela interseção (zona do nó sem os ramos já fora das esquinas + trechos tratados).</summary>
     public List<Polygon2> Rebuild { get; } = new();
@@ -479,7 +481,9 @@ public static partial class IntersectionGenerator
         var pA = axA.PointAt(Math.Max(0, axA.Length - reach));
         var pB = axB.PointAt(Math.Min(axB.Length, reach));
         var raw = defl < 0.5 * Math.PI / 180 ? new List<Vec2> { pA, pB } : new List<Vec2> { pA, node, pB };
-        var bend = new Polyline2(raw.Count == 3 ? CurveTools.FilletCorners(raw, R, false, 0.3) : raw);
+        // Curva com flecha de 1 mm: as bordas afastadas (calçada, até 2 × o raio do eixo) ficam a até 2 mm do arco – abaixo dos
+        // 5 mm do ajuste de arcos do Revit, que assim usa o centro exato da curva em todas as faixas.
+        var bend = new Polyline2(raw.Count == 3 ? CurveTools.FilletCorners(raw, R, false, 0.3, 0.001) : raw);
         var len = bend.Length;
         if (len < 1) return null;
         double U(double s) { var u = Math.Clamp(s / len, 0, 1); return u * u * (3 - 2 * u); }
@@ -491,6 +495,14 @@ public static partial class IntersectionGenerator
 
         var L = new IntersectionLayout { Node = node, IsBend = true, BendAxis = bend, BendReversed = new[] { flipA, flipB }, Definition = d, BendRight = Right, BendLeft = Left,
             BendMedian = s => Lp(sa.Med, sb.Med, s) };
+        if (raw.Count == 3 && half > 1e-6)
+        {
+            // Centro do arco de concordância (FilletCorners): a T do vértice, para dentro da curva, a R da tangente.
+            var d1 = (node - pA).Normalized();
+            var d2 = (pB - node).Normalized();
+            var t = Math.Min(R * half, Math.Min(pA.DistanceTo(node), node.DistanceTo(pB)) * 0.999);
+            L.BendCenter = node - d1 * t + (d1.Cross(d2) > 0 ? d1.PerpLeft : d1.PerpRight) * (t / half);
+        }
         L.Roads.AddRange(input);
         L.PavementColor = A.Def.Color;
         L.PavementThickness = A.Def.ActualThickness;
@@ -2301,6 +2313,7 @@ public static partial class IntersectionGenerator
         }
         foreach (var e in L.Ears.Where(e => e.Template.ArcCenters != null))
             geo.ArcCenters.AddRange(e.Template.ArcCenters!.Where(c => geo.ArcCenters.All(x => x.DistanceTo(c) > 1e-6)));
+        if (L.BendCenter is { } bc) geo.ArcCenters.Add(bc);
         return geo;
     }
 

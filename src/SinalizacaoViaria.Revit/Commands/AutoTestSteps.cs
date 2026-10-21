@@ -390,10 +390,8 @@ internal sealed partial class AutoTestRunner
         {
             var road = MakeRoad(s, "ferroviária", T(0), 0, false, RelevoVia.Plana, FimLivre.Nenhum, (350, 1600), (650, 1600));
             if (road == null) return;
-            var rc = new RailCrossingSetup
-            {
-                Station = road.Axis.Length / 2, RightWidth = road.Pavement.RightWidth, LeftWidth = road.Pavement.LeftWidth, TwoWay = road.Pavement.TwoWay,
-            };
+            var rc = new RailCrossingSetup { Station = road.Axis.Length / 2 };
+            rc.FitTo(road.Pavement);
             var defs = rc.Build(road.Pavement.PathRef, road.Axis, road.Pavement.PathRef.Z, Out());
             Commit(s, defs, "cruzamento rodoferroviário");
             foreach (var d in defs.Where(d => d.Overlay)) FootprintCutter.ApplyOverlay(_uidoc, d);

@@ -80,6 +80,7 @@ internal static class ManualForms
                         LeftWidth = s.LeftWidth, LanesPerDirection = s.LanesPerDirection, Speed = s.Speed, Barrier = s.Barrier, StopLineDistance = s.StopLineDistance,
                         RectangleDistance = s.RectangleDistance, RectangleLength = s.RectangleLength, LineWidth = s.LineWidth, NoPassingLength = s.NoPassingLength,
                         PareLegend = s.PareLegend, Lrv = s.Lrv, Signs = s.Signs, ConflictArea = s.ConflictArea,
+                        RightLanesInner = s.RightLanesInner, RightLanesOuter = s.RightLanesOuter, LeftLanesInner = s.LeftLanesInner, LeftLanesOuter = s.LeftLanesOuter,
                     };
                     var ctx = new BuildContext { Catalog = PluginContext.Catalog, Glyphs = PluginContext.Glyphs };
                     var geo = new MarkingGeometry();
@@ -170,11 +171,10 @@ public sealed class CmdCruzamentoFerroviario : CommandBase
             axis = best.Road.Axis;
             station = best.Proj.Station;
             z = axisRef.Z;
-            s.RightWidth = best.Road.Def.RightWidth;
-            s.LeftWidth = best.Road.Def.LeftWidth;
-            s.TwoWay = best.Road.Def.TwoWay;
+            s.FitTo(best.Road.Def);
             s.Speed = best.Road.Def.Hierarchy is { } hh ? Hierarquia.DefaultSpeed(hh) : s.Speed;
-            s.LanesPerDirection = Math.Max(1, (int)Math.Round((s.TwoWay ? best.Road.Def.RightWidth : best.Road.Def.RightWidth + best.Road.Def.LeftWidth) / 3.5));
+            if (s.RightLanesOuter == null && s.LeftLanesOuter == null)
+                s.LanesPerDirection = Math.Max(1, (int)Math.Round((s.TwoWay ? best.Road.Def.RightWidth : best.Road.Def.RightWidth + best.Road.Def.LeftWidth) / 3.5));
         }
         else
         {

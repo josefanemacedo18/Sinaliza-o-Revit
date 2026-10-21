@@ -32,6 +32,7 @@ Não compile enquanto a suíte roda com `--no-build`: a compilação troca as DL
 | 2026-10-20 | EZ | 2 825 | 2 825 aprovados, 0 falhas | 14 min 46 s (Linux) | +25 `EZRevitFullRun2Tests` |
 | 2026-10-20 | FA | 2 843 | 2 843 aprovados, 0 falhas | 20 min 18 s (Linux) | +18 `FARevitFullRun3Tests` |
 | 2026-10-20 | FB | 2 856 | 2 856 aprovados, 0 falhas | 20 min 59 s (Linux) | +13 `FBAutotestSpeedTests` |
+| 2026-10-21 | FC | 2 869 | em execução | — | +13 `FCRevitFullRun4Tests` (fixtures do 4º Autoteste em `Fixtures/`) |
 
 Compilação na linha de base:
 - Core e plugin: 0 avisos.
@@ -60,6 +61,7 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
 | `EVAlignmentElementsTests` | elementos do traçado (TS/SC/CS/ST, curva circular calculada à mão, espirais, reduzida, sem curva) e do greide (convexa ±2 %, côncava com piso K, vão curto, extremo fora da curva, consistência com `Z(s)`), CSV e estacas |
 | `EVSectionVolumesTests` | volumes por seções: corte/aterro constantes, terreno linear (exato) e quadrático (erro h²/12 esperado), última seção no fim, eixo em curva, conferência com a malha de `Grading.Volumes`, CSV |
 | `EWAxisElementsTests` | elementos do eixo das vias comuns: canto arredondado (R, Δ, T, estacas conferidos à mão), canto vivo, curva reversa, reta, CSV |
+| `FCRevitFullRun4Tests` | reprodução do 4º Autoteste completo com as definições e os contornos gravados no arquivo de dados: rotatórias (8 tipos) sem pintura sobre a sarjeta nem pisos sobrepostos; formas diretas da rotatória oval aceitáveis pelo Revit; T de via reconhecida em pisos com pavimento "Nenhum" (interseção formada, sem pares entre marcas, < 1 cm² depois do ajuste de arcos); cruzamento rodoferroviário só nas faixas de rolamento; as 8 interseções com os pisos da mesma curva no mesmo arco (emulação do contorno que vai ao Revit); `AxisSnap` mantendo o raio do arco vizinho |
 | `FBAutotestSpeedTests` | leitura das marcas pelo tipo no começo do JSON (`DefinitionKinds`) igual ao teste de tipo da leitura completa, para todas as definições (JSON compacto e indentado, classes e interfaces); texto inesperado nunca descartado; ids de conjunto, recorte, marca, elemento e via hospedeira no JSON sem escape (filtro de texto de `MarkingStorage.Mentioning`) |
 | `EYRevitFullRunTests` | perfis das 168 placas aceitáveis pelo Revit (pictograma que se toca, peça menor que a tolerância, furo encostado), retas fora do eixo pelo critério do Revit nas cenas de cruzamento, T, esconso, rotatórias e cul-de-sac, alinhamento a 45° e fora da janela, nenhum piso sobreposto em todos os modelos de via, ciclofaixas e canteiros, faixa de pedestres recortando as vagas, notas do Autoteste |
 | `EXRevitWarningsTests` | alinhamento de anéis de pontos (lote com resíduo em coordenadas grandes, lote inclinado de projeto intacto), lotes reais do cruzamento sem deformação, Marca dos lotes com um, dois e homônimos loteamentos (cenário do Autoteste repetido sem marca repetida), resumo dos avisos do Autoteste por texto e por elemento |
@@ -87,6 +89,7 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
 | 2026-10-20 | idem | 2.1.0.0 (EX) | Autoteste **completo** (178 etapas, 1 h 42 min) | 97 OK, 80 avisos (Revit: 3 091 sobreposições, 614 pares persistentes; 1 385 retas fora do eixo), **1 erro** (perfis de placas; corrigido em EY) | `docs/evidencias/2026-10-20-autoteste-completo.txt`, `2026-10-20-log-autoteste-completo.txt` |
 | 2026-10-20 | idem | 2.1.0.0 (EY, DLL de 07:59) | Autoteste **completo** (178 etapas, 1 h 41 min) | 106 OK, 72 avisos (Revit: 3 153 sobreposições, 622 pares persistentes, listados por tipo; 85 retas fora do eixo – corrigidas no núcleo em EZ), **0 erros** | `docs/evidencias/2026-10-20-autoteste-completo-2.txt` |
 | 2026-10-20 | idem | 2.1.0.0 (EZ, DLL de 13:28) | Autoteste **completo** (178 etapas, 1 h 41 min) | 110 OK, 67 avisos (Revit: 3 135 sobreposições, 590 pares persistentes com cotas; 8 retas fora do eixo), **1 erro** (forma direta da rotatória oval; corrigido em FA) | `docs/evidencias/2026-10-20-autoteste-completo-3.txt`, `2026-10-20-log-autoteste-completo-3.txt` |
+| 2026-10-21 | 2027.3 (build 27.3.0.28) | 2.1.0.0 (FB, DLL de 08:57) | Autoteste **completo** (180 etapas, 36 min) | 111 OK, 68 avisos (modelo final: 323 pares sobrepostos, 3,10 m³; 3 retas fora do eixo, 2 delas ruído de 0°), **1 erro** (rotatória oval; corrigido no FC) | `docs/evidencias/2026-10-21-autoteste-completo-4.txt` (arquivo de dados reproduzido em `FCRevitFullRun4Tests`) |
 
 ## Validação manual no Revit (roteiro mínimo)
 

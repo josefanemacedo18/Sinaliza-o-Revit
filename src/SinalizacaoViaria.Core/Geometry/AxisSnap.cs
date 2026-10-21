@@ -23,7 +23,8 @@ public static class AxisSnap
     /// Contorno fechado (o fim de cada trecho é o início do seguinte) com as retas quase alinhadas a uma das
     /// <see cref="Directions"/> exatamente alinhadas. Vértices ligados por retas quase paralelas a uma direção ficam todos na
     /// mesma reta dessa direção (a da reta mais longa do grupo); numa quina entre duas direções, o vértice vai ao encontro
-    /// das duas. Arcos mantêm o ponto do meio. Grupo cujo ajuste passaria de <paramref name="maxOffset"/> num vértice não é
+    /// das duas. A ponta de um arco desliza pela reta alinhada até a circunferência dele (ou, longe dela, o arco fica com o mesmo
+    /// raio). Grupo cujo ajuste passaria de <paramref name="maxOffset"/> num vértice não é
     /// mexido. Repete até 3 vezes (um ajuste pode inclinar uma reta vizinha curta para dentro da janela). Um ajuste que faria
     /// um contorno válido se tocar (peça estreita, como o nariz de um meio-fio) não é aplicado.
     /// </summary>
@@ -130,7 +131,20 @@ public static class AxisSnap
             res[i] = v[i];
             if (cons[i] is not { Count: > 0 } c) continue;
             Vec2 p;
-            if (c.Count == 1) p = v[i] + c[0].N * (c[0].D - v[i].Dot(c[0].N));
+            if (c.Count == 1)
+            {
+                p = v[i] + c[0].N * (c[0].D - v[i].Dot(c[0].N));
+                // Ponta de arco: desliza pela reta alinhada até a circunferência dele (o arco fica com o mesmo centro e raio; o
+                // piso vizinho com o mesmo arco continua encostado). Reta quase tangente (encontro longe) fica como antes.
+                BoundarySegment? arc = ring[i].IsArc ? ring[i] : closed || i > 0 ? ring[(i - 1 + n) % n] : null;
+                if (arc is { IsArc: true } a && (!ring[i].IsArc || !ring[(i - 1 + n) % n].IsArc) && OnCircle(a.Circle, c[0].N, c[0].D, p) is { } q
+                    && q.DistanceTo(p) <= 4 * p.DistanceTo(v[i]) + 1e-12)
+                {
+                    var perp = p.DistanceTo(v[i]);
+                    if (perp <= maxOffset * 1.5 && q.DistanceTo(v[i]) > 1e-12) { res[i] = q; changed = true; }
+                    continue;
+                }
+            }
             else
             {
                 // Quina entre duas direções: o encontro das duas retas alvo.
@@ -145,8 +159,57 @@ public static class AxisSnap
             if (moved <= maxOffset * 1.5 && moved > 1e-12) { res[i] = p; changed = true; }
         }
         var outRing = new List<BoundarySegment>(n);
-        for (var i = 0; i < n; i++) outRing.Add(new BoundarySegment(res[i], res[(i + 1) % n], ring[i].Mid));
+        for (var i = 0; i < n; i++)
+        {
+            var s = ring[i];
+            var (a, b) = (res[i], res[(i + 1) % n]);
+            outRing.Add(s.Mid is { } m && (a != s.Start || b != s.End) ? Moved(s, m, a, b) : new BoundarySegment(a, b, s.Mid));
+        }
         return outRing;
+    }
+
+    /// <summary>Encontro da reta n·x = d com a circunferência, o mais perto de <paramref name="near"/>.</summary>
+    private static Vec2? OnCircle((Vec2 Center, double Radius) c, Vec2 nrm, double d, Vec2 near)
+    {
+        var u = new Vec2(nrm.Y, -nrm.X);
+        var x0 = nrm * d - c.Center;
+        var b = u.Dot(x0);
+        var disc = b * b - (x0.Dot(x0) - c.Radius * c.Radius);
+        if (disc < 0) return null;
+        var sq = Math.Sqrt(disc);
+        var (q1, q2) = (c.Center + x0 + u * (-b + sq), c.Center + x0 + u * (-b - sq));
+        return q1.DistanceTo(near) <= q2.DistanceTo(near) ? q1 : q2;
+    }
+
+    /// <summary>
+    /// Arco com as pontas movidas pelo alinhamento das retas vizinhas: o mesmo raio, com o centro andando o mínimo para passar
+    /// pelas pontas novas. Antes o arco era refeito pelas pontas novas e pelo meio antigo – 3 mm numa ponta tiravam o centro
+    /// 3 cm do lugar (arco curto de raio grande) e o piso vizinho, com o mesmo arco intacto, ficava sobreposto ao longo da curva.
+    /// </summary>
+    private static BoundarySegment Moved(BoundarySegment s, Vec2 m, Vec2 a, Vec2 b)
+    {
+        var (c, r) = s.Circle;
+        var moved = Math.Max(a.DistanceTo(s.Start), b.DistanceTo(s.End));
+        var half = a.DistanceTo(b) / 2;
+        var mid = (a + b) * 0.5;
+        var w = (b - a).Normalized().PerpLeft;
+        // Centro sobre a mediatriz das pontas novas: com o raio de antes (o mais perto do centro antigo) ou, se isso o
+        // levaria longe (arco quase reto), o ponto da mediatriz mais perto do centro antigo.
+        var k = (c - mid).Dot(w);
+        var nc = mid + w * k;
+        if (r > half)
+        {
+            var h = Math.Sqrt(r * r - half * half) * (k >= 0 ? 1 : -1);
+            var keep = mid + w * h;
+            if (keep.DistanceTo(c) <= 3 * moved + 1e-9) nc = keep;
+        }
+        var nr = a.DistanceTo(nc);
+        var sw = BoundaryFit.Sweep(c, s.Start, m, s.End);
+        var a0 = Math.Atan2(a.Y - nc.Y, a.X - nc.X);
+        var d = Math.Atan2(b.Y - nc.Y, b.X - nc.X) - a0;
+        while (d - sw > Math.PI) d -= 2 * Math.PI;
+        while (sw - d > Math.PI) d += 2 * Math.PI;
+        return Math.Sign(d) == Math.Sign(sw) ? new BoundarySegment(a, b, nc + Vec2.FromAngle(a0 + d / 2) * nr) : new BoundarySegment(a, b, m);
     }
 
     /// <summary>União de vértices ligados por retas quase alinhadas (e as retas de cada grupo, com o comprimento).</summary>

@@ -129,7 +129,8 @@ internal sealed partial class AutoTestRunner
                     return l;
                 }
                 floors.Add(Floor.Create(_doc, new List<CurveLoop> { Rect(1200, Y - 3.5, 1400, Y + 3.5) }, type, level.Id));
-                floors.Add(Floor.Create(_doc, new List<CurveLoop> { Rect(1297, Y + 3, 1303, Y + 90) }, type, level.Id));
+                // O ramo encosta no piso da via principal (sem sobrepor: dois pisos comuns sobrepostos já são um aviso do Revit).
+                floors.Add(Floor.Create(_doc, new List<CurveLoop> { Rect(1297, Y + 3.5, 1303, Y + 90) }, type, level.Id));
                 t.Commit();
             }
             var warnings = new List<string>();

@@ -39,6 +39,45 @@ public sealed class RailCrossingSetup
     public bool Signs { get; set; } = true;
     public bool ConflictArea { get; set; }
 
+    /// <summary>
+    /// Faixas de rolamento de cada lado: afastamentos do eixo da borda interna e da externa (seção da via, ver
+    /// <see cref="FitTo"/>). Nulo = a pista toda. Não é guardado com a última configuração (vale para a via escolhida).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore] public double? RightLanesInner { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore] public double? RightLanesOuter { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore] public double? LeftLanesInner { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore] public double? LeftLanesOuter { get; set; }
+
+    /// <summary>Folga das transversais ao eixo na mão dupla: meia LFO-3 (0,30 m) + 5 cm – não pisam na linha central.</summary>
+    public const double CenterGap = 0.20;
+
+    /// <summary>Folga ao bordo das faixas: a linha de bordo fica de 0,05 a 0,15 m para dentro e a linha de fundo das vagas, 0,05 m.</summary>
+    public const double EdgeGap = 0.20;
+
+    /// <summary>
+    /// Ajusta à via: larguras, sentido e as faixas de rolamento da seção (as linhas transversais, a cruz e o PARE ficam só nas
+    /// faixas – no 4º Autoteste completo elas atravessavam as vagas, a sarjeta e a linha central).
+    /// </summary>
+    public void FitTo(RoadPavementDefinition pav)
+    {
+        RightWidth = pav.RightWidth;
+        LeftWidth = pav.LeftWidth;
+        TwoWay = pav.TwoWay;
+        RightLanesInner = RightLanesOuter = LeftLanesInner = LeftLanesOuter = null;
+        if (RoadTemplates.FromJson(pav.SetupJson) is not { } setup) return;
+        static bool Travel(ElementoSecao e) => e.Tipo is TipoElementoSecao.FaixaRolamento or TipoElementoSecao.FaixaExclusiva or TipoElementoSecao.FaixaPreferencial;
+        static (double A, double B, int N)? Lanes(List<(ElementoSecao E, double A, double B)> side)
+        {
+            var run = side.TakeWhile(x => Travel(x.E)).ToList();
+            return run.Count == 0 ? null : (run[0].A, run[^1].B, run.Count);
+        }
+        if (Lanes(setup.Intervalos(false)) is { } r) { RightLanesInner = r.A; RightLanesOuter = r.B - EdgeGap; }
+        if (Lanes(setup.Intervalos(true)) is { } l) { LeftLanesInner = l.A; LeftLanesOuter = l.B - EdgeGap; }
+        var nr = setup.Right.TakeWhile(Travel).Count();
+        var nl = setup.Left.TakeWhile(Travel).Count();
+        LanesPerDirection = Math.Max(1, TwoWay ? nr : nr + nl);
+    }
+
     /// <summary>Distância de colocação da placa de advertência (A-39/A-40) antes da linha de retenção.</summary>
     public double WarningDistance => Math.Max(50, DesignRules.DecelerationDistance(Speed, 0) + 10);
 
@@ -75,10 +114,23 @@ public sealed class RailCrossingSetup
         }
         foreach (var dir in TwoWay ? new[] { 1, -1 } : new[] { 1 })
         {
-            // Faixas de aproximação: mão dupla = lado direito de quem se aproxima; mão única = toda a pista.
+            // Faixas de aproximação: mão dupla = lado direito de quem se aproxima; mão única = toda a pista. Só as faixas de
+            // rolamento (sem vagas, ciclofaixa, acostamento e sarjeta), fora da linha central.
             double oInner, oOuter;
-            if (TwoWay) { oInner = 0; oOuter = dir > 0 ? -RightWidth : LeftWidth; }
-            else { oInner = LeftWidth; oOuter = -RightWidth; }
+            if (TwoWay)
+            {
+                var sg = dir > 0 ? -1 : 1;
+                var (inner, outer) = dir > 0 ? (RightLanesInner, RightLanesOuter) : (LeftLanesInner, LeftLanesOuter);
+                oInner = sg * Math.Max(CenterGap, inner ?? 0);
+                oOuter = sg * (outer ?? (dir > 0 ? RightWidth : LeftWidth));
+            }
+            else
+            {
+                oInner = LeftLanesOuter ?? LeftWidth;
+                oOuter = -(RightLanesOuter ?? RightWidth);
+            }
+            // Bordo da pista (placas além dele).
+            var oEdge = TwoWay ? (dir > 0 ? -RightWidth : LeftWidth) : -RightWidth;
             var lanes = Math.Max(1, LanesPerDirection);
             var laneW = Math.Abs(oOuter - oInner) / lanes;
             var sStop = sRail - dir * stopOffset;
@@ -121,7 +173,7 @@ public sealed class RailCrossingSetup
                 });
             if (Signs)
             {
-                var side = oOuter + Math.Sign(oOuter - oInner) * 0.9;   // lado direito de quem se aproxima
+                var side = oEdge + Math.Sign(oEdge - oInner) * 0.9;   // lado direito de quem se aproxima
                 var sSign = sRail - dir * 3.60;
                 Add(new SignDefinition { Code = "R-1", Position = P(sSign, side), Direction = travel, Z = z, Width = 0.60 });
                 Add(new SignDefinition { Code = "A-41", Position = P(sSign, side), Direction = travel, Z = z, Width = 0.90, MountHeight = 2.10 + 0.60 + 0.15, Support = TipoSuporte.Nenhum,

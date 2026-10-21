@@ -61,13 +61,18 @@ provável a partir de fatos) ou **HIPÓTESE** (risco plausível ainda não demon
   1 h 41 min. Retas fora do eixo: 8 (rotatória com by-pass; corrigidas no núcleo em FA); 590 pares persistentes, com as cotas
   de base e topo, que mostraram a causa dos maiores (tipo do primeiro piso de cada cor aplicado a todas as peças na nova
   geração – D-012).
-- **LIMITE DA EVIDÊNCIA:** um build do Revit; um projeto; obras de arte e pranchas não estão no roteiro do Autoteste. As
-  correções de FA (tipo de piso por espessura, golas das árvores, ajuste conferido, espinhos, recuos, forma direta) e a
-  leitura mais rápida das marcas de FB (D-013) ainda não rodaram no Revit.
+- **FATO (2026-10-21 09:35, `docs/evidencias/2026-10-21-autoteste-completo-4.txt`):** a DLL do FB rodou o 4º Autoteste
+  **completo** no Revit 2027.3 (build 27.3.0.28): 180 etapas, 111 OK, 68 com aviso e **1 erro** (rotatória oval:
+  `CreateExtrusionGeometry` recusou um contorno; corrigido no FC), em **36 min**. Etapa "Modelo final": 323 pares de pisos
+  sobrepostos (3,10 m³) e 1 reta fora do eixo (mais 2 de 0°, ruído). O arquivo de dados permitiu reproduzir no núcleo cada
+  par tratado no FC sem outro Autoteste (`FCRevitFullRun4Tests`).
+- **LIMITE DA EVIDÊNCIA:** dois builds do Revit (27.0 e 27.3); um projeto; obras de arte e pranchas não estão no roteiro do
+  Autoteste. As correções do FC (rotatória oval, pinturas sobre a sarjeta, T de via reconhecida, cruzamento rodoferroviário,
+  arcos das esquinas, lombada invertida) ainda não rodaram no Revit.
 - **Desempenho (FB, medido nos relatórios):** no 3º completo, a mesma operação ficava mais lenta à medida que o projeto
   crescia: uma via de 12 elementos levava 5 s no começo e um cul-de-sac de 30 elementos, 46 s no meio do teste. A causa era a
   leitura de todas as definições a cada consulta; foi corrigida no código sem mudar o resultado (`FBAutotestSpeedTests`). O
-  ganho real só será conhecido no próximo Autoteste completo, que traz o tempo por trecho do plugin em cada etapa.
+  4º completo, com a DLL do FB, levou 36 min contra 1 h 41 min do 3º (180 etapas contra 178).
 - **Avisos do Revit nos relatórios** (todos nas etapas com interseção ou loteamento; as vias isoladas não tiveram nenhum):
   - "A linha no croqui está ligeiramente fora da linha central": reproduzido no núcleo e corrigido nos pisos das marcas
     (EW2: no 2º relatório, de centenas para 62). Os 62 restantes não diziam em que pisos; EX levou o alinhamento aos
@@ -163,7 +168,7 @@ Legenda de estado:
 | XII | Cenários de projeto (geometria) e otimização geral | AUSENTE / PARCIAL (greide compensado, tempos semafóricos) | — |
 | XIII | Janelas WPF com prévia ao vivo (Core) | IMPLEMENTADA, NÃO VALIDADA aqui | `UI/*.xaml` |
 | XIV | Transações, rollback, `FailuresPreprocessor` | IMPLEMENTADA, NÃO VALIDADA aqui | §3 |
-| XV | Autoteste dentro do Revit (relatório) | VALIDADA no Revit 2027: modo rápido (DLL 2.0.0 e 2.1.0) e **completo** três vezes (2026-10-20, 178 etapas), com o resumo por elemento, a conferência das sobreposições, os pares persistentes por tipo, a medida das retas fora do eixo e (desde EZ) as cotas e a espessura do tipo dos exemplos funcionando | `AutoTest*.cs`, `WarningSummary`, `docs/evidencias` |
+| XV | Autoteste dentro do Revit (relatório) | VALIDADA no Revit 2027: modo rápido (DLL 2.0.0 e 2.1.0) e **completo** quatro vezes (2026-10-20, 178 etapas; 2026-10-21, 180 etapas com o arquivo de dados e a conferência final), com o resumo por elemento, a conferência das sobreposições, os pares persistentes por tipo, a medida das retas fora do eixo e (desde EZ) as cotas e a espessura do tipo dos exemplos funcionando | `AutoTest*.cs`, `WarningSummary`, `docs/evidencias` |
 | — | Sinalização horizontal e vertical (MBST), dispositivos, mobiliário, acessibilidade (NBR 9050/16537) | VALIDADA (Core) | maior parte da suíte |
 | — | Detalhamento, pranchas, quantitativos, memorial | VALIDADA (Core) / Revit não validado | rodadas AF/AH/AI |
 | — | Georreferência e calibração de imagem | VALIDADA (Core) | `Geo/*`, testes X1 |

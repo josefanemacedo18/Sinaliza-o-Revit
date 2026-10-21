@@ -141,10 +141,13 @@ internal static class FootprintCutter
                 return;
             case TrafficCalmingDefinition { Type: TipoModeracao.LombadaInvertida } tc:
             {
-                // A lombada invertida fica abaixo do pavimento: a pista (piso) e as linhas são recortadas sobre ela.
+                // A lombada invertida fica abaixo do pavimento: a pista (piso) e as linhas são recortadas sobre ela. Sarjeta e
+                // meio-fio ficam fora da pista e acima da lombada: o recorte (1 cm além dela) abria um degrau de 1 cm na sarjeta
+                // e a reta de 218 m da borda dela ficava 0,003° fora do eixo (4º Autoteste completo).
                 var geo = new MarkingService(uidoc.Document, uidoc.ActiveView).BuildGeometry(tc, out _);
                 var fp = PolygonOps.Offset(PolygonOps.Union(geo.Pieces.Select(p => p.Shape)), 0.01);
-                Apply(uidoc, tc, fp, d => RoadMarking(d) || d is RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition);
+                Apply(uidoc, tc, fp, d => RoadMarking(d) && !IntersectionGenerator.IsPhysical(d)
+                                          || d is RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition);
                 return;
             }
         }

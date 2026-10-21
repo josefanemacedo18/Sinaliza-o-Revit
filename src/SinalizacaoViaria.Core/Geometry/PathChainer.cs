@@ -103,9 +103,10 @@ public static class CurveTools
     /// <summary>
     /// Arredonda os cantos vivos da polilinha (vértices com deflexão maior que <paramref name="minTurnDeg"/>) com arcos de
     /// raio <paramref name="radius"/>, limitados pelo comprimento disponível dos trechos vizinhos. Arcos já discretizados
-    /// (deflexões pequenas) ficam como estão.
+    /// (deflexões pequenas) ficam como estão. <paramref name="chordError"/>: flecha máxima das cordas dos arcos.
     /// </summary>
-    public static List<Vec2> FilletCorners(IReadOnlyList<Vec2> pts, double radius, bool closed = false, double minTurnDeg = 8)
+    public static List<Vec2> FilletCorners(IReadOnlyList<Vec2> pts, double radius, bool closed = false, double minTurnDeg = 8,
+        double chordError = 0.005)
     {
         var p = pts.ToList();
         if (closed && p.Count > 3 && p[0].AlmostEquals(p[^1], 1e-6)) p.RemoveAt(p.Count - 1);
@@ -145,7 +146,7 @@ public static class CurveTools
             var c = a + nrm * r;
             var a0 = Math.Atan2(a.Y - c.Y, a.X - c.X);
             var sweep = left ? turns[i] : -turns[i];
-            var arc = Arc(c, r, a0, sweep, 0.005);
+            var arc = Arc(c, r, a0, sweep, chordError);
             res.AddRange(arc);
         }
         if (closed) res.Add(res[0]);

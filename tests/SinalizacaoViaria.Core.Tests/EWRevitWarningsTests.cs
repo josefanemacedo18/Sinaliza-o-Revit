@@ -50,7 +50,7 @@ public class EWRevitWarningsTests
     [Fact]
     public void QuinaComAsDuasRetas_E_ArcosPreservados()
     {
-        // Quina com reta quase horizontal e reta quase vertical; o arco mantém o ponto do meio.
+        // Quina com reta quase horizontal e reta quase vertical; o arco mantém o raio (o centro anda o mínimo com as pontas).
         var r = new List<BoundarySegment>
         {
             L(0, 0, 10, 0.0002),
@@ -65,7 +65,9 @@ public class EWRevitWarningsTests
         Assert.Equal(0.0001, s[0].Start.Y, 12);
         Assert.Equal(s[0].Start.Y, s[0].End.Y);
         Assert.True(s[2].IsArc);
-        Assert.Equal(r[2].Mid, s[2].Mid);
+        Assert.Equal(r[2].Circle.Radius, s[2].Circle.Radius, 9);
+        Assert.True(s[2].Circle.Center.DistanceTo(r[2].Circle.Center) < 0.001);
+        Assert.Equal(s[1].End, s[2].Start);
         Assert.Equal(s[1].Start.X, s[1].End.X);
     }
 
@@ -83,7 +85,7 @@ public class EWRevitWarningsTests
         var cat = CatalogService.LoadDefault();
         var scene = IntersectionDemo.Create(new IntersectionDefinition(), cat, 0, 0, 90);
         var ctx = new BuildContext { Catalog = cat, Lookup = id => scene.Definitions.FirstOrDefault(x => x.Id == id), PathOf = x => scene.Paths.GetValueOrDefault(x.Id) };
-        int before = 0, after = 0, rings = 0;
+        int fitted = 0, after = 0, rings = 0;
         foreach (var def in scene.Definitions.OfType<IntersectionDefinition>())
         {
             var g = MarkingBuilder.Build(def, null, ctx);
@@ -92,7 +94,7 @@ public class EWRevitWarningsTests
                     foreach (var ring in BoundaryFit.FitPolygon(ElementPlan.Prepare(sh), BoundaryFit.DefaultTolerance, 0.0018, g.ArcCenters))
                     {
                         rings++;
-                        before += AxisSnap.CountNearAxis(ring);
+                        fitted += AxisSnap.CountNearAxis(ring);
                         var snapped = AxisSnap.Snap(ring);
                         after += AxisSnap.CountNearAxis(snapped);
                         // Continua um contorno válido (sem laço) e com a mesma área (diferença < 1 cm²).
@@ -103,7 +105,10 @@ public class EWRevitWarningsTests
                     }
         }
         Assert.True(rings > 0);
-        Assert.True(before > 0, "a reprodução deixou de ter retas quase alinhadas – revise o teste");
+        // As retas quase alinhadas desta cena vinham do próprio ajuste: a junção reta → arco ia para a circunferência na
+        // direção do centro e girava a reta. Desde o FC ela anda ao longo da reta (D-015) e o ajuste já sai sem nenhuma; o
+        // alinhamento continua coberto pelos casos acima (resíduo, quina, arcos).
+        Assert.Equal(0, fitted);
         Assert.Equal(0, after);
     }
 }

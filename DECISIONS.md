@@ -147,3 +147,38 @@ como substituída.
   - O ganho é proporcional à fração de marcas descartadas; o tempo por trecho do Autoteste mede o que sobrou.
   - Uma migração que renomear o discriminador deixa o nome antigo desconhecido, e ele cai na leitura completa.
   - Um discriminador nunca pode ser reaproveitado para outro tipo.
+
+## D-014 – Via com pavimento "Nenhum" guarda a definição do pavimento como dado
+- **Contexto:** a via reconhecida em pisos comuns (pista já modelada pelo usuário) usa pavimento "Nenhum". O plugin não
+  registrava a definição do pavimento – e é ela que liga a via às interseções e rotatórias e guarda a seção para editar a
+  via depois. No 4º Autoteste completo, o T de duas vias assim não virou interseção: calçadas, meios-fios e linhas se
+  cruzaram (61 pares de pisos sobrepostos).
+- **Alternativas descartadas:**
+  - Piso de espessura mínima: um piso a mais sob o do usuário, sobreposto a ele.
+  - Inferir a via pelas outras marcas do conjunto: já existe para vias antigas (`IntersectionService.Roads`), mas perde a
+    seção e é a leitura mais cara do projeto (K15).
+- **Decisão:** a definição do pavimento sempre é criada. Com "Nenhum", o `MarkingService` a grava só como dado
+  (`SaveAsData`, sem elemento de modelo). O atualizador apaga o dado quando o conjunto não tem mais nenhuma outra marca.
+- **Consequências:** interseções, rotatórias e edição da via funcionam igual para a pista do plugin e a do usuário. Uma via
+  "Nenhum" de versão anterior só ganha a definição ao ser gerada de novo.
+
+## D-015 – Ajuste de arcos com o centro exato aceita os cortes sobre as cordas da curva discretizada
+- **Contexto:** as operações booleanas (Clipper) discretizam as curvas com flecha de 0,2 % do raio: 12 mm em R = 6 m, 20 mm em
+  R = 10 m. Os recortes (rampas, limite da zona) caem sobre essas cordas, para dentro da curva. Com os 5 mm de tolerância, o
+  ajuste em retas e arcos que vai ao Revit recusava o centro exato da esquina, e cada piso caía num círculo próprio: os
+  vizinhos se sobrepunham ~2 mm ao longo da curva (13 pares INTERSECAO no 4º Autoteste completo).
+- **Alternativas descartadas:**
+  - Discretizar as curvas com 2 mm no `Close` das interseções: mudou outras formas que os testes protegem (grama da esquina,
+    ângulos das extensões de calçada, rampas sobre a pista, orelhas, plataformas no terreno).
+  - Não densificar as cordas no meio-fio da esquina: a sarjeta e o meio-fio chegavam ao limite da zona 11 cm fora das faixas
+    da via (T da via reconhecida).
+- **Decisão:** só quando o centro é um dos centros exatos do traçado (esquinas, emenda em curva):
+  - os pontos podem ficar para dentro da circunferência até a flecha das cordas (0,25 % do raio, entre 5 mm e 3 cm);
+  - o raio é o envelope externo dos vértices, no milímetro de projeto quando está a até 0,45 mm dele;
+  - a junção com uma reta vai ao encontro dela com a circunferência (reta quase tangente, com o encontro longe: projeção
+    na circunferência).
+  Para os demais arcos, a tolerância continua 5 mm nos dois sentidos.
+- **Consequências:**
+  - Pisos vizinhos da mesma curva recebem o mesmo arco (0–31 cm³ sobrepostos por interseção, eram 2,7–11,5 L).
+  - Um vértice de corte pode ficar até 3 cm de onde o Clipper o pôs, sempre sobre a curva de projeto.
+  - A emenda em curva ainda tem as transições das pontas (K13).

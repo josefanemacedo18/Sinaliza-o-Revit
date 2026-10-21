@@ -38,8 +38,11 @@ public class V4Tests
         var blq = s.Build(new PathReference(), new OutputSettings(), Cat).OfType<RoadPavementDefinition>().Single();
         Assert.Equal(0.08, blq.ActualThickness, 6);
         Assert.All(MarkingBuilder.Build(blq, axis, Ctx).Pieces, p => Assert.Equal(MarkingColor.Bloquete, p.Color));
+        // Pista já modelada: o pavimento fica registrado (liga a via às outras e guarda a seção), mas sem nenhuma peça.
         s.Pavement = TipoPavimento.Nenhum;
-        Assert.Empty(s.Build(new PathReference(), new OutputSettings(), Cat).OfType<RoadPavementDefinition>());
+        var none = s.Build(new PathReference(), new OutputSettings(), Cat).OfType<RoadPavementDefinition>().Single();
+        Assert.Equal(TipoPavimento.Nenhum, none.Material);
+        Assert.Empty(MarkingBuilder.Build(none, axis, Ctx).Pieces);
     }
 
     [Fact]

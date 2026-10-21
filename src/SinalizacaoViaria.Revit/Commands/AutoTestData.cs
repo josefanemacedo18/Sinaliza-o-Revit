@@ -204,9 +204,11 @@ internal sealed partial class AutoTestRunner
                             {
                                 var d = l.Direction;
                                 var seg = new Core.Geometry.BoundarySegment(Vec2.Zero, new Vec2(d.X, d.Y));
-                                if (AxisSnap.OffAxisDeg(seg) is { } off && off > 1e-9 && off <= AxisSnap.MaxAngleDeg)
+                                // Ruído de ponto flutuante não conta: retas de 2 cm a 1e-9° (desvio lateral de 1e-13 m) não têm aviso do
+                                // Revit e apareciam aqui (4º Autoteste completo); conta a partir de 0,1 µm de desvio na ponta.
+                                var len = UnitConv.M(l.Length);
+                                if (AxisSnap.OffAxisDeg(seg) is { } off && off > 1e-9 && off <= AxisSnap.MaxAngleDeg && len * Math.Sin(off * Math.PI / 180) > 1e-7)
                                 {
-                                    var len = UnitConv.M(l.Length);
                                     offAxis.Add((code, off, len));
                                     s.Records.Add(new { tipo = "fora-do-eixo-final", piso = f.Id.Value, marca = r?.MarkingId, codigo = code, desvioGraus = off, comprimento = Math.Round(len, 4),
                                         de = Loc(a).Take(2).ToArray(), ate = Loc(c.GetEndPoint(1)).Take(2).ToArray() });

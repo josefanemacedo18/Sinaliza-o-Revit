@@ -276,6 +276,13 @@ public sealed class MarkingUpdater : IUpdater
         orphans.AddRange(defs.OfType<Core.Definitions.SectionDimensionDefinition>()
             .Where(s => Core.Generators.DetailGenerator.SectionDataOnly(s) && !profiled.Contains(s.Id))
             .SelectMany(s => Of(s, e => e is Autodesk.Revit.DB.ExtensibleStorage.DataStorage)));
+        // Pista já modelada (pavimento só como dado): com a via apagada (nenhuma outra marca do conjunto), o dado sai também –
+        // senão a via invisível continuaria ligando interseções.
+        var drawnGroups = defs.Where(d => d.GroupId != null && d is not Core.Definitions.RoadPavementDefinition { Material: Core.Definitions.TipoPavimento.Nenhum })
+            .Select(d => d.GroupId!).ToHashSet();
+        orphans.AddRange(defs.OfType<Core.Definitions.RoadPavementDefinition>()
+            .Where(p => p.Material == Core.Definitions.TipoPavimento.Nenhum && p.GroupId != null && !drawnGroups.Contains(p.GroupId))
+            .SelectMany(p => Of(p, e => e is Autodesk.Revit.DB.ExtensibleStorage.DataStorage)));
         foreach (var id in orphans)
             try { doc.Delete(id); } catch { /* já removido */ }
         // Recortes de uma marca apagada (boca de lobo, grelha, rampa...): o piso/meio-fio/calçada volta a ser contínuo.

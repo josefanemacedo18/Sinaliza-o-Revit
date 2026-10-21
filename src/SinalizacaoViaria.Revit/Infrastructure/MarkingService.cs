@@ -569,6 +569,8 @@ public sealed class MarkingService
         PruneExclusions(def);
         // Traçado das linhas de referência guardado na marca: apagar a linha depois não faz a marca perder o caminho.
         try { PathResolver.RefreshCache(_doc, def.Path); } catch (Exception ex) { Log.Error("Cache do caminho", ex); }
+        // Pista já modelada (pavimento "Nenhum"): sem piso – a definição fica num elemento de dados, que liga a via às outras.
+        if (def is RoadPavementDefinition { Material: TipoPavimento.Nenhum }) return SaveAsData(def, existing);
 
         // Detalhes, anotações e legendas existem somente na vista.
         if (def is IAnnotationDefinition) def.Output.Mode = OutputMode.Detalhe2D;
