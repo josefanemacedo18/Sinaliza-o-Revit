@@ -22,7 +22,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
 - **Revit:** dois Autotestes rápidos e quatro **completos**, mais um Validar Modelo. Relatórios em `docs/evidencias/`. As
   mudanças do FC ainda não rodaram no Revit.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros.
-- **Testes:** FC: +13 `FCRevitFullRun4Tests`; suíte completa em execução (resultado no próximo commit).
+- **Testes:** suíte completa 2 869/2 869 (FC: +13 `FCRevitFullRun4Tests`).
 
 ## Próxima tarefa
 

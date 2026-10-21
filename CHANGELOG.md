@@ -68,8 +68,7 @@ Fase da missão: IV/XIV (geometria e regras da API do Revit) – atual; XV (test
 - `V4Tests` (pavimento "Nenhum" registrado sem peças) e `EWRevitWarningsTests` atualizados: arco com o mesmo raio depois
   do alinhamento; o cruzamento local × local já sai do ajuste sem retas quase alinhadas (elas vinham da junção projetada na
   direção do centro, que girava a reta).
-- Suíte completa: em execução neste commit (resultado no próximo). Antes dela: `FCRevitFullRun4Tests`, `AI3BoundaryArcTests` e
-  `EWRevitWarningsTests` 30/30.
+- Suíte completa: 2 869/2 869 em 14 min 57 s (Linux). Core, plugin e testes com 0 avisos.
 
 ## 2026-10-20 – FB: Autoteste completo mais rápido e com todos os dados numa rodada só
 

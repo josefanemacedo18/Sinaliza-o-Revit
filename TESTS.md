@@ -32,7 +32,7 @@ Não compile enquanto a suíte roda com `--no-build`: a compilação troca as DL
 | 2026-10-20 | EZ | 2 825 | 2 825 aprovados, 0 falhas | 14 min 46 s (Linux) | +25 `EZRevitFullRun2Tests` |
 | 2026-10-20 | FA | 2 843 | 2 843 aprovados, 0 falhas | 20 min 18 s (Linux) | +18 `FARevitFullRun3Tests` |
 | 2026-10-20 | FB | 2 856 | 2 856 aprovados, 0 falhas | 20 min 59 s (Linux) | +13 `FBAutotestSpeedTests` |
-| 2026-10-21 | FC | 2 869 | em execução | — | +13 `FCRevitFullRun4Tests` (fixtures do 4º Autoteste em `Fixtures/`) |
+| 2026-10-21 | FC | 2 869 | 2 869 aprovados, 0 falhas | 14 min 57 s (Linux) | +13 `FCRevitFullRun4Tests` (fixtures do 4º Autoteste em `Fixtures/`) |
 
 Compilação na linha de base:
 - Core e plugin: 0 avisos.
