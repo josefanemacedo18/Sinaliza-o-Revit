@@ -147,6 +147,7 @@ Legenda de estado:
 | V | Alinhamento horizontal por PIs (curva circular + clotoides) e eixo das vias comuns | VALIDADA (Core). Relatório de elementos do traçado (TS/SC/CS/ST) desde EV5 e do eixo das vias comuns (tangentes, curvas, cantos) desde EW3, em CSV no Perfil da Via | `Tracado`, `AlignmentElements`, `EVAlignmentElementsTests`, `EWAxisElementsTests` |
 | V | Perfil vertical (PIVs, curvas parabólicas, rampas, superelevação, caimentos) | VALIDADA (Core); elementos (PCV/PTV, K, alto/baixo) e CSV desde EV5; sem verificação de distância de visibilidade (não inventar critério) | `RoadGrade`, `AlignmentElements` |
 | V | Projeto de greide automático (acompanhar terreno, compensado) | VALIDADA (Core) | `RoadProfileDesigner`, testes rodadas J/K/AL3 |
+| V | Limites geométricos informados pelo usuário (raio, tangente, deflexão sem curva, rampa, K, curva vertical) com a fonte | VALIDADA (Core) desde a Fase V; CSV de verificação no Perfil da Via e V12 no Validar Modelo **não executados no Revit**; sem valores normativos no plugin | `GeometricCheck`, `Fase05AlinhamentoTests` |
 | VI | Seção transversal da via (faixas, ciclofaixas, calçadas, canteiros, larguras variáveis) | VALIDADA (Core) | `RoadSetup*`, centenas de testes |
 | VI | Pavimento (asfalto, bloquete, concreto, terra) e camadas no perfil | VALIDADA (Core) | rodadas AD3/LX2 |
 | VI | Corredor 3D (pisos no greide, obras hospedadas) | VALIDADA (Core) / Revit não validado | rodadas K/L/VT |
@@ -160,7 +161,7 @@ Legenda de estado:
 | IX | Regras mínimas configuráveis (frente 5 m e área 125 m² por padrão, editáveis) | VALIDADA (Core) | `LoteamentoDefinition.Minimos`; **sem aprovação legal automática** |
 | IX | Quadros de áreas, de quadras e de lotes; memorial `.docx` | VALIDADA (Core) | `LotReport`, `LotMemorial`, `DocxWriter` |
 | X | Verificações no Revit (pintura × pisos, continuidade, terreno × via) | IMPLEMENTADA, NÃO VALIDADA aqui | `AutoTestChecks.cs` |
-| X | Validação do modelo com severidade, confiança e revisão humana | VALIDADA (Core) desde EV4/EV5; o comando rodou no Revit 2027 (relatório do usuário, 2026-10-19) | `ModelValidator` V01–V11, `CmdValidarModelo`, `docs/evidencias` |
+| X | Validação do modelo com severidade, confiança e revisão humana | VALIDADA (Core) desde EV4/EV5; o comando rodou no Revit 2027 (relatório do usuário, 2026-10-19) | `ModelValidator` V01–V12, `CmdValidarModelo`, `docs/evidencias` |
 | XI | Análise de capacidade, atraso e nível de serviço; Webster | VALIDADA (Core), não calibrada | `TrafficAnalysis`, testes S3/T8/AA2 |
 | XI | Microssimulação (IDM, brechas, semáforos, pedestres) | VALIDADA (Core: invariantes como sem colisão e fila coerente); **não calibrada com dados de campo** | testes V4/W5/AA2 |
 | XI | Animação | IMPLEMENTADA (é reprodução dos quadros simulados, não substitui a simulação) | `SimFrame`, `TrafficMap` |

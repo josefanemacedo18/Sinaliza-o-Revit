@@ -51,6 +51,12 @@ public sealed class PluginSettings
     /// <summary>Última seção usada no "Sinalizar via" (reaberta na próxima vez).</summary>
     public string? LastRoadSetup { get; set; }
 
+    /// <summary>
+    /// Limites geométricos do traçado e do greide informados pelo usuário, com a fonte (K8). Vazios por padrão: o plugin não
+    /// traz valores normativos.
+    /// </summary>
+    public Geometry.GeometricCriteria CriteriosGeometricos { get; set; } = new();
+
     public double DefaultSpeed { get; set; } = 60;
     public string FontFamily { get; set; } = "Arial";
     public bool FontBold { get; set; } = true;

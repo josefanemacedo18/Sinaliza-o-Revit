@@ -21,7 +21,7 @@ cada módulo estão em [AUDIT.md](AUDIT.md); as decisões e seus motivos, em [DE
 │   Parcelamento LotDivider · DivisaoPorLinhas · LotDrawing · LotReport · LotMemorial · Masterplan                   │
 │   Traffic      TrafficNetwork · TrafficAnalysis · TrafficSimulation · cenários · soluções · diagnóstico           │
 │   Quantities / Reports (DocxWriter, Memorial) / Geo (TM local, SIRGAS) / Catalog (MBST, JSON embutido)            │
-│   Model        ModelGraph (dependências) · ModelValidator (V01–V11, severidade e confiança)                       │
+│   Model        ModelGraph (dependências) · ModelValidator (V01–V12, severidade e confiança)                       │
 └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 

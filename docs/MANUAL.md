@@ -752,6 +752,7 @@ sempre sua, com Editar, Atualizar ou apagando o elemento.
 | V09 | quadras do mesmo loteamento sobrepostas (mais de 0,5 m²) | a área seria contada duas vezes nos lotes e no quadro: corrija o contorno de uma delas |
 | V10 | quadra com parte fora da gleba (mais de 0,5 m²) | confira o contorno da quadra ou da gleba (confiança média: pode ser só um contorno desatualizado) |
 | V11 | interseção com menos de duas vias existentes | apague a interseção ou refaça a conexão |
+| V12 | eixo ou greide de uma via fora dos **limites geométricos que você informou** em Configurações (raio, tangente entre curvas, vértice sem curva, rampa, K, comprimento de curva vertical) | confira o traçado ou o greide; a fonte dos limites é a que você escreveu. Sem limites informados, não aparece |
 
 O resumo aparece numa janela (com **Selecionar os elementos com erro ou aviso** e **Abrir o relatório**). O relatório
 completo é gravado em `%AppData%\SinalizaBIM\validacao-AAAAMMDD-HHMMSS.txt`. A validação confere os **dados**; a
@@ -923,6 +924,11 @@ subcategoria.
 * **Configurações**: representação e material padrão, velocidade padrão, fonte das legendas,
   espessura mínima, elevação adicional, projeção sobre superfícies, atualização automática, contorno
   das regiões 2D e caminho do catálogo do usuário.
+* **Limites geométricos do traçado e do greide**: raio mínimo das curvas horizontais, tangente mínima entre curvas,
+  deflexão máxima de um vértice sem curva, rampa máxima e mínima, K mínimo das curvas convexas e côncavas e comprimento
+  mínimo de curva vertical, com a **fonte** (norma, edição, tabela, classe da via). O plugin **não traz valores
+  normativos**: campo vazio não é conferido e a fonte sai nos relatórios como você a escreveu. Os limites são conferidos
+  no **Perfil da Via** (CSV de verificação) e no **Validar Modelo** (V12).
 * **Catálogo**: abre o JSON para edição, recarrega ou restaura o padrão. Formato em
   [CATALOGO.md](CATALOGO.md).
 
@@ -2128,10 +2134,14 @@ via vira obra. É o "perfil longitudinal" do projeto rodoviário.
    comprimento **efetivo** e **pedido** da curva vertical, **K = L/|A|**, convexa/côncava, **PCV** e **PTV** com as cotas, e o
    **ponto alto/baixo** quando ele cai dentro da curva. Os elementos em planta vão para `eixo-<via>.csv`: tangentes, curvas
    circulares (raio, deflexão, sentido, T) e cantos vivos, com as estacas de início e fim. Os dois caminhos aparecem no resumo.
+7. **Verificação contra os seus limites**: com limites geométricos informados em Configurações, o eixo e o greide aplicados
+   são conferidos e o que estiver fora vai para `verificacao-<via>.csv` (elemento, estacas, critério, valor, limite e a fonte
+   que você escreveu). O resumo mostra os primeiros itens. Sem limites, o resumo avisa que nada foi conferido.
 
 > O comprimento efetivo pode diferir do pedido. Para não haver "quina", a curva é no mínimo K = 10 m por %, um piso de
 > suavização da geometria, **não um critério de visibilidade**. E ela nunca passa de 98 % do menor vão entre PIVs
-> vizinhos. Verificar distâncias de visibilidade e K mínimos da norma do órgão continua sendo do projetista.
+> vizinhos. Os K mínimos da norma do órgão podem ser informados em Configurações (item 7); a distância de visibilidade
+> não é calculada.
 
 ### 24.6 Muro de arrimo e talude
 * **Muro de arrimo**: **flexão**, **gravidade**, **contrafortes**, **gabião**, **terra armada** e **cortina atirantada**, com

@@ -28,7 +28,9 @@ public static class ModelValidator
 {
     /// <param name="copias">Todas as cópias lidas do documento.</param>
     /// <param name="elementoExiste">UniqueId (dono da borda) → existe no documento. Nulo = não verificar elementos do Revit.</param>
-    public static List<Achado> Validate(IReadOnlyList<CopiaGravada> copias, Func<string, bool>? elementoExiste = null)
+    /// <param name="criterios">Limites geométricos informados pelo usuário (V12). Nulo ou vazio = não conferir.</param>
+    public static List<Achado> Validate(IReadOnlyList<CopiaGravada> copias, Func<string, bool>? elementoExiste = null,
+        GeometricCriteria? criterios = null)
     {
         var res = new List<Achado>();
         var defs = new Dictionary<string, MarkingDefinition>();
@@ -80,6 +82,7 @@ public static class ModelValidator
         }
 
         CheckLayout(defs, res);
+        if (criterios is { IsEmpty: false }) CheckAlignment(defs, criterios, res);
 
         // Corte só de dados (sem desenho na planta) sem o perfil que o usa.
         var perfis = defs.Values.OfType<SectionProfileDefinition>().Select(p => p.SectionId).ToHashSet();
@@ -104,6 +107,7 @@ public static class ModelValidator
         ["V09"] = "quadras do mesmo loteamento sobrepostas",
         ["V10"] = "quadra fora da gleba do loteamento",
         ["V11"] = "interseção com menos de duas vias existentes",
+        ["V12"] = "eixo ou greide de via fora dos limites geométricos informados pelo usuário (raio, tangente, rampa, K)",
     };
 
     /// <summary>Relatório em texto (o mesmo que a camada Revit grava em TXT).</summary>
@@ -210,6 +214,34 @@ public static class ModelValidator
                     $"{n.DisplayCode}: só {vias} via(s) existente(s) no cruzamento – a interseção não liga mais duas vias (apagar ou refazer a conexão).",
                     new[] { n.Id }));
         }
+    }
+
+    /// <summary>
+    /// Eixo (pelo traçado guardado na via) e greide de cada pavimento contra os limites que o usuário informou (V12, K8). O
+    /// eixo vem do cache do caminho: se a linha de referência mudou depois da última geração, a via precisa ser atualizada
+    /// (confiança média).
+    /// </summary>
+    private static void CheckAlignment(Dictionary<string, MarkingDefinition> defs, GeometricCriteria c, List<Achado> res)
+    {
+        foreach (var road in defs.Values.OfType<RoadPavementDefinition>())
+        {
+            var v = new List<Violacao>();
+            if (StoredAxis(road.PathRef) is { } axis) v.AddRange(GeometricCheck.Axis(AlignmentElements.FromAxis(axis), c));
+            if (road.Output.Grade is { } grade && grade.SortedPoints().Count >= 2) v.AddRange(GeometricCheck.Vertical(AlignmentElements.Vertical(grade), c));
+            if (v.Count == 0) continue;
+            var lista = string.Join("; ", v.Take(4).Select(x => x.Texto)) + (v.Count > 4 ? $"; … e mais {v.Count - 4}" : "");
+            res.Add(new("V12", Severidade.Aviso, Confianca.Media, true,
+                $"{road.DisplayCode}: {v.Count} elemento(s) fora dos limites informados ({c.FonteTexto}): {lista}.", new[] { road.Id }));
+        }
+    }
+
+    /// <summary>Eixo guardado na definição: pontos fixos ou o traçado das linhas na última geração, com os cantos arredondados.</summary>
+    private static Polyline2? StoredAxis(PathReference p)
+    {
+        var pts = p.Points.Count >= 2 ? p.Points
+            : p.Cache is { Count: > 0 } c ? c.SelectMany((q, k) => k == 0 ? q : q.Skip(1)).ToList() : null;
+        if (pts == null || pts.Count < 2) return null;
+        return new Polyline2(PathReference.Smooth(pts, p.SmoothRadius, p.Closed).ToList(), p.Closed);
     }
 
     private static bool BoundsOverlap(Polygon2 a, Polygon2 b)

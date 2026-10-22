@@ -3,6 +3,36 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-22 – Fase V concluída: limites geométricos do traçado e do greide informados pelo usuário (versão 2.4.0)
+
+Fase da missão: V (alinhamentos e perfis) – concluída. Entrega: `Releases/Fase05` (não executada no Revit 2027).
+
+### Limites geométricos configuráveis (K8)
+- O plugin já listava os elementos do traçado (curvas nos PIs e no eixo das vias comuns) e do greide (rampas e curvas
+  verticais), mas não os conferia contra nada. Agora o usuário informa os limites em **Configurações → Limites geométricos
+  do traçado e do greide**: raio mínimo, tangente mínima entre curvas, deflexão máxima de vértice sem curva, rampa máxima e
+  mínima, K mínimo das curvas convexas e côncavas, comprimento mínimo de curva vertical e a **fonte** (norma, edição,
+  tabela, classe da via).
+- O plugin **não traz valores normativos**. Campo vazio não é conferido; a fonte sai nos relatórios como foi escrita, ou
+  como "fonte não informada pelo usuário".
+- `GeometricCriteria` (guardado em `PluginSettings.CriteriosGeometricos`) e `GeometricCheck` (Core):
+  - `Axis`: curvas do eixo abaixo do raio mínimo, tangente curta entre duas curvas e vértice sem curva (acima da deflexão
+    máxima informada; sem ela, com raio mínimo informado, o vértice conta como raio zero);
+  - `Horizontal`: o mesmo para as curvas nos PIs do traçado;
+  - `Vertical`: rampas fora do intervalo, K abaixo do mínimo (convexa: a rampa diminui; sem curva, K = 0) e curva
+    vertical curta;
+  - `Csv` (";" e vírgula decimal, fonte na primeira linha) e `Summary` (resumo para a mensagem do comando).
+- **Perfil da Via** grava `verificacao-<via>.csv` ao lado dos outros relatórios e mostra os primeiros itens fora dos
+  limites; sem limites informados, avisa que traçado e greide não foram conferidos.
+- **Validar Modelo**: novo código **V12** (aviso, confiança média, revisão humana), um por via, com até quatro itens e a
+  fonte. Só aparece com limites informados.
+- Distância de visibilidade continua sem cálculo (K8).
+
+### Testes
+- `Fase05AlinhamentoTests` (7): sem limites nada é conferido; raio e tangente abaixo do informado; vértice sem curva;
+  rampas, K e comprimento das curvas verticais; fonte no CSV como foi escrita; V12 só com limites; configurações antigas
+  sem o campo carregam com limites vazios.
+
 ## 2026-10-22 – Fase IV concluída: ajuste topológico dos contornos e pares restantes do 4º Autoteste (versão 2.3.0)
 
 Fase da missão: IV (motor geométrico e topologia) – concluída. Entrega: `Releases/Fase04` (não executada no Revit 2027).

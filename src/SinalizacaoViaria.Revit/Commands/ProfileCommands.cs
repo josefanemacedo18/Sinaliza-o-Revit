@@ -192,6 +192,17 @@ public sealed class CmdPerfilVia : CommandBase
             var axisPath = Path.Combine(PluginPaths.Root, $"eixo-{key}.csv");
             File.WriteAllText(axisPath, AlignmentElements.AxisCsv(AlignmentElements.FromAxis(road.Axis)), new System.Text.UTF8Encoding(true));
             summary += $"\nElementos do greide (PIV, rampas, L, K, PCV/PTV): {path}\nElementos do eixo (tangentes, curvas, raios, estacas): {axisPath}";
+            // Limites geométricos informados pelo usuário (Configurações), com a fonte dele (K8): sem limites, nada é conferido.
+            var crit = PluginContext.Settings.CriteriosGeometricos;
+            if (crit is { IsEmpty: false })
+            {
+                var v = GeometricCheck.Axis(AlignmentElements.FromAxis(road.Axis), crit)
+                    .Concat(GeometricCheck.Vertical(AlignmentElements.Vertical(grade), crit)).ToList();
+                var checkPath = Path.Combine(PluginPaths.Root, $"verificacao-{key}.csv");
+                File.WriteAllText(checkPath, GeometricCheck.Csv(v, crit), new System.Text.UTF8Encoding(true));
+                summary += "\n" + GeometricCheck.Summary(v, crit) + $"\nVerificação do traçado e do greide: {checkPath}";
+            }
+            else summary += "\nLimites geométricos (raio, rampa, K) não informados em Configurações: traçado e greide não conferidos.";
         }
         catch (Exception ex)
         {

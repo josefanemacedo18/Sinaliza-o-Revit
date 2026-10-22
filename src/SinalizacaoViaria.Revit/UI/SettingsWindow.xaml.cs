@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using Microsoft.Win32;
 using SinalizacaoViaria.Core.Catalog;
+using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Revit.Infrastructure;
 
@@ -43,6 +44,16 @@ public partial class SettingsWindow : Window
         CkPaintFloors.IsChecked = s.PaintAsFloors;
         TbBoundaryTol.Text = UiHelpers.F(s.BoundaryTolerance * 1000, "0.##");
         CkBoundary.IsChecked = s.VisibleBoundary2D;
+        var c = s.CriteriosGeometricos ?? new GeometricCriteria();
+        TbCritFonte.Text = c.Fonte ?? "";
+        TbCritRaio.Text = UiHelpers.F(c.RaioMinimo, "0.##");
+        TbCritTangente.Text = UiHelpers.F(c.TangenteMinima, "0.##");
+        TbCritDeflexao.Text = UiHelpers.F(c.DeflexaoMaximaSemCurva, "0.###");
+        TbCritRampaMax.Text = UiHelpers.F(c.RampaMaxima, "0.###");
+        TbCritRampaMin.Text = UiHelpers.F(c.RampaMinima, "0.###");
+        TbCritKConvexa.Text = UiHelpers.F(c.KMinimoConvexa, "0.##");
+        TbCritKConcava.Text = UiHelpers.F(c.KMinimoConcava, "0.##");
+        TbCritCurvaVert.Text = UiHelpers.F(c.CurvaVerticalMinima, "0.##");
         TbCatalog.Text = PluginContext.UserCatalogPath;
         UpdateStatus();
     }
@@ -110,6 +121,18 @@ public partial class SettingsWindow : Window
             s.PaintAsFloors = CkPaintFloors.IsChecked == true;
             s.BoundaryTolerance = UiHelpers.Parse(TbBoundaryTol, 5, "Desvio máximo dos contornos", 0, 50) / 1000;
             s.VisibleBoundary2D = CkBoundary.IsChecked == true;
+            s.CriteriosGeometricos = new GeometricCriteria
+            {
+                Fonte = string.IsNullOrWhiteSpace(TbCritFonte.Text) ? null : TbCritFonte.Text.Trim(),
+                RaioMinimo = UiHelpers.ParseNullable(TbCritRaio, "Raio mínimo", 0, 100000),
+                TangenteMinima = UiHelpers.ParseNullable(TbCritTangente, "Tangente mínima", 0, 100000),
+                DeflexaoMaximaSemCurva = UiHelpers.ParseNullable(TbCritDeflexao, "Deflexão máxima sem curva", 0, 180),
+                RampaMaxima = UiHelpers.ParseNullable(TbCritRampaMax, "Rampa máxima", 0, 100),
+                RampaMinima = UiHelpers.ParseNullable(TbCritRampaMin, "Rampa mínima", 0, 100),
+                KMinimoConvexa = UiHelpers.ParseNullable(TbCritKConvexa, "K mínimo convexa", 0, 100000),
+                KMinimoConcava = UiHelpers.ParseNullable(TbCritKConcava, "K mínimo côncava", 0, 100000),
+                CurvaVerticalMinima = UiHelpers.ParseNullable(TbCritCurvaVert, "Comprimento mínimo de curva vertical", 0, 100000),
+            };
             s.UserCatalogPath = string.Equals(TbCatalog.Text, PluginPaths.DefaultUserCatalog, StringComparison.OrdinalIgnoreCase) ? null : TbCatalog.Text;
             PluginContext.SaveSettings();
             PluginContext.ReloadCatalog();

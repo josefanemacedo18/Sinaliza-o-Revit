@@ -62,6 +62,33 @@
                         <CheckBox x:Name="CkBoundary" Content="Contorno visível nas regiões 2D (recomendado para marcas brancas)"/>
                     </StackPanel>
                 </GroupBox>
+                <GroupBox Header="Limites geométricos do traçado e do greide">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Grid.ColumnSpan="2" Style="{StaticResource Hint}" TextWrapping="Wrap"
+                                   Text="Informe os limites da norma e da classe da via adotadas no projeto. O plugin não traz valores normativos: campo vazio não é conferido. O resultado sai no Perfil da Via (CSV de verificação) e no Validar Modelo (V12)."/>
+                        <TextBlock Grid.Row="1" Text="Fonte (norma, edição, tabela, classe)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbCritFonte"/>
+                        <TextBlock Grid.Row="2" Text="Raio mínimo das curvas horizontais (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbCritRaio"/>
+                        <TextBlock Grid.Row="3" Text="Tangente mínima entre curvas (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbCritTangente"/>
+                        <TextBlock Grid.Row="4" Text="Deflexão máxima sem curva (°)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="4" Grid.Column="1" x:Name="TbCritDeflexao"
+                                 ToolTip="Vértice do eixo sem curva com deflexão maior que esta é apontado. Vazio, com raio mínimo informado: qualquer vértice sem curva conta como raio zero."/>
+                        <TextBlock Grid.Row="5" Text="Rampa máxima (%)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="5" Grid.Column="1" x:Name="TbCritRampaMax"/>
+                        <TextBlock Grid.Row="6" Text="Rampa mínima (%)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="6" Grid.Column="1" x:Name="TbCritRampaMin"/>
+                        <TextBlock Grid.Row="7" Text="K mínimo – curva convexa (m/%)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="7" Grid.Column="1" x:Name="TbCritKConvexa"/>
+                        <TextBlock Grid.Row="8" Text="K mínimo – curva côncava (m/%)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="8" Grid.Column="1" x:Name="TbCritKConcava"/>
+                        <TextBlock Grid.Row="9" Text="Comprimento mínimo de curva vertical (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="9" Grid.Column="1" x:Name="TbCritCurvaVert"/>
+                    </Grid>
+                </GroupBox>
                 <GroupBox Header="Catálogo normativo">
                     <StackPanel>
                         <TextBlock Style="{StaticResource Hint}" Text="Arquivo JSON com os tipos de marca, dimensões, cores, símbolos, vagas e materiais. Itens com o mesmo código substituem os padrões do plugin."/>

@@ -23,7 +23,8 @@ public sealed class CmdValidarModelo : CommandBase
             TaskDialog.Show(AppTitle, "Nenhuma marca do SinalizaBIM neste projeto – nada a validar.");
             return Result.Cancelled;
         }
-        var achados = ModelValidator.Validate(copias, uid => !string.IsNullOrWhiteSpace(uid) && doc.GetElement(uid) != null);
+        var achados = ModelValidator.Validate(copias, uid => !string.IsNullOrWhiteSpace(uid) && doc.GetElement(uid) != null,
+            PluginContext.Settings.CriteriosGeometricos);
         var marcas = copias.Select(c => c.MarkingId).Distinct().Count();
         var text = ModelValidator.Report(achados, marcas, copias.Count, doc.Title, DateTime.Now);
         string? path = null;
