@@ -201,3 +201,60 @@ Legenda de estado:
   - A microssimulação usa IDM (parâmetros a, b e T por veículo) com zonas de conflito.
   - Os testes verificam **coerência** (sem colisões, filas com muita demanda), não a **precisão** contra campo.
   - Os resultados devem ser lidos como estimativa de estudo.
+
+## 7. RT-1 – Integração Toposolid × vias × terraplenagem × drenagem (auditoria RT-1.1, 2026-10-22)
+
+Levantamento pelo código (nada executado no Revit neste ciclo). Os métodos da API citados são os que o plugin já chama e
+que compilam contra o pacote do Revit 2027 referenciado (K10); nenhum foi presumido.
+
+### 7.1 Terreno (Toposolid)
+- **Criação:** `Toposolid.Create(doc, loops, pontos, tipo, nível)` só quando o projeto não tem terreno e o usuário pede
+  "criar terreno" (`TerrainService.cs:709`); o Autoteste cria o dele (`AutoTestSteps2.cs:37`).
+- **Leitura:** malha atual (`TerrainModel.Live`) e **terreno original**, gravado no próprio Toposolid em armazenamento
+  extensível na primeira terraplenagem (`TerrainModel.Save/Original`, `TerrainModel.cs:89–130`); `TerrainModel.Ground` dá a
+  cota natural sob um ponto (volumes, seções por estaca, Relatório da Rede).
+- **Alteração:** editor de forma (`GetSlabShapeEditor`, `AddPoints`/`AddPoint`; `TerrainService.cs:414` e `639–650`): os
+  pontos dentro da área de projeto e da área da terraplenagem anterior (com 1 m de folga) são trocados pela superfície de
+  projeto; fora dela voltam os originais (`TerrainRebuild.Points`). A superfície suavizada é desligada
+  (`Toposolid.SetSmoothedSurface`, `TerrainService.cs:345–347`) e o tipo do Toposolid tem a espessura ajustada (`611–622`).
+- **Escavação:** `CanBeExcavatedBy`/`ExcavateBy` com túneis e caixas de drenagem (`TerrainService.cs:444–448`).
+- **Subdivisões:** `CreateSubDivision` para grama de taludes e ilhas, mapa de corte e aterro e lotes
+  (`TerrainService.cs:748`, `LotService.cs:104/174`).
+- **Separação lógica:** terreno original = dado gravado no Toposolid; terreno projetado = o próprio Toposolid editado;
+  pavimentação = pisos. Não há um Toposolid projetado separado: a reversibilidade hoje é pelo dado (a região é refeita a
+  partir do original a cada terraplenagem) e pelo Desfazer do Revit; `TerrainModel.Reset` esquece o original (novo
+  levantamento).
+
+### 7.2 Pisos das vias
+- Um `Floor` por peça, com o tipo pela espessura (D-012). O topo segue o greide da via (perfil, abaulamento e
+  superelevação do `RoadGrade`) por edição de forma em lote (`MarkingService.FlushShapeEdits`, `MarkingService.cs:2181–2270`):
+  os vértices do contorno ficam no plano de cada faceta do greide (pista e pintura nos mesmos planos, rodada VT) ou nos
+  pontos da malha do terreno quando a marca acompanha a superfície (`AddDrapePoints`). A cota vem do projeto – o piso não
+  é movido até "encostar".
+
+### 7.3 Terraplenagem
+- Núcleo `Grading`: plataformas e taludes de corte e aterro até o terreno natural, com os taludes de cada via (ou os
+  padrões 1,0 e 1,5 H:V, configuráveis em `GradingOptions`); plataforma por camadas – o terreno fica no fundo da estrutura
+  sob a pista (`Subgrade` = 0,40 m sob o topo) e sobe ao topo do acabamento nas bordas externas, onde começa o talude
+  (`Grading.cs:650–690`, `Layered`; rodada VT). Volumes pela malha e pelas seções (EV6, F7b).
+
+### 7.4 Drenagem
+- Os dispositivos encaixam na face do meio-fio e adotam a cota da base da guia (`DrainageCommand.Fit`); a rede (Fase VIII)
+  usa as cotas de tampa e de fundo das caixas. A declividade da sarjeta e a área de contribuição são informadas em cada
+  dispositivo (K5), não lidas da via nem do terreno.
+
+### 7.5 Verificações que já existem
+- Autoteste, `AutoTestChecks.CheckRoad`: pintura × pisos (escondida ou flutuando), buracos e degraus no pavimento e terreno
+  × via (Toposolid acima da pista; desnível de mais de 30 cm entre o terreno e a borda da seção). **É a opção "Verificações
+  do modelo", desligada por padrão (`AutoTestOptions.Checks`), e não rodou em nenhum dos quatro Autotestes completos.**
+- Núcleo: `PieceOverlaps` (pares de pisos sobrepostos) e a conferência final dos pisos do Autoteste (pares por tipo).
+
+### 7.6 Lacunas (destino no ROADMAP)
+1. Terreno × via no núcleo, sem o Revit: topo dos pisos × superfície de projeto e terreno nas bordas (RT-1.2, Fase X).
+2. Classificação dos pares sobrepostos em camadas intencionais, interseções legítimas, duplicações, conflitos reais e
+   inconclusivos (RT-1.3, Fase X).
+3. "Verificações do modelo" ligadas no Autoteste completo (RT-1.2/RT-1.6).
+4. Drenagem lendo a declividade da sarjeta do greide e a área do modelo; pontos baixos sem captação (RT-1.5).
+5. Toposolid projetado separado do original: avaliar contra a edição atual com o original gravado (RT-1.4, decisão a
+   registrar).
+
