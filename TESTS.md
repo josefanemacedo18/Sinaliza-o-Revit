@@ -37,6 +37,7 @@ Não compile enquanto a suíte roda com `--no-build`: a compilação troca as DL
 | 2026-10-22 | `43bf855` (Fase IV, 2.3.0) | 2 887 | 2 887 aprovados, 0 falhas | 13 min 29 s (Linux) | +11 `Fase04GeometriaTests`; entrega `Releases/Fase04` |
 | 2026-10-22 | `dd8b1fc` (Fase V, 2.4.0) | 2 894 | 2 894 aprovados, 0 falhas | 13 min 8 s (Linux) | +7 `Fase05AlinhamentoTests`; entrega `Releases/Fase05` |
 | 2026-10-22 | `ec398bc` (Fase VI, 2.5.0) | 2 914 | 2 914 aprovados, 0 falhas | 13 min 5 s (Linux) | +16 `Fase06ComponentesTests`, +4 `Fase06RegeneracaoTests`; entrega `Releases/Fase06` |
+| 2026-10-22 | `b87e668` (Fase VII, 2.6.0) | 2 921 | 2 921 aprovados, 0 falhas | 24 min 24 s (Linux, com compilações em paralelo) | +7 `Fase07InterseccoesTests`; entrega `Releases/Fase07` |
 
 Compilação na linha de base:
 - Core e plugin: 0 avisos.
