@@ -154,7 +154,7 @@ Legenda de estado:
 | VI | Quantitativo por componente da seção (pavimento, meio-fio com extensão, sarjeta, calçada, gramado, ilhas) | VALIDADA (Core) desde a Fase VI; aba, CSV e planilha **não executados no Revit** | `ComponentQuantities`, `Fase06ComponentesTests` |
 | VI | Regeneração depois de mudar eixo, greide ou seção | Regras do núcleo VALIDADAS (Fase VI); updater no Revit não validado (K17) | `ModelGraph.ConnectionsToRefresh`, `IntersectionGenerator.FollowNode`, `Fase06RegeneracaoTests` |
 | VII | Terreno (TIN, Toposolid nativo) | VALIDADA (Core) / Revit não validado | `Tin`, `TerrainMesh`, `Grading` |
-| VII | Terraplenagem: corte/aterro, taludes, bermas, volumes | VALIDADA (Core); desde EV6 também o método das seções (Core, sem interface no Revit), conferido com a malha | `Grading.Volumes`, `SectionVolumes` (§6.7) |
+| VII | Terraplenagem: corte/aterro, taludes, bermas, volumes | VALIDADA (Core); desde EV6 também o método das seções, conferido com a malha; desde a Fase VII as seções de cada via vão ao quantitativo do Revit (aba, CSV e planilha – **não executados no Revit**) | `Grading.Volumes`, `SectionVolumes` (§6.7), `Fase07InterseccoesTests` |
 | VII | Interseções (T, cruz, oblíquas, tipos II–IV), rotatórias, nós em desnível | VALIDADA (Core) | rodadas S2, V2, AB2, AE3 |
 | VIII | Dispositivos de drenagem superficial (bocas de lobo, grelhas, PV, sarjetão, canaletas) – geometria | VALIDADA (Core) | `DrainageGenerator`, `SarjetaoGenerator` |
 | VIII | Rede de drenagem (tubos, poços ligados, declividades) | AUSENTE | não há modelo de rede |

@@ -31,14 +31,15 @@ public sealed class CmdQuantitativos : CommandBase
             TaskDialog.Show(AppTitle, "Nenhuma marca de sinalização encontrada neste projeto.");
             return Result.Cancelled;
         }
-        var (items, rows) = Collect(doc, uidoc.ActiveView, defs, families);
+        var sections = new List<Core.Automation.SecoesDaVia>();
+        var (items, rows) = Collect(doc, uidoc.ActiveView, defs, families, sections);
         // Miniaturas da própria sinalização (face da placa, trecho da linha, unidade do dispositivo, amostra de material).
         var thumbs = QuantityThumbnails.Build(items);
         // Resumo por componente da seção (pavimento, meio-fio, sarjeta, calçada...) somado em todas as marcas.
         var components = new List<ComponentRow>();
         try { components = ComponentQuantities.Compute(items); }
         catch (Exception ex) { Log.Error("Quantitativo por componente da seção", ex); }
-        var w = new QuantitiesWindow(rows, doc.Title, thumbs, components);
+        var w = new QuantitiesWindow(rows, doc.Title, thumbs, components, sections);
         if (UiHelpers.ShowModal(w) == true && (w.CreateSchedule || w.SchedulesByCategory))
         {
             // Tabela nativa: roda com qualquer vista ativa (inclusive folha) e vai direto para a folha escolhida.
@@ -54,7 +55,7 @@ public sealed class CmdQuantitativos : CommandBase
     /// quadro da janela, das tabelas do Revit, do memorial descritivo e das pranchas.
     /// </summary>
     internal static (List<(MarkingDefinition Def, MarkingGeometry Geo)> Items, List<QuantityRow> Rows) Collect(Document doc, View? view,
-        IReadOnlyList<MarkingDefinition>? defs = null, List<FamilyItem>? families = null)
+        IReadOnlyList<MarkingDefinition>? defs = null, List<FamilyItem>? families = null, List<Core.Automation.SecoesDaVia>? sections = null)
     {
         defs ??= MarkingStorage.Definitions(doc);
         families ??= FamilyClassifier.Collect(doc);
@@ -83,7 +84,7 @@ public sealed class CmdQuantitativos : CommandBase
         // Toposolid (nada é gravado).
         try
         {
-            var (earth, _, _) = TerrainService.Quantities(doc, service, defs);
+            var (earth, _, _) = TerrainService.Quantities(doc, service, defs, null, sections);
             if (earth.Count > 0) rows = QuantityCalculator.AddEarthworks(rows, earth, new GradingOptions().Homogenization);
         }
         catch (Exception ex) { Log.Error("Quantitativo de terraplenagem", ex); }

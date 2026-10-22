@@ -210,6 +210,7 @@ public static class RoundaboutGenerator
         // Pista: anel + ramos, com raio de entrada (lado de chegada) e de saída (lado de partida) por ramo.
         List<Polygon2> full;
         var bypassIslands = new List<Polygon2>();
+        var bypassGap = new List<Polygon2>();
         if (complete)
         {
             var parts = new List<Polygon2> { outer };
@@ -230,16 +231,18 @@ public static class RoundaboutGenerator
                 var bw = Math.Clamp(d.BypassWidth, 3.0, 8.0);
                 // A folga entre as concordâncias cresce ~0,41·ΔR na bissetriz: raio suficiente para a faixa + ilha de 2 m.
                 var rb = Math.Max(d.BypassRadius, Math.Max(re, rx) + (bw + 2.0) / 0.414);
-                List<Polygon2> lobes = new(), lanes = new(), isl = new();
+                List<Polygon2> lobes = new(), lanes = new(), isl = new(), big = new();
                 for (int it = 0; it < 5; it++)
                 {
-                    var big = PolygonOps.Intersect(Close(raw, rb), zone);
+                    big = PolygonOps.Intersect(Close(raw, rb), zone);
                     var band = PolygonOps.Difference(big, PolygonOps.Offset(big, -bw));
                     lobes = PolygonOps.Difference(big, PolygonOps.Offset(full, 0.02)).Where(p => p.Area > 5).ToList();
                     lanes = PolygonOps.Intersect(lobes, band);
                     isl = PolygonOps.Difference(lobes, PolygonOps.Offset(lanes, 0.02));
                     // Sem fatias estreitas (< 1,5 m) ao longo dos ramos: onde a ilha não cabe, a faixa do by-pass se junta à do ramo.
-                    isl = PolygonOps.Offset(PolygonOps.Offset(isl, -0.75, true), 0.75, true).Where(p => p.Area > 6).ToList();
+                    // A abertura refaz as curvas com outros vértices e passava até 0,4 mm do lóbulo, por cima do meio-fio
+                    // externo (lascas no Revit, K16): o resultado fica dentro da ilha de antes.
+                    isl = PolygonOps.Intersect(PolygonOps.Offset(PolygonOps.Offset(isl, -0.75, true), 0.75, true), isl).Where(p => p.Area > 6).ToList();
                     if (isl.Count >= Math.Min(d.Legs.Count, 2)) break;
                     rb *= 1.3;   // sem espaço para a ilha: concordância maior
                 }
@@ -247,6 +250,9 @@ public static class RoundaboutGenerator
                 if (lanes.Count == 0) L.Warnings.Add("Sem espaço para o by-pass: aumente o raio do by-pass ou reduza a largura da faixa.");
                 else
                 {
+                    // Os lóbulos foram separados da pista a 2 cm: o vão entre os dois (a até 3 cm de ambos, dentro do contorno)
+                    // volta a ser pista depois da zona efetiva – sobrava como uma tira de meio-fio de 2 cm colada na ilha (K16).
+                    bypassGap.AddRange(PolygonOps.Intersect(PolygonOps.Intersect(PolygonOps.Offset(lobes, 0.03), PolygonOps.Offset(full, 0.03)), big));
                     full = PolygonOps.Union(full.Concat(lobes));
                     bypassIslands.AddRange(isl);
                 }
@@ -265,6 +271,8 @@ public static class RoundaboutGenerator
                     zone = new[] { L.Zone };
                     full = PolygonOps.Intersect(full, zone);
                 }
+                // Depois da zona: unido antes, o vão ligava os lóbulos às faixas dos ramos e a zona ia até o fim deles.
+                if (bypassGap.Count > 0) full = PolygonOps.Union(full.Concat(PolygonOps.Intersect(bypassGap, zone)));
             }
         }
         else full = d.Integration == IntegracaoRotatoria.Anel ? new List<Polygon2> { outer } : new List<Polygon2>();

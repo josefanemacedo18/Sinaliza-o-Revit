@@ -232,3 +232,13 @@ como substituída.
     gerado = soma dos componentes, sem "outros" nas vias, interseções e rotatórias sem paisagismo) acusam.
   - A extensão do meio-fio é medida na peça (fórmula da faixa), não no eixo da linha: inclui os recortes de rampas e
     travessias.
+
+## D-018 – Volumes por estaca medidos só na superfície da própria via
+- **Contexto:** a tabela por estaca (F7b) usa o método das seções sobre a superfície de projeto do projeto conjunto. Uma
+  seção perpendicular à via atravessa também o nó de uma interseção, a rotatória ou outra via: somando as vias, o volume do
+  nó entraria em mais de uma, e nenhuma bateria com a parte dela na malha.
+- **Decisão:** a seção só conta os pontos cuja superfície de projeto é da via (`GradingResult.DesignAt` informa o dono da
+  plataforma ou do talude – `SectionVolumes.ForOwner`). A malha continua a medida do quantitativo; as seções ficam ao lado,
+  com a diferença em %, para conferir.
+- **Consequências:** a tabela de cada via confere com a parte dela na malha (−1,4 % no teste em corte; com um nó cruzando,
+  a seção no nó sai vazia). O volume dos nós não aparece na tabela por estaca (eles não têm estacas); está no quantitativo.

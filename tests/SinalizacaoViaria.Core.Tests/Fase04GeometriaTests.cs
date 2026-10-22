@@ -233,9 +233,9 @@ public class Fase04GeometriaTests
     public void Autoteste4_Rotatorias_PisosDaMesmaMarcaSemLascas()
     {
         // 4º Autoteste completo: ROTATORIA × ROTATORIA [mesma marca] 36 pares. Na emulação do ajuste piso a piso eram 9,6 a
-        // 67 L por rotatória; com o ajuste topológico, até 40 cm³. A rotatória com by-pass fica de fora: as peças dela já se
-        // sobrepõem antes do ajuste (KNOWN_ISSUES K13).
-        foreach (var d in FCRevitFullRun4Tests.Fixture().Where(x => x.Type != TipoRotatoria.ComBypass))
+        // 67 L por rotatória; com o ajuste topológico, até 40 cm³. A com by-pass entrou na Fase VII (K16: a tira de meio-fio
+        // de 2 cm colada na ilha do by-pass).
+        foreach (var d in FCRevitFullRun4Tests.Fixture())
         {
             var geo = MarkingBuilder.Build(d, null, new BuildContext { Catalog = Cat });
             var raw = ElementPlan.RevitPieces(d, geo).Where(PieceOverlaps.IsFloorPiece).ToList();

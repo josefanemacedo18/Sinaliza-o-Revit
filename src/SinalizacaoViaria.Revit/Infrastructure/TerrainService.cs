@@ -210,8 +210,10 @@ public static class TerrainService
     /// é gravado; vazio sem Toposolid ou sem obras que moldem o terreno. Usa os taludes do greide de cada via e o subleito
     /// padrão das opções.
     /// </summary>
+    /// <param name="sections">Quando dado, recebe os volumes por estaca de cada via (método das seções sobre a mesma superfície
+    /// de projeto, só na parte que é da via – F7b), com a parte dela na malha para conferir.</param>
     public static (List<EarthworkItem> Items, double Cut, double Fill) Quantities(Document doc, MarkingService service, IReadOnlyCollection<MarkingDefinition> all,
-        GradingOptions? opt = null)
+        GradingOptions? opt = null, List<SecoesDaVia>? sections = null)
     {
         opt ??= new GradingOptions();
         var items = new List<EarthworkItem>();
@@ -252,6 +254,17 @@ public static class TerrainService
             count[kind] = count.GetValueOrDefault(kind) + 1;
             var label = d.Hierarchy is { } h && h != HierarquiaViaria.NaoDefinida ? $" {Hierarquia.Label(h).ToLowerInvariant()}" : "";
             items.Add(new EarthworkItem($"{kind}{label} {count[kind]}", d.Hierarchy, v.Cut, v.Fill, v.Area));
+            if (sections != null && d is RoadPavementDefinition road && PathResolver.Resolve(doc, road.Path)?.Main is { Length: > 1 } axis)
+            {
+                try
+                {
+                    // Seções a cada 20 m, cobrindo a plataforma e o alcance dos taludes.
+                    var half = Math.Max(road.TotalLeft, road.TotalRight) + Math.Max(5, opt.MaxDaylight);
+                    var vol = SectionVolumes.ForOwner(design, d.Id, axis, Ground, half, 20, 0.25);
+                    sections.Add(new SecoesDaVia(items[^1].Name, d.Hierarchy, vol, v.Cut, v.Fill));
+                }
+                catch (Exception ex) { Log.Error($"Volumes por estaca {d.DisplayCode}", ex); }
+            }
         }
         return (items, design.CutM3, design.FillM3);
     }

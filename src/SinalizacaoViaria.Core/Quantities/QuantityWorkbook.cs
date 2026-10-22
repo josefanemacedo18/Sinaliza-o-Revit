@@ -22,7 +22,7 @@ public static class QuantityWorkbook
     private const int StTitle = 1, StHeader = 2, StCategory = 3, StSub = 4, StText = 5, StNum = 6, StInt = 7, StSubTotText = 8, StSubTotNum = 9, StMeta = 10, StTextCenter = 11;
 
     public static byte[] Build(IEnumerable<QuantityRow> rows, IEnumerable<QuantityRow>? summary, string? projectName, Func<QuantityRow, byte[]?>? thumbnail = null,
-        IEnumerable<ComponentRow>? components = null)
+        IEnumerable<ComponentRow>? components = null, IEnumerable<Automation.SecoesDaVia>? sections = null)
     {
         var list = rows.ToList();
         var sheet = new StringBuilder();
@@ -131,6 +131,21 @@ public static class QuantityWorkbook
                 Text(0, q.Name, StText); Text(1, q.ColorLabel, StText); Text(2, q.HierarchyName, StText); Num(3, q.Area, StNum);
                 if (q.Length > 1e-6) Num(4, q.Length, StNum); else Blank(4, StText);
                 Num(5, q.Elements, StInt); Text(6, q.Sources, StText);
+                Row();
+            }
+        }
+        if (sections != null && sections.Any())
+        {
+            var vias = sections.ToList();
+            Row();
+            Line("TERRAPLENAGEM POR ESTACA (método das seções – média das áreas; a malha é a do quantitativo)", StCategory, 20);
+            foreach (var v in vias) Line(v.Comparacao, StMeta);
+            foreach (var (h, i) in new[] { "Via", "Estaca", "Estaca (m)", "Área de corte (m²)", "Área de aterro (m²)", "Corte acumulado (m³)", "Aterro acumulado (m³)", "Massa acumulada (m³)" }.Select((h, i) => (h, i))) Text(i, h, StHeader);
+            Row();
+            foreach (var e in Automation.SectionVolumes.Rows(vias))
+            {
+                Text(0, e.Via, StText); Text(1, e.Estaca, StTextCenter); Num(2, e.EstacaM, StNum); Num(3, e.AreaCorte, StNum); Num(4, e.AreaAterro, StNum);
+                Num(5, e.CorteAcumulado, StNum); Num(6, e.AterroAcumulado, StNum); Num(7, e.Massa, StNum);
                 Row();
             }
         }

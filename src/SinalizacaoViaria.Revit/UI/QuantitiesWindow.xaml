@@ -227,6 +227,25 @@
                     </DataGrid>
                 </DockPanel>
             </TabItem>
+            <TabItem x:Name="TabStations" Header="Terraplenagem por estaca">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Margin="2,4,2,2" TextWrapping="Wrap" Foreground="#5A6472"
+                               Text="Método das seções (média das áreas), a cada 20 m, sobre a mesma superfície de projeto da terraplenagem e o terreno original do Toposolid – só na parte que é de cada via (interseções e rotatórias ficam fora). Para conferir com a malha, que é a do quantitativo; sem correção de curvatura."/>
+                    <TextBlock x:Name="TxtStations" DockPanel.Dock="Top" Margin="2,2,2,6" TextWrapping="Wrap" FontWeight="SemiBold"/>
+                    <DataGrid x:Name="GridStations" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" RowHeight="24" BorderBrush="#D5DBE3">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Via" Binding="{Binding Via}" Width="*" FontWeight="SemiBold"/>
+                            <DataGridTextColumn Header="Estaca" Binding="{Binding Estaca}" Width="90"/>
+                            <DataGridTextColumn Header="Corte (m²)" Binding="{Binding AreaCorte, StringFormat=N2, ConverterCulture=pt-BR}" Width="90"/>
+                            <DataGridTextColumn Header="Aterro (m²)" Binding="{Binding AreaAterro, StringFormat=N2, ConverterCulture=pt-BR}" Width="90"/>
+                            <DataGridTextColumn Header="Corte acum. (m³)" Binding="{Binding CorteAcumulado, StringFormat=N1, ConverterCulture=pt-BR}" Width="120"/>
+                            <DataGridTextColumn Header="Aterro acum. (m³)" Binding="{Binding AterroAcumulado, StringFormat=N1, ConverterCulture=pt-BR}" Width="120"/>
+                            <DataGridTextColumn Header="Massa (m³)" Binding="{Binding Massa, StringFormat=N1, ConverterCulture=pt-BR}" Width="100"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
             <TabItem Header="Pintura por cor e material">
                 <DataGrid x:Name="GridSummary" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
                           GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" RowHeight="26" BorderBrush="#D5DBE3">

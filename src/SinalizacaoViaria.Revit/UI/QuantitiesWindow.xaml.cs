@@ -17,6 +17,7 @@ public partial class QuantitiesWindow : Window
 {
     private readonly List<QuantityRow> _rows;
     private readonly List<ComponentRow> _components;
+    private readonly List<Core.Automation.SecoesDaVia> _sections;
     private readonly string _projectName;
     private readonly ListCollectionView _view;
 
@@ -36,11 +37,16 @@ public partial class QuantitiesWindow : Window
     private readonly Dictionary<string, BitmapSource> _thumbs = new();
 
     public QuantitiesWindow(List<QuantityRow> rows, string projectName, Dictionary<string, BitmapSource>? thumbnails = null,
-        List<ComponentRow>? components = null)
+        List<ComponentRow>? components = null, List<Core.Automation.SecoesDaVia>? sections = null)
     {
         InitializeComponent();
         _rows = rows;
         _components = components ?? new List<ComponentRow>();
+        _sections = sections ?? new List<Core.Automation.SecoesDaVia>();
+        // Terraplenagem por estaca (F7b): só com vias que moldam o terreno.
+        TabStations.Visibility = _sections.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        GridStations.ItemsSource = Core.Automation.SectionVolumes.Rows(_sections);
+        TxtStations.Text = string.Join("\n", _sections.Select(v => v.Comparacao));
         _projectName = projectName;
         if (thumbnails != null) foreach (var (k, v) in thumbnails) _thumbs[k] = v;
         ThumbnailConverter.Images = _thumbs;
@@ -183,7 +189,7 @@ public partial class QuantitiesWindow : Window
                 pngCache[key] = b;
                 return b;
             }
-            File.WriteAllBytes(dlg.FileName, QuantityWorkbook.Build(v, QuantityCalculator.Summary(v), _projectName, Png, VisibleComponents));
+            File.WriteAllBytes(dlg.FileName, QuantityWorkbook.Build(v, QuantityCalculator.Summary(v), _projectName, Png, VisibleComponents, _sections));
             MessageBox.Show(this, "Planilha exportada:\n" + dlg.FileName, "Quantitativos", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
@@ -204,7 +210,7 @@ public partial class QuantitiesWindow : Window
         if (dlg.ShowDialog(this) != true) return;
         try
         {
-            File.WriteAllText(dlg.FileName, QuantityCalculator.ToCsv(v, QuantityCalculator.Summary(v), _projectName, VisibleComponents), new UTF8Encoding(true));
+            File.WriteAllText(dlg.FileName, QuantityCalculator.ToCsv(v, QuantityCalculator.Summary(v), _projectName, VisibleComponents, _sections), new UTF8Encoding(true));
             MessageBox.Show(this, "Arquivo exportado:\n" + dlg.FileName, "Quantitativos", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)

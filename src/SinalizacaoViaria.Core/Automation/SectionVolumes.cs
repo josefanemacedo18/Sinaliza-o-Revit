@@ -1,3 +1,5 @@
+using System.Globalization;
+using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Geometry;
 
 namespace SinalizacaoViaria.Core.Automation;
@@ -14,6 +16,37 @@ public sealed class VolumesPorSecao
     public double AterroM3 { get; set; }
     /// <summary>Volumes acumulados (m³) até cada seção – a curva de massas usa a diferença (corte − aterro).</summary>
     public List<(double Estaca, double Corte, double Aterro)> Acumulado { get; } = new();
+}
+
+/// <summary>
+/// Seções de uma via do projeto conjunto (quantitativo por estaca, F7b): volumes medidos só na superfície de projeto que é
+/// da via, e a parte dela na malha (<see cref="GradingResult.ByOwner"/>) para conferir os dois métodos.
+/// </summary>
+public sealed record SecoesDaVia(string Via, HierarquiaViaria? Hierarquia, VolumesPorSecao Volumes, double MalhaCorte, double MalhaAterro)
+{
+    private static readonly CultureInfo Pt = CultureInfo.GetCultureInfo("pt-BR");
+
+    /// <summary>Diferença relativa das seções em relação à malha (%); nula quando a malha não tem volume.</summary>
+    public static double? Diferenca(double secoes, double malha) => malha > 1e-6 ? (secoes - malha) / malha * 100 : null;
+
+    /// <summary>Resumo dos dois métodos (ex.: "Via local 1 – corte: seções 1.234,5 m³, malha 1.240,0 m³ (−0,4 %); ...").</summary>
+    public string Comparacao
+    {
+        get
+        {
+            string Par(string nome, double sec, double malha) =>
+                $"{nome}: seções {sec.ToString("N1", Pt)} m³, malha {malha.ToString("N1", Pt)} m³" +
+                (Diferenca(sec, malha) is { } d ? $" ({(d >= 0 ? "+" : "−")}{Math.Abs(d).ToString("0.0", Pt)} %)" : "");
+            return $"{Via} – {Par("corte", Volumes.CorteM3, MalhaCorte)}; {Par("aterro", Volumes.AterroM3, MalhaAterro)}";
+        }
+    }
+}
+
+/// <summary>Uma linha da tabela por estaca (janela, CSV e planilha do quantitativo).</summary>
+public sealed record LinhaEstaca(string Via, string Estaca, double EstacaM, double AreaCorte, double AreaAterro, double CorteAcumulado, double AterroAcumulado)
+{
+    /// <summary>Massa acumulada (corte − aterro, m³) – a curva de massas.</summary>
+    public double Massa => CorteAcumulado - AterroAcumulado;
 }
 
 /// <summary>
@@ -77,6 +110,37 @@ public static class SectionVolumes
         res.CorteM3 = vc;
         res.AterroM3 = vf;
         return res;
+    }
+
+    /// <summary>
+    /// Seções sobre a superfície de projeto de um dono (a via) no projeto conjunto: pontos da superfície de outro dono (o nó de
+    /// uma interseção, outra via) ficam fora – a soma das vias não conta duas vezes o que é do nó, e o resultado confere com a
+    /// parte da malha daquela via (<see cref="GradingResult.ByOwner"/>).
+    /// </summary>
+    public static VolumesPorSecao ForOwner(GradingResult design, string owner, Polyline2 axis, Func<Vec2, double?> ground,
+        double halfWidth, double spacing = 20, double step = 0.25) =>
+        Compute(axis, p => design.DesignAt(p) is ({ } z, var o) && o == owner ? z : null, ground, spacing, halfWidth, step);
+
+    /// <summary>Linhas da tabela por estaca de todas as vias, na ordem dada.</summary>
+    public static List<LinhaEstaca> Rows(IEnumerable<SecoesDaVia> vias) => vias
+        .SelectMany(v => v.Volumes.Secoes.Select((s, i) => new LinhaEstaca(v.Via, AlignmentElements.Estaca(s.Estaca), s.Estaca, s.Corte, s.Aterro,
+            v.Volumes.Acumulado[i].Corte, v.Volumes.Acumulado[i].Aterro)))
+        .ToList();
+
+    /// <summary>Bloco do CSV do quantitativo: a comparação com a malha e as estacas de cada via.</summary>
+    public static string Csv(IEnumerable<SecoesDaVia> vias)
+    {
+        var pt = CultureInfo.GetCultureInfo("pt-BR");
+        string N(double x) => x.ToString("0.00", pt);
+        var list = vias.ToList();
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("TERRAPLENAGEM POR ESTACA (método das seções – média das áreas; a malha é a do quantitativo)");
+        foreach (var v in list) sb.AppendLine(v.Comparacao.Replace(';', ','));
+        sb.AppendLine("Via;Estaca;Estaca (m);Área de corte (m²);Área de aterro (m²);Corte acumulado (m³);Aterro acumulado (m³);Massa acumulada (m³)");
+        foreach (var r in Rows(list))
+            sb.AppendLine(string.Join(";", r.Via, r.Estaca, N(r.EstacaM), N(r.AreaCorte), N(r.AreaAterro), N(r.CorteAcumulado), N(r.AterroAcumulado), N(r.Massa)));
+        sb.AppendLine("Seções perpendiculares ao eixo a cada 20 m, só na superfície de projeto da via (nós e outras vias ficam fora); sem correção de curvatura.");
+        return sb.ToString();
     }
 
     /// <summary>CSV pt-BR (";" e vírgula decimal) com as áreas e os volumes acumulados por estaca.</summary>

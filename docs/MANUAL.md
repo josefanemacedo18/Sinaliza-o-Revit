@@ -913,6 +913,14 @@ os do subleito padrão. A **Tabela nativa do Revit** conta elementos e por isso 
 são elementos do modelo), nem o *Quadro de Quantitativos* da prancha (montado só com as marcas); use a janela, o Excel,
 o CSV ou o memorial.
 
+**Terraplenagem por estaca.** Com vias que moldam o terreno, a janela ganha a aba **Terraplenagem por estaca**: para cada
+via, as **seções a cada 20 m** (método das seções – média das áreas) sobre a mesma superfície de projeto e o terreno original
+do Toposolid, **só na parte que é da via** (interseções, rotatórias e outras vias ficam fora, sem contar duas vezes). No
+alto, a comparação com a malha (ex.: *Via local 1 – corte: seções 9.271,0 m³, malha 9.405,8 m³ (−1,4 %)*); na tabela,
+estaca, áreas de corte e de aterro, volumes acumulados e massa acumulada (curva de massas). O CSV e a planilha trazem o
+mesmo bloco. O volume das linhas TER-CORTE/TER-ATERRO continua o da malha; as seções servem para conferir e para o
+quadro por estaca. Em curvas fechadas, as seções perpendiculares se sobrepõem do lado interno (sem correção de curvatura).
+
 **Janela redesenhada**: cabeçalho com o projeto, **cartões de resumo** (elementos, área pintada, extensão
 pintada, pavimento, placas, elementos urbanos e tinta estimada), filtros e **grupos recolhíveis** por
 **categoria → subcategoria** com subtotais no cabeçalho de cada grupo (itens, m², m e un). A coluna *Cor*

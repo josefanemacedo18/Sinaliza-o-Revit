@@ -3,6 +3,40 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-22 – Fase VII concluída: rotatória com by-pass sem pisos sobrepostos e volumes por estaca no quantitativo (versão 2.6.0)
+
+Fase da missão: VII (terreno, terraplenagem e interseções) – concluída no que é verificável aqui. Entrega: `Releases/Fase07`
+(não executada no Revit 2027).
+
+### Rotatória com by-pass (K16)
+- No 4º Autoteste completo, a rotatória com by-pass ficou com 43 pares de pisos sobrepostos no modelo final; na emulação do
+  contorno do Revit, 30 pares e 111 L entre as ilhas do by-pass e o meio-fio externo.
+- Causa 1: os lóbulos do by-pass eram recortados a 2 cm da pista (para separá-los dela) e depois unidos de volta. O vão
+  ficava fora da pista e virava uma **tira de meio-fio de 2 cm × ~14 m colada na ilha** do by-pass. Agora o vão volta a ser
+  pista, depois da zona efetiva da rotatória: unido antes, ligava os lóbulos às faixas dos ramos e a zona ia até o fim delas.
+- Causa 2: a abertura da ilha (−0,75 m / +0,75 m, para tirar fatias estreitas) refazia as curvas com outros vértices e passava
+  até 0,4 mm por cima dessa tira. Agora o resultado fica dentro da ilha de antes.
+- Resultado na fixture do 4º Autoteste: 0 pares crus (eram 4, de 2 a 5 cm²) e 0 na emulação do contorno do Revit; todas as
+  peças do meio-fio externo com 15 cm de largura média (havia peça de 8,3 cm por causa da tira).
+
+### Volumes por estaca no quantitativo de terraplenagem (F7b, K7)
+- O quantitativo de terraplenagem no Revit usava só a malha; o método das seções existia só no núcleo (EV6).
+- Agora o quantitativo calcula, para cada via que molda o terreno, as **seções a cada 20 m** sobre a mesma superfície de
+  projeto e o terreno original do Toposolid, **só na parte que é da via** (`SectionVolumes.ForOwner`: interseções,
+  rotatórias e outras vias ficam fora, sem contar duas vezes). Ao lado, a parte da via na malha, para conferir os dois
+  métodos (`SecoesDaVia.Comparacao`).
+- Janela do quantitativo: aba **Terraplenagem por estaca** (comparação malha × seções por via e a tabela: estaca, áreas de
+  corte e aterro, volumes acumulados e massa). O mesmo bloco no CSV e na planilha. O Autoteste anota os dois volumes de
+  cada via na etapa do quantitativo de terraplenagem.
+- O volume do quantitativo continua o da malha; as seções são para conferência e para a tabela por estaca. Sem correção
+  de curvatura (as seções perpendiculares se sobrepõem no lado interno das curvas fechadas).
+
+### Testes
+- `Fase07InterseccoesTests` (7): by-pass do 4º Autoteste sem pisos sobrepostos (cru e contorno do Revit), meio-fio externo
+  sem tira estreita, ilhas fora do meio-fio externo (fixture e by-pass montado à mão); seções da via conferem com a parte
+  dela na malha (−1,4 %), nó que cruza a via fica fora, tabela, CSV e planilha.
+- `Fase04GeometriaTests`: o teste das rotatórias do 4º Autoteste passa a incluir a com by-pass.
+
 ## 2026-10-22 – Fase VI concluída: quantitativo por componente da seção e regras da regeneração no núcleo (versão 2.5.0)
 
 Fase da missão: VI (corredores, seções e pavimentação) – concluída no que é verificável aqui. Entrega: `Releases/Fase06`
