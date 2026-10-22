@@ -35,6 +35,7 @@ Não compile enquanto a suíte roda com `--no-build`: a compilação troca as DL
 | 2026-10-21 | FC | 2 869 | 2 869 aprovados, 0 falhas | 14 min 57 s (Linux) | +13 `FCRevitFullRun4Tests` (fixtures do 4º Autoteste em `Fixtures/`) |
 | 2026-10-21 | `87cf484` (Fase III, 2.2.0) | 2 876 | 2 876 aprovados, 0 falhas | 12 min 53 s (Linux) | +7 `Fase03ArquiteturaTests`; entrega `Releases/Fase03` |
 | 2026-10-22 | `43bf855` (Fase IV, 2.3.0) | 2 887 | 2 887 aprovados, 0 falhas | 13 min 29 s (Linux) | +11 `Fase04GeometriaTests`; entrega `Releases/Fase04` |
+| 2026-10-22 | `dd8b1fc` (Fase V, 2.4.0) | 2 894 | 2 894 aprovados, 0 falhas | 13 min 8 s (Linux) | +7 `Fase05AlinhamentoTests`; entrega `Releases/Fase05` |
 
 Compilação na linha de base:
 - Core e plugin: 0 avisos.

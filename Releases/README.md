@@ -29,6 +29,7 @@ desejada. `Instalar/Revit2027` tem sempre a versão mais recente.
 | XI – Tráfego | 2.0.0 | 2026-10-19 | `777a278` | 2 730/2 730 | Autoteste rápido (2026-10-19) |
 | III – Arquitetura integrada | 2.2.0 | 2026-10-21 | `87cf484` | 2 876/2 876 | não executado – [`Fase03`](Fase03/RELEASE.md) |
 | IV – Motor geométrico e topologia | 2.3.0 | 2026-10-22 | `43bf855` | 2 887/2 887 | não executado – [`Fase04`](Fase04/RELEASE.md) |
+| V – Alinhamentos e perfis | 2.4.0 | 2026-10-22 | `dd8b1fc` | 2 894/2 894 | não executado – [`Fase05`](Fase05/RELEASE.md) |
 
 As fases I, II, IX e XI foram concluídas antes desta pasta existir. As DLLs delas estão no histórico do git, no commit
 indicado: `git show <commit>:Instalar/Revit2027/SinalizaBIM.dll > SinalizaBIM.dll`. As fases seguintes ganham uma linha
