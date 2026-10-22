@@ -40,7 +40,7 @@ public readonly record struct BoundarySegment(Vec2 Start, Vec2 End, Vec2? Mid = 
 /// curva vira arcos de circunferência, com desvio máximo dado em relação ao contorno original. É o que o usuário vê ao
 /// editar o esboço do piso no Revit – linhas e arcos inteiros, sem dezenas de "tracinhos".
 /// </summary>
-public static class BoundaryFit
+public static partial class BoundaryFit
 {
     /// <summary>Desvio máximo padrão entre o contorno ajustado e o original (m).</summary>
     public const double DefaultTolerance = 0.005;

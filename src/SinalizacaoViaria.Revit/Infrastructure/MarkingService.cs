@@ -694,10 +694,14 @@ public sealed class MarkingService
 
                 var failed = new List<MarkingPiece>();
                 string? reason = null;
-                foreach (var grp in floorPieces.Where(p => !locked.Contains(p.Color))
-                             .GroupBy(ElementPlan.FloorKey))
+                var floorGroups = floorPieces.Where(p => !locked.Contains(p.Color)).GroupBy(ElementPlan.FloorKey)
+                    .Select(grp => (Group: grp, Parts: FloorParts(def, grp.Select(p => p.Shape), terrain, baseZ, MarkingColors.IsPaint(grp.Key.Color))))
+                    .ToList();
+                // Bordas comuns entre os pisos físicos da marca ajustadas uma vez só (ajuste topológico, K13).
+                PrepareSharedFit(floorGroups.Where(g => !MarkingColors.IsPaint(g.Group.Key.Color)).SelectMany(g => g.Parts.Select(p => p.Shape)));
+                foreach (var (grp, groupParts) in floorGroups)
                 {
-                    var parts = FloorParts(def, grp.Select(p => p.Shape), terrain, baseZ, MarkingColors.IsPaint(grp.Key.Color));
+                    var parts = groupParts;
                     if (MarkingColors.IsPaint(grp.Key.Color) && parts.Count > 1)
                     {
                         // Pintura: um piso por cor e por plano, com todos os traços/áreas como contornos do mesmo esboço.
@@ -731,6 +735,7 @@ public sealed class MarkingService
                         }
                     }
                 }
+                _sharedFits.Clear();
                 foreach (var f in pool) if (f.IsValidObject && !keep.Contains(f.Id)) SafeDelete(f.Id);
                 _reuse = null;
                 // Inclinação e edição de forma de todos os pisos da marca de uma vez (uma regeneração, não uma por piso).
@@ -1617,14 +1622,7 @@ public sealed class MarkingService
     private CurveLoop? ToCurveLoop(IReadOnlyList<Vec2> ring, double zFt, bool raw = false)
     {
         var tol = _doc.Application.ShortCurveTolerance * 1.5;
-        var pts = new List<XYZ>();
-        foreach (var v in ring)
-        {
-            var p = new XYZ(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), zFt);
-            if (pts.Count == 0 || pts[^1].DistanceTo(p) > tol) pts.Add(p);
-        }
-        while (pts.Count > 2 && pts[0].DistanceTo(pts[^1]) <= tol) pts.RemoveAt(pts.Count - 1);
-        pts = Sanitize(pts, tol);
+        var pts = SketchPoints(ring, zFt, tol);
         if (pts.Count < 3) return null;
         if (!raw && BoundaryTolerance > 0)
         {
@@ -1650,6 +1648,61 @@ public sealed class MarkingService
         return loop;
     }
 
+    /// <summary>Vértices do esboço (pés): sem pontos colados (abaixo de <paramref name="tol"/>) e sem espinhos.</summary>
+    private List<XYZ> SketchPoints(IReadOnlyList<Vec2> ring, double zFt, double tol)
+    {
+        var pts = new List<XYZ>();
+        foreach (var v in ring)
+        {
+            var p = new XYZ(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), zFt);
+            if (pts.Count == 0 || pts[^1].DistanceTo(p) > tol) pts.Add(p);
+        }
+        while (pts.Count > 2 && pts[0].DistanceTo(pts[^1]) <= tol) pts.RemoveAt(pts.Count - 1);
+        return Sanitize(pts, tol);
+    }
+
+    /// <summary>
+    /// Contornos já ajustados em conjunto (<see cref="BoundaryFit.FitRings"/>) para os pisos físicos da marca em criação, pelos
+    /// pontos que <see cref="FittedLoop"/> recebe: a borda comum a dois pisos sai igual nos dois (antes cada um ajustava a sua e
+    /// eles se sobrepunham numa lasca ao longo das curvas – emenda de vias em curva, rotatórias).
+    /// </summary>
+    private Dictionary<string, List<Core.Geometry.BoundarySegment>> _sharedFits = new();
+
+    private static string RingKey(IReadOnlyList<Vec2> ring) => string.Join(";", ring.Select(v => $"{v.X:R},{v.Y:R}"));
+
+    private void PrepareSharedFit(IEnumerable<Polygon2> shapes)
+    {
+        _sharedFits = new();
+        if (BoundaryTolerance <= 0) return;
+        using var perf = Perf.Measure("Ajuste conjunto dos contornos (FitRings)");
+        var tol = _doc.Application.ShortCurveTolerance * 1.5;
+        var rings = new List<IReadOnlyList<Vec2>>();
+        foreach (var shape in shapes)
+        {
+            Polygon2 poly;
+            // Como em CreateFloors: a parte preparada passa de novo pelo preparo em ToCurveLoops.
+            try { poly = Prepare(Prepare(shape)); }
+            catch { continue; }
+            foreach (var r in new[] { poly.Outer }.Concat(poly.Holes))
+            {
+                var pts = SketchPoints(r, 0, tol);
+                if (pts.Count >= 3) rings.Add(pts.Select(p => new Vec2(UnitConv.M(p.X), UnitConv.M(p.Y))).ToList());
+            }
+        }
+        if (rings.Count < 2) return;
+        try
+        {
+            var fits = BoundaryFit.FitRings(rings, BoundaryTolerance, UnitConv.M(tol), _arcCenters, SnapOffset);
+            for (int i = 0; i < rings.Count; i++)
+                if (fits[i] is { } f) _sharedFits.TryAdd(RingKey(rings[i]), f);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Ajuste conjunto dos contornos", ex);
+            _sharedFits.Clear();
+        }
+    }
+
     /// <summary>Só retas (sem o ajuste de arcos), mas com o alinhamento aos eixos: contorno com furos cujos arcos se tocariam.</summary>
     private CurveLoop? ToCurveLoopLines(IReadOnlyList<Vec2> ring, double zFt) => ToCurveLoop(ring, zFt, raw: true);
 
@@ -1669,7 +1722,8 @@ public sealed class MarkingService
     {
         // Retas quase alinhadas aos eixos ficam exatas (ver AxisSnap): sem o aviso "ligeiramente fora da linha central"; ajuste
         // que se cruza tenta tolerância menor e, por fim, volta às retas (BoundaryFit.FitRing).
-        var segs = BoundaryFit.FitRing(ring, BoundaryTolerance, UnitConv.M(shortFt), _arcCenters, SnapOffset);
+        var segs = _sharedFits.TryGetValue(RingKey(ring), out var shared) ? shared
+            : BoundaryFit.FitRing(ring, BoundaryTolerance, UnitConv.M(shortFt), _arcCenters, SnapOffset);
         if (segs == null) return null;
         XYZ P(Vec2 v) => new(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), zFt);
         var loop = new CurveLoop();

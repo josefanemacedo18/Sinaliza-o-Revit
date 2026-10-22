@@ -74,9 +74,13 @@ geometria em elementos e a lê de volta.
 | `Vec2.Eps` | 1e-9 | comparações numéricas puras |
 | `PolygonChecks.DefaultTolerance` | 1e-6 m | autointerseção e vértices repetidos (validador) |
 | `FloorTiling.Coplanar` / `SeamTol` | 0,5 mm / 1 mm | planos e costuras dos pisos |
-| `BoundaryFit.DefaultTolerance` | 5 mm | ajuste de arcos nos contornos de piso |
+| `BoundaryFit.DefaultTolerance` | 5 mm | ajuste de arcos nos contornos de piso; também a distância até a qual trechos de bordas comuns com vértices próprios são unificados no ajuste topológico (D-016) |
+| `BoundaryFit.SameVertex` | 0,15 mm | vértices de pisos diferentes considerados o mesmo (grade das booleanas: 0,1 mm) |
 | `TrimTools.Gap` | 3 cm | folga nos recortes manuais |
 | `Tracado` | 1e-4 m | pontos coincidentes do eixo |
+
+Contorno dos pisos no Revit: cada marca tem os pisos físicos ajustados juntos (`BoundaryFit.FitRings`, D-016). A borda comum a
+dois pisos sai igual nos dois (ajustada uma vez); entre marcas diferentes valem os centros exatos do traçado (D-015).
 
 ## 5. Revit: regras seguidas
 

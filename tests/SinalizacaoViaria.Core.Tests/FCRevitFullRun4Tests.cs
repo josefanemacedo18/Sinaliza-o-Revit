@@ -216,11 +216,23 @@ public class FCRevitFullRun4Tests(ITestOutputHelper output)
     /// <summary>O anel como o plugin manda ao Revit: pontos colados e espinhos fora, ajuste conferido (MarkingService.ToCurveLoop).</summary>
     internal static List<BoundarySegment> RevitRing(IReadOnlyList<Vec2> ring, IReadOnlyList<Vec2> centers)
     {
+        var pts = SketchPoints(ring);
+        if (BoundaryFit.FitRing(pts, BoundaryFit.DefaultTolerance, Tol, centers, BoundaryFit.DefaultTolerance) is { } segs) return segs;
+        return Lines(pts);
+    }
+
+    /// <summary>Pontos do esboço (MarkingService.SketchPoints): sem pontos colados nem espinhos.</summary>
+    private static List<Vec2> SketchPoints(IReadOnlyList<Vec2> ring)
+    {
         var pts = new List<Vec2>();
         foreach (var v in ring) if (pts.Count == 0 || pts[^1].DistanceTo(v) > Tol) pts.Add(v);
         while (pts.Count > 2 && pts[0].DistanceTo(pts[^1]) <= Tol) pts.RemoveAt(pts.Count - 1);
-        pts = ProfileCleanup.Prepare(pts, Tol);
-        if (BoundaryFit.FitRing(pts, BoundaryFit.DefaultTolerance, Tol, centers, BoundaryFit.DefaultTolerance) is { } segs) return segs;
+        return ProfileCleanup.Prepare(pts, Tol);
+    }
+
+    /// <summary>Anel sem ajuste (retas do esboço, alinhadas aos eixos) – o que o plugin faz quando o ajuste não passa.</summary>
+    private static List<BoundarySegment> Lines(List<Vec2> pts)
+    {
         var lines = AxisSnap.SnapRing(pts, BoundaryFit.DefaultTolerance);
         return lines.Select((p, i) => new BoundarySegment(p, lines[(i + 1) % lines.Count])).ToList();
     }
@@ -230,15 +242,28 @@ public class FCRevitFullRun4Tests(ITestOutputHelper output)
         System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "fc-autoteste4-intersecoes.json")))
             .RootElement.EnumerateArray().Select(e => MarkingDefinition.FromJson(e.GetRawText())!).ToList();
 
-    /// <summary>Peças de piso como o Revit as recebe: o contorno ajustado (retas e arcos) amostrado de volta em pontos.</summary>
+    /// <summary>
+    /// Peças de piso de UMA marca como o Revit as recebe: o contorno ajustado (retas e arcos) amostrado de volta em pontos. Os
+    /// pisos físicos são ajustados juntos (MarkingService.PrepareSharedFit, ajuste topológico); a pintura, um a um.
+    /// </summary>
     internal static List<MarkingPiece> Fitted(IEnumerable<MarkingPiece> pieces, IReadOnlyList<Vec2> centers)
     {
+        var list = pieces.Where(PieceOverlaps.IsFloorPiece).ToList();
+        var preps = list.Select(p => ElementPlan.Prepare(p.Shape)).Select(p => new[] { p.Outer }.Concat(p.Holes).Select(SketchPoints).ToList()).ToList();
+        var shared = new Dictionary<(int, int), List<BoundarySegment>>();
+        var keys = new List<(int, int)>();
+        var rings = new List<IReadOnlyList<Vec2>>();
+        for (int i = 0; i < list.Count; i++)
+            if (!MarkingColors.IsPaint(list[i].Color))
+                for (int k = 0; k < preps[i].Count; k++) { keys.Add((i, k)); rings.Add(preps[i][k]); }
+        var fits = BoundaryFit.FitRings(rings, BoundaryFit.DefaultTolerance, Tol, centers, BoundaryFit.DefaultTolerance);
+        for (int j = 0; j < keys.Count; j++) if (fits[j] is { } f) shared[keys[j]] = f;
         var res = new List<MarkingPiece>();
-        foreach (var p in pieces.Where(PieceOverlaps.IsFloorPiece))
+        for (int i = 0; i < list.Count; i++)
         {
-            var prep = ElementPlan.Prepare(p.Shape);
-            var rings = new[] { prep.Outer }.Concat(prep.Holes).Select(r => BoundaryFit.Sample(RevitRing(r, centers), 0.0002)).ToList();
-            res.Add(p with { Shape = new Polygon2(rings[0], rings.Skip(1)) });
+            var rr = preps[i].Select((r, k) => BoundaryFit.Sample(shared.TryGetValue((i, k), out var f) ? f
+                : BoundaryFit.FitRing(r, BoundaryFit.DefaultTolerance, Tol, centers, BoundaryFit.DefaultTolerance) ?? Lines(r), 0.0002)).ToList();
+            res.Add(list[i] with { Shape = new Polygon2(rr[0], rr.Skip(1)) });
         }
         return res;
     }
@@ -280,9 +305,9 @@ public class FCRevitFullRun4Tests(ITestOutputHelper output)
             // Antes do ajuste: só lascas de décimos de mm entre faixas vizinhas.
             Assert.True(raw < 400, $"{d.Id[..6]}: {raw:0.0} cm³ entre as peças da interseção");
             Assert.True(centers > 0, $"{d.Id[..6]}: sem centros de arco");
-            // Esquinas: só as junções com as rampas (≤ 2 cm²); a emenda (fd4594, curva entre duas vias pela ponta) ainda tem as
-            // transições das pontas da curva (K13).
-            Assert.True(fitted < (d.Id.StartsWith("fd4594") ? 3000 : 50), $"{d.Id[..6]}: {fitted:0} cm³ depois do ajuste");
+            // Com o ajuste topológico (Fase IV, K13) as bordas comuns saem iguais nos pisos vizinhos: nem as junções com as
+            // rampas (até 31 cm³) nem a emenda em curva entre duas vias pela ponta (fd4594, 2,8 L) sobram.
+            Assert.True(fitted < 5, $"{d.Id[..6]}: {fitted:0} cm³ depois do ajuste");
         }
     }
 

@@ -69,6 +69,25 @@ public static class AxisSnap
         return segs.Select(s => s.Start).ToList();
     }
 
+    /// <summary>
+    /// Mesmo ajuste para um trecho aberto de contorno com as pontas presas (borda comum a dois pisos, ver
+    /// <see cref="BoundaryFit.FitRings"/>): as pontas não andam – a reta quase alinhada que sai de uma ponta fica exata
+    /// passando por ela; um grupo que precisaria mover uma ponta (ou alinhar duas pontas desalinhadas) fica como está.
+    /// </summary>
+    public static List<BoundarySegment> SnapChain(IReadOnlyList<BoundarySegment> chain, double maxOffset = MaxOffset, double maxAngleDeg = MaxAngleDeg)
+    {
+        if (chain.Count == 0) return chain.ToList();
+        var segs = chain.Append(new BoundarySegment(chain[^1].End, chain[0].Start)).ToList();
+        var pinned = new bool[segs.Count];
+        pinned[0] = pinned[^1] = true;
+        for (var pass = 0; pass < 3; pass++)
+        {
+            segs = SnapOnce(segs, maxOffset, maxAngleDeg, false, out var changed, pinned);
+            if (!changed) break;
+        }
+        return segs.Take(chain.Count).ToList();
+    }
+
     /// <summary>Retas que o Revit avisaria: desalinhadas de <paramref name="exactDeg"/> a <paramref name="maxAngleDeg"/> de uma das <see cref="Directions"/>.</summary>
     public static int CountNearAxis(IEnumerable<BoundarySegment> ring, double maxAngleDeg = MaxAngleDeg, double exactDeg = 1e-9) =>
         ring.Count(s => OffAxisDeg(s) is { } off && off > exactDeg && off <= maxAngleDeg);
@@ -84,7 +103,8 @@ public static class AxisSnap
         return Math.Min(a, 45 - a);
     }
 
-    private static List<BoundarySegment> SnapOnce(List<BoundarySegment> ring, double maxOffset, double maxAngleDeg, bool closed, out bool changed)
+    private static List<BoundarySegment> SnapOnce(List<BoundarySegment> ring, double maxOffset, double maxAngleDeg, bool closed, out bool changed,
+        bool[]? pinned = null)
     {
         changed = false;
         var n = ring.Count;
@@ -120,6 +140,15 @@ public static class AxisSnap
                 if (!target.TryGetValue(root, out var t) || len > t.Len) target[root] = (len, mid.Dot(nrm));
             }
             var ok = target.Keys.ToDictionary(r => r, _ => true);
+            // Ponta presa no grupo: a reta alvo passa por ela (duas pontas presas fora da mesma reta: o grupo fica como está).
+            if (pinned != null)
+                foreach (var root in target.Keys.ToList())
+                {
+                    var pins = Enumerable.Range(0, n).Where(i => pinned[i] && g.InGroup(i) && g.Find(i) == root).Select(i => v[i].Dot(nrm)).ToList();
+                    if (pins.Count == 0) continue;
+                    if (pins.Max() - pins.Min() > 1e-12) ok[root] = false;
+                    else target[root] = (target[root].Len, pins[0]);
+                }
             for (var i = 0; i < n; i++)
                 if (g.InGroup(i) && Math.Abs(v[i].Dot(nrm) - target[g.Find(i)].Value) > maxOffset) ok[g.Find(i)] = false;
             for (var i = 0; i < n; i++)
@@ -129,7 +158,7 @@ public static class AxisSnap
         for (var i = 0; i < n; i++)
         {
             res[i] = v[i];
-            if (cons[i] is not { Count: > 0 } c) continue;
+            if (cons[i] is not { Count: > 0 } c || pinned?[i] == true) continue;
             Vec2 p;
             if (c.Count == 1)
             {

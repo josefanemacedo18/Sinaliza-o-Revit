@@ -189,3 +189,31 @@ como substituída.
   - Pisos vizinhos da mesma curva recebem o mesmo arco (0–31 cm³ sobrepostos por interseção, eram 2,7–11,5 L).
   - Um vértice de corte pode ficar até 3 cm de onde o Clipper o pôs, sempre sobre a curva de projeto.
   - A emenda em curva ainda tem as transições das pontas (K13).
+
+## D-016 – Ajuste topológico: a borda comum a dois pisos da mesma marca é ajustada uma vez só
+- **Contexto:** o contorno de cada piso vai ao Revit em retas e arcos inteiros (`BoundaryFit`, 5 mm), ajustado piso a piso.
+  Numa borda curva comum a dois pisos, cada um escolhia quebras, raios e junções próprios. Sem centro exato do traçado
+  (rotatórias, curvas que vêm de deslocamentos com cantos arredondados), os dois ficavam até 5 mm um do outro e se
+  sobrepunham ao longo da curva. No 4º Autoteste completo: 36 pares ROTATORIA × ROTATORIA da mesma marca e a emenda em
+  curva entre duas vias (2,8 L na emulação).
+- **Alternativas descartadas:**
+  - Só unificar retas e circunferências já ajustadas (consenso): resolve curvas com centro exato, mas não as compostas
+    (cada piso parte a curva em arcos diferentes, que não se reconhecem como a mesma borda). As rotatórias caíam só 30 a
+    70 %.
+  - Informar centros exatos para todas as curvas das rotatórias: as curvas vêm de deslocamentos com cantos arredondados
+    sobre polígonos já arredondados – não há um centro só.
+- **Decisão:** `BoundaryFit.FitRings` (núcleo), usado pelo plugin para os pisos físicos de cada marca:
+  - a borda comum (os mesmos vértices nos dois pisos, depois das junções em T e da unificação de trechos a até 5 mm) é
+    ajustada uma vez, como trecho aberto com pontas fixas, e os dois pisos usam o mesmo resultado;
+  - só entram pares cujos vértices comuns cobrem ≥ 95 % do contato entre eles;
+  - piso que não passa nas conferências sai da topologia junto com os pares dele;
+  - nos demais pisos, retas e circunferências da mesma borda viram uma só (consenso), sem mexer nos pisos já ajustados
+    em conjunto.
+- **Consequências:**
+  - Pisos vizinhos da mesma marca não se sobrepõem por causa do ajuste (0 cm³ nas interseções, até 39 cm³ nas rotatórias
+    da fixture).
+  - Um vértice pode andar até 5 mm (trecho unificado) ou até a flecha da corda (ponta movida para o arco exato) –
+    sempre dentro da tolerância do ajuste.
+  - O ajuste de uma marca custa mais: cada piso ainda é ajustado sozinho, e os trechos comuns uma vez mais.
+  - Pisos de marcas diferentes continuam ajustados separados; entre eles valem os centros exatos (D-015).
+

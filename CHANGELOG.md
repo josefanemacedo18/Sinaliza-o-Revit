@@ -3,6 +3,54 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-22 – Fase IV concluída: ajuste topológico dos contornos e pares restantes do 4º Autoteste (versão 2.3.0)
+
+Fase da missão: IV (motor geométrico e topologia) – concluída. Entrega: `Releases/Fase04` (não executada no Revit 2027).
+
+### Ajuste topológico do contorno dos pisos (K13, D-016)
+- Cada piso ajustava sozinho o contorno em retas e arcos (tolerância de 5 mm). Dois pisos vizinhos escolhiam quebras, raios e
+  junções diferentes para a mesma borda e ficavam sobrepostos numa lasca de milímetros ao longo dela. O Revit avisa "Pisos
+  realçados se sobrepõem" para cada par.
+- `BoundaryFit.FitRings` ajusta juntos os pisos físicos de uma marca, em três passos:
+  1. Prepara as bordas comuns. O vértice de um piso que cai na aresta do vizinho entra nela (junção em T). Trechos com
+     vértices próprios em cada piso, a até 5 mm um do outro, passam a usar os mesmos vértices.
+  2. Ajusta cada borda comum uma vez só, como trecho aberto com as pontas fixas (`FitChain`), e os dois pisos usam o mesmo
+     resultado. Uma ponta que cai dentro de um arco exato (corte sobre a corda) vai para a circunferência antes do ajuste.
+  3. Nos pisos que ficaram fora (bordas só geometricamente iguais), retas e circunferências da mesma borda passam a ser
+     uma só e os vértices são refeitos nos encontros.
+- Piso cujo contorno montado não passa nas conferências sai da topologia junto com os pares dele, e tudo é refeito. Essas
+  conferências são: sem autointerseção, trechos acima da aresta mínima e perto do contorno original nos dois sentidos.
+- `AxisSnap.SnapChain` faz o alinhamento aos eixos de um trecho aberto sem mover as pontas.
+- No Revit, `MarkingService.PrepareSharedFit` roda o ajuste conjunto antes de criar os pisos de cada marca, e `FittedLoop`
+  usa o resultado. A pintura continua ajustada peça a peça.
+- Medido nas fixtures do 4º Autoteste (emulação do contorno do Revit no núcleo):
+  - interseções: 0 cm³ em todas, inclusive a emenda em curva `fd4594` (era 2,8 L) e as junções com as rampas (eram até
+    31 cm³);
+  - rotatórias: de 9,6–67 L para 0–39 cm³, exceto a com by-pass (K16).
+
+### Pares restantes do 4º Autoteste (K11)
+- **MER-0 × ORELHA (13,95 cm² no contorno do Revit):** a extensão de calçada reta não informava os centros das curvas de
+  transição, e cada piso ajustava os arcos sozinho. Agora:
+  - `SidewalkGenerator.EarArcCenters` dá os centros das curvas de transição;
+  - o recorte que ela faz nas marcas vizinhas leva esses centros (`ExclusionZone.ArcCenters`, `FootprintCutter`);
+  - `ApplyExclusions` não perde mais os centros da própria marca.
+- **FTP-1 × ZPA na minirrotatória:** no Revit, o zebrado por contorno ia por `MarkingBuilder.BuildHatch`, que ignorava os
+  recortes da marca. O zebrado da gota passava sob a faixa de pedestres, embora o núcleo recortasse. `BuildHatchArea`
+  aplica os recortes.
+
+### Testes
+- `Fase04GeometriaTests` (11) com fixtures do 4º Autoteste:
+  - centros das curvas da extensão de calçada;
+  - recorte que mantém e acrescenta centros;
+  - MER-0 × ORELHA e FTP-1 × ZPA;
+  - borda curva comum com o mesmo arco nos dois pisos;
+  - junção em T;
+  - trecho com vértices próprios unificado;
+  - trecho aberto com pontas presas;
+  - rotatórias sem lascas.
+- `FCRevitFullRun4Tests`: a emulação do contorno do Revit usa o ajuste conjunto. O limite das interseções caiu para
+  5 cm³ em todas (a emenda podia ter 3 L).
+
 ## 2026-10-21 – Fase III concluída: ordem de regeneração pelo grafo e placas personalizadas por projeto (versão 2.2.0)
 
 Fase da missão: III (arquitetura integrada) – concluída. Entrega: `Releases/Fase03` (não executada no Revit 2027).
