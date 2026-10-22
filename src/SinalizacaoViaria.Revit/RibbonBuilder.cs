@@ -177,6 +177,15 @@ public static class RibbonBuilder
                 "Bocas de lobo simples, dupla, com grelha e combinada (guia chapéu, caixa, tampa, rebaixo da sarjeta) e poços de visita – alinhadas ao meio-fio com um clique."),
             Data(typeof(CmdGrelha), "Grelha de Drenagem", "grelha",
                 "Grelhas de sarjeta e de piso com caixa, e canaleta com grelha contínua ao longo de linhas (barras transversais seguras para ciclistas)."));
+        Stack(dren,
+            Data(typeof(CmdTrechoDrenagem), "Trecho de Rede", "tubodren",
+                "Liga dois dispositivos com caixa (PV, boca de lobo, grelha) por um tubo de concreto: clique no de montante e no de jusante; o de jusante vira o montante do próximo trecho (Esc termina)."),
+            Data(typeof(CmdProjetoDrenagem), "Projeto de Drenagem", "chuva",
+                "Equação de chuva, tempo de retorno, coeficiente de escoamento, rugosidade, diâmetros, limites e identificação do memorial, gravados no projeto – com as predefinições do Manual SUDERHSA (2002) e do memorial modelo."),
+            Data(typeof(CmdRedeDrenagem), "Relatório da Rede", "rededren",
+                "Planilha de dimensionamento das galerias pelo método racional, captações (sarjeta e engolimento) e conferência da rede (sentido, ligações, ciclos, recobrimento, PVs); aplica os diâmetros calculados (CSV)."));
+        Large(dren, typeof(CmdMemorialDrenagem), "Memorial de Drenagem", "memdren",
+            "Memorial descritivo de drenagem pluvial (.docx): parâmetros de projeto, planilha das galerias, descritivo dos serviços, quantitativo e disposições finais.");
         var oa = app.CreateRibbonPanel(InfraTab, "Obras de Arte");
         Split(oa, "SvObrasArte", "Pontes e Viadutos",
             Data(typeof(CmdViaduto), "Viaduto", "viaduto",

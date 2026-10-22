@@ -13,6 +13,8 @@ public enum TipoDependencia
     Loteamento,
     /// <summary>Nó (interseção/rotatória) → sinalização gerada por ele (<c>ChildIds</c>): a filha depende do nó.</summary>
     Filha,
+    /// <summary>Trecho de drenagem → dispositivo de montante ou de jusante (PV, boca de lobo, grelha).</summary>
+    Rede,
     /// <summary>Marca recortada → marca que fez o recorte (<see cref="ExclusionZone.SourceId"/>). Fraca: não ordena a regeneração.</summary>
     Recorte,
 }
@@ -74,6 +76,11 @@ public sealed class ModelGraph
                 break;
             case CulDeSacDefinition cs:
                 list.AddRange(One(cs.RoadId, TipoDependencia.Via));
+                break;
+            case DrainagePipeDefinition tp:
+                // O trecho é desenhado entre as caixas dos dois dispositivos: refeito depois deles.
+                list.AddRange(One(tp.FromId, TipoDependencia.Rede));
+                list.AddRange(One(tp.ToId, TipoDependencia.Rede));
                 break;
             case QuadraDefinition q:
                 list.AddRange(One(q.LoteamentoId, TipoDependencia.Loteamento));

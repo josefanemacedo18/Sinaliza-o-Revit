@@ -151,6 +151,26 @@ public sealed class MarkingService
         }
         return res;
     }
+
+    /// <summary>
+    /// Trechos de rede (F8) ligados aos dispositivos regenerados: o tubo acompanha a caixa que mudou de lugar, de cota ou de
+    /// medidas (a ponta do tubo é a parede da caixa).
+    /// </summary>
+    public List<RenderResult> RenderNetwork(IEnumerable<string> deviceIds)
+    {
+        var ids = deviceIds.ToHashSet();
+        _definitions = null;
+        _nodeParents = null;
+        _byId = null;
+        var res = new List<RenderResult>();
+        foreach (var p in MarkingStorage.Definitions<DrainagePipeDefinition>(_doc).Where(p => !ids.Contains(p.Id) && (ids.Contains(p.FromId) || ids.Contains(p.ToId))))
+        {
+            try { res.Add(Render(p)); }
+            catch (Exception ex) { Log.Error($"RenderNetwork {p.DisplayCode}", ex); }
+        }
+        return res;
+    }
+
     private static Catalogo Catalog => PluginContext.Catalog;
 
     // ------------------------------------------------------------------ geometria

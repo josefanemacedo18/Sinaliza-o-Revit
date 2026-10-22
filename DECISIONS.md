@@ -242,3 +242,27 @@ como substituída.
   com a diferença em %, para conferir.
 - **Consequências:** a tabela de cada via confere com a parte dela na malha (−1,4 % no teste em corte; com um nó cruzando,
   a seção no nó sai vazia). O volume dos nós não aparece na tabela por estaca (eles não têm estacas); está no quantitativo.
+
+## D-019 – Dimensionamento da drenagem só com as fontes enviadas pelo usuário
+- **Contexto:** até a Fase VIII o plugin não dimensionava a drenagem: não havia método nem valores com fonte, e a regra da
+  missão é não inventar norma. Em 2026-10-22 o usuário enviou o *Manual de Drenagem Urbana – RMC* (SUDERHSA, 2002) e um
+  memorial descritivo de drenagem (Miguelópolis/SP, 2019) e pediu o cálculo da vazão no memorial.
+- **Decisão:** o cálculo usa só o que está nesses documentos: método racional, curvas IDF (Fendrich, Parigot de Souza;
+  Barretos como escrita no memorial), Kirpich, Horner (o memorial cita; a expressão aplicada é a que reproduz a planilha
+  dele), Manning a seção plena, sarjeta pelo exemplo 6.1, bocas de lobo pelas equações 6.5–6.7 e tabelas 6.3, 6.4 e 6.1.
+  Cada predefinição e cada texto do memorial levam a fonte. O que as fontes deixam ao projetista é dito no código e no
+  relatório (lâmina entre 1 e 2 vezes a abertura: vertedor; grelha entre 12 e 42 cm: o menor dos dois; tabela 6.3
+  interpolada). O que nenhuma fonte dá (George Ribeiro, macrodrenagem) não é implementado.
+- **Consequências:** a planilha do memorial modelo e os exemplos do manual são testes de regressão. Os valores do manual são
+  de Curitiba e os do memorial, de Miguelópolis: a equação de chuva começa vazia (só geometria) até o usuário escolher uma
+  predefinição ou digitar a do local, com a fonte. O projetista continua responsável pelo projeto.
+
+## D-020 – Projeto de Drenagem gravado no projeto do Revit, não nas Configurações
+- **Contexto:** os limites da rede (Fase VIII, primeira versão) estavam nas Configurações do usuário. Chuva, tempo de
+  retorno e critérios dependem do local e do órgão de cada obra; nas Configurações, valeriam para todos os projetos do usuário.
+- **Decisão:** `ProjetoDrenagem` (critérios, equação de chuva e identificação do memorial) fica nas Informações do projeto
+  (armazenamento extensível, `DrainageDesignStore`), como os cenários de tráfego. Os limites deixam as Configurações (a
+  versão anterior não chegou a ser entregue). Limite nulo = não conferir, e o nulo é gravado (sobrevive à reabertura).
+- **Consequências:** cada projeto tem os seus critérios; um projeto novo começa sem equação de chuva. O Validar Modelo, o
+  Relatório da Rede e o Memorial leem o mesmo registro.
+

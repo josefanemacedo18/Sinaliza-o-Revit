@@ -26,6 +26,13 @@ public sealed class MarkingSelectionFilter : ISelectionFilter
     public bool AllowReference(Reference reference, XYZ position) => false;
 }
 
+/// <summary>Filtro de seleção: dispositivos de drenagem com caixa (PV, bocas de lobo, grelhas) – as pontas de um trecho de rede.</summary>
+public sealed class DrainageDeviceFilter : ISelectionFilter
+{
+    public bool AllowElement(Element elem) => elem is DirectShape or Floor && MarkingStorage.Read(elem)?.Definition is Core.Definitions.DrainageDefinition { IsLinear: false };
+    public bool AllowReference(Reference reference, XYZ position) => false;
+}
+
 /// <summary>Filtro de seleção: superfícies para projeção (Toposolid, pisos, topografia).</summary>
 public sealed class SurfaceSelectionFilter : ISelectionFilter
 {

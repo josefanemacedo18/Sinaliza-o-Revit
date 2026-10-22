@@ -11,9 +11,10 @@ namespace SinalizacaoViaria.Core.Reports;
 public static class DocxWriter
 {
     private const string W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-    // A4 retrato, margens 2,5 / 2,0 cm: largura útil em twips.
+    // A4 retrato, margens 2,5 / 2,0 cm: largura útil em twips (em paisagem, a altura da folha).
     private const int PageW = 11906, PageH = 16838, MarginL = 1418, MarginR = 1134, MarginT = 1418, MarginB = 1134;
     private const int ContentW = PageW - MarginL - MarginR;
+    private const int ContentWLandscape = PageH - MarginL - MarginR;
     private const string Accent = "1F5FA8";
 
     private static string X(string s) => SecurityElement.Escape(s) ?? "";
@@ -29,6 +30,16 @@ public static class DocxWriter
     {
         var body = new StringBuilder();
         var sdtId = 1000;
+        var landscape = false;
+        var hasHeader = !string.IsNullOrWhiteSpace(doc.Header);
+        string SectPr(bool land)
+        {
+            var refs = (hasHeader ? "<w:headerReference w:type=\"default\" r:id=\"rId3\"/>" : "") +
+                       (doc.PageNumbers ? "<w:footerReference w:type=\"default\" r:id=\"rId4\"/>" : "");
+            var size = land ? $"<w:pgSz w:w=\"{PageH}\" w:h=\"{PageW}\" w:orient=\"landscape\"/>" : $"<w:pgSz w:w=\"{PageW}\" w:h=\"{PageH}\"/>";
+            return $"<w:sectPr>{refs}{size}<w:pgMar w:top=\"{MarginT}\" w:right=\"{MarginR}\" w:bottom=\"{MarginB}\" w:left=\"{MarginL}\" " +
+                   "w:header=\"709\" w:footer=\"709\" w:gutter=\"0\"/></w:sectPr>";
+        }
         Para(body, doc.Title, "Title");
         foreach (var blk in doc.Blocks)
         {
@@ -38,7 +49,15 @@ public static class DocxWriter
                     Para(body, h.Text, h.Level <= 1 ? "Heading1" : "Heading2");
                     break;
                 case MemParagraph p:
-                    Para(body, p.Text, null, italic: p.Italic);
+                    Para(body, p.Text, null, italic: p.Italic, bold: p.Bold, jc: p.Center ? "center" : null);
+                    break;
+                case MemPageBreak:
+                    body.Append("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>");
+                    break;
+                case MemSection s:
+                    // A seção que termina aqui leva as propriedades dela (orientação) no último parágrafo.
+                    body.Append("<w:p><w:pPr>").Append(SectPr(landscape)).Append("</w:pPr></w:p>");
+                    landscape = s.Landscape;
                     break;
                 case MemBullets bl:
                     foreach (var it in bl.Items)
@@ -55,12 +74,11 @@ public static class DocxWriter
                     body.Append("</w:p>");
                     break;
                 case MemTable t:
-                    Table(body, t);
+                    Table(body, t, landscape ? ContentWLandscape : ContentW);
                     break;
             }
         }
-        body.Append($"<w:sectPr><w:pgSz w:w=\"{PageW}\" w:h=\"{PageH}\"/><w:pgMar w:top=\"{MarginT}\" w:right=\"{MarginR}\" w:bottom=\"{MarginB}\" w:left=\"{MarginL}\" " +
-                    "w:header=\"709\" w:footer=\"709\" w:gutter=\"0\"/></w:sectPr>");
+        body.Append(SectPr(landscape));
         var document = $"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><w:document xmlns:w=\"{W}\" " +
                        "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><w:body>" + body + "</w:body></w:document>";
 
@@ -79,6 +97,8 @@ public static class DocxWriter
                 "<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>" +
                 "<Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/>" +
                 "<Override PartName=\"/word/settings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml\"/>" +
+                (hasHeader ? "<Override PartName=\"/word/header1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml\"/>" : "") +
+                (doc.PageNumbers ? "<Override PartName=\"/word/footer1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml\"/>" : "") +
                 "<Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/>" +
                 "<Override PartName=\"/docProps/app.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/></Types>");
             Put("_rels/.rels",
@@ -89,7 +109,25 @@ public static class DocxWriter
             Put("word/_rels/document.xml.rels",
                 "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
                 "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>" +
-                "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings\" Target=\"settings.xml\"/></Relationships>");
+                "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings\" Target=\"settings.xml\"/>" +
+                (hasHeader ? "<Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/header\" Target=\"header1.xml\"/>" : "") +
+                (doc.PageNumbers ? "<Relationship Id=\"rId4\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer\" Target=\"footer1.xml\"/>" : "") +
+                "</Relationships>");
+            if (hasHeader)
+            {
+                var hp = new StringBuilder();
+                foreach (var line in doc.Header!.Split('\n'))
+                    hp.Append("<w:p><w:pPr><w:spacing w:after=\"0\"/><w:jc w:val=\"center\"/></w:pPr>").Append(Run(line, italic: true)).Append("</w:p>");
+                Put("word/header1.xml", $"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><w:hdr xmlns:w=\"{W}\">{hp}</w:hdr>");
+            }
+            if (doc.PageNumbers)
+            {
+                string Field(string code) =>
+                    "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r>" + $"<w:r><w:instrText xml:space=\"preserve\"> {code} </w:instrText></w:r>" +
+                    "<w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r>";
+                Put("word/footer1.xml", $"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><w:ftr xmlns:w=\"{W}\">" +
+                    "<w:p><w:pPr><w:jc w:val=\"right\"/></w:pPr>" + Run("Página ") + Field("PAGE") + Run(" de ") + Field("NUMPAGES") + "</w:p></w:ftr>");
+            }
             Put("word/document.xml", document);
             Put("word/styles.xml", Styles);
             Put("word/settings.xml", $"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><w:settings xmlns:w=\"{W}\"><w:defaultTabStop w:val=\"284\"/>" +
@@ -126,7 +164,7 @@ public static class DocxWriter
         return sb.Append("</w:r>").ToString();
     }
 
-    private static void Para(StringBuilder sb, string text, string? style, bool italic = false, string? jc = null)
+    private static void Para(StringBuilder sb, string text, string? style, bool italic = false, string? jc = null, bool bold = false)
     {
         sb.Append("<w:p>");
         if (style != null || jc != null)
@@ -136,13 +174,13 @@ public static class DocxWriter
             if (jc != null) sb.Append($"<w:jc w:val=\"{jc}\"/>");
             sb.Append("</w:pPr>");
         }
-        sb.Append(Run(text, italic: italic)).Append("</w:p>");
+        sb.Append(Run(text, bold: bold, italic: italic)).Append("</w:p>");
     }
 
-    private static void Table(StringBuilder sb, MemTable t)
+    private static void Table(StringBuilder sb, MemTable t, int contentW)
     {
         var total = t.Widths.Sum();
-        var widths = t.Widths.Select(w => (int)Math.Round(ContentW * w / total)).ToList();
+        var widths = t.Widths.Select(w => (int)Math.Round(contentW * w / total)).ToList();
         var numeric = new HashSet<int>(t.Numeric ?? Array.Empty<int>());
         const string border = "w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"9AA4B0\"";
         // Ordem do esquema: tblW, tblBorders, tblLayout, tblCellMar.

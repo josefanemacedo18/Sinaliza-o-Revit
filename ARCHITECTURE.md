@@ -11,17 +11,19 @@ cada módulo estão em [AUDIT.md](AUDIT.md); as decisões e seus motivos, em [DE
 │   App / RibbonBuilder ─ Commands (IExternalCommand, 93 Cmd*) ─ UI (janelas WPF com prévia do Core)                 │
 │   Infrastructure: MarkingService (render) · MarkingStorage (Extensible Storage) · PathResolver · SurfaceSampler    │
 │                   StyleService · SharedParameters · TerrainService · LotService · IntersectionService · Log …      │
+│                   DrainageDesignStore (Projeto de Drenagem nas Informações do projeto) · TrafficScenarioStore      │
 │   Updater: MarkingUpdater (DMU) · CopyHandler                                                                      │
 │                                                                                                                    │
 │  SinalizacaoViaria.Core (compilado dentro da mesma DLL; também é uma biblioteca net10.0 testável sem o Revit)      │
 │   Definitions  MarkingDefinition (≈ 70 tipos JSON polimórficos) · MarkingBuilder                                   │
-│   Generators   sinalização, vias, interseções, rotatórias, obras, drenagem, detalhes (DetailGenerators1–5)        │
+│   Generators   sinalização, vias, interseções, rotatórias, obras, drenagem, detalhes (DetailGenerators1–5)         │
 │   Automation   RoadSetup (seção), Grading/Tin (terraplenagem), RoadProfileDesigner, AutoSignage, regras            │
+│                DrainageNetwork (rede) · DrainageHydraulics (método racional, galerias, sarjetas, bocas de lobo)    │
 │   Geometry     Vec2 · Polyline2 · Polygon2 · PolygonOps (Clipper2) · Tracado · RoadGrade · Solid3D · FloorTiling   │
 │   Parcelamento LotDivider · DivisaoPorLinhas · LotDrawing · LotReport · LotMemorial · Masterplan                   │
-│   Traffic      TrafficNetwork · TrafficAnalysis · TrafficSimulation · cenários · soluções · diagnóstico           │
-│   Quantities (por marca e por componente da seção) / Reports (DocxWriter, Memorial) / Geo / Catalog (MBST, JSON)   │
-│   Model        ModelGraph (dependências) · ModelValidator (V01–V12, severidade e confiança)                       │
+│   Traffic      TrafficNetwork · TrafficAnalysis · TrafficSimulation · cenários · soluções · diagnóstico            │
+│   Quantities (por marca e por componente) / Reports (DocxWriter, Memorial, DrainageMemorial) / Geo / Catalog       │
+│   Model        ModelGraph (dependências) · ModelValidator (V01–V13, severidade e confiança)                        │
 └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 

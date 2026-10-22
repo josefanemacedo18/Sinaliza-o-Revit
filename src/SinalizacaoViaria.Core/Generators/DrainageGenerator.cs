@@ -564,6 +564,71 @@ public static class DrainageGenerator
                 false, r + wall + 0.001, r + wall + 0.001, 24);
     }
 
+    // ================================================================== rede (F8)
+
+    /// <summary>
+    /// Caixa do dispositivo como nó da rede: centro em planta, profundidade do fundo do tubo abaixo da cota de implantação
+    /// (<see cref="DrainageDefinition.Z"/>) e o recuo do centro até a parede interna (onde o tubo entra) – as mesmas medidas do
+    /// desenho da caixa e do tubo de saída. Nulo na canaleta contínua (não é nó da rede).
+    /// </summary>
+    public static (Vec2 Center, double InvertDepth, double Inset)? NetworkBox(DrainageDefinition d)
+    {
+        if (d.IsLinear) return null;
+        var u = d.Along.Length < 1e-9 ? Vec2.UnitX : d.Along.Normalized();
+        var f = new Frame { O = d.Position, U = u, V = d.SidewalkLeft ? u.PerpLeft : u.PerpRight };
+        switch (d.Type)
+        {
+            case TipoDrenagem.PocoDeVisita:
+                // Tubos sobre o berço, 0,12 m acima do fundo (como no desenho do PV).
+                return (f.O, Math.Max(1.0, d.BoxDepth) - 0.12, Math.Max(0.4, d.BoxLength / 2));
+            case TipoDrenagem.GrelhaQuadrada:
+            {
+                var (hx, hy) = FloorGrateHalf(d);
+                var t = Math.Max(0.08, d.WallThickness);
+                return (f.O, Math.Max(0.3, d.BoxDepth) - 0.05, Math.Max(0.05, Math.Min(hx, hy) - t));
+            }
+            default:
+            {
+                var p = Plan(d);
+                return (f.W((p.Xa + p.Xb) / 2, (p.Ya + p.Yb) / 2), -p.Floor - 0.05, Math.Min(p.Xb - p.Xa, p.Yb - p.Ya) / 2);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tubo do trecho entre as caixas dos dois dispositivos, nas cotas de fundo do trecho (concreto, com as bolsas a cada
+    /// metro, como o tubo de saída). As cotas das peças são relativas a <see cref="DrainagePipeDefinition.Z"/>.
+    /// </summary>
+    public static MarkingGeometry PipeRun(DrainagePipeDefinition p, BuildContext ctx)
+    {
+        var geo = new MarkingGeometry();
+        if (Automation.DrainageNetwork.Ends(p, ctx.Lookup) is not { } e)
+        {
+            geo.Warnings.Add("Trecho de drenagem: um dos dispositivos das pontas não existe mais.");
+            return geo;
+        }
+        var r = Math.Clamp(p.Diameter, 0.1, 3.0) / 2;
+        var wall = Automation.DrainageNetwork.Wall(p.Diameter);
+        var len = e.A.DistanceTo(e.B);
+        if (len < e.InsetA + e.InsetB + 0.1)
+        {
+            geo.Warnings.Add("Trecho de drenagem: os dois dispositivos estão encostados (sem espaço para o tubo).");
+            return geo;
+        }
+        var dir = (e.B - e.A) / len;
+        double Inv(double s) => e.InvertA + (e.InvertB - e.InvertA) * s / len;
+        var (s0, s1) = (e.InsetA, len - e.InsetB);
+        var a = e.A + dir * s0;
+        SolidSweep.AddRound(geo, Vec3.At(a, Inv(s0) + r - p.Z), Vec3.At(e.A + dir * s1, Inv(s1) + r - p.Z), r + wall, r + wall, MarkingColor.Concreto, "TUBO", false, r, r, 24);
+        for (var s = s0 + 1.0; s < s1 - 0.1; s += 1.0)
+            SolidSweep.AddRound(geo, Vec3.At(e.A + dir * (s - 0.06), Inv(s - 0.06) + r - p.Z), Vec3.At(e.A + dir * (s + 0.06), Inv(s + 0.06) + r - p.Z),
+                r + wall + 0.035, r + wall + 0.035, MarkingColor.Concreto, "TUBO", false, r + wall + 0.001, r + wall + 0.001, 24);
+        geo.PaintedLength = len;
+        geo.PathLength = len;
+        if (e.InvertB > e.InvertA + 1e-6) geo.Warnings.Add($"Trecho {e.CodeA} → {e.CodeB}: fundo de jusante acima do de montante (contrafluxo).");
+        return geo;
+    }
+
     // ================================================================== grelha de piso
 
     private static (double Hx, double Hy) FloorGrateHalf(DrainageDefinition d)

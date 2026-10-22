@@ -39,6 +39,8 @@ public static class MarkingCreator
         {
             var targets = ordered.Where(d => d is not IAnnotationDefinition).Select(d => d.Id).ToList();
             if (targets.Count > 0) results.AddRange(service.RenderDependents(targets, includeLegends: true).Where(r => r.Warnings.Count > 0));
+            var devices = ordered.OfType<DrainageDefinition>().Select(d => d.Id).ToList();
+            if (devices.Count > 0) results.AddRange(service.RenderNetwork(devices).Where(r => r.Warnings.Count > 0));
         }
         catch (Exception ex)
         {

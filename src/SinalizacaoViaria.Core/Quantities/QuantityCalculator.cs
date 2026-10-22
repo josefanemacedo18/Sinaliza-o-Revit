@@ -143,7 +143,7 @@ public sealed class QuantityRow
     public static CategoriaQuantitativo Categorize(MarkingDefinition def, GrupoMarca group) => def switch
     {
         RampDefinition or TactileRouteDefinition => CategoriaQuantitativo.Acessibilidade,
-        DrainageDefinition => CategoriaQuantitativo.Drenagem,
+        DrainageDefinition or DrainagePipeDefinition => CategoriaQuantitativo.Drenagem,
         BridgeDefinition or TunnelDefinition or TrenchDefinition or RetainingWallDefinition or SlopeDefinition or InterchangeDefinition => CategoriaQuantitativo.ObrasDeArteTerraplenagem,
         RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or RailwayDefinition => CategoriaQuantitativo.PavimentacaoGeometria,
         _ => group switch

@@ -291,6 +291,7 @@ public static class MarkingBuilder
         CulDeSacDefinition cd => path == null ? Missing("Eixo do cul-de-sac não encontrado.") : SidewalkGenerator.CulDeSac(cd, path),
         TrafficCalmingDefinition tc => path == null || path.Points.Count < 2 ? Missing("Bordos da pista não encontrados.") : TrafficCalmingGenerator.Generate(tc, path, ctx.Catalog),
         DrainageDefinition dr => DrainageGenerator.Build(dr, path),
+        DrainagePipeDefinition tp => DrainageGenerator.PipeRun(tp, ctx),
         TunnelDefinition tn => path == null || path.Points.Count < 2 ? Missing("Eixo do túnel não encontrado.") : EarthworksGenerator.Tunnel(tn, path, ctx),
         TrenchDefinition tr2 => path == null || path.Points.Count < 2 ? Missing("Eixo da trincheira não encontrado.") : EarthworksGenerator.Trench(tr2, path, ctx),
         RetainingWallDefinition rw2 => path == null || path.Points.Count < 2 ? Missing("Linha do muro não encontrada.") : EarthworksGenerator.RetainingWall(rw2, path, ctx),
@@ -986,6 +987,9 @@ public static class MarkingBuilder
                     TipoModeracao.FaixaElevada => "Faixa elevada para travessia de pedestres",
                     _ => "Lombada invertida (valeta transversal)",
                 }, GrupoMarca.Moderacao, "Resoluções CONTRAN sobre ondulações transversais e faixas elevadas (conferir versão vigente)", "un");
+            case DrainagePipeDefinition tp:
+                return new MarkingInfo(tp.DisplayCode, $"Tubo de drenagem Ø {tp.Diameter * 1000:0} mm (trecho entre dispositivos)", GrupoMarca.Urbanizacao,
+                    "Geometria da rede: diâmetro, cotas de fundo, declividade e cobrimento informados – sem dimensionamento hidráulico", "m");
             case DrainageDefinition dr:
                 return new MarkingInfo(dr.DisplayCode, dr.Type switch
                 {

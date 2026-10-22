@@ -525,6 +525,52 @@ internal sealed partial class AutoTestRunner
             Take(s, DrainageCommand.Place(_uidoc, batch), batch);
             s.Note($"{batch.Count} grelha(s) na série.");
         });
+        Step("Calçadas", "Drenagem – rede: trechos, vazão (método racional), diâmetros calculados e memorial", s =>
+        {
+            // Três PVs em linha com área de contribuição, ligados por trechos de DN 400; o projeto de drenagem fica só na memória.
+            var pvs = Enumerable.Range(0, 3).Select(k =>
+            {
+                var d = new DrainageDefinition { Type = TipoDrenagem.PocoDeVisita };
+                d.ApplyDefaults();
+                (d.Position, d.Z, d.AreaContribuicao, d.CoeficienteEscoamento) = (P(900 + 45 * k, Y0 + 40), _z0 - 0.25 * k, 6000, 0.8);
+                d.Output = InfraRunner.Output3D();
+                return d;
+            }).ToList();
+            Commit(s, pvs, "PVs da rede");
+            var tubos = new[] { (0, 1), (1, 2) }.Select(e => new DrainagePipeDefinition
+            {
+                FromId = pvs[e.Item1].Id, ToId = pvs[e.Item2].Id, Diameter = 0.40, Z = pvs[e.Item1].Z, Output = InfraRunner.Output3D(),
+            }).ToList();
+            Commit(s, tubos, "trechos da rede");
+            var p = Core.Automation.ProjetoDrenagem.ManualSuderhsa();
+            var defs = MarkingStorage.Definitions(_doc);
+            var r = Core.Automation.DrainageHydraulics.Calcular(defs, p);
+            if (r.Trechos.Count != 2) { s.Error($"Esperados 2 trechos calculados, saíram {r.Trechos.Count}."); return; }
+            foreach (var t in r.Trechos)
+                s.Note($"{t.Nome} ({t.Montante} → {t.Jusante}): {t.Extensao:0.00} m, t {t.Duracao:0.0} min, i {t.Intensidade:0.0} mm/h, Q {t.Vazao:0.0} L/s, " +
+                       $"Ø {t.Diametro * 1000:0} mm (calculado {t.DiametroNecessario * 1000:0}), Qmax {t.VazaoMaxima:0.0} L/s, v {t.Velocidade:0.00} m/s.");
+            // Aplica os diâmetros calculados e redesenha; depois move o PV do meio e confere que os tubos o acompanham.
+            var dim = Core.Automation.DrainageHydraulics.Calcular(defs, p, dimensionar: true);
+            var mudou = new List<MarkingDefinition>();
+            foreach (var t in dim.Trechos)
+                if (t.DiametroNecessario is { } dn && tubos.FirstOrDefault(x => x.Id == t.Id) is { } tubo && Math.Abs(tubo.Diameter - dn) > 1e-6)
+                {
+                    tubo.Diameter = dn;
+                    mudou.Add(tubo);
+                }
+            if (mudou.Count > 0) Commit(s, mudou, "diâmetros calculados");
+            pvs[1].Position += new Vec2(0, 2);
+            Commit(s, new[] { pvs[1] }, "PV movido");
+            // Os tubos são redesenhados com o PV (MarkingService.RenderNetwork): continuam no modelo, com a extensão nova.
+            var presentes = MarkingStorage.Ids(_doc);
+            foreach (var t in tubos.Where(t => !presentes.Contains(t.Id))) s.Error($"{t.DisplayCode}: o trecho sumiu depois de mover o PV.");
+            var depois = Core.Automation.DrainageNetwork.Analyze(MarkingStorage.Definitions(_doc));
+            s.Note($"Depois de mover o PV: {string.Join("; ", depois.Select(t => $"{t.Nome} {t.Comprimento:0.00} m"))}.");
+            var achados = Core.Model.ModelValidator.Validate(MarkingStorage.Copies(_doc, out _), drenagem: p).Where(a => a.Codigo == "V13").ToList();
+            s.Note($"V13: {achados.Count} achado(s) com os critérios do Manual SUDERHSA.");
+            var bytes = Core.Reports.DocxWriter.Write(Core.Reports.DrainageMemorial.Build(MarkingStorage.Definitions(_doc), p, DateTime.Now));
+            s.Note($"Memorial de drenagem gerado na memória: {bytes.Length / 1024} KiB.");
+        });
         _ = cal; _ = mod;
     }
 }

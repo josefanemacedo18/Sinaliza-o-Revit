@@ -12,7 +12,13 @@ public abstract record MemorialBlock;
 
 public sealed record MemHeading(int Level, string Text) : MemorialBlock;
 
-public sealed record MemParagraph(string Text, bool Italic = false) : MemorialBlock;
+public sealed record MemParagraph(string Text, bool Italic = false, bool Bold = false, bool Center = false) : MemorialBlock;
+
+/// <summary>Quebra de página.</summary>
+public sealed record MemPageBreak : MemorialBlock;
+
+/// <summary>Começa uma nova seção do documento, em paisagem ou retrato (tabelas largas).</summary>
+public sealed record MemSection(bool Landscape) : MemorialBlock;
 
 public sealed record MemBullets(IReadOnlyList<string> Items) : MemorialBlock;
 
@@ -27,6 +33,10 @@ public sealed class MemorialDocument
 {
     public string Title { get; init; } = "MEMORIAL DESCRITIVO";
     public List<MemorialBlock> Blocks { get; } = new();
+    /// <summary>Texto do cabeçalho de todas as páginas (ex.: autor e registro profissional); nulo = sem cabeçalho.</summary>
+    public string? Header { get; init; }
+    /// <summary>Rodapé "Página X de Y".</summary>
+    public bool PageNumbers { get; init; }
 
     /// <summary>Títulos de nível 1 (seções), na ordem.</summary>
     public IEnumerable<string> Sections => Blocks.OfType<MemHeading>().Where(h => h.Level == 1).Select(h => h.Text);

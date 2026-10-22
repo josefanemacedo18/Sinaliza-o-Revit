@@ -137,6 +137,25 @@ internal static class InfraForms
              .Number("Comprimento do tubo (m)", () => d.PipeLength, v => d.PipeLength = v, 0.5, 30)
              .If(AtCurb, y => y.Choice("Saída do tubo", new[] { ("Sob a pista (ramal até a galeria)", SaidaTubo.SobAPista), ("Ao longo do meio-fio", SaidaTubo.AoLongo) },
                 () => d.PipeDirection, v => d.PipeDirection = v)));
+        // Dados do cálculo da vazão (F8): zero = o valor do Projeto de Drenagem.
+        static double? Opt(double v) => v > 0 ? v : null;
+        w.If(() => !d.IsLinear, x => x.Section("Contribuição (cálculo da vazão)",
+                "Usado no Relatório da Rede, no Validar Modelo e no Memorial de Drenagem quando o Projeto de Drenagem tem equação de chuva. Zero = o valor do projeto.")
+             .Number("Área de contribuição local (m²)", () => d.AreaContribuicao, v => d.AreaContribuicao = v, 0, 1e7, "0",
+                 "Área (lotes, calçadas e pista) cuja água chega por superfície a este dispositivo. 0 = só recebe dos trechos de montante.")
+             .Number("Coeficiente de escoamento C (0 = o do projeto)", () => d.CoeficienteEscoamento ?? 0, v => d.CoeficienteEscoamento = Opt(v), 0, 1, "0.00",
+                 "Manual SUDERHSA, tabela 4.1: concreto, asfalto e telhado 0,95; paralelepípedo 0,70; grama em solo argiloso 0,20.")
+             .Number("Área impermeável p (%, Horner; 0 = a do projeto)", () => d.Impermeabilizacao ?? 0, v => d.Impermeabilizacao = Opt(v), 0, 100, "0.#")
+             .Number("Tempo de concentração (min; 0 = o do projeto)", () => d.TempoConcentracao ?? 0, v => d.TempoConcentracao = Opt(v), 0, 600, "0.##")
+             .Number("Talvegue – comprimento (m; Kirpich)", () => d.TalvegueComprimento ?? 0, v => d.TalvegueComprimento = Opt(v), 0, 100000, "0.#",
+                 "Com o desnível, o tempo de concentração da área sai por Kirpich (Manual SUDERHSA, eq. 4.3), se não for informado acima.")
+             .Number("Talvegue – desnível (m)", () => d.TalvegueDesnivel ?? 0, v => d.TalvegueDesnivel = Opt(v), 0, 10000, "0.##")
+             .Number("Vazão externa afluente (L/s)", () => d.VazaoExterna, v => d.VazaoExterna = v, 0, 1e6, "0.##",
+                 "Vazão que chega de fora do modelo (outra rede, área remanescente), somada à da chuva sem passar pelo método racional.")
+             .If(() => d.IsInlet, y => y
+                 .Number("Declividade da sarjeta (%; 0 = não verificar)", () => d.DeclividadeSarjeta ?? 0, v => d.DeclividadeSarjeta = Opt(v), 0, 30, "0.##",
+                     "Declividade longitudinal da rua junto à captação: capacidade da sarjeta e lâmina que chega à boca de lobo.")
+                 .Check("Captação em ponto baixo da sarjeta", () => d.PontoBaixo, v => d.PontoBaixo = v)));
         w.Section("Encaixe na via")
          .Check("Recortar pavimento, sarjeta, meio-fio, calçada e pinturas sob o dispositivo", () => d.CutFloors, v => d.CutFloors = v);
         if (!edit)

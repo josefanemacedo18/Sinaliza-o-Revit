@@ -3,6 +3,65 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-22 – Fase VIII concluída: rede de drenagem dimensionada pelo método racional e memorial de drenagem (versão 2.7.0)
+
+Fase da missão: VIII (drenagem e redes). Entrega: `Releases/Fase08` (não executada no Revit 2027). No meio da fase, o usuário
+pediu o requisito transversal RT-1 (Toposolid × vias × terraplenagem × drenagem): registrado no ROADMAP, a fase seguiu.
+
+### Fontes enviadas pelo usuário
+- *Manual de Drenagem Urbana – Região Metropolitana de Curitiba* (SUDERHSA, versão 1.0, dez. 2002) e o memorial descritivo de
+  drenagem pluvial de um loteamento em Miguelópolis/SP (set. 2019), como modelo. O cálculo usa só o que está nesses
+  documentos, com a fonte citada no Projeto de Drenagem, no relatório e no memorial (D-019).
+- A planilha de galerias do memorial modelo foi reproduzida com a equação de chuva dele: intensidade a menos de 0,005 mm/h e
+  vazão a menos de 0,1 % nos 12 trechos. O C da planilha é o da fórmula de Horner com 80 % de área impermeável e a vazão
+  máxima é a de Manning a seção plena com n ≈ 0,0151 (o memorial não escreve esses dois valores; a predefinição usa 80 % e
+  0,015). Com as cotas exatas, o trecho 6 passa da capacidade (+3,0 %) – na própria planilha ele já passava (+2,6 %).
+
+### Rede de drenagem
+- **Trecho de Rede**: tubo de concreto entre dois dispositivos com caixa (PV, bocas de lobo, grelhas), de parede a parede, no
+  fundo de cada caixa ou nas cotas informadas, com bolsas; o de jusante vira o montante do trecho seguinte. Editar o trecho:
+  diâmetro e cotas de fundo. Mover ou editar um dispositivo redesenha os trechos ligados a ele (`MarkingService.RenderNetwork`).
+- Trechos nomeados de montante para jusante (T1, T2…); ligações das bocas de lobo separadas das galerias.
+- Conferência (sempre): contrafluxo, trecho ligado ao próprio dispositivo, dispositivo apagado e ciclos. Com o Projeto de
+  Drenagem: declividades, recobrimento sobre a geratriz superior externa, diâmetros mínimos (galeria e ligação), espaçamento
+  entre PVs (tabela 6.1 do manual), PV de queda e alinhamento pela geratriz superior na mudança de diâmetro.
+
+### Vazões e dimensionamento
+- **Projeto de Drenagem** (gravado nas Informações do projeto, D-020): equação de chuva nas formas potência e logarítmica
+  (Fendrich e Parigot de Souza do manual; Barretos/DAEE-SP do memorial), tempo de retorno, tempo de concentração inicial,
+  duração mínima, C ponderado ou de Horner, rugosidade, diâmetros comerciais, limites, sarjetas, bocas de lobo, valas e a
+  identificação do memorial. Predefinições "Manual SUDERHSA" e "Memorial modelo"; sem equação de chuva, só a geometria.
+- Contribuição em cada dispositivo: área local, C, área impermeável, tempo de concentração ou talvegue (Kirpich), vazão
+  externa, declividade da sarjeta e ponto baixo.
+- Método racional com o maior tempo de concentração que chega ao trecho mais o percurso a seção plena; Manning a seção
+  plena (capacidade e velocidades) e o menor diâmetro comercial que escoa a vazão. Captações: sarjeta por Manning na seção
+  triangular com o fator da tabela 6.3, lâmina, velocidade e engolimento pelas equações 6.5 a 6.7 com a tabela 6.4.
+- **Relatório da Rede**: planilha de galerias (as colunas do memorial modelo e as do cálculo) e captações em CSV; **aplica os
+  diâmetros calculados** e redesenha os tubos. **Validar Modelo**: V13 com a geometria, os critérios e, com a equação de chuva,
+  capacidade, velocidade, sarjeta e engolimento.
+
+### Memorial de Drenagem (.docx)
+- Na estrutura do modelo: capa com a identificação; 1 Do projeto; 2 Parâmetros de projeto (vazões, chuva, recorrência, tempo
+  de concentração, coeficiente de escoamento, capacidade das vias, critério das captações, bocas de lobo, tubos,
+  recobrimento, velocidades, ligações e PVs); 3 Planilha das galerias em página de paisagem, com as captações e as
+  observações da verificação; 4 Descritivo dos serviços; 5 Quantitativo (tubos por diâmetro, PVs, bocas de lobo por tipo e
+  estimativas de escavação, escoramento, reaterro e material excedente); 6 Disposições finais com as assinaturas.
+- O texto dos serviços é do plugin (o do modelo não é copiado), com os parâmetros do projeto (largura da vala, escoramento).
+- `DocxWriter`: seções em paisagem, quebra de página, parágrafos centralizados e em negrito, cabeçalho com o autor e rodapé
+  "Página X de Y".
+
+### Não implementado (motivo em K5)
+- Tempo de concentração de George Ribeiro (o memorial cita sem a expressão); divisão da vazão em dispositivo com mais de uma
+  saída; excesso de uma boca de lobo passado à seguinte pela sarjeta; terreno entre as caixas no recobrimento; macrodrenagem.
+
+### Testes
+- `Fase08DrenagemTests`: caixas da rede, tubo entre as paredes, avisos, medição, conferência sem e com critérios, ciclo,
+  persistência, V13 e o Projeto de Drenagem em JSON (incluindo limite apagado que continua apagado ao reabrir).
+- `Fase08HidraulicaTests`: tabela B.3 (Fendrich e Parigot), exemplos 6.1 (sarjeta), 6.2 (bocas de lobo) e 6.3 (galeria) do
+  manual, planilha do memorial modelo, junções (tempo de concentração e áreas), dimensionamento aplicado, captações, PV de
+  queda, espaçamento e geratriz superior, V13 com a vazão e o memorial em .docx (seções, paisagem, cabeçalho e rodapé).
+- Autoteste: etapa "Drenagem – rede" (PVs, trechos, vazões, diâmetros calculados, PV movido, V13 e memorial).
+
 ## 2026-10-22 – Fase VII concluída: rotatória com by-pass sem pisos sobrepostos e volumes por estaca no quantitativo (versão 2.6.0)
 
 Fase da missão: VII (terreno, terraplenagem e interseções) – concluída no que é verificável aqui. Entrega: `Releases/Fase07`

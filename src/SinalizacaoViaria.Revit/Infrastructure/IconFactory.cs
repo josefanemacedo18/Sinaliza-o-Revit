@@ -100,6 +100,32 @@ public static class IconFactory
                 dc.DrawRectangle(B(Muted), P(White, 1.5), new Rect(6, 8, 20, 16));
                 for (int x = 9; x < 25; x += 3) dc.DrawLine(P(Color.FromRgb(30, 30, 30), 1.4), new Point(x, 10), new Point(x, 22));
                 break;
+            case "tubodren":
+            case "rededren":
+            {
+                // Corte da rede: duas caixas e o tubo entre elas (o relatório leva a lista por cima).
+                dc.DrawRectangle(B(Color.FromRgb(120, 150, 90)), null, new Rect(1, 1, 30, 30));
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(2, 6, 6, 22));
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(24, 10, 6, 18));
+                dc.DrawGeometry(B(Color.FromRgb(150, 150, 146)), P(White, 1), Close(Poly(new Point(8, 18), new Point(24, 22), new Point(24, 27), new Point(8, 23))));
+                if (key == "tubodren") dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(13, 13), new Point(19, 15), new Point(16, 11))));
+                else for (int y = 4; y < 14; y += 4) dc.DrawLine(P(White, 1.6), new Point(11, y), new Point(22, y));
+                break;
+            }
+            case "chuva":
+                // Nuvem e gotas (a chuva de projeto).
+                dc.DrawEllipse(B(Muted), null, new Point(11, 11), 7, 6);
+                dc.DrawEllipse(B(Muted), null, new Point(20, 9), 8, 7);
+                dc.DrawRoundedRectangle(B(Muted), null, new Rect(5, 10, 23, 7), 3, 3);
+                foreach (var (x0, y0) in new[] { (9.0, 21.0), (16.0, 24.0), (23.0, 21.0) })
+                    dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(x0, y0), new Point(x0 - 2.2, y0 + 4), new Point(x0, y0 + 6), new Point(x0 + 2.2, y0 + 4))));
+                break;
+            case "memdren":
+                // Folha com a gota da drenagem.
+                dc.DrawRectangle(B(White), P(Muted, 1.5), new Rect(6, 2, 20, 28));
+                for (int y = 7; y < 17; y += 4) dc.DrawLine(P(Muted, 1.4), new Point(10, y), new Point(22, y));
+                dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(16, 17), new Point(11.5, 24), new Point(16, 28), new Point(20.5, 24))));
+                break;
             case "viaduto":
             case "ponte":
             case "passarela":

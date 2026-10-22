@@ -190,6 +190,30 @@ public sealed class DrainageDefinition : MarkingDefinition
     /// <summary>Espaçamento na colocação em série ao longo do meio-fio (m).</summary>
     public double SeriesSpacing { get; set; } = 40;
 
+    // ---- Cálculo da vazão (F8, Método Racional). Nulo = o valor do Projeto de Drenagem.
+
+    /// <summary>Área de contribuição local que chega a este dispositivo (m²). 0 = só recebe dos trechos de montante.</summary>
+    public double AreaContribuicao { get; set; }
+    /// <summary>Coeficiente de escoamento C da área local (método racional com C ponderado).</summary>
+    public double? CoeficienteEscoamento { get; set; }
+    /// <summary>Área impermeável da área local (%), para o C pela fórmula de Horner.</summary>
+    public double? Impermeabilizacao { get; set; }
+    /// <summary>Tempo de concentração da área local (min).</summary>
+    public double? TempoConcentracao { get; set; }
+    /// <summary>Comprimento do talvegue da área local (m) – com o desnível, tempo de concentração por Kirpich.</summary>
+    public double? TalvegueComprimento { get; set; }
+    /// <summary>Desnível entre o ponto mais remoto da área local e o dispositivo (m).</summary>
+    public double? TalvegueDesnivel { get; set; }
+    /// <summary>Vazão que entra na rede neste dispositivo vinda de fora do modelo (L/s), somada sem passar pela chuva.</summary>
+    public double VazaoExterna { get; set; }
+    /// <summary>Declividade longitudinal da sarjeta junto à captação (%). Nulo = a sarjeta não é verificada.</summary>
+    public double? DeclividadeSarjeta { get; set; }
+    /// <summary>Captação num ponto baixo da sarjeta (fatores de redução da tabela 6.4 do Manual SUDERHSA).</summary>
+    public bool PontoBaixo { get; set; }
+
+    /// <summary>Dispositivo que capta a água da sarjeta ou do piso (bocas de lobo e grelhas; não o PV nem a canaleta).</summary>
+    public bool IsInlet => Type is not (TipoDrenagem.PocoDeVisita or TipoDrenagem.GrelhaContinua);
+
     public override string KindName => "Drenagem";
     public override string DisplayCode => Type switch
     {
@@ -756,4 +780,29 @@ public sealed class InterchangeDefinition : MarkingDefinition, ITerrainAware
     public double CrossWidth => 2 * (CrossLanes * CrossLaneWidth + CrossShoulder);
     /// <summary>Cota do greide da via que passa por cima (m).</summary>
     public double Height => Clearance + DeckDepth;
+}
+
+/// <summary>
+/// Trecho da rede de drenagem (F8): tubo entre dois dispositivos (PV, boca de lobo, grelha com caixa), de montante
+/// (<see cref="FromId"/>) para jusante (<see cref="ToId"/>). Só geometria – diâmetro, cotas de fundo, declividade e cobrimento;
+/// o plugin não dimensiona a rede (vazão, lâmina, velocidade).
+/// </summary>
+public sealed class DrainagePipeDefinition : MarkingDefinition
+{
+    /// <summary>Dispositivo de montante (id da marca).</summary>
+    public string FromId { get; set; } = "";
+    /// <summary>Dispositivo de jusante (id da marca).</summary>
+    public string ToId { get; set; } = "";
+    /// <summary>Diâmetro interno (m).</summary>
+    public double Diameter { get; set; } = 0.40;
+    /// <summary>Cota de fundo (geratriz inferior interna) na saída do dispositivo de montante (m); nula = o fundo da caixa dele.</summary>
+    public double? InvertFrom { get; set; }
+    /// <summary>Cota de fundo na chegada ao dispositivo de jusante (m); nula = o fundo da caixa dele.</summary>
+    public double? InvertTo { get; set; }
+    /// <summary>Cota de referência das peças (a do dispositivo de montante), m.</summary>
+    public double Z { get; set; }
+
+    public override string KindName => "Trecho de drenagem";
+    public override string DisplayCode => "TUBO-DREN";
+    public override double? PointZ => Z;
 }

@@ -29,8 +29,9 @@ public static class ModelValidator
     /// <param name="copias">Todas as cópias lidas do documento.</param>
     /// <param name="elementoExiste">UniqueId (dono da borda) → existe no documento. Nulo = não verificar elementos do Revit.</param>
     /// <param name="criterios">Limites geométricos informados pelo usuário (V12). Nulo ou vazio = não conferir.</param>
+    /// <param name="drenagem">Projeto de drenagem (V13): critérios e, com a equação de chuva, a vazão. Nulo = só a geometria (sentido, ligação, ciclo).</param>
     public static List<Achado> Validate(IReadOnlyList<CopiaGravada> copias, Func<string, bool>? elementoExiste = null,
-        GeometricCriteria? criterios = null)
+        GeometricCriteria? criterios = null, Automation.ProjetoDrenagem? drenagem = null)
     {
         var res = new List<Achado>();
         var defs = new Dictionary<string, MarkingDefinition>();
@@ -65,9 +66,10 @@ public static class ModelValidator
                 TipoDependencia.Via => (Severidade.Aviso, $"{o.DisplayCode}: aponta para uma via que não existe mais."),
                 TipoDependencia.Loteamento => (Severidade.Aviso, $"{o.DisplayCode}: o loteamento da quadra não existe mais (usa as categorias padrão)."),
                 TipoDependencia.Filha => (Severidade.Info, $"{o.DisplayCode}: sinalização gerada pelo nó foi apagada (volta ao atualizar o nó)."),
+                TipoDependencia.Rede => (Severidade.Aviso, $"{o.DisplayCode}: o dispositivo de drenagem de uma ponta do trecho não existe mais (o tubo não é desenhado)."),
                 _ => (Severidade.Info, $"{o.DisplayCode}: recorte deixado por uma marca que não existe mais (sai na próxima atualização)."),
             };
-            res.Add(new("V04", sev, Confianca.Alta, e.Tipo is TipoDependencia.Alvo or TipoDependencia.Via or TipoDependencia.Loteamento, msg,
+            res.Add(new("V04", sev, Confianca.Alta, e.Tipo is TipoDependencia.Alvo or TipoDependencia.Via or TipoDependencia.Loteamento or TipoDependencia.Rede, msg,
                 new[] { e.Origem, e.Destino }));
         }
         foreach (var c in graph.Cycles())
@@ -83,6 +85,7 @@ public static class ModelValidator
 
         CheckLayout(defs, res);
         if (criterios is { IsEmpty: false }) CheckAlignment(defs, criterios, res);
+        CheckDrainage(defs, drenagem, res);
 
         // Corte só de dados (sem desenho na planta) sem o perfil que o usa.
         var perfis = defs.Values.OfType<SectionProfileDefinition>().Select(p => p.SectionId).ToHashSet();
@@ -108,6 +111,7 @@ public static class ModelValidator
         ["V10"] = "quadra fora da gleba do loteamento",
         ["V11"] = "interseção com menos de duas vias existentes",
         ["V12"] = "eixo ou greide de via fora dos limites geométricos informados pelo usuário (raio, tangente, rampa, K)",
+        ["V13"] = "rede de drenagem: contrafluxo, trecho ligado ao próprio dispositivo, ciclo ou fora dos critérios do Projeto de Drenagem (declividade, recobrimento, diâmetro, PVs, capacidade, velocidade, sarjeta, engolimento)",
     };
 
     /// <summary>Relatório em texto (o mesmo que a camada Revit grava em TXT).</summary>
@@ -232,6 +236,25 @@ public static class ModelValidator
             var lista = string.Join("; ", v.Take(4).Select(x => x.Texto)) + (v.Count > 4 ? $"; … e mais {v.Count - 4}" : "");
             res.Add(new("V12", Severidade.Aviso, Confianca.Media, true,
                 $"{road.DisplayCode}: {v.Count} elemento(s) fora dos limites informados ({c.FonteTexto}): {lista}.", new[] { road.Id }));
+        }
+    }
+
+    /// <summary>
+    /// Rede de drenagem (V13, F8): sentido do escoamento, ligações e ciclos sempre; os critérios do Projeto de Drenagem e, com
+    /// a equação de chuva, a vazão (capacidade e velocidade das galerias, sarjetas e engolimento). O dispositivo inexistente já
+    /// sai no V04. O recobrimento é medido sob a reta entre as tampas dos dois dispositivos (o terreno entre eles não é lido –
+    /// confiança média), como a sarjeta, que depende da área de contribuição informada.
+    /// </summary>
+    private static void CheckDrainage(Dictionary<string, MarkingDefinition> defs, Automation.ProjetoDrenagem? c, List<Achado> res)
+    {
+        if (!defs.Values.Any(d => d is DrainagePipeDefinition)) return;
+        var problemas = Automation.DrainageNetwork.Check(defs.Values, c).Where(p => p.Criterio != "dispositivo").ToList();
+        if (c is { TemChuva: true }) problemas.AddRange(Automation.DrainageHydraulics.Calcular(defs.Values, c).Problemas);
+        foreach (var p in problemas)
+        {
+            var texto = p.PorLimite ? $"{p.Texto} Critérios: {c!.FonteTexto}." : p.Texto;
+            var media = p.Criterio is "cobrimento" or "sarjeta" or "engolimento";
+            res.Add(new("V13", Severidade.Aviso, media ? Confianca.Media : Confianca.Alta, true, texto, p.Ids ?? Array.Empty<string>()));
         }
     }
 

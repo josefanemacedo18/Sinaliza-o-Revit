@@ -171,6 +171,7 @@ public enum Justificacao
 [JsonDerivedType(typeof(RailwayDefinition), "ferrovia")]
 [JsonDerivedType(typeof(SectionProfileDefinition), "perfil-secao")]
 [JsonDerivedType(typeof(DrainageDefinition), "drenagem")]
+[JsonDerivedType(typeof(DrainagePipeDefinition), "trecho-drenagem")]
 [JsonDerivedType(typeof(BridgeDefinition), "obra-de-arte")]
 [JsonDerivedType(typeof(TunnelDefinition), "tunel")]
 [JsonDerivedType(typeof(TrenchDefinition), "trincheira")]

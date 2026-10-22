@@ -157,13 +157,14 @@ Legenda de estado:
 | VII | Terraplenagem: corte/aterro, taludes, bermas, volumes | VALIDADA (Core); desde EV6 também o método das seções, conferido com a malha; desde a Fase VII as seções de cada via vão ao quantitativo do Revit (aba, CSV e planilha – **não executados no Revit**) | `Grading.Volumes`, `SectionVolumes` (§6.7), `Fase07InterseccoesTests` |
 | VII | Interseções (T, cruz, oblíquas, tipos II–IV), rotatórias, nós em desnível | VALIDADA (Core) | rodadas S2, V2, AB2, AE3 |
 | VIII | Dispositivos de drenagem superficial (bocas de lobo, grelhas, PV, sarjetão, canaletas) – geometria | VALIDADA (Core) | `DrainageGenerator`, `SarjetaoGenerator` |
-| VIII | Rede de drenagem (tubos, poços ligados, declividades) | AUSENTE | não há modelo de rede |
+| VIII | Rede de drenagem (trechos entre caixas, sentido, ligações, ciclos, recobrimento, diâmetros, PVs) | VALIDADA (Core) desde a Fase VIII; comandos Trecho de Rede e Relatório da Rede **não executados no Revit** | `DrainageNetwork`, `Fase08DrenagemTests` |
+| VIII | Dimensionamento pelo método racional (IDF, C, tc acumulado, Manning a seção plena, sarjetas, bocas de lobo) e Memorial de Drenagem | VALIDADA (Core) contra os exemplos 6.1–6.3 e a tabela B.3 do Manual SUDERHSA e a planilha do memorial modelo (fontes do usuário, D-019); Revit não validado; limites em K5 | `DrainageHydraulics`, `DrainageMemorial`, `Fase08HidraulicaTests` |
 | VIII | Dimensionamento hidráulico | AUSENTE (não afirmado) | nenhum cálculo de vazão/Manning |
 | IX | Loteamento: gleba, quadras, lotes por testada e por linhas, chanfros, uniões, numeração, categorias | VALIDADA (Core) | rodadas LT/LU/LV/LW/LX |
 | IX | Regras mínimas configuráveis (frente 5 m e área 125 m² por padrão, editáveis) | VALIDADA (Core) | `LoteamentoDefinition.Minimos`; **sem aprovação legal automática** |
 | IX | Quadros de áreas, de quadras e de lotes; memorial `.docx` | VALIDADA (Core) | `LotReport`, `LotMemorial`, `DocxWriter` |
 | X | Verificações no Revit (pintura × pisos, continuidade, terreno × via) | IMPLEMENTADA, NÃO VALIDADA aqui | `AutoTestChecks.cs` |
-| X | Validação do modelo com severidade, confiança e revisão humana | VALIDADA (Core) desde EV4/EV5; o comando rodou no Revit 2027 (relatório do usuário, 2026-10-19) | `ModelValidator` V01–V12, `CmdValidarModelo`, `docs/evidencias` |
+| X | Validação do modelo com severidade, confiança e revisão humana | VALIDADA (Core) desde EV4/EV5; o comando rodou no Revit 2027 (relatório do usuário, 2026-10-19) | `ModelValidator` V01–V13, `CmdValidarModelo`, `docs/evidencias` |
 | XI | Análise de capacidade, atraso e nível de serviço; Webster | VALIDADA (Core), não calibrada | `TrafficAnalysis`, testes S3/T8/AA2 |
 | XI | Microssimulação (IDM, brechas, semáforos, pedestres) | VALIDADA (Core: invariantes como sem colisão e fila coerente); **não calibrada com dados de campo** | testes V4/W5/AA2 |
 | XI | Animação | IMPLEMENTADA (é reprodução dos quadros simulados, não substitui a simulação) | `SimFrame`, `TrafficMap` |
@@ -194,7 +195,7 @@ Legenda de estado:
 
 - **§6.5 Alinhamento.** Quando o raio pedido não cabe entre os PIs vizinhos, ele é **reduzido com aviso** (`Tracado.Build`). As espirais são simétricas e o desenvolvimento é limitado a 95 % do arco. A integração é numérica (passo ≤ 1,5° de deflexão). Ver `Tracado.cs`.
 - **§6.7 Volumes de terraplenagem.** O método é a **amostragem estratificada em malha**: um ponto fixo, sorteado de forma determinística, por célula; o volume é Σ(Δz·área da célula); a malha é limitada a ~250 mil amostras. Está em `Grading.Volumes`, `Grading.cs:1262`. O próprio código explica a escolha: com o centro da célula, o erro chegava a 4 % em vias alinhadas à malha. Desde EV6 existe no Core o **método das seções transversais** (`SectionVolumes`: seções perpendiculares ao eixo, média das áreas, sem correção de curvatura). Ele é conferido com a malha num teste (diferença < 2 %), mas ainda não aparece no quantitativo do Revit.
-- **§6.8 Drenagem.** Só geometria e encaixe (rebaixo de sarjeta, caixa, grelha, tubo de ligação), com as referências citadas no código (DNIT 030/2004-ES, NBR 10160). **Nenhum dimensionamento hidráulico** é feito ou afirmado.
+- **§6.8 Drenagem.** Dispositivos com encaixe na via (rebaixo de sarjeta, caixa, grelha, tubo de ligação; DNIT 030/2004-ES, NBR 10160) e, desde a Fase VIII, a **rede** (trechos entre as caixas) com **dimensionamento pelo método racional** segundo as fontes enviadas pelo usuário (Manual SUDERHSA 2002 e memorial modelo de Miguelópolis/SP 2019; D-019): planilha de galerias, captações, V13 e Memorial de Drenagem. A planilha do memorial modelo e os exemplos do manual são testes. Limites em K5; nada executado no Revit.
 - **§6.11 Tráfego.**
   - A análise usa formulações do tipo HCM e Webster.
   - A microssimulação usa IDM (parâmetros a, b e T por veículo) com zonas de conflito.

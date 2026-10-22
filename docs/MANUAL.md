@@ -753,6 +753,7 @@ sempre sua, com Editar, Atualizar ou apagando o elemento.
 | V10 | quadra com parte fora da gleba (mais de 0,5 m²) | confira o contorno da quadra ou da gleba (confiança média: pode ser só um contorno desatualizado) |
 | V11 | interseção com menos de duas vias existentes | apague a interseção ou refaça a conexão |
 | V12 | eixo ou greide de uma via fora dos **limites geométricos que você informou** em Configurações (raio, tangente entre curvas, vértice sem curva, rampa, K, comprimento de curva vertical) | confira o traçado ou o greide; a fonte dos limites é a que você escreveu. Sem limites informados, não aparece |
+| V13 | **rede de drenagem**: contrafluxo, trecho ligado ao próprio dispositivo, ciclo e os critérios do **Projeto de Drenagem** (declividade, recobrimento, diâmetros, espaçamento e queda dos PVs, geratriz superior); com a equação de chuva, também capacidade e velocidade das galerias, sarjeta e engolimento das captações | confira a contribuição de cada dispositivo e os critérios; o **Relatório da Rede** indica e aplica os diâmetros calculados |
 
 O resumo aparece numa janela (com **Selecionar os elementos com erro ou aviso** e **Abrir o relatório**). O relatório
 completo é gravado em `%AppData%\SinalizaBIM\validacao-AAAAMMDD-HHMMSS.txt`. A validação confere os **dados**; a
@@ -2069,6 +2070,51 @@ quantitativo (categorias *9. Drenagem* e *10. Obras de arte, contenções e terr
   Ø 0,60 m** em aro circular rente ao pavimento (o asfalto recebe o furo redondo). **Grelha de piso**: adota o nível do piso
   clicado (calçada ou pista).
 * Apagar um dispositivo devolve a continuidade dos pisos recortados. Referências: DNIT 030/2004-ES, NBR 10160, PMSP.
+
+### 24.1a Rede de drenagem, vazões e memorial (Fase VIII)
+Guia **SinalizaBIM Infra › Drenagem**: **Trecho de Rede**, **Projeto de Drenagem**, **Relatório da Rede** e **Memorial de
+Drenagem**. Nada disso foi executado no Revit 2027 ainda (o cálculo é testado no núcleo).
+
+1. **Projeto de Drenagem** (uma vez por projeto; fica gravado no arquivo do Revit). Escolha a **predefinição** e clique em
+   *Aplicar a predefinição*:
+   * *Manual de Drenagem Urbana – SUDERHSA (2002)*: curva de Fendrich (Curitiba), T = 2 anos, tempo inicial 10 min, C da
+     tabela 4.1, n = 0,013, diâmetros 400 a 2 000 mm, velocidades 0,75 a 5,0 m/s, recobrimento 1,00 m, lâmina de 10 cm,
+     espaçamento dos PVs pela tabela 6.1 e PV de queda acima de 0,70 m;
+   * *Memorial modelo – Miguelópolis/SP (2019)*: curva de Barretos (DAEE-SP), T = 10 anos, C de Horner com 80 % de área
+     impermeável, n = 0,015, galerias DN 600 a 1 200 e ligações DN 400, velocidades 0,75 a 6,0 m/s, recobrimento 0,80 m,
+     lâmina de 12 cm e sarjeta entre 0,7 e 3,5 m/s.
+
+   **A curva de chuva é do local**: troque pela equação do seu município (forma potência ou logarítmica, com a fonte).
+   Todos os valores são editáveis; **zero = não conferir**. Preencha também a identificação (obra, município, proprietário,
+   autor, registro, ART) – vai para o memorial. Sem equação de chuva, o plugin só confere a geometria da rede.
+2. **Contribuição de cada dispositivo** (Editar a boca de lobo, a grelha ou o PV › *Contribuição*): área local que chega
+   por superfície (m²), C ou área impermeável (zero = o do projeto), tempo de concentração ou talvegue (Kirpich), vazão
+   externa (L/s, de fora do modelo), **declividade da sarjeta** (%, para verificar a sarjeta e a lâmina) e *ponto baixo*.
+3. **Trecho de Rede**: escolha o diâmetro, clique no dispositivo de **montante** e depois no de **jusante**; o de jusante
+   vira o montante do próximo trecho (Esc termina). O tubo de concreto sai de parede a parede, no fundo das caixas; para
+   outras cotas, Editar o trecho › *Informar as cotas de fundo*. Mover ou editar uma caixa redesenha os tubos ligados a ela.
+4. **Relatório da Rede**: planilha de dimensionamento das galerias (trecho, extensão, i, área, vazão, diâmetro, vazão
+   máxima, cotas de terreno e de galeria, declividade, profundidades, velocidade e o **diâmetro necessário**), a verificação
+   das captações (vazão na sarjeta, capacidade, lâmina, velocidade, engolimento e excesso) e os problemas (contrafluxo,
+   ligações, ciclos, recobrimento, diâmetros, espaçamento dos PVs, PV de queda, geratriz superior, capacidade e
+   velocidades), em CSV. *Aplicar os diâmetros calculados* troca o diâmetro dos trechos pelo menor diâmetro comercial que
+   escoa a vazão a seção plena e redesenha os tubos – rode o relatório de novo para conferir recobrimento e PVs.
+5. **Memorial de Drenagem** (.docx): capa com a identificação, o projeto, os parâmetros de projeto (vazões pelo método
+   racional, chuva, recorrência, tempo de concentração, coeficiente de escoamento, capacidade das vias, captações, tubos,
+   recobrimento, velocidades, ligações e PVs), a planilha das galerias em página de paisagem, o descritivo dos serviços, o
+   quantitativo (tubos por diâmetro, PVs, bocas de lobo, escavação, escoramento, reaterro e excedente – estimativas) e as
+   disposições finais com as assinaturas. Confira no Word antes de assinar.
+
+**Como o cálculo é feito.** Vazão pelo método racional, Q = 0,278·C·i·A, com a área acumulada a montante de cada trecho e a
+chuva de duração igual ao maior tempo de concentração que chega ao trecho (tempo inicial + percurso nos trechos a seção
+plena). Galerias por Manning a seção plena. Sarjeta por Manning na seção triangular (guia + declividade transversal),
+com o fator de redução da tabela 6.3; bocas de lobo pelas equações de vertedor e orifício (6.5 a 6.7) com os fatores da
+tabela 6.4. A planilha do memorial modelo e os exemplos 6.1 a 6.3 do manual são testes do plugin.
+
+**Limites** (KNOWN_ISSUES K5): a área de contribuição e a declividade da sarjeta são as que você informa em cada
+dispositivo; o recobrimento é medido sob a reta entre as tampas; um dispositivo com duas saídas manda a vazão inteira para
+cada uma (o relatório aponta); o excesso de uma boca de lobo não segue até a seguinte; não há George Ribeiro (use o tempo
+informado ou Kirpich), macrodrenagem nem reservatórios. O plugin não substitui o projetista nem a aprovação do órgão.
 
 ### 24.2 Vias e obras: um só sistema
 As obras de infraestrutura **não são mais objetos separados**: a pista, as calçadas, os meios-fios, as faixas e a sinalização

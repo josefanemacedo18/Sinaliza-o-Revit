@@ -24,7 +24,7 @@ public sealed class CmdValidarModelo : CommandBase
             return Result.Cancelled;
         }
         var achados = ModelValidator.Validate(copias, uid => !string.IsNullOrWhiteSpace(uid) && doc.GetElement(uid) != null,
-            PluginContext.Settings.CriteriosGeometricos);
+            PluginContext.Settings.CriteriosGeometricos, DrainageDesignStore.Load(doc));
         var marcas = copias.Select(c => c.MarkingId).Distinct().Count();
         var text = ModelValidator.Report(achados, marcas, copias.Count, doc.Title, DateTime.Now);
         string? path = null;
