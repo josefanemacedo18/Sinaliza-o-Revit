@@ -3,6 +3,46 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-22 – Fase VI concluída: quantitativo por componente da seção e regras da regeneração no núcleo (versão 2.5.0)
+
+Fase da missão: VI (corredores, seções e pavimentação) – concluída no que é verificável aqui. Entrega: `Releases/Fase06`
+(não executada no Revit 2027).
+
+### Quantitativo por componente da seção
+- No quadro por marca, a interseção, a rotatória e o cul-de-sac saem como uma unidade, e o concreto de meio-fio, sarjeta,
+  calçada, ilhas e canteiros vai junto numa linha "Concreto". Não dava para saber quantos metros de meio-fio ou metros
+  quadrados de calçada o projeto tem.
+- `ComponentQuantities` soma, em todas as marcas da seção (vias e seus elementos de bordo, interseções, rotatórias,
+  extensões de calçada, cul-de-sac e áreas de calçada), cada componente: pavimento, faixa galgável, sarjeta, sarjetão,
+  meio-fio (área e extensão), calçada, gramado, ilhas e canteiros pavimentados; o que é físico e não é da seção (árvores
+  da ilha) fica em "outros". Uma linha por componente, material e hierarquia viária, com a origem (marcas e quantas).
+- Medido nas peças geradas, depois dos recortes. A extensão do meio-fio é a do eixo da peça: L = (P + √(P² − 16A)) / 4,
+  exata na faixa reta e no setor de coroa; num anel fechado, P / 2. Pisos editados no modelo entram com a área medida,
+  repartida entre os componentes da mesma cor na proporção do que foi gerado.
+- Os geradores marcam o componente das peças que a camada não identifica (`MarkingPiece.Component`): meio-fio de
+  canteiro, ilha e ilha separadora; miolos gramados ou pavimentados; faixa galgável; sarjeta, calçada e faixa de serviço
+  sem perfil da via. A marcação **não separa pisos no Revit** (a chave dos pisos continua cor, cota, espessura e camada).
+- Janela do quantitativo: aba **Resumo por componente da seção** (com o filtro de hierarquia); o mesmo bloco no CSV e na
+  planilha.
+
+### Regeneração depois de mudar eixo, greide ou seção
+- A escolha das conexões a refazer (interseções pelas vias, rotatórias pela via ou pelo grupo do ramo, balões pela via)
+  passou da camada Revit para o núcleo (`ModelGraph.ConnectionsToRefresh`); a regra do nó que acompanha o eixo movido até
+  15 m ou faz a interseção sair, idem (`IntersectionGenerator.FollowNode`). O Revit chama as duas; o comportamento é o
+  mesmo.
+- Conferido no núcleo: eixos movidos 7 m e 4 m → a mesma interseção (id e ajustes) refeita fica deslocada do mesmo vetor
+  e com os mesmos quantitativos por componente (diferença ≤ 0,001 m²); calçada da via 1 m mais larga → o perfil lido pela
+  interseção aumenta 1 m de cada lado e a calçada dela, de 63,9 para 77,7 m².
+- A atualização automática no Revit (updater) depois dessas edições continua não executada aqui (K17).
+
+### Testes
+- `Fase06ComponentesTests` (16): extensão do meio-fio exata na faixa reta, na curva e no anel; vias de todos os modelos,
+  interseções do 4º Autoteste e rotatórias de todos os tipos com toda peça física num componente (soma igual ao físico
+  gerado); área medida no modelo repartida na proporção; sinalização e mobiliário fora; componente sem efeito nos pisos
+  do Revit; CSV e planilha com o bloco novo.
+- `Fase06RegeneracaoTests` (4): conexões refeitas por via alterada; nó que acompanha até 15 m; eixo movido; seção
+  alterada.
+
 ## 2026-10-22 – Fase V concluída: limites geométricos do traçado e do greide informados pelo usuário (versão 2.4.0)
 
 Fase da missão: V (alinhamentos e perfis) – concluída. Entrega: `Releases/Fase05` (não executada no Revit 2027).

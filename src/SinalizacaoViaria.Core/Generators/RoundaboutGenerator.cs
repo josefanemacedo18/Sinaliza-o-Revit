@@ -520,12 +520,12 @@ public static class RoundaboutGenerator
         var L = Layout(d);
         var geo = new MarkingGeometry();
         geo.Warnings.AddRange(L.Warnings);
-        void Raised(IEnumerable<Polygon2> shapes, MarkingColor col, double h, double elev = 0)
+        void Raised(IEnumerable<Polygon2> shapes, MarkingColor col, double h, double elev = 0, string? component = null)
         {
             foreach (var s in shapes)
             {
                 var ss = s.Simplified();
-                if (ss != null && ss.Area > 1e-4) geo.Pieces.Add(new MarkingPiece(ss, col) { Thickness = h, Elevation = elev });
+                if (ss != null && ss.Area > 1e-4) geo.Pieces.Add(new MarkingPiece(ss, col) { Thickness = h, Elevation = elev, Component = component });
             }
         }
         // Rebaixamentos das travessias recortam a calçada da rotatória.
@@ -570,12 +570,12 @@ public static class RoundaboutGenerator
             // Sem lascas de pavimento (by-pass × anel × ilhas): pisos ≥ 0,01 m², sem pescoços finos.
             else Raised(IntersectionGenerator.Sound(L.Pavement), pavColor, pt, -pt);
         }
-        Raised(L.Apron, MarkingColor.Bloquete, Math.Clamp(d.ApronHeight, 0.02, 0.15), hp);   // galgável: bloquete elevado
-        Raised(L.IslandCurb, MarkingColor.Concreto, d.CurbHeight, hp);
+        Raised(L.Apron, MarkingColor.Bloquete, Math.Clamp(d.ApronHeight, 0.02, 0.15), hp, SectionComponent.Galgavel);   // galgável: bloquete elevado
+        Raised(L.IslandCurb, MarkingColor.Concreto, d.CurbHeight, hp, SectionComponent.MeioFio);
         switch (d.IslandType)
         {
             case TipoIlhaCentral.Galgavel: Raised(L.IslandCore, MarkingColor.Branca, 0.07, hp); break;   // cúpula galgável pintada
-            case TipoIlhaCentral.Pavimentada: Raised(L.IslandCore, MarkingColor.Concreto, d.CurbHeight, hp); break;
+            case TipoIlhaCentral.Pavimentada: Raised(L.IslandCore, MarkingColor.Concreto, d.CurbHeight, hp, SectionComponent.Ilha); break;
             case TipoIlhaCentral.Pintada: break;                                                     // marcas filhas (LCA, tachões, zebrado)
             case TipoIlhaCentral.Calota:
             {
@@ -588,12 +588,12 @@ public static class RoundaboutGenerator
                     (Scaled(1.0), hp), (Scaled(1 - (1 - top) * 0.05), hp + dh * 0.12), (Scaled(1 - (1 - top) * 0.35), hp + dh * 0.55),
                     (Scaled(1 - (1 - top) * 0.75), hp + dh * 0.88), (Scaled(top), hp + dh),
                 };
-                geo.Pieces.Add(DeviceGenerator.Loft(rings, MarkingColor.PavimentoConcreto));
+                geo.Pieces.Add(DeviceGenerator.Loft(rings, MarkingColor.PavimentoConcreto) with { Component = SectionComponent.Ilha });
                 if (d.DomeGrassTop)
                 {
                     // Platô superior gramado (canteiro sobre a calota).
                     var plateau = new Polygon2(Scaled(top * 0.98));
-                    geo.Pieces.Add(new MarkingPiece(plateau, MarkingColor.Grama) { Elevation = hp + dh, Thickness = 0.04 });
+                    geo.Pieces.Add(new MarkingPiece(plateau, MarkingColor.Grama) { Elevation = hp + dh, Thickness = 0.04, Component = SectionComponent.Gramado });
                 }
                 break;
             }
@@ -602,14 +602,14 @@ public static class RoundaboutGenerator
                 // Ilha ajardinada: faixa pavimentada opcional entre o meio-fio e a grama; grama elevada opcional (canteiro).
                 var paved = Math.Clamp(d.IslandPavedRing, 0, 10);
                 var core = paved > 0.05 ? PolygonOps.Offset(L.IslandCore, -paved) : L.IslandCore;
-                if (paved > 0.05) Raised(PolygonOps.Difference(L.IslandCore, core), MarkingColor.Concreto, d.CurbHeight, hp);
-                Raised(core, MarkingColor.Grama, d.CurbHeight + Math.Clamp(d.GrassRaise, 0, 1), hp);
+                if (paved > 0.05) Raised(PolygonOps.Difference(L.IslandCore, core), MarkingColor.Concreto, d.CurbHeight, hp, SectionComponent.Ilha);
+                Raised(core, MarkingColor.Grama, d.CurbHeight + Math.Clamp(d.GrassRaise, 0, 1), hp, SectionComponent.Gramado);
                 break;
             }
         }
-        Raised(L.Dividers, MarkingColor.Concreto, 0.10, hp);
-        Raised(L.SplitterCurb, MarkingColor.Concreto, d.CurbHeight);
-        Raised(L.SplitterCore, MarkingColor.Concreto, d.CurbHeight);
+        Raised(L.Dividers, MarkingColor.Concreto, 0.10, hp, SectionComponent.Ilha);
+        Raised(L.SplitterCurb, MarkingColor.Concreto, d.CurbHeight, 0, SectionComponent.MeioFio);
+        Raised(L.SplitterCore, MarkingColor.Concreto, d.CurbHeight, 0, SectionComponent.Ilha);
         var profile = d.MatchRoadSection ? d.EdgeProfile : new List<Automation.EdgeBand>();
         if (profile.Count > 0 && L.Curb.Count > 0)
         {
@@ -636,13 +636,14 @@ public static class RoundaboutGenerator
         else
         {
             IntersectionGenerator.AddPieces(geo, L.Curb.Select(c => new MarkingPiece(c, MarkingColor.Concreto) { Thickness = d.CurbHeight, Layer = "MEIO-FIO" }));
-            Raised(L.Gutter, MarkingColor.Concreto, 0.005);
+            Raised(L.Gutter, MarkingColor.Concreto, 0.005, 0, SectionComponent.Sarjeta);
             if (L.SidewalkService.Count > 0)
             {
-                Raised(PolygonOps.Difference(L.Sidewalk, L.SidewalkService), MarkingColor.Concreto, d.CurbHeight);
-                Raised(L.SidewalkService, d.ServiceStripGrass ? MarkingColor.Grama : MarkingColor.Concreto, d.CurbHeight + (d.ServiceStripGrass ? 0.0 : 0.001));
+                Raised(PolygonOps.Difference(L.Sidewalk, L.SidewalkService), MarkingColor.Concreto, d.CurbHeight, 0, SectionComponent.Calcada);
+                Raised(L.SidewalkService, d.ServiceStripGrass ? MarkingColor.Grama : MarkingColor.Concreto, d.CurbHeight + (d.ServiceStripGrass ? 0.0 : 0.001), 0,
+                    d.ServiceStripGrass ? SectionComponent.Gramado : SectionComponent.Calcada);
             }
-            else Raised(L.Sidewalk, MarkingColor.Concreto, d.CurbHeight);
+            else Raised(L.Sidewalk, MarkingColor.Concreto, d.CurbHeight, 0, SectionComponent.Calcada);
         }
 
 

@@ -16,6 +16,7 @@ namespace SinalizacaoViaria.Revit.UI;
 public partial class QuantitiesWindow : Window
 {
     private readonly List<QuantityRow> _rows;
+    private readonly List<ComponentRow> _components;
     private readonly string _projectName;
     private readonly ListCollectionView _view;
 
@@ -34,10 +35,12 @@ public partial class QuantitiesWindow : Window
 
     private readonly Dictionary<string, BitmapSource> _thumbs = new();
 
-    public QuantitiesWindow(List<QuantityRow> rows, string projectName, Dictionary<string, BitmapSource>? thumbnails = null)
+    public QuantitiesWindow(List<QuantityRow> rows, string projectName, Dictionary<string, BitmapSource>? thumbnails = null,
+        List<ComponentRow>? components = null)
     {
         InitializeComponent();
         _rows = rows;
+        _components = components ?? new List<ComponentRow>();
         _projectName = projectName;
         if (thumbnails != null) foreach (var (k, v) in thumbnails) _thumbs[k] = v;
         ThumbnailConverter.Images = _thumbs;
@@ -74,6 +77,10 @@ public partial class QuantitiesWindow : Window
 
     private List<QuantityRow> Visible => _rows.Where(Matches).ToList();
 
+    /// <summary>Resumo por componente com o filtro de hierarquia (a categoria não se aplica: são componentes da seção).</summary>
+    private List<ComponentRow> VisibleComponents => _components
+        .Where(r => CbHierarchy?.SelectedItem is not HOption { All: false } h || r.Hierarchy == h.Value).ToList();
+
     private void FilterChanged(object sender, RoutedEventArgs e)
     {
         if (_view == null) return;
@@ -94,6 +101,7 @@ public partial class QuantitiesWindow : Window
         GridCategories.ItemsSource = CategoryTree(v);
         GridSummary.ItemsSource = QuantityCalculator.Summary(v);
         GridHierarchy.ItemsSource = QuantityCalculator.HierarchySummary(v);
+        GridComponents.ItemsSource = VisibleComponents;
         var cats = v.Select(r => r.Category).Distinct().Count();
         TxtHeader.Text = $"{v.Count} item(ns) em {cats} categoria(s) e {v.Select(r => (r.Category, r.SubcategoryName)).Distinct().Count()} subcategoria(s)" +
                          (Category is { } c ? $" – filtro: {QuantityRow.CategoryLabel(c)}" : "") + $" – {DateTime.Now:dd/MM/yyyy HH:mm}";
@@ -175,7 +183,7 @@ public partial class QuantitiesWindow : Window
                 pngCache[key] = b;
                 return b;
             }
-            File.WriteAllBytes(dlg.FileName, QuantityWorkbook.Build(v, QuantityCalculator.Summary(v), _projectName, Png));
+            File.WriteAllBytes(dlg.FileName, QuantityWorkbook.Build(v, QuantityCalculator.Summary(v), _projectName, Png, VisibleComponents));
             MessageBox.Show(this, "Planilha exportada:\n" + dlg.FileName, "Quantitativos", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
@@ -196,7 +204,7 @@ public partial class QuantitiesWindow : Window
         if (dlg.ShowDialog(this) != true) return;
         try
         {
-            File.WriteAllText(dlg.FileName, QuantityCalculator.ToCsv(v, QuantityCalculator.Summary(v), _projectName), new UTF8Encoding(true));
+            File.WriteAllText(dlg.FileName, QuantityCalculator.ToCsv(v, QuantityCalculator.Summary(v), _projectName, VisibleComponents), new UTF8Encoding(true));
             MessageBox.Show(this, "Arquivo exportado:\n" + dlg.FileName, "Quantitativos", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)

@@ -17,13 +17,14 @@ public static class SidewalkGenerator
         return g;
     }
 
-    private static void AddRaised(MarkingGeometry geo, IEnumerable<Polygon2> shapes, MarkingColor color, double height, double elevation = 0)
+    private static void AddRaised(MarkingGeometry geo, IEnumerable<Polygon2> shapes, MarkingColor color, double height, double elevation = 0,
+        string? component = null)
     {
         foreach (var s in shapes)
         {
             var simple = s.Simplified();
             if (simple == null || simple.Area < 1e-4) continue;
-            geo.Pieces.Add(new MarkingPiece(simple, color) { Thickness = Math.Max(0.001, height), Elevation = elevation });
+            geo.Pieces.Add(new MarkingPiece(simple, color) { Thickness = Math.Max(0.001, height), Elevation = elevation, Component = component });
         }
     }
 
@@ -382,9 +383,9 @@ public static class SidewalkGenerator
                 platform = PolygonOps.Difference(whole, curb.Concat(planter));
             }
         }
-        AddRaised(geo, platform, MarkingColor.Concreto, d.Height);
+        AddRaised(geo, platform, MarkingColor.Concreto, d.Height, 0, SectionComponent.Calcada);
         foreach (var c in curb) geo.Pieces.Add(new MarkingPiece(c, MarkingColor.Concreto) { Thickness = Math.Max(0.001, d.Height), Layer = "MEIO-FIO" });
-        AddRaised(geo, planter, MarkingColor.Grama, d.Height);
+        AddRaised(geo, planter, MarkingColor.Grama, d.Height, 0, SectionComponent.Gramado);
         geo.PathLength = L;
         geo.PaintedLength = L;
         geo.UnitCount = 1;
@@ -427,7 +428,7 @@ public static class SidewalkGenerator
                 if (d.Curb && d.Type != TipoAreaCalcada.FaixaServico)
                 {
                     var ring = PolygonOps.Difference(shapes, PolygonOps.Offset(shapes, -cw));
-                    AddRaised(geo, ring, MarkingColor.Concreto, d.Height);
+                    AddRaised(geo, ring, MarkingColor.Concreto, d.Height, 0, SectionComponent.MeioFio);
                     body = PolygonOps.Offset(shapes, -cw);
                 }
                 var color = d.Type switch
@@ -436,7 +437,12 @@ public static class SidewalkGenerator
                     TipoAreaCalcada.Deck => MarkingColor.Marrom,
                     _ => MarkingColor.Concreto,
                 };
-                AddRaised(geo, body, color, d.Height);
+                AddRaised(geo, body, color, d.Height, 0, d.Type switch
+                {
+                    TipoAreaCalcada.Canteiro or TipoAreaCalcada.FaixaServico => SectionComponent.Gramado,
+                    TipoAreaCalcada.Calcada => SectionComponent.Calcada,
+                    _ => null,
+                });
                 break;
             }
         }
@@ -648,18 +654,19 @@ public static class SidewalkGenerator
             var service = d.ServiceStripWidth > 0.05 ? Automation.SectionMatch.ServiceBand(pav, walk, cw, d.ServiceStripWidth) : new List<Polygon2>();
             if (service.Count > 0)
             {
-                AddRaised(geo, W(PolygonOps.Difference(walk, service)), MarkingColor.Concreto, d.Height);
-                AddRaised(geo, W(service), d.ServiceStripGrass ? MarkingColor.Grama : MarkingColor.Concreto, d.Height + (d.ServiceStripGrass ? 0 : 0.001));
+                AddRaised(geo, W(PolygonOps.Difference(walk, service)), MarkingColor.Concreto, d.Height, 0, SectionComponent.Calcada);
+                AddRaised(geo, W(service), d.ServiceStripGrass ? MarkingColor.Grama : MarkingColor.Concreto, d.Height + (d.ServiceStripGrass ? 0 : 0.001), 0,
+                    d.ServiceStripGrass ? SectionComponent.Gramado : SectionComponent.Calcada);
             }
-            else AddRaised(geo, W(walk), MarkingColor.Concreto, d.Height);
+            else AddRaised(geo, W(walk), MarkingColor.Concreto, d.Height, 0, SectionComponent.Calcada);
         }
-        if (d.GutterWidth > 0.05) AddRaised(geo, W(Automation.SectionMatch.GutterBand(roadway, curb, d.GutterWidth)), MarkingColor.Concreto, 0.005);
+        if (d.GutterWidth > 0.05) AddRaised(geo, W(Automation.SectionMatch.GutterBand(roadway, curb, d.GutterWidth)), MarkingColor.Concreto, 0.005, 0, SectionComponent.Sarjeta);
         }
         if (island != null)
         {
             var islandCore = PolygonOps.Offset(new[] { island }, -cw);
-            AddRaised(geo, W(PolygonOps.Difference(new[] { island }, islandCore)), MarkingColor.Concreto, d.Height);
-            AddRaised(geo, W(islandCore), MarkingColor.Grama, d.Height);
+            AddRaised(geo, W(PolygonOps.Difference(new[] { island }, islandCore)), MarkingColor.Concreto, d.Height, 0, SectionComponent.MeioFio);
+            AddRaised(geo, W(islandCore), MarkingColor.Grama, d.Height, 0, SectionComponent.Gramado);
         }
         if (d.EdgeLine)
         {

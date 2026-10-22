@@ -20,7 +20,7 @@ cada módulo estão em [AUDIT.md](AUDIT.md); as decisões e seus motivos, em [DE
 │   Geometry     Vec2 · Polyline2 · Polygon2 · PolygonOps (Clipper2) · Tracado · RoadGrade · Solid3D · FloorTiling   │
 │   Parcelamento LotDivider · DivisaoPorLinhas · LotDrawing · LotReport · LotMemorial · Masterplan                   │
 │   Traffic      TrafficNetwork · TrafficAnalysis · TrafficSimulation · cenários · soluções · diagnóstico           │
-│   Quantities / Reports (DocxWriter, Memorial) / Geo (TM local, SIRGAS) / Catalog (MBST, JSON embutido)            │
+│   Quantities (por marca e por componente da seção) / Reports (DocxWriter, Memorial) / Geo / Catalog (MBST, JSON)   │
 │   Model        ModelGraph (dependências) · ModelValidator (V01–V12, severidade e confiança)                       │
 └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```

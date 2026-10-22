@@ -869,13 +869,20 @@ desdobrar por cor nem por material da chapa. Cores e materiais (consumo de tinta
   5. Calçadas, meios-fios e urbanização, 6. Moderação de tráfego, 7. Mobiliário e elementos urbanos.
 * Filtro por categoria, por **hierarquia viária** e **pesquisa** (código, descrição, cor, material); abas
   *Itens por categoria*, *Resumo por categoria*, **Resumo por hierarquia viária** (extensão de vias,
-  pavimento, área e extensão pintadas, placas, elementos e consumo de tinta de cada hierarquia) e
-  *Pintura por cor e material*.
+  pavimento, área e extensão pintadas, placas, elementos e consumo de tinta de cada hierarquia),
+  **Resumo por componente da seção** e *Pintura por cor e material*.
+* **Resumo por componente da seção**: pavimento, faixa galgável, sarjeta, sarjetão, **meio-fio (m² e metros)**, calçada,
+  gramado e ilhas pavimentadas somados em todas as vias, interseções, rotatórias, extensões de calçada, cul-de-sac e áreas
+  de calçada – por material e hierarquia, com a origem (ex.: *SARJETA (12), INTERSECAO (3)*). No quadro por item a
+  interseção e a rotatória contam como uma unidade e o concreto delas sai junto; aqui cada componente tem a sua linha.
+  Medido nas peças geradas, **depois dos recortes** (rampas, travessias); a extensão do meio-fio é a do eixo da peça, por
+  isso pode diferir da extensão do eixo da linha no quadro por item. Pisos editados à mão entram com a área medida.
+  Árvores da ilha da rotatória ficam em *Outros elementos físicos da seção*.
 * Cada item é separado também pela **hierarquia viária** da via a que pertence (coluna *Hierarquia*).
 * Cada linha traz a **quantidade na unidade de medição** do item (m², m ou un), área (pintada para
   tintas, em planta para concreto/grama/metal), extensão, unidades, consumo estimado e referência.
 * **Exportar CSV**: blocos por categoria com subtotais (com a coluna de hierarquia), resumo por categoria,
-  **resumo por hierarquia viária** e resumo de pintura
+  **resumo por hierarquia viária**, **resumo por componente da seção** e resumo de pintura
   (separador `;` e vírgula decimal – abre direto no Excel em português). Exporta a categoria/pesquisa
   atual.
 * **Criar tabela no Revit**: *SV - Quantitativos de sinalização* com o **mesmo layout da janela** – título

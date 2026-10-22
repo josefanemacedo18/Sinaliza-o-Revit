@@ -151,6 +151,8 @@ Legenda de estado:
 | VI | Seção transversal da via (faixas, ciclofaixas, calçadas, canteiros, larguras variáveis) | VALIDADA (Core) | `RoadSetup*`, centenas de testes |
 | VI | Pavimento (asfalto, bloquete, concreto, terra) e camadas no perfil | VALIDADA (Core) | rodadas AD3/LX2 |
 | VI | Corredor 3D (pisos no greide, obras hospedadas) | VALIDADA (Core) / Revit não validado | rodadas K/L/VT |
+| VI | Quantitativo por componente da seção (pavimento, meio-fio com extensão, sarjeta, calçada, gramado, ilhas) | VALIDADA (Core) desde a Fase VI; aba, CSV e planilha **não executados no Revit** | `ComponentQuantities`, `Fase06ComponentesTests` |
+| VI | Regeneração depois de mudar eixo, greide ou seção | Regras do núcleo VALIDADAS (Fase VI); updater no Revit não validado (K17) | `ModelGraph.ConnectionsToRefresh`, `IntersectionGenerator.FollowNode`, `Fase06RegeneracaoTests` |
 | VII | Terreno (TIN, Toposolid nativo) | VALIDADA (Core) / Revit não validado | `Tin`, `TerrainMesh`, `Grading` |
 | VII | Terraplenagem: corte/aterro, taludes, bermas, volumes | VALIDADA (Core); desde EV6 também o método das seções (Core, sem interface no Revit), conferido com a malha | `Grading.Volumes`, `SectionVolumes` (§6.7) |
 | VII | Interseções (T, cruz, oblíquas, tipos II–IV), rotatórias, nós em desnível | VALIDADA (Core) | rodadas S2, V2, AB2, AE3 |

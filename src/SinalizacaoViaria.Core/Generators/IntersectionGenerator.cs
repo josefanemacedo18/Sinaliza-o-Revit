@@ -314,6 +314,17 @@ public static partial class IntersectionGenerator
     // ------------------------------------------------------------------ nós
 
     /// <summary>Encontra os cruzamentos (e entroncamentos em T) entre os eixos das vias.</summary>
+    /// <summary>
+    /// Nó de uma interseção existente depois que os eixos mudaram: o cruzamento das vias mais perto do nó gravado, se estiver a
+    /// até <paramref name="maxShift"/>; senão nulo – as vias não se cruzam mais ali e a interseção sai.
+    /// </summary>
+    public static Vec2? FollowNode(Vec2 previous, IReadOnlyList<IntersectionRoad> roads, double maxShift = 15)
+    {
+        if (roads.Count < 2) return null;
+        var node = FindNodes(roads).OrderBy(n => n.Node.DistanceTo(previous)).FirstOrDefault();
+        return node.Roads == null || node.Node.DistanceTo(previous) > maxShift ? null : node.Node;
+    }
+
     public static List<(Vec2 Node, List<int> Roads)> FindNodes(IReadOnlyList<IntersectionRoad> roads)
     {
         var raw = new List<(Vec2, int, int)>();
@@ -2208,12 +2219,12 @@ public static partial class IntersectionGenerator
         // Orelhas das esquinas (marcas filhas): a pista e a sarjeta da interseção saem de baixo delas.
         var earFp = L.Ears.SelectMany(e => e.CutZone.Count > 0 ? e.CutZone : new List<Polygon2> { e.Footprint }).ToList();
         List<Polygon2> NoEars(List<Polygon2> a) => earFp.Count == 0 ? a : PolygonOps.Difference(a, earFp).Where(p => p.Area >= 0.01).ToList();
-        void Raised(IEnumerable<Polygon2> shapes, MarkingColor c, double h, double elev = 0)
+        void Raised(IEnumerable<Polygon2> shapes, MarkingColor c, double h, double elev = 0, string? component = null)
         {
             foreach (var s in shapes)
             {
                 var ss = s.Simplified();
-                if (ss != null && ss.Area > 1e-4) geo.Pieces.Add(new MarkingPiece(ss, c) { Thickness = h, Elevation = elev });
+                if (ss != null && ss.Area > 1e-4) geo.Pieces.Add(new MarkingPiece(ss, c) { Thickness = h, Elevation = elev, Component = component });
             }
         }
         // Rebaixamentos das travessias recortam as calçadas refeitas pela interseção (retângulo da rampa com as abas: a
@@ -2279,28 +2290,28 @@ public static partial class IntersectionGenerator
             if (roads.Any(r => r.Def.Material != TipoPavimento.Nenhum))
                 Raised(SoundPavement(NoEars(L.Gutter.Count > 0 ? PolygonOps.Difference(L.Pavement, L.Gutter) : L.Pavement)), L.PavementColor, L.PavementThickness, -L.PavementThickness);
             AddPieces(geo, NoEars(L.Curb).Select(c => new MarkingPiece(c, MarkingColor.Concreto) { Thickness = L.CurbHeight, Layer = "MEIO-FIO" }));
-            Raised(NoEars(L.Gutter), MarkingColor.Concreto, 0.005);
+            Raised(NoEars(L.Gutter), MarkingColor.Concreto, 0.005, 0, SectionComponent.Sarjeta);
             if (L.SidewalkService.Count > 0)
             {
                 // Sobras da faixa gramada menores que 0,15 m² (junto à aba da rampa) ficam no passeio; na curva da esquina a
                 // faixa fica inteira (concêntrica ao meio-fio) ou sai.
                 var service = CornerGrass(L, L.SidewalkService.Select(p => new MarkingPiece(p, MarkingColor.Grama) { Layer = "GRAMADO" }).ToList(), drop: true)
                     .Select(p => p.Shape).Where(p => p.Area >= 0.15).ToList();
-                Raised(PolygonOps.Difference(L.Sidewalk, service), MarkingColor.Concreto, L.CurbHeight);
-                Raised(service, MarkingColor.Grama, L.CurbHeight);
+                Raised(PolygonOps.Difference(L.Sidewalk, service), MarkingColor.Concreto, L.CurbHeight, 0, SectionComponent.Calcada);
+                Raised(service, MarkingColor.Grama, L.CurbHeight, 0, SectionComponent.Gramado);
             }
-            else Raised(L.Sidewalk, MarkingColor.Concreto, L.CurbHeight);
+            else Raised(L.Sidewalk, MarkingColor.Concreto, L.CurbHeight, 0, SectionComponent.Calcada);
         }
         // Miolo de canteiro menor que um piso (ponta estreita do nariz): vira meio-fio junto com a borda, sem lasca de grama.
         var tinyCore = L.MedianCore.Where(p => p.Area < MinFloorArea).ToList();
-        Raised(tinyCore.Count > 0 ? PolygonOps.Union(L.MedianCurb.Concat(tinyCore)) : L.MedianCurb, MarkingColor.Concreto, L.CurbHeight);
-        Raised(L.MedianCore.Where(p => p.Area >= MinFloorArea), MarkingColor.Grama, L.CurbHeight);
+        Raised(tinyCore.Count > 0 ? PolygonOps.Union(L.MedianCurb.Concat(tinyCore)) : L.MedianCurb, MarkingColor.Concreto, L.CurbHeight, 0, SectionComponent.MeioFio);
+        Raised(L.MedianCore.Where(p => p.Area >= MinFloorArea), MarkingColor.Grama, L.CurbHeight, 0, SectionComponent.Gramado);
         foreach (var isl in L.Islands)
         {
             var core = PolygonOps.Offset(new[] { isl }, -L.CurbWidth);
-            Raised(PolygonOps.Difference(new[] { isl }, core), MarkingColor.Concreto, L.CurbHeight);
+            Raised(PolygonOps.Difference(new[] { isl }, core), MarkingColor.Concreto, L.CurbHeight, 0, SectionComponent.MeioFio);
             // Ilhas pequenas: concreto; maiores: ajardinadas.
-            Raised(core, isl.Area > 25 ? MarkingColor.Grama : MarkingColor.Concreto, L.CurbHeight);
+            Raised(core, isl.Area > 25 ? MarkingColor.Grama : MarkingColor.Concreto, L.CurbHeight, 0, isl.Area > 25 ? SectionComponent.Gramado : SectionComponent.Ilha);
         }
         geo.UnitCount = 1;
         geo.PathLength = L.Legs.Count;

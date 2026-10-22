@@ -3,6 +3,7 @@ using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
+using SinalizacaoViaria.Core.Model;
 
 namespace SinalizacaoViaria.Revit.Infrastructure;
 
@@ -329,26 +330,25 @@ public sealed class IntersectionService
         it.RoadIds = roads.Select(r => r.Def.Id).ToList();
 
         // As vias ainda se cruzam aqui? (eixos movidos): acompanha o nó ou remove a interseção.
-        var node = roads.Count >= 2 ? IntersectionGenerator.FindNodes(roads).OrderBy(n => n.Node.DistanceTo(it.Node)).FirstOrDefault() : default;
-        if (roads.Count < 2 || node.Roads == null || node.Node.DistanceTo(it.Node) > 15)
+        if (IntersectionGenerator.FollowNode(it.Node, roads) is not { } node)
         {
             Remove(it);
             return results;
         }
-        if (Separated(roads, node.Node))
+        if (Separated(roads, node))
         {
             // As vias passam a se cruzar em desnível (greide/viaduto): a interseção sai e as vias ficam contínuas.
             Remove(it);
             return results;
         }
-        it.Node = node.Node;
-        it.Z = roads.Average(r => RoadZ(r, node.Node));
+        it.Node = node;
+        it.Z = roads.Average(r => RoadZ(r, node));
         it.EdgeProfile = it.MatchRoadSection ? EdgeProfile.Best(roads.Select(r => ProfileOf(r.Def))) : new List<EdgeBand>();
         it.RoadProfiles = it.MatchRoadSection ? roads.Select(r => SidesOf(r.Def)).ToList() : new List<RoadEdgeProfile>();
         // Nós vizinhos (outras interseções e rotatórias): as linhas de aproximação vão no máximo até a metade da quadra.
         it.NeighborNodes = all.OfType<IntersectionDefinition>().Where(o => o.Id != it.Id).Select(o => o.Node)
             .Concat(all.OfType<RoundaboutDefinition>().Select(o => o.Center))
-            .Where(p => p.DistanceTo(node.Node) > 3 && p.DistanceTo(node.Node) < 400).ToList();
+            .Where(p => p.DistanceTo(node) > 3 && p.DistanceTo(node) < 400).ToList();
         var layout = IntersectionGenerator.Layout(it, roads);
         if (layout.Roads.Count > 0) it.Hierarchy = layout.Roads[layout.Main].Def.Hierarchy;
 
@@ -479,14 +479,9 @@ public sealed class IntersectionService
         return results;
     }
 
-    public List<RoundaboutDefinition> RoundaboutsDependentOn(IEnumerable<MarkingDefinition> changed)
-    {
-        var groups = changed.Select(d => d.GroupId).Where(g => g != null).ToHashSet();
-        var all = MarkingStorage.Definitions(_doc, typeof(RoadPavementDefinition), typeof(RoundaboutDefinition));
-        var roadIds = all.OfType<RoadPavementDefinition>().Where(p => groups.Contains(p.GroupId)).Select(p => p.Id).ToHashSet();
-        return all.OfType<RoundaboutDefinition>().Where(r => r.Legs.Any(l => l.RoadId != null && roadIds.Contains(l.RoadId)
-            || l.GroupId != null && groups.Contains(l.GroupId))).ToList();
-    }
+    public List<RoundaboutDefinition> RoundaboutsDependentOn(IEnumerable<MarkingDefinition> changed) =>
+        ModelGraph.ConnectionsToRefresh(changed, MarkingStorage.Definitions(_doc, typeof(RoadPavementDefinition), typeof(RoundaboutDefinition)))
+            .OfType<RoundaboutDefinition>().ToList();
 
     /// <summary>Apaga a interseção, suas travessias/rampas e os recortes que ela fazia nas vias.</summary>
     public void Remove(IntersectionDefinition it)
@@ -566,13 +561,9 @@ public sealed class IntersectionService
         return results;
     }
 
-    public List<CulDeSacDefinition> CulDeSacsDependentOn(IEnumerable<MarkingDefinition> changed)
-    {
-        var groups = changed.Select(d => d.GroupId).Where(g => g != null).ToHashSet();
-        var all = MarkingStorage.Definitions(_doc, typeof(RoadPavementDefinition), typeof(CulDeSacDefinition));
-        var roadIds = all.OfType<RoadPavementDefinition>().Where(p => groups.Contains(p.GroupId)).Select(p => p.Id).ToHashSet();
-        return all.OfType<CulDeSacDefinition>().Where(c => c.RoadId != null && roadIds.Contains(c.RoadId)).ToList();
-    }
+    public List<CulDeSacDefinition> CulDeSacsDependentOn(IEnumerable<MarkingDefinition> changed) =>
+        ModelGraph.ConnectionsToRefresh(changed, MarkingStorage.Definitions(_doc, typeof(RoadPavementDefinition), typeof(CulDeSacDefinition)))
+            .OfType<CulDeSacDefinition>().ToList();
 
     /// <summary>Rotatórias cujo centro está na ponta (ou sobre o eixo) da via indicada.</summary>
     public List<RoundaboutDefinition> RoundaboutsTouching(IntersectionRoad road) =>
@@ -791,11 +782,7 @@ public sealed class IntersectionService
     }
 
     /// <summary>Interseções que dependem das marcas (grupos de via) indicadas.</summary>
-    public List<IntersectionDefinition> DependentOn(IEnumerable<MarkingDefinition> changed)
-    {
-        var groups = changed.Select(d => d.GroupId).Where(g => g != null).ToHashSet();
-        var all = MarkingStorage.Definitions(_doc, typeof(RoadPavementDefinition), typeof(IntersectionDefinition));
-        var roadIds = all.OfType<RoadPavementDefinition>().Where(p => groups.Contains(p.GroupId)).Select(p => p.Id).ToHashSet();
-        return all.OfType<IntersectionDefinition>().Where(i => i.RoadIds.Any(roadIds.Contains)).ToList();
-    }
+    public List<IntersectionDefinition> DependentOn(IEnumerable<MarkingDefinition> changed) =>
+        ModelGraph.ConnectionsToRefresh(changed, MarkingStorage.Definitions(_doc, typeof(RoadPavementDefinition), typeof(IntersectionDefinition)))
+            .OfType<IntersectionDefinition>().ToList();
 }

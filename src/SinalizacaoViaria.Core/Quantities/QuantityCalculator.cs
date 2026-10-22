@@ -67,12 +67,15 @@ public sealed class QuantityRow
     public string SubcategoryName => string.IsNullOrEmpty(Subcategory) ? GroupName : Subcategory;
 
     /// <summary>Nome da cor para exibição ("—" em famílias do usuário).</summary>
-    public string ColorLabel => IsFamily ? "—" : Color switch
+    public string ColorLabel => IsFamily ? "—" : ColorText(Color);
+
+    /// <summary>Nome curto de uma cor ou material para exibição.</summary>
+    public static string ColorText(MarkingColor c) => c switch
     {
         MarkingColor.PavimentoConcreto => "Pav. concreto",
         MarkingColor.PavimentoTerra => "Terra",
         MarkingColor.RelevoTatil => "Relevo tátil",
-        _ => Color.ToString(),
+        _ => c.ToString(),
     };
 
     /// <summary>Consumo com unidade ("" quando não se aplica).</summary>
@@ -420,7 +423,8 @@ public static class QuantityCalculator
     /// um bloco por categoria e subcategoria com as colunas que fazem sentido para ela (memorial: modelo e quantidade;
     /// horizontal: cor, material, área, extensão e consumo), subtotais e resumos ao final.
     /// </summary>
-    public static string ToCsv(IEnumerable<QuantityRow> rows, IEnumerable<QuantityRow>? summary = null, string? projectName = null)
+    public static string ToCsv(IEnumerable<QuantityRow> rows, IEnumerable<QuantityRow>? summary = null, string? projectName = null,
+        IEnumerable<ComponentRow>? components = null)
     {
         var pt = CultureInfo.GetCultureInfo("pt-BR");
         var sb = new StringBuilder();
@@ -465,6 +469,11 @@ public static class QuantityCalculator
         sb.AppendLine("Hierarquia;Extensão de vias (m);Pavimento (m²);Área pintada (m²);Extensão pintada (m);Placas (un);Elementos;Consumo de tinta");
         foreach (var h in HierarchySummary(list))
             sb.AppendLine(string.Join(";", Esc(h.Name), N(h.RoadLength), N(h.PavementArea), N(h.PaintedArea), N(h.PaintedLength), h.Signs, h.Elements, N(h.PaintConsumption)));
+        if (components != null && components.Any())
+        {
+            sb.AppendLine();
+            sb.Append(ComponentQuantities.Csv(components));
+        }
         if (summary != null && summary.Any())
         {
             sb.AppendLine();

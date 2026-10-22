@@ -34,7 +34,11 @@ public sealed class CmdQuantitativos : CommandBase
         var (items, rows) = Collect(doc, uidoc.ActiveView, defs, families);
         // Miniaturas da própria sinalização (face da placa, trecho da linha, unidade do dispositivo, amostra de material).
         var thumbs = QuantityThumbnails.Build(items);
-        var w = new QuantitiesWindow(rows, doc.Title, thumbs);
+        // Resumo por componente da seção (pavimento, meio-fio, sarjeta, calçada...) somado em todas as marcas.
+        var components = new List<ComponentRow>();
+        try { components = ComponentQuantities.Compute(items); }
+        catch (Exception ex) { Log.Error("Quantitativo por componente da seção", ex); }
+        var w = new QuantitiesWindow(rows, doc.Title, thumbs, components);
         if (UiHelpers.ShowModal(w) == true && (w.CreateSchedule || w.SchedulesByCategory))
         {
             // Tabela nativa: roda com qualquer vista ativa (inclusive folha) e vai direto para a folha escolhida.

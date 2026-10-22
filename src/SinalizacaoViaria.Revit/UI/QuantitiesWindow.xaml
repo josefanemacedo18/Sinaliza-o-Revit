@@ -209,6 +209,24 @@
                     </DataGrid.Columns>
                 </DataGrid>
             </TabItem>
+            <TabItem Header="Resumo por componente da seção">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Margin="2,4,2,6" TextWrapping="Wrap" Foreground="#5A6472"
+                               Text="Pavimento, meio-fio, sarjeta, calçada, gramado e ilhas somados em todas as vias, interseções, rotatórias, extensões de calçada e cul-de-sac – medidos nas peças geradas, depois dos recortes. A extensão do meio-fio é a do eixo das peças. Pisos editados no modelo entram com a área medida."/>
+                    <DataGrid x:Name="GridComponents" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" RowHeight="26" BorderBrush="#D5DBE3">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Componente" Binding="{Binding Name}" Width="*" FontWeight="SemiBold"/>
+                            <DataGridTextColumn Header="Material" Binding="{Binding ColorLabel}" Width="110"/>
+                            <DataGridTextColumn Header="Hierarquia" Binding="{Binding HierarchyName}" Width="130"/>
+                            <DataGridTextColumn Header="Área (m²)" Binding="{Binding Area, StringFormat=N2, ConverterCulture=pt-BR}" Width="100"/>
+                            <DataGridTextColumn Header="Extensão (m)" Binding="{Binding Length, StringFormat=N2, ConverterCulture=pt-BR}" Width="100"/>
+                            <DataGridTextColumn Header="Elementos" Binding="{Binding Elements}" Width="80"/>
+                            <DataGridTextColumn Header="Origem" Binding="{Binding Sources}" Width="220"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
             <TabItem Header="Pintura por cor e material">
                 <DataGrid x:Name="GridSummary" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
                           GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" RowHeight="26" BorderBrush="#D5DBE3">

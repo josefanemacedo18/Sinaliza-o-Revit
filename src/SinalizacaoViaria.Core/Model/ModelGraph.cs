@@ -83,6 +83,25 @@ public sealed class ModelGraph
         return list;
     }
 
+    /// <summary>
+    /// Interseções, rotatórias e balões a refazer quando as marcas <paramref name="changed"/> mudam (eixo, greide ou seção de
+    /// uma via): os ligados ao pavimento de uma via do mesmo grupo de alguma marca alterada – a interseção pelas vias
+    /// (<c>RoadIds</c>), a rotatória pela via ou pelo grupo de um ramo, o balão pela via. Nessa ordem (interseções, rotatórias,
+    /// balões), como a atualização automática do Revit os refaz.
+    /// </summary>
+    public static List<MarkingDefinition> ConnectionsToRefresh(IEnumerable<MarkingDefinition> changed, IEnumerable<MarkingDefinition> all)
+    {
+        var groups = changed.Select(d => d.GroupId).Where(g => g != null).Cast<string>().ToHashSet();
+        var list = all.ToList();
+        var roadIds = list.OfType<RoadPavementDefinition>().Where(p => p.GroupId != null && groups.Contains(p.GroupId)).Select(p => p.Id).ToHashSet();
+        var res = new List<MarkingDefinition>();
+        res.AddRange(list.OfType<IntersectionDefinition>().Where(i => i.RoadIds.Any(roadIds.Contains)));
+        res.AddRange(list.OfType<RoundaboutDefinition>().Where(r => r.Legs.Any(l => l.RoadId != null && roadIds.Contains(l.RoadId)
+                                                                                  || l.GroupId != null && groups.Contains(l.GroupId))));
+        res.AddRange(list.OfType<CulDeSacDefinition>().Where(c => c.RoadId != null && roadIds.Contains(c.RoadId)));
+        return res;
+    }
+
     /// <summary>Quem depende de <paramref name="id"/> (direta ou indiretamente), só pelas referências fortes.</summary>
     public IReadOnlyList<string> Dependents(string id, bool transitive = true)
     {

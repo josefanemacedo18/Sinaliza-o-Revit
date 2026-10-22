@@ -30,6 +30,12 @@ public sealed record MarkingPiece(Polygon2 Shape, MarkingColor Color)
     public string? Layer { get; init; }
 
     /// <summary>
+    /// Componente da seção para o quantitativo por componente (<see cref="SectionComponent"/>) quando a camada não o diz:
+    /// meio-fio da ilha, miolo do canteiro, faixa galgável. Ao contrário de <see cref="Layer"/>, não separa pisos no Revit.
+    /// </summary>
+    public string? Component { get; init; }
+
+    /// <summary>
     /// Sólido de revolução exato (cilindro, tronco de cone, anel) – no Revit vira superfície curva de verdade, sem facetas;
     /// <see cref="Solid"/> guarda a aproximação poliédrica (prévias, quantitativos e plano B se o Revit recusar).
     /// </summary>

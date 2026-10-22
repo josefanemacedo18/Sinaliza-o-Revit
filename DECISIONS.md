@@ -217,3 +217,18 @@ como substituída.
   - O ajuste de uma marca custa mais: cada piso ainda é ajustado sozinho, e os trechos comuns uma vez mais.
   - Pisos de marcas diferentes continuam ajustados separados; entre eles valem os centros exatos (D-015).
 
+## D-017 – Componente da seção marcado na peça, separado da camada que divide os pisos
+- **Contexto:** o quantitativo por componente (Fase VI) precisa saber o que cada peça é – meio-fio, sarjeta, calçada,
+  gramado, ilha. A camada (`MarkingPiece.Layer`) já diz isso nas peças que vêm do perfil das vias, mas nas interseções,
+  rotatórias e cul-de-sacs o meio-fio do canteiro e das ilhas, os miolos e a faixa galgável não têm camada. E a camada
+  entra na chave dos pisos do Revit (`ElementPlan.FloorKey`): dar camada a essas peças mudaria quais pisos são criados e
+  unidos – mudança no modelo que só um Autoteste confirmaria.
+- **Decisão:** um campo à parte, `MarkingPiece.Component`, posto pelos geradores onde a camada não identifica a peça e
+  lido só pelo quantitativo. A classificação é: marcação do gerador → camada → código da marca linear → pavimento pela
+  cor → "outros" (o físico que não é da seção). A pintura não é componente.
+- **Consequências:**
+  - Os pisos do Revit não mudam (teste `MarcacaoDoComponente_NaoMudaOsPisosDoRevit`).
+  - Gerador novo que crie peça física da seção sem camada nem marcação cai em "outros"; os testes de soma (todo físico
+    gerado = soma dos componentes, sem "outros" nas vias, interseções e rotatórias sem paisagismo) acusam.
+  - A extensão do meio-fio é medida na peça (fórmula da faixa), não no eixo da linha: inclui os recortes de rampas e
+    travessias.

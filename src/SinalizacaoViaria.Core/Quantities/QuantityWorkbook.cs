@@ -21,7 +21,8 @@ public static class QuantityWorkbook
     // estilos (índices de cellXfs)
     private const int StTitle = 1, StHeader = 2, StCategory = 3, StSub = 4, StText = 5, StNum = 6, StInt = 7, StSubTotText = 8, StSubTotNum = 9, StMeta = 10, StTextCenter = 11;
 
-    public static byte[] Build(IEnumerable<QuantityRow> rows, IEnumerable<QuantityRow>? summary, string? projectName, Func<QuantityRow, byte[]?>? thumbnail = null)
+    public static byte[] Build(IEnumerable<QuantityRow> rows, IEnumerable<QuantityRow>? summary, string? projectName, Func<QuantityRow, byte[]?>? thumbnail = null,
+        IEnumerable<ComponentRow>? components = null)
     {
         var list = rows.ToList();
         var sheet = new StringBuilder();
@@ -118,6 +119,20 @@ public static class QuantityWorkbook
         {
             Text(0, h.Name, StText); Num(1, h.RoadLength, StNum); Num(2, h.PavementArea, StNum); Num(3, h.PaintedArea, StNum); Num(4, h.PaintedLength, StNum); Num(5, h.Signs, StInt); Num(6, h.Elements, StInt); Num(7, h.PaintConsumption, StNum);
             Row();
+        }
+        if (components != null && components.Any())
+        {
+            Row();
+            Line("RESUMO POR COMPONENTE DA SEÇÃO (medido nas peças geradas, depois dos recortes)", StCategory, 20);
+            foreach (var (h, i) in new[] { "Componente", "Material", "Hierarquia", "Área (m²)", "Extensão (m)", "Elementos", "Origem" }.Select((h, i) => (h, i))) Text(i, h, StHeader);
+            Row();
+            foreach (var q in components)
+            {
+                Text(0, q.Name, StText); Text(1, q.ColorLabel, StText); Text(2, q.HierarchyName, StText); Num(3, q.Area, StNum);
+                if (q.Length > 1e-6) Num(4, q.Length, StNum); else Blank(4, StText);
+                Num(5, q.Elements, StInt); Text(6, q.Sources, StText);
+                Row();
+            }
         }
         if (summary != null && summary.Any())
         {
