@@ -3,6 +3,24 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-23 – Prompt Master adotado: auditoria pelo novo escopo
+
+Sem mudança de código nem DLL nova.
+- `docs/PROMPT_MASTER.md`: transcrição do documento enviado pelo usuário. Ele rege o desenvolvimento a partir de agora
+  (DECISIONS D-021): a ordem vem dos riscos, e as 15 fases ficam como mapa de rastreio.
+- AUDIT §8:
+  - mapa dos módulos e dependências, com a contagem das referências entre pastas do Core, que mostrou referências
+    mútuas (R15, K18);
+  - matriz pelo escopo do Prompt Master nas cinco situações pedidas;
+  - riscos e prioridades.
+- Lacunas novas no ROADMAP (X3–X5, P6–P8):
+  - diagnóstico do terreno;
+  - validação com módulo, ação recomendada, "não verificável" e comparação com a anterior;
+  - terraplenagem desatualizada sem aviso;
+  - estrutura do pavimento só no desenho do corte;
+  - atualização associativa sem mostrar o que ficou desatualizado.
+- Correção na matriz da AUDIT §5: saiu a linha que ainda dava o dimensionamento hidráulico como ausente.
+
 ## 2026-10-22 – Fase VIII concluída: rede de drenagem dimensionada pelo método racional e memorial de drenagem (versão 2.7.0)
 
 Fase da missão: VIII (drenagem e redes). Entrega: `Releases/Fase08` (não executada no Revit 2027). No meio da fase, o usuário

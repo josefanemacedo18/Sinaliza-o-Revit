@@ -159,7 +159,6 @@ Legenda de estado:
 | VIII | Dispositivos de drenagem superficial (bocas de lobo, grelhas, PV, sarjetão, canaletas) – geometria | VALIDADA (Core) | `DrainageGenerator`, `SarjetaoGenerator` |
 | VIII | Rede de drenagem (trechos entre caixas, sentido, ligações, ciclos, recobrimento, diâmetros, PVs) | VALIDADA (Core) desde a Fase VIII; comandos Trecho de Rede e Relatório da Rede **não executados no Revit** | `DrainageNetwork`, `Fase08DrenagemTests` |
 | VIII | Dimensionamento pelo método racional (IDF, C, tc acumulado, Manning a seção plena, sarjetas, bocas de lobo) e Memorial de Drenagem | VALIDADA (Core) contra os exemplos 6.1–6.3 e a tabela B.3 do Manual SUDERHSA e a planilha do memorial modelo (fontes do usuário, D-019); Revit não validado; limites em K5 | `DrainageHydraulics`, `DrainageMemorial`, `Fase08HidraulicaTests` |
-| VIII | Dimensionamento hidráulico | AUSENTE (não afirmado) | nenhum cálculo de vazão/Manning |
 | IX | Loteamento: gleba, quadras, lotes por testada e por linhas, chanfros, uniões, numeração, categorias | VALIDADA (Core) | rodadas LT/LU/LV/LW/LX |
 | IX | Regras mínimas configuráveis (frente 5 m e área 125 m² por padrão, editáveis) | VALIDADA (Core) | `LoteamentoDefinition.Minimos`; **sem aprovação legal automática** |
 | IX | Quadros de áreas, de quadras e de lotes; memorial `.docx` | VALIDADA (Core) | `LotReport`, `LotMemorial`, `DocxWriter` |
@@ -258,3 +257,100 @@ que compilam contra o pacote do Revit 2027 referenciado (K10); nenhum foi presum
 5. Toposolid projetado separado do original: avaliar contra a edição atual com o original gravado (RT-1.4, decisão a
    registrar).
 
+
+## 8. Auditoria pelo Prompt Master (2026-10-23)
+
+Em 2026-10-23 o usuário enviou o **Prompt Master** (`docs/PROMPT_MASTER.md`). Ele amplia o escopo para uma plataforma de
+infraestrutura urbana no Revit 2027 e troca a sequência rígida das 15 fases pela ordem de riscos e dependências
+(DECISIONS D-021). Esta seção compara o código com cada parte do Prompt Master, sem refazer as auditorias anteriores.
+Ela usa as cinco situações pedidas no item 28:
+
+- **IT – implementada e testada:** testes automatizados do núcleo passam (local e CI). O Revit não foi validado, salvo
+  quando indicado.
+- **INV – implementada, não validada:** o código existe, mas sem teste automatizado do comportamento principal (em geral,
+  código que só roda dentro do Revit).
+- **P – parcial.**
+- **A – ausente.**
+- **B – bloqueada.**
+
+Base: commit `6d2b72f`, compilação limpa, suíte 2 949/2 949 (Fase VIII). Nada desta seção foi executado no Revit.
+
+### 8.1 Mapa dos módulos e dependências
+
+A coluna "Usa" mostra a dependência **principal** de cada módulo. As pastas do Core são espaços de nomes de um único
+assembly, não módulos isolados. A contagem das referências entre pastas (`SinalizacaoViaria.Core.X` citado em outra pasta)
+mostra **referências mútuas**:
+- `Geometry` usa as peças de `Model` (`MarkingPiece`, `MarkingColor`, em 5 arquivos), e `Model` usa `Geometry`;
+- `Definitions`, `Generators` e `Automation` se citam entre si (`MarkingBuilder` chama os geradores, que leem as
+  definições).
+
+Isso compila (é um assembly só), mas contraria o §4 do Prompt Master. Está registrado como R15 (§8.3) e K18.
+
+| Camada (Prompt Master §4) | Módulo | Onde | Usa |
+|---|---|---|---|
+| Domínio | Definições persistentes (≈ 70 tipos), versões e migrações, identidade (GUID) | `Core/Definitions`, `Core/Serialization`, `Core/Model/ModelGraph` | Geometria |
+| Motor geométrico | Vec2, Polyline2, Polygon2, booleanas (Clipper2), traçado, greide, sólidos, contornos, pares sobrepostos | `Core/Geometry`, `Core/Model/PieceOverlaps`, `ThirdParty/Clipper2` | — |
+| Motor topográfico | TIN (Delaunay), malha do terreno, terreno de projeto (plataformas e taludes), volumes (malha e seções) | `Core/Automation/Tin`, `TerrainMesh`, `Grading`, `SectionVolumes` | Geometria |
+| Serviços – vias | seção (RoadSetup), greide automático, geradores das vias, interseções, rotatórias, nós, acessos | `Core/Automation/Road*`, `Core/Generators/*Road*`, `Intersection*`, `Roundabout*`, `Interchange*` | Geometria, Domínio, Topografia |
+| Serviços – drenagem | dispositivos, rede, hidráulica (método racional), memorial | `Core/Generators/DrainageGenerator`, `Core/Automation/Drainage*`, `Core/Reports/DrainageMemorial` | Geometria, Domínio |
+| Serviços – parcelamento | gleba, quadras, lotes, quadros, memorial | `Core/Parcelamento` | Geometria, Domínio, vias (área de circulação) |
+| Serviços – sinalização e tráfego | sinalização (MBST), catálogo, simulação e análise | `Core/Generators`, `Core/Catalog`, `Core/Traffic` | Geometria, Domínio, vias |
+| Serviços – quantitativos e relatórios | por marca, por componente, volumes, `.docx` | `Core/Quantities`, `Core/Reports` | todos os serviços |
+| Validação (Core) | grafo de dependências, validador V01–V13, classificação de sobreposições (nova, Fase X) | `Core/Model` | Domínio, Geometria, drenagem, parcelamento |
+| Adaptadores Revit | render e leitura (`MarkingService`, `PathResolver`, `SurfaceSampler`), persistência (`MarkingStorage`, `*Store`), terreno (`TerrainService`, `TerrainModel`), lotes, interseções | `Revit/Infrastructure` | Core |
+| Atualização associativa | DMU (`MarkingUpdater`), cópias (`CopyHandler`) | `Revit/Updater` | Adaptadores, `ModelGraph` |
+| Interface | 93 comandos, faixa de opções, janelas WPF com prévia, formulários | `Revit/Commands`, `Revit/UI` | Adaptadores, Core |
+| Validação (Revit) | Validar Modelo, Autoteste (rápido e completo), conferência final dos pisos | `Revit/Commands/ValidationCommands`, `AutoTest*` | tudo |
+
+### 8.2 Matriz pelo escopo do Prompt Master
+
+| § | Requisito | Situação | Evidência e o que falta |
+|---|---|---|---|
+| 3 | Plugin nativo do Revit 2027, sem motor externo | IT | DLL única carregada no Revit 2027 (Autotestes); Core sem referência ao Revit (ARCHITECTURE §1) |
+| 4 | Identificadores estáveis e rastreio projeto ↔ elemento | IT (Core) / INV (Revit) | `MarkingDefinition.Id` em cada elemento (Extensible Storage); `ModelGraph` |
+| 5 | Núcleo geométrico com tolerâncias explícitas | P | primitivas e casos degenerados testados (EV5); tolerâncias documentadas, mas definidas em cada módulo (K9) |
+| 5 | Detecção de geometria inválida, lacunas e sobreposições | P | `PolygonChecks` (V07), `PieceOverlaps`; **a classificação das sobreposições falta** (RT-1.3, Fase X) |
+| 6 | Terreno existente × projetado separados | IT (Core) / INV (Revit) | original gravado no Toposolid (AUDIT §7.1); `Grading` |
+| 6 | Diagnóstico da superfície (dados insuficientes, triângulos inválidos, descontinuidades, declividade fora do limite, extrapolação) | **A** | nenhum diagnóstico do TIN no núcleo; o Revit recebe os pontos sem conferência |
+| 7 | Eixos, alinhamentos, greides, estacas, seções, prévia | IT (Core) / INV (prévia no Revit) | Fases V e VI; `RoadPreviewServer` (DirectContext3D) |
+| 8 | Interseções e rotatórias calculadas, regeneração ao mudar eixos | IT (Core) / INV (updater, K17) | Fases VI e VII |
+| 8 | Configuração impossível explicada, com os parâmetros a rever | P | avisos dos geradores (`IntersectionGenerator`, `RoundaboutGenerator`), sem lista padronizada de parâmetros |
+| 9 | Corte e aterro com método documentado e limites | IT (Core) | `Grading.Volumes` (malha) e `SectionVolumes` (seções), AUDIT §6.7 |
+| 9 | Cálculo de terraplenagem desatualizado depois de mudar a via | **A** | o Toposolid fica como estava até nova Terraplenagem; nada aponta que ficou velho |
+| 10 | Estrutura de pavimento por via ou trecho (ordem, espessura, material) usada pelo cálculo | P | camadas só no desenho do corte (`SectionLayer`); a terraplenagem usa uma profundidade única de subleito (0,40 m, `TerrainService.Subgrade`); o piso tem só o revestimento |
+| 10 | Sobreposições classificadas antes de qualquer correção | P → em andamento | `OverlapClassifier` (Fase X) |
+| 11 | Drenagem: conectividade, sentido, cotas, ligações | IT (Core) / INV (Revit) | `DrainageNetwork`, V13, Fase VIII |
+| 11 | Hidráulica separada da geometria, com entradas, hipóteses e limites documentados | IT (Core) | `DrainageNetwork.Check` (geometria) × `DrainageHydraulics` (método racional); memorial com as fontes; K5 |
+| 11 | Drenagem integrada à topografia e aos greides | P | a área e a declividade da sarjeta são informadas por dispositivo (K5, RT-1.5) |
+| 12 | Quadras e lotes por regras configuráveis, quadros e memorial | IT (Core) / validado no Revit | Fase IX; sem aprovação legal automática |
+| 13 | Parâmetros pela interface, perfis salvos | P | formulários e Configurações; modelos de via salvos; Projeto de Drenagem por documento; sem salvar ou carregar perfis de terraplenagem e de interseção |
+| 14 | Relações explícitas e regeneração só do necessário | P | `ModelGraph` + DMU; terraplenagem e drenagem fora do grafo de regeneração |
+| 14 | Mostrar o que foi atualizado e o que ficou desatualizado | **A** | o DMU regenera em silêncio; nenhum estado "desatualizado" |
+| 15 | Transações, rollback, falhas | INV | ARCHITECTURE §5; Autotestes no Revit sem documento inconsistente |
+| 16 | Causa das retas fora do eixo e das sobreposições | P | K11 e K12 reproduzidos e corrigidos no núcleo até o 4º Autoteste; a confirmação depende de um novo Autoteste (K3) |
+| 17 | Validação por módulo e transversal | P | V01–V13 com severidade e confiança |
+| 17 | Erro / alerta / informação / **não verificável**; módulo, objeto, evidência e ação recomendada; resumo, métricas, versão; histórico antes × depois | P | `Achado` tem código, severidade, confiança, mensagem e Ids; **faltam** o módulo, a evidência, a ação recomendada, a categoria "não verificável" e a comparação com a validação anterior |
+| 18 | Testes unitários e de integração, casos-limite e inválidos | IT | 2 949 testes; fixtures dos Autotestes |
+| 19 | Autoteste com versão, data, ambiente, executados e ignorados | IT no Revit | 4 Autotestes completos (`docs/evidencias`) |
+| 19 | Problemas conhecidos × novos × inconclusivos | P | pares persistentes por tipo; sem comparação com a rodada anterior nem marcação de "conhecido" |
+| 20 | Fluxos por tarefa, unidades, prévia, mensagens acionáveis, cancelar | P | painéis por tarefa; cancelamento só em janelas de cálculo (`TrafficWindow` e outras) |
+| 21 | Atualização incremental, cache com invalidação, desempenho | P | D-013 (leitura rápida); K14 e K15 abertos |
+| 23 | DLL só de build limpo, versão rastreável, entregas preservadas | IT | `tools/release.sh`, `Releases/FaseNN` com SHA-256 |
+| 24 | Documentação e progresso | IT | documentos de controle; esta seção |
+| 1, 25 | Simulação urbana ou tráfego em escala de cidade | A (fora do escopo atual) | a microssimulação é local, não calibrada (K6); nada de equivalência com InfraWorks ou Cities: Skylines |
+
+Correção desta auditoria na matriz da §5: a linha "VIII | Dimensionamento hidráulico | AUSENTE" ficou desatualizada com
+a Fase VIII (o dimensionamento existe e é testado; ver a linha acima dela). Foi retirada.
+
+### 8.3 Riscos e prioridades (item 28.5)
+
+| Ordem | Risco | Situação | Encaminhamento |
+|---|---|---|---|
+| 1 | Perda de dados | R1–R3 corrigidos (§5.1); K2 apontado pelo V03; nenhum risco novo encontrado | — |
+| 2 | Falha de build | compilação limpa; CI verde até `6d2b72f` (execução 125) | conferir o CI de cada push |
+| 3 | Inconsistência geométrica | pisos sobrepostos sem classe (K11, RT-1.3); retas fora do eixo (K12, 1 restante, corrigida no FC); pisos × terreno sem conferência no núcleo (RT-1.2); terreno sem diagnóstico (§6 do Prompt Master) | **agora:** classificador, conferência piso × terreno, diagnóstico do terreno |
+| 4 | Regressão não vista | "Verificações do modelo" desligadas no Autoteste (§7.5); validação sem comparação com a anterior | ligar as verificações no Autoteste completo; histórico da validação |
+| 5 | Resultado velho apresentado como atual | terraplenagem desatualizada depois de mudar a via, sem aviso | assinatura das entradas gravada com a terraplenagem e conferida no Validar Modelo |
+| 6 | Cálculo com dado incoerente | estrutura do pavimento diferente entre o corte (camadas) e a terraplenagem (0,40 m) | estrutura do pavimento na via, usada pelo corte, pela terraplenagem e pelos quantitativos |
+| 7 | Acoplamento entre pastas do Core (R15) | referências mútuas (§8.1) | sem reestruturação em bloco (Prompt Master §2); código novo sem nova referência mútua; um ciclo é desfeito quando a mudança já toca aquele código |
+| 8 | Demais | F12, F11, K14/K15, revisão da interface (XIII) | depois dos itens acima |

@@ -266,3 +266,23 @@ como substituída.
 - **Consequências:** cada projeto tem os seus critérios; um projeto novo começa sem equação de chuva. O Validar Modelo, o
   Relatório da Rede e o Memorial leem o mesmo registro.
 
+
+## D-021 – O Prompt Master rege o desenvolvimento; as 15 fases ficam como referência
+- **Contexto:** em 2026-10-23 o usuário enviou o *Prompt Master* (`docs/PROMPT_MASTER.md`). Ele amplia o escopo para uma
+  plataforma de infraestrutura urbana no Revit 2027 (topografia, corredores, terraplenagem, pavimentação, drenagem,
+  parcelamento, diagnósticos). O item 22 diz para não tratar o plano antigo de 15 fases como sequência rígida e para
+  ordenar o trabalho pelo estado real, pelos riscos e pelas dependências, preservando os requisitos anteriores.
+- **Decisão:**
+  - A ordem do trabalho segue a prioridade do item 28.5: perda de dados, build, inconsistência geométrica, regressão
+    (AUDIT §8.3).
+  - O quadro das 15 fases continua no ROADMAP como mapa de rastreio: cada entrega diz a que fase pertence. Ele deixa de
+    ser a fila.
+  - As regras anteriores continuam valendo: nada inventado, nada declarado validado no Revit sem ter rodado no Revit, e uma
+    DLL em `Releases/FaseNN` para cada entrega com mudança de código, preservando as anteriores. A numeração segue a fase
+    a que a entrega pertence.
+  - Não há reestruturação em bloco da arquitetura (item 2). As referências mútuas entre pastas do Core (R15) são
+    desfeitas só quando a mudança já toca aquele código, e código novo não cria referência mútua nova.
+- **Alternativa descartada:** reorganizar o Core em projetos separados por camada antes de continuar. Exigiria mover
+  centenas de arquivos sem defeito a corrigir, e o item 2 pede justificativa para trocar a arquitetura.
+- **Consequências:** a próxima entrega (Fase X) junta o que a auditoria pôs no topo: sobreposições classificadas, piso ×
+  terreno, diagnóstico do terreno e validação com módulo, ação recomendada, "não verificável" e comparação com a anterior.

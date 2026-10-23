@@ -1,24 +1,21 @@
 # ROADMAP – Plano de evolução
 
-O estado atual de cada item está em [AUDIT.md](AUDIT.md) §5. Este roteiro ordena o que falta pela prioridade da missão:
-1. segurança de dados;
-2. defeitos críticos;
-3. compilação;
-4. integridade geométrica;
-5. testes;
-6. arquitetura;
-7. infraestrutura;
-8. interoperabilidade com o Revit;
-9. desempenho;
-10. usabilidade;
-11. simulação e otimização;
-12. extras.
+O estado atual de cada item está em [AUDIT.md](AUDIT.md) §5 e §8. Desde 2026-10-23 o desenvolvimento segue o
+[Prompt Master](docs/PROMPT_MASTER.md) (DECISIONS D-021). A ordem vem dos riscos (Prompt Master 28.5, AUDIT §8.3):
+1. perda de dados;
+2. falha de build;
+3. inconsistência geométrica;
+4. regressão não vista;
+5. resultado desatualizado apresentado como atual;
+6. cálculo com dado incoerente;
+7. o restante do escopo (cenários, tráfego, desempenho, interface).
 
 Cada etapa só é marcada como concluída com compilação limpa, suíte verde e registro no CHANGELOG.
 
 ## Situação das 15 fases da missão
 
-Atualizada a cada ciclo. ✅ concluída (critério da fase atendido e comprovado no ambiente disponível: núcleo, testes e
+Mapa de rastreio, não fila (D-021): cada entrega diz a que fase pertence e gera a DLL dessa fase. Atualizada a cada
+ciclo. ✅ concluída (critério da fase atendido e comprovado no ambiente disponível: núcleo, testes e
 compilação aqui e no CI Windows), 🔄 em andamento ou parcial, ⬜ não iniciada. **Fase atual** = onde está o trabalho do
 ciclo em curso. O Revit não roda neste ambiente (TESTS.md): a coluna "Revit 2027" diz se a fase já passou por um Autoteste
 no Revit; cada fase concluída gera uma DLL em `Releases/FaseNN` (ver `Releases/README.md`).
@@ -34,7 +31,7 @@ no Revit; cada fase concluída gera uma DLL em `Releases/FaseNN` (ver `Releases/
 | VII – Terreno, terraplenagem e interseções | ✅ | volumes pela malha e pelo método das seções no núcleo (EV6); sinalização das entradas das rotatórias sem pintura sobre pintura (EZ); pintura das rotatórias fora da sarjeta, T de via reconhecida em pisos e cruzamento rodoferroviário só nas faixas de rolamento (FC); rotatória com by-pass sem pisos sobrepostos no núcleo (K16) e volumes por estaca de cada via no quantitativo, ao lado da malha (F7b) – Fase VII | — (conferência no próximo Autoteste: K11, K16, K7) | DLL 2.6.0 (`Releases/Fase07`) não executada no Revit |
 | VIII – Drenagem e redes | ✅ | dispositivos (rodadas anteriores); rede de trechos entre caixas (geometria, sentido, ligações, ciclos, recobrimento, diâmetros, PVs); vazão pelo método racional e galerias por Manning a seção plena, sarjetas e bocas de lobo, com as fontes enviadas pelo usuário (Manual SUDERHSA 2002 e memorial modelo de Miguelópolis/SP 2019; D-019); Projeto de Drenagem por documento (D-020), Relatório da Rede com a planilha de galerias e os diâmetros calculados, V13 e Memorial de Drenagem (.docx) – Fase VIII | — (George Ribeiro, divisão de vazões e excesso entre bocas de lobo: K5) | DLL 2.7.0 (`Releases/Fase08`) não executada no Revit |
 | IX – Quadras, lotes e parcelamento | ✅ | parcelamento completo no núcleo, sobras e mínimos configuráveis, quadros e memorial, Marca única (EX), validação V09–V10; etapas do Autoteste sem erro no Revit | — | validada (Autotestes completos) |
-| X – Compatibilização | 🔄 **atual** | `ModelValidator` V01–V13 com severidade, confiança e revisão humana; comando Validar Modelo no Revit (EV4–EV5) | verificações sobre a geometria gerada (F10: pintura fora do pavimento, lote × calçada, pisos sobrepostos classificados, pisos suspensos ou enterrados – RT-1) | Validar Modelo (2026-10-19) |
+| X – Compatibilização | 🔄 **atual** | `ModelValidator` V01–V13 com severidade, confiança e revisão humana; comando Validar Modelo no Revit (EV4–EV5) | X1–X5 das Próximas etapas: sobreposições classificadas, pisos × terreno, diagnóstico do terreno, validação com módulo, ação e comparação, terraplenagem desatualizada (Prompt Master; RT-1.2 e RT-1.3) | Validar Modelo (2026-10-19) |
 | XI – Mobilidade e tráfego | ✅ | simulador auditado (AUDIT §6.11): modelo, hipóteses e limites registrados; não calibrado, sem dados de campo (K6) | — (calibração depende de contagens reais) | validada (Autoteste) |
 | XII – Cenários e otimização | 🔄 | cenários e soluções de tráfego (rodadas anteriores) | cenários de projeto comparados por quantitativos (F12) | — |
 | XIII – Interface e experiência | ⬜ | janelas existentes (rodadas anteriores), sem trabalho desta missão | revisão das mensagens e fluxos com base no uso real | — |
@@ -67,13 +64,24 @@ no Revit; cada fase concluída gera uma DLL em `Releases/FaseNN` (ver `Releases/
 
 ## Próximas etapas (em ordem)
 
-| # | Fase da missão | Etapa | Critério de aceite |
-|---|---|---|---|
-| K11 | XIV – Revit | Pares persistentes restantes: com a lista por tipo do próximo Autoteste, reproduzir cada tipo no núcleo (`PieceOverlaps`) e corrigir | Autoteste sem par persistente |
-| K12 | XIV – Revit | Confirmar no próximo Autoteste que as retas fora do eixo sumiram (a nota mede as que restarem) | Autoteste sem esse aviso, ou só retas de projeto |
-| F10 | X – compatibilização | Verificações que precisam da geometria gerada (lotes sobre a calçada, obra × via, pintura fora do pavimento): exigem rodar os geradores no validador ou no Autoteste | testes por código Vxx |
-| F11 | XI – tráfego | Separar no relatório o que é simulação e o que é animação; registrar parâmetros e sementes usados | relatório reprodutível |
-| F12 | XII – cenários | Cenários de projeto (variantes de seção e de greide) comparados por quantitativos | testes de comparação |
+A ordem vem da AUDIT §8.3. "PM §n" é o item do Prompt Master atendido.
+
+| # | Fase | Etapa | PM § | Critério de aceite |
+|---|---|---|---|---|
+| X1 | X | Pisos sobrepostos classificados (RT-1.3): camada empilhada, cruzamento de vias, duplicação, conflito, inconclusivo; a classe vai ao Autoteste (etapas e modelo final) | 10, 16 | testes por classe; nada apagado; Autoteste mostra a contagem por classe |
+| X2 | X | Pisos × terreno no núcleo (RT-1.2): piso enterrado ou suspenso, degrau na borda; "Verificações do modelo" ligadas no Autoteste completo | 6, 16 | testes no núcleo |
+| X3 | X | Diagnóstico do terreno: pontos insuficientes, triângulos degenerados, pontos repetidos com cotas diferentes, declividade acima do limite informado, ponto fora da superfície (extrapolação) | 6 | testes no núcleo; código no Validar Modelo |
+| X4 | X | Validação com módulo, evidência, ação recomendada e "não verificável"; resumo com a versão; comparação com a validação anterior (novo, persistente, resolvido) | 17, 19 | testes no núcleo |
+| X5 | X | Terraplenagem desatualizada: assinatura das entradas (vias, greides, seções, opções) gravada com a terraplenagem e conferida no Validar Modelo | 9, 14 | testes no núcleo |
+| P6 | VI/VII | Estrutura do pavimento na via (camadas com ordem, espessura e material) usada pelo corte, pela terraplenagem e pelos quantitativos | 10 | testes no núcleo; projetos antigos abrem iguais |
+| K11 | XIV | Pares persistentes restantes: com a lista por classe do próximo Autoteste, reproduzir no núcleo e corrigir só os conflitos | 16 | Autoteste sem conflito |
+| K12 | XIV | Confirmar no próximo Autoteste que as retas fora do eixo sumiram | 16 | Autoteste sem esse aviso, ou só retas de projeto |
+| F10 | X | Verificações sobre a geometria gerada (lote × calçada, obra × via, pintura fora do pavimento) | 17 | testes por código Vxx |
+| P7 | XIV | Atualização associativa visível: o que foi atualizado e o que ficou desatualizado | 14 | testes das regras no núcleo |
+| F12 | XII | Cenários de projeto (variantes de seção e de greide) comparados por quantitativos | 13 | testes de comparação |
+| F11 | XI | Separar no relatório o que é simulação e o que é animação; registrar parâmetros e sementes usados | 1, 19 | relatório reprodutível |
+| P8 | XIII | Fluxo completo por tarefa (terreno → vias → perfis → interseções → terraplenagem → documentação) e perfis de parâmetros salvos | 13, 20 | revisão com o uso real |
+| K14/K15 | XV | Desempenho: piso tátil longo e leituras do projeto inteiro | 21 | tempo medido no Autoteste |
 
 ## Fora do escopo até haver especificação
 

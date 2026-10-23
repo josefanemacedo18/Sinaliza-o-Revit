@@ -2,8 +2,13 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-22 (Fase VIII concluída; Fase X em andamento; requisito transversal RT-1 registrado)
+## Estado em 2026-10-23 (Prompt Master adotado; Fase X em andamento)
 
+- **Prompt Master** (`docs/PROMPT_MASTER.md`, enviado em 2026-10-23): rege o desenvolvimento (D-021). As 15 fases ficam
+  como mapa de rastreio; a ordem vem dos riscos (AUDIT §8.3). Auditoria pelo novo escopo: AUDIT §8 (mapa de módulos,
+  matriz em cinco situações, riscos). Lacunas que ele revelou: diagnóstico do terreno, validação sem módulo, ação e
+  comparação, terraplenagem desatualizada sem aviso, estrutura do pavimento só no desenho do corte, referências mútuas
+  entre pastas do Core (K18).
 - **Ramo:** `claude/dreamy-gates-a3nrta`. Sem PR aberto (o fluxo do projeto é commit e push direto no ramo).
 - **Versão do plugin:** 2.7.0 (`Directory.Build.props`), entregue em `Releases/Fase08` (commit `9ed7e12`, SHA-256 no
   `RELEASE.md`). `Instalar/Revit2027` tem a mesma DLL. As anteriores continuam em `Releases/Fase03` a `Fase07`
@@ -29,11 +34,15 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
 
 ## Próxima tarefa
 
-1. **RT-1.1:** auditoria escrita no AUDIT (código com arquivo e linha; métodos da API 2027 realmente usados).
-2. **Fase X (atual):** F10 com as partes RT-1.2 (pisos suspensos ou enterrados, bordas e degraus, no núcleo) e RT-1.3
-   (classificação dos pisos sobrepostos); ligar as "Verificações do modelo" no Autoteste completo.
-3. **Fases seguintes, na ordem do ROADMAP:** XII (F12), XIII, XIV, XV (com RT-1.4 a RT-1.6).
-4. **No Revit (quando houver):** 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer
+1. **Fase X (ROADMAP, Próximas etapas X1–X5):**
+   1. `OverlapClassifier` (arquivo novo em `Core/Model`, ainda sem testes no início desta retomada) com testes e no
+      Autoteste;
+   2. pisos × terreno no núcleo e "Verificações do modelo" ligadas no Autoteste completo;
+   3. diagnóstico do terreno;
+   4. validação com módulo, evidência, ação, "não verificável" e comparação com a anterior;
+   5. terraplenagem desatualizada.
+2. **Depois:** P6 (estrutura do pavimento), F10, P7, F12, F11, P8, K14/K15 – na ordem do ROADMAP.
+3. **No Revit (quando houver):** 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer
    tudo**; enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`).
 
 ## Como retomar
@@ -44,7 +53,7 @@ dotnet build src/SinalizacaoViaria.Revit -c Release -p:EnableWindowsTargeting=tr
 dotnet test tests/SinalizacaoViaria.Core.Tests -c Release                            # ~15–22 min
 ```
 
-Leia nesta ordem: AUDIT.md (estado e evidências) → KNOWN_ISSUES.md → ROADMAP.md → DECISIONS.md.
+Leia nesta ordem: docs/PROMPT_MASTER.md (escopo e regras) → AUDIT.md (estado e evidências; §8 pelo Prompt Master) → KNOWN_ISSUES.md → ROADMAP.md → DECISIONS.md.
 
 ## Regras de trabalho em vigor
 
