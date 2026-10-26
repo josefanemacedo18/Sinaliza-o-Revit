@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-26 (Etapas 0–7 entregues; Etapa 8 a seguir)
+## Estado em 2026-10-26 (Etapas 0–8 entregues; Etapa 9 a seguir)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -22,16 +22,18 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     pontos baixos e talvegues no V13, recobrimento sob a superfície acabada, perfil da rede.
   - Etapa 7 ✅: 2.13.0 em `Releases/Etapa07` (`e3a27c4`, 3 016/3 016) – indicadores do parcelamento, fonte dos mínimos,
     V16 e Trocar Elementos (auditoria dos elementos urbanos em AUDIT §9.2a).
-  - `Instalar/Revit2027` tem a DLL 2.13.0. As anteriores continuam em `Releases/`.
-- **Etapa 8 (próxima):** integração associativa – dependências terreno → via → terraplenagem → pavimento → drenagem →
-  lotes, estado de cada resultado (atualizado, pendente, desatualizado), invalidação seletiva.
+  - Etapa 8 ✅: 2.14.0 em `Releases/Etapa08` (`072b683`, 3 022/3 022) – estado dos resultados (D-026), leitura com
+    origem nas captações, atualização seletiva, impacto da edição, V17 (K22).
+  - `Instalar/Revit2027` tem a DLL 2.14.0. As anteriores continuam em `Releases/`.
+- **Etapa 9 (próxima):** design system (tokens no `Styles.xaml`, cores soltas do código para os tokens) e faixa de opções
+  por tema (Interface §7), reorganizando os 98 botões atuais sem perder nem duplicar; mapa antigo → novo no MANUAL.
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros (compilar sempre também o projeto de testes antes do
   commit).
 
 ## Próxima tarefa
 
-1. Etapa 8 (PLANO). Depois, as Etapas 9–13 na ordem do plano.
+1. Etapa 9 (PLANO). Depois, as Etapas 10–13 na ordem do plano.
 2. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer tudo**;
    enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`); rodar também o
    Validar Modelo duas vezes (a segunda mostra a comparação com a primeira).
