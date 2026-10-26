@@ -18,6 +18,8 @@ public partial class QuantitiesWindow : Window
     private readonly List<QuantityRow> _rows;
     private readonly List<ComponentRow> _components;
     private readonly List<Core.Automation.SecoesDaVia> _sections;
+    private readonly List<CamadaQuantidade> _layers;
+    private readonly List<string> _noStructure;
     private readonly string _projectName;
     private readonly ListCollectionView _view;
 
@@ -37,10 +39,16 @@ public partial class QuantitiesWindow : Window
     private readonly Dictionary<string, BitmapSource> _thumbs = new();
 
     public QuantitiesWindow(List<QuantityRow> rows, string projectName, Dictionary<string, BitmapSource>? thumbnails = null,
-        List<ComponentRow>? components = null, List<Core.Automation.SecoesDaVia>? sections = null)
+        List<ComponentRow>? components = null, List<Core.Automation.SecoesDaVia>? sections = null,
+        List<CamadaQuantidade>? layers = null, List<string>? noStructure = null)
     {
         InitializeComponent();
         _rows = rows;
+        _layers = layers ?? new List<CamadaQuantidade>();
+        _noStructure = noStructure ?? new List<string>();
+        // Camadas do pavimento (Etapa 5): só com vias ou nós com pavimento.
+        TabLayers.Visibility = _layers.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        TxtLayers.Text = _noStructure.Count > 0 ? $"Sem estrutura do pavimento informada (só o revestimento): {string.Join(", ", _noStructure)}" : "";
         _components = components ?? new List<ComponentRow>();
         _sections = sections ?? new List<Core.Automation.SecoesDaVia>();
         // Terraplenagem por estaca (F7b): só com vias que moldam o terreno.
@@ -87,6 +95,10 @@ public partial class QuantitiesWindow : Window
     private List<ComponentRow> VisibleComponents => _components
         .Where(r => CbHierarchy?.SelectedItem is not HOption { All: false } h || r.Hierarchy == h.Value).ToList();
 
+    /// <summary>Camadas do pavimento com o filtro de hierarquia.</summary>
+    private List<CamadaQuantidade> VisibleLayers => _layers
+        .Where(r => CbHierarchy?.SelectedItem is not HOption { All: false } h || r.Hierarquia == h.Value).ToList();
+
     private void FilterChanged(object sender, RoutedEventArgs e)
     {
         if (_view == null) return;
@@ -108,6 +120,7 @@ public partial class QuantitiesWindow : Window
         GridSummary.ItemsSource = QuantityCalculator.Summary(v);
         GridHierarchy.ItemsSource = QuantityCalculator.HierarchySummary(v);
         GridComponents.ItemsSource = VisibleComponents;
+        GridLayers.ItemsSource = VisibleLayers;
         var cats = v.Select(r => r.Category).Distinct().Count();
         TxtHeader.Text = $"{v.Count} item(ns) em {cats} categoria(s) e {v.Select(r => (r.Category, r.SubcategoryName)).Distinct().Count()} subcategoria(s)" +
                          (Category is { } c ? $" – filtro: {QuantityRow.CategoryLabel(c)}" : "") + $" – {DateTime.Now:dd/MM/yyyy HH:mm}";
@@ -189,7 +202,7 @@ public partial class QuantitiesWindow : Window
                 pngCache[key] = b;
                 return b;
             }
-            File.WriteAllBytes(dlg.FileName, QuantityWorkbook.Build(v, QuantityCalculator.Summary(v), _projectName, Png, VisibleComponents, _sections));
+            File.WriteAllBytes(dlg.FileName, QuantityWorkbook.Build(v, QuantityCalculator.Summary(v), _projectName, Png, VisibleComponents, _sections, VisibleLayers, _noStructure));
             MessageBox.Show(this, "Planilha exportada:\n" + dlg.FileName, "Quantitativos", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
@@ -210,7 +223,7 @@ public partial class QuantitiesWindow : Window
         if (dlg.ShowDialog(this) != true) return;
         try
         {
-            File.WriteAllText(dlg.FileName, QuantityCalculator.ToCsv(v, QuantityCalculator.Summary(v), _projectName, VisibleComponents, _sections), new UTF8Encoding(true));
+            File.WriteAllText(dlg.FileName, QuantityCalculator.ToCsv(v, QuantityCalculator.Summary(v), _projectName, VisibleComponents, _sections, VisibleLayers, _noStructure), new UTF8Encoding(true));
             MessageBox.Show(this, "Arquivo exportado:\n" + dlg.FileName, "Quantitativos", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)

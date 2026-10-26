@@ -212,6 +212,9 @@ public static class RibbonBuilder
         var nos = app.CreateRibbonPanel(InfraTab, "Nós Viários");
         Large(nos, typeof(CmdNoViario), "Nó Viário", "noviario",
             "Interseção em desnível: diamante, diamante com rotatórias, trevo completo, trevo parcial, trombeta e rotatória em dois níveis – viadutos, rampas e laços com greide.");
+        Large(rel, typeof(CmdEstruturaPavimento), "Estrutura do Pavimento", "estruturapav",
+            "Camadas do pavimento de uma via (revestimento, base, sub-base, reforço), com material, espessura, função e fonte: o fundo da caixa na terraplenagem, " +
+            "as camadas no corte transversal e o quantitativo por camada. O plugin não dimensiona – as espessuras são do projeto de pavimentação.");
         Large(rel, typeof(CmdTerraplenagem), "Terraplenagem", "terraplenagem",
             "Ajusta o Toposolid (Massa e terreno) às vias, conexões e obras: plataformas, taludes de corte e aterro até o terreno natural, reaterro de muros e escavação – com volumes de corte e aterro.");
 

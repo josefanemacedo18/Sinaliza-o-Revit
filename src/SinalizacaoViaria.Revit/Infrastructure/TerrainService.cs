@@ -138,13 +138,15 @@ public static class TerrainService
                 var s0 = Math.Max(0, road.StartSetback);
                 var s1 = Math.Max(s0 + 0.5, axis.Length - Math.Max(0, road.EndSetback));
                 var works = (all ?? Array.Empty<MarkingDefinition>()).Where(h => road.GroupId != null && h is IHostedStructure hs && hs.HostRoad == road.GroupId);
+                // Fundo da estrutura sob a pista: a estrutura do pavimento da via (revestimento + camadas, Etapa 5) ou o subleito padrão.
+                var depth = EarthworkRecord.Profundidade(road, opt.Subgrade);
                 // Fora dos trechos em obra; junto a encontros e emboques a via termina numa face vertical (emboque: testa + talude).
-                var roadCorr = InfraRoads.RoadCorridors(axis, prof, right, left, s0, s1, opt.Subgrade, cut, fill, works);
+                var roadCorr = InfraRoads.RoadCorridors(axis, prof, right, left, s0, s1, depth, cut, fill, works);
                 // A plataforma acompanha a mesma superfície dos pisos (abaulamento, superelevação e concordância com os nós).
                 if (g != null)
                 {
                     var surf = service?.SurfaceFor(road, axis) ?? new Core.Geometry.GradeSurface(axis, g);
-                    InfraRoads.FitToSection(roadCorr, left, right, surf, InfraRoads.Edges(road, axis), opt.Subgrade, InfraRoads.SectionBreaks(surf.Grade));
+                    InfraRoads.FitToSection(roadCorr, left, right, surf, InfraRoads.Edges(road, axis), depth, InfraRoads.SectionBreaks(surf.Grade));
                     // Nós em que a via é secundária: a crista da via principal, prolongada, cruza a concordância.
                     foreach (var b in surf.Blends)
                         foreach (var c in roadCorr) c.Breaklines.AddRange(InfraRoads.NodeBreaklines(b.Node));
@@ -161,15 +163,17 @@ public static class TerrainService
                 var onGround = geo.Pieces.Where(p => p.Elevation < 0.5).ToList();
                 var union = Core.Geometry.PolygonOps.Union(onGround.Select(p => p.Shape));
                 var (cutS, fillS) = RoadSlopes(def, all, opt);
+                // Estrutura sob a pista do nó: a mais funda entre as vias que chegam (cada uma pela estrutura dela ou o subleito padrão).
+                var depth = EarthworkRecord.ProfundidadeDoNo(def, all ?? Array.Empty<MarkingDefinition>(), opt.Subgrade);
                 // Por camadas: estrutura sob a pista do nó, fundo das lajes sob calçadas e ilhas, topo das calçadas na quina do lote.
                 var (paved, rise) = InfraRoads.PadLayers(onGround);
                 foreach (var u in union.Where(u => u.Area > 1))
                 {
-                    var pad = new GradePad(u, z0 - opt.Subgrade)
+                    var pad = new GradePad(u, z0 - depth)
                     {
                         CutSlope = cutS, FillSlope = fillS, Label = def.KindName,
-                        ZAt = node == null ? null : q => node.Z(q) - opt.Subgrade,
-                        Structure = opt.Subgrade, EdgeRise = rise, Owner = def.Id,
+                        ZAt = node == null ? null : q => node.Z(q) - depth,
+                        Structure = depth, EdgeRise = rise, Owner = def.Id,
                     };
                     pad.Paved.AddRange(paved);
                     // Crista e fim do caimento da via principal: pontos do Toposolid sobre as quebras da superfície do nó.
@@ -185,13 +189,15 @@ public static class TerrainService
                 var onGround = geo.Pieces.Where(p => p.Elevation < 0.5).ToList();
                 var union = Core.Geometry.PolygonOps.Union(onGround.Select(p => p.Shape));
                 var (paved, rise) = InfraRoads.PadLayers(onGround);
-                var owner = service.NodeOwner(def)?.Id ?? def.Id;
+                var nodeDef = service.NodeOwner(def);
+                var owner = nodeDef?.Id ?? def.Id;
+                var depth = nodeDef == null ? opt.Subgrade : EarthworkRecord.ProfundidadeDoNo(nodeDef, all ?? Array.Empty<MarkingDefinition>(), opt.Subgrade);
                 foreach (var u in union.Where(u => u.Area > 0.05))
                 {
-                    var pad = new GradePad(u, z0 - opt.Subgrade)
+                    var pad = new GradePad(u, z0 - depth)
                     {
-                        Daylight = false, Label = def.KindName, ZAt = q => members(q) - opt.Subgrade,
-                        Structure = opt.Subgrade, EdgeRise = rise, Owner = owner,
+                        Daylight = false, Label = def.KindName, ZAt = q => members(q) - depth,
+                        Structure = depth, EdgeRise = rise, Owner = owner,
                     };
                     pad.Paved.AddRange(paved);
                     pad.Breaklines.AddRange(InfraRoads.NodeBreaklines(memberNode));
@@ -270,13 +276,7 @@ public static class TerrainService
     }
 
     /// <summary>Vias ligadas a um nó (interseção, rotatória, cul-de-sac).</summary>
-    public static IEnumerable<string> NodeRoads(MarkingDefinition d) => (d switch
-    {
-        IntersectionDefinition it => it.RoadIds.Cast<string?>(),
-        RoundaboutDefinition rb => rb.Legs.Select(l => l.RoadId),
-        CulDeSacDefinition c => new[] { c.RoadId },
-        _ => Enumerable.Empty<string?>(),
-    }).Where(x => x != null).Cast<string>();
+    public static IEnumerable<string> NodeRoads(MarkingDefinition d) => EarthworkRecord.NodeRoads(d);
 
     /// <summary>Taludes do nó: os das vias ligadas (o mais suave), senão os padrões.</summary>
     private static (double Cut, double Fill) RoadSlopes(MarkingDefinition d, IReadOnlyCollection<MarkingDefinition>? all, GradingOptions opt)
@@ -299,16 +299,9 @@ public static class TerrainService
     {
         _ = doc;
         // Nós (interseções, rotatórias, cul-de-sacs) moldam o terreno quando QUALQUER via ligada a eles molda – antes só os
-        // que ficavam perto das pontas das vias entravam, e os cruzamentos no meio das vias ficavam sem corte/aterro.
-        var graded = all.OfType<RoadPavementDefinition>().Where(r => r.Output.Grade is { AdjustTerrain: true }).Select(r => r.Id).ToHashSet();
-        return all.Where(d => d switch
-        {
-            ITerrainAware t => t.AdjustTerrain,
-            RoadPavementDefinition r => graded.Contains(r.Id),
-            IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition => NodeRoads(d).Any(graded.Contains),
-            DrainageDefinition => true,
-            _ => false,
-        }).ToList();
+        // que ficavam perto das pontas das vias entravam, e os cruzamentos no meio das vias ficavam sem corte/aterro. A escolha
+        // fica no núcleo (EarthworkRecord), a mesma do registro da terraplenagem e da V15.
+        return EarthworkRecord.Participantes(all);
     }
 
     /// <summary>
@@ -402,6 +395,7 @@ public static class TerrainService
         if (opt.DryRun) return report;
         var footprint = design.Footprint.Count == 0 ? new List<Polygon2>() : PolygonOps.Union(design.Footprint).Where(f => f.Area > 0.5).ToList();
 
+        var failed = false;
         foreach (var topo in topos)
         {
             var orig = originals[topo.Id];
@@ -423,11 +417,24 @@ public static class TerrainService
             }
             catch (Exception ex)
             {
+                failed = true;
                 Log.Error("Terraplenagem do Toposolid", ex);
                 report.Notes.Add($"Toposolid {topo.Id}: {ex.Message}");
             }
         }
         service.InvalidateTerrain();
+        // Registro da terraplenagem aplicada (Etapa 5): quem moldou o terreno e com que assinatura, o subleito e os taludes. Na
+        // mesma transação – desfazer a terraplenagem desfaz o registro. Com falha num Toposolid o registro antigo fica (a V15
+        // continua acusando o que não foi aplicado).
+        if (!failed)
+        {
+            try
+            {
+                EarthworkRecordStore.Save(doc, EarthworkRecord.Gravar(list, opt.Subgrade, opt.CutSlope, opt.FillSlope, DateTime.Now,
+                    typeof(TerrainService).Assembly.GetName().Version?.ToString(3)));
+            }
+            catch (Exception ex) { Log.Error("Registro da terraplenagem", ex); }
+        }
 
         // 3) Escavação pelo modelo (túneis, caixas de drenagem) – quando o Revit aceita o elemento.
         if (opt.Excavate && excavators.Count > 0)

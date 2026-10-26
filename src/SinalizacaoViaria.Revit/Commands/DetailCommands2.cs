@@ -41,16 +41,21 @@ internal static class DetailForms
     {
         var rows = (getLayers() ?? SectionLayer.Defaults()).Select(x => x.Clone()).ToList();
         while (rows.Count < 4) rows.Add(new SectionLayer { Hatch = Hachura.Terra });
-        void Save() => setLayers(rows.Where(r => r.ThicknessCm > 0.05).Select(r => r.Clone()).ToList());
+        // Nulo = as camadas da estrutura do pavimento da via cortada (Etapa 5) ou, sem ela, as típicas.
+        var useRoad = getLayers() == null;
+        void Save() => setLayers(useRoad ? null : rows.Where(r => r.ThicknessCm > 0.05).Select(r => r.Clone()).ToList());
         w.Section("Camadas do pavimento (perfil)", "Sob o revestimento da via, de cima para baixo. Espessura 0 = sem a camada. " +
-            "Valores indicativos – ajuste ao projeto de pavimentação.");
+            "Valores indicativos – ajuste ao projeto de pavimentação.")
+         .Check("Usar a estrutura do pavimento da via cortada (sem ela, as camadas típicas)", () => useRoad, v => { useRoad = v; Save(); },
+            "A estrutura é informada por via em SinalizaBIM Infra › Estrutura do pavimento e também vai à terraplenagem e ao quantitativo.");
         for (int i = 0; i < rows.Count; i++)
         {
             var r = rows[i];
             var n = i + 1;
-            w.Text($"Camada {n} – nome", () => r.Name, v => { r.Name = (v ?? "").Trim(); Save(); })
+            w.If(() => !useRoad, x => x
+             .Text($"Camada {n} – nome", () => r.Name, v => { r.Name = (v ?? "").Trim(); Save(); })
              .Number($"Camada {n} – espessura (cm)", () => r.ThicknessCm, v => { r.ThicknessCm = v; Save(); }, 0, 200, "0.#")
-             .Choice($"Camada {n} – hachura", LayerHatches, () => r.Hatch, v => { r.Hatch = v; Save(); });
+             .Choice($"Camada {n} – hachura", LayerHatches, () => r.Hatch, v => { r.Hatch = v; Save(); }));
         }
         var spec = (getSpec() ?? new CurbGutterSpec()).Clone();
         void SaveSpec() => setSpec(spec.Clone());

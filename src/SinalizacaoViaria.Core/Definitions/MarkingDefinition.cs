@@ -1189,7 +1189,7 @@ public sealed class SectionProfileDefinition : MarkingDefinition, IProjectWideAn
     public int DesenhoVersao { get; set; }
     /// <summary>Nomes, cores e hachuras escolhidos para os elementos da seção (nulo = os padrões).</summary>
     public List<SectionItemStyle>? ItemStyles { get; set; }
-    /// <summary>Camadas do pavimento sob o revestimento (nulo = as típicas; lista vazia = nenhuma).</summary>
+    /// <summary>Camadas do pavimento sob o revestimento (nulo = as da estrutura do pavimento da via cortada ou, sem ela, as típicas; lista vazia = nenhuma).</summary>
     public List<SectionLayer>? Layers { get; set; }
     /// <summary>Meio-fio e sarjeta: medidas e detalhe ampliado (nulo = o padrão).</summary>
     public CurbGutterSpec? CurbGutter { get; set; }
@@ -1423,7 +1423,7 @@ public sealed class SectionDimensionDefinition : MarkingDefinition, IProjectWide
     public int DesenhoVersao { get; set; }
     /// <summary>Nomes, cores e hachuras escolhidos para os elementos da seção (nulo = os padrões).</summary>
     public List<SectionItemStyle>? ItemStyles { get; set; }
-    /// <summary>Camadas do pavimento sob o revestimento, no perfil (nulo = as típicas; lista vazia = nenhuma).</summary>
+    /// <summary>Camadas do pavimento sob o revestimento, no perfil (nulo = as da estrutura do pavimento da via cortada ou, sem ela, as típicas; lista vazia = nenhuma).</summary>
     public List<SectionLayer>? Layers { get; set; }
     /// <summary>Meio-fio e sarjeta: medidas e detalhe ampliado no perfil (nulo = o padrão).</summary>
     public CurbGutterSpec? CurbGutter { get; set; }
@@ -1602,6 +1602,11 @@ public sealed class RoadPavementDefinition : MarkingDefinition
     /// </summary>
     public Estaqueamento? Estaqueamento { get; set; }
     /// <summary>
+    /// Estrutura do pavimento sob o revestimento (camadas). Nulo = não informada: a terraplenagem usa o subleito das opções
+    /// dela e o corte transversal, as camadas típicas.
+    /// </summary>
+    public EstruturaPavimento? Estrutura { get; set; }
+    /// <summary>
     /// Pontas que convergem em faixa paralela com outra via (ramos de nós viários): não geram interseção nem cul-de-sac.
     /// </summary>
     public bool MergeStart { get; set; }
@@ -1684,6 +1689,8 @@ public sealed class RoadPavementDefinition : MarkingDefinition
 
     public double DefaultThickness => Material switch { TipoPavimento.Bloquete => 0.08, TipoPavimento.Concreto => 0.15, TipoPavimento.Terra => 0.15, _ => 0.05 };
     public double ActualThickness => Thickness is > 0 ? Thickness.Value : DefaultThickness;
+    /// <summary>Profundidade do topo da pista ao fundo da estrutura (m), com a estrutura informada; nula sem ela.</summary>
+    public double? ProfundidadeEstrutura => Estrutura is { Camadas.Count: > 0 } e ? e.Profundidade(ActualThickness) : null;
     public double TotalRight => RightWidth + RightSidewalk;
     public double TotalLeft => LeftWidth + LeftSidewalk;
 

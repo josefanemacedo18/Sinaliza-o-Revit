@@ -251,21 +251,27 @@ internal sealed partial class AutoTestRunner
             return nodeBoxes.Any(b => x > b!.Min.X - m && x < b.Max.X + m && y > b.Min.Y - m && y < b.Max.Y + m);
         }
         var sect = new TopProbe(mine.Where(r => Core.Generators.IntersectionGenerator.IsPhysical(r.Definition)).Select(r => r.Element).Concat(pavEls));
-        // Sob a pista: o terreno não pode passar do topo. A profundidade do subleito usada na terraplenagem não é guardada com
-        // ela (Etapa 5 do plano), então o fundo da estrutura não é conferido aqui.
+        // Sob a pista: o terreno não pode passar do topo e deve ficar no fundo da estrutura (K19) – a profundidade usada na última
+        // terraplenagem (a estrutura do pavimento da via ou o subleito registrado), só quando o registro tem esta via com a
+        // definição atual; sem isso o terreno pode ser de outra versão dela e só o topo é conferido.
+        var rec = EarthworkRecordStore.Load(_doc);
+        double? depth = rec != null && rec.Assinaturas.TryGetValue(pav.Id, out var sig) && sig == EarthworkRecord.Assinatura(pav)
+            ? EarthworkRecord.Profundidade(pav, rec.Subleito) : null;
         var half = Math.Max(0, Math.Min(pav.LeftWidth, pav.RightWidth) - 0.5);
         var samples = new List<AmostraPiso>();
         for (var st = 5.0; st < axis.Length - 5; st += 5)
             foreach (var o in new[] { 0.0, half, -half })
             {
                 var pt = axis.PointAt(st) + axis.TangentAt(st).PerpLeft * o;
-                if (!Skip(pt) && probe.TopZ(pt) is { } top) samples.Add(new AmostraPiso(pt, top, null, pav.DisplayCode, pav.Id));
+                if (!Skip(pt) && probe.TopZ(pt) is { } top) samples.Add(new AmostraPiso(pt, top, depth, pav.DisplayCode, pav.Id));
             }
         var under = FloorTerrainCheck.Pisos(samples, terrain);
         var edge = FloorTerrainCheck.Bordas(FloorTerrainCheck.BordasDaVia(axis, pav.TotalLeft, pav.TotalRight, 5.0, 5.0, Skip),
             p => sect.TopZ(p), terrain, out var edgeChecked, $"{pav.DisplayCode} – borda da seção");
         s.Note($"Terreno projetado × via: {samples.Count} ponto(s) sob a pista e {edgeChecked} na borda da seção conferidos " +
-               $"(tolerância {FloorTerrainCheck.Tolerancia * 100:0} cm sob a pista, {FloorTerrainCheck.ToleranciaBorda * 100:0} cm na borda; fundo da estrutura não conferido).");
+               $"(tolerância {FloorTerrainCheck.Tolerancia * 100:0} cm sob a pista, {FloorTerrainCheck.ToleranciaBorda * 100:0} cm na borda; " +
+               (depth is { } dp ? $"fundo da estrutura a {dp:0.00} m do topo{(pav.ProfundidadeEstrutura != null ? ", pela estrutura do pavimento" : ", pelo subleito registrado")})."
+                   : rec == null ? "fundo da estrutura não conferido: sem registro da terraplenagem)." : "fundo da estrutura não conferido: a via mudou depois da terraplenagem)."));
         foreach (var a in under) s.Error(a.Texto + " – fora de túneis e pontes.");
         if (edge != null)
         {

@@ -42,6 +42,20 @@ public static partial class DetailGenerator
     private static readonly string[] LayerTones = { "#CFCBC2", "#DCCDAE", "#D3C4A4", "#C9BD9F" };
     private const string GroundTone = "#ECE5D8";
 
+    /// <summary>
+    /// Camadas da estrutura do pavimento das vias cortadas, da primeira ao longo do corte (nulo = nenhuma com estrutura). O perfil
+    /// desenha um só pacote de camadas: vias com estruturas diferentes ficam num aviso.
+    /// </summary>
+    internal static List<SectionLayer>? RoadLayers(IEnumerable<ProfileSegment> segs, MarkingGeometry geo)
+    {
+        var vias = segs.OrderBy(x => x.S0).Select(x => x.Def).OfType<RoadPavementDefinition>()
+            .Where(r => r.Estrutura is { Camadas.Count: > 0 }).DistinctBy(r => r.Id).ToList();
+        if (vias.Count == 0) return null;
+        if (vias.Select(r => r.Estrutura!.Texto()).Distinct().Count() > 1)
+            geo.Warnings.Add($"Perfil transversal: as vias cortadas têm estruturas de pavimento diferentes; desenhadas as camadas de {vias[0].DisplayCode}.");
+        return vias[0].Estrutura!.ParaCorte();
+    }
+
     /// <summary>Perfil transversal no desenho por elemento (ver o resumo da classe).</summary>
     private static void SectionProfileV2(MarkingGeometry geo, SectionDimensionDefinition sd, SectionProfileDefinition pd, BuildContext ctx,
         IReadOnlyList<(MarkingDefinition Def, MarkingGeometry Geo)> withGeo, List<double> planStations, List<double> axes, Vec2 pos, string letter)
@@ -54,7 +68,8 @@ public static partial class DetailGenerator
         var segs = ProfileSegments(a, b, withGeo);
         if (segs.Count == 0) { geo.Warnings.Add("Perfil transversal: nada cortado pela linha de seção."); return; }
         var spec = pd.CurbGutter ?? new CurbGutterSpec();
-        var layers = SectionLayer.Effective(pd.Layers);
+        // Camadas: as escolhidas no perfil; sem elas, a estrutura do pavimento da via cortada (Etapa 5); sem estrutura, as típicas.
+        var layers = SectionLayer.Effective(pd.Layers ?? RoadLayers(segs, geo));
         var styles = pd.ItemStyles;
         var place = new Placer();
 

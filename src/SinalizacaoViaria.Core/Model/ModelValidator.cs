@@ -48,9 +48,11 @@ public static class ModelValidator
     /// <param name="incluirNaoVerificados">Acrescenta, com <see cref="Severidade.NaoVerificavel"/>, as verificações que não
     /// puderam rodar (sem documento, sem limites, sem Projeto de Drenagem ou sem equação de chuva, sem terreno).</param>
     /// <param name="terreno">Superfície do terreno PROJETADO (o Toposolid como está) para o V14. Nulo = não conferida.</param>
+    /// <param name="terraplenagem">Registro da última terraplenagem aplicada (V15). Nulo = sem registro: não se sabe se o terreno
+    /// acompanha as marcas.</param>
     public static List<Achado> Validate(IReadOnlyList<CopiaGravada> copias, Func<string, bool>? elementoExiste = null,
         GeometricCriteria? criterios = null, Automation.ProjetoDrenagem? drenagem = null, bool incluirNaoVerificados = false,
-        Automation.TerrainMesh? terreno = null)
+        Automation.TerrainMesh? terreno = null, Automation.RegistroTerraplenagem? terraplenagem = null)
     {
         var res = new List<Achado>();
         var defs = new Dictionary<string, MarkingDefinition>();
@@ -106,6 +108,7 @@ public static class ModelValidator
         if (criterios is { IsEmpty: false }) CheckAlignment(defs, criterios, res);
         CheckDrainage(defs, drenagem, res);
         if (terreno != null) CheckTerrain(defs, terreno, criterios?.DeclividadeMaximaTerreno, res);
+        if (terraplenagem != null) CheckEarthwork(defs, terraplenagem, res);
 
         // Corte só de dados (sem desenho na planta) sem o perfil que o usa.
         var perfis = defs.Values.OfType<SectionProfileDefinition>().Select(p => p.SectionId).ToHashSet();
@@ -113,13 +116,14 @@ public static class ModelValidator
             res.Add(new("V08", Severidade.Info, Confianca.Alta, false,
                 $"{s.DisplayCode}: linha de corte sem o perfil transversal (sai na próxima atualização).", new[] { s.Id }));
 
-        if (incluirNaoVerificados) res.AddRange(NaoVerificados(defs.Values, elementoExiste, criterios, drenagem, terreno));
+        if (incluirNaoVerificados) res.AddRange(NaoVerificados(defs.Values, elementoExiste, criterios, drenagem, terreno, terraplenagem));
         return res.OrderBy(a => a.Severidade).ThenBy(a => a.Codigo, StringComparer.Ordinal).ToList();
     }
 
     /// <summary>Verificações que não puderam rodar com os dados dados – ditas, nunca contadas como "sem problema".</summary>
     private static IEnumerable<Achado> NaoVerificados(IEnumerable<MarkingDefinition> defs, Func<string, bool>? elementoExiste,
-        GeometricCriteria? criterios, Automation.ProjetoDrenagem? drenagem, Automation.TerrainMesh? terreno)
+        GeometricCriteria? criterios, Automation.ProjetoDrenagem? drenagem, Automation.TerrainMesh? terreno,
+        Automation.RegistroTerraplenagem? terraplenagem)
     {
         var lista = defs.ToList();
         static Achado N(string codigo, string msg, string acao) => new(codigo, Severidade.NaoVerificavel, Confianca.Alta, false, msg, Array.Empty<string>(), acao);
@@ -146,6 +150,35 @@ public static class ModelValidator
         else if (criterios?.DeclividadeMaximaTerreno == null)
             yield return N("V14", "Declividade máxima do terreno não informada: a declividade das faces não foi conferida.",
                 "informar a declividade máxima em Configurações › Limites geométricos");
+        if (terraplenagem == null && Automation.EarthworkRecord.Participantes(lista).Count is > 0 and var n)
+            yield return N("V15", $"Sem registro da terraplenagem aplicada (nunca aplicada, aplicada por versão anterior à 2.11 ou validação sem o documento): " +
+                $"não se sabe se o terreno acompanha as {n} marca(s) que o moldam.", "rodar a Terraplenagem uma vez para gravar o registro");
+    }
+
+    /// <summary>
+    /// Terraplenagem desatualizada (V15): marcas que moldam o terreno e mudaram, foram apagadas ou entraram depois da última
+    /// terraplenagem aplicada (o registro gravado com ela). O Toposolid não acompanha sozinho: só a Terraplenagem o refaz.
+    /// </summary>
+    private static void CheckEarthwork(Dictionary<string, MarkingDefinition> defs, Automation.RegistroTerraplenagem registro, List<Achado> res)
+    {
+        var quando = registro.Quando.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+        foreach (var g in Automation.EarthworkRecord.Comparar(registro, defs.Values).GroupBy(m => m.Situacao).OrderBy(g => g.Key))
+        {
+            var l = g.ToList();
+            var nomes = string.Join(", ", l.Take(8).Select(m => m.Nome)) + (l.Count > 8 ? $" e mais {l.Count - 8}" : "");
+            var (texto, acao) = g.Key switch
+            {
+                Automation.SituacaoTerraplenagem.Alterada => ($"{l.Count} marca(s) que moldam o terreno mudaram depois da terraplenagem de {quando}: {nomes}.",
+                    "rodar a Terraplenagem para refazer o terreno com as marcas atuais"),
+                Automation.SituacaoTerraplenagem.Removida => ($"{l.Count} marca(s) que moldaram o terreno foram apagadas e o terreno ainda tem a terraplenagem delas: {nomes}.",
+                    "rodar a Terraplenagem: a área delas volta ao terreno original guardado"),
+                Automation.SituacaoTerraplenagem.Retirada => ($"{l.Count} marca(s) deixaram de moldar o terreno e ele ainda tem a terraplenagem delas: {nomes}.",
+                    "rodar a Terraplenagem: a área delas volta ao terreno original guardado"),
+                _ => ($"{l.Count} marca(s) moldam o terreno mas não estavam na terraplenagem de {quando}: {nomes}.",
+                    "rodar a Terraplenagem para incluí-las no terreno"),
+            };
+            res.Add(new("V15", Severidade.Aviso, Confianca.Alta, true, $"Terraplenagem desatualizada: {texto}", l.Select(m => m.Id).ToArray(), acao));
+        }
     }
 
     /// <summary>
@@ -202,6 +235,8 @@ public static class ModelValidator
             "rever o trecho ou o dispositivo indicado, ou o critério no Projeto de Drenagem"),
         new Regra("V14", "Topografia", "superfície do terreno projetado: dados insuficientes ou inválidos, cotas diferentes no mesmo ponto, triângulos sem área, declividade acima do limite informado, eixos fora da superfície",
             "conferir o levantamento ou o Toposolid no ponto indicado"),
+        new Regra("V15", "Terraplenagem", "terraplenagem desatualizada: marca que molda o terreno mudou, foi apagada, deixou de moldá-lo ou entrou depois da última terraplenagem aplicada",
+            "rodar a Terraplenagem (o terreno original fica guardado e é a base do novo cálculo)"),
     }.ToDictionary(r => r.Codigo);
 
     /// <summary>O que cada código verifica (relatório e manual).</summary>

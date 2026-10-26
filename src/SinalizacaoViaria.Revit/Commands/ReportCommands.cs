@@ -39,7 +39,14 @@ public sealed class CmdQuantitativos : CommandBase
         var components = new List<ComponentRow>();
         try { components = ComponentQuantities.Compute(items); }
         catch (Exception ex) { Log.Error("Quantitativo por componente da seção", ex); }
-        var w = new QuantitiesWindow(rows, doc.Title, thumbs, components, sections);
+        // Camadas do pavimento (revestimento + estrutura de cada via; nós pela via ligada mais funda).
+        var layers = new List<CamadaQuantidade>();
+        var noStructure = new List<string>();
+        // Só as marcas do plugin: os pisos desenhados à mão com hierarquia não têm espessura nem estrutura conhecidas.
+        var ids = defs.Select(d => d.Id).ToHashSet();
+        try { layers = PavementLayerQuantities.Compute(items.Where(i => ids.Contains(i.Def.Id)), defs, noStructure); }
+        catch (Exception ex) { Log.Error("Quantitativo das camadas do pavimento", ex); }
+        var w = new QuantitiesWindow(rows, doc.Title, thumbs, components, sections, layers, noStructure);
         if (UiHelpers.ShowModal(w) == true && (w.CreateSchedule || w.SchedulesByCategory))
         {
             // Tabela nativa: roda com qualquer vista ativa (inclusive folha) e vai direto para a folha escolhida.

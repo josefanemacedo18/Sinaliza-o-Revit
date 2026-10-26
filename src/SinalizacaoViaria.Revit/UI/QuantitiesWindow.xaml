@@ -227,6 +227,27 @@
                     </DataGrid>
                 </DockPanel>
             </TabItem>
+            <TabItem x:Name="TabLayers" Header="Camadas do pavimento">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Margin="2,4,2,2" TextWrapping="Wrap" Foreground="#5A6472"
+                               Text="Revestimento e camadas da estrutura do pavimento de cada via (SinalizaBIM Infra › Estrutura do pavimento); interseções, rotatórias e balões usam a estrutura da via ligada mais funda. Área = pavimento em planta medido nas peças geradas; volume = área × espessura, sem a sobrelargura das camadas sob a sarjeta e o meio-fio. As espessuras são do projeto de pavimentação – o plugin não dimensiona."/>
+                    <TextBlock x:Name="TxtLayers" DockPanel.Dock="Top" Margin="2,2,2,6" TextWrapping="Wrap" FontWeight="SemiBold"/>
+                    <DataGrid x:Name="GridLayers" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" RowHeight="24" BorderBrush="#D5DBE3">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Origem" Binding="{Binding Origem}" Width="*" FontWeight="SemiBold"/>
+                            <DataGridTextColumn Header="Hierarquia" Binding="{Binding HierarquiaNome}" Width="110"/>
+                            <DataGridTextColumn Header="Camada" Binding="{Binding Camada}" Width="130"/>
+                            <DataGridTextColumn Header="Material" Binding="{Binding Material}" Width="150"/>
+                            <DataGridTextColumn Header="Função" Binding="{Binding Funcao}" Width="110"/>
+                            <DataGridTextColumn Header="Espessura (cm)" Binding="{Binding EspessuraCm, StringFormat=N1, ConverterCulture=pt-BR}" Width="100"/>
+                            <DataGridTextColumn Header="Área (m²)" Binding="{Binding Area, StringFormat=N2, ConverterCulture=pt-BR}" Width="90"/>
+                            <DataGridTextColumn Header="Volume (m³)" Binding="{Binding Volume, StringFormat=N2, ConverterCulture=pt-BR}" Width="90"/>
+                            <DataGridTextColumn Header="Fonte" Binding="{Binding Fonte}" Width="140"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
             <TabItem x:Name="TabStations" Header="Terraplenagem por estaca">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top" Margin="2,4,2,2" TextWrapping="Wrap" Foreground="#5A6472"

@@ -424,7 +424,8 @@ public static class QuantityCalculator
     /// horizontal: cor, material, área, extensão e consumo), subtotais e resumos ao final.
     /// </summary>
     public static string ToCsv(IEnumerable<QuantityRow> rows, IEnumerable<QuantityRow>? summary = null, string? projectName = null,
-        IEnumerable<ComponentRow>? components = null, IEnumerable<Automation.SecoesDaVia>? sections = null)
+        IEnumerable<ComponentRow>? components = null, IEnumerable<Automation.SecoesDaVia>? sections = null,
+        IEnumerable<CamadaQuantidade>? layers = null, IReadOnlyList<string>? noStructure = null)
     {
         var pt = CultureInfo.GetCultureInfo("pt-BR");
         var sb = new StringBuilder();
@@ -473,6 +474,11 @@ public static class QuantityCalculator
         {
             sb.AppendLine();
             sb.Append(ComponentQuantities.Csv(components));
+        }
+        if (layers != null && layers.Any())
+        {
+            sb.AppendLine();
+            sb.Append(PavementLayerQuantities.Csv(layers.ToList(), noStructure));
         }
         if (sections != null && sections.Any())
         {

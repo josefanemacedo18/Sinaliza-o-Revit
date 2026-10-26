@@ -247,6 +247,16 @@ public static class IconFactory
                 dc.DrawLine(P(Asphalt, 3), new Point(10, 20), new Point(22, 20));
                 dc.DrawGeometry(null, new Pen(B(Yellow), 1.2) { DashStyle = DashStyles.Dash }, Poly(new Point(1, 14), new Point(8, 10), new Point(15, 6), new Point(24, 8), new Point(31, 12)));
                 break;
+            case "estruturapav":
+                // Estrutura do pavimento: revestimento escuro sobre base, sub-base e subleito.
+                dc.DrawRectangle(B(Asphalt), null, new Rect(2, 5, 28, 5));
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(2, 10, 28, 6));
+                dc.DrawRectangle(B(Color.FromRgb(214, 196, 160)), null, new Rect(2, 16, 28, 6));
+                dc.DrawRectangle(B(Color.FromRgb(150, 118, 84)), null, new Rect(2, 22, 28, 8));
+                foreach (var x in new[] { 6.0, 13.0, 20.0, 27.0 }) dc.DrawEllipse(B(Color.FromRgb(120, 118, 112)), null, new Point(x, 13), 1.2, 1.2);
+                dc.DrawLine(P(Yellow, 1.2), new Point(8, 7.5), new Point(14, 7.5));
+                dc.DrawLine(P(Yellow, 1.2), new Point(18, 7.5), new Point(24, 7.5));
+                break;
             case "ferrovia":
                 RoadBackground(dc);
                 dc.DrawLine(P(White, 2), new Point(6, 6), new Point(26, 26));

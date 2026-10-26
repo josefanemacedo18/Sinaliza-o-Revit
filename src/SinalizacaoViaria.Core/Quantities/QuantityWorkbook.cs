@@ -22,7 +22,8 @@ public static class QuantityWorkbook
     private const int StTitle = 1, StHeader = 2, StCategory = 3, StSub = 4, StText = 5, StNum = 6, StInt = 7, StSubTotText = 8, StSubTotNum = 9, StMeta = 10, StTextCenter = 11;
 
     public static byte[] Build(IEnumerable<QuantityRow> rows, IEnumerable<QuantityRow>? summary, string? projectName, Func<QuantityRow, byte[]?>? thumbnail = null,
-        IEnumerable<ComponentRow>? components = null, IEnumerable<Automation.SecoesDaVia>? sections = null)
+        IEnumerable<ComponentRow>? components = null, IEnumerable<Automation.SecoesDaVia>? sections = null,
+        IEnumerable<CamadaQuantidade>? layers = null, IReadOnlyList<string>? noStructure = null)
     {
         var list = rows.ToList();
         var sheet = new StringBuilder();
@@ -133,6 +134,27 @@ public static class QuantityWorkbook
                 Num(5, q.Elements, StInt); Text(6, q.Sources, StText);
                 Row();
             }
+        }
+        if (layers != null && layers.Any())
+        {
+            var cl = layers.ToList();
+            Row();
+            Line("CAMADAS DO PAVIMENTO (área do pavimento em planta × espessura; sem a sobrelargura das camadas sob sarjeta e meio-fio)", StCategory, 20);
+            foreach (var (h, i) in new[] { "Origem", "Hierarquia", "Camada", "Material", "Função", "Espessura (cm)", "Área (m²)", "Volume (m³)", "Fonte da estrutura" }.Select((h, i) => (h, i))) Text(i, h, StHeader);
+            Row();
+            foreach (var q in cl)
+            {
+                Text(0, q.Origem, StText); Text(1, q.HierarquiaNome, StText); Text(2, q.Camada, StText); Text(3, q.Material ?? "", StText); Text(4, q.Funcao, StText);
+                Num(5, q.EspessuraCm, StNum); Num(6, q.Area, StNum); Num(7, q.Volume, StNum); Text(8, q.Fonte ?? "", StText);
+                Row();
+            }
+            foreach (var t in PavementLayerQuantities.Totais(cl))
+            {
+                Text(0, "TOTAL", StSubTotText); Blank(1, StSubTotText); Text(2, t.Camada, StSubTotText); Text(3, t.Material ?? "", StSubTotText); Blank(4, StSubTotText); Blank(5, StSubTotText);
+                Num(6, t.Area, StSubTotNum); Num(7, t.Volume, StSubTotNum); Blank(8, StSubTotText);
+                Row();
+            }
+            if (noStructure is { Count: > 0 }) Line($"Sem estrutura do pavimento informada (só o revestimento): {string.Join(", ", noStructure)}", StMeta);
         }
         if (sections != null && sections.Any())
         {
