@@ -40,6 +40,12 @@ public class Etapa04ViasTests
         Assert.DoesNotContain(w, x => x.Contains("13 a 25"));
         var pista = Assert.Single(w, x => x.StartsWith("Pista giratória de 3"));      // 3,50 m (o número segue a cultura do Windows)
         Assert.Contains("abaixo de 4 m: limite de conferência do plugin, sem norma citada", pista);
+        // Duas faixas numa compacta: o aviso não apresenta a classificação do plugin como norma.
+        var compacta = new RoundaboutDefinition { Center = Vec2.Zero, Type = TipoRotatoria.Compacta, IslandRadius = 10, Lanes = 2, LaneWidth = 4 };
+        compacta.Legs.Add(new RoundaboutLeg { AngleDeg = 0, Width = 7 });
+        var aviso = Assert.Single(RoundaboutGenerator.Layout(compacta).Warnings, x => x.StartsWith("Rotatória compacta com 2 faixas"));
+        Assert.Contains("sem norma citada", aviso);
+        Assert.DoesNotContain("devem", aviso);
     }
 
     [Fact]

@@ -205,7 +205,8 @@ public static class RoundaboutGenerator
             L.Warnings.Add($"Diâmetro inscrito de {inscribed:0.0} m menor que a pista mais larga que chega ({d.Legs.Max(l => l.Width):0.0} m) + 4 m: as entradas ficam maiores que o anel – use rotatória compacta/1 faixa com raio maior ou reduza a entrada (MBST Vol. IV).");
         if (d.Type != TipoRotatoria.Mini && d.IslandType is not (TipoIlhaCentral.Galgavel or TipoIlhaCentral.Pintada or TipoIlhaCentral.Calota) && ri < LimitesDeConferencia.IlhaCentralMinima.Valor && d.Legs.Count > 0)
             L.Warnings.Add($"Ilha central pequena (raio de {ri:0.0} m, abaixo de {LimitesDeConferencia.IlhaCentralMinima.Rotulo}). Em rotatórias compactas prefira ilha galgável ou pintada (minirrotatória).");
-        if (d.Lanes >= 2 && d.Type is TipoRotatoria.Compacta or TipoRotatoria.Mini) L.Warnings.Add("Rotatórias compactas/mini devem ter uma faixa no anel.");
+        if (d.Lanes >= 2 && d.Type is TipoRotatoria.Compacta or TipoRotatoria.Mini)
+            L.Warnings.Add($"Rotatória {(d.Type == TipoRotatoria.Mini ? "mini" : "compacta")} com {d.Lanes} faixas no anel: estes tipos do plugin pressupõem uma faixa (classificação do plugin, sem norma citada) – para duas faixas, use outro tipo e confira com a norma adotada.");
         if (!complete && d.Legs.Any(l => l.RoadId == null && l.GroupId == null) && d.Legs.Count > 0)
             L.Warnings.Add("Integração 'anel' ou 'somente ilha' sem vias ligadas: a pista dos ramos não é gerada – use 'Completa' ou crie as vias antes.");
 
