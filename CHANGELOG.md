@@ -42,7 +42,7 @@ Etapa 4 do plano unificado (Fases V e VII). Entrega: `Releases/Etapa04` (não ex
   o início do eixo. Isso muda na Etapa 11.
 
 ### Testes
-- `Etapa04ViasTests` (8).
+- `Etapa04ViasTests` (7).
 
 ## 2026-10-26 – Etapas 2 e 3: diagnóstico padronizado e topografia (versão 2.9.0)
 
