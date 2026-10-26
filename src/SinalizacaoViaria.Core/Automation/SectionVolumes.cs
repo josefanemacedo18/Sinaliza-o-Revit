@@ -22,7 +22,8 @@ public sealed class VolumesPorSecao
 /// Seções de uma via do projeto conjunto (quantitativo por estaca, F7b): volumes medidos só na superfície de projeto que é
 /// da via, e a parte dela na malha (<see cref="GradingResult.ByOwner"/>) para conferir os dois métodos.
 /// </summary>
-public sealed record SecoesDaVia(string Via, HierarquiaViaria? Hierarquia, VolumesPorSecao Volumes, double MalhaCorte, double MalhaAterro)
+public sealed record SecoesDaVia(string Via, HierarquiaViaria? Hierarquia, VolumesPorSecao Volumes, double MalhaCorte, double MalhaAterro,
+    Estaqueamento? Estacas = null)
 {
     private static readonly CultureInfo Pt = CultureInfo.GetCultureInfo("pt-BR");
 
@@ -123,7 +124,7 @@ public static class SectionVolumes
 
     /// <summary>Linhas da tabela por estaca de todas as vias, na ordem dada.</summary>
     public static List<LinhaEstaca> Rows(IEnumerable<SecoesDaVia> vias) => vias
-        .SelectMany(v => v.Volumes.Secoes.Select((s, i) => new LinhaEstaca(v.Via, AlignmentElements.Estaca(s.Estaca), s.Estaca, s.Corte, s.Aterro,
+        .SelectMany(v => v.Volumes.Secoes.Select((s, i) => new LinhaEstaca(v.Via, (v.Estacas ?? new Estaqueamento()).Rotulo(s.Estaca), s.Estaca, s.Corte, s.Aterro,
             v.Volumes.Acumulado[i].Corte, v.Volumes.Acumulado[i].Aterro)))
         .ToList();
 
@@ -144,8 +145,9 @@ public static class SectionVolumes
     }
 
     /// <summary>CSV pt-BR (";" e vírgula decimal) com as áreas e os volumes acumulados por estaca.</summary>
-    public static string Csv(VolumesPorSecao v)
+    public static string Csv(VolumesPorSecao v, Estaqueamento? estacas = null)
     {
+        var est = estacas ?? new Estaqueamento();
         var pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
         string N(double x) => x.ToString("F2", pt);
         var sb = new System.Text.StringBuilder();
@@ -154,7 +156,7 @@ public static class SectionVolumes
         {
             var s = v.Secoes[i];
             var acc = v.Acumulado[i];
-            sb.AppendLine(string.Join(";", AlignmentElements.Estaca(s.Estaca), N(s.Estaca), N(s.Corte), N(s.Aterro), N(acc.Corte), N(acc.Aterro),
+            sb.AppendLine(string.Join(";", est.Rotulo(s.Estaca), N(s.Estaca), N(s.Corte), N(s.Aterro), N(acc.Corte), N(acc.Aterro),
                 N(acc.Corte - acc.Aterro)));
         }
         sb.AppendLine($"Total;;;;{N(v.CorteM3)};{N(v.AterroM3)};{N(v.CorteM3 - v.AterroM3)}");

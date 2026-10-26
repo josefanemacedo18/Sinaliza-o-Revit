@@ -144,14 +144,15 @@ public static class AlignmentElements
         return res;
     }
 
-    /// <summary>CSV pt-BR dos elementos do eixo de uma via.</summary>
-    public static string AxisCsv(IEnumerable<ElementoEixo> els)
+    /// <summary>CSV pt-BR dos elementos do eixo de uma via; <paramref name="estacas"/> nulo = estaqueamento padrão.</summary>
+    public static string AxisCsv(IEnumerable<ElementoEixo> els, Estaqueamento? estacas = null)
     {
+        var est = estacas ?? new Estaqueamento();
         var sb = new StringBuilder();
-        sb.AppendLine("Elemento;Início;Fim;Início (m);Fim (m);Comprimento (m);Raio (m);Deflexão (°);Sentido;T (m)");
+        sb.AppendLine($"Elemento;Início;Fim;Início{M(est)};Fim{M(est)};Comprimento (m);Raio (m);Deflexão (°);Sentido;T (m)");
         foreach (var e in els)
             sb.AppendLine(string.Join(";", e.Tipo switch { TipoElementoEixo.Curva => "curva circular", TipoElementoEixo.Vertice => "vértice sem curva", _ => "tangente" },
-                Estaca(e.Inicio), Estaca(e.Fim), N(e.Inicio, 3), N(e.Fim, 3), N(e.Comprimento, 3),
+                est.Rotulo(e.Inicio), est.Rotulo(e.Fim), N(e.Inicio, 3), N(e.Fim, 3), N(e.Comprimento, 3),
                 e.Tipo == TipoElementoEixo.Curva ? N(e.Raio, 3) : "", e.Tipo == TipoElementoEixo.Tangente ? "" : N(e.DeflexaoGraus, 4), e.Sentido,
                 e.Tipo == TipoElementoEixo.Curva ? N(e.TangenteExterna, 3) : ""));
         return sb.ToString();
@@ -198,8 +199,10 @@ public static class AlignmentElements
     }
 
     /// <summary>CSV no padrão brasileiro (";" e vírgula decimal) das curvas horizontais.</summary>
-    public static string HorizontalCsv(IEnumerable<ElementoHorizontal> els)
+    public static string HorizontalCsv(IEnumerable<ElementoHorizontal> els, Estaqueamento? estacas = null)
     {
+        var est = estacas ?? new Estaqueamento();
+        string Est(double? s) => Est2(est, s);
         var sb = new StringBuilder();
         sb.AppendLine("PI;X (m);Y (m);Deflexão (°);R (m);R pedido (m);Ls (m);Ls pedida (m);T (m);TS;SC;CS;ST;Circular (m);Observação");
         foreach (var e in els)
@@ -210,12 +213,14 @@ public static class AlignmentElements
     }
 
     /// <summary>CSV no padrão brasileiro (";" e vírgula decimal) dos PIVs do greide.</summary>
-    public static string VerticalCsv(IEnumerable<ElementoVertical> els)
+    public static string VerticalCsv(IEnumerable<ElementoVertical> els, Estaqueamento? estacas = null)
     {
+        var est = estacas ?? new Estaqueamento();
+        string Est(double? s) => Est2(est, s);
         var sb = new StringBuilder();
-        sb.AppendLine("PIV;Estaca;Estaca (m);Cota (m);i1 (%);i2 (%);A (%);L (m);L pedido (m);K (m/%);Tipo;PCV;Cota PCV;PTV;Cota PTV;Ponto alto/baixo;Cota");
+        sb.AppendLine($"PIV;Estaca;Estaca{M(est)};Cota (m);i1 (%);i2 (%);A (%);L (m);L pedido (m);K (m/%);Tipo;PCV;Cota PCV;PTV;Cota PTV;Ponto alto/baixo;Cota");
         foreach (var e in els)
-            sb.AppendLine(string.Join(";", e.Piv, Estaca(e.Estaca), N(e.Estaca, 3), N(e.Cota, 3), N(e.RampaEntradaPct, 3), N(e.RampaSaidaPct, 3),
+            sb.AppendLine(string.Join(";", e.Piv, est.Rotulo(e.Estaca), N(e.Estaca, 3), N(e.Cota, 3), N(e.RampaEntradaPct, 3), N(e.RampaSaidaPct, 3),
                 N(e.VariacaoPct, 3), N(e.Comprimento, 2), N(e.ComprimentoPedido, 2), N(e.K, 2),
                 !e.TemCurva ? "" : e.Convexa ? "convexa" : "côncava", Est(e.EstacaPcv), N(e.CotaPcv, 3), Est(e.EstacaPtv), N(e.CotaPtv, 3),
                 Est(e.EstacaExtremo), N(e.CotaExtremo, 3)));
@@ -223,5 +228,8 @@ public static class AlignmentElements
     }
 
     private static string N(double? v, int dec) => v is { } x ? x.ToString("F" + dec, Pt) : "";
-    private static string Est(double? s) => s is { } x ? $"{Estaca(x)} ({x.ToString("0.00", Pt)})" : "";
+    private static string Est2(Estaqueamento est, double? s) => s is { } x ? $"{est.Rotulo(x)} ({x.ToString("0.00", Pt)})" : "";
+
+    /// <summary>Cabeçalho das colunas em metros: com estaqueamento próprio, deixa claro que é a distância no eixo.</summary>
+    private static string M(Estaqueamento est) => est.EhPadrao ? " (m)" : " (m, distância no eixo)";
 }

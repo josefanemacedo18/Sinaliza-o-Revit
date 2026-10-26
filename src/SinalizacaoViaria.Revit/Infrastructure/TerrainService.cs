@@ -261,7 +261,7 @@ public static class TerrainService
                     // Seções a cada 20 m, cobrindo a plataforma e o alcance dos taludes.
                     var half = Math.Max(road.TotalLeft, road.TotalRight) + Math.Max(5, opt.MaxDaylight);
                     var vol = SectionVolumes.ForOwner(design, d.Id, axis, Ground, half, 20, 0.25);
-                    sections.Add(new SecoesDaVia(items[^1].Name, d.Hierarchy, vol, v.Cut, v.Fill));
+                    sections.Add(new SecoesDaVia(items[^1].Name, d.Hierarchy, vol, v.Cut, v.Fill, road.Estaqueamento));
                 }
                 catch (Exception ex) { Log.Error($"Volumes por estaca {d.DisplayCode}", ex); }
             }

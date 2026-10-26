@@ -84,11 +84,15 @@ internal static class RoadWorks
     /// Grava o greide em todas as marcas da via e as regenera (pisos e pinturas acompanham), refaz as conexões e as obras
     /// hospedadas.
     /// </summary>
-    public static List<RenderResult> SetGrade(UIDocument uidoc, string gid, RoadGrade grade, IEnumerable<MarkingDefinition>? extra = null)
+    /// <param name="estacas">Com <paramref name="definirEstacas"/>, o estaqueamento gravado no pavimento da via (nulo = o padrão).</param>
+    public static List<RenderResult> SetGrade(UIDocument uidoc, string gid, RoadGrade grade, IEnumerable<MarkingDefinition>? extra = null,
+        Estaqueamento? estacas = null, bool definirEstacas = false)
     {
         var doc = uidoc.Document;
         var members = Members(doc, gid);
         foreach (var m in members) m.Output.Grade = grade.Clone();
+        if (definirEstacas)
+            foreach (var p in members.OfType<RoadPavementDefinition>()) p.Estaqueamento = estacas is { EhPadrao: false } ? estacas.Clone() : null;
         var hosted = Hosted(doc, gid);
         foreach (var h in hosted) h.Output.Grade = grade.Clone();
         var all = members.Concat(hosted).Concat(extra ?? Array.Empty<MarkingDefinition>()).GroupBy(d => d.Id).Select(g => g.Last()).ToList();

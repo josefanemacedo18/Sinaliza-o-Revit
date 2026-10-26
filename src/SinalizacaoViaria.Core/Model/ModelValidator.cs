@@ -357,6 +357,7 @@ public static class ModelValidator
             if (StoredAxis(road.PathRef) is { } axis) v.AddRange(GeometricCheck.Axis(AlignmentElements.FromAxis(axis), c));
             if (road.Output.Grade is { } grade && grade.SortedPoints().Count >= 2) v.AddRange(GeometricCheck.Vertical(AlignmentElements.Vertical(grade), c));
             if (v.Count == 0) continue;
+            v = v.Select(x => x with { Estacas = road.Estaqueamento }).ToList();
             var lista = string.Join("; ", v.Take(4).Select(x => x.Texto)) + (v.Count > 4 ? $"; … e mais {v.Count - 4}" : "");
             res.Add(new("V12", Severidade.Aviso, Confianca.Media, true,
                 $"{road.DisplayCode}: {v.Count} elemento(s) fora dos limites informados ({c.FonteTexto}): {lista}.", new[] { road.Id }));

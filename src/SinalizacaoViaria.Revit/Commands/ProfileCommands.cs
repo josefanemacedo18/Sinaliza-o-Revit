@@ -106,8 +106,31 @@ public sealed class CmdPerfilVia : CommandBase
                 .Number("Unir obras separadas por menos de (m)", () => o.MergeGap, v => o.MergeGap = v, 0, 500, "0")
                 .Check("Substituir as obras que esta via já tem", () => _replace, v => _replace = v,
                     "As obras usam os últimos parâmetros de Viaduto/Ponte, Túnel e Trincheira (sistema, pilares, emboques, muros)."));
+        // Estaqueamento da via (D-023): só muda como as estacas aparecem nos relatórios desta via.
+        var est = road.Pavement.Estaqueamento?.Clone() ?? new Estaqueamento();
+        var inicioTxt = est.Formatar(est.Inicio);
+        var intervalo = est.Intervalo;
+        var equacoesTxt = est.EquacoesTexto();
+        w.Section("Estaqueamento (relatórios desta via)")
+            .Text("Estaca do início do eixo (n+resto ou m)", () => inicioTxt, v => inicioTxt = v ?? "", false,
+                "Ex.: 100+0,00 (com estacas de 20 m, 2 000 m). Os formulários de largura, recuo e extensão continuam pedindo a distância desde o início do eixo.")
+            .Number("Intervalo entre estacas (m)", () => intervalo, v => intervalo = v, 1, 1000, "0.##")
+            .Text("Equações de estaca (estaca atrás = estaca à frente; …)", () => equacoesTxt, v => equacoesTxt = v ?? "", false,
+                "Ex.: 15+12,40 = 16+0,00; 40+0,00 = 39+15,00. Vazio = sem equações.");
         if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
-        Report("Perfil da via", Apply(uidoc, road, o, _replace).Where(r => r.Warnings.Count > 0).ToList(), alwaysShow: true);
+        est.Intervalo = intervalo;
+        var problemas = new List<string>();
+        if (est.Ler(inicioTxt) is { } ini) est.Inicio = ini;
+        else problemas.Add($"estaca inicial \"{inicioTxt}\" não é uma estaca");
+        problemas.AddRange(est.LerEquacoes(equacoesTxt, L));
+        var graves = est.Problemas(L).Where(p => !p.Contains("repete estacas")).ToList();
+        problemas.AddRange(graves);
+        if (problemas.Count > 0)
+        {
+            TaskDialog.Show(AppTitle, "Estaqueamento não aplicado – nada foi alterado:\n• " + string.Join("\n• ", problemas));
+            return Result.Cancelled;
+        }
+        Report("Perfil da via", Apply(uidoc, road, o, _replace, est).Where(r => r.Warnings.Count > 0).ToList(), alwaysShow: true);
         return Result.Succeeded;
     }
 
@@ -115,8 +138,10 @@ public sealed class CmdPerfilVia : CommandBase
     /// Aplica o perfil: greide em toda a via, obras nos trechos que o terreno pede (substituindo as da via, se
     /// <paramref name="replace"/>) e terraplenagem. O primeiro resultado traz o resumo.
     /// </summary>
-    internal static List<RenderResult> Apply(UIDocument uidoc, PickedRoad road, PerfilOpcoes o, bool replace)
+    /// <param name="estacas">Estaqueamento a gravar na via; nulo = manter o que ela tem.</param>
+    internal static List<RenderResult> Apply(UIDocument uidoc, PickedRoad road, PerfilOpcoes o, bool replace, Estaqueamento? estacas = null)
     {
+        var est = estacas ?? road.Pavement.Estaqueamento;
         var doc = uidoc.Document;
         var L = road.Axis.Length;
         var groundFn = RoadWorks.Ground(doc, road.BaseZ);
@@ -179,7 +204,7 @@ public sealed class CmdPerfilVia : CommandBase
             }
         var grade = RoadWorks.Compose(doc, road, keep.Concat(created), baseGrade);
         foreach (var c in created) c.Output.Grade = grade.Clone();
-        results.AddRange(RoadWorks.SetGrade(uidoc, road.GroupId, grade, created));
+        results.AddRange(RoadWorks.SetGrade(uidoc, road.GroupId, grade, created, est, estacas != null));
         TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { road.Pavement }.Concat(created).ToList());
         var summary = res.Summary() + (created.Count > 0 ? $"\n{created.Count} obra(s) criada(s) na via." : "\nNenhuma obra necessária: a via fica em aterro/corte no terreno.");
         // Elementos do greide aplicado (PIV, rampas, L, K, PCV/PTV, ponto alto/baixo) – um CSV por via, refeito a cada aplicação.
@@ -188,16 +213,16 @@ public sealed class CmdPerfilVia : CommandBase
             Directory.CreateDirectory(PluginPaths.Root);
             var key = string.Concat((road.GroupId ?? road.Pavement.Id).Where(char.IsLetterOrDigit));
             var path = Path.Combine(PluginPaths.Root, $"greide-{key}.csv");
-            File.WriteAllText(path, AlignmentElements.VerticalCsv(AlignmentElements.Vertical(grade)), new System.Text.UTF8Encoding(true));
+            File.WriteAllText(path, AlignmentElements.VerticalCsv(AlignmentElements.Vertical(grade), est), new System.Text.UTF8Encoding(true));
             var axisPath = Path.Combine(PluginPaths.Root, $"eixo-{key}.csv");
-            File.WriteAllText(axisPath, AlignmentElements.AxisCsv(AlignmentElements.FromAxis(road.Axis)), new System.Text.UTF8Encoding(true));
+            File.WriteAllText(axisPath, AlignmentElements.AxisCsv(AlignmentElements.FromAxis(road.Axis), est), new System.Text.UTF8Encoding(true));
             summary += $"\nElementos do greide (PIV, rampas, L, K, PCV/PTV): {path}\nElementos do eixo (tangentes, curvas, raios, estacas): {axisPath}";
             // Limites geométricos informados pelo usuário (Configurações), com a fonte dele (K8): sem limites, nada é conferido.
             var crit = PluginContext.Settings.CriteriosGeometricos;
             if (crit is { IsEmpty: false })
             {
                 var v = GeometricCheck.Axis(AlignmentElements.FromAxis(road.Axis), crit)
-                    .Concat(GeometricCheck.Vertical(AlignmentElements.Vertical(grade), crit)).ToList();
+                    .Concat(GeometricCheck.Vertical(AlignmentElements.Vertical(grade), crit)).Select(x => x with { Estacas = est }).ToList();
                 var checkPath = Path.Combine(PluginPaths.Root, $"verificacao-{key}.csv");
                 File.WriteAllText(checkPath, GeometricCheck.Csv(v, crit), new System.Text.UTF8Encoding(true));
                 summary += "\n" + GeometricCheck.Summary(v, crit) + $"\nVerificação do traçado e do greide: {checkPath}";

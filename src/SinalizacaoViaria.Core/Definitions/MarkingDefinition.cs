@@ -1596,6 +1596,12 @@ public sealed class RoadPavementDefinition : MarkingDefinition
     /// <summary>Seção transversal completa (RoadSetup em JSON) usada para gerar a via – permite editar a via inteira depois.</summary>
     public string? SetupJson { get; set; }
     /// <summary>
+    /// Estaqueamento da via (estaca inicial, intervalo, equações) para mostrar as estacas nos relatórios. Nulo = o padrão
+    /// (estaca 0 no início do eixo, de 20 em 20 m). As estacas guardadas nas definições continuam sendo distâncias ao longo
+    /// do eixo (D-023).
+    /// </summary>
+    public Estaqueamento? Estaqueamento { get; set; }
+    /// <summary>
     /// Pontas que convergem em faixa paralela com outra via (ramos de nós viários): não geram interseção nem cul-de-sac.
     /// </summary>
     public bool MergeStart { get; set; }

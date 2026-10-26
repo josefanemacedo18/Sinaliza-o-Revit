@@ -52,8 +52,13 @@ public sealed record Violacao(string Elemento, double Inicio, double Fim, string
 {
     private static readonly CultureInfo Pt = CultureInfo.GetCultureInfo("pt-BR");
 
+    /// <summary>Estaqueamento da via para mostrar as estacas; nulo = o padrão.</summary>
+    public Estaqueamento? Estacas { get; init; }
+
+    private string Estaca(double s) => (Estacas ?? new Estaqueamento()).Rotulo(s);
+
     public string Texto =>
-        $"{Elemento} ({(Fim > Inicio + 1e-6 ? $"estacas {AlignmentElements.Estaca(Inicio)} a {AlignmentElements.Estaca(Fim)}" : $"estaca {AlignmentElements.Estaca(Inicio)}")}): " +
+        $"{Elemento} ({(Fim > Inicio + 1e-6 ? $"estacas {Estaca(Inicio)} a {Estaca(Fim)}" : $"estaca {Estaca(Inicio)}")}): " +
         $"{Criterio} {Valor.ToString("0.##", Pt)} {Unidade} – limite {Limite.ToString("0.##", Pt)} {Unidade}";
 }
 
@@ -161,7 +166,7 @@ public static class GeometricCheck
         sb.AppendLine($"Limites informados pelo usuário – fonte: {c.FonteTexto.Replace(';', ',')}");
         sb.AppendLine("Elemento;Estaca inicial;Estaca final;Critério;Valor;Limite;Unidade");
         foreach (var v in vs)
-            sb.AppendLine(string.Join(";", v.Elemento, AlignmentElements.Estaca(v.Inicio), AlignmentElements.Estaca(v.Fim), v.Criterio,
+            sb.AppendLine(string.Join(";", v.Elemento, (v.Estacas ?? new Estaqueamento()).Rotulo(v.Inicio), (v.Estacas ?? new Estaqueamento()).Rotulo(v.Fim), v.Criterio,
                 v.Valor.ToString("0.###", Pt), v.Limite.ToString("0.###", Pt), v.Unidade));
         return sb.ToString();
     }
