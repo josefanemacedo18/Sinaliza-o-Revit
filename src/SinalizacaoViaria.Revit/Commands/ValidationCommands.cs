@@ -24,15 +24,24 @@ public sealed class CmdValidarModelo : CommandBase
             return Result.Cancelled;
         }
         var achados = ModelValidator.Validate(copias, uid => !string.IsNullOrWhiteSpace(uid) && doc.GetElement(uid) != null,
-            PluginContext.Settings.CriteriosGeometricos, DrainageDesignStore.Load(doc));
+            PluginContext.Settings.CriteriosGeometricos, DrainageDesignStore.Load(doc), incluirNaoVerificados: true);
         var marcas = copias.Select(c => c.MarkingId).Distinct().Count();
-        var text = ModelValidator.Report(achados, marcas, copias.Count, doc.Title, DateTime.Now);
+        var now = DateTime.Now;
+        var version = typeof(CmdValidarModelo).Assembly.GetName().Version?.ToString(3);
+        // Histórico: a validação anterior deste projeto (arquivo do usuário, fora do modelo – o comando é somente leitura).
+        var historyPath = HistoryPath(doc);
+        ValidacaoGravada? previous = null;
+        try { if (File.Exists(historyPath)) previous = ValidationHistory.FromJson(File.ReadAllText(historyPath)); }
+        catch (Exception ex) { Log.Error("Validar Modelo – histórico", ex); }
+        var cmp = ValidationHistory.Comparar(achados, previous);
+        var text = ModelValidator.Report(achados, marcas, copias.Count, doc.Title, now, version, cmp);
         string? path = null;
         try
         {
             Directory.CreateDirectory(PluginPaths.Root);
-            path = Path.Combine(PluginPaths.Root, $"validacao-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+            path = Path.Combine(PluginPaths.Root, $"validacao-{now:yyyyMMdd-HHmmss}.txt");
             File.WriteAllText(path, text);
+            File.WriteAllText(historyPath, ValidationHistory.ToJson(ValidationHistory.Gravar(achados, now, version)));
         }
         catch (Exception ex)
         {
@@ -40,19 +49,23 @@ public sealed class CmdValidarModelo : CommandBase
             path = null;
         }
 
+        var problems = achados.Where(a => a.Severidade != Severidade.NaoVerificavel).ToList();
         int Count(Severidade s) => achados.Count(a => a.Severidade == s);
+        var since = cmp.Anterior != null ? $" Desde a anterior: {cmp.Novos.Count} novo(s), {cmp.Resolvidos.Count} resolvido(s)." : "";
         var td = new TaskDialog(AppTitle)
         {
-            MainInstruction = achados.Count == 0
-                ? $"Modelo validado: nenhum problema em {marcas} marca(s)."
-                : $"Validação: {Count(Severidade.Erro)} erro(s), {Count(Severidade.Aviso)} aviso(s), {Count(Severidade.Info)} informação(ões).",
-            MainContent = string.Join("\n", achados.Take(12).Select(a => $"• [{a.Codigo}] {a.Mensagem}")) +
-                          (achados.Count > 12 ? $"\n… e mais {achados.Count - 12} no relatório." : "") +
+            MainInstruction = problems.Count == 0
+                ? $"Nenhum problema em {marcas} marca(s) nas verificações que rodaram ({Count(Severidade.NaoVerificavel)} não verificada(s))."
+                : $"Validação: {Count(Severidade.Erro)} erro(s), {Count(Severidade.Aviso)} aviso(s), {Count(Severidade.Info)} informação(ões), " +
+                  $"{Count(Severidade.NaoVerificavel)} não verificada(s).{since}",
+            MainContent = string.Join("\n", problems.Take(12).Select(a => $"• [{a.Codigo} · {a.Modulo}] {a.Mensagem}")) +
+                          (problems.Count > 12 ? $"\n… e mais {problems.Count - 12} no relatório." : "") +
+                          (Count(Severidade.NaoVerificavel) > 0 ? "\n\nNão verificado: " + string.Join(" ", achados.Where(a => a.Severidade == Severidade.NaoVerificavel).Select(a => a.Mensagem)) : "") +
                           "\n\nNada foi alterado no projeto.",
             ExpandedContent = text,
             FooterText = path != null ? $"Relatório: {path}" : "O relatório não pôde ser gravado (ver log).",
         };
-        var ids = achados.Where(a => a.Severidade != Severidade.Info)
+        var ids = achados.Where(a => a.Severidade is Severidade.Erro or Severidade.Aviso)
             .SelectMany(a => a.Ids).Distinct()
             .SelectMany(id => elements.TryGetValue(id, out var l) ? l : new List<ElementId>())
             .Where(id => doc.GetElement(id) != null).Distinct().ToList();
@@ -67,5 +80,13 @@ public sealed class CmdValidarModelo : CommandBase
             catch (Exception ex) { Log.Error("Validar Modelo – abrir relatório", ex); }
         }
         return Result.Succeeded;
+    }
+
+    /// <summary>Arquivo da última validação do projeto, pelo caminho do arquivo (ou pelo título, se ainda não foi salvo).</summary>
+    private static string HistoryPath(Document doc)
+    {
+        var key = string.IsNullOrWhiteSpace(doc.PathName) ? doc.Title : doc.PathName;
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key.ToLowerInvariant())))[..16];
+        return Path.Combine(PluginPaths.Root, $"validacao-ultima-{hash}.json");
     }
 }

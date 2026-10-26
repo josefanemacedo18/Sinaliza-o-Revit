@@ -3,7 +3,7 @@ namespace SinalizacaoViaria.Core.Geometry;
 public static partial class BoundaryFit
 {
     /// <summary>Distância (m) abaixo da qual dois vértices de anéis diferentes são o mesmo: a grade das operações booleanas é 0,1 mm.</summary>
-    private const double SameVertex = 1.5e-4;
+    internal const double SameVertex = 1.5e-4;
 
     /// <summary>Fração mínima do contato entre dois anéis com os mesmos vértices para a borda ser ajustada em comum.</summary>
     private const double CleanShare = 0.95;

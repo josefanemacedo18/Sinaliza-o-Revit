@@ -735,9 +735,16 @@ desfazer a marca (pavimento, calçadas, placas e dispositivos não entram).
 ### 9.3 Validar Modelo (conferência sem alterar nada)
 
 **Editar → Validar Modelo** lê as definições gravadas em todos os elementos do plugin e aponta problemas. É **somente
-leitura**: o projeto não é alterado (nem entra no Desfazer). Cada achado traz a **severidade** (erro, aviso,
-informação), a **confiança** (alta: verificado nos dados; média: provável) e se pede **revisão humana**. A correção é
-sempre sua, com Editar, Atualizar ou apagando o elemento.
+leitura**: o projeto não é alterado (nem entra no Desfazer). Cada achado traz:
+- a **severidade**: erro, aviso, informação ou **não verificado**. "Não verificado" é a verificação que não pôde rodar por
+  falta de dado ou configuração – nunca quer dizer "sem problema";
+- o **módulo**: Dados e versões, Dependências, Integração com o Revit, Geometria, Detalhamento, Quadras e lotes,
+  Interseções, Vias ou Drenagem;
+- a **confiança**: alta (verificado nos dados) ou média (provável);
+- se pede **revisão humana**;
+- a **ação recomendada**.
+
+A correção é sempre sua, com Editar, Atualizar ou apagando o elemento.
 
 | Código | O que confere | O que fazer |
 |---|---|---|
@@ -758,6 +765,20 @@ sempre sua, com Editar, Atualizar ou apagando o elemento.
 O resumo aparece numa janela (com **Selecionar os elementos com erro ou aviso** e **Abrir o relatório**). O relatório
 completo é gravado em `%AppData%\SinalizaBIM\validacao-AAAAMMDD-HHMMSS.txt`. A validação confere os **dados**; a
 geometria gerada no Revit é conferida pelo Autoteste.
+
+O relatório começa por um resumo:
+- a versão do plugin;
+- as contagens por severidade e por módulo;
+- a comparação com a **validação anterior do mesmo projeto**: quantos achados são **novos**, quantos **persistem** e
+  quantos foram **resolvidos**. Cada achado é marcado [NOVO] ou [persistente], e os resolvidos aparecem numa lista
+  própria. A última validação de cada projeto fica em `%AppData%\SinalizaBIM\validacao-ultima-….json`, fora do modelo,
+  e por isso o comando continua somente leitura. Um achado é o mesmo de uma vez para outra pelo código e pelas marcas
+  envolvidas, mesmo que o valor na mensagem mude.
+
+No fim do relatório, a seção **Não verificado** diz o que faltou para conferir e como resolver:
+- limites geométricos não informados (V12);
+- rede sem Projeto de Drenagem ou sem equação de chuva (V13);
+- elementos do Revit (V06), quando a validação roda sem o documento.
 
 **Marcas de versão mais nova.** Um projeto aberto com um SinalizaBIM mais antigo que o que o criou mostra essas marcas
 como estão. Editar, Atualizar e o ajuste de escala não as alteram (aparece um aviso), para não apagar o que a versão

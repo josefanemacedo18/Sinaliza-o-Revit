@@ -4,17 +4,32 @@ using SinalizacaoViaria.Core.Geometry;
 
 namespace SinalizacaoViaria.Core.Model;
 
-public enum Severidade { Erro, Aviso, Info }
+/// <summary>
+/// Gravidade do achado. <see cref="NaoVerificavel"/>: a verificação não pôde rodar (falta dado ou configuração) – não é
+/// "sem problema" (Prompt Master §17).
+/// </summary>
+public enum Severidade { Erro, Aviso, Info, NaoVerificavel }
 
 /// <summary>Quanto o achado é certo: Alta = verificado nos dados; Média = provável; Baixa = indício.</summary>
 public enum Confianca { Alta, Media, Baixa }
 
 /// <summary>
 /// Um problema encontrado no modelo. <paramref name="RevisaoHumana"/>: o plugin não corrige sozinho – uma pessoa decide
-/// (apagar, refazer, aceitar).
+/// (apagar, refazer, aceitar). <paramref name="Acao"/>: ação recomendada própria deste achado; nula = a da regra
+/// (<see cref="ModelValidator.Regras"/>).
 /// </summary>
 public sealed record Achado(string Codigo, Severidade Severidade, Confianca Confianca, bool RevisaoHumana, string Mensagem,
-    IReadOnlyList<string> Ids);
+    IReadOnlyList<string> Ids, string? Acao = null)
+{
+    /// <summary>Módulo da regra (Dados e versões, Dependências, Geometria, Vias, Interseções, Quadras e lotes, Drenagem…).</summary>
+    public string Modulo => ModelValidator.Regras.TryGetValue(Codigo, out var r) ? r.Modulo : "Outros";
+
+    /// <summary>O que fazer: a ação própria do achado ou, sem ela, a da regra.</summary>
+    public string AcaoRecomendada => Acao ?? (ModelValidator.Regras.TryGetValue(Codigo, out var r) ? r.Acao : "revisão humana");
+}
+
+/// <summary>Regra do validador: código, módulo, o que verifica e a ação recomendada padrão.</summary>
+public sealed record Regra(string Codigo, string Modulo, string Verifica, string Acao);
 
 /// <summary>Cópia da definição gravada num elemento (o mesmo Id em vários elementos: um por cor/peça).</summary>
 public sealed record CopiaGravada(string MarkingId, string Json, string Elemento);
@@ -30,8 +45,10 @@ public static class ModelValidator
     /// <param name="elementoExiste">UniqueId (dono da borda) → existe no documento. Nulo = não verificar elementos do Revit.</param>
     /// <param name="criterios">Limites geométricos informados pelo usuário (V12). Nulo ou vazio = não conferir.</param>
     /// <param name="drenagem">Projeto de drenagem (V13): critérios e, com a equação de chuva, a vazão. Nulo = só a geometria (sentido, ligação, ciclo).</param>
+    /// <param name="incluirNaoVerificados">Acrescenta, com <see cref="Severidade.NaoVerificavel"/>, as verificações que não
+    /// puderam rodar (sem documento, sem limites, sem Projeto de Drenagem ou sem equação de chuva).</param>
     public static List<Achado> Validate(IReadOnlyList<CopiaGravada> copias, Func<string, bool>? elementoExiste = null,
-        GeometricCriteria? criterios = null, Automation.ProjetoDrenagem? drenagem = null)
+        GeometricCriteria? criterios = null, Automation.ProjetoDrenagem? drenagem = null, bool incluirNaoVerificados = false)
     {
         var res = new List<Achado>();
         var defs = new Dictionary<string, MarkingDefinition>();
@@ -60,17 +77,17 @@ public static class ModelValidator
         foreach (var e in graph.Broken)
         {
             var o = defs[e.Origem];
-            var (sev, msg) = e.Tipo switch
+            var (sev, msg, acao) = e.Tipo switch
             {
-                TipoDependencia.Alvo => (Severidade.Aviso, $"{o.DisplayCode}: a marca detalhada não existe mais (detalhe órfão)."),
-                TipoDependencia.Via => (Severidade.Aviso, $"{o.DisplayCode}: aponta para uma via que não existe mais."),
-                TipoDependencia.Loteamento => (Severidade.Aviso, $"{o.DisplayCode}: o loteamento da quadra não existe mais (usa as categorias padrão)."),
-                TipoDependencia.Filha => (Severidade.Info, $"{o.DisplayCode}: sinalização gerada pelo nó foi apagada (volta ao atualizar o nó)."),
-                TipoDependencia.Rede => (Severidade.Aviso, $"{o.DisplayCode}: o dispositivo de drenagem de uma ponta do trecho não existe mais (o tubo não é desenhado)."),
-                _ => (Severidade.Info, $"{o.DisplayCode}: recorte deixado por uma marca que não existe mais (sai na próxima atualização)."),
+                TipoDependencia.Alvo => (Severidade.Aviso, $"{o.DisplayCode}: a marca detalhada não existe mais (detalhe órfão).", "apagar o detalhe ou refazê-lo sobre outra marca"),
+                TipoDependencia.Via => (Severidade.Aviso, $"{o.DisplayCode}: aponta para uma via que não existe mais.", "refazer a conexão com uma via existente ou apagar a marca"),
+                TipoDependencia.Loteamento => (Severidade.Aviso, $"{o.DisplayCode}: o loteamento da quadra não existe mais (usa as categorias padrão).", "ligar a quadra a um loteamento existente ou recriar o loteamento"),
+                TipoDependencia.Filha => (Severidade.Info, $"{o.DisplayCode}: sinalização gerada pelo nó foi apagada (volta ao atualizar o nó).", "atualizar o nó se a sinalização deve voltar"),
+                TipoDependencia.Rede => (Severidade.Aviso, $"{o.DisplayCode}: o dispositivo de drenagem de uma ponta do trecho não existe mais (o tubo não é desenhado).", "ligar o trecho a um dispositivo existente ou apagá-lo"),
+                _ => (Severidade.Info, $"{o.DisplayCode}: recorte deixado por uma marca que não existe mais (sai na próxima atualização).", "nenhuma – sai na próxima atualização da marca"),
             };
             res.Add(new("V04", sev, Confianca.Alta, e.Tipo is TipoDependencia.Alvo or TipoDependencia.Via or TipoDependencia.Loteamento or TipoDependencia.Rede, msg,
-                new[] { e.Origem, e.Destino }));
+                new[] { e.Origem, e.Destino }, acao));
         }
         foreach (var c in graph.Cycles())
             res.Add(new("V05", Severidade.Erro, Confianca.Alta, true,
@@ -93,48 +110,108 @@ public static class ModelValidator
             res.Add(new("V08", Severidade.Info, Confianca.Alta, false,
                 $"{s.DisplayCode}: linha de corte sem o perfil transversal (sai na próxima atualização).", new[] { s.Id }));
 
+        if (incluirNaoVerificados) res.AddRange(NaoVerificados(defs.Values, elementoExiste, criterios, drenagem));
         return res.OrderBy(a => a.Severidade).ThenBy(a => a.Codigo, StringComparer.Ordinal).ToList();
     }
 
-    /// <summary>O que cada código verifica (relatório e manual).</summary>
-    public static readonly IReadOnlyDictionary<string, string> Codigos = new Dictionary<string, string>
+    /// <summary>Verificações que não puderam rodar com os dados dados – ditas, nunca contadas como "sem problema".</summary>
+    private static IEnumerable<Achado> NaoVerificados(IEnumerable<MarkingDefinition> defs, Func<string, bool>? elementoExiste,
+        GeometricCriteria? criterios, Automation.ProjetoDrenagem? drenagem)
     {
-        ["V01"] = "dados da definição ilegíveis (JSON inválido ou tipo desconhecido)",
-        ["V02"] = "definição gravada por versão mais nova do plugin (somente leitura)",
-        ["V03"] = "elementos da mesma marca com definições diferentes",
-        ["V04"] = "referência a marca inexistente (detalhe, via, loteamento, sinalização filha, recorte)",
-        ["V05"] = "dependência circular entre marcas",
-        ["V06"] = "linha ou elemento do Revit referenciado foi apagado",
-        ["V07"] = "contorno inválido (poucos vértices, área nula, lados que se cruzam)",
-        ["V08"] = "linha de corte sem o perfil transversal",
-        ["V09"] = "quadras do mesmo loteamento sobrepostas",
-        ["V10"] = "quadra fora da gleba do loteamento",
-        ["V11"] = "interseção com menos de duas vias existentes",
-        ["V12"] = "eixo ou greide de via fora dos limites geométricos informados pelo usuário (raio, tangente, rampa, K)",
-        ["V13"] = "rede de drenagem: contrafluxo, trecho ligado ao próprio dispositivo, ciclo ou fora dos critérios do Projeto de Drenagem (declividade, recobrimento, diâmetro, PVs, capacidade, velocidade, sarjeta, engolimento)",
+        var lista = defs.ToList();
+        static Achado N(string codigo, string msg, string acao) => new(codigo, Severidade.NaoVerificavel, Confianca.Alta, false, msg, Array.Empty<string>(), acao);
+        if (elementoExiste == null && lista.Any(d => d.Path is { ElementIds.Count: > 0 } || d is QuadraDefinition or LoteamentoDefinition))
+            yield return N("V06", "Linhas e elementos do Revit citados pelas marcas não conferidos (validação sem o documento).", "validar com o projeto aberto no Revit");
+        var vias = lista.OfType<RoadPavementDefinition>().Count();
+        if (vias > 0 && criterios is not { IsEmpty: false })
+            yield return N("V12", $"Limites geométricos não informados: traçado e greide de {vias} via(s) não conferidos.",
+                "informar os limites e a fonte em Configurações › Limites geométricos do traçado e do greide");
+        if (lista.Any(d => d is DrainagePipeDefinition))
+        {
+            if (drenagem == null)
+                yield return N("V13", "Sem Projeto de Drenagem: só o sentido, as ligações e os ciclos da rede foram conferidos; critérios e vazão não.",
+                    "preencher o Projeto de Drenagem (critérios e equação de chuva)");
+            else if (!drenagem.TemChuva)
+                yield return N("V13", "Sem equação de chuva no Projeto de Drenagem: vazão, capacidade e velocidade das galerias, sarjetas e engolimento não calculados.",
+                    "escolher ou digitar a equação de chuva do local, com a fonte, no Projeto de Drenagem");
+        }
+    }
+
+    /// <summary>Regras do validador: módulo, o que cada código verifica e a ação recomendada padrão (relatório e manual).</summary>
+    public static readonly IReadOnlyDictionary<string, Regra> Regras = new[]
+    {
+        new Regra("V01", "Dados e versões", "dados da definição ilegíveis (JSON inválido ou tipo desconhecido)", "refazer a marca (o log tem o erro da leitura)"),
+        new Regra("V02", "Dados e versões", "definição gravada por versão mais nova do plugin (somente leitura)", "abrir o projeto com a versão que gravou a marca, ou recriá-la"),
+        new Regra("V03", "Dados e versões", "elementos da mesma marca com definições diferentes", "atualizar a marca para regravar todas as cópias iguais"),
+        new Regra("V04", "Dependências", "referência a marca inexistente (detalhe, via, loteamento, sinalização filha, recorte)", "refazer a ligação ou apagar a marca órfã"),
+        new Regra("V05", "Dependências", "dependência circular entre marcas", "apagar e refazer uma das marcas do ciclo"),
+        new Regra("V06", "Integração com o Revit", "linha ou elemento do Revit referenciado foi apagado", "redesenhar a linha de referência, ou manter o traçado guardado"),
+        new Regra("V07", "Geometria", "contorno inválido (poucos vértices, área nula, lados que se cruzam)", "redesenhar o contorno sem lados que se cruzem e com área"),
+        new Regra("V08", "Detalhamento", "linha de corte sem o perfil transversal", "nenhuma – sai na próxima atualização, ou refazer o perfil"),
+        new Regra("V09", "Quadras e lotes", "quadras do mesmo loteamento sobrepostas", "ajustar os contornos das quadras"),
+        new Regra("V10", "Quadras e lotes", "quadra fora da gleba do loteamento", "ajustar a quadra ou a gleba"),
+        new Regra("V11", "Interseções", "interseção com menos de duas vias existentes", "apagar ou refazer a conexão entre as vias"),
+        new Regra("V12", "Vias (traçado e greide)", "eixo ou greide de via fora dos limites geométricos informados pelo usuário (raio, tangente, rampa, K)",
+            "rever o traçado ou o greide, ou os limites informados"),
+        new Regra("V13", "Drenagem", "rede de drenagem: contrafluxo, trecho ligado ao próprio dispositivo, ciclo ou fora dos critérios do Projeto de Drenagem (declividade, recobrimento, diâmetro, PVs, capacidade, velocidade, sarjeta, engolimento)",
+            "rever o trecho ou o dispositivo indicado, ou o critério no Projeto de Drenagem"),
+    }.ToDictionary(r => r.Codigo);
+
+    /// <summary>O que cada código verifica (relatório e manual).</summary>
+    public static readonly IReadOnlyDictionary<string, string> Codigos = Regras.ToDictionary(kv => kv.Key, kv => kv.Value.Verifica);
+
+    public static string Nome(Severidade s) => s switch
+    {
+        Severidade.Erro => "ERRO", Severidade.Aviso => "AVISO", Severidade.Info => "INFO", _ => "NÃO VERIFICADO",
     };
 
-    /// <summary>Relatório em texto (o mesmo que a camada Revit grava em TXT).</summary>
-    public static string Report(IReadOnlyList<Achado> achados, int marcas, int elementos, string projeto, DateTime quando)
+    /// <summary>
+    /// Relatório em texto (o mesmo que a camada Revit grava em TXT): resumo executivo com a versão, contagens por gravidade e
+    /// por módulo, a comparação com a validação anterior (quando há), os achados com módulo e ação recomendada e o que não
+    /// pôde ser verificado.
+    /// </summary>
+    public static string Report(IReadOnlyList<Achado> achados, int marcas, int elementos, string projeto, DateTime quando,
+        string? versao = null, ComparacaoValidacao? comparacao = null)
     {
-        static string S(Severidade s) => s switch { Severidade.Erro => "ERRO", Severidade.Aviso => "AVISO", _ => "INFO" };
         static string C(Confianca c) => c switch { Confianca.Alta => "alta", Confianca.Media => "média", _ => "baixa" };
+        var problemas = achados.Where(a => a.Severidade != Severidade.NaoVerificavel).ToList();
+        var nao = achados.Where(a => a.Severidade == Severidade.NaoVerificavel).ToList();
         var sb = new System.Text.StringBuilder();
         sb.AppendLine($"VALIDAÇÃO DO MODELO – {projeto}");
-        sb.AppendLine($"{quando:dd/MM/yyyy HH:mm} · {marcas} marca(s) em {elementos} elemento(s) · nada foi alterado no projeto.");
-        sb.AppendLine($"Erros: {achados.Count(a => a.Severidade == Severidade.Erro)} · Avisos: {achados.Count(a => a.Severidade == Severidade.Aviso)} · " +
-                      $"Informações: {achados.Count(a => a.Severidade == Severidade.Info)} · Pedem revisão humana: {achados.Count(a => a.RevisaoHumana)}");
+        sb.AppendLine($"{quando:dd/MM/yyyy HH:mm}{(versao != null ? $" · SinalizaBIM {versao}" : "")} · {marcas} marca(s) em {elementos} elemento(s) · nada foi alterado no projeto.");
+        sb.AppendLine($"Erros: {problemas.Count(a => a.Severidade == Severidade.Erro)} · Avisos: {problemas.Count(a => a.Severidade == Severidade.Aviso)} · " +
+                      $"Informações: {problemas.Count(a => a.Severidade == Severidade.Info)} · Não verificados: {nao.Count} · " +
+                      $"Pedem revisão humana: {problemas.Count(a => a.RevisaoHumana)}");
+        if (problemas.Count > 0)
+            sb.AppendLine("Por módulo: " + string.Join(" · ", problemas.GroupBy(a => a.Modulo).OrderBy(g => g.Key, StringComparer.Ordinal)
+                .Select(g => $"{g.Key} {g.Count()}")));
+        if (comparacao != null)
+            sb.AppendLine(comparacao.Anterior is { } ant
+                ? $"Desde a validação de {ant:dd/MM/yyyy HH:mm}: {comparacao.Novos.Count} novo(s), {comparacao.Persistentes.Count} persistente(s), {comparacao.Resolvidos.Count} resolvido(s)."
+                : "Primeira validação registrada deste projeto: nada a comparar.");
         sb.AppendLine();
-        if (achados.Count == 0) sb.AppendLine("Nenhum problema encontrado nas verificações abaixo.");
-        foreach (var a in achados)
+        if (problemas.Count == 0) sb.AppendLine("Nenhum problema encontrado nas verificações que rodaram.");
+        var novos = comparacao?.Novos.ToHashSet() ?? new HashSet<Achado>();
+        foreach (var a in problemas)
         {
-            sb.AppendLine($"[{S(a.Severidade)}] {a.Codigo} (confiança {C(a.Confianca)}{(a.RevisaoHumana ? ", revisão humana" : "")}) {a.Mensagem}");
+            var marca = comparacao?.Anterior != null ? (novos.Contains(a) ? " [NOVO]" : " [persistente]") : "";
+            sb.AppendLine($"[{Nome(a.Severidade)}]{marca} {a.Codigo} · {a.Modulo} (confiança {C(a.Confianca)}{(a.RevisaoHumana ? ", revisão humana" : "")}) {a.Mensagem}");
+            sb.AppendLine($"        Ação: {a.AcaoRecomendada}");
             sb.AppendLine($"        Id: {string.Join(", ", a.Ids)}");
         }
+        if (comparacao is { Resolvidos.Count: > 0 })
+        {
+            sb.AppendLine();
+            sb.AppendLine("Resolvidos desde a validação anterior:");
+            foreach (var r in comparacao.Resolvidos) sb.AppendLine($"  [{Nome(r.Severidade)}] {r.Codigo} {r.Mensagem}");
+        }
+        sb.AppendLine();
+        sb.AppendLine("Não verificado:");
+        foreach (var a in nao) sb.AppendLine($"  {a.Codigo} · {a.Modulo}: {a.Mensagem} → {a.AcaoRecomendada}");
+        sb.AppendLine("  Geometria gerada no Revit (pisos sobrepostos, pisos × terreno, retas fora do eixo): use o Autoteste. Normas de projeto e aprovação legal: fora do plugin.");
         sb.AppendLine();
         sb.AppendLine("Verificações:");
-        foreach (var (k, v) in Codigos) sb.AppendLine($"  {k} – {v}");
-        sb.AppendLine("Não verificado aqui: geometria gerada no Revit (use o Autoteste), normas de projeto e aprovação legal.");
+        foreach (var r in Regras.Values) sb.AppendLine($"  {r.Codigo} – {r.Verifica} ({r.Modulo})");
         return sb.ToString();
     }
 
