@@ -123,17 +123,22 @@ public class Fase10CompatibilizacaoTests(ITestOutputHelper output)
 
     // ------------------------------------------------------------------ com os geradores reais
 
-    /// <summary>Peças planas que viram pisos no Revit (mesmo corte do <c>MarkingService</c>), com código, marca e grupo.</summary>
-    private static List<PecaPiso> Pecas(IReadOnlyList<MarkingDefinition> defs, IReadOnlyDictionary<string, Polyline2> paths)
+    /// <summary>
+    /// Peças planas que viram pisos no Revit (mesmo corte do <c>MarkingService</c>), com código, marca e grupo. Com
+    /// <paramref name="ajustar"/>, o contorno de cada marca passa pelo ajuste conjunto do Revit (D-016, emulado como no
+    /// <see cref="FCRevitFullRun4Tests"/>): é ele que chega ao modelo.
+    /// </summary>
+    private static List<PecaPiso> Pecas(IReadOnlyList<MarkingDefinition> defs, IReadOnlyDictionary<string, Polyline2> paths, bool ajustar = false)
     {
         var ctx = new BuildContext { Catalog = Cat, Lookup = id => defs.FirstOrDefault(x => x.Id == id), PathOf = d => paths.GetValueOrDefault(d.Id), AllDefinitions = () => defs };
         var res = new List<PecaPiso>();
         foreach (var d in defs)
         {
             var path = paths.GetValueOrDefault(d.Id) ?? (d.Path is { Points.Count: >= 2 } pr ? new Polyline2(pr.Points, pr.Closed) : null);
-            foreach (var p in ElementPlan.RevitPieces(d, MarkingBuilder.Build(d, path, ctx)))
-                if (PieceOverlaps.IsFloorPiece(p))
-                    res.Add(new PecaPiso(p.Shape, p.Thickness, p.Elevation, 0, d.DisplayCode, d.Id, d.GroupId, MarkingColors.IsPaint(p.Color)));
+            var geo = MarkingBuilder.Build(d, path, ctx);
+            var pieces = ElementPlan.RevitPieces(d, geo).Where(PieceOverlaps.IsFloorPiece).ToList();
+            if (ajustar) pieces = FCRevitFullRun4Tests.Fitted(pieces, geo.ArcCenters);
+            res.AddRange(pieces.Select(p => new PecaPiso(p.Shape, p.Thickness, p.Elevation, 0, d.DisplayCode, d.Id, d.GroupId, MarkingColors.IsPaint(p.Color))));
         }
         return res;
     }
@@ -144,8 +149,9 @@ public class Fase10CompatibilizacaoTests(ITestOutputHelper output)
 
     /// <summary>
     /// Duas vias que se cruzam sem interseção: as sobreposições entre as peças das duas vias são interseção legítima (falta o
-    /// nó), não conflito – e nenhuma é atribuída a uma via só. Com o nó gerado (mesmas vias), não sobra cruzamento sem nó nem
-    /// duplicação.
+    /// nó), não conflito – e nenhuma é atribuída a uma via só. Com o nó gerado (mesmas vias) e o contorno ajustado como no
+    /// Revit, nenhum par: nas peças cruas o classificador achava meio-fio × calçada da interseção (2 × 62 cm³ – um vértice
+    /// a 5 mm da borda comum, simplificado num piso e não no outro), que o ajuste conjunto dos contornos (D-016) já desfaz.
     /// </summary>
     [Fact]
     public void ViasCruzadas_SemNoSaoInterseccaoLegitima_ComNoNaoSobraCruzamento()
@@ -172,10 +178,13 @@ public class Fase10CompatibilizacaoTests(ITestOutputHelper output)
 
         var w = Y34TipTests.Make(null, (1, a), (1, b));
         Assert.Single(w.Nodes);
-        var pecasNo = Pecas(w.Defs, w.Paths);
+        var cruas = Pecas(w.Defs, w.Paths);
+        var resCruas = OverlapClassifier.DasPecas(cruas, OverlapClassifier.NosEntreVias(w.Defs));
+        output.WriteLine("Com nó, peças cruas: " + (resCruas.Count == 0 ? "nenhum par" : Lista(cruas, resCruas)));
+        Assert.DoesNotContain(resCruas, r => r.C.Classe is ClasseSobreposicao.InterseccaoLegitima or ClasseSobreposicao.Duplicacao);
+        var pecasNo = Pecas(w.Defs, w.Paths, ajustar: true);
         var resNo = OverlapClassifier.DasPecas(pecasNo, OverlapClassifier.NosEntreVias(w.Defs));
-        output.WriteLine("Com nó: " + (resNo.Count == 0 ? "nenhum par" : Lista(pecasNo, resNo)));
-        Assert.DoesNotContain(resNo, r => r.C.Classe is ClasseSobreposicao.InterseccaoLegitima or ClasseSobreposicao.Duplicacao);
+        Assert.True(resNo.Count == 0, "Com nó, contorno ajustado: " + Lista(pecasNo, resNo));
     }
 
     [Fact]
