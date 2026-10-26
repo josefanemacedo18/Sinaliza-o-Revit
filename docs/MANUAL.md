@@ -789,7 +789,7 @@ criada 400 m à direita de tudo o que existe no projeto:
 | Edição | editar linha/interseção/rotatória, mover eixo (atualização automática), Apagar Trecho (na via, fora da via, zebrado, sem linha de referência, devolver peças), 2D/3D, excluir, Atualizar Todas |
 | Detalhamento | detalhe de placas, anotação, legenda, cota de seção + perfil, detalhe típico, quadros, notas, norte, eixos, quantitativos e tabelas |
 | Tráfego | Simulador de Tráfego sobre a área de teste: leitura da rede, análise HCM e diagnóstico, microssimulação de 5 min, cenários (rotatória × semáforo coordenado × contagem) com comparação, cenários gravados e lidos do projeto, plano semafórico gravado na interseção, sinalização interpretada (placas, marcas, dispositivos e semáforos associados a trechos e cruzamentos), resultados nos parâmetros SV_NivelServico/SV_Trafego e mapa de níveis de serviço na planta; **contatos entre veículos (deve ser zero) e setas**, **planta real no mapa**, **recomendação de tempos e onda verde**, **semáforo de travessia do cenário** e **soluções testadas** para o pior cruzamento |
-| Verificações | pintura escondida sob o piso ou flutuando, buracos e degraus entre pisos da pista, terreno acima da pista ou sem encostar na seção, estruturas invadindo outras vias, formas sem geometria |
+| Verificações (sempre no Completo) | pintura escondida sob o piso ou flutuando, buracos e degraus entre pisos da pista, **terreno projetado** (o Toposolid depois da terraplenagem) acima da pista ou com degrau na borda da seção – o talude começa no topo do acabamento –, estruturas invadindo outras vias, formas sem geometria |
 
 Cada erro do plugin (inclusive os que antes só iam para o log), cada erro/aviso do Revit e cada verificação que falha
 entram no relatório, salvo em `%AppData%\SinalizaBIM\autoteste-AAAAMMDD-HHMMSS.txt` (gravado a cada etapa – se o
@@ -822,7 +822,15 @@ que os elementos são de uma mesma marca, sinal de piso duplicado numa regenera�
 sobrepõem", o fim da etapa confere cada par no modelo como ficou: quantos **ainda têm volume em comum** (sobreposição
 real, vira o primeiro aviso da etapa, com exemplos) e quantos **não têm mais** (aviso de passagem: a via é criada inteira e
 a interseção recorta as vias depois, em outra transação); uma nota lista **todos** os pares que ficaram, por tipo
-("MEIO-FIO × MER-0 2 (0,071 m³)"). Para os avisos "ligeiramente fora da linha central", uma nota mede as retas citadas
+("MEIO-FIO × MER-0 2 (0,071 m³)"). Desde a 2.8.0 cada par tem também uma **classe**, com o motivo e a ação recomendada
+(no arquivo de dados), e a nota "Por classe" resume as contagens:
+- **conflito real:** pisos que não deviam se cruzar se invadem;
+- **duplicação acidental:** dois pisos iguais no mesmo lugar;
+- **interseção legítima:** peças de duas vias que se cruzam sem interseção entre elas – crie o nó;
+- **inconclusivo:** piso que não é do plugin, ou um piso inteiro dentro de outro de outro tipo;
+- **camada intencional:** um piso apenas apoiado sobre o outro.
+
+Nada é apagado: a classe orienta a correção. A conferência do **modelo final** classifica os pares do mesmo jeito. Para os avisos "ligeiramente fora da linha central", uma nota mede as retas citadas
 (desalinhamento, comprimento e quanto a ponta teria de andar para a reta ficar exata). Envie esse relatório.
 
 **Retas alinhadas.** Pela ajuda do Revit, o aviso "ligeiramente fora da linha central" vale para retas a até 0,2° da

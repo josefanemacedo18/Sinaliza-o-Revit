@@ -246,6 +246,9 @@ que compilam contra o pacote do Revit 2027 referenciado (K10); nenhum foi presum
 - Autoteste, `AutoTestChecks.CheckRoad`: pintura × pisos (escondida ou flutuando), buracos e degraus no pavimento e terreno
   × via (Toposolid acima da pista; desnível de mais de 30 cm entre o terreno e a borda da seção). **É a opção "Verificações
   do modelo", desligada por padrão (`AutoTestOptions.Checks`), e não rodou em nenhum dos quatro Autotestes completos.**
+  Desde a 2.8.0 (Etapa 1) ela roda sempre no Completo. A parte terreno × via passou a usar o Toposolid projetado
+  (`TerrainModel.Current`) e o verificador do núcleo (`FloorTerrainCheck`). Antes usava o terreno **natural**
+  (`TerrainModel.Ground`) e acusaria "Toposolid acima da pista" em todo trecho de corte (FATO, pela leitura do código).
 - Núcleo: `PieceOverlaps` (pares de pisos sobrepostos) e a conferência final dos pisos do Autoteste (pares por tipo).
 
 ### 7.6 Lacunas (destino no ROADMAP)
@@ -309,7 +312,7 @@ Isso compila (é um assembly só), mas contraria o §4 do Prompt Master. Está r
 | 3 | Plugin nativo do Revit 2027, sem motor externo | IT | DLL única carregada no Revit 2027 (Autotestes); Core sem referência ao Revit (ARCHITECTURE §1) |
 | 4 | Identificadores estáveis e rastreio projeto ↔ elemento | IT (Core) / INV (Revit) | `MarkingDefinition.Id` em cada elemento (Extensible Storage); `ModelGraph` |
 | 5 | Núcleo geométrico com tolerâncias explícitas | P | primitivas e casos degenerados testados (EV5); tolerâncias documentadas, mas definidas em cada módulo (K9) |
-| 5 | Detecção de geometria inválida, lacunas e sobreposições | P | `PolygonChecks` (V07), `PieceOverlaps`; **a classificação das sobreposições falta** (RT-1.3, Fase X) |
+| 5 | Detecção de geometria inválida, lacunas e sobreposições | IT (núcleo) / INV (Revit) | `PolygonChecks` (V07), `PieceOverlaps`; classificação das sobreposições desde a Etapa 1 (`OverlapClassifier`, RT-1.3) |
 | 6 | Terreno existente × projetado separados | IT (Core) / INV (Revit) | original gravado no Toposolid (AUDIT §7.1); `Grading` |
 | 6 | Diagnóstico da superfície (dados insuficientes, triângulos inválidos, descontinuidades, declividade fora do limite, extrapolação) | **A** | nenhum diagnóstico do TIN no núcleo; o Revit recebe os pontos sem conferência |
 | 7 | Eixos, alinhamentos, greides, estacas, seções, prévia | IT (Core) / INV (prévia no Revit) | Fases V e VI; `RoadPreviewServer` (DirectContext3D) |
@@ -318,7 +321,7 @@ Isso compila (é um assembly só), mas contraria o §4 do Prompt Master. Está r
 | 9 | Corte e aterro com método documentado e limites | IT (Core) | `Grading.Volumes` (malha) e `SectionVolumes` (seções), AUDIT §6.7 |
 | 9 | Cálculo de terraplenagem desatualizado depois de mudar a via | **A** | o Toposolid fica como estava até nova Terraplenagem; nada aponta que ficou velho |
 | 10 | Estrutura de pavimento por via ou trecho (ordem, espessura, material) usada pelo cálculo | P | camadas só no desenho do corte (`SectionLayer`); a terraplenagem usa uma profundidade única de subleito (0,40 m, `TerrainService.Subgrade`); o piso tem só o revestimento |
-| 10 | Sobreposições classificadas antes de qualquer correção | P → em andamento | `OverlapClassifier` (Fase X) |
+| 10 | Sobreposições classificadas antes de qualquer correção | IT (núcleo) / INV (Autoteste) | `OverlapClassifier`, `Fase10CompatibilizacaoTests`; no Autoteste desde a 2.8.0 |
 | 11 | Drenagem: conectividade, sentido, cotas, ligações | IT (Core) / INV (Revit) | `DrainageNetwork`, V13, Fase VIII |
 | 11 | Hidráulica separada da geometria, com entradas, hipóteses e limites documentados | IT (Core) | `DrainageNetwork.Check` (geometria) × `DrainageHydraulics` (método racional); memorial com as fontes; K5 |
 | 11 | Drenagem integrada à topografia e aos greides | P | a área e a declividade da sarjeta são informadas por dispositivo (K5, RT-1.5) |
@@ -348,7 +351,7 @@ a Fase VIII (o dimensionamento existe e é testado; ver a linha acima dela). Foi
 |---|---|---|---|
 | 1 | Perda de dados | R1–R3 corrigidos (§5.1); K2 apontado pelo V03; nenhum risco novo encontrado | — |
 | 2 | Falha de build | compilação limpa; CI verde até `6d2b72f` (execução 125) | conferir o CI de cada push |
-| 3 | Inconsistência geométrica | pisos sobrepostos sem classe (K11, RT-1.3); retas fora do eixo (K12, 1 restante, corrigida no FC); pisos × terreno sem conferência no núcleo (RT-1.2); terreno sem diagnóstico (§6 do Prompt Master) | **agora:** classificador, conferência piso × terreno, diagnóstico do terreno |
+| 3 | Inconsistência geométrica | pisos sobrepostos sem classe (K11, RT-1.3); retas fora do eixo (K12, 1 restante, corrigida no FC); pisos × terreno sem conferência no núcleo (RT-1.2); terreno sem diagnóstico (§6 do Prompt Master) | classificador e pisos × terreno feitos na Etapa 1 (2.8.0); diagnóstico do terreno na Etapa 3 |
 | 4 | Regressão não vista | "Verificações do modelo" desligadas no Autoteste (§7.5); validação sem comparação com a anterior | ligar as verificações no Autoteste completo; histórico da validação |
 | 5 | Resultado velho apresentado como atual | terraplenagem desatualizada depois de mudar a via, sem aviso | assinatura das entradas gravada com a terraplenagem e conferida no Validar Modelo |
 | 6 | Cálculo com dado incoerente | estrutura do pavimento diferente entre o corte (camadas) e a terraplenagem (0,40 m) | estrutura do pavimento na via, usada pelo corte, pela terraplenagem e pelos quantitativos |

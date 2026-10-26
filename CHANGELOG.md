@@ -3,6 +3,44 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-26 – Etapa 1: integridade geométrica (versão 2.8.0)
+
+Etapa 1 do plano unificado (`docs/PLANO_DE_ACAO.md`), na Fase X. Entrega: `Releases/Etapa01` (não executada no Revit 2027).
+
+### Pisos sobrepostos classificados (RT-1.3)
+- `OverlapClassifier` classifica cada par pelo que foi medido, com motivo e ação recomendada. Nada é apagado.
+- **As cinco classes:**
+  - camada intencional (só apoiados);
+  - interseção legítima (peças de duas vias que se cruzam sem nó);
+  - duplicação acidental;
+  - conflito real;
+  - inconclusivo (piso que não é do plugin, ou um piso inteiro dentro de outro de outro tipo).
+- **Autoteste:** a conferência do fim de cada etapa e a do modelo final dão o resumo por classe. O arquivo de dados traz a
+  classe, o motivo e a ação de cada par, e o aviso do modelo final diz quantos pares são conflito real ou duplicação.
+- **Resíduo investigado sem mudar o gerador:**
+  - nas peças cruas de um cruzamento simples, o classificador achou 2 pares meio-fio × calçada (62 cm³ cada) – um vértice
+    a 5 mm da borda comum, simplificado num piso e não no outro;
+  - com o contorno ajustado como no Revit (ajuste conjunto, D-016) não sobra nenhum par;
+  - o teste exige zero pares nesse caso.
+
+### Pisos × terreno projetado (RT-1.2)
+- `FloorTerrainCheck` (núcleo) acusa quatro problemas:
+  - piso enterrado (terreno acima do topo);
+  - terreno dentro do piso ou da estrutura;
+  - piso suspenso (vão sob a estrutura);
+  - degrau entre o terreno e a borda da seção, onde o talude devia começar.
+- Ele diz quantos pontos foram de fato conferidos: zero pontos é "não verificado", não "sem problema".
+- **Defeito corrigido no Autoteste:** a conferência terreno × via comparava a pista com o terreno **natural**
+  (`TerrainModel.Ground`) e acusaria "Toposolid acima da pista" em todo trecho de corte. Agora compara com o Toposolid
+  projetado (`TerrainModel.Current`), pelo verificador do núcleo. Ela nunca tinha rodado: as "Verificações do modelo" eram
+  opcionais e desligadas. Passam a rodar sempre no Completo.
+- Limite: no Revit, o fundo da estrutura sob a pista não é conferido, porque a profundidade do subleito não é gravada com a
+  terraplenagem (K19, Etapa 5).
+
+### Outros
+- `Fase08HidraulicaTests`: aviso xUnit2029 corrigido (a compilação dos testes voltou a 0 avisos).
+- Testes novos: `Fase10CompatibilizacaoTests` (9) e `Fase10PisoTerrenoTests` (8).
+
 ## 2026-10-26 – Etapa 0: plano unificado dos três prompts
 
 Sem DLL nova (a Etapa 0 não muda o plugin).
