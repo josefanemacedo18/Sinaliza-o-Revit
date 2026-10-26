@@ -94,6 +94,18 @@ public sealed class PathReference
     [JsonIgnore]
     public bool IsAssociative => ElementIds.Count > 0;
 
+    /// <summary>
+    /// Traçado guardado, sem o Revit: os pontos ou, num caminho por linhas, o traçado de cada referência no cache (em ordem),
+    /// suavizado como na geração. Nulo sem dois pontos.
+    /// </summary>
+    public Polyline2? StoredPolyline()
+    {
+        var pts = Points.Count >= 2 ? Points
+            : Cache is { Count: > 0 } c ? c.SelectMany((q, k) => k == 0 ? q : q.Skip(1)).ToList() : null;
+        if (pts == null || pts.Count < 2) return null;
+        return new Polyline2(Smooth(pts, SmoothRadius, Closed).ToList(), Closed);
+    }
+
     /// <summary>Prefixo das referências a arestas de elementos (bordas de pisos, lajes, topografia...).</summary>
     public const string EdgePrefix = "edge|";
 

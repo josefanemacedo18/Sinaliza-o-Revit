@@ -459,13 +459,7 @@ public static class ModelValidator
     }
 
     /// <summary>Eixo guardado na definição: pontos fixos ou o traçado das linhas na última geração, com os cantos arredondados.</summary>
-    private static Polyline2? StoredAxis(PathReference p)
-    {
-        var pts = p.Points.Count >= 2 ? p.Points
-            : p.Cache is { Count: > 0 } c ? c.SelectMany((q, k) => k == 0 ? q : q.Skip(1)).ToList() : null;
-        if (pts == null || pts.Count < 2) return null;
-        return new Polyline2(PathReference.Smooth(pts, p.SmoothRadius, p.Closed).ToList(), p.Closed);
-    }
+    private static Polyline2? StoredAxis(PathReference p) => p.StoredPolyline();
 
     private static bool BoundsOverlap(Polygon2 a, Polygon2 b)
     {

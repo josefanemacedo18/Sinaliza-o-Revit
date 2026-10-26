@@ -94,7 +94,8 @@ public static class DrenagemDoModelo
         foreach (var r in defs.OfType<RoadPavementDefinition>())
         {
             n++;
-            if (TerraPaint.StoredPath(r) is not { Length: > 1 } eixo) continue;
+            // Pontos ou, numa via sobre linhas do Revit, o traçado guardado delas (o StoredPath só lê os pontos).
+            if (r.PathRef.StoredPolyline() is not { Length: > 1 } eixo) continue;
             res.Add(new ViaDrenada(r.Id, $"Via {n}", eixo, r.PathRef.Z, r.Output.Grade, r.LeftWidth, r.RightWidth,
                 r.LeftSidewalk, r.RightSidewalk, r.Estaqueamento, r.CurbHeight));
         }
@@ -298,7 +299,7 @@ public static class DrenagemDoModelo
     {
         var inlets = defs.OfType<DrainageDefinition>().Where(d => d.IsInlet).ToList();
         bool Captado(Vec2 p) => inlets.Any(d => d.IsLinear
-            ? TerraPaint.StoredPath(d) is { } path && Math.Abs(path.SignedDistance(p)) <= ToleranciaPontoBaixo
+            ? d.PathRef.StoredPolyline() is { } path && Math.Abs(path.SignedDistance(p)) <= ToleranciaPontoBaixo
             : d.Position.DistanceTo(p) <= ToleranciaPontoBaixo);
         return Vias(defs).SelectMany(v => new[] { 1, -1 }.SelectMany(l => PontosBaixos(v, l))).Where(pb => !Captado(pb.Ponto)).ToList();
     }

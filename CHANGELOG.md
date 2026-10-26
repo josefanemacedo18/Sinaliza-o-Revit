@@ -35,9 +35,12 @@ Etapa 6 do plano unificado (Fase VIII e RT-1.5). Entrega: `Releases/Etapa06` (n�
   CSV do Relatório da Rede, com as captações × modelo; o perfil também é conferido no Autoteste.
 - **Tolerâncias da conferência** no registro único (`Tolerancias`): são limites do plugin, não de norma.
 - **Nome dos tipos de dispositivo** passou para `DrainageDefinition.NomeTipo` (memorial e relatório usam o mesmo).
+- **Traçado guardado** (`PathReference.StoredPolyline`): pontos ou, numa via sobre linhas do Revit, o cache das linhas –
+  o mesmo que o validador já usava. Corrige, antes da entrega, a primeira versão desta etapa (`c959e00`), que lia só os
+  pontos e ignorava as vias por linhas.
 
 ### Testes
-- `Etapa06DrenagemTests` (10).
+- `Etapa06DrenagemTests` (11, com a regressão da via sobre linhas).
 
 ## 2026-10-26 – Etapa 5: estrutura do pavimento e terraplenagem desatualizada (versão 2.11.0)
 

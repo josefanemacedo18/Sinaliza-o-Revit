@@ -77,6 +77,23 @@ public class Etapa06DrenagemTests
     }
 
     [Fact]
+    public void ViaSobreLinhasDoRevit_UsaOTracadoGuardadoNoCache()
+    {
+        // Regressão: a primeira versão lia só os pontos do caminho (TerraPaint.StoredPath) e ignorava as vias por linhas.
+        var via = ViaEmVale();
+        via.PathRef = new PathReference
+        {
+            ElementIds = { "linha-1", "linha-2" }, Z = 100,
+            Cache = new List<List<Vec2>> { new() { new(0, 0), new(100, 0) }, new() { new(100, 0), new(200, 0) } },
+        };
+        var v = Assert.Single(DrenagemDoModelo.Vias(new MarkingDefinition[] { via }));
+        Assert.Equal(200, v.Eixo.Length, 6);
+        Assert.True(DrenagemDoModelo.Sarjeta(Boca(100, 3.5, 100.3), new[] { v })!.PontoBaixo);
+        Assert.Equal(200, via.PathRef.StoredPolyline()!.Length, 6);
+        Assert.Null(new PathReference { ElementIds = { "x" } }.StoredPolyline());
+    }
+
+    [Fact]
     public void Area_DoDivisorACaptacao_ComACaptacaoDeCimaEOValeDosDoisLados()
     {
         var via = ViaEmVale();
