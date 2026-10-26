@@ -299,7 +299,7 @@ Isso compila (é um assembly só), mas contraria o §4 do Prompt Master. Está r
 | Serviços – parcelamento | gleba, quadras, lotes, quadros, memorial | `Core/Parcelamento` | Geometria, Domínio, vias (área de circulação) |
 | Serviços – sinalização e tráfego | sinalização (MBST), catálogo, simulação e análise | `Core/Generators`, `Core/Catalog`, `Core/Traffic` | Geometria, Domínio, vias |
 | Serviços – quantitativos e relatórios | por marca, por componente, volumes, `.docx` | `Core/Quantities`, `Core/Reports` | todos os serviços |
-| Validação (Core) | grafo de dependências, validador V01–V13, classificação de sobreposições (nova, Fase X) | `Core/Model` | Domínio, Geometria, drenagem, parcelamento |
+| Validação (Core) | grafo de dependências, validador V01–V15, classificação de sobreposições (nova, Fase X) | `Core/Model` | Domínio, Geometria, drenagem, parcelamento |
 | Adaptadores Revit | render e leitura (`MarkingService`, `PathResolver`, `SurfaceSampler`), persistência (`MarkingStorage`, `*Store`), terreno (`TerrainService`, `TerrainModel`), lotes, interseções | `Revit/Infrastructure` | Core |
 | Atualização associativa | DMU (`MarkingUpdater`), cópias (`CopyHandler`) | `Revit/Updater` | Adaptadores, `ModelGraph` |
 | Interface | 93 comandos, faixa de opções, janelas WPF com prévia, formulários | `Revit/Commands`, `Revit/UI` | Adaptadores, Core |
@@ -319,8 +319,8 @@ Isso compila (é um assembly só), mas contraria o §4 do Prompt Master. Está r
 | 8 | Interseções e rotatórias calculadas, regeneração ao mudar eixos | IT (Core) / INV (updater, K17) | Fases VI e VII |
 | 8 | Configuração impossível explicada, com os parâmetros a rever | IT (núcleo) | os avisos dos geradores dizem a causa e o parâmetro; desde a Etapa 4 os limites citados neles estão em `LimitesDeConferencia`, com a fonte ou "sem norma citada" |
 | 9 | Corte e aterro com método documentado e limites | IT (Core) | `Grading.Volumes` (malha) e `SectionVolumes` (seções), AUDIT §6.7 |
-| 9 | Cálculo de terraplenagem desatualizado depois de mudar a via | **A** | o Toposolid fica como estava até nova Terraplenagem; nada aponta que ficou velho |
-| 10 | Estrutura de pavimento por via ou trecho (ordem, espessura, material) usada pelo cálculo | P | camadas só no desenho do corte (`SectionLayer`); a terraplenagem usa uma profundidade única de subleito (0,40 m, `TerrainService.Subgrade`); o piso tem só o revestimento |
+| 9 | Cálculo de terraplenagem desatualizado depois de mudar a via | IT (núcleo) / INV (Revit) | registro da terraplenagem aplicada com a assinatura de cada marca (`EarthworkRecord`) e V15 no Validar Modelo; "Só calcular" compara a alternativa com a aplicada (Etapa 5, D-024). O Toposolid só muda pela Terraplenagem |
+| 10 | Estrutura de pavimento por via ou trecho (ordem, espessura, material) usada pelo cálculo | IT (núcleo) / INV (Revit) | `EstruturaPavimento` na via (Etapa 5): fundo da caixa da terraplenagem, camadas do corte e quantitativo por camada; nó pela via mais funda; por trecho e por modelos de pavimento: Etapa 11 (K21) |
 | 10 | Sobreposições classificadas antes de qualquer correção | IT (núcleo) / INV (Autoteste) | `OverlapClassifier`, `Fase10CompatibilizacaoTests`; no Autoteste desde a 2.8.0 |
 | 11 | Drenagem: conectividade, sentido, cotas, ligações | IT (Core) / INV (Revit) | `DrainageNetwork`, V13, Fase VIII |
 | 11 | Hidráulica separada da geometria, com entradas, hipóteses e limites documentados | IT (Core) | `DrainageNetwork.Check` (geometria) × `DrainageHydraulics` (método racional); memorial com as fontes; K5 |
@@ -328,10 +328,10 @@ Isso compila (é um assembly só), mas contraria o §4 do Prompt Master. Está r
 | 12 | Quadras e lotes por regras configuráveis, quadros e memorial | IT (Core) / validado no Revit | Fase IX; sem aprovação legal automática |
 | 13 | Parâmetros pela interface, perfis salvos | P | formulários e Configurações; modelos de via salvos; Projeto de Drenagem por documento; sem salvar ou carregar perfis de terraplenagem e de interseção |
 | 14 | Relações explícitas e regeneração só do necessário | P | `ModelGraph` + DMU; terraplenagem e drenagem fora do grafo de regeneração |
-| 14 | Mostrar o que foi atualizado e o que ficou desatualizado | **A** | o DMU regenera em silêncio; nenhum estado "desatualizado" |
+| 14 | Mostrar o que foi atualizado e o que ficou desatualizado | P | terraplenagem desatualizada no V15 (Etapa 5); o DMU ainda regenera em silêncio e não há estado "desatualizado" na tela (Etapas 8 e 10) |
 | 15 | Transações, rollback, falhas | INV | ARCHITECTURE §5; Autotestes no Revit sem documento inconsistente |
 | 16 | Causa das retas fora do eixo e das sobreposições | P | K11 e K12 reproduzidos e corrigidos no núcleo até o 4º Autoteste; a confirmação depende de um novo Autoteste (K3) |
-| 17 | Validação por módulo e transversal | P | V01–V13 com severidade e confiança |
+| 17 | Validação por módulo e transversal | P | V01–V15 com severidade, confiança, módulo e ação |
 | 17 | Erro / alerta / informação / **não verificável**; módulo, objeto, evidência e ação recomendada; resumo, métricas, versão; histórico antes × depois | IT (núcleo) / INV (Revit) | `ModelValidator.Regras` (módulo, ação), `Severidade.NaoVerificavel`, `ValidationHistory` (novo, persistente, resolvido), relatório com versão (Etapa 2); a tela (Central de Qualidade) é a Etapa 12 |
 | 18 | Testes unitários e de integração, casos-limite e inválidos | IT | 2 949 testes; fixtures dos Autotestes |
 | 19 | Autoteste com versão, data, ambiente, executados e ignorados | IT no Revit | 4 Autotestes completos (`docs/evidencias`) |
@@ -353,8 +353,8 @@ a Fase VIII (o dimensionamento existe e é testado; ver a linha acima dela). Foi
 | 2 | Falha de build | compilação limpa; CI verde até `6d2b72f` (execução 125) | conferir o CI de cada push |
 | 3 | Inconsistência geométrica | pisos sobrepostos sem classe (K11, RT-1.3); retas fora do eixo (K12, 1 restante, corrigida no FC); pisos × terreno sem conferência no núcleo (RT-1.2); terreno sem diagnóstico (§6 do Prompt Master) | classificador e pisos × terreno feitos na Etapa 1 (2.8.0); diagnóstico do terreno na Etapa 3 |
 | 4 | Regressão não vista | "Verificações do modelo" desligadas no Autoteste (§7.5); validação sem comparação com a anterior | ligar as verificações no Autoteste completo; histórico da validação |
-| 5 | Resultado velho apresentado como atual | terraplenagem desatualizada depois de mudar a via, sem aviso | assinatura das entradas gravada com a terraplenagem e conferida no Validar Modelo |
-| 6 | Cálculo com dado incoerente | estrutura do pavimento diferente entre o corte (camadas) e a terraplenagem (0,40 m) | estrutura do pavimento na via, usada pelo corte, pela terraplenagem e pelos quantitativos |
+| 5 | Resultado velho apresentado como atual | terraplenagem desatualizada depois de mudar a via, sem aviso | feito na Etapa 5: registro com a assinatura das marcas e V15 |
+| 6 | Cálculo com dado incoerente | estrutura do pavimento diferente entre o corte (camadas) e a terraplenagem (0,40 m); quantitativo de terraplenagem sempre com 0,40 m | feito na Etapa 5: estrutura na via usada pelos três; quantitativo com as opções da terraplenagem aplicada |
 | 7 | Acoplamento entre pastas do Core (R15) | referências mútuas (§8.1) | sem reestruturação em bloco (Prompt Master §2); código novo sem nova referência mútua; um ciclo é desfeito quando a mudança já toca aquele código |
 | 8 | Demais | F12, F11, K14/K15, revisão da interface (XIII) | depois dos itens acima |
 
@@ -405,8 +405,8 @@ As linhas da AUDIT §8.2 marcadas P ou A, com a prioridade. A coluna "Etapa" rem
 | P0 | Pisos × terreno sem conferência no núcleo; "Verificações do modelo" desligadas no Autoteste | topografia / vias | 1 | via enterrada ou suspensa sem aviso |
 | P1 | Diagnóstico sem módulo, ação e "não verificável"; sem histórico | núcleo comum | 2 | regressão não vista |
 | P1 | Terreno sem diagnóstico (dados insuficientes, triângulos degenerados, extrapolação) | topografia | 3 | volumes sobre dado ruim |
-| P1 | Estrutura de pavimento só no desenho do corte; terraplenagem com subleito único | pavimentação / terraplenagem | 5 | caixa e quantitativos incoerentes |
-| P1 | Terraplenagem desatualizada sem aviso | terraplenagem | 5 | volume velho apresentado como atual |
+| P1 | ~~Estrutura de pavimento só no desenho do corte; terraplenagem com subleito único~~ feito (2.11.0) | pavimentação / terraplenagem | 5 | — |
+| P1 | ~~Terraplenagem desatualizada sem aviso~~ feito (2.11.0, V15) | terraplenagem | 5 | — |
 | P1 | Drenagem sem ler greide e área do modelo (K5) | drenagem | 6 | vazão com dado digitado errado |
 | P1 | Estados de atualização e propagação terreno → via → terraplenagem → drenagem | integração | 8 | modelo incoerente depois de editar |
 | P2 | Equações de estaqueamento | vias | 4 | — (contorno: estacas contínuas) |

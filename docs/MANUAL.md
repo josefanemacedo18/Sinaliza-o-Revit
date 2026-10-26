@@ -35,7 +35,7 @@ Guia **SinalizaBIM Infra**:
 | **Drenagem** | boca de lobo / PV · grelha |
 | **Obras de Arte** | **Pontes e Viadutos** (viaduto · ponte · passarela) · **Túneis e Trincheiras** (túnel · trincheira) |
 | **Contenções** | muro de arrimo · talude |
-| **Relevo e Terreno** | Perfil da Via · Terraplenagem |
+| **Relevo e Terreno** | Perfil da Via · Estrutura do Pavimento · Terraplenagem |
 | **Nós Viários** | Nó Viário (interseção em desnível) |
 | **Loteamento** | **Loteamento** · **Quadra e Lote** (quadra · lote · unir lotes) · Nomear Vias · Categorias e Filtros · **Detalhar e Quadros** (detalhar lotes · quadros do loteamento · memorial do loteamento) · **Masterplan** (seção 27) |
 
@@ -739,7 +739,7 @@ leitura**: o projeto não é alterado (nem entra no Desfazer). Cada achado traz:
 - a **severidade**: erro, aviso, informação ou **não verificado**. "Não verificado" é a verificação que não pôde rodar por
   falta de dado ou configuração – nunca quer dizer "sem problema";
 - o **módulo**: Dados e versões, Dependências, Integração com o Revit, Geometria, Detalhamento, Quadras e lotes,
-  Interseções, Vias ou Drenagem;
+  Interseções, Vias, Drenagem, Topografia ou Terraplenagem;
 - a **confiança**: alta (verificado nos dados) ou média (provável);
 - se pede **revisão humana**;
 - a **ação recomendada**.
@@ -762,6 +762,7 @@ A correção é sempre sua, com Editar, Atualizar ou apagando o elemento.
 | V12 | eixo ou greide de uma via fora dos **limites geométricos que você informou** em Configurações (raio, tangente entre curvas, vértice sem curva, rampa, K, comprimento de curva vertical) | confira o traçado ou o greide; a fonte dos limites é a que você escreveu. Sem limites informados, não aparece |
 | V13 | **rede de drenagem**: contrafluxo, trecho ligado ao próprio dispositivo, ciclo e os critérios do **Projeto de Drenagem** (declividade, recobrimento, diâmetros, espaçamento e queda dos PVs, geratriz superior); com a equação de chuva, também capacidade e velocidade das galerias, sarjeta e engolimento das captações | confira a contribuição de cada dispositivo e os critérios; o **Relatório da Rede** indica e aplica os diâmetros calculados |
 | V14 | **superfície do terreno projetado** (o Toposolid como está): menos de três pontos ou todos numa reta, coordenada não numérica, o mesmo ponto com cotas diferentes (degrau vertical ou dado duplicado), triângulos sem área, faces mais íngremes que a **declividade máxima do terreno** que você informou e eixos das vias que moldam o terreno passando fora dele (ali o cálculo seria extrapolação) | confira o levantamento ou o Toposolid no ponto indicado; amplie o terreno até as vias. Sem Toposolid ou sem a declividade informada, o relatório diz "não verificado" |
+| V15 | **terraplenagem desatualizada**: uma marca que molda o terreno (via com greide, nó ligado a ela, obra, caixa de drenagem) **mudou**, foi **apagada**, **deixou de moldar** o terreno ou **entrou** depois da última Terraplenagem aplicada. Um achado por situação, com as marcas | rode a **Terraplenagem**: o terreno é refeito a partir do original guardado. Sem registro (terraplenagem nunca aplicada ou aplicada por versão anterior à 2.11), o relatório diz "não verificado" |
 
 O resumo aparece numa janela (com **Selecionar os elementos com erro ou aviso** e **Abrir o relatório**). O relatório
 completo é gravado em `%AppData%\SinalizaBIM\validacao-AAAAMMDD-HHMMSS.txt`. A validação confere os **dados**; a
@@ -779,7 +780,15 @@ O relatório começa por um resumo:
 No fim do relatório, a seção **Não verificado** diz o que faltou para conferir e como resolver:
 - limites geométricos não informados (V12);
 - rede sem Projeto de Drenagem ou sem equação de chuva (V13);
+- terreno não lido ou declividade máxima não informada (V14);
+- terraplenagem sem registro (V15);
 - elementos do Revit (V06), quando a validação roda sem o documento.
+
+**Registro da terraplenagem.** Cada Terraplenagem aplicada (pelo botão ou automática, depois de criar ou editar uma via ou
+obra) grava nas *Informações do projeto*: quando, a versão, o subleito, os taludes e o alcance das opções, os volumes e a
+**assinatura** de cada marca que moldou o terreno. A assinatura muda com qualquer mudança na marca, menos a linha do
+terreno natural que as obras guardam ao serem geradas (leitura do terreno, não escolha do projeto). O registro fica na
+mesma transação da terraplenagem: Desfazer a terraplenagem desfaz o registro.
 
 **Marcas de versão mais nova.** Um projeto aberto com um SinalizaBIM mais antigo que o que o criou mostra essas marcas
 como estão. Editar, Atualizar e o ajuste de escala não as alteram (aparece um aviso), para não apagar o que a versão
@@ -938,9 +947,10 @@ contenções e terraplenagem**, subcategoria *Terraplenagem (corte e aterro no t
 * cartões **Corte** e **Aterro** no alto da janela; CSV, planilha Excel e memorial descritivo trazem as mesmas linhas.
 Os volumes são calculados **na hora**, com o mesmo projeto da *Terraplenagem* (todas as vias e obras que moldam o terreno,
 plataforma por camadas, taludes do greide de cada via) contra o **terreno original guardado no Toposolid** – nada é
-gravado no projeto. Sem a terraplenagem aplicada, o terreno atual é o natural e os volumes são os previstos. A conta usa o
-subleito padrão (0,40 m): se você aplicou a terraplenagem com outra profundidade de subleito, os volumes do quantitativo são
-os do subleito padrão. A **Tabela nativa do Revit** conta elementos e por isso **não** traz a terraplenagem (os volumes não
+gravado no projeto. Sem a terraplenagem aplicada, o terreno atual é o natural e os volumes são os previstos. A conta usa a
+**estrutura do pavimento** de cada via (seção 18.1) e as **opções da última Terraplenagem aplicada** (subleito, taludes,
+alcance e fator de homogeneização, do registro); sem terraplenagem registrada, as opções padrão (subleito de 0,40 m). Até a
+2.10 a conta usava sempre o subleito padrão. A **Tabela nativa do Revit** conta elementos e por isso **não** traz a terraplenagem (os volumes não
 são elementos do modelo), nem o *Quadro de Quantitativos* da prancha (montado só com as marcas); use a janela, o Excel,
 o CSV ou o memorial.
 
@@ -951,6 +961,15 @@ alto, a comparação com a malha (ex.: *Via local 1 – corte: seções 9.271,0 
 estaca, áreas de corte e de aterro, volumes acumulados e massa acumulada (curva de massas). O CSV e a planilha trazem o
 mesmo bloco. O volume das linhas TER-CORTE/TER-ATERRO continua o da malha; as seções servem para conferir e para o
 quadro por estaca. Em curvas fechadas, as seções perpendiculares se sobrepõem do lado interno (sem correção de curvatura).
+
+**Camadas do pavimento.** A aba **Camadas do pavimento** traz, para cada via e cada interseção, rotatória ou balão, o
+**revestimento** e cada **camada da estrutura do pavimento** (seção 18.1): camada, material, função, espessura, **área** e
+**volume** (área × espessura) e a fonte da estrutura, com os totais por camada e material. A área é a do pavimento em
+planta, medida nas peças geradas (a do modelo, quando o piso foi editado); as camadas não ganham a sobrelargura sob a
+sarjeta e o meio-fio. Os nós usam a estrutura da via ligada mais funda. Vias sem estrutura informada aparecem só com o
+revestimento e são listadas no alto da aba. As vias são numeradas pela ordem no projeto (*Via 1*, *Via 2*…), porque o
+código PAV-ASF é o mesmo de todas. Pisos desenhados à mão com hierarquia não entram (não têm espessura nem estrutura
+conhecidas). O CSV e a planilha trazem o mesmo bloco; o filtro de hierarquia vale para a aba.
 
 **Janela redesenhada**: cabeçalho com o projeto, **cartões de resumo** (elementos, área pintada, extensão
 pintada, pavimento, placas, elementos urbanos e tinta estimada), filtros e **grupos recolhíveis** por
@@ -1182,8 +1201,9 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   elementos (os que não cabem no vão ficam lado a lado, com chamada até o elemento); **setas de caimento** junto à
   superfície, paralelas a ela, com o % na pista e nas calçadas; e os **níveis**. O **eixo** atravessa o desenho em
   traço-ponto e as linhas de chamada das cotas descem até a superfície, interrompidas atrás dos textos. Sob a pista, as
-  **camadas do pavimento** – revestimento da via e as camadas escolhidas (padrão: base de brita graduada simples 15 cm e
-  sub-base de solo-brita 15 cm, **valores indicativos – ajuste ao projeto de pavimentação**) – cada uma com **hachura
+  **camadas do pavimento** – revestimento da via e as camadas da **estrutura do pavimento da via cortada** (seção 18.1)
+  ou, sem ela, as típicas (base de brita graduada simples 15 cm e sub-base de solo-brita 15 cm, **valores indicativos –
+  ajuste ao projeto de pavimentação**); camadas escolhidas no próprio perfil valem acima das duas – cada uma com **hachura
   própria** (pontilhado, brita, solo) e **chamada** (linha + texto com o nome e a espessura) embaixo do perfil, junto com
   o **subleito compactado**. O **terreno** (hachura de terra) fica sob todo o corte e **além do alinhamento dos dois
   lados**, com linha de interrupção. Ao lado, abaixo da tabela de elementos, o **detalhe ampliado do meio-fio e da
@@ -1191,8 +1211,8 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   meio-fio (3 %) –, **cotas em cm** (topo, base, sarjeta, alturas aparente, enterrada e total), as inclinações e as notas
   **CONCRETO fck ≥ 20 MPa**, **GREIDE DO PAVIMENTO** e **PASSEIO OU TERRENO APILOADO**, com o título sublinhado e a escala.
   Larguras e altura aparente vêm da própria via; o resto se ajusta na janela do Cotar Seção / Corte Transversal (e em
-  **Editar** o perfil): seções **Camadas do pavimento (perfil)** – até 4 camadas com nome, espessura (cm; 0 = sem a camada)
-  e hachura – e **Meio-fio e sarjeta (perfil)** – detalhe sim/não, escala do detalhe, altura enterrada, inclinação do
+  **Editar** o perfil): seções **Camadas do pavimento (perfil)** – **usar a estrutura do pavimento da via cortada**
+  (marcado nos perfis novos) ou até 4 camadas próprias com nome, espessura (cm; 0 = sem a camada) e hachura – e **Meio-fio e sarjeta (perfil)** – detalhe sim/não, escala do detalhe, altura enterrada, inclinação do
   espelho, caimento da sarjeta e a nota do concreto. Os **títulos** (perfil e detalhe) são **sublinhados** (traço duplo
   abaixo dos acentos e descendentes) com a escala embaixo. Tudo é medido em **mm de papel × escala da vista** e cada texto
   vai para onde não encosta em outro – o perfil fica legível de 1:20 a 1:200, e o desenho começa à direita do ponto
@@ -1406,6 +1426,34 @@ sarjetas ficam sem pavimento. O pavimento também **registra a seção da via** 
 calçadas), usada pelas interseções e rotatórias. Com **Nenhum** (pista já modelada) a seção continua registrada, só como
 dado, sem piso: a via se liga às outras nas interseções e rotatórias do mesmo jeito, e a interseção não cria pavimento
 por cima da pista existente.
+
+### 18.1 Estrutura do pavimento
+
+**SinalizaBIM Infra → Relevo e Terreno → Estrutura do Pavimento.** Clique a via (pista, calçada ou linha dela) e informe:
+- a **espessura do revestimento** (o próprio piso da pista – muda a espessura do piso);
+- as **camadas sob o revestimento**, uma por linha, de cima para baixo, no formato
+  `nome; espessura em cm; material; função`, com material e função opcionais. Funções: base, sub-base, reforço do
+  subleito, regularização, outra. Exemplo:
+
+  ```
+  Base; 15; brita graduada simples; base
+  Sub-base; 20; solo-brita; sub-base
+  ```
+- a **fonte** (projeto de pavimentação, dimensionamento).
+
+O plugin **não dimensiona** pavimento: as espessuras e a fonte são as do seu projeto. Linha ilegível, função desconhecida,
+camada sem nome, espessura nula ou acima de 2 m impedem a gravação, e nada muda no modelo. Texto vazio = sem estrutura.
+
+Onde a estrutura é usada:
+- **Terraplenagem**: sob a pista o terreno fica no **fundo da estrutura** (revestimento + camadas). Interseções,
+  rotatórias e balões usam a **via ligada mais funda**. Vias sem estrutura usam o subleito das opções da Terraplenagem
+  (0,40 m por padrão). Com a via moldando um terreno existente, a janela oferece **refazer a terraplenagem** com a nova
+  profundidade; sem refazer, a Validação acusa a terraplenagem desatualizada (V15);
+- **corte transversal** (seção 16): sem camadas escolhidas no próprio perfil, ele desenha as camadas da estrutura da via
+  cortada. Com vias de estruturas diferentes no mesmo corte, desenha as da primeira e avisa;
+- **quantitativo** (seção 10): aba *Camadas do pavimento*;
+- **Autoteste**: confere o terreno no fundo da estrutura sob a pista, com a profundidade da última Terraplenagem, quando o
+  registro tem a via com a definição atual.
 
 ## 19. Interseções
 
@@ -2291,7 +2339,8 @@ troca os pontos da área de projeto pelos pontos da plataforma, das cristas e p�
 Revit triangula de novo. Por isso cada obra entrega os pontos certos:
 * **Via em corte/aterro**: plataforma **por camadas**, de alinhamento a alinhamento, e **taludes** até o terreno natural:
   * **sob a pista** (faixas, sarjetas, canteiros e extensões dentro dela) o terreno fica no **fundo da estrutura do
-    pavimento** (superfície menos o subleito, 0,40 m por padrão);
+    pavimento**: a estrutura informada na via (seção 18.1) ou, sem ela, o subleito das opções (0,40 m por padrão). Nos nós,
+    a via ligada mais funda;
   * **sob o meio-fio, a calçada e a faixa gramada** ele fica no **fundo da laje** (a laje assenta no terreno) – a passagem da
     caixa do pavimento para o fundo da laje fica escondida sob o meio-fio;
   * **na borda externa** (alinhamento do lote, quina da esquina) o terreno **sobe ao topo da calçada** – na altura, na
@@ -2450,7 +2499,10 @@ inteira, sem afinar).
   **exceto sob pontes e viadutos** (o terreno fica natural) e nos túneis. Taludes vizinhos viram uma superfície só.
 * **Terraplenagem** (botão): refaz tudo; vias escolhidas sem greide passam a moldar o terreno. Opção **novo levantamento**:
   o Toposolid atual vira o terreno natural (depois de editá-lo à mão ou importar outro levantamento).
-* **Só calcular (simulação)**: calcula volumes e balanço **sem alterar o Toposolid**.
+* **Só calcular (simulação)**: calcula volumes e balanço **sem alterar o Toposolid** e, com terraplenagem registrada,
+  **compara a alternativa com a aplicada**: corte, aterro e balanço de cada uma, a diferença e quantas marcas que moldam
+  o terreno são diferentes. Serve para testar outro greide, outra estrutura ou outros taludes antes de aplicar.
+* **Profundidade do subleito**: vale para as vias **sem** estrutura do pavimento informada.
 * **Tipo de terreno**: presets de taludes – solo comum (corte 1:1, aterro 1,5:1), arenoso (1,5:1 / 2:1), rocha (0,5:1 /
   1,5:1), argiloso rijo (0,75:1 / 1,5:1) ou personalizado.
 * **Mapa de corte e aterro**: subdivisões coloridas no Toposolid – **vermelho** onde o terreno é cortado, **verde** onde é

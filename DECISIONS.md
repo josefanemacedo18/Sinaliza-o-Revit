@@ -321,3 +321,24 @@ como substituída.
 - **Consequências:** projetos antigos abrem iguais (campo ausente = padrão). Os formulários que pedem estacas continuam
   pedindo a distância desde o início do eixo até a tela da via ser refeita (Etapa 11; K20).
 
+## D-024 – Estrutura do pavimento na via; registro da terraplenagem no projeto
+- **Contexto:** o Prompt Master (§9, §10) e o de Motores (§8, §9) pedem estrutura de pavimento por camadas usada no cálculo
+  e o estado "desatualizado" dos resultados. O corte, a terraplenagem e o quantitativo usavam profundidades diferentes, e
+  nada dizia que o Toposolid não acompanhava mais o projeto.
+- **Decisão:**
+  - **Estrutura:** guardada no pavimento da via (`RoadPavementDefinition.Estrutura`), só as camadas **sob** o
+    revestimento. O revestimento continua sendo a espessura do piso da pista, para não haver dois valores para a mesma
+    coisa. A profundidade (revestimento + camadas) é o fundo da caixa; nó = a via ligada mais funda.
+  - **Registro:** nas Informações do projeto (armazenamento estendido, esquema próprio), gravado dentro da transação da
+    terraplenagem. A assinatura é o SHA-256 do JSON da definição, sem a linha do terreno natural das obras.
+  - **V15:** compara o registro com as marcas atuais. Sem registro, "não verificado", nunca "em dia".
+- **Alternativas descartadas:**
+  - estrutura por tipo de via ou num catálogo do projeto: a Etapa 11 (gerenciador de pavimentos) pode acrescentar
+    modelos; por ora cada via tem a sua;
+  - registro num arquivo fora do modelo, como o histórico da validação: o estado do terreno é do modelo e precisa
+    acompanhar o Desfazer;
+  - assinatura de todas as entradas (Toposolid, opções): o terreno original e as opções mudam só pela própria
+    Terraplenagem, que regrava o registro.
+- **Consequências:** projetos antigos abrem iguais; a primeira Terraplenagem na 2.11 grava o registro. Até lá a V15 diz
+  "não verificado".
+

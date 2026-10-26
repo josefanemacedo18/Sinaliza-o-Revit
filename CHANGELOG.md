@@ -3,6 +3,54 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-26 – Etapa 5: estrutura do pavimento e terraplenagem desatualizada (versão 2.11.0)
+
+Etapa 5 do plano unificado (Fases VI, VII e X). Entrega: `Releases/Etapa05` (não executada no Revit 2027).
+
+### Achados da auditoria que esta etapa corrige
+- **Três profundidades para a mesma via:** o corte transversal desenhava camadas próprias (padrão 15 + 15 cm), a
+  terraplenagem usava um subleito único (0,40 m) e o quantitativo de terraplenagem usava sempre 0,40 m, mesmo quando a
+  terraplenagem tinha sido aplicada com outro subleito (o MANUAL dizia isso).
+- **Terraplenagem velha apresentada como atual:** depois de mudar uma via ou obra, o Toposolid ficava como estava e nada
+  apontava que ele não acompanhava mais o projeto.
+
+### Estrutura do pavimento (`EstruturaPavimento`)
+- **Na via:** camadas sob o revestimento, de cima para baixo, com nome, espessura (cm), material, função (base, sub-base,
+  reforço do subleito, regularização, outra) e a fonte. O revestimento é o próprio piso da pista. Campo opcional: projetos
+  antigos abrem iguais.
+- **Comando Estrutura do Pavimento** (Relevo e Terreno): espessura do revestimento, camadas em texto
+  ("nome; espessura; material; função") e fonte. Linha ilegível, função desconhecida, camada sem nome, espessura nula ou
+  acima de 2 m: nada é gravado. Oferece refazer a terraplenagem quando a via molda um terreno existente.
+- **Terraplenagem:** o fundo da caixa sob a pista é a estrutura da via (revestimento + camadas). Interseções, rotatórias,
+  balões e as marcas deles usam a via ligada mais funda. Vias sem estrutura usam o subleito das opções. O relatório diz
+  quantas vias usaram a estrutura.
+- **Corte transversal:** sem camadas escolhidas no perfil, desenha as da estrutura da via cortada (antes, as típicas).
+  Vias de estruturas diferentes no mesmo corte: as da primeira, com aviso. A janela do perfil ganhou "Usar a estrutura
+  do pavimento da via cortada".
+- **Quantitativo por camada** (`PavementLayerQuantities`): aba *Camadas do pavimento*, CSV e planilha. Revestimento e cada
+  camada de cada via e nó, com área do pavimento em planta, volume e fonte; totais por camada e material; vias sem
+  estrutura listadas. Vias numeradas pela ordem no projeto (o código PAV-ASF é o mesmo de todas). Limite: sem
+  sobrelargura das camadas sob a sarjeta e o meio-fio (K21).
+
+### Registro da terraplenagem e V15
+- **Registro** (`RegistroTerraplenagem`, nas Informações do projeto, na mesma transação da terraplenagem): quando, versão,
+  subleito, taludes, alcance, volumes, homogeneização e a assinatura (SHA-256 da definição) de cada marca que moldou o
+  terreno. A linha do terreno natural guardada pelas obras não entra na assinatura (é leitura do terreno). Com falha num
+  Toposolid, o registro antigo fica.
+- **Quem molda o terreno** passou para o núcleo (`EarthworkRecord.Participantes`), a mesma escolha da Terraplenagem.
+- **V15 – terraplenagem desatualizada** (módulo Terraplenagem): marca que molda o terreno e mudou, foi apagada, deixou de
+  moldá-lo ou entrou depois da última terraplenagem. Um achado por situação. Sem registro: "não verificado".
+- **Comparação de alternativas:** "Só calcular" compara a simulação com a terraplenagem aplicada (corte, aterro, balanço,
+  diferença e quantas marcas diferem).
+- **Quantitativo de terraplenagem:** usa as opções da última terraplenagem aplicada (subleito, taludes, alcance,
+  homogeneização). Sem registro, as padrão.
+- **Autoteste (K19):** sob a pista, confere também o fundo da estrutura, com a profundidade da última terraplenagem,
+  quando o registro tem a via com a definição atual. Senão diz por que não conferiu.
+
+### Testes
+- `Etapa05PavimentoTests` (14). `Etapa02DiagnosticoTests` conta 15 regras. A mensagem do commit `ebfacc8` diz 14 testes
+  quando eram 13; o 14º entrou em `0be14f2`.
+
 ## 2026-10-26 – Etapa 4: estaqueamento e limites dos avisos (versão 2.10.0)
 
 Etapa 4 do plano unificado (Fases V e VII). Entrega: `Releases/Etapa04` (não executada no Revit 2027).
