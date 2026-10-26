@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-26 (Etapas 0–4 entregues; Etapa 5 em andamento)
+## Estado em 2026-10-26 (Etapas 0–5 entregues; Etapa 6 em andamento)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -15,17 +15,20 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     ação, "não verificado" e histórico; tolerâncias num registro; diagnóstico do terreno e V14.
   - Etapa 4 ✅: 2.10.0 em `Releases/Etapa04` (`ee75f3f`, 2 986/2 986) – limites dos avisos com a origem dita
     (`LimitesDeConferencia`); estaqueamento da via com estaca inicial e equações (D-023, K20).
-  - `Instalar/Revit2027` tem a DLL 2.10.0. As anteriores continuam em `Releases/`.
-- **Etapa 5 (atual):** estrutura do pavimento na via (camadas sob o revestimento) usada pela terraplenagem, pelo corte
-  transversal e pelos quantitativos por camada; registro da terraplenagem (entradas e subleito) para apontar quando ela
-  fica desatualizada (V15) e para conferir o fundo da estrutura no Autoteste (K19).
+  - Etapa 5 ✅: 2.11.0 em `Releases/Etapa05` (`5dc91f7`, 3 000/3 000) – estrutura do pavimento na via usada pela
+    terraplenagem, pelo corte e pelo quantitativo por camada; registro da terraplenagem e V15; "Só calcular" compara com
+    a aplicada (D-024, K19, K21).
+  - `Instalar/Revit2027` tem a DLL 2.11.0. As anteriores continuam em `Releases/`.
+- **Etapa 6 (atual):** drenagem integrada – sarjeta e área de contribuição lidas da via (`DrenagemDoModelo`, comando Ler
+  do Modelo), pontos baixos sem captação e talvegues sob aterro no V13, recobrimento sob a superfície acabada, perfil
+  longitudinal da rede e lista de dispositivos no Relatório da Rede.
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros (compilar sempre também o projeto de testes antes do
   commit).
 
 ## Próxima tarefa
 
-1. Etapa 5 (PLANO). Depois, as Etapas 6–13 na ordem do plano.
+1. Etapa 6 (PLANO). Depois, as Etapas 7–13 na ordem do plano.
 2. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer tudo**;
    enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`); rodar também o
    Validar Modelo duas vezes (a segunda mostra a comparação com a primeira).
