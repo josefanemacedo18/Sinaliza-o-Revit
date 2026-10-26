@@ -21,7 +21,7 @@ Convenções usadas em todo o plugin:
 
 | Painel | Ferramentas |
 |---|---|
-| **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão · **Distância entre Vias** · **Mover Via** · Alterar Largura por Trecho · Recuo na Via) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Extensão de Calçada · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · famílias do Revit) · Mostrar/Ocultar Eixos |
+| **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão · **Distância entre Vias** · **Mover Via** · Alterar Largura por Trecho · Recuo na Via) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Extensão de Calçada · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · trocar elementos · famílias do Revit) · Mostrar/Ocultar Eixos |
 | **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (piso tátil · ciclovia · quebra-mola · cruzamento rodoferroviário) |
 | **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive **tachas e tachões** e guard rail) |
 | **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · **Pranchas** · **Memorial Descritivo** · Quantitativos |
@@ -763,6 +763,7 @@ A correção é sempre sua, com Editar, Atualizar ou apagando o elemento.
 | V13 | **rede de drenagem**: contrafluxo, trecho ligado ao próprio dispositivo, ciclo e os critérios do **Projeto de Drenagem** (declividade, recobrimento sob a superfície acabada, diâmetros, espaçamento e queda dos PVs, geratriz superior); com a equação de chuva, também capacidade e velocidade das galerias, sarjeta e engolimento das captações. **Drenagem × vias e terreno**: ponto baixo da sarjeta sem boca de lobo ou grelha a até 5 m (só com drenagem modelada no projeto); captação cuja declividade informada difere do greide ou que está num ponto baixo sem a marca (informação); talvegue do terreno natural sob o aterro de uma via sem trecho de rede atravessando a via (a via represa a água) | confira a contribuição de cada dispositivo e os critérios; o **Relatório da Rede** indica e aplica os diâmetros calculados; **Ler do Modelo** preenche a sarjeta e a área pela via; coloque a captação no ponto baixo ou preveja a travessia (bueiro). Sem o terreno natural, os talvegues saem como "não verificado" |
 | V14 | **superfície do terreno projetado** (o Toposolid como está): menos de três pontos ou todos numa reta, coordenada não numérica, o mesmo ponto com cotas diferentes (degrau vertical ou dado duplicado), triângulos sem área, faces mais íngremes que a **declividade máxima do terreno** que você informou e eixos das vias que moldam o terreno passando fora dele (ali o cálculo seria extrapolação) | confira o levantamento ou o Toposolid no ponto indicado; amplie o terreno até as vias. Sem Toposolid ou sem a declividade informada, o relatório diz "não verificado" |
 | V15 | **terraplenagem desatualizada**: uma marca que molda o terreno (via com greide, nó ligado a ela, obra, caixa de drenagem) **mudou**, foi **apagada**, **deixou de moldar** o terreno ou **entrou** depois da última Terraplenagem aplicada. Um achado por situação, com as marcas | rode a **Terraplenagem**: o terreno é refeito a partir do original guardado. Sem registro (terraplenagem nunca aplicada ou aplicada por versão anterior à 2.11), o relatório diz "não verificado" |
+| V16 | **parcelamento**: percentual da gleba (sistema viário, áreas públicas, uma categoria) abaixo do **mínimo informado no loteamento**, e lotes abaixo do **lote mínimo** informado (frente e área), com a fonte que você escreveu | reveja as quadras, as categorias ou o mínimo informado. Sem mínimos informados, o relatório diz "não verificado" |
 
 O resumo aparece numa janela (com **Selecionar os elementos com erro ou aviso** e **Abrir o relatório**). O relatório
 completo é gravado em `%AppData%\SinalizaBIM\validacao-AAAAMMDD-HHMMSS.txt`. A validação confere os **dados**; a
@@ -782,6 +783,7 @@ No fim do relatório, a seção **Não verificado** diz o que faltou para confer
 - rede sem Projeto de Drenagem ou sem equação de chuva (V13);
 - terreno não lido ou declividade máxima não informada (V14);
 - terraplenagem sem registro (V15);
+- percentuais mínimos do loteamento não informados (V16);
 - elementos do Revit (V06), quando a validação roda sem o documento.
 
 **Registro da terraplenagem.** Cada Terraplenagem aplicada (pelo botão ou automática, depois de criar ou editar uma via ou
@@ -2082,6 +2084,12 @@ apoios de aço com braços; **lixeira** cônica com tampa; **poste** cônico com
 **floreira** com arbustos; **placa de rua** e **semáforo** com anteparo e pestanas. Elementos urbanos e
 placas são assentados no **topo da calçada** (nível da base 0,15 m, ajustável na janela; 0 = nível da pista).
 
+**Trocar Elementos** (Elementos Urbanos ▾, desde a 2.13): selecione vários elementos urbanos do plugin e escolha o novo tipo
+do catálogo (ex.: todas as lixeiras de uma calçada viram paraciclos). Posição, direção, caminho, afastamento, recuos, rotação e
+nível ficam. Escolha se as **medidas e a cor próprias** de cada elemento ficam ou voltam às do novo tipo, e se, ao longo de
+linhas, o **espaçamento** passa a ser o do novo tipo. Desfazer volta ao que estava. Famílias do Revit trocam pelo seletor de
+tipo do próprio Revit.
+
 ---
 
 ## 23. Cruzamento rodoferroviário (MCF)
@@ -3100,8 +3108,9 @@ quando lotes são criados, divididos, unidos (Unir Lotes) ou mudam de categoria.
 
 Categorias padrão: **Lote** (bege), **Institucional** (rosado, hachura diagonal, pública, AI) e **Área verde** (verde, hachura
 de grama, pública, AV). Em **Categorias e Filtros** você muda nome, cor (#RRGGBB), hachura, "área pública", prefixo e o
-**mínimo em % da gleba**, o **lote mínimo** (frente e área), cria categorias novas (ex.: Comercial) e exclui categorias (os
-lotes delas voltam a Lote). Loteamentos criados na rodada anterior podem ter a categoria "Sobra" na lista: nenhum lote a usa
+**mínimo em % da gleba**, o **lote mínimo** (frente e área), a **fonte dos mínimos** (lei municipal, plano diretor – desde a
+2.13), cria categorias novas (ex.: Comercial) e exclui categorias (os lotes delas voltam a Lote). Nenhum mínimo é universal:
+sem mínimos informados, o Validar Modelo diz que os percentuais não foram conferidos (V16). Loteamentos criados na rodada anterior podem ter a categoria "Sobra" na lista: nenhum lote a usa
 mais (some dos quadros) – exclua-a em Categorias e Filtros.
 
 **Categoria do Lote (pincel)** – Quadra e Lote → *Categoria do Lote*: escolha a categoria (Lote, Institucional, Área verde ou
@@ -3155,7 +3164,10 @@ as divisas por baixo) – por isso aparece também no masterplan.
   quadras e a área remanescente: vias, calçadas e canteiros), **área total da gleba** (100 %) e **áreas públicas** (sistema
   viário + categorias públicas); coluna **Mínimo** quando informado. **A gleba é a soma de tudo**: lotes + institucional + área
   verde + sistema viário = 100 % (cada linha "retira" a sua parte da gleba – ex.: 35 % de áreas públicas e sistema viário, 65 %
-  de lotes). Sem linha de "sobras": as sobras de testada são lotes. Desenho: título numa faixa própria, cabeçalho com fundo
+  de lotes). Sem linha de "sobras": as sobras de testada são lotes. O **memorial** traz, abaixo do quadro de áreas, a **fonte
+  dos mínimos** e os **indicadores do parcelamento**: número de lotes, densidade bruta (lotes por hectare da gleba), área média,
+  menor e maior lote, frente média, menor e maior, lotes abaixo do lote mínimo e os percentuais do sistema viário, das áreas
+  públicas e das áreas verdes – medidas do projeto, sem limite universal. Desenho: título numa faixa própria, cabeçalho com fundo
   cinza, colunas na largura do maior texto (medido na fonte Arial dos textos do Revit) com 2 mm de folga de cada lado – nenhum
   texto encosta nas divisas –, números alinhados à direita, amostras de cor do mesmo tamanho e a linha da gleba destacada.
   Os quadros de quadras e de lotes usam o mesmo desenho.

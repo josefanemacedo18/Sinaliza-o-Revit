@@ -3,6 +3,38 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-26 – Etapa 7: urbanismo e elementos complementares (versão 2.13.0)
+
+Etapa 7 do plano unificado (Fase IX e Motores §11–§12). Entrega: `Releases/Etapa07` (não executada no Revit 2027).
+
+### Auditoria antes de implementar (Motores §12)
+- **Elementos urbanos e viários complementares:** quase tudo já existia (AUDIT §9.2a). Faltava a substituição controlada,
+  que esta etapa faz.
+- **Parcelamento:** os percentuais por categoria, as áreas públicas, o sistema viário e os mínimos editáveis já existiam.
+  Faltavam:
+  - a fonte dos mínimos;
+  - indicadores além dos percentuais;
+  - a conferência no Validar Modelo (os avisos só apareciam no quadro e no memorial).
+
+### Parcelamento
+- **Indicadores** (`IndicadoresUrbanisticos`): lotes, densidade bruta (lotes por hectare da gleba), área e frente dos lotes
+  (média, menor, maior), lotes abaixo do lote mínimo e percentuais do sistema viário, das áreas públicas e das áreas verdes.
+  Sem gleba ou sem lotes, o indicador diz isso em vez de dar zero. Saem no memorial, abaixo do quadro de áreas.
+- **Fonte dos mínimos** no loteamento (Mínimos gerais): na tela, no memorial e nas mensagens da validação.
+- **V16 – parcelamento** (Quadras e lotes):
+  - percentual da gleba abaixo do mínimo informado, com a fonte;
+  - lotes abaixo do lote mínimo, por quadra;
+  - sem mínimos informados, "não verificado".
+- `LotReport.MinimosNaoAtendidos` faz a conta usada pelos avisos do quadro e pela V16.
+
+### Elementos urbanos
+- **Trocar Elementos** (Elementos Urbanos ▾, `SubstituicaoUrbana`): troca o tipo de vários elementos de uma vez, mantendo
+  posição, direção, caminho, afastamento, recuos, rotação e nível. Medidas, cor e espaçamento próprios ficam ou passam a
+  ser os do novo tipo, por escolha.
+
+### Testes
+- `Etapa07UrbanismoTests` (5). `Etapa02DiagnosticoTests` conta 16 regras.
+
 ## 2026-10-26 – Etapa 6: drenagem integrada às vias e ao terreno (versão 2.12.0)
 
 Etapa 6 do plano unificado (Fase VIII e RT-1.5). Entrega: `Releases/Etapa06` (não executada no Revit 2027).

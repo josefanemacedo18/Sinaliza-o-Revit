@@ -325,7 +325,7 @@ Isso compila (é um assembly só), mas contraria o §4 do Prompt Master. Está r
 | 11 | Drenagem: conectividade, sentido, cotas, ligações | IT (Core) / INV (Revit) | `DrainageNetwork`, V13, Fase VIII |
 | 11 | Hidráulica separada da geometria, com entradas, hipóteses e limites documentados | IT (Core) | `DrainageNetwork.Check` (geometria) × `DrainageHydraulics` (método racional); memorial com as fontes; K5 |
 | 11 | Drenagem integrada à topografia e aos greides | IT (núcleo) / INV (Revit) | `DrenagemDoModelo` (Etapa 6): sarjeta pelo greide, área pela geometria da via (comando Ler do Modelo), pontos baixos sem captação e talvegues sob aterro no V13, recobrimento sob a superfície acabada; `PerfilRede`. Lotes e áreas externas na área: K5 |
-| 12 | Quadras e lotes por regras configuráveis, quadros e memorial | IT (Core) / validado no Revit | Fase IX; sem aprovação legal automática |
+| 12 | Quadras e lotes por regras configuráveis, quadros e memorial | IT (Core) / validado no Revit | Fase IX; sem aprovação legal automática. Indicadores do parcelamento no memorial, fonte dos mínimos e V16 (mínimos e lote mínimo) desde a Etapa 7 (núcleo; Revit INV) |
 | 13 | Parâmetros pela interface, perfis salvos | P | formulários e Configurações; modelos de via salvos; Projeto de Drenagem por documento; sem salvar ou carregar perfis de terraplenagem e de interseção |
 | 14 | Relações explícitas e regeneração só do necessário | P | `ModelGraph` + DMU; terraplenagem e drenagem fora do grafo de regeneração |
 | 14 | Mostrar o que foi atualizado e o que ficou desatualizado | P | terraplenagem desatualizada no V15 (Etapa 5); o DMU ainda regenera em silêncio e não há estado "desatualizado" na tela (Etapas 8 e 10) |
@@ -395,6 +395,22 @@ pedem e a §8 não cobria: a interface (Etapa Zero do Prompt de Interface) e a c
 | Estados de atualização – §20 | AUSENTE (depende da Etapa 8) | 8 → 10 |
 | Progresso e cancelamento – §21 | PARCIAL | 13 |
 
+### 9.2a Elementos urbanos e viários complementares (Prompt de Motores §12, auditoria da Etapa 7)
+
+O §12 pede auditar antes e implementar só o que falta. Pela leitura do código:
+
+| Item do §12 | Situação | Onde |
+|---|---|---|
+| Guias, meios-fios, sarjetas, passeios, rampas de acessibilidade, travessias | existe | Calçadas, Rampas (NBR 9050), Faixa de Pedestres, Sinalizar Via |
+| Ciclovias, ciclofaixas, baias, estacionamentos, pontos de parada | existe | Ciclofaixa, Recuo na Via (baias), Vagas, abrigo de ônibus |
+| Sinalização horizontal e vertical, dispositivos de segurança | existe | Sinalização Horizontal, Placas, Bloqueios físicos |
+| Postes, luminárias, árvores, canteiros, mobiliário, abrigos | existe | Elementos Urbanos (por cliques ou ao longo de linhas), Canteiros |
+| Bocas de lobo, canaletas, caixas | existe | Drenagem (Etapa 6 para a leitura do modelo) |
+| Famílias e bibliotecas reutilizáveis | existe | Famílias do Revit como elementos urbanos (classificadas no Quantitativo) |
+| Posicionamento em lote, espaçamento, alinhamento, distribuição, orientação | existe | ao longo de linhas: espaçamento, afastamento, recuos, rotação |
+| **Substituição controlada** | **faltava** | Trocar Elementos (Etapa 7, `SubstituicaoUrbana`) |
+| Valetas e dissipadores | não existe | fora desta etapa: sem dado de projeto do usuário para dimensionar |
+
 ### 9.3 Lacunas dos motores por prioridade (Prompt de Motores §5)
 
 As linhas da AUDIT §8.2 marcadas P ou A, com a prioridade. A coluna "Etapa" remete ao plano.
@@ -411,6 +427,6 @@ As linhas da AUDIT §8.2 marcadas P ou A, com a prioridade. A coluna "Etapa" rem
 | P1 | Estados de atualização e propagação terreno → via → terraplenagem → drenagem | integração | 8 | modelo incoerente depois de editar |
 | P2 | Equações de estaqueamento | vias | 4 | — (contorno: estacas contínuas) |
 | P2 | Interseção que não se resolve sem explicar os parâmetros | interseções | 4 | usuário sem saber o que mudar |
-| P2 | Indicadores urbanísticos configuráveis | urbanismo | 7 | — |
-| P2 | Perfil longitudinal da rede e lista de dispositivos | drenagem | 6 | — |
+| P2 | ~~Indicadores urbanísticos configuráveis~~ feito (2.13.0: indicadores, fonte dos mínimos, V16) | urbanismo | 7 | — |
+| P2 | ~~Perfil longitudinal da rede e lista de dispositivos~~ feito (2.12.0, `PerfilRede`) | drenagem | 6 | — |
 | P3 | Cenários de projeto comparados (F12), relatório do tráfego (F11), desempenho (K14/K15) | vários | 5, 13 | — |
