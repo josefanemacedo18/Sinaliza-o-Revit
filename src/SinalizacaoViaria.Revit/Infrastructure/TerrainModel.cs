@@ -141,6 +141,24 @@ public static class TerrainModel
     public static void ClearCache() => _originals.Clear();
 
     /// <summary>
+    /// Cota do terreno PROJETADO (m, absoluta): o topo de cada Toposolid como está agora, depois da terraplenagem (o de cima,
+    /// onde houver mais de um). É contra ele que pisos e bordas são conferidos – o natural fica acima da pista no corte e abaixo
+    /// no aterro, por projeto. Nulo sem Toposolid sob o ponto.
+    /// </summary>
+    public static Func<Vec2, double?>? Current(Document doc)
+    {
+        var meshes = Hosts(doc).Select(Live).Where(m => m.Count > 0).ToList();
+        if (meshes.Count == 0) return null;
+        return p =>
+        {
+            double? best = null;
+            foreach (var m in meshes)
+                if (m.Z(p) is { } z && (best == null || z > best)) best = z;
+            return best;
+        };
+    }
+
+    /// <summary>
     /// Cota do terreno NATURAL (m, absoluta): terreno original de cada Toposolid (o de cima, onde houver mais de um).
     /// Nulo sem Toposolid sob o ponto.
     /// </summary>

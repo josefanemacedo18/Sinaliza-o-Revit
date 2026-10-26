@@ -1,4 +1,5 @@
 using Autodesk.Revit.DB;
+using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Revit.Infrastructure;
@@ -236,35 +237,41 @@ internal sealed partial class AutoTestRunner
         else if (holes > 0) s.Warn($"{holes} ponto(s) sem piso sob a pista (primeiro em {L(holeAt!.Value)}).");
         if (steps > 0) s.Error($"{steps} degrau(s) entre pisos da pista (máx. {maxStep * 100:0.0} cm em {L(stepAt!.Value)}).");
 
-        // 3) Terreno × via (vias que moldam o Toposolid).
-        if (pav.Output.Grade is not { AdjustTerrain: true } || TerrainModel.Ground(_doc) is not { } ground) return;
+        // 3) Terreno × via (vias que moldam o Toposolid), pelo verificador do núcleo (FloorTerrainCheck, RT-1.2). O terreno é o
+        //    Toposolid como ficou depois da terraplenagem: antes esta conferência usava o terreno NATURAL (TerrainModel.Ground),
+        //    que fica acima da pista no corte e abaixo no aterro por projeto – acusaria erro em todo corte.
+        if (pav.Output.Grade is not { AdjustTerrain: true } || TerrainModel.Current(_doc) is not { } terrain) return;
         var hosted = RoadWorks.Hosted(_doc, gid).OfType<IHostedStructure>().Select(h => (Math.Min(h.HostStart, h.HostEnd) - 15, Math.Max(h.HostStart, h.HostEnd) + 15)).ToList();
-        var sect = new TopProbe(mine.Where(r => Core.Generators.IntersectionGenerator.IsPhysical(r.Definition)).Select(r => r.Element).Concat(pavEls));
-        int above = 0, mism = 0, tn = 0;
-        double worstEdge = 0;
-        Vec2? edgeAt = null;
-        for (var st = 5.0; st < axis.Length - 5; st += 5)
+        var nodeBoxes = nodes.Select(n => n.Element.get_BoundingBox(null)).Where(b => b != null).ToList();
+        bool Skip(Vec2 p)
         {
-            if (hosted.Any(h => st > h.Item1 && st < h.Item2)) continue;
-            var c = axis.PointAt(st);
-            var nrm = axis.TangentAt(st).PerpLeft;
-            var top = probe.TopZ(c);
-            if (top == null || ground(c) is not { } g) continue;
-            tn++;
-            if (g > top.Value + 0.03) above++;
-            foreach (var side in new[] { pav.TotalLeft, -pav.TotalRight })
-            {
-                var inner = c + nrm * (side - Math.Sign(side) * 0.3);
-                var outer = c + nrm * (side + Math.Sign(side) * 0.5);
-                if (sect.TopZ(inner) is not { } e || ground(outer) is not { } go) continue;
-                var d = go - e;
-                if (Math.Abs(d) > 0.3) { mism++; if (Math.Abs(d) > Math.Abs(worstEdge)) { worstEdge = d; edgeAt = outer; } }
-            }
+            var st = axis.Project(p).Station;
+            if (hosted.Any(h => st > h.Item1 && st < h.Item2)) return true;
+            var (x, y, m) = (UnitConv.Ft(p.X), UnitConv.Ft(p.Y), UnitConv.Ft(3.0));
+            return nodeBoxes.Any(b => x > b!.Min.X - m && x < b.Max.X + m && y > b.Min.Y - m && y < b.Max.Y + m);
         }
-        s.Note($"Terreno: {tn} seções – terreno acima da pista em {above}; desnível > 30 cm no limite da seção em {mism} lado(s).");
-        if (above > 0) s.Error($"O Toposolid fica ACIMA da pista em {above} de {tn} seções (fora de túneis/pontes).");
-        if (mism > tn * 0.1) s.Error($"O terreno não encosta na borda da seção: até {worstEdge:+0.00;-0.00} m em {L(edgeAt!.Value)} ({mism} lados).");
-        else if (mism > 0) s.Warn($"Desnível de até {worstEdge:+0.00;-0.00} m entre o terreno e a borda da seção em {L(edgeAt!.Value)}.");
+        var sect = new TopProbe(mine.Where(r => Core.Generators.IntersectionGenerator.IsPhysical(r.Definition)).Select(r => r.Element).Concat(pavEls));
+        // Sob a pista: o terreno não pode passar do topo. A profundidade do subleito usada na terraplenagem não é guardada com
+        // ela (Etapa 5 do plano), então o fundo da estrutura não é conferido aqui.
+        var half = Math.Max(0, Math.Min(pav.LeftWidth, pav.RightWidth) - 0.5);
+        var samples = new List<AmostraPiso>();
+        for (var st = 5.0; st < axis.Length - 5; st += 5)
+            foreach (var o in new[] { 0.0, half, -half })
+            {
+                var pt = axis.PointAt(st) + axis.TangentAt(st).PerpLeft * o;
+                if (!Skip(pt) && probe.TopZ(pt) is { } top) samples.Add(new AmostraPiso(pt, top, null, pav.DisplayCode, pav.Id));
+            }
+        var under = FloorTerrainCheck.Pisos(samples, terrain);
+        var edge = FloorTerrainCheck.Bordas(FloorTerrainCheck.BordasDaVia(axis, pav.TotalLeft, pav.TotalRight, 5.0, 5.0, Skip),
+            p => sect.TopZ(p), terrain, out var edgeChecked, $"{pav.DisplayCode} – borda da seção");
+        s.Note($"Terreno projetado × via: {samples.Count} ponto(s) sob a pista e {edgeChecked} na borda da seção conferidos " +
+               $"(tolerância {FloorTerrainCheck.Tolerancia * 100:0} cm sob a pista, {FloorTerrainCheck.ToleranciaBorda * 100:0} cm na borda; fundo da estrutura não conferido).");
+        foreach (var a in under) s.Error(a.Texto + " – fora de túneis e pontes.");
+        if (edge != null)
+        {
+            if (edge.Pontos > edge.Conferidos * 0.1) s.Error(edge.Texto + ".");
+            else s.Warn(edge.Texto + ".");
+        }
     }
 
     private static BoundingBoxXYZ? Box(IEnumerable<Element> els)

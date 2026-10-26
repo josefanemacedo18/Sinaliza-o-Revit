@@ -177,6 +177,29 @@ internal sealed partial class AutoTestRunner
         }, always: true);
     }
 
+    /// <summary>
+    /// Classe do par de pisos (RT-1.3, <see cref="OverlapClassifier"/>) pelo que o Revit mede: código da marca (ou o tipo do piso
+    /// comum), marca, grupo, volume em comum e de cada piso, pintura e se as vias dos dois têm nó. Nada é apagado.
+    /// </summary>
+    private Classificacao Classify(Element ea, Element eb, Solid sa, Solid sb, double volumeFt3, Func<string, string, bool?> nos)
+    {
+        (string Code, StoredMarking? R) Who(Element e)
+        {
+            var r = MarkingStorage.Read(e);
+            return (r?.Definition.DisplayCode ?? (e is Floor f && _doc.GetElement(f.GetTypeId()) is { } t ? t.Name : e.Category?.Name ?? "?"), r);
+        }
+        var (ca, ra) = Who(ea);
+        var (cb, rb) = Who(eb);
+        var (ga, gb) = (ra?.Definition.GroupId, rb?.Definition.GroupId);
+        return OverlapClassifier.Classificar(new FatosSobreposicao(ca, cb, ra?.MarkingId, rb?.MarkingId, ga, gb, volumeFt3 * 0.0283168,
+            sa.Volume * 0.0283168, sb.Volume * 0.0283168, ra != null && MarkingColors.IsPaint(ra.Color), rb != null && MarkingColors.IsPaint(rb.Color),
+            ViasComNo: ga != null && gb != null ? nos(ga, gb) : null));
+    }
+
+    /// <summary>Vias com nó em comum, pelas definições de pavimento, interseção e rotatória do projeto (lidas uma vez, quando preciso).</summary>
+    private Func<string, string, bool?> NodesBetweenRoads() =>
+        OverlapClassifier.NosEntreVias(MarkingStorage.Definitions(_doc, typeof(RoadPavementDefinition), typeof(IntersectionDefinition), typeof(RoundaboutDefinition)));
+
     private void FinalFloors(StepReport s)
     {
         var floors = new FilteredElementCollector(_doc).OfClass(typeof(Floor)).Cast<Floor>().Where(f => f.Id.Value > _maxIdBefore).ToList();
@@ -250,6 +273,8 @@ internal sealed partial class AutoTestRunner
             }
         var solids = new Dictionary<long, Solid?>();
         var kinds = new List<(string A, string B, bool Same, double VolumeM3)>();
+        var classes = new List<(Classificacao C, double VolumeM3)>();
+        Func<string, string, bool?>? nos = null;
         int unknown = 0;
         foreach (var (fa, fb) in cand)
         {
@@ -262,10 +287,12 @@ internal sealed partial class AutoTestRunner
                 var (ia, ib) = (info[fa.Id.Value], info[fb.Id.Value]);
                 var same = ia.Mark != null && ia.Mark == ib.Mark;
                 kinds.Add((ia.Code, ib.Code, same, v * 0.0283168));
+                var c = Classify(fa, fb, sa, sb, v, nos ??= NodesBetweenRoads());
+                classes.Add((c, v * 0.0283168));
                 double[]? center = null;
                 try { center = Loc(inter!.ComputeCentroid()); } catch { /* sem centro */ }
                 s.Records.Add(new { tipo = "sobreposicao-final", volumeCm3 = Math.Round(v * 28316.8, 1), mesmaMarca = same, centro = center,
-                    a = ElementInfo(fa, s), b = ElementInfo(fb, s) });
+                    classe = OverlapClassifier.Nome(c.Classe), motivo = c.Motivo, acao = c.Acao, a = ElementInfo(fa, s), b = ElementInfo(fb, s) });
             }
             catch { unknown++; }
         }
@@ -274,7 +301,9 @@ internal sealed partial class AutoTestRunner
         if (WarningSummary.PersistentPairsNote(kinds) is { } byKind)
         {
             s.Note(byKind);
-            s.WarnFirst($"{kinds.Count} par(es) de pisos sobrepostos no modelo final ({kinds.Sum(k => k.VolumeM3):0.###} m³) – detalhes no arquivo de dados.");
+            if (OverlapClassifier.Resumo(classes) is { } byClass) s.Note(byClass + " Motivo e ação de cada par no arquivo de dados; nada foi apagado.");
+            var real = classes.Count(c => c.C.Classe is ClasseSobreposicao.Conflito or ClasseSobreposicao.Duplicacao);
+            s.WarnFirst($"{kinds.Count} par(es) de pisos sobrepostos no modelo final ({kinds.Sum(k => k.VolumeM3):0.###} m³), {real} deles conflito real ou duplicação – detalhes no arquivo de dados.");
         }
     }
 }

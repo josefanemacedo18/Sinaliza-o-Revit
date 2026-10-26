@@ -46,7 +46,7 @@ public sealed class CmdAutoteste : CommandBase
             .Check("Obras: viaduto, ponte, túnel, trincheira, muros, taludes, nó viário (pesado)", () => o.Works, v => o.Works = v)
             .Check("Edição e detalhamento", () => o.Editing, v => { o.Editing = v; o.Detailing = v; })
             .Check("Simulador de Tráfego", () => o.Traffic, v => o.Traffic = v)
-            .Check("Verificações do modelo (pintura × pisos, continuidade)", () => o.Checks, v => o.Checks = v)
+            .Check("Verificações do modelo (pintura × pisos, continuidade, terreno × via) – sempre no Completo", () => o.Checks, v => o.Checks = v)
             .Check("Loteamento (gleba, quadras, lotes, quadros, filtros e masterplan)", () => o.Loteamento, v => o.Loteamento = v);
         if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
         var runner = new AutoTestRunner(app, uidoc, o);
@@ -69,7 +69,9 @@ internal sealed class AutoTestOptions
     public bool Works { get; set; }
     public bool Editing { get; set; }
     public bool Detailing { get; set; }
+    /// <summary>Verificações do modelo; o Completo sempre as roda (RT-1.2: nunca tinham rodado nos Autotestes do usuário).</summary>
     public bool Checks { get; set; }
+    public bool RunChecks => Checks || Full;
     public bool Loteamento { get; set; } = true;
     /// <summary>Completo: todas as variantes; senão, no máximo 3 etapas por bloco e 3 minutos no total.</summary>
     public bool Full { get; set; }
@@ -179,7 +181,7 @@ internal sealed partial class AutoTestRunner
             if (_opt.Editing) Editing();
             if (_opt.Detailing) Detailing();
             if (_opt.Traffic) Traffic();
-            if (_opt.Checks) Checks();
+            if (_opt.RunChecks) Checks();
             FinalModel();
         }
         catch (Exception ex)
@@ -471,6 +473,8 @@ internal sealed partial class AutoTestRunner
         int still = 0, apart = 0, gone = 0, unknown = 0;
         var examples = new List<string>();
         var kinds = new List<(string A, string B, bool Same, double VolumeM3)>();
+        var classes = new List<(Classificacao C, double VolumeM3)>();
+        Func<string, string, bool?>? nos = null;
         foreach (var (a, b) in pairs)
         {
             var ea = _doc.GetElement(new ElementId(a));
@@ -485,7 +489,10 @@ internal sealed partial class AutoTestRunner
                 still++;
                 double[]? center = null;
                 try { center = Loc(inter!.ComputeCentroid()); } catch { /* sem centro */ }
-                s.Records.Add(new { tipo = "sobreposicao", volumeCm3 = Math.Round(v * 28316.8, 1), centro = center, a = ElementInfo(ea, s), b = ElementInfo(eb, s) });
+                var c = Classify(ea, eb, sa, sb, v, nos ??= NodesBetweenRoads());
+                classes.Add((c, v * 0.0283168));
+                s.Records.Add(new { tipo = "sobreposicao", volumeCm3 = Math.Round(v * 28316.8, 1), centro = center,
+                    classe = OverlapClassifier.Nome(c.Classe), motivo = c.Motivo, acao = c.Acao, a = ElementInfo(ea, s), b = ElementInfo(eb, s) });
                 var (ra, rb) = (MarkingStorage.Read(ea), MarkingStorage.Read(eb));
                 kinds.Add((ra?.Definition.DisplayCode ?? ea.Category?.Name ?? "?", rb?.Definition.DisplayCode ?? eb.Category?.Name ?? "?",
                     ra != null && rb != null && ra.MarkingId == rb.MarkingId, v * 0.0283168));
@@ -496,6 +503,7 @@ internal sealed partial class AutoTestRunner
         s.Note($"Pisos sobrepostos conferidos no fim da etapa: {pairs.Count} par(es) dos avisos – {still} ainda com volume em comum, "
                + $"{apart} sem volume em comum (aviso de passagem), {gone} com piso apagado ou refeito, {unknown} sem conferência.");
         if (WarningSummary.PersistentPairsNote(kinds) is { } byKind) s.Note(byKind);
+        if (OverlapClassifier.Resumo(classes) is { } byClass) s.Note(byClass);
         if (still > 0) s.WarnFirst($"{still} par(es) de pisos continuam sobrepostos no modelo: {string.Join("; ", examples)}{(still > examples.Count ? "; …" : "")}.");
     }
 
