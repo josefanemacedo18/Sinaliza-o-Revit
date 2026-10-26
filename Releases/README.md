@@ -39,6 +39,7 @@ desejada. `Instalar/Revit2027` tem sempre a versão mais recente.
 | Etapa 4 – estaqueamento e limites dos avisos (Fases V e VII) | 2.10.0 | 2026-10-26 | `ee75f3f` | 2 986/2 986 | não executado – [`Etapa04`](Etapa04/RELEASE.md) |
 | Etapa 5 – estrutura do pavimento e terraplenagem desatualizada (Fases VI, VII e X) | 2.11.0 | 2026-10-26 | `5dc91f7` | 3 000/3 000 | não executado – [`Etapa05`](Etapa05/RELEASE.md) |
 | Etapa 6 – drenagem integrada às vias e ao terreno (Fase VIII, RT-1.5) | 2.12.0 | 2026-10-26 | `ab92d46` | 3 011/3 011 | não executado – [`Etapa06`](Etapa06/RELEASE.md) |
+| Etapa 7 – urbanismo e elementos complementares (Fase IX) | 2.13.0 | 2026-10-26 | `e3a27c4` | 3 016/3 016 | não executado – [`Etapa07`](Etapa07/RELEASE.md) |
 
 As fases I, II, IX e XI foram concluídas antes desta pasta existir. As DLLs delas estão no histórico do git, no commit
 indicado: `git show <commit>:Instalar/Revit2027/SinalizaBIM.dll > SinalizaBIM.dll`. As fases seguintes ganham uma linha

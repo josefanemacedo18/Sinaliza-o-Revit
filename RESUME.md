@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-26 (Etapas 0–6 entregues; Etapa 7 em andamento)
+## Estado em 2026-10-26 (Etapas 0–7 entregues; Etapa 8 a seguir)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -20,16 +20,18 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     a aplicada (D-024, K19, K21).
   - Etapa 6 ✅: 2.12.0 em `Releases/Etapa06` (`ab92d46`, 3 011/3 011) – drenagem lida do modelo (Ler do Modelo, D-025),
     pontos baixos e talvegues no V13, recobrimento sob a superfície acabada, perfil da rede.
-  - `Instalar/Revit2027` tem a DLL 2.12.0. As anteriores continuam em `Releases/`.
-- **Etapa 7 (atual):** código e documentos em `e3a27c4` (2.13.0): indicadores do parcelamento, fonte dos mínimos, V16 e
-  Trocar Elementos; falta a suíte completa e a entrega `Releases/Etapa07`.
+  - Etapa 7 ✅: 2.13.0 em `Releases/Etapa07` (`e3a27c4`, 3 016/3 016) – indicadores do parcelamento, fonte dos mínimos,
+    V16 e Trocar Elementos (auditoria dos elementos urbanos em AUDIT §9.2a).
+  - `Instalar/Revit2027` tem a DLL 2.13.0. As anteriores continuam em `Releases/`.
+- **Etapa 8 (próxima):** integração associativa – dependências terreno → via → terraplenagem → pavimento → drenagem →
+  lotes, estado de cada resultado (atualizado, pendente, desatualizado), invalidação seletiva.
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros (compilar sempre também o projeto de testes antes do
   commit).
 
 ## Próxima tarefa
 
-1. Etapa 7 (entrega). Depois, as Etapas 8–13 na ordem do plano.
+1. Etapa 8 (PLANO). Depois, as Etapas 9–13 na ordem do plano.
 2. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer tudo**;
    enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`); rodar também o
    Validar Modelo duas vezes (a segunda mostra a comparação com a primeira).
