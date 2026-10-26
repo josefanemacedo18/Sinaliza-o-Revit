@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-26 (Etapas 0–3 entregues; Etapa 4 em andamento)
+## Estado em 2026-10-26 (Etapas 0–4 entregues; Etapa 5 em andamento)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -13,16 +13,19 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     Autoteste contra o Toposolid projetado.
   - Etapas 2 e 3 ✅, entrega conjunta: 2.9.0 em `Releases/Etapa03` (`23c92c8`, 2 979/2 979) – validação com módulo,
     ação, "não verificado" e histórico; tolerâncias num registro; diagnóstico do terreno e V14.
-  - `Instalar/Revit2027` tem a DLL 2.9.0. As anteriores continuam em `Releases/`.
-- **Etapa 4 (atual):** equações de estaqueamento; avisos de interseção e rotatória com valor de referência sem fonte (lista
-  no PLANO); causa e parâmetro a rever quando o nó não se resolve.
+  - Etapa 4 ✅: 2.10.0 em `Releases/Etapa04` (`ee75f3f`, 2 986/2 986) – limites dos avisos com a origem dita
+    (`LimitesDeConferencia`); estaqueamento da via com estaca inicial e equações (D-023, K20).
+  - `Instalar/Revit2027` tem a DLL 2.10.0. As anteriores continuam em `Releases/`.
+- **Etapa 5 (atual):** estrutura do pavimento na via (camadas sob o revestimento) usada pela terraplenagem, pelo corte
+  transversal e pelos quantitativos por camada; registro da terraplenagem (entradas e subleito) para apontar quando ela
+  fica desatualizada (V15) e para conferir o fundo da estrutura no Autoteste (K19).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros (compilar sempre também o projeto de testes antes do
   commit).
 
 ## Próxima tarefa
 
-1. Etapa 4 (PLANO). Depois, as Etapas 5–13 na ordem do plano.
+1. Etapa 5 (PLANO). Depois, as Etapas 6–13 na ordem do plano.
 2. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer tudo**;
    enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`); rodar também o
    Validar Modelo duas vezes (a segunda mostra a comparação com a primeira).
