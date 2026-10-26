@@ -1,5 +1,6 @@
 using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Geometry;
+using SinalizacaoViaria.Core.Model;
 
 namespace SinalizacaoViaria.Core.Tests;
 
