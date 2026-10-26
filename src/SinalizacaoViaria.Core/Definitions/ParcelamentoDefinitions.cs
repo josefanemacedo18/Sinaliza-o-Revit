@@ -189,6 +189,8 @@ public sealed class LoteamentoDefinition : MarkingDefinition
     /// nº 6.766/1979 remete à lei municipal; conferir). Chave: nome da categoria, "Sistema viário" ou "Áreas públicas".
     /// </summary>
     public Dictionary<string, double> Minimos { get; set; } = new();
+    /// <summary>De onde vêm os mínimos e o lote mínimo (lei municipal, plano diretor), escrito pelo usuário. Nulo = sem fonte.</summary>
+    public string? FonteMinimos { get; set; }
     /// <summary>
     /// Frente mínima de um lote (m). Padrão 5 m, informado pela usuária (norma ou lei de parcelamento – [a confirmar]); lotes
     /// menores são avisados e a sobra de testada menor que isso não vira lote.

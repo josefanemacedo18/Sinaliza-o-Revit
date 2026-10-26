@@ -48,6 +48,13 @@ public static class LotMemorial
         b.Add(new MemHeading(1, SecAreas));
         b.Add(QuadroAreas(r));
         b.Add(new MemParagraph(NotaLegislacao, Italic: true));
+        b.Add(new MemParagraph(string.IsNullOrWhiteSpace(lot.FonteMinimos)
+            ? "Fonte dos mínimos: não informada no projeto."
+            : $"Fonte dos mínimos: {lot.FonteMinimos!.Trim()}.", Italic: true));
+        // Indicadores do parcelamento (Etapa 7): medidas do projeto, sem limite universal.
+        b.Add(new MemTable(new[] { "Indicador", "Valor" },
+            IndicadoresUrbanisticos.Linhas(IndicadoresUrbanisticos.Calcular(r)).Select(x => (IReadOnlyList<string>)new[] { x.Indicador, x.Valor }).ToList(),
+            new[] { 2.4, 1.6 }));
         foreach (var a in r.Avisos.Where(a => a.Contains("abaixo do mínimo"))) b.Add(new MemParagraph("Atenção: " + a, Italic: true));
 
         b.Add(new MemHeading(1, SecViario));

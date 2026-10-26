@@ -151,3 +151,53 @@ public sealed class CmdAreaConflito : CommandBase
     protected override Result Run(UIApplication app, UIDocument uidoc) => CmdZebrado.RunWith(uidoc, "MAC");
 }
 
+
+/// <summary>
+/// Trocar Elementos Urbanos (Etapa 7): selecione vários elementos urbanos e escolha o novo tipo do catálogo – posição,
+/// direção, caminho, afastamento, recuos e rotação ficam; medidas, cor e espaçamento próprios ficam ou passam a ser os do
+/// novo tipo, conforme a escolha.
+/// </summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdTrocarElementosUrbanos : CommandBase
+{
+    private static string _codigo = "LIXEIRA";
+    private static bool _manterMedidas = true;
+    private static bool _espacamentoDoTipo;
+
+    protected override Result Run(UIApplication app, UIDocument uidoc)
+    {
+        var picked = MarkingPicker.PickMany(uidoc, "Selecione os elementos urbanos a trocar e clique em Concluir");
+        var elementos = picked.Select(r => r.Definition).OfType<UrbanElementDefinition>().GroupBy(d => d.Id).Select(g => g.First()).ToList();
+        if (elementos.Count == 0)
+        {
+            TaskDialog.Show(AppTitle, "Nenhum elemento urbano do plugin entre os selecionados (famílias do Revit trocam pelo seletor de tipo).");
+            return Result.Cancelled;
+        }
+        var catalogo = PluginContext.Catalog.Mobiliario;
+        if (catalogo.Count == 0) throw new UserMessageException("O catálogo não tem elementos urbanos.");
+        if (catalogo.All(m => !string.Equals(m.Codigo, _codigo, StringComparison.OrdinalIgnoreCase))) _codigo = catalogo[0].Codigo;
+        var tipos = string.Join(", ", elementos.GroupBy(e => e.Code).Select(g => $"{g.Key} ({g.Count()})"));
+        var w = new FormWindow("Trocar elementos urbanos", "Substituição controlada",
+                $"{elementos.Count} elemento(s) selecionado(s): {tipos}. Posição, direção, caminho, afastamento, recuos, rotação e nível ficam.",
+                null, null, false, "Trocar", 640, 420)
+            .Choice("Novo tipo", catalogo.Select(m => (m.ToString(), m.Codigo)).ToArray(), () => _codigo, v => _codigo = v)
+            .Check("Manter as medidas e a cor próprias de cada elemento", () => _manterMedidas, v => _manterMedidas = v,
+                "Desmarcado: as medidas e a cor voltam às do novo tipo no catálogo.")
+            .Check("Ao longo de linhas: usar o espaçamento do novo tipo", () => _espacamentoDoTipo, v => _espacamentoDoTipo = v);
+        if (UiHelpers.ShowModal(w) != true) return Result.Cancelled;
+        var novo = PluginContext.Catalog.Movel(_codigo) ?? throw new UserMessageException($"Tipo {_codigo} não está no catálogo.");
+        var mudou = SinalizacaoViaria.Core.Automation.SubstituicaoUrbana.Trocar(elementos, novo, _manterMedidas, _espacamentoDoTipo);
+        if (mudou.Count == 0)
+        {
+            TaskDialog.Show(AppTitle, $"Todos os elementos selecionados já são {novo.Codigo}: nada mudou.");
+            return Result.Cancelled;
+        }
+        var res = MarkingCreator.Commit(uidoc, mudou.Select(m => (MarkingDefinition)m.Elemento).ToList(), "SV - Trocar elementos urbanos");
+        var resumo = new RenderResult();
+        resumo.Warnings.Add($"{mudou.Count} elemento(s) trocado(s) para {novo}:\n" + string.Join("\n", mudou.Take(12).Select(m => "• " + m.Texto)) +
+                            (mudou.Count > 12 ? $"\n… e mais {mudou.Count - 12}." : ""));
+        res.Insert(0, resumo);
+        Report("Trocar elementos urbanos", res.Where(r => r.Warnings.Count > 0).ToList(), alwaysShow: true);
+        return Result.Succeeded;
+    }
+}

@@ -378,7 +378,8 @@ public static class LotForms
         Minimos(w, lot);
         double Min(string key) => lot.Minimos.TryGetValue(key, out var m) ? m : 0;
         void SetMin(string key, double v) { if (v > 1e-6) lot.Minimos[key] = v; else lot.Minimos.Remove(key); }
-        w.Section("Mínimos gerais (% da gleba)")
+        w.Section("Mínimos gerais (% da gleba)", "Valores da legislação aplicável ao projeto – nenhum é universal. A Validação (V16) aponta o que ficar abaixo.")
+            .Text("Fonte dos mínimos (lei municipal, plano diretor)", () => lot.FonteMinimos, v => lot.FonteMinimos = string.IsNullOrWhiteSpace(v) ? null : v!.Trim())
             .Number(ResumoLoteamento.SistemaViario, () => Min(ResumoLoteamento.SistemaViario), v => SetMin(ResumoLoteamento.SistemaViario, v), 0, 100)
             .Number(ResumoLoteamento.AreasPublicas, () => Min(ResumoLoteamento.AreasPublicas), v => SetMin(ResumoLoteamento.AreasPublicas, v), 0, 100);
         foreach (var c in lot.Categorias)

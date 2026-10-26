@@ -98,18 +98,22 @@ public static class LotReport
             res.Avisos.AddRange(d.Avisos);
         }
         // Mínimos editáveis (legislação aplicável – conferir): avisa o que ficou abaixo.
-        foreach (var (key, min) in lot.Minimos)
-        {
-            double area = key switch
-            {
-                ResumoLoteamento.SistemaViario => res.AreaViaria,
-                ResumoLoteamento.AreasPublicas => res.AreaPublica,
-                _ => res.Categorias.Where(c => string.Equals(c.Nome, key, StringComparison.OrdinalIgnoreCase)).Sum(c => c.Area),
-            };
-            if (res.Pct(area) + 1e-9 < min) res.Avisos.Add($"{key}: {P(res.Pct(area))} da gleba, abaixo do mínimo informado de {P(min)}.");
-        }
+        foreach (var (key, pct, min) in MinimosNaoAtendidos(res))
+            res.Avisos.Add($"{key}: {P(pct)} da gleba, abaixo do mínimo informado de {P(min)}.");
         return res;
     }
+
+    /// <summary>Percentual (% da gleba) de uma chave dos mínimos: uma categoria, "Sistema viário" ou "Áreas públicas".</summary>
+    public static double Percentual(ResumoLoteamento r, string chave) => r.Pct(chave switch
+    {
+        ResumoLoteamento.SistemaViario => r.AreaViaria,
+        ResumoLoteamento.AreasPublicas => r.AreaPublica,
+        _ => r.Categorias.Where(c => string.Equals(c.Nome, chave, StringComparison.OrdinalIgnoreCase)).Sum(c => c.Area),
+    });
+
+    /// <summary>Mínimos informados no loteamento que o parcelamento não atende: chave, percentual obtido e mínimo.</summary>
+    public static List<(string Chave, double Percentual, double Minimo)> MinimosNaoAtendidos(ResumoLoteamento r) =>
+        r.Loteamento.Minimos.Select(kv => (kv.Key, Percentual(r, kv.Key), kv.Value)).Where(x => x.Item2 + 1e-9 < x.Value).ToList();
 
     private static double? Minimo(LoteamentoDefinition lot, string key) =>
         lot.Minimos.FirstOrDefault(kv => string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase)) is { Key: not null } kv ? kv.Value : null;

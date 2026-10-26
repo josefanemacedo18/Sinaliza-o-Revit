@@ -108,6 +108,7 @@ public static class ModelValidator
         }
 
         CheckLayout(defs, res);
+        CheckParcelamento(defs, res);
         if (criterios is { IsEmpty: false }) CheckAlignment(defs, criterios, res);
         CheckDrainage(defs, drenagem, terreno, res);
         CheckDrainageModel(defs, terrenoNatural, res);
@@ -157,6 +158,9 @@ public static class ModelValidator
         if (terraplenagem == null && Automation.EarthworkRecord.Participantes(lista).Count is > 0 and var n)
             yield return N("V15", $"Sem registro da terraplenagem aplicada (nunca aplicada, aplicada por versão anterior à 2.11 ou validação sem o documento): " +
                 $"não se sabe se o terreno acompanha as {n} marca(s) que o moldam.", "rodar a Terraplenagem uma vez para gravar o registro");
+        foreach (var lot in lista.OfType<LoteamentoDefinition>().Where(l => l.Minimos.Count == 0 && lista.OfType<QuadraDefinition>().Any(q => q.LoteamentoId == l.Id)))
+            yield return N("V16", $"{lot.Nome}: percentuais mínimos (sistema viário, áreas públicas, categorias) não informados – não conferidos.",
+                "informar os mínimos e a fonte no Loteamento (Mínimos gerais e de cada categoria)");
         if (terrenoNatural == null && lista.OfType<RoadPavementDefinition>().Any(r => r.Output.Grade is { AdjustTerrain: true }))
             yield return N("V13", "Terreno natural não lido: os talvegues sob o aterro das vias (água represada pela via) não foram conferidos.",
                 "validar com o Toposolid no projeto");
@@ -244,6 +248,8 @@ public static class ModelValidator
             "conferir o levantamento ou o Toposolid no ponto indicado"),
         new Regra("V15", "Terraplenagem", "terraplenagem desatualizada: marca que molda o terreno mudou, foi apagada, deixou de moldá-lo ou entrou depois da última terraplenagem aplicada",
             "rodar a Terraplenagem (o terreno original fica guardado e é a base do novo cálculo)"),
+        new Regra("V16", "Quadras e lotes", "parcelamento: percentual da gleba (sistema viário, áreas públicas, categoria) abaixo do mínimo informado no loteamento; lote abaixo do lote mínimo informado (frente e área)",
+            "rever as quadras e os lotes, ou o mínimo informado e a sua fonte"),
     }.ToDictionary(r => r.Codigo);
 
     /// <summary>O que cada código verifica (relatório e manual).</summary>
@@ -403,6 +409,42 @@ public static class ModelValidator
             var lista = string.Join("; ", v.Take(4).Select(x => x.Texto)) + (v.Count > 4 ? $"; … e mais {v.Count - 4}" : "");
             res.Add(new("V12", Severidade.Aviso, Confianca.Media, true,
                 $"{road.DisplayCode}: {v.Count} elemento(s) fora dos limites informados ({c.FonteTexto}): {lista}.", new[] { road.Id }));
+        }
+    }
+
+    /// <summary>
+    /// Parcelamento (V16, Etapa 7): percentuais da gleba abaixo dos mínimos informados no loteamento e lotes abaixo do lote
+    /// mínimo (frente e área informadas). Os limites são os do projeto, com a fonte que o usuário escreveu.
+    /// </summary>
+    private static void CheckParcelamento(Dictionary<string, MarkingDefinition> defs, List<Achado> res)
+    {
+        var quadras = defs.Values.OfType<QuadraDefinition>().ToList();
+        foreach (var lot in defs.Values.OfType<LoteamentoDefinition>())
+        {
+            var minhas = quadras.Where(q => q.LoteamentoId == lot.Id).ToList();
+            if (minhas.Count == 0) continue;
+            Parcelamento.ResumoLoteamento r;
+            try { r = Parcelamento.LotReport.Resumo(lot, minhas); }
+            catch (Exception ex)
+            {
+                res.Add(new("V16", Severidade.NaoVerificavel, Confianca.Alta, false, $"{lot.Nome}: o parcelamento não pôde ser dividido para conferir ({ex.Message}).",
+                    new[] { lot.Id }, "abrir a quadra e conferir o contorno"));
+                continue;
+            }
+            var fonte = string.IsNullOrWhiteSpace(lot.FonteMinimos) ? "sem fonte informada" : $"fonte: {lot.FonteMinimos!.Trim()}";
+            foreach (var (chave, pct, min) in Parcelamento.LotReport.MinimosNaoAtendidos(r))
+                res.Add(new("V16", Severidade.Aviso, Confianca.Alta, true,
+                    $"{lot.Nome}: {chave} com {Parcelamento.LotReport.P(pct)} da gleba, abaixo do mínimo informado de {Parcelamento.LotReport.P(min)} ({fonte}).",
+                    new[] { lot.Id }, "rever as quadras, as categorias ou o mínimo informado"));
+            foreach (var (q, d) in r.Quadras)
+            {
+                var abaixo = d.Parcelas.Where(p => p.AbaixoDoMinimo != null).ToList();
+                if (abaixo.Count == 0) continue;
+                var lista = string.Join("; ", abaixo.Take(6).Select(p => $"lote {p.Numero}: {p.AbaixoDoMinimo}")) + (abaixo.Count > 6 ? $"; e mais {abaixo.Count - 6}" : "");
+                res.Add(new("V16", Severidade.Aviso, Confianca.Alta, true,
+                    $"{lot.Nome}, quadra {q.Nome}: {abaixo.Count} lote(s) abaixo do lote mínimo informado ({lista}) – {fonte}.",
+                    new[] { q.Id, lot.Id }, "ajustar as medidas ou unir os lotes da quadra, ou rever o lote mínimo informado"));
+            }
         }
     }
 

@@ -22,7 +22,7 @@ public class Etapa02DiagnosticoTests
     [Fact]
     public void Regras_CadaCodigoComModuloEAcao_EAcaoPropriaQuandoHa()
     {
-        Assert.Equal(15, ModelValidator.Regras.Count);     // V15 (terraplenagem desatualizada) entrou na Etapa 5
+        Assert.Equal(16, ModelValidator.Regras.Count);     // V15 (terraplenagem) na Etapa 5, V16 (parcelamento) na Etapa 7
         Assert.All(ModelValidator.Regras.Values, r =>
         {
             Assert.False(string.IsNullOrWhiteSpace(r.Modulo));

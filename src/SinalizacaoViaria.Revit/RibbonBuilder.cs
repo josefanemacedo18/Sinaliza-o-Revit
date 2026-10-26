@@ -69,6 +69,9 @@ public static class RibbonBuilder
                 "Rebaixamentos de calçada (NBR 9050) com abas e piso tátil, e guias rebaixadas de veículos."));
         Split(via, "SvUrbanos", "Elementos Urbanos",
             Data(typeof(CmdMobiliario), "Elementos Urbanos", "mobiliario", "Bancos, lixeiras, postes, árvores, abrigos, paraciclos, hidrantes, floreiras, semáforos..."),
+            Data(typeof(CmdTrocarElementosUrbanos), "Trocar Elementos", "mobiliario",
+                "Selecione vários elementos urbanos e troque o tipo de uma vez (ex.: lixeiras por paraciclos): posição, direção, caminho e espaçamento ficam; " +
+                "medidas e cor próprias ficam ou voltam às do novo tipo."),
             Data(typeof(CmdElementoFamilia), "Famílias do Revit", "familia",
                 "Use suas próprias famílias de componente (mobiliário, luminárias, plantio, modelo genérico...) como elementos urbanos – por cliques ou ao longo de linhas – " +
                 "classificadas por subcategoria (iluminação, arborização, bancos, lixeiras...) no Quantitativo. Também classifica famílias já inseridas."));
