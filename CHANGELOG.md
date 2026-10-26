@@ -3,6 +3,47 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-26 – Etapa 4: estaqueamento e limites dos avisos (versão 2.10.0)
+
+Etapa 4 do plano unificado (Fases V e VII). Entrega: `Releases/Etapa04` (não executada no Revit 2027).
+
+### Limites citados nos avisos (regra: nenhuma norma inventada)
+- **Achado da auditoria:** avisos de rotatória, interseção, canalização e obras citavam valores sem fonte no código ou no
+  estudo dos manuais:
+  - minirrotatória com "referência: 13 a 25 m";
+  - "T entre 75° e 105°" e "< 30°";
+  - transição de 30/60 m junto a obstáculo;
+  - pista giratória de 4 m e ilha central de 4 m;
+  - "rotatórias compactas/mini devem ter uma faixa".
+- **`LimitesDeConferencia`:** cada limite tem valor, unidade, origem e fonte. A origem é o espaço que o gerador precisa
+  para desenhar a peça ou um valor de referência. Sem fonte, o aviso diz "limite de conferência do plugin, sem norma
+  citada – confira com a norma adotada". Os valores e as condições não mudaram.
+- **Textos retirados:** "13 a 25 m" e "T entre 75° e 105°", que não tinham origem.
+- **Ilha separadora:** o aviso dizia "mínimo ~7 m". O gerador precisa de 6 m de faixas mais 0,80 m de ilha (6,8 m), e o
+  aviso agora diz isso.
+
+### Estaqueamento (D-023)
+- **`Estaqueamento` da via:**
+  - estaca do início do eixo e intervalo entre estacas;
+  - equações de estaca na forma do levantamento ("estaca atrás = estaca à frente");
+  - posição no eixo de uma estaca. Estaca numa lacuna não tem posição; estaca repetida (equação que volta) fica no
+    primeiro trecho, e isso é dito.
+- **Gravação:** no pavimento da via, opcional. Dentro das definições, as estacas continuam sendo distâncias ao longo do
+  eixo, então não há migração e projetos antigos abrem iguais.
+- **Onde aparece:**
+  - CSVs do eixo, do greide e da verificação do traçado;
+  - V12 do Validar Modelo;
+  - tabela de volumes por estaca.
+
+  Com estaqueamento próprio, as colunas em metros dizem "distância no eixo".
+- **Perfil da Via:** campos de estaca inicial, intervalo e equações. Valores ilegíveis ou uma equação fora do eixo não são
+  aplicados, e nada muda no modelo.
+- **Limite (K20):** os formulários de largura por trecho, recuo, extensão e níveis da calçada ainda pedem a distância desde
+  o início do eixo. Isso muda na Etapa 11.
+
+### Testes
+- `Etapa04ViasTests` (8).
+
 ## 2026-10-26 – Etapas 2 e 3: diagnóstico padronizado e topografia (versão 2.9.0)
 
 Etapas 2 e 3 do plano unificado, na Fase X. Entrega conjunta em `Releases/Etapa03` (não executada no Revit 2027).

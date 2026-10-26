@@ -315,9 +315,9 @@ Isso compila (é um assembly só), mas contraria o §4 do Prompt Master. Está r
 | 5 | Detecção de geometria inválida, lacunas e sobreposições | IT (núcleo) / INV (Revit) | `PolygonChecks` (V07), `PieceOverlaps`; classificação das sobreposições desde a Etapa 1 (`OverlapClassifier`, RT-1.3) |
 | 6 | Terreno existente × projetado separados | IT (Core) / INV (Revit) | original gravado no Toposolid (AUDIT §7.1); `Grading` |
 | 6 | Diagnóstico da superfície (dados insuficientes, triângulos inválidos, descontinuidades, declividade fora do limite, extrapolação) | IT (núcleo) / INV (Revit) | `TerrainDiagnostics` e V14 no Validar Modelo com o Toposolid projetado (Etapa 3); importação de pontos e curvas de nível: Etapa 11 |
-| 7 | Eixos, alinhamentos, greides, estacas, seções, prévia | IT (Core) / INV (prévia no Revit) | Fases V e VI; `RoadPreviewServer` (DirectContext3D) |
+| 7 | Eixos, alinhamentos, greides, estacas, seções, prévia | IT (Core) / INV (prévia no Revit) | Fases V e VI; `RoadPreviewServer` (DirectContext3D); estaqueamento com estaca inicial e equações nos relatórios (Etapa 4, D-023); formulários ainda pela distância no eixo (K20) |
 | 8 | Interseções e rotatórias calculadas, regeneração ao mudar eixos | IT (Core) / INV (updater, K17) | Fases VI e VII |
-| 8 | Configuração impossível explicada, com os parâmetros a rever | P | avisos dos geradores (`IntersectionGenerator`, `RoundaboutGenerator`), sem lista padronizada de parâmetros |
+| 8 | Configuração impossível explicada, com os parâmetros a rever | IT (núcleo) | os avisos dos geradores dizem a causa e o parâmetro; desde a Etapa 4 os limites citados neles estão em `LimitesDeConferencia`, com a fonte ou "sem norma citada" |
 | 9 | Corte e aterro com método documentado e limites | IT (Core) | `Grading.Volumes` (malha) e `SectionVolumes` (seções), AUDIT §6.7 |
 | 9 | Cálculo de terraplenagem desatualizado depois de mudar a via | **A** | o Toposolid fica como estava até nova Terraplenagem; nada aponta que ficou velho |
 | 10 | Estrutura de pavimento por via ou trecho (ordem, espessura, material) usada pelo cálculo | P | camadas só no desenho do corte (`SectionLayer`); a terraplenagem usa uma profundidade única de subleito (0,40 m, `TerrainService.Subgrade`); o piso tem só o revestimento |

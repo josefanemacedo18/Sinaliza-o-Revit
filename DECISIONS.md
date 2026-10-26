@@ -307,3 +307,17 @@ como substituída.
   Interface e as 15 fases antigas) em paralelo. Os mesmos itens seriam auditados e implementados duas ou três vezes.
 - **Consequências:** o usuário recebe um aviso ao fim de cada etapa. O ROADMAP aponta para o plano em vez de manter outra
   lista de próximas etapas.
+
+## D-023 – Estacas guardadas como distância no eixo; o estaqueamento só muda o que é mostrado
+- **Contexto:** o Prompt de Motores (§7) pede estaqueamento e equações de estaca. O plugin sempre contou as estacas a partir
+  de 0 no início do eixo, de 20 em 20 m. Essas estacas estão guardadas em dezenas de campos das definições (larguras por
+  trecho, recuos, extensões, obras, PIVs) e são digitadas em vários formulários.
+- **Decisão:** dentro das definições, toda estaca continua sendo a **distância ao longo do eixo a partir do início**. O
+  `Estaqueamento` da via (estaca inicial, intervalo, equações "estaca atrás = estaca à frente") é guardado no pavimento,
+  é opcional e só converte essa distância na estaca mostrada. Os relatórios desta via o usam desde a Etapa 4. Nulo = o
+  padrão de sempre.
+- **Alternativa descartada:** guardar o valor da estaca nos campos. Exigiria migrar todas as definições existentes e
+  regravar cada vez que uma equação muda – risco de perda de dados (R1) sem ganho para o cálculo.
+- **Consequências:** projetos antigos abrem iguais (campo ausente = padrão). Os formulários que pedem estacas continuam
+  pedindo a distância desde o início do eixo até a tela da via ser refeita (Etapa 11; K20).
+

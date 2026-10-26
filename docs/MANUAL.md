@@ -2230,6 +2230,19 @@ via vira obra. É o "perfil longitudinal" do projeto rodoviário.
 7. **Verificação contra os seus limites**: com limites geométricos informados em Configurações, o eixo e o greide aplicados
    são conferidos e o que estiver fora vai para `verificacao-<via>.csv` (elemento, estacas, critério, valor, limite e a fonte
    que você escreveu). O resumo mostra os primeiros itens. Sem limites, o resumo avisa que nada foi conferido.
+8. **Estaqueamento** (seção no fim da janela) – como as estacas desta via aparecem nos relatórios:
+   - **estaca do início do eixo**: "100+0,00" ou em metros (2 000);
+   - **intervalo entre estacas**: 20 m no padrão;
+   - **equações de estaca**: na forma do levantamento, "estaca atrás = estaca à frente", separadas por ";" (ex.:
+     15+12,40 = 16+0,00).
+
+   Os CSVs do greide, do eixo e da verificação, o V12 do Validar Modelo e a tabela de volumes por estaca usam esse
+   estaqueamento. As colunas em metros passam a dizer "distância no eixo". Valores que não podem ser lidos, ou uma equação
+   fora do eixo, impedem a aplicação, e nada muda no modelo. Uma equação que volta (estaca à frente menor que a de trás)
+   é aceita: quem lê uma estaca repetida usa o primeiro trecho.
+
+> Os formulários de largura por trecho, recuo, extensão de calçada e níveis da calçada continuam pedindo a **distância ao
+> longo do eixo desde o início** (no formato n+resto de 20 m), qualquer que seja o estaqueamento da via (K20).
 
 > O comprimento efetivo pode diferir do pedido. Para não haver "quina", a curva é no mínimo K = 10 m por %, um piso de
 > suavização da geometria, **não um critério de visibilidade**. E ela nunca passa de 98 % do menor vão entre PIVs
