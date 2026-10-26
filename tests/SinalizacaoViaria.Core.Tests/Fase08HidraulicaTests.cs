@@ -235,7 +235,7 @@ public class Fase08HidraulicaTests(ITestOutputHelper output)
         Assert.True(c.Lamina < 0.10);
         Assert.Equal(0.55, c.Fator);   // combinada, ponto intermediário, barras transversais
         Assert.True(r.Trechos.Single().Ligacao);
-        Assert.Empty(r.Problemas.Where(x => x.Criterio is "sarjeta" or "engolimento"));
+        Assert.DoesNotContain(r.Problemas, x => x.Criterio is "sarjeta" or "engolimento");
         // Área grande demais para a sarjeta e para a boca de lobo.
         bl.AreaContribuicao = 60000;
         var r2 = DrainageHydraulics.Calcular(defs, p);
