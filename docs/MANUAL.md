@@ -764,6 +764,7 @@ A correção é sempre sua, com Editar, Atualizar ou apagando o elemento.
 | V14 | **superfície do terreno projetado** (o Toposolid como está): menos de três pontos ou todos numa reta, coordenada não numérica, o mesmo ponto com cotas diferentes (degrau vertical ou dado duplicado), triângulos sem área, faces mais íngremes que a **declividade máxima do terreno** que você informou e eixos das vias que moldam o terreno passando fora dele (ali o cálculo seria extrapolação) | confira o levantamento ou o Toposolid no ponto indicado; amplie o terreno até as vias. Sem Toposolid ou sem a declividade informada, o relatório diz "não verificado" |
 | V15 | **terraplenagem desatualizada**: uma marca que molda o terreno (via com greide, nó ligado a ela, obra, caixa de drenagem) **mudou**, foi **apagada**, **deixou de moldar** o terreno ou **entrou** depois da última Terraplenagem aplicada. Um achado por situação, com as marcas | rode a **Terraplenagem**: o terreno é refeito a partir do original guardado. Sem registro (terraplenagem nunca aplicada ou aplicada por versão anterior à 2.11), o relatório diz "não verificado" |
 | V16 | **parcelamento**: percentual da gleba (sistema viário, áreas públicas, uma categoria) abaixo do **mínimo informado no loteamento**, e lotes abaixo do **lote mínimo** informado (frente e área), com a fonte que você escreveu | reveja as quadras, as categorias ou o mínimo informado. Sem mínimos informados, o relatório diz "não verificado" |
+| V17 | **integração**: área ou declividade de uma captação **lida do modelo** (Ler do Modelo) que o modelo agora dá diferente – a via mudou, outra captação entrou acima ou o dispositivo saiu da sarjeta. As editadas à mão não entram | **Ler do Modelo › Atualizar só as desatualizadas**: relê só elas e troca só os campos que ainda eram os lidos |
 
 O resumo aparece numa janela (com **Selecionar os elementos com erro ou aviso** e **Abrir o relatório**). O relatório
 completo é gravado em `%AppData%\SinalizaBIM\validacao-AAAAMMDD-HHMMSS.txt`. A validação confere os **dados**; a
@@ -785,6 +786,17 @@ No fim do relatório, a seção **Não verificado** diz o que faltou para confer
 - terraplenagem sem registro (V15);
 - percentuais mínimos do loteamento não informados (V16);
 - elementos do Revit (V06), quando a validação roda sem o documento.
+
+**Estado dos resultados** (desde a 2.14): no fim do relatório, cada resultado derivado do modelo com a situação –
+*atualizado*, *DESATUALIZADO*, *não verificado* ou *informação*:
+- **Terraplenagem**: o Toposolid acompanha as marcas que o moldam (registro da última aplicação) ou não;
+- **Captações lidas da via**: quantas estão em dia, desatualizadas, editadas à mão (preservadas) ou nunca lidas;
+- **Interseções, rotatórias e balões**: refeitos pela atualização automática quando a via muda;
+- **Quantitativos, volumes por estaca, perfis e relatórios**: calculados na hora, não ficam desatualizados.
+
+Depois de editar uma marca, de mudar o greide (Perfil da Via) ou a estrutura do pavimento, o relatório da edição diz o
+que **ficou por refazer**: a terraplenagem, quando não foi reaplicada, e as captações lidas do modelo que ficaram
+desatualizadas.
 
 **Registro da terraplenagem.** Cada Terraplenagem aplicada (pelo botão ou automática, depois de criar ou editar uma via ou
 obra) grava nas *Informações do projeto*: quando, a versão, o subleito, os taludes e o alcance das opções, os volumes e a
@@ -2188,7 +2200,10 @@ e **Memorial de Drenagem**. Nada disso foi executado no Revit 2027 ainda (o cál
      Com a sarjeta em nível entre duas captações, metade para cada.
 
    A janela mostra o que leu e oferece **preencher só os campos vazios** (área 0, declividade vazia, ponto baixo
-   desmarcado) ou **substituir pelo modelo**; nada é gravado sem a escolha, e Desfazer volta ao que estava. **Lotes,
+   desmarcado), **substituir pelo modelo** ou, desde a 2.14, **atualizar só as desatualizadas**; nada é gravado sem a escolha,
+   e Desfazer volta ao que estava. Cada leitura fica registrada no dispositivo: um campo igual ao lido **vem do modelo** e
+   fica *desatualizado* quando o modelo passa a dizer outra coisa (a via mudou, outra captação entrou acima); um campo
+   diferente do lido foi **editado à mão** e nunca é trocado pela atualização. **Lotes,
    quadras e áreas fora da via não entram** na área: some-as à mão. A água que passa por uma captação conta como captada
    nela. Captação fora da sarjeta de uma via (PV, grelha de piso no meio de uma praça) fica como você informou.
 3. **Trecho de Rede**: escolha o diâmetro, clique no dispositivo de **montante** e depois no de **jusante**; o de jusante

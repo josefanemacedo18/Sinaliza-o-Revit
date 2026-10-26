@@ -328,7 +328,7 @@ Isso compila (é um assembly só), mas contraria o §4 do Prompt Master. Está r
 | 12 | Quadras e lotes por regras configuráveis, quadros e memorial | IT (Core) / validado no Revit | Fase IX; sem aprovação legal automática. Indicadores do parcelamento no memorial, fonte dos mínimos e V16 (mínimos e lote mínimo) desde a Etapa 7 (núcleo; Revit INV) |
 | 13 | Parâmetros pela interface, perfis salvos | P | formulários e Configurações; modelos de via salvos; Projeto de Drenagem por documento; sem salvar ou carregar perfis de terraplenagem e de interseção |
 | 14 | Relações explícitas e regeneração só do necessário | P | `ModelGraph` + DMU; terraplenagem e drenagem fora do grafo de regeneração |
-| 14 | Mostrar o que foi atualizado e o que ficou desatualizado | P | terraplenagem desatualizada no V15 (Etapa 5); o DMU ainda regenera em silêncio e não há estado "desatualizado" na tela (Etapas 8 e 10) |
+| 14 | Mostrar o que foi atualizado e o que ficou desatualizado | IT (núcleo) / INV (Revit) | `EstadoDosResultados` (Etapa 8, D-026): terraplenagem e captações lidas com estado (em dia, desatualizado, editado à mão), seção no relatório da validação, V15 e V17, e o que ficou por refazer no relatório das edições; a tela (Central do Projeto) é a Etapa 10 |
 | 15 | Transações, rollback, falhas | INV | ARCHITECTURE §5; Autotestes no Revit sem documento inconsistente |
 | 16 | Causa das retas fora do eixo e das sobreposições | P | K11 e K12 reproduzidos e corrigidos no núcleo até o 4º Autoteste; a confirmação depende de um novo Autoteste (K3) |
 | 17 | Validação por módulo e transversal | P | V01–V15 com severidade, confiança, módulo e ação |
@@ -424,7 +424,7 @@ As linhas da AUDIT §8.2 marcadas P ou A, com a prioridade. A coluna "Etapa" rem
 | P1 | ~~Estrutura de pavimento só no desenho do corte; terraplenagem com subleito único~~ feito (2.11.0) | pavimentação / terraplenagem | 5 | — |
 | P1 | ~~Terraplenagem desatualizada sem aviso~~ feito (2.11.0, V15) | terraplenagem | 5 | — |
 | P1 | ~~Drenagem sem ler greide e área do modelo (K5)~~ feito (2.12.0, Ler do Modelo e V13) | drenagem | 6 | — |
-| P1 | Estados de atualização e propagação terreno → via → terraplenagem → drenagem | integração | 8 | modelo incoerente depois de editar |
+| P1 | ~~Estados de atualização e propagação terreno → via → terraplenagem → drenagem~~ feito no núcleo (2.14.0, D-026); updater no Revit NÃO VALIDADO (K17) | integração | 8 | — |
 | P2 | Equações de estaqueamento | vias | 4 | — (contorno: estacas contínuas) |
 | P2 | Interseção que não se resolve sem explicar os parâmetros | interseções | 4 | usuário sem saber o que mudar |
 | P2 | ~~Indicadores urbanísticos configuráveis~~ feito (2.13.0: indicadores, fonte dos mínimos, V16) | urbanismo | 7 | — |

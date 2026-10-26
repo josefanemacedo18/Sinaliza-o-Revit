@@ -3,6 +3,48 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-26 – Etapa 8: integração associativa – estado dos resultados (versão 2.14.0)
+
+Etapa 8 do plano unificado (Fase X; Prompt Master §14; Motores §14–§15). Entrega: `Releases/Etapa08` (não executada no
+Revit 2027).
+
+### Auditoria
+- **Grafo de dependências:** o `ModelGraph` cobria as referências gravadas entre marcas (detalhe, nó, quadra, rede,
+  recortes) e a atualização automática refazia as conexões. Nada dizia o estado dos resultados derivados do modelo, além
+  da V15 da terraplenagem, nem distinguia um valor lido do modelo de um editado à mão.
+
+### Origem dos valores lidos e atualização seletiva
+- **Registro da leitura** (`ContribuicaoLida`): o Ler do Modelo guarda em cada captação o que leu (via, quando, área,
+  declividade, ponto baixo). Campo igual ao lido vem do modelo; diferente foi editado à mão e fica preservado.
+- **Estado da leitura** (`DrenagemDoModelo.Estado`):
+  - nunca lida;
+  - em dia;
+  - desatualizada: o campo ainda é o lido, mas o modelo agora dá outro valor (a via mudou, outra captação entrou acima,
+    o dispositivo saiu da sarjeta);
+  - editada à mão.
+- **Atualizar só as desatualizadas** (Ler do Modelo): relê só essas e troca só os campos que ainda eram os lidos.
+
+### Estado dos resultados e impacto da edição (`EstadoDosResultados`)
+- **Estado do projeto:** terraplenagem (registro), captações lidas, o que a atualização automática refaz e o que é
+  calculado na hora. Sai numa seção própria do relatório do Validar Modelo.
+- **Impacto de uma edição:**
+  - conexões ligadas à via;
+  - marcas dependentes pelo grafo;
+  - terraplenagem não reaplicada;
+  - captações lidas que ficaram desatualizadas.
+
+  O relatório de Editar, do Perfil da Via e da Estrutura do Pavimento diz o que ficou por refazer.
+- **V17 – Integração:** leitura do modelo que ficou desatualizada (as editadas à mão não entram).
+
+### Correção
+- **Assinatura das caixas de drenagem:** passou a ignorar os dados hidráulicos (área, coeficientes, tempos, vazão
+  externa, sarjeta, ponto baixo, leitura do modelo), porque as caixas só entram na terraplenagem pela escavação. Antes,
+  preencher a área acusava a terraplenagem desatualizada (V15). Um registro gravado pela 2.11–2.13 com caixas que tinham
+  esses dados aponta essas caixas uma vez; rodar a Terraplenagem regrava o registro.
+
+### Testes
+- `Etapa08IntegracaoTests` (6). `Etapa02DiagnosticoTests` conta 17 regras.
+
 ## 2026-10-26 – Etapa 7: urbanismo e elementos complementares (versão 2.13.0)
 
 Etapa 7 do plano unificado (Fase IX e Motores §11–§12). Entrega: `Releases/Etapa07` (não executada no Revit 2027).

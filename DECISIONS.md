@@ -355,3 +355,19 @@ como substituída.
     água da via da que vem dos lotes – fica para quando houver regra do usuário (K5).
 - **Consequências:** projetos antigos calculam igual. A área lida é da via; o projetista soma lotes e áreas externas.
 
+## D-026 – Estado dos resultados pela comparação do que foi lido com o que o modelo diz agora
+- **Contexto:** o Prompt Master (§14) pede mostrar o que foi atualizado e o que ficou desatualizado, preservando as
+  edições manuais. A atualização automática (DMU) refaz geometria em silêncio; os resultados derivados guardados no modelo
+  (terreno moldado, valores lidos da via) não tinham estado.
+- **Decisão:**
+  - cada resultado derivado guarda o que o gerou: o registro da terraplenagem (D-024) e, nas captações, a leitura feita
+    (`ContribuicaoLida`);
+  - o estado é calculado na hora, comparando o guardado com o que o modelo dá agora – sem marcar nada como "sujo" a cada
+    evento;
+  - campo igual ao lido = do modelo; diferente = editado à mão, que a atualização não toca.
+- **Alternativa descartada:** marcar dependentes como desatualizados no updater a cada mudança. O updater não roda neste
+  ambiente (K17), uma marcação perdida deixaria o estado errado para sempre, e a comparação dá o mesmo resultado sem
+  guardar estado extra.
+- **Consequências:** o estado vale também para mudanças que não passam pelo plugin (por exemplo, outra captação colocada
+  acima). Cobre a terraplenagem e as captações; outros resultados derivados entram quando guardarem o que os gerou.
+
