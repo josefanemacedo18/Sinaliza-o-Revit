@@ -3,6 +3,42 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-26 – Etapa 6: drenagem integrada às vias e ao terreno (versão 2.12.0)
+
+Etapa 6 do plano unificado (Fase VIII e RT-1.5). Entrega: `Releases/Etapa06` (não executada no Revit 2027).
+
+### Achados da auditoria que esta etapa trata
+- A área de contribuição e a declividade da sarjeta de cada captação só existiam como valores digitados (K5).
+- O recobrimento dos tubos era medido sob a reta entre as tampas, mesmo com uma via ou uma baixada do terreno entre elas.
+  O `DrainageNetwork.Analyze` já aceitava uma superfície, mas nenhum chamador a passava.
+- Nada apontava um ponto baixo da sarjeta sem captação, nem um aterro de via sobre um talvegue sem travessia.
+
+### Drenagem lida do modelo (`DrenagemDoModelo`)
+- **Sarjeta de cada boca de lobo e grelha:** a via de meio-fio mais próximo, a até 1,5 m da face. Lê a declividade pelo
+  greide (com abaulamento ou superelevação), o sentido do escoamento e se a captação está num ponto baixo (a sarjeta sobe
+  ao menos 1 cm dos dois lados, a até 5 m).
+- **Área que escoa até a captação:** a pista do eixo ao meio-fio e a calçada (com superelevação, a pista inteira para o
+  lado baixo). Vai do divisor, da ponta da via ou da captação de cima até ela; com a sarjeta em nível entre duas
+  captações, metade para cada. Lotes e áreas externas não entram.
+- **Comando Ler do Modelo** (Drenagem): mostra o que leu e preenche só os campos vazios ou substitui todos, por escolha do
+  usuário. Nada é gravado sem a escolha.
+- **V13 – drenagem × vias e terreno:**
+  - ponto baixo da sarjeta sem captação (aviso), só quando o projeto tem drenagem modelada;
+  - captação cuja declividade informada difere do greide em mais de 0,5 ponto percentual, ou que está num ponto baixo
+    sem a marca (informação);
+  - talvegue do terreno natural sob o aterro de uma via, sem trecho de rede atravessando a via a até 15 m (aviso). Trechos
+    em obra ficam de fora. Sem o terreno natural, "não verificado". O Validar Modelo passa o terreno natural do Toposolid.
+- **Recobrimento sob a superfície acabada:** pista e calçada das vias do plugin e, fora delas, o terreno projetado; sem
+  nenhum dos dois, a reta entre as tampas. Vale no V13, no Relatório da Rede e no memorial.
+- **Perfil longitudinal da rede e lista de dispositivos** (`PerfilRede`): ramos de montante para jusante, com tampas,
+  fundos, declividades, diâmetros e recobrimentos; tipo, posição, profundidade e ligações de cada dispositivo. Entram no
+  CSV do Relatório da Rede, com as captações × modelo; o perfil também é conferido no Autoteste.
+- **Tolerâncias da conferência** no registro único (`Tolerancias`): são limites do plugin, não de norma.
+- **Nome dos tipos de dispositivo** passou para `DrainageDefinition.NomeTipo` (memorial e relatório usam o mesmo).
+
+### Testes
+- `Etapa06DrenagemTests` (10).
+
 ## 2026-10-26 – Etapa 5: estrutura do pavimento e terraplenagem desatualizada (versão 2.11.0)
 
 Etapa 5 do plano unificado (Fases VI, VII e X). Entrega: `Releases/Etapa05` (não executada no Revit 2027).

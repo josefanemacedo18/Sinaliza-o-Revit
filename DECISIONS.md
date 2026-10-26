@@ -342,3 +342,16 @@ como substituída.
 - **Consequências:** projetos antigos abrem iguais; a primeira Terraplenagem na 2.11 grava o registro. Até lá a V15 diz
   "não verificado".
 
+## D-025 – Área de contribuição lida da via por escolha do usuário, nunca em silêncio
+- **Contexto:** RT-1.5 e o Prompt Master (§11) pedem a drenagem integrada às vias e ao terreno. O cálculo hidráulico usava
+  só a área e a declividade digitadas em cada captação (K5).
+- **Decisão:** o núcleo lê da via a sarjeta (greide) e a área que escoa até a captação (geometria da via), mas o cálculo
+  continua usando o que está gravado no dispositivo. O comando Ler do Modelo mostra o que leu e grava só por escolha:
+  preencher os vazios ou substituir tudo. O V13 aponta a divergência entre o informado e o greide como informação.
+- **Alternativas descartadas:**
+  - usar a área da via sempre que o campo estivesse vazio: o resultado mudaria sem o usuário ver, e a área da via não
+    tem os lotes;
+  - medir a área sobre o Toposolid (bacias pelo terreno): exigiria a triangulação inteira por captação e não separa a
+    água da via da que vem dos lotes – fica para quando houver regra do usuário (K5).
+- **Consequências:** projetos antigos calculam igual. A área lida é da via; o projetista soma lotes e áreas externas.
+

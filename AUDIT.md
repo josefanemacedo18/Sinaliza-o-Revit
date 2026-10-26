@@ -324,7 +324,7 @@ Isso compila (é um assembly só), mas contraria o §4 do Prompt Master. Está r
 | 10 | Sobreposições classificadas antes de qualquer correção | IT (núcleo) / INV (Autoteste) | `OverlapClassifier`, `Fase10CompatibilizacaoTests`; no Autoteste desde a 2.8.0 |
 | 11 | Drenagem: conectividade, sentido, cotas, ligações | IT (Core) / INV (Revit) | `DrainageNetwork`, V13, Fase VIII |
 | 11 | Hidráulica separada da geometria, com entradas, hipóteses e limites documentados | IT (Core) | `DrainageNetwork.Check` (geometria) × `DrainageHydraulics` (método racional); memorial com as fontes; K5 |
-| 11 | Drenagem integrada à topografia e aos greides | P | a área e a declividade da sarjeta são informadas por dispositivo (K5, RT-1.5) |
+| 11 | Drenagem integrada à topografia e aos greides | IT (núcleo) / INV (Revit) | `DrenagemDoModelo` (Etapa 6): sarjeta pelo greide, área pela geometria da via (comando Ler do Modelo), pontos baixos sem captação e talvegues sob aterro no V13, recobrimento sob a superfície acabada; `PerfilRede`. Lotes e áreas externas na área: K5 |
 | 12 | Quadras e lotes por regras configuráveis, quadros e memorial | IT (Core) / validado no Revit | Fase IX; sem aprovação legal automática |
 | 13 | Parâmetros pela interface, perfis salvos | P | formulários e Configurações; modelos de via salvos; Projeto de Drenagem por documento; sem salvar ou carregar perfis de terraplenagem e de interseção |
 | 14 | Relações explícitas e regeneração só do necessário | P | `ModelGraph` + DMU; terraplenagem e drenagem fora do grafo de regeneração |
@@ -407,7 +407,7 @@ As linhas da AUDIT §8.2 marcadas P ou A, com a prioridade. A coluna "Etapa" rem
 | P1 | Terreno sem diagnóstico (dados insuficientes, triângulos degenerados, extrapolação) | topografia | 3 | volumes sobre dado ruim |
 | P1 | ~~Estrutura de pavimento só no desenho do corte; terraplenagem com subleito único~~ feito (2.11.0) | pavimentação / terraplenagem | 5 | — |
 | P1 | ~~Terraplenagem desatualizada sem aviso~~ feito (2.11.0, V15) | terraplenagem | 5 | — |
-| P1 | Drenagem sem ler greide e área do modelo (K5) | drenagem | 6 | vazão com dado digitado errado |
+| P1 | ~~Drenagem sem ler greide e área do modelo (K5)~~ feito (2.12.0, Ler do Modelo e V13) | drenagem | 6 | — |
 | P1 | Estados de atualização e propagação terreno → via → terraplenagem → drenagem | integração | 8 | modelo incoerente depois de editar |
 | P2 | Equações de estaqueamento | vias | 4 | — (contorno: estacas contínuas) |
 | P2 | Interseção que não se resolve sem explicar os parâmetros | interseções | 4 | usuário sem saber o que mudar |

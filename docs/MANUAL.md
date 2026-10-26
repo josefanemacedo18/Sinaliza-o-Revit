@@ -32,7 +32,7 @@ Guia **SinalizaBIM Infra**:
 
 | Painel | Ferramentas |
 |---|---|
-| **Drenagem** | boca de lobo / PV · grelha |
+| **Drenagem** | boca de lobo / PV · grelha · Trecho de Rede · Projeto de Drenagem · Relatório da Rede · Ler do Modelo · Memorial de Drenagem |
 | **Obras de Arte** | **Pontes e Viadutos** (viaduto · ponte · passarela) · **Túneis e Trincheiras** (túnel · trincheira) |
 | **Contenções** | muro de arrimo · talude |
 | **Relevo e Terreno** | Perfil da Via · Estrutura do Pavimento · Terraplenagem |
@@ -760,7 +760,7 @@ A correção é sempre sua, com Editar, Atualizar ou apagando o elemento.
 | V10 | quadra com parte fora da gleba (mais de 0,5 m²) | confira o contorno da quadra ou da gleba (confiança média: pode ser só um contorno desatualizado) |
 | V11 | interseção com menos de duas vias existentes | apague a interseção ou refaça a conexão |
 | V12 | eixo ou greide de uma via fora dos **limites geométricos que você informou** em Configurações (raio, tangente entre curvas, vértice sem curva, rampa, K, comprimento de curva vertical) | confira o traçado ou o greide; a fonte dos limites é a que você escreveu. Sem limites informados, não aparece |
-| V13 | **rede de drenagem**: contrafluxo, trecho ligado ao próprio dispositivo, ciclo e os critérios do **Projeto de Drenagem** (declividade, recobrimento, diâmetros, espaçamento e queda dos PVs, geratriz superior); com a equação de chuva, também capacidade e velocidade das galerias, sarjeta e engolimento das captações | confira a contribuição de cada dispositivo e os critérios; o **Relatório da Rede** indica e aplica os diâmetros calculados |
+| V13 | **rede de drenagem**: contrafluxo, trecho ligado ao próprio dispositivo, ciclo e os critérios do **Projeto de Drenagem** (declividade, recobrimento sob a superfície acabada, diâmetros, espaçamento e queda dos PVs, geratriz superior); com a equação de chuva, também capacidade e velocidade das galerias, sarjeta e engolimento das captações. **Drenagem × vias e terreno**: ponto baixo da sarjeta sem boca de lobo ou grelha a até 5 m (só com drenagem modelada no projeto); captação cuja declividade informada difere do greide ou que está num ponto baixo sem a marca (informação); talvegue do terreno natural sob o aterro de uma via sem trecho de rede atravessando a via (a via represa a água) | confira a contribuição de cada dispositivo e os critérios; o **Relatório da Rede** indica e aplica os diâmetros calculados; **Ler do Modelo** preenche a sarjeta e a área pela via; coloque a captação no ponto baixo ou preveja a travessia (bueiro). Sem o terreno natural, os talvegues saem como "não verificado" |
 | V14 | **superfície do terreno projetado** (o Toposolid como está): menos de três pontos ou todos numa reta, coordenada não numérica, o mesmo ponto com cotas diferentes (degrau vertical ou dado duplicado), triângulos sem área, faces mais íngremes que a **declividade máxima do terreno** que você informou e eixos das vias que moldam o terreno passando fora dele (ali o cálculo seria extrapolação) | confira o levantamento ou o Toposolid no ponto indicado; amplie o terreno até as vias. Sem Toposolid ou sem a declividade informada, o relatório diz "não verificado" |
 | V15 | **terraplenagem desatualizada**: uma marca que molda o terreno (via com greide, nó ligado a ela, obra, caixa de drenagem) **mudou**, foi **apagada**, **deixou de moldar** o terreno ou **entrou** depois da última Terraplenagem aplicada. Um achado por situação, com as marcas | rode a **Terraplenagem**: o terreno é refeito a partir do original guardado. Sem registro (terraplenagem nunca aplicada ou aplicada por versão anterior à 2.11), o relatório diz "não verificado" |
 
@@ -2152,8 +2152,8 @@ quantitativo (categorias *9. Drenagem* e *10. Obras de arte, contenções e terr
 * Apagar um dispositivo devolve a continuidade dos pisos recortados. Referências: DNIT 030/2004-ES, NBR 10160, PMSP.
 
 ### 24.1a Rede de drenagem, vazões e memorial (Fase VIII)
-Guia **SinalizaBIM Infra › Drenagem**: **Trecho de Rede**, **Projeto de Drenagem**, **Relatório da Rede** e **Memorial de
-Drenagem**. Nada disso foi executado no Revit 2027 ainda (o cálculo é testado no núcleo).
+Guia **SinalizaBIM Infra › Drenagem**: **Trecho de Rede**, **Projeto de Drenagem**, **Relatório da Rede**, **Ler do Modelo**
+e **Memorial de Drenagem**. Nada disso foi executado no Revit 2027 ainda (o cálculo é testado no núcleo).
 
 1. **Projeto de Drenagem** (uma vez por projeto; fica gravado no arquivo do Revit). Escolha a **predefinição** e clique em
    *Aplicar a predefinição*:
@@ -2170,6 +2170,19 @@ Drenagem**. Nada disso foi executado no Revit 2027 ainda (o cálculo é testado 
 2. **Contribuição de cada dispositivo** (Editar a boca de lobo, a grelha ou o PV › *Contribuição*): área local que chega
    por superfície (m²), C ou área impermeável (zero = o do projeto), tempo de concentração ou talvegue (Kirpich), vazão
    externa (L/s, de fora do modelo), **declividade da sarjeta** (%, para verificar a sarjeta e a lâmina) e *ponto baixo*.
+
+   **Ler do Modelo** (desde a 2.12) lê da via, para cada boca de lobo e grelha com caixa a até 1,5 m da face do meio-fio
+   de uma via do plugin:
+   * a **declividade da sarjeta** pelo greide (com o abaulamento ou a superelevação), o **sentido** do escoamento e se ela
+     está num **ponto baixo** (a sarjeta sobe ao menos 1 cm dos dois lados, a até 5 m);
+   * a **área que escoa até ela** pela geometria da via: a pista do eixo ao meio-fio (com superelevação, a pista inteira
+     para o lado baixo) e a calçada, do divisor (ponto alto da sarjeta), da ponta da via ou da captação de cima até ela.
+     Com a sarjeta em nível entre duas captações, metade para cada.
+
+   A janela mostra o que leu e oferece **preencher só os campos vazios** (área 0, declividade vazia, ponto baixo
+   desmarcado) ou **substituir pelo modelo**; nada é gravado sem a escolha, e Desfazer volta ao que estava. **Lotes,
+   quadras e áreas fora da via não entram** na área: some-as à mão. A água que passa por uma captação conta como captada
+   nela. Captação fora da sarjeta de uma via (PV, grelha de piso no meio de uma praça) fica como você informou.
 3. **Trecho de Rede**: escolha o diâmetro, clique no dispositivo de **montante** e depois no de **jusante**; o de jusante
    vira o montante do próximo trecho (Esc termina). O tubo de concreto sai de parede a parede, no fundo das caixas; para
    outras cotas, Editar o trecho › *Informar as cotas de fundo*. Mover ou editar uma caixa redesenha os tubos ligados a ela.
@@ -2179,6 +2192,13 @@ Drenagem**. Nada disso foi executado no Revit 2027 ainda (o cálculo é testado 
    ligações, ciclos, recobrimento, diâmetros, espaçamento dos PVs, PV de queda, geratriz superior, capacidade e
    velocidades), em CSV. *Aplicar os diâmetros calculados* troca o diâmetro dos trechos pelo menor diâmetro comercial que
    escoa a vazão a seção plena e redesenha os tubos – rode o relatório de novo para conferir recobrimento e PVs.
+   O **recobrimento** é medido sob a **superfície acabada**: sobre a pista de uma via do plugin, a cota dela; sobre a
+   calçada, a sarjeta mais a altura do meio-fio; fora das vias, o Toposolid como está; sem nenhum dos dois, a reta entre as
+   tampas (como até a 2.11). O CSV traz também o **perfil longitudinal da rede** (por ramo, de montante para jusante:
+   distância, tampa, fundos de chegada e de saída, trecho, extensão, declividade, diâmetro e recobrimento – o ramo seguinte
+   para no dispositivo em que encontra um ramo já listado), a **lista de dispositivos** (tipo, posição, tampa, fundo,
+   profundidade, trechos que chegam e saem) e as **captações × modelo** (o informado ao lado do lido da via). Pontos
+   baixos sem captação e talvegues sob aterro sem travessia entram nos problemas.
 5. **Memorial de Drenagem** (.docx): capa com a identificação, o projeto, os parâmetros de projeto (vazões pelo método
    racional, chuva, recorrência, tempo de concentração, coeficiente de escoamento, capacidade das vias, captações, tubos,
    recobrimento, velocidades, ligações e PVs), a planilha das galerias em página de paisagem, o descritivo dos serviços, o
@@ -2191,10 +2211,12 @@ plena). Galerias por Manning a seção plena. Sarjeta por Manning na seção tri
 com o fator de redução da tabela 6.3; bocas de lobo pelas equações de vertedor e orifício (6.5 a 6.7) com os fatores da
 tabela 6.4. A planilha do memorial modelo e os exemplos 6.1 a 6.3 do manual são testes do plugin.
 
-**Limites** (KNOWN_ISSUES K5): a área de contribuição e a declividade da sarjeta são as que você informa em cada
-dispositivo; o recobrimento é medido sob a reta entre as tampas; um dispositivo com duas saídas manda a vazão inteira para
-cada uma (o relatório aponta); o excesso de uma boca de lobo não segue até a seguinte; não há George Ribeiro (use o tempo
-informado ou Kirpich), macrodrenagem nem reservatórios. O plugin não substitui o projetista nem a aprovação do órgão.
+**Limites** (KNOWN_ISSUES K5): o cálculo usa a área de contribuição e a declividade da sarjeta gravadas em cada
+dispositivo – informadas por você ou lidas da via com **Ler do Modelo** (que não conta lotes nem áreas externas); um
+dispositivo com duas saídas manda a vazão inteira para cada uma (o relatório aponta); o excesso de uma boca de lobo não
+segue até a seguinte; não há George Ribeiro (use o tempo informado ou Kirpich), macrodrenagem nem reservatórios. As
+distâncias da conferência (1,5 m do meio-fio, 5 m do ponto baixo, 1 m de aterro e 0,5 m de vale no talvegue, 15 m para a
+travessia) são do plugin, não de norma. O plugin não substitui o projetista nem a aprovação do órgão.
 
 ### 24.2 Vias e obras: um só sistema
 As obras de infraestrutura **não são mais objetos separados**: a pista, as calçadas, os meios-fios, as faixas e a sinalização
