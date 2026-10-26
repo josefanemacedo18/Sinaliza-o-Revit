@@ -2,36 +2,30 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-26 (Etapa 1 entregue; Etapas 2 e 3 em andamento)
+## Estado em 2026-10-26 (Etapas 0–3 entregues; Etapa 4 em andamento)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
-  executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13, cada pedido repetido numa etapa só). Entregas em
-  `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim de cada etapa o usuário é avisado.
-- **Etapa 0** ✅ (plano e AUDIT §8–§9). **Etapa 1** ✅: 2.8.0 em `Releases/Etapa01` (commit `43ab058`, SHA-256 no
-  `RELEASE.md`, suíte 2 966/2 966). Ela trouxe:
-  - pisos sobrepostos classificados (`OverlapClassifier`) no núcleo e no Autoteste;
-  - pisos × terreno (`FloorTerrainCheck`);
-  - Autoteste comparando com o Toposolid projetado (antes, com o terreno natural), com as "Verificações do modelo"
-    sempre no Completo.
-  `Instalar/Revit2027` tem a mesma DLL. As anteriores continuam em `Releases/Fase03` a `Fase08`.
-- **Etapa 2 (atual, `a51520c`, testes ainda não executados):**
-  - `ModelValidator.Regras` (módulo e ação);
-  - `Severidade.NaoVerificavel`;
-  - `ValidationHistory` (novo, persistente, resolvido) e o relatório novo;
-  - `Tolerancias`;
-  - Validar Modelo com histórico.
-- **Etapa 3 (iniciada, `01ed60c`):** `TerrainDiagnostics` e o limite de declividade do terreno nas Configurações. Falta o
-  V14 no Validar Modelo, com o Toposolid.
+  executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
+  de cada etapa o usuário é avisado.
+- **Entregas:**
+  - Etapa 0 ✅: plano e AUDIT §8–§9.
+  - Etapa 1 ✅: 2.8.0 em `Releases/Etapa01` (`43ab058`, 2 966/2 966) – pisos sobrepostos classificados, pisos × terreno,
+    Autoteste contra o Toposolid projetado.
+  - Etapas 2 e 3 ✅, entrega conjunta: 2.9.0 em `Releases/Etapa03` (`23c92c8`, 2 979/2 979) – validação com módulo,
+    ação, "não verificado" e histórico; tolerâncias num registro; diagnóstico do terreno e V14.
+  - `Instalar/Revit2027` tem a DLL 2.9.0. As anteriores continuam em `Releases/`.
+- **Etapa 4 (atual):** equações de estaqueamento; avisos de interseção e rotatória com valor de referência sem fonte (lista
+  no PLANO); causa e parâmetro a rever quando o nó não se resolve.
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
-- **Compilação:** Core, plugin e testes com 0 avisos e 0 erros.
+- **Compilação:** Core, plugin e testes com 0 avisos e 0 erros (compilar sempre também o projeto de testes antes do
+  commit).
 
 ## Próxima tarefa
 
-1. Rodar `Etapa02DiagnosticoTests` e a suíte, entregar `Releases/Etapa02` (2.9.0) e avisar o usuário.
-2. Etapa 3: V14 no Validar Modelo (Toposolid projetado; eixos das vias como consultas), testes, entrega 2.10.0.
-3. Seguir o plano (Etapas 4–13).
-4. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer tudo**;
-   enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`).
+1. Etapa 4 (PLANO). Depois, as Etapas 5–13 na ordem do plano.
+2. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer tudo**;
+   enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`); rodar também o
+   Validar Modelo duas vezes (a segunda mostra a comparação com a primeira).
 
 ## Como retomar
 
