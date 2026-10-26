@@ -24,7 +24,8 @@ public sealed class CmdValidarModelo : CommandBase
             return Result.Cancelled;
         }
         var achados = ModelValidator.Validate(copias, uid => !string.IsNullOrWhiteSpace(uid) && doc.GetElement(uid) != null,
-            PluginContext.Settings.CriteriosGeometricos, DrainageDesignStore.Load(doc), incluirNaoVerificados: true);
+            PluginContext.Settings.CriteriosGeometricos, DrainageDesignStore.Load(doc), incluirNaoVerificados: true,
+            terreno: TerrainModel.CurrentMesh(doc));
         var marcas = copias.Select(c => c.MarkingId).Distinct().Count();
         var now = DateTime.Now;
         var version = typeof(CmdValidarModelo).Assembly.GetName().Version?.ToString(3);

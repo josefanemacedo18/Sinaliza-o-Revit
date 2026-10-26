@@ -46,9 +46,11 @@ public static class ModelValidator
     /// <param name="criterios">Limites geométricos informados pelo usuário (V12). Nulo ou vazio = não conferir.</param>
     /// <param name="drenagem">Projeto de drenagem (V13): critérios e, com a equação de chuva, a vazão. Nulo = só a geometria (sentido, ligação, ciclo).</param>
     /// <param name="incluirNaoVerificados">Acrescenta, com <see cref="Severidade.NaoVerificavel"/>, as verificações que não
-    /// puderam rodar (sem documento, sem limites, sem Projeto de Drenagem ou sem equação de chuva).</param>
+    /// puderam rodar (sem documento, sem limites, sem Projeto de Drenagem ou sem equação de chuva, sem terreno).</param>
+    /// <param name="terreno">Superfície do terreno PROJETADO (o Toposolid como está) para o V14. Nulo = não conferida.</param>
     public static List<Achado> Validate(IReadOnlyList<CopiaGravada> copias, Func<string, bool>? elementoExiste = null,
-        GeometricCriteria? criterios = null, Automation.ProjetoDrenagem? drenagem = null, bool incluirNaoVerificados = false)
+        GeometricCriteria? criterios = null, Automation.ProjetoDrenagem? drenagem = null, bool incluirNaoVerificados = false,
+        Automation.TerrainMesh? terreno = null)
     {
         var res = new List<Achado>();
         var defs = new Dictionary<string, MarkingDefinition>();
@@ -103,6 +105,7 @@ public static class ModelValidator
         CheckLayout(defs, res);
         if (criterios is { IsEmpty: false }) CheckAlignment(defs, criterios, res);
         CheckDrainage(defs, drenagem, res);
+        if (terreno != null) CheckTerrain(defs, terreno, criterios?.DeclividadeMaximaTerreno, res);
 
         // Corte só de dados (sem desenho na planta) sem o perfil que o usa.
         var perfis = defs.Values.OfType<SectionProfileDefinition>().Select(p => p.SectionId).ToHashSet();
@@ -110,13 +113,13 @@ public static class ModelValidator
             res.Add(new("V08", Severidade.Info, Confianca.Alta, false,
                 $"{s.DisplayCode}: linha de corte sem o perfil transversal (sai na próxima atualização).", new[] { s.Id }));
 
-        if (incluirNaoVerificados) res.AddRange(NaoVerificados(defs.Values, elementoExiste, criterios, drenagem));
+        if (incluirNaoVerificados) res.AddRange(NaoVerificados(defs.Values, elementoExiste, criterios, drenagem, terreno));
         return res.OrderBy(a => a.Severidade).ThenBy(a => a.Codigo, StringComparer.Ordinal).ToList();
     }
 
     /// <summary>Verificações que não puderam rodar com os dados dados – ditas, nunca contadas como "sem problema".</summary>
     private static IEnumerable<Achado> NaoVerificados(IEnumerable<MarkingDefinition> defs, Func<string, bool>? elementoExiste,
-        GeometricCriteria? criterios, Automation.ProjetoDrenagem? drenagem)
+        GeometricCriteria? criterios, Automation.ProjetoDrenagem? drenagem, Automation.TerrainMesh? terreno)
     {
         var lista = defs.ToList();
         static Achado N(string codigo, string msg, string acao) => new(codigo, Severidade.NaoVerificavel, Confianca.Alta, false, msg, Array.Empty<string>(), acao);
@@ -134,6 +137,48 @@ public static class ModelValidator
             else if (!drenagem.TemChuva)
                 yield return N("V13", "Sem equação de chuva no Projeto de Drenagem: vazão, capacidade e velocidade das galerias, sarjetas e engolimento não calculados.",
                     "escolher ou digitar a equação de chuva do local, com a fonte, no Projeto de Drenagem");
+        }
+        if (terreno == null)
+        {
+            if (lista.OfType<RoadPavementDefinition>().Any(r => r.Output.Grade is { AdjustTerrain: true }))
+                yield return N("V14", "Superfície do terreno não lida: os dados do terreno e as vias sobre ele não foram conferidos.", "validar com o Toposolid no projeto");
+        }
+        else if (criterios?.DeclividadeMaximaTerreno == null)
+            yield return N("V14", "Declividade máxima do terreno não informada: a declividade das faces não foi conferida.",
+                "informar a declividade máxima em Configurações › Limites geométricos");
+    }
+
+    /// <summary>
+    /// Superfície do terreno projetado (V14): dados insuficientes ou inválidos, cotas diferentes no mesmo ponto, triângulos sem
+    /// área, declividade acima do limite informado e eixos das vias que moldam o terreno fora da superfície (extrapolação).
+    /// </summary>
+    private static void CheckTerrain(Dictionary<string, MarkingDefinition> defs, Automation.TerrainMesh terreno, double? declividadePct,
+        List<Achado> res)
+    {
+        var vias = defs.Values.OfType<RoadPavementDefinition>().Where(r => r.Output.Grade is { AdjustTerrain: true })
+            .Select(r => (r, StoredAxis(r.PathRef))).Where(x => x.Item2 != null).ToList();
+        var pontos = new List<(Vec2 P, string Via)>();
+        foreach (var (r, axis) in vias)
+            for (var s = 0.0; s <= axis!.Length + 1e-9; s += 5) pontos.Add((axis.PointAt(Math.Min(s, axis.Length)), r.Id));
+        foreach (var a in Automation.TerrainDiagnostics.Diagnosticar(terreno, declividadePct / 100, pontos.Select(p => p.P)))
+        {
+            var sev = a.Tipo switch
+            {
+                Automation.ProblemaTerreno.DadosInsuficientes or Automation.ProblemaTerreno.CoordenadaInvalida => Severidade.Erro,
+                Automation.ProblemaTerreno.TrianguloDegenerado => Severidade.Info,
+                _ => Severidade.Aviso,
+            };
+            var ids = a.Tipo == Automation.ProblemaTerreno.ForaDaSuperficie
+                ? pontos.Where(p => terreno.Z(p.P) == null).Select(p => p.Via).Distinct().ToArray()
+                : Array.Empty<string>();
+            var onde = a.Onde is { } o ? $" – por exemplo em ({o.X:0.00}; {o.Y:0.00})" : "";
+            var acao = a.Tipo switch
+            {
+                Automation.ProblemaTerreno.ForaDaSuperficie => "ampliar o levantamento ou o Toposolid até as vias, ou não moldar o terreno nessas vias",
+                Automation.ProblemaTerreno.DeclividadeAcimaDoLimite => "conferir o levantamento ou o projeto nas faces indicadas",
+                _ => (string?)null,
+            };
+            res.Add(new("V14", sev, Confianca.Alta, sev != Severidade.Info, $"Terreno: {a.Texto}{onde}.", ids, acao));
         }
     }
 
@@ -155,6 +200,8 @@ public static class ModelValidator
             "rever o traçado ou o greide, ou os limites informados"),
         new Regra("V13", "Drenagem", "rede de drenagem: contrafluxo, trecho ligado ao próprio dispositivo, ciclo ou fora dos critérios do Projeto de Drenagem (declividade, recobrimento, diâmetro, PVs, capacidade, velocidade, sarjeta, engolimento)",
             "rever o trecho ou o dispositivo indicado, ou o critério no Projeto de Drenagem"),
+        new Regra("V14", "Topografia", "superfície do terreno projetado: dados insuficientes ou inválidos, cotas diferentes no mesmo ponto, triângulos sem área, declividade acima do limite informado, eixos fora da superfície",
+            "conferir o levantamento ou o Toposolid no ponto indicado"),
     }.ToDictionary(r => r.Codigo);
 
     /// <summary>O que cada código verifica (relatório e manual).</summary>

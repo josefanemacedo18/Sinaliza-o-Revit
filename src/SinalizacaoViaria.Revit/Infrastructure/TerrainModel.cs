@@ -158,6 +158,18 @@ public static class TerrainModel
         };
     }
 
+    /// <summary>Superfície do terreno PROJETADO como malha (todos os Toposolids principais juntos); nula sem Toposolid.</summary>
+    public static TerrainMesh? CurrentMesh(Document doc)
+    {
+        var meshes = Hosts(doc).Select(Live).Where(m => m.Count > 0).ToList();
+        if (meshes.Count == 0) return null;
+        if (meshes.Count == 1) return meshes[0];
+        var all = new TerrainMesh();
+        foreach (var m in meshes)
+            foreach (var (a, b, c) in m.Triangles) all.Add(m.Vertices[a], m.Vertices[b], m.Vertices[c]);
+        return all;
+    }
+
     /// <summary>
     /// Cota do terreno NATURAL (m, absoluta): terreno original de cada Toposolid (o de cima, onde houver mais de um).
     /// Nulo sem Toposolid sob o ponto.

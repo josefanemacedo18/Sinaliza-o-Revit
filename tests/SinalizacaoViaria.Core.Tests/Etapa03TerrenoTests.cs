@@ -1,4 +1,5 @@
 using SinalizacaoViaria.Core.Automation;
+using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Core.Model;
 
@@ -83,5 +84,51 @@ public class Etapa03TerrenoTests
         Assert.Equal(ProblemaTerreno.ForaDaSuperficie, a.Tipo);
         Assert.Equal(2, a.Quantidade);
         Assert.Equal(new Vec2(30, 5), a.Onde);
+    }
+    // ------------------------------------------------------------------ V14 no Validar Modelo
+
+    private static RoadPavementDefinition Via(double x0, double x1, bool molda = true)
+    {
+        var r = new RoadPavementDefinition { PathRef = PathReference.FromPoints(new[] { new Vec2(x0, 10), new Vec2(x1, 10) }, 0), GroupId = "g" };
+        r.Output.Grade = new RoadGrade { AdjustTerrain = molda };
+        return r;
+    }
+
+    private static List<CopiaGravada> Copias(params MarkingDefinition[] defs) => defs.Select(d => new CopiaGravada(d.Id, d.ToJson(), "e")).ToList();
+
+    [Fact]
+    public void V14_ViaQueMoldaOTerrenoForaDaSuperficie_EDeclividadeSoComLimite()
+    {
+        var via = Via(5, 40);                                   // o terreno vai até x = 20
+        var r = ModelValidator.Validate(Copias(via), terreno: Plano());
+        var fora = Assert.Single(r, a => a.Codigo == "V14");
+        Assert.Equal(Severidade.Aviso, fora.Severidade);
+        Assert.Equal("Topografia", fora.Modulo);
+        Assert.Contains("fora da superfície", fora.Mensagem);
+        Assert.Equal(new[] { via.Id }, fora.Ids);
+        Assert.Contains("ampliar o levantamento", fora.AcaoRecomendada);
+        // Via que não molda o terreno: não é consulta (pode passar fora dele de propósito).
+        Assert.DoesNotContain(ModelValidator.Validate(Copias(Via(5, 40, molda: false)), terreno: Plano()), a => a.Codigo == "V14");
+
+        var ingreme = TerrainMesh.FromFunction(Vec2.Zero, new Vec2(20, 20), 5, p => 0.6 * p.X);
+        Assert.DoesNotContain(ModelValidator.Validate(Copias(Via(2, 18)), terreno: ingreme), a => a.Codigo == "V14");
+        var limite = new GeometricCriteria { DeclividadeMaximaTerreno = 30 };
+        var dec = Assert.Single(ModelValidator.Validate(Copias(Via(2, 18)), criterios: limite, terreno: ingreme), a => a.Codigo == "V14");
+        Assert.Contains("mais íngremes que 30 %", dec.Mensagem);
+        Assert.True(limite.IsEmpty);                            // o limite do terreno não liga o V12
+    }
+
+    [Fact]
+    public void V14_NaoVerificado_SemTerrenoOuSemLimite()
+    {
+        var via = Via(2, 18);
+        var sem = ModelValidator.Validate(Copias(via), incluirNaoVerificados: true);
+        Assert.Contains(sem, a => a.Codigo == "V14" && a.Severidade == Severidade.NaoVerificavel && a.Mensagem.StartsWith("Superfície do terreno não lida"));
+        var semLimite = ModelValidator.Validate(Copias(via), terreno: Plano(), incluirNaoVerificados: true);
+        Assert.Contains(semLimite, a => a.Codigo == "V14" && a.Severidade == Severidade.NaoVerificavel && a.Mensagem.StartsWith("Declividade máxima do terreno"));
+        // Com o terreno e o limite, o V14 roda inteiro: nada não verificado nem problema nesta superfície.
+        var completo = ModelValidator.Validate(Copias(via), criterios: new GeometricCriteria { DeclividadeMaximaTerreno = 30 }, incluirNaoVerificados: true,
+            terreno: Plano());
+        Assert.DoesNotContain(completo, a => a.Codigo == "V14");
     }
 }

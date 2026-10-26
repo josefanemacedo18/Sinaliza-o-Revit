@@ -67,7 +67,7 @@
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Grid.ColumnSpan="2" Style="{StaticResource Hint}" TextWrapping="Wrap"
-                                   Text="Informe os limites da norma e da classe da via adotadas no projeto. O plugin não traz valores normativos: campo vazio não é conferido. O resultado sai no Perfil da Via (CSV de verificação) e no Validar Modelo (V12)."/>
+                                   Text="Informe os limites da norma e da classe da via adotadas no projeto. O plugin não traz valores normativos: campo vazio não é conferido. O resultado sai no Perfil da Via (CSV de verificação) e no Validar Modelo (V12; a declividade do terreno, no V14)."/>
                         <TextBlock Grid.Row="1" Text="Fonte (norma, edição, tabela, classe)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbCritFonte"/>
                         <TextBlock Grid.Row="2" Text="Raio mínimo das curvas horizontais (m)" Style="{StaticResource FieldLabel}"/>

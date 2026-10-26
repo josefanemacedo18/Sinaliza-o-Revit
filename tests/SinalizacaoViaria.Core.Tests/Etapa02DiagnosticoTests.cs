@@ -22,7 +22,7 @@ public class Etapa02DiagnosticoTests
     [Fact]
     public void Regras_CadaCodigoComModuloEAcao_EAcaoPropriaQuandoHa()
     {
-        Assert.Equal(13, ModelValidator.Regras.Count);
+        Assert.Equal(14, ModelValidator.Regras.Count);
         Assert.All(ModelValidator.Regras.Values, r =>
         {
             Assert.False(string.IsNullOrWhiteSpace(r.Modulo));
