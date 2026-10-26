@@ -3,6 +3,53 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-26 – Etapas 2 e 3: diagnóstico padronizado e topografia (versão 2.9.0)
+
+Etapas 2 e 3 do plano unificado, na Fase X. Entrega conjunta em `Releases/Etapa03` (não executada no Revit 2027).
+
+**Por que juntas.** A Etapa 3 já tinha posto nas Configurações o campo "Declividade máxima do terreno". Uma DLL só da Etapa
+2 mostraria esse campo sem efeito, e o Prompt de Interface proíbe controle que parece funcionar e não funciona. Por isso
+as duas etapas saem numa entrega só, e não há `Releases/Etapa02`.
+
+### Etapa 2 – diagnóstico padronizado e tolerâncias
+- **Módulo e ação recomendada em cada achado do Validar Modelo.** As regras V01–V14 estão em `ModelValidator.Regras`, cada
+  uma com módulo, o que verifica e a ação padrão. Um achado pode ter ação própria: o V04 diz o que fazer em cada tipo de
+  dependência quebrada.
+- **"Não verificado"** (`Severidade.NaoVerificavel`): a verificação que não pôde rodar é dita, nunca contada como "sem
+  problema". Casos:
+  - limites geométricos não informados (V12);
+  - rede sem Projeto de Drenagem ou sem equação de chuva (V13);
+  - elementos do Revit sem o documento (V06);
+  - sem Toposolid ou sem a declividade máxima do terreno (V14).
+- **Histórico da validação** (`ValidationHistory`): a validação anterior do projeto, gravada fora do modelo (o comando
+  continua somente leitura), entra na comparação, que separa os achados **novos**, **persistentes** e **resolvidos**. O
+  achado é identificado pelo código e pelas marcas, não pela mensagem.
+- **Relatório:** resumo com a versão do plugin, contagens por severidade e por módulo, comparação, ação de cada achado e a
+  seção "Não verificado".
+- **Tolerâncias** do núcleo reunidas em `Tolerancias.Todas`, com unidade, onde fica e uso. Nenhum valor mudou (K9). O teste
+  confere as relações entre elas: grade das booleanas < mesmo vértice < ajuste do contorno.
+
+### Etapa 3 – topografia
+- **Diagnóstico da superfície** (`TerrainDiagnostics`):
+  - dados insuficientes (menos de três pontos ou todos numa reta);
+  - coordenada não numérica;
+  - o mesmo ponto com cotas diferentes;
+  - triângulos sem área;
+  - declividade acima do limite **informado** (sem limite, não conferida);
+  - consultas fora da superfície (extrapolação).
+- **V14 no Validar Modelo**, com o Toposolid **projetado** (`TerrainModel.CurrentMesh`). As consultas são os eixos das
+  vias que moldam o terreno.
+- **Configurações:** declividade máxima do terreno (%) no grupo dos limites geométricos. Ela não liga o V12.
+- **Ainda não feito, passa à tela do terreno (Etapa 11):**
+  - importação de pontos;
+  - curvas de nível – o Toposolid tem recursos nativos que não devem ser replicados sem antes conferir o que a API 2027
+    oferece.
+
+### Outros
+- Testes novos: `Etapa02DiagnosticoTests` (5) e `Etapa03TerrenoTests` (8).
+- Correção do commit `01ed60c`: a mensagem dizia "compila sem avisos", mas o projeto de testes não compilava (só o núcleo e
+  o plugin tinham sido compilados). O CI apontou e `762c20f` corrigiu.
+
 ## 2026-10-26 – Etapa 1: integridade geométrica (versão 2.8.0)
 
 Etapa 1 do plano unificado (`docs/PLANO_DE_ACAO.md`), na Fase X. Entrega: `Releases/Etapa01` (não executada no Revit 2027).

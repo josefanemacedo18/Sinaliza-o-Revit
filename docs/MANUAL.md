@@ -761,6 +761,7 @@ A correção é sempre sua, com Editar, Atualizar ou apagando o elemento.
 | V11 | interseção com menos de duas vias existentes | apague a interseção ou refaça a conexão |
 | V12 | eixo ou greide de uma via fora dos **limites geométricos que você informou** em Configurações (raio, tangente entre curvas, vértice sem curva, rampa, K, comprimento de curva vertical) | confira o traçado ou o greide; a fonte dos limites é a que você escreveu. Sem limites informados, não aparece |
 | V13 | **rede de drenagem**: contrafluxo, trecho ligado ao próprio dispositivo, ciclo e os critérios do **Projeto de Drenagem** (declividade, recobrimento, diâmetros, espaçamento e queda dos PVs, geratriz superior); com a equação de chuva, também capacidade e velocidade das galerias, sarjeta e engolimento das captações | confira a contribuição de cada dispositivo e os critérios; o **Relatório da Rede** indica e aplica os diâmetros calculados |
+| V14 | **superfície do terreno projetado** (o Toposolid como está): menos de três pontos ou todos numa reta, coordenada não numérica, o mesmo ponto com cotas diferentes (degrau vertical ou dado duplicado), triângulos sem área, faces mais íngremes que a **declividade máxima do terreno** que você informou e eixos das vias que moldam o terreno passando fora dele (ali o cálculo seria extrapolação) | confira o levantamento ou o Toposolid no ponto indicado; amplie o terreno até as vias. Sem Toposolid ou sem a declividade informada, o relatório diz "não verificado" |
 
 O resumo aparece numa janela (com **Selecionar os elementos com erro ou aviso** e **Abrir o relatório**). O relatório
 completo é gravado em `%AppData%\SinalizaBIM\validacao-AAAAMMDD-HHMMSS.txt`. A validação confere os **dados**; a
@@ -973,7 +974,9 @@ subcategoria.
   deflexão máxima de um vértice sem curva, rampa máxima e mínima, K mínimo das curvas convexas e côncavas e comprimento
   mínimo de curva vertical, com a **fonte** (norma, edição, tabela, classe da via). O plugin **não traz valores
   normativos**: campo vazio não é conferido e a fonte sai nos relatórios como você a escreveu. Os limites são conferidos
-  no **Perfil da Via** (CSV de verificação) e no **Validar Modelo** (V12).
+  no **Perfil da Via** (CSV de verificação) e no **Validar Modelo** (V12). No mesmo grupo, a **declividade máxima do
+  terreno** (%) faz o Validar Modelo apontar as faces do Toposolid mais íngremes que ela (V14). Vazio, a declividade do
+  terreno não é conferida.
 * **Catálogo**: abre o JSON para edição, recarrega ou restaura o padrão. Formato em
   [CATALOGO.md](CATALOGO.md).
 

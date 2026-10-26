@@ -311,10 +311,10 @@ Isso compila (é um assembly só), mas contraria o §4 do Prompt Master. Está r
 |---|---|---|---|
 | 3 | Plugin nativo do Revit 2027, sem motor externo | IT | DLL única carregada no Revit 2027 (Autotestes); Core sem referência ao Revit (ARCHITECTURE §1) |
 | 4 | Identificadores estáveis e rastreio projeto ↔ elemento | IT (Core) / INV (Revit) | `MarkingDefinition.Id` em cada elemento (Extensible Storage); `ModelGraph` |
-| 5 | Núcleo geométrico com tolerâncias explícitas | P | primitivas e casos degenerados testados (EV5); tolerâncias documentadas, mas definidas em cada módulo (K9) |
+| 5 | Núcleo geométrico com tolerâncias explícitas | IT | primitivas e casos degenerados testados (EV5); registro único `Tolerancias` com unidade e uso, valores onde são usados (Etapa 2) |
 | 5 | Detecção de geometria inválida, lacunas e sobreposições | IT (núcleo) / INV (Revit) | `PolygonChecks` (V07), `PieceOverlaps`; classificação das sobreposições desde a Etapa 1 (`OverlapClassifier`, RT-1.3) |
 | 6 | Terreno existente × projetado separados | IT (Core) / INV (Revit) | original gravado no Toposolid (AUDIT §7.1); `Grading` |
-| 6 | Diagnóstico da superfície (dados insuficientes, triângulos inválidos, descontinuidades, declividade fora do limite, extrapolação) | **A** | nenhum diagnóstico do TIN no núcleo; o Revit recebe os pontos sem conferência |
+| 6 | Diagnóstico da superfície (dados insuficientes, triângulos inválidos, descontinuidades, declividade fora do limite, extrapolação) | IT (núcleo) / INV (Revit) | `TerrainDiagnostics` e V14 no Validar Modelo com o Toposolid projetado (Etapa 3); importação de pontos e curvas de nível: Etapa 11 |
 | 7 | Eixos, alinhamentos, greides, estacas, seções, prévia | IT (Core) / INV (prévia no Revit) | Fases V e VI; `RoadPreviewServer` (DirectContext3D) |
 | 8 | Interseções e rotatórias calculadas, regeneração ao mudar eixos | IT (Core) / INV (updater, K17) | Fases VI e VII |
 | 8 | Configuração impossível explicada, com os parâmetros a rever | P | avisos dos geradores (`IntersectionGenerator`, `RoundaboutGenerator`), sem lista padronizada de parâmetros |
@@ -332,7 +332,7 @@ Isso compila (é um assembly só), mas contraria o §4 do Prompt Master. Está r
 | 15 | Transações, rollback, falhas | INV | ARCHITECTURE §5; Autotestes no Revit sem documento inconsistente |
 | 16 | Causa das retas fora do eixo e das sobreposições | P | K11 e K12 reproduzidos e corrigidos no núcleo até o 4º Autoteste; a confirmação depende de um novo Autoteste (K3) |
 | 17 | Validação por módulo e transversal | P | V01–V13 com severidade e confiança |
-| 17 | Erro / alerta / informação / **não verificável**; módulo, objeto, evidência e ação recomendada; resumo, métricas, versão; histórico antes × depois | P | `Achado` tem código, severidade, confiança, mensagem e Ids; **faltam** o módulo, a evidência, a ação recomendada, a categoria "não verificável" e a comparação com a validação anterior |
+| 17 | Erro / alerta / informação / **não verificável**; módulo, objeto, evidência e ação recomendada; resumo, métricas, versão; histórico antes × depois | IT (núcleo) / INV (Revit) | `ModelValidator.Regras` (módulo, ação), `Severidade.NaoVerificavel`, `ValidationHistory` (novo, persistente, resolvido), relatório com versão (Etapa 2); a tela (Central de Qualidade) é a Etapa 12 |
 | 18 | Testes unitários e de integração, casos-limite e inválidos | IT | 2 949 testes; fixtures dos Autotestes |
 | 19 | Autoteste com versão, data, ambiente, executados e ignorados | IT no Revit | 4 Autotestes completos (`docs/evidencias`) |
 | 19 | Problemas conhecidos × novos × inconclusivos | P | pares persistentes por tipo; sem comparação com a rodada anterior nem marcação de "conhecido" |

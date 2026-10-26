@@ -69,7 +69,8 @@ geometria em elementos e a lê de volta.
 
 - Unidades internas do Core: **metros**. A conversão para pés acontece só na camada Revit (`UnitConv`).
 - Booleanas e offsets de polígonos: Clipper2 (inteiros com escala fixa, robusto para contornos côncavos e com furos).
-- Tolerâncias usadas hoje (deliberadamente locais, cada uma justificada no ponto de uso):
+- Tolerâncias usadas hoje (deliberadamente locais, cada uma justificada no ponto de uso). Desde a Etapa 2 elas estão
+  reunidas, com unidade e uso, no registro `Core/Model/Tolerancias.cs`, que um teste confere:
 
 | Constante | Valor | Uso |
 |---|---|---|
