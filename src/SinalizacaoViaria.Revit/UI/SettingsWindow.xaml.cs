@@ -54,6 +54,7 @@ public partial class SettingsWindow : Window
         TbCritKConvexa.Text = UiHelpers.F(c.KMinimoConvexa, "0.##");
         TbCritKConcava.Text = UiHelpers.F(c.KMinimoConcava, "0.##");
         TbCritCurvaVert.Text = UiHelpers.F(c.CurvaVerticalMinima, "0.##");
+        TbCritTerreno.Text = UiHelpers.F(c.DeclividadeMaximaTerreno, "0.##");
         TbCatalog.Text = PluginContext.UserCatalogPath;
         UpdateStatus();
     }
@@ -132,6 +133,7 @@ public partial class SettingsWindow : Window
                 KMinimoConvexa = UiHelpers.ParseNullable(TbCritKConvexa, "K mínimo convexa", 0, 100000),
                 KMinimoConcava = UiHelpers.ParseNullable(TbCritKConcava, "K mínimo côncava", 0, 100000),
                 CurvaVerticalMinima = UiHelpers.ParseNullable(TbCritCurvaVert, "Comprimento mínimo de curva vertical", 0, 100000),
+                DeclividadeMaximaTerreno = UiHelpers.ParseNullable(TbCritTerreno, "Declividade máxima do terreno", 0, 1000),
             };
             s.UserCatalogPath = string.Equals(TbCatalog.Text, PluginPaths.DefaultUserCatalog, StringComparison.OrdinalIgnoreCase) ? null : TbCatalog.Text;
             PluginContext.SaveSettings();

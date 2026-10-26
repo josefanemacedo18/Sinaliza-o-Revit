@@ -28,6 +28,11 @@ public sealed class GeometricCriteria
     public double? KMinimoConcava { get; set; }
     /// <summary>Comprimento mínimo de curva vertical (m).</summary>
     public double? CurvaVerticalMinima { get; set; }
+    /// <summary>
+    /// Declividade máxima das faces do terreno (%) acima da qual o Validar Modelo aponta a face (V14). É do terreno, não do
+    /// traçado: não entra em <see cref="IsEmpty"/>.
+    /// </summary>
+    public double? DeclividadeMaximaTerreno { get; set; }
 
     /// <summary>Nenhum limite informado: nada a conferir.</summary>
     public bool IsEmpty => RaioMinimo == null && TangenteMinima == null && DeflexaoMaximaSemCurva == null && RampaMaxima == null
