@@ -2,47 +2,36 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-26 (plano unificado dos três prompts; Etapa 0 concluída, Etapa 1 em andamento)
+## Estado em 2026-10-26 (Etapa 1 entregue; Etapas 2 e 3 em andamento)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13, cada pedido repetido numa etapa só). Entregas em
-  `Releases/EtapaNN` (`tools/release.sh E<n>`), a partir da 2.8.0 na Etapa 1. Ao fim de cada etapa o usuário é avisado.
-- **Etapa 1 (atual):** classificação dos pisos sobrepostos no núcleo feita (`OverlapClassifier`, `9701ebb`); falta levá-la
-  ao Autoteste, corrigir o resíduo INTERSECAO MEIO-FIO × CALCADA (62 cm³) que ela achou, conferir pisos × terreno e ligar
-  as "Verificações do modelo".
-- **Prompt Master** (`docs/PROMPT_MASTER.md`, enviado em 2026-10-23): rege o desenvolvimento (D-021). As 15 fases ficam
-  como mapa de rastreio; a ordem vem dos riscos (AUDIT §8.3). Auditoria pelo novo escopo: AUDIT §8 (mapa de módulos,
-  matriz em cinco situações, riscos). Lacunas que ele revelou: diagnóstico do terreno, validação sem módulo, ação e
-  comparação, terraplenagem desatualizada sem aviso, estrutura do pavimento só no desenho do corte, referências mútuas
-  entre pastas do Core (K18).
-- **Ramo:** `claude/dreamy-gates-a3nrta`. Sem PR aberto (o fluxo do projeto é commit e push direto no ramo).
-- **Versão do plugin:** 2.7.0 (`Directory.Build.props`), entregue em `Releases/Fase08` (commit `9ed7e12`, SHA-256 no
-  `RELEASE.md`). `Instalar/Revit2027` tem a mesma DLL. As anteriores continuam em `Releases/Fase03` a `Fase07`
-  (2.2.0–2.6.0). Nenhuma foi executada no Revit 2027.
-- **Fases da missão:** quadro no ROADMAP. ✅ I–IX, XI; 🔄 X (atual), XII, XIV, XV; ⬜ XIII.
-- **Entregas por fase (G0):** `tools/release.sh <fase> "<suíte>"` compila de um commit limpo, confere `Versão+commit` na
-  DLL e grava `Releases/FaseNN` com o manifesto; índice em `Releases/README.md`. Cada fase sobe o número do meio da versão.
-- **Fase VIII:** rede de drenagem (trechos entre caixas) e dimensionamento pelo método racional com as fontes enviadas pelo
-  usuário (Manual SUDERHSA 2002 e memorial modelo de Miguelópolis/SP 2019 – D-019; Projeto de Drenagem por documento –
-  D-020); Relatório da Rede com a planilha de galerias e os diâmetros calculados; V13; Memorial de Drenagem (.docx). A
-  planilha do memorial modelo e os exemplos 6.1–6.3 do manual são testes. Limites em K5.
-- **Requisito transversal RT-1** (pedido do usuário em 2026-10-22, durante a Fase VIII): integração Toposolid × pisos das
-  vias × terraplenagem × drenagem; plano e partes no ROADMAP. Já levantado (para a auditoria RT-1.1): o plugin guarda o
-  terreno original, refaz o Toposolid pelo editor de forma (`TerrainService.Apply`, `ApplyPoints`) com as plataformas e
-  taludes do núcleo (`Grading`, plataforma por camadas e borda no topo do acabamento), deixa o terreno 0,40 m sob o topo do
-  pavimento, escava elementos enterrados (`ExcavateBy`) e os pisos seguem o greide por edição de forma em planos
-  (`MarkingService.FlushShapeEdits`). As "Verificações do modelo" do Autoteste (pintura × pisos, pavimento contínuo,
-  terreno × via – `AutoTestChecks.CheckRoad`) ficam desligadas por padrão e **nunca rodaram** nos Autotestes do usuário.
-- **Revit:** dois Autotestes rápidos e quatro **completos**, mais um Validar Modelo. Relatórios em `docs/evidencias/`. As
-  mudanças do FC e das fases III a VIII ainda não rodaram no Revit.
+  `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim de cada etapa o usuário é avisado.
+- **Etapa 0** ✅ (plano e AUDIT §8–§9). **Etapa 1** ✅: 2.8.0 em `Releases/Etapa01` (commit `43ab058`, SHA-256 no
+  `RELEASE.md`, suíte 2 966/2 966). Ela trouxe:
+  - pisos sobrepostos classificados (`OverlapClassifier`) no núcleo e no Autoteste;
+  - pisos × terreno (`FloorTerrainCheck`);
+  - Autoteste comparando com o Toposolid projetado (antes, com o terreno natural), com as "Verificações do modelo"
+    sempre no Completo.
+  `Instalar/Revit2027` tem a mesma DLL. As anteriores continuam em `Releases/Fase03` a `Fase08`.
+- **Etapa 2 (atual, `a51520c`, testes ainda não executados):**
+  - `ModelValidator.Regras` (módulo e ação);
+  - `Severidade.NaoVerificavel`;
+  - `ValidationHistory` (novo, persistente, resolvido) e o relatório novo;
+  - `Tolerancias`;
+  - Validar Modelo com histórico.
+- **Etapa 3 (iniciada, `01ed60c`):** `TerrainDiagnostics` e o limite de declividade do terreno nas Configurações. Falta o
+  V14 no Validar Modelo, com o Toposolid.
+- **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros.
-- **Testes:** suíte completa 2 949/2 949 (Fase VIII).
 
 ## Próxima tarefa
 
-Seguir o plano (`docs/PLANO_DE_ACAO.md`): terminar a Etapa 1, entregar `Releases/Etapa01` (2.8.0), avisar o usuário e
-passar à Etapa 2. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com
-**Desfazer tudo**; enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`).
+1. Rodar `Etapa02DiagnosticoTests` e a suíte, entregar `Releases/Etapa02` (2.9.0) e avisar o usuário.
+2. Etapa 3: V14 no Validar Modelo (Toposolid projetado; eixos das vias como consultas), testes, entrega 2.10.0.
+3. Seguir o plano (Etapas 4–13).
+4. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer tudo**;
+   enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`).
 
 ## Como retomar
 

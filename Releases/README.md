@@ -34,7 +34,8 @@ desejada. `Instalar/Revit2027` tem sempre a versão mais recente.
 | VI – Corredores, seções e pavimentação | 2.5.0 | 2026-10-22 | `ec398bc` | 2 914/2 914 | não executado – [`Fase06`](Fase06/RELEASE.md) |
 | VII – Terreno, terraplenagem e interseções | 2.6.0 | 2026-10-22 | `b87e668` | 2 921/2 921 | não executado – [`Fase07`](Fase07/RELEASE.md) |
 | VIII – Drenagem e redes | 2.7.0 | 2026-10-22 | `9ed7e12` | 2 949/2 949 | não executado – [`Fase08`](Fase08/RELEASE.md) |
+| Etapa 1 – integridade geométrica (Fase X) | 2.8.0 | 2026-10-26 | `43ab058` | 2 966/2 966 | não executado – [`Etapa01`](Etapa01/RELEASE.md) |
 
 As fases I, II, IX e XI foram concluídas antes desta pasta existir. As DLLs delas estão no histórico do git, no commit
 indicado: `git show <commit>:Instalar/Revit2027/SinalizaBIM.dll > SinalizaBIM.dll`. As fases seguintes ganham uma linha
-aqui e uma pasta `FaseNN` ao serem concluídas.
+aqui e uma pasta `FaseNN` ao serem concluídas; desde 2026-10-26, as etapas do plano unificado, uma pasta `EtapaNN`.
