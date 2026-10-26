@@ -62,26 +62,11 @@ no Revit; cada fase concluída gera uma DLL em `Releases/FaseNN` (ver `Releases/
 | EX | Segundo Autoteste (2.1.0): Marca dos lotes única com vários loteamentos; alinhamento aos eixos também nos lotes, áreas remanescentes, acabamentos do terreno e contornos só de retas; resumo de avisos por elemento e conferência das sobreposições no fim da etapa | `EXRevitWarningsTests`, DECISIONS D-009 |
 | VIII / F8 | Rede de drenagem: trechos entre as caixas, conferência da geometria e critérios; vazão pelo método racional, galerias, sarjetas e bocas de lobo; Projeto de Drenagem, Relatório da Rede, V13 e Memorial de Drenagem – com os exemplos do Manual SUDERHSA e a planilha do memorial modelo reproduzidos | `Fase08DrenagemTests`, `Fase08HidraulicaTests`, DECISIONS D-019 e D-020 |
 
-## Próximas etapas (em ordem)
+## Próximas etapas
 
-A ordem vem da AUDIT §8.3. "PM §n" é o item do Prompt Master atendido.
-
-| # | Fase | Etapa | PM § | Critério de aceite |
-|---|---|---|---|---|
-| X1 | X | Pisos sobrepostos classificados (RT-1.3): camada empilhada, cruzamento de vias, duplicação, conflito, inconclusivo; a classe vai ao Autoteste (etapas e modelo final) | 10, 16 | testes por classe; nada apagado; Autoteste mostra a contagem por classe |
-| X2 | X | Pisos × terreno no núcleo (RT-1.2): piso enterrado ou suspenso, degrau na borda; "Verificações do modelo" ligadas no Autoteste completo | 6, 16 | testes no núcleo |
-| X3 | X | Diagnóstico do terreno: pontos insuficientes, triângulos degenerados, pontos repetidos com cotas diferentes, declividade acima do limite informado, ponto fora da superfície (extrapolação) | 6 | testes no núcleo; código no Validar Modelo |
-| X4 | X | Validação com módulo, evidência, ação recomendada e "não verificável"; resumo com a versão; comparação com a validação anterior (novo, persistente, resolvido) | 17, 19 | testes no núcleo |
-| X5 | X | Terraplenagem desatualizada: assinatura das entradas (vias, greides, seções, opções) gravada com a terraplenagem e conferida no Validar Modelo | 9, 14 | testes no núcleo |
-| P6 | VI/VII | Estrutura do pavimento na via (camadas com ordem, espessura e material) usada pelo corte, pela terraplenagem e pelos quantitativos | 10 | testes no núcleo; projetos antigos abrem iguais |
-| K11 | XIV | Pares persistentes restantes: com a lista por classe do próximo Autoteste, reproduzir no núcleo e corrigir só os conflitos | 16 | Autoteste sem conflito |
-| K12 | XIV | Confirmar no próximo Autoteste que as retas fora do eixo sumiram | 16 | Autoteste sem esse aviso, ou só retas de projeto |
-| F10 | X | Verificações sobre a geometria gerada (lote × calçada, obra × via, pintura fora do pavimento) | 17 | testes por código Vxx |
-| P7 | XIV | Atualização associativa visível: o que foi atualizado e o que ficou desatualizado | 14 | testes das regras no núcleo |
-| F12 | XII | Cenários de projeto (variantes de seção e de greide) comparados por quantitativos | 13 | testes de comparação |
-| F11 | XI | Separar no relatório o que é simulação e o que é animação; registrar parâmetros e sementes usados | 1, 19 | relatório reprodutível |
-| P8 | XIII | Fluxo completo por tarefa (terreno → vias → perfis → interseções → terraplenagem → documentação) e perfis de parâmetros salvos | 13, 20 | revisão com o uso real |
-| K14/K15 | XV | Desempenho: piso tátil longo e leituras do projeto inteiro | 21 | tempo medido no Autoteste |
+Desde 2026-10-26 a lista de próximas etapas é o **plano unificado** dos três prompts:
+[docs/PLANO_DE_ACAO.md](docs/PLANO_DE_ACAO.md) (D-022). Ele tem 14 etapas (0–13), cada uma com a origem, a situação e o
+critério de aceite. Os itens que estavam aqui (X1–X5, P6–P8, K11, K12, F10–F12, K14/K15) foram para as etapas 1–13 do plano.
 
 ## Fora do escopo até haver especificação
 

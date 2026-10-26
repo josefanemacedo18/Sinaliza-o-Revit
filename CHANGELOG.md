@@ -3,6 +3,22 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-26 – Etapa 0: plano unificado dos três prompts
+
+Sem DLL nova (a Etapa 0 não muda o plugin).
+- Prompts de Motores e de Interface lidos com o Prompt Master. O plano único `docs/PLANO_DE_ACAO.md` tem 14 etapas e diz
+  em que etapa fica cada pedido repetido (D-022).
+- AUDIT §9:
+  - interface atual: WPF, `Styles.xaml`, `FormWindow`, `IconFactory`, 2 guias e 12 painéis por tipo de elemento;
+  - o que o Prompt de Interface pede e não existe;
+  - lacunas dos motores classificadas de P0 a P3.
+- `tools/release.sh` aceita etapas (`E<n>` → `Releases/EtapaNN`).
+- Etapa 1 começou:
+  - `OverlapClassifier` no núcleo (commit `9701ebb`). Ele classifica os pisos sobrepostos em camada intencional,
+    interseção legítima, duplicação acidental, conflito real e inconclusivo, com motivo e ação;
+  - testes `Fase10CompatibilizacaoTests` (9);
+  - aviso xUnit2029 corrigido em `Fase08HidraulicaTests`.
+
 ## 2026-10-23 – Prompt Master adotado: auditoria pelo novo escopo
 
 Sem mudança de código nem DLL nova.

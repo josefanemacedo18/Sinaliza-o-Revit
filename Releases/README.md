@@ -1,6 +1,7 @@
-# Entregas por fase
+# Entregas por fase e por etapa
 
-Cada pasta `FaseNN` guarda a DLL do plugin gerada ao concluir a fase NN da missão, com o `.addin` e o manifesto
+Cada pasta `FaseNN` guarda a DLL do plugin gerada ao concluir a fase NN da missão. Desde 2026-10-26 (D-022), cada pasta
+`EtapaNN` guarda a DLL da etapa NN do plano unificado (`docs/PLANO_DE_ACAO.md`). As duas vêm com o `.addin` e o manifesto
 `RELEASE.md`. O manifesto traz a versão, a data, o commit do código, a configuração e o resultado da compilação, o SHA-256
 da DLL, os testes executados e o que **não** foi verificado.
 

@@ -1,0 +1,111 @@
+# Plano de ação unificado – Prompt Master, Motores e Interface
+
+Plano único para os três documentos enviados pelo usuário. Cada pedido aparece uma vez só, mesmo quando vários documentos o
+repetem.
+
+- [Prompt Master](PROMPT_MASTER.md) (2026-10-23): princípios, escopo central e ordem por risco.
+- [Prompt Complementar Mestre de Motores](PROMPT_MOTORES.md) (2026-10-26): motores, contratos entre motores e expansão funcional. Substitui
+  os sete prompts especializados que estavam previstos.
+- [Prompt de Interface](PROMPT_INTERFACE.md) (2026-10-26): design system, faixa de opções, Central do Projeto, formulários, diagnósticos e
+  configurações.
+
+Regras de uso deste plano:
+- Substitui a lista "Próximas etapas" do ROADMAP, que agora aponta para cá. O quadro das 15 fases continua no ROADMAP como
+  mapa de rastreio (D-021).
+- Estado de cada item: AUDIT §8 (pelo escopo do Master) e §9 (motores e interface). Decisões: DECISIONS D-021 e D-022.
+- O documento de estado pedido pelo Prompt de Motores (§21, "ou equivalente já adotado") é este plano junto com a AUDIT e
+  os documentos de controle que já existem. Não foi criado um documento a mais.
+
+## 1. Como os três documentos se combinam
+
+| Documento | Papel | Quando entra |
+|---|---|---|
+| Prompt Master | princípios, escopo, critérios gerais, prioridade por risco | o tempo todo |
+| Motores | o que cada motor calcula, contratos, integração associativa, P0–P3 | Etapas 1 a 8 e 13 |
+| Interface | como o usuário vê e usa o que os motores fazem | Etapas 9 a 12 |
+
+O Prompt de Interface (§1) pede que o Master esteja implementado antes dele. Por isso as telas vêm depois dos motores de que
+dependem. Uma tela só entra quando o motor que ela mostra existe. Senão, o controle fica no estado C (indisponível, dito
+com clareza) – nunca simulado.
+
+## 2. Regras comuns (as mesmas nos três documentos)
+
+1. **Antes de mexer:** auditar o código real e preservar o que funciona. Nada de reescrita ampla, serviço duplicado ou
+   arquitetura paralela.
+2. **Nada inventado:** nenhum resultado, norma, coeficiente, dado de chuva, teste ou compatibilidade inventados. Um
+   parâmetro sem fonte fica configurável e apontado como pendente.
+3. **Quatro níveis de prova, registrados separadamente:** build, testes automatizados, testes geométricos ou de integração
+   do núcleo e validação dentro do Revit 2027. Neste ambiente não há Revit nem Windows: o que depende deles fica **NÃO
+   VALIDADO NO REVIT**.
+4. **Controles da interface em três estados:** A – funcional; B – parcial, com o limite dito; C – indisponível, dito com
+   clareza. Nenhuma mensagem de sucesso sem operação concluída.
+5. **Diagnóstico acionável:** elemento, causa provável, impacto, ação recomendada. Erro, aviso, informação e "não
+   verificável" ficam separados.
+6. **Modelo íntegro:** identificadores persistentes; reexecutar não duplica; transações com rollback; nada alheio ao plugin
+   é apagado; edições manuais preservadas ou o conflito é comunicado.
+7. **Autonomia:** decisões técnicas reversíveis sem pedir autorização. O usuário só é chamado em bloqueio real, risco
+   irreversível ou requisito que só ele define.
+
+## 3. Pedidos repetidos e onde ficam
+
+| Pedido | Master | Motores | Interface | Fica em |
+|---|---|---|---|---|
+| Auditoria, inventário, mapa de módulos | §2, §28 | §1, §5, Fase 1 | Etapa Zero, Etapa 1 | **Etapa 0** |
+| Pisos sobrepostos classificados, retas fora do eixo, piso × terreno | §5, §10, §16 | §9, §16 | — | **Etapa 1** |
+| Diagnóstico padronizado (gravidade, elemento, causa, ação, "não verificável", histórico) | §17, §19 | §16 | §17.2, §27 | **Etapa 2** (núcleo) → **Etapa 12** (tela) |
+| Unidades, tolerâncias, coordenadas explícitas | §5 | §4, §6 | — | **Etapa 2** |
+| Diagnóstico do terreno | §6 | §6 | §7.2, §14 | **Etapa 3** (motor) → **Etapa 11** (tela) |
+| Eixos, estacas, perfis, seções, corredores | §7 | §7 | §10 | **Etapa 4** (motor) → **Etapa 11** (formulário de vias) |
+| Interseções e rotatórias explicando o que não resolvem | §8 | §7 | §12 | **Etapa 4** → **Etapa 11** |
+| Estrutura de pavimento por camadas usada no cálculo | §10 | §9 | §15 | **Etapa 5** (motor) → **Etapa 11** (gerenciador) |
+| Terraplenagem desatualizada, comparação de alternativas | §9 | §8 | §7.5, §10.7 | **Etapa 5** |
+| Drenagem integrada a greides e terreno, perfis e listas | §11 | §10 | §16 | **Etapa 6** → **Etapa 11** |
+| Indicadores urbanísticos, elementos urbanos em lote | §12 | §11, §12 | §13 | **Etapa 7** → **Etapa 11** |
+| Atualização associativa e estados (atualizado, pendente, desatualizado) | §14 | §14, §15 | §8.4, §20 | **Etapa 8** (motor) → **Etapa 10** (Central do Projeto) |
+| Fluxos por tarefa e faixa de opções por tema | §20 | §13 | §2.3, §7 | **Etapa 9** |
+| Pré-visualização e resumo antes de aplicar | §7 | §3, §13 | §10.9, §11 | **Etapa 11** |
+| Quantitativos e relatórios rastreáveis | §17 | §17 | §18 | **Etapa 12** |
+| Configurações do usuário × do projeto, perfis reutilizáveis | §13 | §13 | §19, §26 | **Etapa 12** |
+| Progresso, cancelamento, desempenho | §20, §21 | §13, §18 | §21 | **Etapa 13** (medição) e em cada tela longa |
+| Relatório técnico final, imagens reais da interface | §27 | §21 | §32 | **Etapa 13** |
+
+## 4. Etapas
+
+**Situação:** ✅ concluída · 🔄 em andamento · ⬜ não iniciada.
+
+**Entrega:** cada etapa que muda código termina com:
+- build limpo e suíte completa verde;
+- uma DLL em `Releases/EtapaNN`, com o número do meio da versão subindo (D-022), preservando as anteriores;
+- documentos atualizados;
+- um aviso ao usuário com o que foi feito, os testes e o caminho da DLL.
+
+| Etapa | Situação | Conteúdo | Origem | Critério de aceite |
+|---|---|---|---|---|
+| **0 – Auditoria unificada e plano** | ✅ | AUDIT §8 (escopo do Master) e §9 (motores e interface); este plano; D-022; transcrição dos três prompts em `docs/` | Master §2/§28; Motores Fase 1; Interface Etapas 0–1 | inventário com evidência; cada pedido com uma etapa |
+| **1 – Integridade geométrica (P0)** | 🔄 | classificação dos pisos sobrepostos no núcleo (feita, `9701ebb`) e no Autoteste; resíduo INTERSECAO MEIO-FIO × CALCADA (62 cm³) achado pelo classificador: causa e correção; pisos × terreno no núcleo (enterrado, suspenso, degrau na borda); "Verificações do modelo" ligadas no Autoteste completo; retas fora do eixo (K12) | Master §5, §10, §16, RT-1.2/1.3; Motores §9, §16 | testes por classe; nenhum piso apagado; Autoteste com a contagem por classe; DLL 2.8.0 |
+| **2 – Núcleo de diagnósticos e tolerâncias** | ⬜ | `Achado` com módulo, elemento, causa, impacto, ação e "não verificável"; resumo com versão; comparação com a validação anterior (novo, persistente, resolvido); tolerâncias e unidades reunidas num registro único, sem mudar valores (K9) | Master §5, §17, §19; Motores §4, §16; Interface §17.2 | testes do núcleo; V01–V13 com módulo e ação |
+| **3 – Topografia e superfícies** | ⬜ | diagnóstico do terreno (pontos insuficientes ou repetidos com cotas diferentes, triângulos degenerados, declividade acima do limite informado, consulta fora da superfície); terreno original × projetado explícito em cada cálculo; importação de pontos (CSV), se o Toposolid nativo não bastar; curvas de nível pelo recurso nativo do Toposolid, sem replicar | Master §6; Motores §6; Interface §14 | testes do núcleo; código Vxx no Validar Modelo |
+| **4 – Vias, corredores e interseções** | ⬜ | lacunas da auditoria: equações de estaqueamento (ausentes); interseção ou rotatória que não se resolve diz a causa e os parâmetros a rever; seções e corredores já existentes revistos só onde a auditoria apontar | Master §7, §8; Motores §7 | testes do núcleo |
+| **5 – Terraplenagem e pavimentação** | ⬜ | estrutura do pavimento na via (camadas com ordem, espessura, material e função), usada pelo corte, pela terraplenagem (fundo da caixa = soma das camadas) e pelos quantitativos por camada; terraplenagem desatualizada (assinatura das entradas); comparação de alternativas (F12) | Master §9, §10; Motores §8, §9; Interface §15 | projetos antigos abrem iguais (migração); testes de quantitativos por camada |
+| **6 – Drenagem integrada** | ⬜ | declividade da sarjeta lida do greide e área de contribuição do modelo (RT-1.5); pontos baixos sem captação; conflitos da rede com o terreno e as vias; perfil longitudinal da rede e lista de dispositivos | Master §11; Motores §10; Interface §16 | testes do núcleo; K5 reduzido |
+| **7 – Urbanismo e elementos complementares** | ⬜ | indicadores urbanísticos configuráveis (percentuais de áreas públicas, verdes e viárias, sem regra municipal universal); auditoria dos elementos urbanos (iluminação, mobiliário, posicionamento em lote) e só o que faltar | Master §12; Motores §11, §12; Interface §13 | testes do núcleo |
+| **8 – Integração associativa** | ⬜ | dependências terreno → via → corredor → terraplenagem → pavimento → drenagem → lotes no grafo; invalidação seletiva; estado de cada resultado (atualizado, pendente, desatualizado); o que foi atualizado e o que ficou desatualizado; edições manuais preservadas | Master §14; Motores §14, §15 | testes das regras no núcleo; updater no Revit NÃO VALIDADO até um Autoteste |
+| **9 – Design system e faixa de opções** | ⬜ | tokens centrais (cores, tipografia, espaçamento, estados) e componentes reutilizáveis sobre o `Styles.xaml` existente; ícones no mesmo estilo; faixa de opções por tema (Projeto, Terreno, Sistema Viário, Interseções, Terraplenagem, Pavimentação, Drenagem, Urbanismo, Análise, Documentação, Sistema) **reorganizando** os 90 comandos atuais, sem duplicar | Interface §5, §6, §7, §22; Master §20 | build; mapa comando antigo → novo; nenhum comando perdido |
+| **10 – Central do Projeto e painel contextual** | ⬜ | Central do Projeto com indicadores reais (vias, nós, quadras, lotes, volumes, pavimento, drenagem, inconsistências), sem zero para dado desconhecido e com os estados da Etapa 8; painel contextual (DockablePane do Revit) com as propriedades do elemento do plugin selecionado | Interface §8, §9 | resumo calculado no núcleo e testado; tela NÃO VALIDADA NO REVIT |
+| **11 – Telas dos módulos** | ⬜ | formulário de vias em seções (identificação, geometria, perfil, seção com esquema, pavimento, terraplenagem, drenagem, validação, resumo; Pré-visualizar / Validar / Aplicar); interseções e rotatórias; terreno; gerenciador de pavimentos; drenagem separando geometria, conectividade, parâmetros e hidráulica; quadras e lotes | Interface §10–§16; Master §7, §13 | modelos de apresentação testados no núcleo; telas NÃO VALIDADAS NO REVIT |
+| **12 – Qualidade, quantitativos e configurações** | ⬜ | Central de Qualidade (validador e Autoteste separados, filtros, localizar elemento); central de quantitativos com a origem de cada número; gerenciador de configurações (usuário × projeto) e perfis reutilizáveis (exemplo, usuário, referência citada) | Interface §17–§19, §26; Master §13, §17; Motores §17 | testes de persistência e validação dos valores |
+| **13 – Desempenho, validação e entrega** | ⬜ | medir antes de otimizar (K14, K15); progresso e cancelamento nas operações longas; relatório de simulação × animação (F11); etapa integrada no Autoteste; relatório técnico final (Interface §32), com imagens reais só se o Revit rodar | Master §21, §27; Motores §18, Fase 7; Interface §21, Etapa 9 | Autoteste completo no Revit pelo usuário (fora deste ambiente) |
+
+A ordem segue a prioridade do Master (§28.5) e as dependências: as telas (9–12) usam o que os motores (1–8) entregam.
+Se uma etapa de motor travar num ponto que só o Revit confirma, a parte do núcleo é entregue e o restante fica registrado
+como NÃO VALIDADO.
+
+## 5. Limites deste ambiente (valem para todas as etapas)
+
+- **Revit 2027 e Windows:** não existem aqui. Tudo o que é API do Revit, janela WPF ou aparência fica NÃO VALIDADO NO
+  REVIT até o usuário rodar o Autoteste ou abrir a tela. Não há capturas reais da interface: o Prompt de Interface (§32)
+  aceita isso desde que fique dito.
+- **SDK do .NET:** o host de download da Microsoft é recusado pela política de rede desta sessão. O SDK 10.0.401 foi
+  instalado pelo cache do Nix. O NuGet funciona.
+- **Persistência:** o contêiner pode ser reciclado. Por isso, cada passo verde vai para o ramo (commit e push) antes do
+  próximo.

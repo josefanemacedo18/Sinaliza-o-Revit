@@ -354,3 +354,60 @@ a Fase VIII (o dimensionamento existe e é testado; ver a linha acima dela). Foi
 | 6 | Cálculo com dado incoerente | estrutura do pavimento diferente entre o corte (camadas) e a terraplenagem (0,40 m) | estrutura do pavimento na via, usada pelo corte, pela terraplenagem e pelos quantitativos |
 | 7 | Acoplamento entre pastas do Core (R15) | referências mútuas (§8.1) | sem reestruturação em bloco (Prompt Master §2); código novo sem nova referência mútua; um ciclo é desfeito quando a mudança já toca aquele código |
 | 8 | Demais | F12, F11, K14/K15, revisão da interface (XIII) | depois dos itens acima |
+
+## 9. Motores e interface (Prompts de Motores e de Interface, 2026-10-26)
+
+O usuário enviou mais dois documentos: o *Prompt Complementar Mestre de Motores* e o *Prompt de Interface*. Os três formam um
+conjunto, e o plano único está em `docs/PLANO_DE_ACAO.md` (D-022). Esta seção completa a §8 com o que esses dois documentos
+pedem e a §8 não cobria: a interface (Etapa Zero do Prompt de Interface) e a classificação P0–P3 das lacunas dos motores
+(Prompt de Motores §5). Base: commit `9701ebb`. Nada foi executado no Revit.
+
+### 9.1 Interface atual (FATO, pela leitura do código)
+
+| Item | Situação | Evidência |
+|---|---|---|
+| Tecnologia | WPF (`net10.0-windows`), janelas modais abertas pelos comandos; sem dependência visual externa | `SinalizacaoViaria.Revit.csproj`, `Revit/UI` |
+| Janelas | 51 arquivos em `Revit/UI`: 20 arquivos XAML (18 janelas, o painel de saída e os estilos) e janelas montadas por código, entre elas o formulário genérico `FormWindow` (campos + prévia `GeometryPreview`), usado pela maioria dos comandos | `UI/*.xaml`, `UI/FormWindow.cs` |
+| Estilos | Um `Styles.xaml` com paleta (azul `#1F5FA8`, cinzas, âmbar de aviso) e estilos de janela, título, dica, rótulo e campo, usado por janelas XAML e pelo `FormWindow` | `UI/Styles.xaml` (74 linhas) |
+| Ícones | desenhados por código, num só estilo (`IconFactory`) | `Infrastructure/IconFactory.cs` |
+| Faixa de opções | 2 guias ("SinalizaBIM" e "SinalizaBIM Infra"), 12 painéis por tipo de elemento: Vias, Sinalização Horizontal e Vertical, Detalhamento, Tráfego, Editar, Drenagem, Obras de Arte, Contenções, Relevo e Terreno, Nós Viários, Loteamento | `RibbonBuilder.cs` |
+| Quantitativos | janela própria com abas (itens, categoria, hierarquia, componente da seção, terraplenagem por estaca, pintura) e exportação CSV/planilha | `UI/QuantitiesWindow.xaml` |
+| Configurações | janela das configurações **do usuário** (padrões de criação, 3D, comportamento, limites geométricos, catálogo); as do **projeto** ficam em registros próprios (drenagem, tráfego, estilos de seção, georreferência), cada um no seu comando | `UI/SettingsWindow.xaml`, `*Store.cs` |
+| Diagnósticos | Validar Modelo grava um relatório de texto e mostra o resumo num `TaskDialog`; Autoteste com janela e relatório próprios | `Commands/ValidationCommands.cs`, `UI/AutoTestWindow.cs` |
+| Progresso | barra só no simulador de tráfego; as demais operações longas não mostram etapa nem permitem cancelar | `UI/TrafficWindow.cs` |
+
+### 9.2 O que o Prompt de Interface pede e não existe
+
+| Pedido (Interface §) | Situação | Etapa do plano |
+|---|---|---|
+| Design system central (tokens, componentes, estados) – §5, §22 | PARCIAL: paleta e estilos básicos; faltam estados (sucesso, erro, desatualizado, indisponível), cartões, tabelas, indicadores | 9 |
+| Faixa de opções por tarefa – §7 | PARCIAL: organizada por tipo de elemento, não por etapa de trabalho | 9 |
+| Central do Projeto – §8 | AUSENTE | 10 |
+| Painel contextual – §9 | AUSENTE (nenhum `DockablePane`) | 10 |
+| Formulário de vias em seções com Pré-visualizar / Validar / Aplicar – §10 | PARCIAL: `RoadWindow` com prévia; sem seções de terraplenagem e drenagem nem resumo do impacto | 11 |
+| Gerenciador de pavimentos – §15 | AUSENTE (depende da estrutura de pavimento, Etapa 5) | 5 → 11 |
+| Central de Qualidade – §17 | PARCIAL: relatório de texto; sem filtro, sem localizar o elemento | 2 → 12 |
+| Central de quantitativos com a origem dos números – §18 | PARCIAL: a janela existe; sem a origem e a validade de cada valor | 12 |
+| Gerenciador de configurações (usuário × projeto, perfis) – §19 | PARCIAL: as do usuário numa janela, as do projeto espalhadas | 12 |
+| Estados de atualização – §20 | AUSENTE (depende da Etapa 8) | 8 → 10 |
+| Progresso e cancelamento – §21 | PARCIAL | 13 |
+
+### 9.3 Lacunas dos motores por prioridade (Prompt de Motores §5)
+
+As linhas da AUDIT §8.2 marcadas P ou A, com a prioridade. A coluna "Etapa" remete ao plano.
+
+| P | Lacuna | Motor | Etapa | Risco se ficar |
+|---|---|---|---|---|
+| P0 | Pisos sobrepostos sem classe; resíduo INTERSECAO MEIO-FIO × CALCADA no núcleo | pavimentação / vias | 1 | correção às cegas, quantitativo com área dobrada |
+| P0 | Pisos × terreno sem conferência no núcleo; "Verificações do modelo" desligadas no Autoteste | topografia / vias | 1 | via enterrada ou suspensa sem aviso |
+| P1 | Diagnóstico sem módulo, ação e "não verificável"; sem histórico | núcleo comum | 2 | regressão não vista |
+| P1 | Terreno sem diagnóstico (dados insuficientes, triângulos degenerados, extrapolação) | topografia | 3 | volumes sobre dado ruim |
+| P1 | Estrutura de pavimento só no desenho do corte; terraplenagem com subleito único | pavimentação / terraplenagem | 5 | caixa e quantitativos incoerentes |
+| P1 | Terraplenagem desatualizada sem aviso | terraplenagem | 5 | volume velho apresentado como atual |
+| P1 | Drenagem sem ler greide e área do modelo (K5) | drenagem | 6 | vazão com dado digitado errado |
+| P1 | Estados de atualização e propagação terreno → via → terraplenagem → drenagem | integração | 8 | modelo incoerente depois de editar |
+| P2 | Equações de estaqueamento | vias | 4 | — (contorno: estacas contínuas) |
+| P2 | Interseção que não se resolve sem explicar os parâmetros | interseções | 4 | usuário sem saber o que mudar |
+| P2 | Indicadores urbanísticos configuráveis | urbanismo | 7 | — |
+| P2 | Perfil longitudinal da rede e lista de dispositivos | drenagem | 6 | — |
+| P3 | Cenários de projeto comparados (F12), relatório do tráfego (F11), desempenho (K14/K15) | vários | 5, 13 | — |

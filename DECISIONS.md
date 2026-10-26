@@ -286,3 +286,24 @@ como substituída.
   centenas de arquivos sem defeito a corrigir, e o item 2 pede justificativa para trocar a arquitetura.
 - **Consequências:** a próxima entrega (Fase X) junta o que a auditoria pôs no topo: sobreposições classificadas, piso ×
   terreno, diagnóstico do terreno e validação com módulo, ação recomendada, "não verificável" e comparação com a anterior.
+
+## D-022 – Plano único para os três prompts; entregas por etapa
+- **Contexto:** em 2026-10-26 o usuário enviou o *Prompt Complementar Mestre de Motores* e o *Prompt de Interface*, para
+  serem executados junto com o Prompt Master sem trabalho repetido. Os três pedem várias coisas iguais: auditoria,
+  diagnóstico padronizado, pavimento por camadas, estados de atualização, configurações, desempenho e relatório final.
+- **Decisão:**
+  - **Plano:** um só, em `docs/PLANO_DE_ACAO.md`, com 14 etapas (0–13). Cada pedido repetido fica numa etapa só: o motor
+    numa etapa, a tela dele numa etapa posterior.
+  - **Ordem:** motores (1–8) antes das telas (9–12), como o Prompt de Interface pede (§1); desempenho e entrega (13) no
+    fim.
+  - **Entregas:**
+    - cada etapa que muda código gera uma DLL em `Releases/EtapaNN` (`tools/release.sh E<n>`) e sobe o número do meio
+      da versão: Etapa 1 = 2.8.0;
+    - as entregas `FaseNN` anteriores ficam como estão;
+    - o quadro das 15 fases continua como rastreio (D-021).
+  - **Documento de estado:** o Prompt de Motores (§21) pede um, "ou equivalente já adotado". O equivalente é o plano mais
+    os documentos de controle (AUDIT §8–§9, ROADMAP, KNOWN_ISSUES, TESTS, CHANGELOG). Não foi criado um documento novo.
+- **Alternativa descartada:** seguir as três sequências (as 7 fases do Prompt de Motores, as 9 etapas do Prompt de
+  Interface e as 15 fases antigas) em paralelo. Os mesmos itens seriam auditados e implementados duas ou três vezes.
+- **Consequências:** o usuário recebe um aviso ao fim de cada etapa. O ROADMAP aponta para o plano em vez de manter outra
+  lista de próximas etapas.

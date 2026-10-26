@@ -2,8 +2,14 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-23 (Prompt Master adotado; Fase X em andamento)
+## Estado em 2026-10-26 (plano unificado dos três prompts; Etapa 0 concluída, Etapa 1 em andamento)
 
+- **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
+  executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13, cada pedido repetido numa etapa só). Entregas em
+  `Releases/EtapaNN` (`tools/release.sh E<n>`), a partir da 2.8.0 na Etapa 1. Ao fim de cada etapa o usuário é avisado.
+- **Etapa 1 (atual):** classificação dos pisos sobrepostos no núcleo feita (`OverlapClassifier`, `9701ebb`); falta levá-la
+  ao Autoteste, corrigir o resíduo INTERSECAO MEIO-FIO × CALCADA (62 cm³) que ela achou, conferir pisos × terreno e ligar
+  as "Verificações do modelo".
 - **Prompt Master** (`docs/PROMPT_MASTER.md`, enviado em 2026-10-23): rege o desenvolvimento (D-021). As 15 fases ficam
   como mapa de rastreio; a ordem vem dos riscos (AUDIT §8.3). Auditoria pelo novo escopo: AUDIT §8 (mapa de módulos,
   matriz em cinco situações, riscos). Lacunas que ele revelou: diagnóstico do terreno, validação sem módulo, ação e
@@ -34,26 +40,26 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
 
 ## Próxima tarefa
 
-1. **Fase X (ROADMAP, Próximas etapas X1–X5):**
-   1. `OverlapClassifier` (arquivo novo em `Core/Model`, ainda sem testes no início desta retomada) com testes e no
-      Autoteste;
-   2. pisos × terreno no núcleo e "Verificações do modelo" ligadas no Autoteste completo;
-   3. diagnóstico do terreno;
-   4. validação com módulo, evidência, ação, "não verificável" e comparação com a anterior;
-   5. terraplenagem desatualizada.
-2. **Depois:** P6 (estrutura do pavimento), F10, P7, F12, F11, P8, K14/K15 – na ordem do ROADMAP.
-3. **No Revit (quando houver):** 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer
-   tudo**; enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`).
+Seguir o plano (`docs/PLANO_DE_ACAO.md`): terminar a Etapa 1, entregar `Releases/Etapa01` (2.8.0), avisar o usuário e
+passar à Etapa 2. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com
+**Desfazer tudo**; enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`).
 
 ## Como retomar
 
+O host de download do .NET (`builds.dotnet.microsoft.com`) é recusado pela política de rede da sessão. Se o contêiner vier
+sem SDK, instale-o pelo Nix (o cache do Nix e o NuGet funcionam):
+
 ```bash
+nix-env -f https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz -iA dotnet-sdk_10   # SDK 10.0.401
+export PATH=/root/.nix-profile/bin:$PATH
 git checkout claude/dreamy-gates-a3nrta && git pull origin claude/dreamy-gates-a3nrta
 dotnet build src/SinalizacaoViaria.Revit -c Release -p:EnableWindowsTargeting=true   # gera Instalar/Revit2027/SinalizaBIM.dll
-dotnet test tests/SinalizacaoViaria.Core.Tests -c Release                            # ~15–22 min
+dotnet test tests/SinalizacaoViaria.Core.Tests -c Release                            # ~15–26 min
 ```
 
-Leia nesta ordem: docs/PROMPT_MASTER.md (escopo e regras) → AUDIT.md (estado e evidências; §8 pelo Prompt Master) → KNOWN_ISSUES.md → ROADMAP.md → DECISIONS.md.
+O contêiner pode ser reciclado sem aviso (em 2026-10-26 perdeu-se trabalho não commitado): commit e push a cada passo verde.
+
+Leia nesta ordem: docs/PLANO_DE_ACAO.md (plano e situação) → docs/PROMPT_MASTER.md (escopo e regras) → AUDIT.md (estado e evidências; §8 pelo Prompt Master) → KNOWN_ISSUES.md → ROADMAP.md → DECISIONS.md.
 
 ## Regras de trabalho em vigor
 
