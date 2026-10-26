@@ -367,6 +367,8 @@ public static class TerrainService
         var excavators = new List<ElementId>();
         var finishes = new List<(Polygon2 Area, MarkingColor Color, string Id)>();
         var perDef = new List<(MarkingDefinition Def, List<GradeCorridor> C, List<GradePad> P)>();
+        // Marcas cuja geometria falhou: não entram no registro (a V15 continua dizendo que não foram aplicadas).
+        var notApplied = new HashSet<string>();
         foreach (var def in list)
         {
             try
@@ -387,6 +389,7 @@ public static class TerrainService
             }
             catch (Exception ex)
             {
+                notApplied.Add(def.Id);
                 Log.Error($"Terraplenagem {def.DisplayCode}", ex);
                 report.Notes.Add($"{def.DisplayCode}: {ex.Message}");
             }
@@ -466,7 +469,7 @@ public static class TerrainService
         {
             try
             {
-                var rec = EarthworkRecord.Gravar(list, opt.Subgrade, opt.CutSlope, opt.FillSlope, DateTime.Now,
+                var rec = EarthworkRecord.Gravar(list.Where(d => !notApplied.Contains(d.Id)), opt.Subgrade, opt.CutSlope, opt.FillSlope, DateTime.Now,
                     typeof(TerrainService).Assembly.GetName().Version?.ToString(3), report.Cut, report.Fill, report.Area, opt.Homogenization);
                 rec.AlcanceTaludes = opt.MaxDaylight;
                 EarthworkRecordStore.Save(doc, rec);

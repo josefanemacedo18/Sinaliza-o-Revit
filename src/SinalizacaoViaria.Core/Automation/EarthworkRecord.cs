@@ -120,7 +120,7 @@ public static class EarthworkRecord
     public static List<MudancaTerraplenagem> Comparar(RegistroTerraplenagem registro, IReadOnlyCollection<MarkingDefinition> all)
     {
         var res = new List<MudancaTerraplenagem>();
-        var atuais = Participantes(all).ToDictionary(d => d.Id);
+        var atuais = Participantes(all).GroupBy(d => d.Id).ToDictionary(g => g.Key, g => g.First());
         foreach (var (id, d) in atuais)
         {
             if (!registro.Assinaturas.TryGetValue(id, out var antes)) res.Add(new(id, d.DisplayCode, SituacaoTerraplenagem.Nova));
