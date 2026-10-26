@@ -1003,7 +1003,7 @@ public sealed class CmdTerraplenagem : CommandBase
                 $"{defs.Count} elemento(s). O terreno é refeito a partir do terreno ORIGINAL com todas as vias e obras que o moldam – " +
                 "regerar não acumula aterros e apagar uma obra devolve o terreno natural.\n" +
                 "O relatório traz corte, aterro, o balanço de massas (bota-fora ou empréstimo) e os volumes de cada elemento. " +
-                "Use \"Só calcular\" para ver os volumes sem mexer no terreno.", null, null, false, "Aplicar", 700, 620)
+                "Use \"Só calcular\" para ver os volumes sem mexer no terreno – e compará-los com os da terraplenagem aplicada.", null, null, false, "Aplicar", 700, 620)
             .Check("Só calcular (simulação: volumes e balanço, sem alterar o Toposolid)", () => opt.DryRun, v => opt.DryRun = v)
             .Choice("Tipo de terreno (taludes sugeridos)", new[]
             {
@@ -1015,7 +1015,8 @@ public sealed class CmdTerraplenagem : CommandBase
             })
             .Number("Talude de corte (H : 1 V)", () => opt.CutSlope, v => opt.CutSlope = v, 0.3, 5, "0.0#", "Solo: 1 : 1; rocha: 0,5 : 1 (DNIT).")
             .Number("Talude de aterro (H : 1 V)", () => opt.FillSlope, v => opt.FillSlope = v, 1, 5, "0.0#", "Usual 1,5 : 1.")
-            .Number("Profundidade do subleito sob o pavimento (m)", () => opt.Subgrade, v => opt.Subgrade = v, 0, 2)
+            .Number("Profundidade do subleito sob o pavimento (m) – vias sem estrutura do pavimento", () => opt.Subgrade, v => opt.Subgrade = v, 0, 2, "0.00",
+                "Vias com a estrutura do pavimento informada (Estrutura do Pavimento) usam a soma das camadas; interseções e rotatórias, a via ligada mais funda.")
             .Number("Alcance máximo dos taludes (m)", () => opt.MaxDaylight, v => opt.MaxDaylight = v, 5, 500, "0")
             .Number("Fator de homogeneização (corte ÷ aterro compactado)", () => opt.Homogenization, v => opt.Homogenization = v, 1, 2, "0.00",
                 "Volume de corte (in situ) necessário por m³ de aterro compactado: 1,20–1,40 em solos (DNIT). Entra no balanço de massas.")

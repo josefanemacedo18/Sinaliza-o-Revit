@@ -165,6 +165,26 @@ public class Etapa05PavimentoTests
         Assert.Equal(SituacaoTerraplenagem.Retirada, Assert.Single(EarthworkRecord.Comparar(lido, new MarkingDefinition[] { v1, v2, caixa })).Situacao);
     }
 
+    [Fact]
+    public void Comparacao_AlternativaSimuladaContraAAplicada()
+    {
+        var v = Via();
+        var reg = EarthworkRecord.Gravar(new[] { v }, 0.4, 1, 1.5, new DateTime(2026, 10, 26, 9, 5, 0), "2.11.0", 1000, 600, 2500, 1.25);
+        var lido = RegistroTerraplenagem.FromJson(reg.ToJson())!;
+        Assert.Equal(1000, lido.Corte);
+        Assert.Equal(1.25, lido.Homogeneizacao);
+        var c = EarthworkRecord.Comparacao(lido, 1100, 560, 1.25, 1)!;
+        Assert.StartsWith("Comparado com a terraplenagem aplicada em 26/10/2026 09:05 (SinalizaBIM 2.11.0), com 1 marca(s) que moldam o terreno diferentes:", c);
+        Assert.Contains("corte 1.000 → 1.100 m³ (+100)", c);
+        Assert.Contains("aterro 600 → 560 m³ (−40)", c);
+        Assert.Contains("balanço: sobram 250 → sobram 400 m³ de corte (+150)", c);   // 1000 − 600 × 1,25 = 250; 1100 − 560 × 1,25 = 400
+        Assert.Contains("com as mesmas marcas", EarthworkRecord.Comparacao(lido, 1000, 600, 1.25)!);
+        Assert.Contains("(igual)", EarthworkRecord.Comparacao(lido, 1000, 600, 1.25)!);
+        // Sem registro ou registro sem volumes: nada a comparar (não inventa a aplicada).
+        Assert.Null(EarthworkRecord.Comparacao(null, 1, 1, 1.25));
+        Assert.Null(EarthworkRecord.Comparacao(EarthworkRecord.Gravar(new[] { v }, 0.4, 1, 1.5, DateTime.Now, null), 1, 1, 1.25));
+    }
+
     // ------------------------------------------------------------------ V15 no Validar Modelo
 
     [Fact]

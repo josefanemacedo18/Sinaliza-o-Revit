@@ -92,7 +92,7 @@ public sealed class CmdQuantitativos : CommandBase
         try
         {
             var (earth, _, _) = TerrainService.Quantities(doc, service, defs, null, sections);
-            if (earth.Count > 0) rows = QuantityCalculator.AddEarthworks(rows, earth, new GradingOptions().Homogenization);
+            if (earth.Count > 0) rows = QuantityCalculator.AddEarthworks(rows, earth, TerrainService.AppliedOptions(doc).Homogenization);
         }
         catch (Exception ex) { Log.Error("Quantitativo de terraplenagem", ex); }
         return (items, rows);

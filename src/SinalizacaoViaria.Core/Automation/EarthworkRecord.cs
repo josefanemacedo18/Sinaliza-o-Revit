@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -18,10 +19,17 @@ public sealed class RegistroTerraplenagem
     public double Subleito { get; set; }
     public double TaludeCorte { get; set; }
     public double TaludeAterro { get; set; }
+    /// <summary>Alcance máximo dos taludes das opções (m).</summary>
+    public double? AlcanceTaludes { get; set; }
     /// <summary>Id → assinatura (SHA-256 do JSON da definição) de cada marca que moldou o terreno.</summary>
     public Dictionary<string, string> Assinaturas { get; set; } = new();
     /// <summary>Id → nome mostrado (para dizer o que foi apagado).</summary>
     public Dictionary<string, string> Nomes { get; set; } = new();
+    /// <summary>Volumes da terraplenagem aplicada (m³, m²) e o fator de homogeneização do balanço – para comparar alternativas.</summary>
+    public double? Corte { get; set; }
+    public double? Aterro { get; set; }
+    public double? Area { get; set; }
+    public double? Homogeneizacao { get; set; }
 
     public string ToJson() => JsonSerializer.Serialize(this);
 
@@ -93,9 +101,13 @@ public static class EarthworkRecord
     }
 
     public static RegistroTerraplenagem Gravar(IEnumerable<MarkingDefinition> participantes, double subleito, double taludeCorte, double taludeAterro,
-        DateTime quando, string? versao)
+        DateTime quando, string? versao, double? corte = null, double? aterro = null, double? area = null, double? homogeneizacao = null)
     {
-        var r = new RegistroTerraplenagem { Quando = quando, Versao = versao, Subleito = subleito, TaludeCorte = taludeCorte, TaludeAterro = taludeAterro };
+        var r = new RegistroTerraplenagem
+        {
+            Quando = quando, Versao = versao, Subleito = subleito, TaludeCorte = taludeCorte, TaludeAterro = taludeAterro,
+            Corte = corte, Aterro = aterro, Area = area, Homogeneizacao = homogeneizacao,
+        };
         foreach (var d in participantes)
         {
             r.Assinaturas[d.Id] = Assinatura(d);
@@ -120,6 +132,28 @@ public static class EarthworkRecord
                 ? new(id, d.DisplayCode, SituacaoTerraplenagem.Retirada)
                 : new(id, registro.Nomes.GetValueOrDefault(id, id), SituacaoTerraplenagem.Removida));
         return res;
+    }
+
+    /// <summary>
+    /// Alternativa simulada × terraplenagem aplicada (Motores §8, "comparar alternativas"): corte, aterro e balanço de cada uma
+    /// e a diferença. Nulo sem registro ou sem os volumes dele (registro gravado sem eles). <paramref name="mudancas"/>: quantas
+    /// marcas que moldam o terreno diferem entre a simulação e a aplicada.
+    /// </summary>
+    public static string? Comparacao(RegistroTerraplenagem? aplicada, double corte, double aterro, double homogeneizacao, int mudancas = 0)
+    {
+        if (aplicada is not { Corte: { } c0, Aterro: { } a0 }) return null;
+        var pt = CultureInfo.GetCultureInfo("pt-BR");
+        string N(double v) => v.ToString("N0", pt);
+        string D(double v) => Math.Abs(v) < 0.5 ? "igual" : (v > 0 ? "+" : "−") + N(Math.Abs(v));
+        var b0 = c0 - a0 * (aplicada.Homogeneizacao ?? homogeneizacao);
+        var b1 = corte - aterro * homogeneizacao;
+        string B(double b) => b >= 0 ? $"sobram {N(b)}" : $"faltam {N(-b)}";
+        return $"Comparado com a terraplenagem aplicada em {aplicada.Quando.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)}" +
+               (aplicada.Versao != null ? $" (SinalizaBIM {aplicada.Versao})" : "") +
+               (mudancas > 0 ? $", com {mudancas} marca(s) que moldam o terreno diferentes" : ", com as mesmas marcas") + ":\n" +
+               $"  corte {N(c0)} → {N(corte)} m³ ({D(corte - c0)})\n" +
+               $"  aterro {N(a0)} → {N(aterro)} m³ ({D(aterro - a0)})\n" +
+               $"  balanço: {B(b0)} → {B(b1)} m³ de corte ({D(b1 - b0)})";
     }
 
     /// <summary>Profundidade sob o topo da pista até o fundo da estrutura de uma via (m): a estrutura dela ou o subleito registrado.</summary>

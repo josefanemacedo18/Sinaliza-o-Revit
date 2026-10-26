@@ -52,6 +52,8 @@ public sealed class TerrainReport
     public List<string> Notes { get; } = new();
     public bool DryRun { get; set; }
     public double Homogenization { get; set; } = 1.25;
+    /// <summary>Simulação × terraplenagem aplicada (registro), quando há registro com volumes.</summary>
+    public string? Comparison { get; set; }
     /// <summary>Volumes de cada elemento: a parte dele no projeto conjunto (GradingResult.ByOwner) – a soma é o total.</summary>
     public List<(string Name, double Cut, double Fill, double Area)> Items { get; } = new();
 
@@ -83,6 +85,7 @@ public sealed class TerrainReport
         if (Skipped > 0) s += $"\nPontos recusados pelo Revit: {Skipped}";
         if (Excavated > 0) s += $"\nEscavações pelo modelo (túneis, caixas): {Excavated}";
         if (Subdivisions > 0) s += $"\nAcabamentos do terreno (subdivisões com grama/revestimento): {Subdivisions}";
+        if (Comparison != null) s += "\n\n" + Comparison;
         if (Notes.Count > 0) s += "\n\n" + string.Join("\n", Notes.Distinct().Take(12));
         return s;
     }
@@ -210,18 +213,34 @@ public static class TerrainService
     }
 
     /// <summary>
+    /// Opções da última terraplenagem aplicada (registro, Etapa 5): subleito, taludes padrão, alcance e homogeneização. Sem
+    /// registro, as padrão. Assim o quantitativo usa as mesmas opções do terreno aplicado.
+    /// </summary>
+    public static GradingOptions AppliedOptions(Document doc)
+    {
+        var o = new GradingOptions();
+        if (EarthworkRecordStore.Load(doc) is not { } r) return o;
+        o.Subgrade = r.Subleito;
+        o.CutSlope = r.TaludeCorte;
+        o.FillSlope = r.TaludeAterro;
+        if (r.AlcanceTaludes is { } d) o.MaxDaylight = d;
+        if (r.Homogeneizacao is { } h) o.Homogenization = h;
+        return o;
+    }
+
+    /// <summary>
     /// Terraplenagem para o quantitativo (rodada VT): o mesmo projeto da Terraplenagem – todas as vias e obras que moldam o
     /// terreno, por camadas – contra o terreno original guardado no Toposolid (sem a terraplenagem aplicada, o terreno atual é
     /// o natural): corte, aterro e área de cada elemento (a parte dele no projeto conjunto) e os totais. Calculado na hora, nada
-    /// é gravado; vazio sem Toposolid ou sem obras que moldem o terreno. Usa os taludes do greide de cada via e o subleito
-    /// padrão das opções.
+    /// é gravado; vazio sem Toposolid ou sem obras que moldem o terreno. Usa os taludes do greide de cada via, a estrutura do
+    /// pavimento de cada via e, sem <paramref name="opt"/>, as opções da última terraplenagem aplicada (<see cref="AppliedOptions"/>).
     /// </summary>
     /// <param name="sections">Quando dado, recebe os volumes por estaca de cada via (método das seções sobre a mesma superfície
     /// de projeto, só na parte que é da via – F7b), com a parte dela na malha para conferir.</param>
     public static (List<EarthworkItem> Items, double Cut, double Fill) Quantities(Document doc, MarkingService service, IReadOnlyCollection<MarkingDefinition> all,
         GradingOptions? opt = null, List<SecoesDaVia>? sections = null)
     {
-        opt ??= new GradingOptions();
+        opt ??= AppliedOptions(doc);
         var items = new List<EarthworkItem>();
         var topos = TerrainModel.Hosts(doc);
         if (topos.Count == 0) return (items, 0, 0);
@@ -386,13 +405,30 @@ public static class TerrainService
         report.Fill = design.FillM3;
         report.Area = design.AreaM2;
         report.Notes.AddRange(design.Warnings);
+        // Fundo da caixa sob a pista (Etapa 5): a estrutura do pavimento de cada via ou o subleito das opções.
+        var roads = list.OfType<RoadPavementDefinition>().ToList();
+        if (roads.Count > 0)
+        {
+            var pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+            var withStructure = roads.Count(r => r.ProfundidadeEstrutura != null);
+            report.Notes.Add(withStructure == 0
+                ? $"Fundo da caixa sob a pista: subleito de {opt.Subgrade.ToString("0.00", pt)} m em todas as vias (nenhuma com estrutura do pavimento informada)."
+                : $"Fundo da caixa sob a pista: estrutura do pavimento em {withStructure} de {roads.Count} via(s); subleito de {opt.Subgrade.ToString("0.00", pt)} m nas demais.");
+        }
         // Volumes por elemento: a parte de cada um no projeto conjunto (a soma é o total). Antes cada um era projetado isolado e as
         // áreas comuns – o nó e o começo das vias que chegam nele – contavam duas vezes.
         if (perDef.Count > 1)
             foreach (var (d, _, _) in perDef)
                 if (design.ByOwner.TryGetValue(d.Id, out var v))
                     report.Items.Add((d is RoadPavementDefinition rp ? $"Via {rp.DisplayCode}" : d.KindName, v.Cut, v.Fill, v.Area));
-        if (opt.DryRun) return report;
+        if (opt.DryRun)
+        {
+            // Alternativa simulada × terraplenagem aplicada (Motores §8).
+            var applied = EarthworkRecordStore.Load(doc);
+            report.Comparison = EarthworkRecord.Comparacao(applied, report.Cut, report.Fill, opt.Homogenization,
+                applied == null ? 0 : EarthworkRecord.Comparar(applied, all).Count);
+            return report;
+        }
         var footprint = design.Footprint.Count == 0 ? new List<Polygon2>() : PolygonOps.Union(design.Footprint).Where(f => f.Area > 0.5).ToList();
 
         var failed = false;
@@ -430,8 +466,10 @@ public static class TerrainService
         {
             try
             {
-                EarthworkRecordStore.Save(doc, EarthworkRecord.Gravar(list, opt.Subgrade, opt.CutSlope, opt.FillSlope, DateTime.Now,
-                    typeof(TerrainService).Assembly.GetName().Version?.ToString(3)));
+                var rec = EarthworkRecord.Gravar(list, opt.Subgrade, opt.CutSlope, opt.FillSlope, DateTime.Now,
+                    typeof(TerrainService).Assembly.GetName().Version?.ToString(3), report.Cut, report.Fill, report.Area, opt.Homogenization);
+                rec.AlcanceTaludes = opt.MaxDaylight;
+                EarthworkRecordStore.Save(doc, rec);
             }
             catch (Exception ex) { Log.Error("Registro da terraplenagem", ex); }
         }
