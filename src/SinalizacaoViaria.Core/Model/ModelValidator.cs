@@ -50,9 +50,12 @@ public static class ModelValidator
     /// <param name="terreno">Superfície do terreno PROJETADO (o Toposolid como está) para o V14. Nulo = não conferida.</param>
     /// <param name="terraplenagem">Registro da última terraplenagem aplicada (V15). Nulo = sem registro: não se sabe se o terreno
     /// acompanha as marcas.</param>
+    /// <param name="terrenoNatural">Terreno natural (o original, antes da terraplenagem) para os talvegues sob aterro (V13).
+    /// Nulo = não conferidos.</param>
     public static List<Achado> Validate(IReadOnlyList<CopiaGravada> copias, Func<string, bool>? elementoExiste = null,
         GeometricCriteria? criterios = null, Automation.ProjetoDrenagem? drenagem = null, bool incluirNaoVerificados = false,
-        Automation.TerrainMesh? terreno = null, Automation.RegistroTerraplenagem? terraplenagem = null)
+        Automation.TerrainMesh? terreno = null, Automation.RegistroTerraplenagem? terraplenagem = null,
+        Func<Vec2, double?>? terrenoNatural = null)
     {
         var res = new List<Achado>();
         var defs = new Dictionary<string, MarkingDefinition>();
@@ -106,7 +109,8 @@ public static class ModelValidator
 
         CheckLayout(defs, res);
         if (criterios is { IsEmpty: false }) CheckAlignment(defs, criterios, res);
-        CheckDrainage(defs, drenagem, res);
+        CheckDrainage(defs, drenagem, terreno, res);
+        CheckDrainageModel(defs, terrenoNatural, res);
         if (terreno != null) CheckTerrain(defs, terreno, criterios?.DeclividadeMaximaTerreno, res);
         if (terraplenagem != null) CheckEarthwork(defs, terraplenagem, res);
 
@@ -116,14 +120,14 @@ public static class ModelValidator
             res.Add(new("V08", Severidade.Info, Confianca.Alta, false,
                 $"{s.DisplayCode}: linha de corte sem o perfil transversal (sai na próxima atualização).", new[] { s.Id }));
 
-        if (incluirNaoVerificados) res.AddRange(NaoVerificados(defs.Values, elementoExiste, criterios, drenagem, terreno, terraplenagem));
+        if (incluirNaoVerificados) res.AddRange(NaoVerificados(defs.Values, elementoExiste, criterios, drenagem, terreno, terraplenagem, terrenoNatural));
         return res.OrderBy(a => a.Severidade).ThenBy(a => a.Codigo, StringComparer.Ordinal).ToList();
     }
 
     /// <summary>Verificações que não puderam rodar com os dados dados – ditas, nunca contadas como "sem problema".</summary>
     private static IEnumerable<Achado> NaoVerificados(IEnumerable<MarkingDefinition> defs, Func<string, bool>? elementoExiste,
         GeometricCriteria? criterios, Automation.ProjetoDrenagem? drenagem, Automation.TerrainMesh? terreno,
-        Automation.RegistroTerraplenagem? terraplenagem)
+        Automation.RegistroTerraplenagem? terraplenagem, Func<Vec2, double?>? terrenoNatural)
     {
         var lista = defs.ToList();
         static Achado N(string codigo, string msg, string acao) => new(codigo, Severidade.NaoVerificavel, Confianca.Alta, false, msg, Array.Empty<string>(), acao);
@@ -153,6 +157,9 @@ public static class ModelValidator
         if (terraplenagem == null && Automation.EarthworkRecord.Participantes(lista).Count is > 0 and var n)
             yield return N("V15", $"Sem registro da terraplenagem aplicada (nunca aplicada, aplicada por versão anterior à 2.11 ou validação sem o documento): " +
                 $"não se sabe se o terreno acompanha as {n} marca(s) que o moldam.", "rodar a Terraplenagem uma vez para gravar o registro");
+        if (terrenoNatural == null && lista.OfType<RoadPavementDefinition>().Any(r => r.Output.Grade is { AdjustTerrain: true }))
+            yield return N("V13", "Terreno natural não lido: os talvegues sob o aterro das vias (água represada pela via) não foram conferidos.",
+                "validar com o Toposolid no projeto");
     }
 
     /// <summary>
@@ -231,7 +238,7 @@ public static class ModelValidator
         new Regra("V11", "Interseções", "interseção com menos de duas vias existentes", "apagar ou refazer a conexão entre as vias"),
         new Regra("V12", "Vias (traçado e greide)", "eixo ou greide de via fora dos limites geométricos informados pelo usuário (raio, tangente, rampa, K)",
             "rever o traçado ou o greide, ou os limites informados"),
-        new Regra("V13", "Drenagem", "rede de drenagem: contrafluxo, trecho ligado ao próprio dispositivo, ciclo ou fora dos critérios do Projeto de Drenagem (declividade, recobrimento, diâmetro, PVs, capacidade, velocidade, sarjeta, engolimento)",
+        new Regra("V13", "Drenagem", "rede de drenagem: contrafluxo, trecho ligado ao próprio dispositivo, ciclo ou fora dos critérios do Projeto de Drenagem (declividade, recobrimento sob a superfície acabada, diâmetro, PVs, capacidade, velocidade, sarjeta, engolimento); ponto baixo da sarjeta sem captação, captação que diverge do greide e talvegue sob aterro sem travessia",
             "rever o trecho ou o dispositivo indicado, ou o critério no Projeto de Drenagem"),
         new Regra("V14", "Topografia", "superfície do terreno projetado: dados insuficientes ou inválidos, cotas diferentes no mesmo ponto, triângulos sem área, declividade acima do limite informado, eixos fora da superfície",
             "conferir o levantamento ou o Toposolid no ponto indicado"),
@@ -400,15 +407,48 @@ public static class ModelValidator
     }
 
     /// <summary>
+    /// Drenagem × vias e terreno (V13, Etapa 6): pontos baixos da sarjeta sem captação (só quando o projeto tem drenagem
+    /// modelada), o que foi informado nas captações e diverge do greide, e talvegues do terreno natural sob aterro sem trecho
+    /// de rede atravessando a via. Leitura geométrica com as tolerâncias de <see cref="Automation.DrenagemDoModelo"/>.
+    /// </summary>
+    private static void CheckDrainageModel(Dictionary<string, MarkingDefinition> defs, Func<Vec2, double?>? terrenoNatural, List<Achado> res)
+    {
+        var pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+        if (defs.Values.Any(d => d is DrainageDefinition))
+        {
+            foreach (var pb in Automation.DrenagemDoModelo.PontosBaixosSemCaptacao(defs.Values))
+                res.Add(new("V13", Severidade.Aviso, Confianca.Media, true,
+                    $"Ponto baixo da sarjeta sem captação: {pb.Via}, lado {Automation.DrenagemDoModelo.Lado(pb.Lado)}, estaca {pb.EstacaTexto} " +
+                    $"(a sarjeta sobe {(pb.Profundidade * 100).ToString("0.#", pt)} cm dos dois lados); nenhuma boca de lobo ou grelha a até " +
+                    $"{Automation.DrenagemDoModelo.ToleranciaPontoBaixo.ToString("0", pt)} m – a água para ali.",
+                    new[] { pb.ViaId }, "colocar uma captação no ponto baixo ou rever o greide"));
+            foreach (var d in Automation.DrenagemDoModelo.Divergencias(Automation.DrenagemDoModelo.Captacoes(defs.Values)))
+                res.Add(new("V13", Severidade.Info, Confianca.Alta, false, d.Texto, d.Ids ?? Array.Empty<string>(),
+                    d.Criterio == "ponto-baixo-modelo" ? "marcar a captação como em ponto baixo (o engolimento muda) ou usar Ler do Modelo"
+                        : "conferir a declividade informada ou usar Ler do Modelo (Drenagem)"));
+        }
+        if (terrenoNatural != null)
+            foreach (var t in Automation.DrenagemDoModelo.TalveguesSemTravessia(defs.Values, terrenoNatural))
+                res.Add(new("V13", Severidade.Aviso, Confianca.Media, true,
+                    $"Talvegue do terreno natural sob o aterro da {t.Via}, estaca {t.EstacaTexto} (aterro de {t.Aterro.ToString("0.0", pt)} m sobre um vale de " +
+                    $"{t.Profundidade.ToString("0.0", pt)} m), sem trecho de rede atravessando a via a até " +
+                    $"{Automation.DrenagemDoModelo.AlcanceTravessia.ToString("0", pt)} m: a via represa a água ali.",
+                    new[] { t.ViaId }, "prever uma travessia (bueiro) ou conferir o terreno natural"));
+    }
+
+    /// <summary>
     /// Rede de drenagem (V13, F8): sentido do escoamento, ligações e ciclos sempre; os critérios do Projeto de Drenagem e, com
     /// a equação de chuva, a vazão (capacidade e velocidade das galerias, sarjetas e engolimento). O dispositivo inexistente já
-    /// sai no V04. O recobrimento é medido sob a reta entre as tampas dos dois dispositivos (o terreno entre eles não é lido –
-    /// confiança média), como a sarjeta, que depende da área de contribuição informada.
+    /// sai no V04. O recobrimento é medido sob a superfície acabada – as vias do plugin e, fora delas, o terreno projetado;
+    /// sem nenhum dos dois, a reta entre as tampas – (confiança média), como a sarjeta, que depende da área de contribuição.
     /// </summary>
-    private static void CheckDrainage(Dictionary<string, MarkingDefinition> defs, Automation.ProjetoDrenagem? c, List<Achado> res)
+    private static void CheckDrainage(Dictionary<string, MarkingDefinition> defs, Automation.ProjetoDrenagem? c, Automation.TerrainMesh? terreno,
+        List<Achado> res)
     {
         if (!defs.Values.Any(d => d is DrainagePipeDefinition)) return;
-        var problemas = Automation.DrainageNetwork.Check(defs.Values, c).Where(p => p.Criterio != "dispositivo").ToList();
+        // Recobrimento sob a superfície acabada: vias do plugin e, fora delas, o terreno projetado (Etapa 6; antes, a reta entre as tampas).
+        var superficie = Automation.DrenagemDoModelo.SuperficieAcabada(defs.Values, terreno == null ? null : terreno.Z);
+        var problemas = Automation.DrainageNetwork.Check(defs.Values, c, superficie).Where(p => p.Criterio != "dispositivo").ToList();
         if (c is { TemChuva: true }) problemas.AddRange(Automation.DrainageHydraulics.Calcular(defs.Values, c).Problemas);
         foreach (var p in problemas)
         {

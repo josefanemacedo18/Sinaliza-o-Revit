@@ -118,7 +118,7 @@ internal static class DrainageNetworkForms
          .Number("Velocidade mínima a seção plena (m/s)", () => p.VelocidadeMinima ?? 0, v => p.VelocidadeMinima = Opt(v), 0, 20, "0.00")
          .Number("Velocidade máxima a seção plena (m/s)", () => p.VelocidadeMaxima ?? 0, v => p.VelocidadeMaxima = Opt(v), 0, 20, "0.00")
          .Number("Recobrimento mínimo (m)", () => p.RecobrimentoMinimo ?? 0, v => p.RecobrimentoMinimo = Opt(v), 0, 10, "0.00",
-             "Sobre a geratriz superior externa do tubo, medido sob a reta entre as tampas dos dispositivos.")
+             "Sobre a geratriz superior externa do tubo, medido sob a superfície acabada: as vias do plugin e, fora delas, o terreno (Toposolid).")
          .Number("Declividade mínima das galerias (%)", () => p.DeclividadeMinima ?? 0, v => p.DeclividadeMinima = Opt(v), 0, 100, "0.###")
          .Number("Declividade máxima das galerias (%)", () => p.DeclividadeMaxima ?? 0, v => p.DeclividadeMaxima = Opt(v), 0, 100, "0.###")
          .Number("Declividade mínima das ligações (%)", () => p.DeclividadeMinimaLigacao ?? 0, v => p.DeclividadeMinimaLigacao = Opt(v), 0, 100, "0.###")
@@ -247,16 +247,30 @@ public sealed class CmdRedeDrenagem : CommandBase
             return Result.Cancelled;
         }
         var p = DrainageDesignStore.Load(doc);
-        var trechos = DrainageNetwork.Analyze(defs);
-        var problemas = DrainageNetwork.Check(defs, p);
+        // Recobrimento sob a superfície acabada (vias do plugin e terreno projetado) – Etapa 6; antes, a reta entre as tampas.
+        var superficie = DrenagemDoModelo.SuperficieAcabada(defs, TerrainModel.Current(doc));
+        var trechos = DrainageNetwork.Analyze(defs, superficie);
+        var problemas = DrainageNetwork.Check(defs, p, superficie);
         var hid = DrainageHydraulics.Calcular(defs, p);
         problemas.AddRange(hid.Problemas);
+        // Drenagem × vias e terreno: captações lidas do modelo, pontos baixos sem captação e talvegues sob aterro.
+        var captacoes = DrenagemDoModelo.Captacoes(defs);
+        problemas.AddRange(DrenagemDoModelo.Divergencias(captacoes));
+        foreach (var pb in DrenagemDoModelo.PontosBaixosSemCaptacao(defs))
+            problemas.Add(new ProblemaRede(pb.Via, "ponto-baixo", $"Ponto baixo da sarjeta sem captação: {pb.Via}, lado {DrenagemDoModelo.Lado(pb.Lado)}, estaca {pb.EstacaTexto}.",
+                false, new[] { pb.ViaId }));
+        if (TerrainModel.Ground(doc) is { } natural)
+            foreach (var tv in DrenagemDoModelo.TalveguesSemTravessia(defs, natural))
+                problemas.Add(new ProblemaRede(tv.Via, "talvegue", $"Talvegue sob o aterro da {tv.Via}, estaca {tv.EstacaTexto} (aterro {tv.Aterro.ToString("0.0", UiHelpers.PtBr)} m): sem travessia da rede – a via represa a água.",
+                    false, new[] { tv.ViaId }));
         string? path = null;
         try
         {
             Directory.CreateDirectory(PluginPaths.Root);
             path = Path.Combine(PluginPaths.Root, $"rede-drenagem-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
-            var csv = DrainageNetwork.Csv(trechos, problemas, p) + (p.TemChuva ? "\n" + DrainageHydraulics.Csv(hid, p) : "");
+            var csv = DrainageNetwork.Csv(trechos, problemas, p) + (p.TemChuva ? "\n" + DrainageHydraulics.Csv(hid, p) : "") +
+                      "\n" + PerfilRede.Csv(PerfilRede.Linhas(defs, superficie), PerfilRede.Dispositivos(defs)) +
+                      (captacoes.Count > 0 ? "\n" + DrenagemDoModelo.Csv(captacoes) : "");
             File.WriteAllText(path, csv, new UTF8Encoding(true));
         }
         catch (Exception ex)
@@ -278,7 +292,7 @@ public sealed class CmdRedeDrenagem : CommandBase
                           (problemas.Count > 12 ? $"\n… e mais {problemas.Count - 12} no relatório." : "") +
                           (p.TemChuva ? $"\n\nCritérios: {p.FonteTexto}." :
                               "\n\nSem equação de chuva no Projeto de Drenagem: só a geometria foi conferida (vazões não calculadas).") +
-                          "\nRecobrimento medido sob a reta entre as tampas dos dispositivos.",
+                          "\nRecobrimento medido sob a superfície acabada (vias do plugin e terreno). O relatório traz o perfil longitudinal da rede e as captações × modelo.",
             FooterText = path != null ? $"Relatório: {path}" : "O relatório não pôde ser gravado (ver log).",
         };
         var ids = problemas.SelectMany(x => x.Ids ?? Array.Empty<string>()).ToHashSet();
@@ -371,7 +385,8 @@ public sealed class CmdMemorialDrenagem : CommandBase
         if (dlg.ShowDialog() != true) return Result.Cancelled;
         try
         {
-            File.WriteAllBytes(dlg.FileName, DocxWriter.Write(DrainageMemorial.Build(defs, p, DateTime.Now)));
+            File.WriteAllBytes(dlg.FileName, DocxWriter.Write(DrainageMemorial.Build(defs, p, DateTime.Now,
+                DrenagemDoModelo.SuperficieAcabada(defs, TerrainModel.Current(doc)))));
         }
         catch (Exception ex)
         {
@@ -388,5 +403,69 @@ public sealed class CmdMemorialDrenagem : CommandBase
             try { Process.Start(new ProcessStartInfo(dlg.FileName) { UseShellExecute = true }); }
             catch (Exception ex) { Log.Error("Abrir memorial de drenagem", ex); }
         return Result.Succeeded;
+    }
+}
+
+/// <summary>
+/// Ler do Modelo (Etapa 6; RT-1.5): para cada boca de lobo e grelha, a sarjeta lida da via (declividade pelo greide, sentido,
+/// ponto baixo) e a área que escoa até ela pela geometria da via. Mostra o que leu e grava nos dispositivos – só os campos
+/// vazios ou todos, conforme a escolha. Nada é gravado sem a escolha.
+/// </summary>
+[Transaction(TransactionMode.Manual)]
+public sealed class CmdCaptacoesDoModelo : CommandBase
+{
+    protected override Result Run(UIApplication app, UIDocument uidoc)
+    {
+        var doc = uidoc.Document;
+        var defs = MarkingStorage.Definitions(doc);
+        var captacoes = DrenagemDoModelo.Captacoes(defs);
+        if (captacoes.Count == 0)
+        {
+            TaskDialog.Show(AppTitle, "Nenhuma boca de lobo ou grelha com caixa neste projeto.");
+            return Result.Cancelled;
+        }
+        var lidas = captacoes.Where(c => c.Sarjeta != null).ToList();
+        var fora = captacoes.Count - lidas.Count;
+        var semGreide = lidas.Count(c => c.Sarjeta!.Declividade == null);
+        var pt = UiHelpers.PtBr;
+        string Linha(CaptacaoLida c)
+        {
+            var s = c.Sarjeta!;
+            return $"• {c.Rotulo} – {s.Via}, lado {DrenagemDoModelo.Lado(s.Lado)}, estaca {s.EstacaTexto}: " +
+                   (s.Declividade is { } d ? $"sarjeta {d.ToString("0.00", pt)} %" : "via sem greide") +
+                   (s.PontoBaixo ? ", ponto baixo" : "") +
+                   (c.Area is { Area: > 0 } a ? $", área {a.Area.ToString("N1", pt)} m²" : "");
+        }
+        var vazios = DrenagemDoModelo.Aplicar(captacoes.Select(Copia).ToList());
+        var todos = DrenagemDoModelo.Aplicar(captacoes.Select(Copia).ToList(), sobrescrever: true);
+        var td = new TaskDialog(AppTitle)
+        {
+            MainInstruction = $"Captações lidas do modelo: {lidas.Count} de {captacoes.Count}",
+            MainContent = string.Join("\n", lidas.Take(12).Select(Linha)) + (lidas.Count > 12 ? $"\n… e mais {lidas.Count - 12}." : "") +
+                          (fora > 0 ? $"\n\n{fora} captação(ões) fora da sarjeta de uma via do plugin (a mais de {DrenagemDoModelo.AlcanceMeioFio.ToString("0.0", pt)} m da face do meio-fio): nada lido." : "") +
+                          (semGreide > 0 ? $"\n{semGreide} em via sem greide: sem declividade nem sentido do escoamento." : "") +
+                          "\n\nA área é a da via (pista do eixo ao meio-fio e calçada, entre o divisor e a captação): lotes e áreas externas não entram – some-as à mão.",
+        };
+        if (vazios.Count > 0)
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, $"Preencher só os campos vazios ({vazios.Count} captação(ões))",
+                "Área de contribuição igual a 0, declividade da sarjeta vazia e ponto baixo desmarcado onde o greide tem um. O que você informou fica.");
+        if (todos.Count > 0)
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, $"Substituir pelo modelo ({todos.Count} captação(ões))",
+                "Troca a área e a declividade informadas pelas lidas da via. Desfazer (Ctrl+Z) volta ao que estava.");
+        td.CommonButtons = TaskDialogCommonButtons.Close;
+        var choice = td.Show();
+        if (choice is not (TaskDialogResult.CommandLink1 or TaskDialogResult.CommandLink2)) return Result.Cancelled;
+        // As definições lidas agora são as gravadas: alteradas no lugar e regravadas.
+        var mudou = DrenagemDoModelo.Aplicar(captacoes, sobrescrever: choice == TaskDialogResult.CommandLink2);
+        var res = MarkingCreator.Commit(uidoc, mudou.Select(m => (MarkingDefinition)m.Dispositivo).ToList(), "SV - Captações lidas do modelo");
+        var resumo = new RenderResult();
+        resumo.Warnings.Add($"{mudou.Count} captação(ões) atualizada(s):\n" + string.Join("\n", mudou.Take(15).Select(m => m.Texto)) +
+                            (mudou.Count > 15 ? $"\n… e mais {mudou.Count - 15}." : ""));
+        res.Insert(0, resumo);
+        Report("Ler do Modelo", res.Where(r => r.Warnings.Count > 0).ToList(), alwaysShow: true);
+        return Result.Succeeded;
+
+        // Cópia para contar o que mudaria, sem tocar nas definições.
+        static CaptacaoLida Copia(CaptacaoLida c) => c with { Dispositivo = (DrainageDefinition)MarkingDefinition.FromJson(c.Dispositivo.ToJson())! };
     }
 }

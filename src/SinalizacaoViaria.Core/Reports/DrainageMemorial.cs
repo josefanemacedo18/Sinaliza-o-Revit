@@ -27,17 +27,7 @@ public static class DrainageMemorial
     public const string SecQuantitativo = "5. QUANTITATIVO DE MATERIAIS E SERVIÇOS";
     public const string SecFinais = "6. DISPOSIÇÕES FINAIS";
 
-    private static string NomeTipo(TipoDrenagem t) => t switch
-    {
-        TipoDrenagem.BocaDeLoboSimples => "Boca de lobo simples (guia chapéu)",
-        TipoDrenagem.BocaDeLoboDupla => "Boca de lobo dupla (guia chapéu)",
-        TipoDrenagem.BocaDeLoboGrelha => "Boca de lobo com grelha",
-        TipoDrenagem.BocaDeLoboCombinada => "Boca de lobo combinada (guia chapéu e grelha)",
-        TipoDrenagem.GrelhaSarjeta => "Grelha de sarjeta com caixa",
-        TipoDrenagem.GrelhaQuadrada => "Grelha de piso com caixa",
-        TipoDrenagem.GrelhaContinua => "Canaleta com grelha contínua",
-        _ => "Poço de visita",
-    };
+    private static string NomeTipo(TipoDrenagem t) => DrainageDefinition.NomeTipo(t);
 
     /// <summary>
     /// Materiais e serviços da rede. Tubos pela extensão entre os centros dos dispositivos (como na planilha do modelo);
@@ -78,16 +68,19 @@ public static class DrainageMemorial
         return itens;
     }
 
-    public static MemorialDocument Build(IReadOnlyCollection<MarkingDefinition> defs, ProjetoDrenagem p, DateTime data)
+    /// <param name="superficie">Superfície acabada para o recobrimento (<see cref="DrenagemDoModelo.SuperficieAcabada"/>); nula =
+    /// a reta entre as tampas.</param>
+    public static MemorialDocument Build(IReadOnlyCollection<MarkingDefinition> defs, ProjetoDrenagem p, DateTime data,
+        Func<Geometry.Vec2, double?>? superficie = null)
     {
         var header = string.IsNullOrWhiteSpace(p.Autor) ? null
             : p.Autor!.Trim().ToUpper(Pt) + (string.IsNullOrWhiteSpace(p.Registro) ? "" : "\n" + p.Registro!.Trim());
         var doc = new MemorialDocument { Title = "MEMORIAL DESCRITIVO", Header = header, PageNumbers = true };
         var b = doc.Blocks;
         var r = DrainageHydraulics.Calcular(defs, p);
-        var problemas = DrainageNetwork.Check(defs, p).Concat(r.Problemas).ToList();
+        var problemas = DrainageNetwork.Check(defs, p, superficie).Concat(r.Problemas).ToList();
         var dispositivos = defs.OfType<DrainageDefinition>().ToList();
-        var trechos = DrainageNetwork.Analyze(defs);
+        var trechos = DrainageNetwork.Analyze(defs, superficie);
         var galerias = trechos.Where(t => !t.Ligacao).ToList();
         var ligacoes = trechos.Where(t => t.Ligacao).ToList();
 

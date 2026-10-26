@@ -30,5 +30,12 @@ public static class Tolerancias
         new Tolerancia("Terreno sob os pisos", FloorTerrainCheck.Tolerancia, "m", "FloorTerrainCheck.Tolerancia", "piso enterrado, suspenso ou com o terreno dentro"),
         new Tolerancia("Terreno na borda da seção", FloorTerrainCheck.ToleranciaBorda, "m", "FloorTerrainCheck.ToleranciaBorda", "degrau entre o terreno e a borda"),
         new Tolerancia("Área de ruído entre quadras", ModelValidator.AreaTolerance, "m²", "ModelValidator.AreaTolerance", "quadras que só se encostam (V09, V10)"),
+        new Tolerancia("Dispositivo na sarjeta", DrenagemDoModelo.AlcanceMeioFio, "m", "DrenagemDoModelo.AlcanceMeioFio", "distância do dispositivo à face do meio-fio para ler a sarjeta daquela via"),
+        new Tolerancia("Captação do ponto baixo", DrenagemDoModelo.ToleranciaPontoBaixo, "m", "DrenagemDoModelo.ToleranciaPontoBaixo", "captação que atende o ponto baixo da sarjeta (V13)"),
+        new Tolerancia("Profundidade do ponto baixo", DrenagemDoModelo.ProfundidadeMinima, "m", "DrenagemDoModelo.ProfundidadeMinima", "quanto a sarjeta sobe dos dois lados para ser ponto baixo"),
+        new Tolerancia("Declividade informada × greide", DrenagemDoModelo.DiferencaDeclividade, "%", "DrenagemDoModelo.DiferencaDeclividade", "diferença apontada entre a declividade da sarjeta informada e a do greide"),
+        new Tolerancia("Aterro sobre o talvegue", DrenagemDoModelo.AterroMinimo, "m", "DrenagemDoModelo.AterroMinimo", "aterro a partir do qual o talvegue precisa de travessia"),
+        new Tolerancia("Profundidade do talvegue", DrenagemDoModelo.TalvegueMinimo, "m", "DrenagemDoModelo.TalvegueMinimo", "vale do terreno natural sob a via"),
+        new Tolerancia("Alcance da travessia", DrenagemDoModelo.AlcanceTravessia, "m", "DrenagemDoModelo.AlcanceTravessia", "trecho de rede que atravessa a via perto do talvegue"),
     };
 }

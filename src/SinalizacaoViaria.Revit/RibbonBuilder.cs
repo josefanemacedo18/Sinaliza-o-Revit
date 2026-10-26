@@ -184,6 +184,9 @@ public static class RibbonBuilder
                 "Equação de chuva, tempo de retorno, coeficiente de escoamento, rugosidade, diâmetros, limites e identificação do memorial, gravados no projeto – com as predefinições do Manual SUDERHSA (2002) e do memorial modelo."),
             Data(typeof(CmdRedeDrenagem), "Relatório da Rede", "rededren",
                 "Planilha de dimensionamento das galerias pelo método racional, captações (sarjeta e engolimento) e conferência da rede (sentido, ligações, ciclos, recobrimento, PVs); aplica os diâmetros calculados (CSV)."));
+        Large(dren, typeof(CmdCaptacoesDoModelo), "Ler do Modelo", "dremodelo",
+            "Lê da via cada boca de lobo e grelha: declividade da sarjeta pelo greide, ponto baixo e a área que escoa até ela (pista do eixo ao meio-fio e calçada, " +
+            "entre o divisor e a captação). Mostra o que leu e preenche só os campos vazios – ou substitui todos, se você escolher.");
         Large(dren, typeof(CmdMemorialDrenagem), "Memorial de Drenagem", "memdren",
             "Memorial descritivo de drenagem pluvial (.docx): parâmetros de projeto, planilha das galerias, descritivo dos serviços, quantitativo e disposições finais.");
         var oa = app.CreateRibbonPanel(InfraTab, "Obras de Arte");

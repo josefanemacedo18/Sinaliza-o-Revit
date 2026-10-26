@@ -227,6 +227,19 @@ public sealed class DrainageDefinition : MarkingDefinition
         _ => "PV",
     };
     public bool IsLinear => Type == TipoDrenagem.GrelhaContinua;
+
+    /// <summary>Nome do tipo (memorial, relatório da rede).</summary>
+    public static string NomeTipo(TipoDrenagem t) => t switch
+    {
+        TipoDrenagem.BocaDeLoboSimples => "Boca de lobo simples (guia chapéu)",
+        TipoDrenagem.BocaDeLoboDupla => "Boca de lobo dupla (guia chapéu)",
+        TipoDrenagem.BocaDeLoboGrelha => "Boca de lobo com grelha",
+        TipoDrenagem.BocaDeLoboCombinada => "Boca de lobo combinada (guia chapéu e grelha)",
+        TipoDrenagem.GrelhaSarjeta => "Grelha de sarjeta com caixa",
+        TipoDrenagem.GrelhaQuadrada => "Grelha de piso com caixa",
+        TipoDrenagem.GrelhaContinua => "Canaleta com grelha contínua",
+        _ => "Poço de visita",
+    };
     public override PathReference? Path => IsLinear ? PathRef : null;
     public override double? PointZ => IsLinear ? null : Z;
     public override void SetPath(PathReference path) => PathRef = path;

@@ -247,6 +247,16 @@ public static class IconFactory
                 dc.DrawLine(P(Asphalt, 3), new Point(10, 20), new Point(22, 20));
                 dc.DrawGeometry(null, new Pen(B(Yellow), 1.2) { DashStyle = DashStyles.Dash }, Poly(new Point(1, 14), new Point(8, 10), new Point(15, 6), new Point(24, 8), new Point(31, 12)));
                 break;
+            case "dremodelo":
+                // Sarjeta com o caimento lido do greide até a boca de lobo.
+                RoadBackground(dc);
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(1, 22, 30, 4));
+                dc.DrawRectangle(B(Color.FromRgb(90, 94, 102)), P(White, 1), new Rect(22, 18, 7, 5));
+                dc.DrawLine(P(Blue, 2), new Point(3, 12), new Point(19, 20));
+                dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(21, 21), new Point(15, 21.5), new Point(18, 16.5))));
+                dc.DrawLine(P(White, 1.2), new Point(3, 6), new Point(12, 6));
+                dc.DrawLine(P(White, 1.2), new Point(3, 9), new Point(9, 9));
+                break;
             case "estruturapav":
                 // Estrutura do pavimento: revestimento escuro sobre base, sub-base e subleito.
                 dc.DrawRectangle(B(Asphalt), null, new Rect(2, 5, 28, 5));

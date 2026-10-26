@@ -568,6 +568,13 @@ internal sealed partial class AutoTestRunner
             s.Note($"Depois de mover o PV: {string.Join("; ", depois.Select(t => $"{t.Nome} {t.Comprimento:0.00} m"))}.");
             var achados = Core.Model.ModelValidator.Validate(MarkingStorage.Copies(_doc, out _), drenagem: p).Where(a => a.Codigo == "V13").ToList();
             s.Note($"V13: {achados.Count} achado(s) com os critérios do Manual SUDERHSA.");
+            // Etapa 6: perfil longitudinal pela superfície acabada (vias e terreno projetado) e captações lidas do modelo.
+            var atuais = MarkingStorage.Definitions(_doc);
+            var perfil = Core.Automation.PerfilRede.Linhas(atuais, Core.Automation.DrenagemDoModelo.SuperficieAcabada(atuais, TerrainModel.Current(_doc)));
+            if (perfil.Count != 3) s.Error($"Perfil da rede: esperadas 3 linhas (um ramo PV → PV → PV), saíram {perfil.Count}.");
+            else s.Note($"Perfil da rede: {string.Join("; ", perfil.Select(l => $"{l.Dispositivo} {l.Distancia:0.00} m, recobrimento {l.Recobrimento?.ToString("0.00") ?? "–"} m"))}.");
+            var lidas = Core.Automation.DrenagemDoModelo.Captacoes(atuais);
+            s.Note($"Captações lidas do modelo: {lidas.Count(c => c.Sarjeta != null)} de {lidas.Count} na sarjeta de uma via.");
             var bytes = Core.Reports.DocxWriter.Write(Core.Reports.DrainageMemorial.Build(MarkingStorage.Definitions(_doc), p, DateTime.Now));
             s.Note($"Memorial de drenagem gerado na memória: {bytes.Length / 1024} KiB.");
         });
