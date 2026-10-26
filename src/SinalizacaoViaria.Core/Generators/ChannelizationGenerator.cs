@@ -70,8 +70,9 @@ public static class ChannelizationGenerator
         var total = LocalOutline(d).Max(c => c.Max(p => p.S)) - d.StartStation;
         if (path.Length + 1e-6 < d.StartStation + total)
             geo.Warnings.Add($"A linha de referência tem {path.Length:0.0} m; a canalização precisa de {d.StartStation + total:0.0} m – prolongue a linha ou reduza os comprimentos.");
-        var minL = d.Type == TipoCanalizacao.Obstaculo ? (d.Rural ? 60 : 30) : 0;
-        if (d.Length > 0.05 && d.Length < minL) geo.Warnings.Add($"Transição de {d.Length:0} m: o mínimo recomendado junto a obstáculos é {minL} m ({(d.Rural ? "rodovia" : "via urbana")}).");
+        var lim = d.Rural ? LimitesDeConferencia.TransicaoObstaculoRodovia : LimitesDeConferencia.TransicaoObstaculoUrbana;
+        var minL = d.Type == TipoCanalizacao.Obstaculo ? lim.Valor : 0;
+        if (d.Length > 0.05 && d.Length < minL) geo.Warnings.Add($"Transição de {d.Length:0} m junto a obstáculo ({(d.Rural ? "rodovia" : "via urbana")}), abaixo de {lim.Rotulo}.");
         if (d.Length > 0.05 && d.Type != TipoCanalizacao.Acostamento && d.Length < 0.5 * d.Speed * Math.Abs(d.WidthChange) - 0.5)
             geo.Warnings.Add($"Transição menor que l = 0,5·V·d = {0.5 * d.Speed * Math.Abs(d.WidthChange):0} m (MBST Vol. IV / DER-SP).");
 

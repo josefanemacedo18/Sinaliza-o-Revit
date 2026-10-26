@@ -196,13 +196,15 @@ public static class RoundaboutGenerator
         var zone = new[] { L.Zone };
         var zoneR = Grow(outer, Math.Max(L.LegLength, 5)).Outer.Max(v => v.DistanceTo(c));
         if (d.Legs.Count == 0) L.Warnings.Add("Rotatória sem ramos: informe os ângulos dos ramos ou posicione-a sobre o cruzamento de vias.");
-        if (d.Lanes * d.LaneWidth < 4.0) L.Warnings.Add("Pista giratória com menos de 4 m – confira a largura para os veículos de projeto.");
+        if (d.Lanes * d.LaneWidth < LimitesDeConferencia.PistaGiratoriaMinima.Valor)
+            L.Warnings.Add($"Pista giratória de {d.Lanes * d.LaneWidth:0.00} m, abaixo de {LimitesDeConferencia.PistaGiratoriaMinima.Rotulo} e os veículos de projeto.");
         var inscribed = 2 * (ri + ring);
-        if (d.Type == TipoRotatoria.Mini && inscribed > 28) L.Warnings.Add($"Minirrotatória com diâmetro inscrito de {inscribed:0.0} m (referência: 13 a 25 m).");
+        if (d.Type == TipoRotatoria.Mini && inscribed > LimitesDeConferencia.MinirrotatoriaDiametroMaximo.Valor)
+            L.Warnings.Add($"Minirrotatória com diâmetro inscrito de {inscribed:0.0} m, acima de {LimitesDeConferencia.MinirrotatoriaDiametroMaximo.Rotulo}.");
         if (d.Legs.Count > 0 && inscribed < d.Legs.Max(l => l.Width) + 4)
             L.Warnings.Add($"Diâmetro inscrito de {inscribed:0.0} m menor que a pista mais larga que chega ({d.Legs.Max(l => l.Width):0.0} m) + 4 m: as entradas ficam maiores que o anel – use rotatória compacta/1 faixa com raio maior ou reduza a entrada (MBST Vol. IV).");
-        if (d.Type != TipoRotatoria.Mini && d.IslandType is not (TipoIlhaCentral.Galgavel or TipoIlhaCentral.Pintada or TipoIlhaCentral.Calota) && ri < 4 && d.Legs.Count > 0)
-            L.Warnings.Add("Ilha central pequena (< 4 m): em rotatórias compactas prefira ilha galgável ou pintada (minirrotatória).");
+        if (d.Type != TipoRotatoria.Mini && d.IslandType is not (TipoIlhaCentral.Galgavel or TipoIlhaCentral.Pintada or TipoIlhaCentral.Calota) && ri < LimitesDeConferencia.IlhaCentralMinima.Valor && d.Legs.Count > 0)
+            L.Warnings.Add($"Ilha central pequena (raio de {ri:0.0} m, abaixo de {LimitesDeConferencia.IlhaCentralMinima.Rotulo}). Em rotatórias compactas prefira ilha galgável ou pintada (minirrotatória).");
         if (d.Lanes >= 2 && d.Type is TipoRotatoria.Compacta or TipoRotatoria.Mini) L.Warnings.Add("Rotatórias compactas/mini devem ter uma faixa no anel.");
         if (!complete && d.Legs.Any(l => l.RoadId == null && l.GroupId == null) && d.Legs.Count > 0)
             L.Warnings.Add("Integração 'anel' ou 'somente ilha' sem vias ligadas: a pista dos ramos não é gerada – use 'Completa' ou crie as vias antes.");
@@ -307,10 +309,10 @@ public static class RoundaboutGenerator
                     if (sp != null && med > 0 && mode == IlhaSeparadora.Pintada)
                         sp = PolygonOps.Intersect(new[] { sp }, PolygonOps.Offset(new[] { L.Zone }, -0.10)).OrderByDescending(p => p.Area).FirstOrDefault();
                 }
-                else L.Warnings.Add($"Ramo a {leg.AngleDeg:0}°: pista estreita para ilha separadora (mínimo ~7 m).");
+                else L.Warnings.Add($"Ramo a {leg.AngleDeg:0}°: pista de {leg.Width:0.0} m estreita para a ilha separadora ({LimitesDeConferencia.PistaParaIlhaSeparadora.Rotulo}).");
             }
             else if (mode != IlhaSeparadora.Nenhuma && leg.Width < 6)
-                L.Warnings.Add($"Ramo a {leg.AngleDeg:0}°: pista estreita para ilha separadora (mínimo ~7 m).");
+                L.Warnings.Add($"Ramo a {leg.AngleDeg:0}°: pista de {leg.Width:0.0} m estreita para a ilha separadora ({LimitesDeConferencia.PistaParaIlhaSeparadora.Rotulo}).");
             var physical = sp != null && mode == IlhaSeparadora.Fisica;
             if (physical) splitters.Add(sp!);
             L.Legs.Add(new RoundaboutLegGeometry(leg, u, n, physical ? sp : null) { PaintedSplitter = sp != null && mode == IlhaSeparadora.Pintada ? sp : null });

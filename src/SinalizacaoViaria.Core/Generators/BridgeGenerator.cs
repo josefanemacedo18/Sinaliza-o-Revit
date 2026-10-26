@@ -155,7 +155,7 @@ public static class BridgeGenerator
     {
         var geo = new MarkingGeometry();
         var L = path.Length;
-        if (L < 10) { geo.Warnings.Add("Eixo da obra muito curto (mínimo 10 m)."); return geo; }
+        if (L < LimitesDeConferencia.EixoMinimoDaObra.Valor) { geo.Warnings.Add($"Eixo da obra de {L:0.0} m, muito curto ({LimitesDeConferencia.EixoMinimoDaObra.Rotulo})."); return geo; }
         if (b.HostRoad != null) return BuildHosted(b, path, ctx, geo);
         var gp = Infra.GroundProfile(b, path, ctx);
         Func<Vec2, double> ground = p => gp.Z(IntersectionGenerator.Project(path, p).Station);
@@ -199,7 +199,7 @@ public static class BridgeGenerator
         var half = host?.Half ?? b.HostHalf;
         var s0 = Math.Clamp(Math.Min(b.HostStart, b.HostEnd), 0, L);
         var s1 = Math.Clamp(Math.Max(b.HostStart, b.HostEnd), 0, L);
-        if (s1 - s0 < 5) { geo.Warnings.Add("Trecho da obra muito curto na via (mínimo 5 m)."); return geo; }
+        if (s1 - s0 < LimitesDeConferencia.TrechoMinimoDaObra.Valor) { geo.Warnings.Add($"Trecho da obra de {s1 - s0:0.0} m na via, muito curto ({LimitesDeConferencia.TrechoMinimoDaObra.Rotulo})."); return geo; }
         var gp = Infra.GroundProfile(b, path, ctx);
         // Vias que passam sob a obra: o terreno ali é o pavimento delas (fundações enterradas abaixo do subleito, nunca
         // acima da pista) e os pilares evitam a pista e as calçadas delas.

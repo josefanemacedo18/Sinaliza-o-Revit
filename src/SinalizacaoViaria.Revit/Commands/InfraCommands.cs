@@ -663,7 +663,7 @@ internal static class HostedRunner
             var stretch = RoadWorks.PickStretch(uidoc, road, def.KindName);
             if (stretch == null) return Result.Cancelled;
             var (s0, s1) = stretch.Value;
-            if (s1 - s0 < 5) { TaskDialog.Show(CommandBase.AppTitle, "Trecho muito curto (mínimo 5 m)."); return Result.Cancelled; }
+            if (s1 - s0 < Core.Generators.LimitesDeConferencia.TrechoMinimoDaObra.Valor) { TaskDialog.Show(CommandBase.AppTitle, $"Trecho de {s1 - s0:0.0} m, muito curto ({Core.Generators.LimitesDeConferencia.TrechoMinimoDaObra.Rotulo})."); return Result.Cancelled; }
             CommandBase.ReportResults(def.KindName, OnExistingRoad(uidoc, def, road, s0, s1).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;
         }
@@ -674,7 +674,7 @@ internal static class HostedRunner
         var path = RoadWorks.AxisFor(uidoc, w.PathMode != PathMode.ViaNovaLinhas, InfraForms.NewRoadRadius, straight, snapped);
         if (path == null) return Result.Cancelled;
         var resolved = PathResolver.Resolve(doc, path);
-        if (resolved?.Main is not { Length: >= 10 }) { TaskDialog.Show(CommandBase.AppTitle, "Eixo muito curto para a obra (mínimo 10 m)."); return Result.Cancelled; }
+        if (resolved?.Main is not { } main || main.Length < Core.Generators.LimitesDeConferencia.EixoMinimoDaObra.Valor) { TaskDialog.Show(CommandBase.AppTitle, $"Eixo muito curto para a obra ({Core.Generators.LimitesDeConferencia.EixoMinimoDaObra.Rotulo})."); return Result.Cancelled; }
         var results = OnNewRoad(uidoc, def, path, InfraForms.NewRoadTemplate);
         if (results == null) return Result.Failed;
         if (snapped.Count > 0 && results.Count > 0) results[0].Warnings.Insert(0, "Conexões: " + string.Join("; ", snapped.Distinct()) + ".");
@@ -707,10 +707,10 @@ internal static class HostedRunner
         var doc = uidoc.Document;
         var results = new List<RenderResult>();
         var resolved = PathResolver.Resolve(doc, path);
-        if (resolved?.Main is not { } axis || axis.Length < 10)
+        if (resolved?.Main is not { } axis || axis.Length < Core.Generators.LimitesDeConferencia.EixoMinimoDaObra.Valor)
         {
             results.Add(new RenderResult());
-            results[0].Warnings.Add("Eixo muito curto para a obra (mínimo 10 m).");
+            results[0].Warnings.Add($"Eixo muito curto para a obra ({Core.Generators.LimitesDeConferencia.EixoMinimoDaObra.Rotulo}).");
             return results;
         }
         var g0 = RoadWorks.Ground(doc, resolved.Z);

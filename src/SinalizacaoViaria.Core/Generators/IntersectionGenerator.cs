@@ -1285,7 +1285,7 @@ public static partial class IntersectionGenerator
                     P = Math.Min(P, med.Width - 0.3);
                     if (P < 2.7)
                     {
-                        L.Warnings.Add($"Canteiro central com {med.Width:0.00} m: estreito para o bolsão de conversão à esquerda (mínimo 3,00 m).");
+                        L.Warnings.Add($"Canteiro central com {med.Width:0.00} m: estreito para o bolsão de conversão à esquerda ({LimitesDeConferencia.CanteiroParaBolsao.Rotulo}).");
                         continue;
                     }
                     var tEnd = c + S + T;
@@ -1373,8 +1373,8 @@ public static partial class IntersectionGenerator
         for (int i = 0; i < dirs.Count; i++)
             for (int j = i + 1; j < dirs.Count; j++)
                 minSin = Math.Min(minSin, Math.Abs(dirs[i].Cross(dirs[j])));
-        if (minSin < 0.5 && !channels)
-            L.Warnings.Add("Vias muito oblíquas (< 30°): considere canalizar as esquinas (Tipo III) ou realinhar o ramo secundário (T entre 75° e 105°).");
+        if (minSin < Math.Sin(LimitesDeConferencia.AnguloMinimoEntreVias.Valor * Math.PI / 180) && !channels)
+            L.Warnings.Add($"Vias muito oblíquas (ângulo abaixo de {LimitesDeConferencia.AnguloMinimoEntreVias.Rotulo}): considere canalizar as esquinas (Tipo III) ou realinhar o ramo secundário mais perto do ângulo reto.");
         var anyTreatment = d.LegSettings.Any(x => x.Treatment == true);
         var reachFeat = (d.SplitterIslands != TipoIlha.Nenhuma || anyTreatment ? Math.Max(d.SplitterLength, 12) + 25 : 0);
         reachFeat = Math.Max(reachFeat, d.LeftTurnPockets || anyTreatment ? d.PocketLength + d.PocketTaper + Math.Max(15, 10 * d.PocketWidth) : 0);
