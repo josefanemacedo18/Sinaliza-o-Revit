@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using SinalizacaoViaria.Core.Automation;
 using SinalizacaoViaria.Core.Model;
 using SinalizacaoViaria.Revit.Infrastructure;
 
@@ -35,7 +36,11 @@ public sealed class CmdValidarModelo : CommandBase
         try { if (File.Exists(historyPath)) previous = ValidationHistory.FromJson(File.ReadAllText(historyPath)); }
         catch (Exception ex) { Log.Error("Validar Modelo – histórico", ex); }
         var cmp = ValidationHistory.Comparar(achados, previous);
-        var text = ModelValidator.Report(achados, marcas, copias.Count, doc.Title, now, version, cmp);
+        // Estado dos resultados derivados (Etapa 8): terraplenagem, captações lidas do modelo e o que é refeito ou calculado na hora.
+        IReadOnlyList<EstadoResultado>? estados = null;
+        try { estados = EstadoDosResultados.Calcular(MarkingStorage.Definitions(doc), EarthworkRecordStore.Load(doc)); }
+        catch (Exception ex) { Log.Error("Estado dos resultados", ex); }
+        var text = ModelValidator.Report(achados, marcas, copias.Count, doc.Title, now, version, cmp, estados);
         string? path = null;
         try
         {

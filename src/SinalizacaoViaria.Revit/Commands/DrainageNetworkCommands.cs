@@ -438,13 +438,19 @@ public sealed class CmdCaptacoesDoModelo : CommandBase
         }
         var vazios = DrenagemDoModelo.Aplicar(captacoes.Select(Copia).ToList());
         var todos = DrenagemDoModelo.Aplicar(captacoes.Select(Copia).ToList(), sobrescrever: true);
+        var desatualizadas = DrenagemDoModelo.AtualizarDesatualizadas(captacoes.Select(Copia).ToList());
+        // Estado do que já foi lido antes (Etapa 8): em dia, desatualizado ou editado à mão (preservado).
+        var estados = captacoes.GroupBy(DrenagemDoModelo.Estado).ToDictionary(g => g.Key, g => g.Count());
+        int E(EstadoLeitura e) => estados.GetValueOrDefault(e);
         var td = new TaskDialog(AppTitle)
         {
             MainInstruction = $"Captações lidas do modelo: {lidas.Count} de {captacoes.Count}",
             MainContent = string.Join("\n", lidas.Take(12).Select(Linha)) + (lidas.Count > 12 ? $"\n… e mais {lidas.Count - 12}." : "") +
                           (fora > 0 ? $"\n\n{fora} captação(ões) fora da sarjeta de uma via do plugin (a mais de {DrenagemDoModelo.AlcanceMeioFio.ToString("0.0", pt)} m da face do meio-fio): nada lido." : "") +
                           (semGreide > 0 ? $"\n{semGreide} em via sem greide: sem declividade nem sentido do escoamento." : "") +
-                          "\n\nA área é a da via (pista do eixo ao meio-fio e calçada, entre o divisor e a captação): lotes e áreas externas não entram – some-as à mão.",
+                          "\n\nA área é a da via (pista do eixo ao meio-fio e calçada, entre o divisor e a captação): lotes e áreas externas não entram – some-as à mão." +
+                          $"\nLeituras anteriores: {E(EstadoLeitura.EmDia)} em dia, {E(EstadoLeitura.Desatualizada)} desatualizada(s), {E(EstadoLeitura.Editada)} editada(s) à mão (ficam), " +
+                          $"{E(EstadoLeitura.NuncaLida)} nunca lida(s).",
         };
         if (vazios.Count > 0)
             td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, $"Preencher só os campos vazios ({vazios.Count} captação(ões))",
@@ -452,11 +458,16 @@ public sealed class CmdCaptacoesDoModelo : CommandBase
         if (todos.Count > 0)
             td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, $"Substituir pelo modelo ({todos.Count} captação(ões))",
                 "Troca a área e a declividade informadas pelas lidas da via. Desfazer (Ctrl+Z) volta ao que estava.");
+        if (desatualizadas.Count > 0)
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, $"Atualizar só as desatualizadas ({desatualizadas.Count} captação(ões))",
+                "Relê só as captações cujo valor lido antes não confere mais com o modelo e troca só os campos que ainda eram os lidos; as editadas à mão ficam.");
         td.CommonButtons = TaskDialogCommonButtons.Close;
         var choice = td.Show();
-        if (choice is not (TaskDialogResult.CommandLink1 or TaskDialogResult.CommandLink2)) return Result.Cancelled;
+        if (choice is not (TaskDialogResult.CommandLink1 or TaskDialogResult.CommandLink2 or TaskDialogResult.CommandLink3)) return Result.Cancelled;
         // As definições lidas agora são as gravadas: alteradas no lugar e regravadas.
-        var mudou = DrenagemDoModelo.Aplicar(captacoes, sobrescrever: choice == TaskDialogResult.CommandLink2);
+        var mudou = choice == TaskDialogResult.CommandLink3
+            ? DrenagemDoModelo.AtualizarDesatualizadas(captacoes)
+            : DrenagemDoModelo.Aplicar(captacoes, sobrescrever: choice == TaskDialogResult.CommandLink2);
         var res = MarkingCreator.Commit(uidoc, mudou.Select(m => (MarkingDefinition)m.Dispositivo).ToList(), "SV - Captações lidas do modelo");
         var resumo = new RenderResult();
         resumo.Warnings.Add($"{mudou.Count} captação(ões) atualizada(s):\n" + string.Join("\n", mudou.Take(15).Select(m => m.Texto)) +

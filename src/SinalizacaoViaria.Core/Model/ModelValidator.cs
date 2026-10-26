@@ -112,6 +112,7 @@ public static class ModelValidator
         if (criterios is { IsEmpty: false }) CheckAlignment(defs, criterios, res);
         CheckDrainage(defs, drenagem, terreno, res);
         CheckDrainageModel(defs, terrenoNatural, res);
+        CheckDerived(defs, res);
         if (terreno != null) CheckTerrain(defs, terreno, criterios?.DeclividadeMaximaTerreno, res);
         if (terraplenagem != null) CheckEarthwork(defs, terraplenagem, res);
 
@@ -250,6 +251,8 @@ public static class ModelValidator
             "rodar a Terraplenagem (o terreno original fica guardado e é a base do novo cálculo)"),
         new Regra("V16", "Quadras e lotes", "parcelamento: percentual da gleba (sistema viário, áreas públicas, categoria) abaixo do mínimo informado no loteamento; lote abaixo do lote mínimo informado (frente e área)",
             "rever as quadras e os lotes, ou o mínimo informado e a sua fonte"),
+        new Regra("V17", "Integração", "resultado lido do modelo que ficou desatualizado: área ou declividade de captação lida da via que o modelo agora dá diferente",
+            "atualizar só o que ficou desatualizado (as edições à mão ficam)"),
     }.ToDictionary(r => r.Codigo);
 
     /// <summary>O que cada código verifica (relatório e manual).</summary>
@@ -265,8 +268,9 @@ public static class ModelValidator
     /// por módulo, a comparação com a validação anterior (quando há), os achados com módulo e ação recomendada e o que não
     /// pôde ser verificado.
     /// </summary>
+    /// <param name="estados">Estado dos resultados derivados (Etapa 8): sai numa seção própria quando dado.</param>
     public static string Report(IReadOnlyList<Achado> achados, int marcas, int elementos, string projeto, DateTime quando,
-        string? versao = null, ComparacaoValidacao? comparacao = null)
+        string? versao = null, ComparacaoValidacao? comparacao = null, IReadOnlyList<Automation.EstadoResultado>? estados = null)
     {
         static string C(Confianca c) => c switch { Confianca.Alta => "alta", Confianca.Media => "média", _ => "baixa" };
         var problemas = achados.Where(a => a.Severidade != Severidade.NaoVerificavel).ToList();
@@ -299,6 +303,13 @@ public static class ModelValidator
             sb.AppendLine();
             sb.AppendLine("Resolvidos desde a validação anterior:");
             foreach (var r in comparacao.Resolvidos) sb.AppendLine($"  [{Nome(r.Severidade)}] {r.Codigo} {r.Mensagem}");
+        }
+        if (estados is { Count: > 0 })
+        {
+            sb.AppendLine();
+            sb.AppendLine("Estado dos resultados:");
+            foreach (var e in estados)
+                sb.AppendLine($"  [{Automation.EstadoDosResultados.Nome(e.Situacao)}] {e.Modulo} · {e.Resultado}: {e.Detalhe}{(e.Acao != null ? $" → {e.Acao}" : "")}");
         }
         sb.AppendLine();
         sb.AppendLine("Não verificado:");
@@ -410,6 +421,22 @@ public static class ModelValidator
             res.Add(new("V12", Severidade.Aviso, Confianca.Media, true,
                 $"{road.DisplayCode}: {v.Count} elemento(s) fora dos limites informados ({c.FonteTexto}): {lista}.", new[] { road.Id }));
         }
+    }
+
+    /// <summary>
+    /// Resultados lidos do modelo que ficaram desatualizados (V17, Etapa 8): captações cuja área ou declividade ainda é a lida
+    /// por Ler do Modelo, mas o modelo agora diz outra coisa. As editadas à mão não entram (ficam como o usuário escreveu).
+    /// </summary>
+    private static void CheckDerived(Dictionary<string, MarkingDefinition> defs, List<Achado> res)
+    {
+        if (!defs.Values.Any(d => d is DrainageDefinition { Lida: not null })) return;
+        var velhas = Automation.DrenagemDoModelo.Captacoes(defs.Values).Where(c => Automation.DrenagemDoModelo.Estado(c) == Automation.EstadoLeitura.Desatualizada).ToList();
+        if (velhas.Count == 0) return;
+        var nomes = string.Join(", ", velhas.Take(8).Select(c => c.Rotulo)) + (velhas.Count > 8 ? $" e mais {velhas.Count - 8}" : "");
+        res.Add(new("V17", Severidade.Aviso, Confianca.Alta, false,
+            $"{velhas.Count} captação(ões) com área ou declividade lidas do modelo que ficaram desatualizadas (a via mudou, outra captação entrou ou o " +
+            $"dispositivo saiu da sarjeta): {nomes}.", velhas.Select(c => c.Dispositivo.Id).ToArray(),
+            "Ler do Modelo › Atualizar só as desatualizadas (as editadas à mão ficam)"));
     }
 
     /// <summary>

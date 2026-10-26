@@ -46,6 +46,9 @@ public sealed record SarjetaLida(string ViaId, string Via, int Lado, double Esta
 /// <summary>Área que escoa pela sarjeta até o dispositivo, estimada pela geometria da via: o trecho de/até e a largura média.</summary>
 public sealed record AreaLida(double Area, double De, double Ate, double Largura);
 
+/// <summary>Estado do que foi lido do modelo numa captação (Etapa 8).</summary>
+public enum EstadoLeitura { NuncaLida, EmDia, Desatualizada, Editada }
+
 /// <summary>Captação com o que o modelo diz dela (nulo = não está na sarjeta de uma via do plugin).</summary>
 public sealed record CaptacaoLida(DrainageDefinition Dispositivo, string Rotulo, SarjetaLida? Sarjeta, AreaLida? Area);
 
@@ -238,10 +241,12 @@ public static class DrenagemDoModelo
 
     /// <summary>
     /// Grava nas captações o que o modelo diz: a área (quando 0 ou com <paramref name="sobrescrever"/>), a declividade da
-    /// sarjeta (quando vazia ou com <paramref name="sobrescrever"/>) e o ponto baixo (só liga). Devolve os dispositivos que
-    /// mudaram e o que mudou. As definições são alteradas no lugar: quem chama grava.
+    /// sarjeta (quando vazia ou com <paramref name="sobrescrever"/>) e o ponto baixo (só liga), e registra a leitura
+    /// (<see cref="DrainageDefinition.Lida"/>, Etapa 8) – o valor informado que ficou é reconhecido depois como editado à mão.
+    /// Devolve os dispositivos que mudaram e o que mudou. As definições são alteradas no lugar: quem chama grava.
     /// </summary>
-    public static List<(DrainageDefinition Dispositivo, string Texto)> Aplicar(IEnumerable<CaptacaoLida> captacoes, bool sobrescrever = false)
+    public static List<(DrainageDefinition Dispositivo, string Texto)> Aplicar(IEnumerable<CaptacaoLida> captacoes, bool sobrescrever = false,
+        DateTime? quando = null)
     {
         var mudou = new List<(DrainageDefinition, string)>();
         foreach (var c in captacoes)
@@ -263,7 +268,84 @@ public static class DrenagemDoModelo
                 d.PontoBaixo = true;
                 partes.Add("ponto baixo");
             }
+            if (c.Sarjeta != null)
+            {
+                var lida = Leitura(c, quando ?? DateTime.Now);
+                if (!MesmaLeitura(d.Lida, lida))
+                {
+                    d.Lida = lida;
+                    if (partes.Count == 0) partes.Add("leitura registrada (os valores informados ficam)");
+                }
+            }
             if (partes.Count > 0) mudou.Add((d, $"{c.Rotulo}: {string.Join(", ", partes)}"));
+        }
+        return mudou;
+    }
+
+    private static ContribuicaoLida Leitura(CaptacaoLida c, DateTime quando) => new()
+    {
+        ViaId = c.Sarjeta?.ViaId ?? "", Quando = quando,
+        Area = c.Area is { Area: > 1e-6 } a ? Math.Round(a.Area, 1) : null,
+        Declividade = c.Sarjeta?.Declividade is { } x ? Math.Round(x, 2) : null,
+        PontoBaixo = c.Sarjeta?.PontoBaixo ?? false,
+    };
+
+    private static bool Igual(double? x, double? y, double tol) => x == null ? y == null : y != null && Math.Abs(x.Value - y.Value) <= tol;
+
+    private static bool MesmaLeitura(ContribuicaoLida? a, ContribuicaoLida b) =>
+        a != null && a.ViaId == b.ViaId && Igual(a.Area, b.Area, 0.05) && Igual(a.Declividade, b.Declividade, 0.005) && a.PontoBaixo == b.PontoBaixo;
+
+    private static bool AreaDoModelo(DrainageDefinition d) => d.Lida?.Area is { } a && Math.Abs(d.AreaContribuicao - a) <= 0.05;
+    private static bool DeclividadeDoModelo(DrainageDefinition d) => d.Lida?.Declividade is { } a && d.DeclividadeSarjeta is { } x && Math.Abs(x - a) <= 0.005;
+
+    /// <summary>
+    /// Estado do que foi lido do modelo numa captação (Etapa 8): nunca lido; em dia; desatualizado (o campo ainda é o lido,
+    /// mas o modelo agora diz outra coisa – a via mudou, outra captação entrou acima, o dispositivo saiu da sarjeta); ou
+    /// editado à mão (nenhum campo é mais o lido: fica como está).
+    /// </summary>
+    public static EstadoLeitura Estado(CaptacaoLida c)
+    {
+        var d = c.Dispositivo;
+        if (d.Lida is not { } l) return EstadoLeitura.NuncaLida;
+        var area = AreaDoModelo(d);
+        var decl = DeclividadeDoModelo(d);
+        if (!area && !decl) return EstadoLeitura.Editada;
+        if (c.Sarjeta == null) return EstadoLeitura.Desatualizada;
+        var agora = Leitura(c, l.Quando);
+        if (agora.ViaId != l.ViaId || (area && !Igual(agora.Area, l.Area, 0.05)) || (decl && !Igual(agora.Declividade, l.Declividade, 0.005)))
+            return EstadoLeitura.Desatualizada;
+        return EstadoLeitura.EmDia;
+    }
+
+    /// <summary>
+    /// Atualização seletiva (Etapa 8): relê só as captações desatualizadas e troca só os campos que ainda eram os lidos – os
+    /// editados à mão ficam. Captação fora da sarjeta de uma via não é relida (fica para conferir à mão).
+    /// </summary>
+    public static List<(DrainageDefinition Dispositivo, string Texto)> AtualizarDesatualizadas(IEnumerable<CaptacaoLida> captacoes, DateTime? quando = null)
+    {
+        var mudou = new List<(DrainageDefinition, string)>();
+        foreach (var c in captacoes.Where(c => c.Sarjeta != null && Estado(c) == EstadoLeitura.Desatualizada))
+        {
+            var d = c.Dispositivo;
+            var agora = Leitura(c, quando ?? DateTime.Now);
+            var partes = new List<string>();
+            if (AreaDoModelo(d) && agora.Area is { } a && Math.Abs(a - d.AreaContribuicao) > 0.05)
+            {
+                partes.Add($"área {d.AreaContribuicao.ToString("N1", Pt)} → {a.ToString("N1", Pt)} m²");
+                d.AreaContribuicao = a;
+            }
+            if (DeclividadeDoModelo(d) && agora.Declividade is { } x && Math.Abs(x - d.DeclividadeSarjeta!.Value) > 0.005)
+            {
+                partes.Add($"sarjeta {d.DeclividadeSarjeta.Value.ToString("0.00", Pt)} → {x.ToString("0.00", Pt)} %");
+                d.DeclividadeSarjeta = x;
+            }
+            if (agora.PontoBaixo && !d.PontoBaixo)
+            {
+                d.PontoBaixo = true;
+                partes.Add("ponto baixo");
+            }
+            d.Lida = agora;
+            mudou.Add((d, $"{c.Rotulo}: {(partes.Count > 0 ? string.Join(", ", partes) : "leitura renovada")}"));
         }
         return mudou;
     }

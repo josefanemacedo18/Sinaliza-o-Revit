@@ -70,6 +70,7 @@ public sealed class CmdEstruturaPavimento : CommandBase
               (molda ? refazer ? " Terraplenagem refeita." : " Terraplenagem NÃO refeita: rode Terraplenagem para o terreno acompanhar." : "")
             : $"{pav.DisplayCode}: sem estrutura informada – a terraplenagem usa o subleito das opções dela.");
         res.Insert(0, resumo);
+        if (EditImpact.Of(doc, new[] { pav }) is { } impact) res.Add(impact);
         Report("Estrutura do pavimento", res.Where(r => r.Warnings.Count > 0).ToList(), alwaysShow: true);
         return Result.Succeeded;
     }

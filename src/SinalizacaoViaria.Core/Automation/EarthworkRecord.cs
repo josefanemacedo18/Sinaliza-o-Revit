@@ -86,8 +86,10 @@ public static class EarthworkRecord
     }
 
     /// <summary>
-    /// Assinatura da definição: SHA-256 do JSON dela. Qualquer mudança na marca muda a assinatura, menos a linha do terreno
-    /// natural guardada pelas obras (<see cref="ITerrainAware.GroundLine"/>), que é leitura do terreno e não escolha do projeto.
+    /// Assinatura da definição: SHA-256 do JSON dela. Qualquer mudança na marca muda a assinatura, menos o que não molda o
+    /// terreno: a linha do terreno natural guardada pelas obras (<see cref="ITerrainAware.GroundLine"/>, leitura do terreno) e,
+    /// nas caixas de drenagem (que entram só pela escavação), os dados hidráulicos – área, coeficientes, tempos, vazão
+    /// externa, sarjeta, ponto baixo e a leitura do modelo (Etapa 8: antes, preencher a área acusava a terraplenagem velha).
     /// </summary>
     public static string Assinatura(MarkingDefinition d)
     {
@@ -96,6 +98,15 @@ public static class EarthworkRecord
         {
             copia.GroundLine = null;
             json = ((MarkingDefinition)copia).ToJson();
+        }
+        else if (d is DrainageDefinition && MarkingDefinition.FromJson(json) is DrainageDefinition c)
+        {
+            c.AreaContribuicao = 0;
+            c.CoeficienteEscoamento = c.Impermeabilizacao = c.TempoConcentracao = c.TalvegueComprimento = c.TalvegueDesnivel = c.DeclividadeSarjeta = null;
+            c.VazaoExterna = 0;
+            c.PontoBaixo = false;
+            c.Lida = null;
+            json = c.ToJson();
         }
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
     }

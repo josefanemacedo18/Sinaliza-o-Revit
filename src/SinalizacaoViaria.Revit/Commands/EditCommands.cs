@@ -170,6 +170,7 @@ public sealed class CmdEditar : CommandBase
                     TerrainActions.AfterCreate(uidoc, new[] { hostRoad.Pavement, def });
             }
             else TerrainActions.AfterCreate(uidoc, def);
+            if (EditImpact.Of(uidoc.Document, new[] { def }) is { } formImpact) r.Add(formImpact);
             Report("Edição", r);
             return Result.Succeeded;
         }
@@ -203,6 +204,7 @@ public sealed class CmdEditar : CommandBase
         var results = MarkingCreator.Commit(uidoc, new[] { edited }, $"SV - Editar {edited.DisplayCode}");
         if (edited is RampDefinition ramp) RampCutter.Apply(uidoc, ramp);
         if (edited is LinearMarkingDefinition or TrafficCalmingDefinition or HatchMarkingDefinition or ChannelizationDefinition || edited.Overlay) FootprintCutter.ApplyFor(uidoc, edited);
+        if (EditImpact.Of(uidoc.Document, new[] { edited }) is { } impact) results.Add(impact);
         Report("Edição", results);
         return Result.Succeeded;
     }

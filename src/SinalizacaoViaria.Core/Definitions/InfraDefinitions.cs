@@ -125,6 +125,18 @@ public enum SaidaTubo
 /// Dispositivos de drenagem superficial urbana: bocas de lobo, grelhas, canaletas e poços de visita – com a caixa de
 /// captação, a tampa de inspeção e o rebaixo da sarjeta. Posicionados junto ao meio-fio (alinhados à via) ou livres.
 /// </summary>
+/// <summary>O que Ler do Modelo leu para uma captação: a via, quando e os valores lidos (arredondados como gravados).</summary>
+public sealed class ContribuicaoLida
+{
+    public string ViaId { get; set; } = "";
+    public DateTime Quando { get; set; }
+    public double? Area { get; set; }
+    public double? Declividade { get; set; }
+    public bool PontoBaixo { get; set; }
+
+    public ContribuicaoLida Clone() => (ContribuicaoLida)MemberwiseClone();
+}
+
 public sealed class DrainageDefinition : MarkingDefinition
 {
     public TipoDrenagem Type { get; set; } = TipoDrenagem.BocaDeLoboSimples;
@@ -210,6 +222,11 @@ public sealed class DrainageDefinition : MarkingDefinition
     public double? DeclividadeSarjeta { get; set; }
     /// <summary>Captação num ponto baixo da sarjeta (fatores de redução da tabela 6.4 do Manual SUDERHSA).</summary>
     public bool PontoBaixo { get; set; }
+    /// <summary>
+    /// O que Ler do Modelo leu (Etapa 8). Campo igual ao lido = vem do modelo (fica desatualizado quando o modelo passa a dizer
+    /// outra coisa); diferente = editado à mão (preservado). Nulo = nunca lido.
+    /// </summary>
+    public ContribuicaoLida? Lida { get; set; }
 
     /// <summary>Dispositivo que capta a água da sarjeta ou do piso (bocas de lobo e grelhas; não o PV nem a canaleta).</summary>
     public bool IsInlet => Type is not (TipoDrenagem.PocoDeVisita or TipoDrenagem.GrelhaContinua);

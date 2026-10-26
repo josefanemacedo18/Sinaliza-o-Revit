@@ -130,7 +130,9 @@ public sealed class CmdPerfilVia : CommandBase
             TaskDialog.Show(AppTitle, "Estaqueamento não aplicado – nada foi alterado:\n• " + string.Join("\n• ", problemas));
             return Result.Cancelled;
         }
-        Report("Perfil da via", Apply(uidoc, road, o, _replace, est).Where(r => r.Warnings.Count > 0).ToList(), alwaysShow: true);
+        var applied = Apply(uidoc, road, o, _replace, est).Where(r => r.Warnings.Count > 0).ToList();
+        if (EditImpact.Of(uidoc.Document, new[] { road.Pavement }) is { } impact) applied.Add(impact);
+        Report("Perfil da via", applied, alwaysShow: true);
         return Result.Succeeded;
     }
 
