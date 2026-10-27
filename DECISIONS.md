@@ -530,3 +530,22 @@ como substituída.
   - seguir a ordem numérica dos pedidos: os defeitos críticos ficariam para o fim;
   - reproduzir a interface do InfraWorks: o Revit não tem o mesmo canvas; os mesmos resultados vêm por janelas e comandos.
 - **Consequências:** cada entrega diz que pedido avança e em que estado (A/B/C), na tabela do PLANO_DE_ACAO_2 §1.
+
+## D-033 – Etapa 15: uma travessia por trecho curto e folga do terreno sob as rampas
+- **Contexto:** os dois defeitos críticos do pedido de 2026-10-27 (itens 18 e 13): travessias, rampas e extensões demais em
+  trechos curtos, e o terreno aparecendo sobre a via nas rampas e nas interseções.
+- **Decisão:**
+  - travessias: num trecho até o nó vizinho na mesma via mais curto que o trecho mínimo da interseção (padrão do plugin 50 m,
+    sem norma citada), só um nó faz a travessia; a escolha usa só dados das duas definições (vias, controle, Id) para ser a
+    mesma vista dos dois lados; o ajuste do ramo vale mais; 0 = como antes; travessias desligadas = manual;
+  - terreno: cada rampa tem plataforma própria na terraplenagem, 5 cm abaixo do fundo (padrão do plugin, maior que o erro de
+    2 cm aceito na triangulação), sem talude e fora da pista; as dos nós entram antes da plataforma do nó;
+  - as rampas não entram no registro da terraplenagem (V15): as dos nós mudam junto com o nó, e o Id delas muda a cada
+    atualização – registrá-las apontaria a terraplenagem desatualizada a cada atualização;
+  - a conferência do Autoteste passa a cobrir as rampas (tolerância zero acima do topo) e os pisos dos nós.
+- **Alternativas descartadas:**
+  - baixar o terreno sob toda a calçada: mudaria os volumes de todos os projetos e criaria vão sob as lajes, que o Autoteste
+    acusa;
+  - travessia só no nó de Id menor: arbitrário para o pedestre;
+  - pedir uma quadra reconhecida para decidir: as interseções existem sem loteamento.
+- **Consequências:** os volumes mudam pouco (5 cm sob a área das rampas); o que não foi visto no Revit está em K28.

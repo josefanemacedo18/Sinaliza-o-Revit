@@ -1022,7 +1022,7 @@ criada 400 m à direita de tudo o que existe no projeto:
 | Detalhamento | detalhe de placas, anotação, legenda, cota de seção + perfil, detalhe típico, quadros, notas, norte, eixos, quantitativos e tabelas |
 | Tráfego | Simulador de Tráfego sobre a área de teste: leitura da rede, análise HCM e diagnóstico, microssimulação de 5 min, cenários (rotatória × semáforo coordenado × contagem) com comparação, cenários gravados e lidos do projeto, plano semafórico gravado na interseção, sinalização interpretada (placas, marcas, dispositivos e semáforos associados a trechos e cruzamentos), resultados nos parâmetros SV_NivelServico/SV_Trafego e mapa de níveis de serviço na planta; **contatos entre veículos (deve ser zero) e setas**, **planta real no mapa**, **recomendação de tempos e onda verde**, **semáforo de travessia do cenário** e **soluções testadas** para o pior cruzamento |
 | Fluxo integrado (sempre no Completo) | duas vias que se cruzam sobre o terreno de teste → interseção → terraplenagem → grelha encaixada no meio-fio → quantitativos → validação, cada etapa conferindo o que a anterior fez: o registro da terraplenagem com as vias e a interseção, a grelha lida na sarjeta da via certa e acusada como nova pela terraplenagem, o resumo por via com a terraplenagem da própria via, a V15 e o impacto da edição depois de mudar o talude da via e o terreno refeito sem pendências. As cinco etapas vão juntas (o teste rápido não corta o fluxo); sem a Topografia, o fluxo cria o mesmo terreno de teste |
-| Verificações (sempre no Completo) | pintura escondida sob o piso ou flutuando, buracos e degraus entre pisos da pista, **terreno projetado** (o Toposolid depois da terraplenagem) acima da pista ou com degrau na borda da seção – o talude começa no topo do acabamento –, estruturas invadindo outras vias, formas sem geometria |
+| Verificações (sempre no Completo) | pintura escondida sob o piso ou flutuando, buracos e degraus entre pisos da pista, **terreno projetado** (o Toposolid depois da terraplenagem) acima da pista ou com degrau na borda da seção – o talude começa no topo do acabamento –, **terreno acima do topo das rampas e dos pisos das interseções e rotatórias** que a via toca (desde a 2.20), estruturas invadindo outras vias, formas sem geometria |
 
 Cada erro do plugin (inclusive os que antes só iam para o log), cada erro/aviso do Revit e cada verificação que falha
 entram no relatório, salvo em `%AppData%\SinalizaBIM\autoteste-AAAAMMDD-HHMMSS.txt` (gravado a cada etapa – se o
@@ -1823,6 +1823,15 @@ aproximações:
 
 Na mão dupla a retenção ocupa a meia pista de chegada (até o eixo, o canteiro ou a ilha); na mão única, a
 pista inteira, só no ramo por onde o tráfego chega.
+
+**Travessias em trechos curtos (desde a 2.20).** Num trecho entre duas esquinas mais curto que o **trecho mínimo** da
+interseção (50 m por padrão – padrão do plugin, sem norma citada), só um dos dois nós faz a travessia sobre a via, com as
+rampas e as extensões do lado contínuo: o de mais vias, depois o de controle mais forte (semáforo, PARE, dê a preferência);
+uma rotatória vizinha sempre fica com a dela. Antes cada esquina fazia a sua e um trecho de 30 m ganhava duas faixas e quatro
+rampas. Para manter a travessia num ramo, marque **Sim** em *Faixa de pedestres neste ramo*; **trecho mínimo 0** faz a
+travessia em todos os ramos, como antes; desmarcar *Faixas de pedestres em cada ramo* deixa as travessias manuais. Na
+seção *Identificação e vias conectadas* a janela diz que ramo ficou sem travessia e por quê. Projetos salvos mudam na
+próxima atualização de cada interseção.
 
 **Linha de continuidade (LCO) na boca das secundárias.** Quando a via principal tem hierarquia maior (arterial,
 trânsito rápido ou rodovia × coletora/local), o bordo da principal continua **tracejado** atravessando a boca da
@@ -2667,6 +2676,10 @@ Revit triangula de novo. Por isso cada obra entrega os pontos certos:
     a via ligada mais funda;
   * **sob o meio-fio, a calçada e a faixa gramada** ele fica no **fundo da laje** (a laje assenta no terreno) – a passagem da
     caixa do pavimento para o fundo da laje fica escondida sob o meio-fio;
+  * **sob as rampas** (desde a 2.20) ele fica **5 cm abaixo do fundo delas** (padrão do plugin): o pé da rampa tem milímetros
+    sobre o fundo e a triangulação do Toposolid pode passar até 2 cm acima do projeto – antes o terreno aparecia por cima
+    das rampas, sobretudo nas interseções. Vale para as rampas das travessias dos nós e para as da via (as da seção dela e as
+    colocadas sobre a calçada dela); rode a Terraplenagem de novo em projetos já terraplenados;
   * **na borda externa** (alinhamento do lote, quina da esquina) o terreno **sobe ao topo da calçada** – na altura, na
     inclinação transversal e nos níveis no alinhamento da seção – e o **talude parte do topo da calçada**. Sem calçada, o
     terreno encontra o bordo da pista. Nas **pontas livres** da via (sem nó nem obra) a testa também sobe ao acabamento, com o

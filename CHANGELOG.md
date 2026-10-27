@@ -3,6 +3,42 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-27 – Etapa 15: defeitos críticos – travessias em trechos curtos e terreno sobre a via (versão 2.20.0)
+
+Primeira entrega do [plano 2](docs/PLANO_DE_ACAO_2.md) ("InfraWorks dentro do Revit", D-032). A Etapa 14 (estudo do
+InfraWorks pela ajuda oficial, lacunas por matéria e o plano) foi só de documentos, sem DLL. Entrega: `Releases/Etapa15`
+(não executada no Revit 2027).
+
+### Travessias espaçadas em trechos curtos (item 18)
+- **Causa:** cada interseção fazia travessia, rampas e extensões do lado contínuo em todos os ramos, sem olhar o nó vizinho:
+  um trecho de 30 m entre duas esquinas ganhava duas faixas de pedestres e quatro rampas.
+- **Agora:** quando o trecho até a interseção ou rotatória vizinha na mesma via é menor que o **trecho mínimo** da
+  interseção (50 m, padrão do plugin, sem norma citada), só um dos dois nós faz a travessia sobre essa via – o de mais vias,
+  depois o de controle mais forte (rotatória sempre fica com a dela); no empate, o de Id menor, a mesma escolha vista dos
+  dois lados.
+- O ajuste do ramo ("Faixa de pedestres neste ramo": Sim/Não) vale mais que a regra; **trecho mínimo 0** volta ao
+  comportamento antigo; travessias desligadas na interseção são o **modo manual**. A janela da interseção tem o campo do
+  trecho mínimo e diz que ramo ficou sem travessia e por quê.
+- Projetos salvos: a regra vale na próxima atualização de cada interseção.
+
+### Terreno abaixo das rampas e conferência nos nós (item 13)
+- **Causa:** sob a calçada o terreno fica no fundo da laje, que é também o fundo da rampa; o pé da rampa tem milímetros (o
+  rebaixamento total, uma placa de 5 mm) e a triangulação do Toposolid pode passar até 2 cm acima do projeto – o terreno
+  aparecia por cima. As rampas não entravam na terraplenagem: nem as da via nem as das interseções, cuja geometria tira o
+  corpo delas da calçada.
+- **Agora:** cada rampa tem plataforma própria na terraplenagem, sem talude, **5 cm abaixo do fundo** (padrão do plugin),
+  fora da pista. Rampas das interseções e rotatórias entram com o nó; as da via, as do grupo dela e as soltas sobre a calçada
+  dela. Vale na próxima Terraplenagem.
+- **Autoteste:** a verificação de cada via passa a conferir as rampas (o terreno não pode passar do topo) e os pisos das
+  interseções e rotatórias que ela toca, cada nó uma vez – antes os nós eram pulados.
+
+### Testes
+- `Etapa15GeracaoTests` (5): trecho curto com uma travessia e um par de rampas, trecho longo com as duas, escolha pelo peso
+  vista dos dois lados, modo manual, rotatória e a ligação no plugin.
+- `Etapa15TerrenoTests` (4): o pé da rampa sem folga cabia no erro da triangulação e com folga não; a plataforma da rampa
+  vence a da via e sai da pista; sem rampas nada muda; a ligação na terraplenagem e no Autoteste.
+- NÃO EXECUTADO NO REVIT (K28).
+
 ## 2026-10-27 – Etapa 13: desempenho, validação e entrega (versão 2.19.0)
 
 Etapa 13, a última do plano unificado (Master §21, §27; Motores §18, Fase 7; Interface §21, §32). Entrega:

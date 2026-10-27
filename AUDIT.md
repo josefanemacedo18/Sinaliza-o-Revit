@@ -461,3 +461,13 @@ com o plugin, ferramenta por ferramenta, estão em `docs/INFRAWORKS_REFERENCIA.m
 - FATO: as rampas são sólidos gerados pelo `RampGenerator` (não pisos) e entram na terraplenagem só pela via;
 - FATO: nenhum material do plugin tem ativo de aparência (`AppearanceAssetElement` não aparece no código);
 - FATO: o chanfro das quadras existe, medido pela face (hipotenusa) e desligado por padrão (`QuadraDefinition.Chanfro`).
+
+Etapa 15 (2.20.0):
+- FATO (teste): cada interseção fazia travessia e rampas em todos os ramos sem olhar o nó vizinho – num trecho de 30 m, duas
+  faixas e quatro rampas; com a regra do trecho mínimo, uma faixa e um par de rampas (`Etapa15GeracaoTests`).
+- FATO (código): o ramo das "marcas do nó" em `TerrainService.Features` nunca rodava – rampas e orelhas não são
+  participantes da terraplenagem; a geometria do nó tira o corpo das rampas da calçada.
+- FATO (teste): o pé da rampa (0 a 5 mm sobre o fundo) é menor que o erro aceito na triangulação do Toposolid (2 cm); com a
+  plataforma 5 cm abaixo do fundo, não (`Etapa15TerrenoTests`).
+- INFERÊNCIA: era esse o "terreno comendo a via nas rampas e nas interseções" relatado; só um Autoteste no Revit confirma
+  (K28).

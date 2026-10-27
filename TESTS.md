@@ -86,6 +86,8 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
 | `EVAlignmentElementsTests` | elementos do traçado (TS/SC/CS/ST, curva circular calculada à mão, espirais, reduzida, sem curva) e do greide (convexa ±2 %, côncava com piso K, vão curto, extremo fora da curva, consistência com `Z(s)`), CSV e estacas |
 | `EVSectionVolumesTests` | volumes por seções: corte/aterro constantes, terreno linear (exato) e quadrático (erro h²/12 esperado), última seção no fim, eixo em curva, conferência com a malha de `Grading.Volumes`, CSV |
 | `EWAxisElementsTests` | elementos do eixo das vias comuns: canto arredondado (R, Δ, T, estacas conferidos à mão), canto vivo, curva reversa, reta, CSV |
+| `Etapa15GeracaoTests` | Etapa 15 (item 18): trecho curto entre duas esquinas com uma travessia e um par de rampas (antes duas e quatro), trecho longo com as duas, escolha pelo peso vista dos dois lados, modo manual, rotatória vizinha e a ligação no plugin |
+| `Etapa15TerrenoTests` | Etapa 15 (item 13): o pé da rampa sem folga cabia no erro da triangulação do Toposolid e com folga não; a plataforma da rampa vence a da via na terraplenagem e sai da pista; sem rampas nada muda; a ligação na terraplenagem e no Autoteste |
 | `Etapa13DesempenhoTests` | Etapa 13: o índice da terraplenagem (`RingIndex`) dá exatamente o ponto da busca em todas as plataformas (4 000 pontos, perto e longe, com furos), a ligação nos contornos dos taludes e os volumes por via somando o total |
 | `Etapa13TrafegoTests` | Etapa 13 (F11): a mesma semente dá os mesmos números e o mesmo relatório (menos a data); a seção 9 com sementes, passo, aquecimento e medição; a assinatura muda com os parâmetros e com a rede |
 | `Etapa13ProgressoTests` | Etapa 13: fração só com total conhecido, contagem, limitador com relógio injetado, cancelamento só no ponto seguro, nenhum ponto de cancelamento depois da gravação em Atualizar Todas, Quantitativos e a janela (sem `Task.Run`, Revit desabilitado e devolvido) |
@@ -155,3 +157,6 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
 5. Desde a 2.19: **Projeto → Atualizar Todas** numa cópia com muitas marcas – cancelar no meio (o modelo fica igual, nada
    novo no Desfazer) e depois deixar terminar; abrir **Quantitativos** e cancelar. No Autoteste, marcar **Fluxo integrado**
    (ou o Completo) e conferir as cinco etapas do bloco sem erro.
+6. Desde a 2.20: num projeto com quadras curtas, atualizar as interseções e conferir uma travessia por trecho; rodar a
+   Terraplenagem com rampas e interseções em relevo e olhar as rampas no 3D (o terreno não pode aparecer por cima); no
+   Autoteste Completo, conferir "Terreno × rampas" e "Terreno × nós" nas verificações de cada via.
