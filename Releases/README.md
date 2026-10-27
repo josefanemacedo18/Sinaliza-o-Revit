@@ -43,6 +43,7 @@ desejada. `Instalar/Revit2027` tem sempre a versão mais recente.
 | Etapa 8 – integração associativa: estado dos resultados (Fase X) | 2.14.0 | 2026-10-26 | `072b683` | 3 022/3 022 | não executado – [`Etapa08`](Etapa08/RELEASE.md) |
 | Etapa 9 – design system e faixa de opções por tema (Fase XIII) | 2.15.0 | 2026-10-27 | `d074465` | 3 036/3 036 | não executado – [`Etapa09`](Etapa09/RELEASE.md) |
 | Etapa 10 – Central do Projeto e painel contextual (Fase XIII) | 2.16.0 | 2026-10-27 | `1a7f2b5` | 3 048/3 048 | não executado – [`Etapa10`](Etapa10/RELEASE.md) |
+| Etapa 11 – Telas dos módulos (Fase XIII) | 2.17.0 | 2026-10-27 | `70d43af` | 3 075/3 075 | não executado – [`Etapa11`](Etapa11/RELEASE.md) |
 
 As fases I, II, IX e XI foram concluídas antes desta pasta existir. As DLLs delas estão no histórico do git, no commit
 indicado: `git show <commit>:Instalar/Revit2027/SinalizaBIM.dll > SinalizaBIM.dll`. As fases seguintes ganham uma linha

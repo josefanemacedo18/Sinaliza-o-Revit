@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-27 (Etapas 0–10 entregues; Etapa 11 a seguir)
+## Estado em 2026-10-27 (Etapas 0–11 entregues; Etapa 12 a seguir)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -34,18 +34,25 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     situação de cada valor, nunca zero para o desconhecido; situação do projeto sem "validado"; módulos; atalhos pelo
     `CommandBase.Invoke`) e painel contextual (`DockablePane` que acompanha a seleção, só leitura; propriedades por tipo,
     estado e operações; sem edição em lote) – D-028, K24.
-  - `Instalar/Revit2027` tem a DLL 2.16.0. As anteriores continuam em `Releases/`.
-- **Etapa 11 (próxima):** telas dos módulos (Interface §10–§16): formulário da via em seções com Pré-visualizar /
-  Validar / Aplicar e resumo do impacto; gerenciador de estruturas de pavimento; tela da rede de drenagem separando
-  consistência, conectividade, parâmetros, cálculo e dimensionamento (com o perfil da rede); terreno; interseções e
-  rotatórias; quadras e lotes; formulários com o estaqueamento da via (K20).
+  - Etapa 11 ✅: 2.17.0 em `Releases/Etapa11` (`70d43af`, 3 075/3 075) – telas dos módulos (D-029): janela da via em
+    nove abas com perfil, pavimentação, terraplenagem, drenagem, validação e resumo; gerenciador de estruturas de
+    pavimento (tabela, esquema, quantitativo com a área medida, modelos do usuário); rede de drenagem por parte
+    (geometria, conectividade, parâmetros, cálculo hidráulico, dimensionamento, vias e terreno), com perfil e seleção no
+    modelo; terreno (origem, natural × projetada, superfície de cada cálculo, módulos a atualizar); seções dos nós com
+    verificação geométrica × operacional; resultados do parcelamento; estaca da via nos formulários (K20 resolvido).
+    Correções: a via refeita perdia a estrutura e o estaqueamento; o nó fora do registro ficava sem estado na
+    terraplenagem. Telas não vistas no Revit (K25).
+  - `Instalar/Revit2027` tem a DLL 2.17.0. As anteriores continuam em `Releases/`.
+- **Etapa 12 (próxima):** qualidade, quantitativos e configurações (Interface §17–§19, §26): Central de Qualidade
+  (validador e Autoteste separados, filtros, localizar o elemento), central de quantitativos com a origem de cada número,
+  gerenciador de configurações (usuário × projeto) e perfis reutilizáveis (exemplo, usuário, referência citada).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros (compilar sempre também o projeto de testes antes do
   commit).
 
 ## Próxima tarefa
 
-1. Etapa 11 (PLANO): telas dos módulos. Depois, as Etapas 12 e 13 na ordem do plano.
+1. Etapa 12 (PLANO): qualidade, quantitativos e configurações. Depois, a Etapa 13.
 2. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer tudo**;
    enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`); rodar também o
    Validar Modelo duas vezes (a segunda mostra a comparação com a primeira).
