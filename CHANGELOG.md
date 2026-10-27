@@ -3,6 +3,49 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-27 – Etapa 16: esquinas – chanfro de 1,50 m, piso tátil e extensão em chanfro (versão 2.21.0)
+
+Itens 19, 20 e 12 do [plano 2](docs/PLANO_DE_ACAO_2.md) (D-034). Entrega: `Releases/Etapa16` (não executada no Revit 2027).
+
+### Chanfro de 1,50 m por padrão, medido sobre os limites (item 19, imagem 4)
+- **Medida pelos catetos:** o chanfro da quina pode ser medido sobre cada limite do lote, a partir do encontro dos
+  alinhamentos ("mínimo de 1,50 m em cada lado, medido sobre os limites do terreno na esquina"), além da face (hipotenusa –
+  a medida de antes, que continua como opção). Medida própria por esquina, na forma da quadra; a janela mostra os catetos e
+  a face de cada quina.
+- **Quadras novas** (Loteamento novo e Reconhecer quadras) nascem com o chanfro ligado, **1,50 m em cada lado** – padrão do
+  loteamento (*Chanfro das quadras novas*; 0 = sem chanfro), **informado pelo usuário** [a confirmar na lei municipal] – e as
+  interseções em volta são refeitas para a calçada ocupar os chanfros. Lotes por Linhas segue o limite desenhado.
+- **Projetos salvos:** as quadras gravadas antes abrem iguais (medida pela face, chanfro como estava); os loteamentos
+  antigos passam a dar 1,50 m às quadras **novas** deles.
+
+### Piso tátil da esquina paralelo ao alinhamento predial (item 20, imagem 1)
+- **Causa:** a faixa direcional da esquina seguia a curva do meio-fio, deslocada para dentro da calçada: sem mudança de
+  direção marcada (nenhum alerta) e, nas esquinas de raio grande com calçada estreita, a faixa passava da quina do lote.
+- **Agora:** paralela ao alinhamento predial, na mesma distância do lote que nos trechos retos, até a quina viva ou
+  **paralela ao chanfro** do lote de esquina, com **alerta em cada mudança de direção** (NBR 16537, 7.4.3). Canto a menos de
+  0,60 m lisos da pista (7.8.2 a): a faixa corta a quina com um trecho reto; quina estreita: folgas equilibradas, sem tocar o
+  meio-fio nem o lote. A interseção tem a opção de voltar ao traçado pela curva do meio-fio.
+- **Faixa junto à faixa de acesso** (opção da via, imagem 1: meio-fio 15, mobiliário 70, percurso 145, faixa tátil 30,
+  acesso 40 cm – informado pelo usuário), quando sobram 1,20 m de faixa livre; desmarcada = posição da 7.8.2.
+- **Ramais até as entradas de pedestres dos lotes:** NÃO FEITO – o plugin não conhece as entradas dos lotes (Etapa 23).
+- Projetos salvos: o traçado novo vale na próxima atualização de cada interseção.
+
+### Esquina da extensão de calçada em chanfro e rampas alinhadas (item 12, imagem 2)
+- **Esquina da extensão em chanfro reto** (recuo em cada face a partir do encontro das faces deslocadas), geral e por
+  esquina (0 = curva com o raio); recuo que faria o chanfro entrar na calçada é reduzido, com aviso. Sem centro de arco no
+  chanfro (o Revit faz o trecho reto).
+- As **rampas no eixo das travessias** foram conferidas com e sem extensão, com curva e com chanfro.
+- O resto da imagem 2 já existia e fica como estava: rampas a 8,33 % e abas a 10 % (NBR 9050), faixa de pedestres de 4,0 m
+  (largura configurável) com as barras do catálogo (MBST), canteiros com árvores nas extensões.
+
+### Testes
+- `Etapa16EsquinasTests` (18): catetos de 1,50 m em esquinas de 60°, 90° e 120° (área e face), medida por esquina e pela
+  face, quadras e loteamentos antigos abrem iguais, a calçada da interseção ocupa os chanfros de 1,50 m; faixa tátil na quina
+  viva (vértice a 90° com alerta), paralela ao chanfro (dois de 45°), corte da quina com a folga e na quina estreita, opção
+  pela curva, faixa junto ao acesso e a posição da norma quando não cabe; rampas alinhadas às travessias, extensão em
+  chanfro em esquinas de 70° e 90°, ajuste por esquina e recuo reduzido; a ligação nas janelas e nos comandos.
+- NÃO EXECUTADO NO REVIT (K29, K30).
+
 ## 2026-10-27 – Etapa 15: defeitos críticos – travessias em trechos curtos e terreno sobre a via (versão 2.20.0)
 
 Primeira entrega do [plano 2](docs/PLANO_DE_ACAO_2.md) ("InfraWorks dentro do Revit", D-032). A Etapa 14 (estudo do

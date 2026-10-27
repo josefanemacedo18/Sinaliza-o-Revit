@@ -1946,6 +1946,11 @@ esquina – CTB art. 181):
 * **Raio da curva da esquina na extensão** – 0 = o **raio da esquina** (veículo de projeto). A face da extensão contorna a
   esquina com esse raio, tangente às faces deslocadas dos dois lados (não mais raio da esquina + avanço). Raio que faria a
   curva entrar na calçada é reduzido (aviso);
+* **Esquina da extensão em chanfro (desde a 2.21)** – recuo em cada face (m; 0 = curva com o raio): a face da extensão faz a
+  esquina com um **trecho reto** entre os pontos a essa distância do encontro das faces deslocadas, como a esquina da imagem
+  de referência do usuário (extensão com chanfro no meio-fio e rampas alinhadas às travessias). Vale para todas as esquinas e
+  por esquina (Ajustes por esquina: −1 = o geral, 0 = curva). Recuo que faria o chanfro entrar na calçada é reduzido (aviso).
+  As **rampas ficam no eixo da faixa de pedestres**, com ou sem extensão (conferido nos testes);
 * **Folga além da faixa de pedestres e das rampas** – padrão 0,30 m;
 * **Terminar onde começa o estacionamento** – a extensão vai até a primeira vaga (fim do trecho sem vagas junto ao
   cruzamento: travessia/retenção + 5 m);
@@ -2330,6 +2335,20 @@ junto com a via – e a refaz a partir do **eixo** sempre que a via é editada o
 * **nas interseções**, a rede contorna **cada esquina** e segue reta nos **lados contínuos**; ela vai além da área do nó até
   passar as **rampas das travessias** (que ficam no trecho reto do meio-fio), e a faixa da via sai nesse trecho – sem placas
   sobrepostas. As rampas sobre o **canteiro central** têm a sinalização própria delas (19.1.5);
+* **na esquina (desde a 2.21)** a faixa é **paralela ao alinhamento predial**, na mesma distância do lote que nos trechos
+  retos: as retas dos dois ramos se encontram na quina (quina viva do lote) ou seguem **paralelas ao chanfro** do lote de
+  esquina (quadras com chanfro, 27.2), com **área de alerta em cada mudança de direção** (7.4.3) – como a imagem de referência
+  do usuário (faixa direcional entre o percurso e o acesso aos imóveis, seguindo o chanfro). Quando o canto ficaria a menos de
+  **0,60 m lisos da pista** (além do meio-fio – a folga da 7.8.2 a), a faixa **corta a quina** com um trecho reto, o mais perto
+  possível do canto com essa folga; se a calçada da quina não comporta as folgas dos dois lados (raio grande com calçada
+  estreita), o trecho fica com as folgas equilibradas entre a pista e o lote, sem tocar o meio-fio. Esquina em que nada disso
+  cabe fica pela curva do meio-fio. A opção **Faixa tátil das esquinas → Pela curva do meio-fio (como até a 2.20)**, na janela
+  da interseção (Rampas das travessias), volta ao traçado antigo – que, nas esquinas de raio grande e calçada estreita, podia
+  passar da quina do lote;
+* **Faixa direcional junto à faixa de acesso aos lotes (imagem de referência)** – opção da via, abaixo do piso tátil: a faixa
+  encosta na faixa de acesso, na borda da faixa livre do lado do lote (meio-fio 15, mobiliário 70, percurso 145, faixa tátil
+  30, acesso 40 cm – medidas informadas pelo usuário), quando sobram pelo menos 1,20 m de faixa livre do lado da pista; senão,
+  a posição pela largura da faixa livre (7.8.2). Desmarcada (padrão) = 7.8.2;
 * o piso tátil **não passa** sobre rampas, meio-fio, grama nem mobiliário (bancos, paraciclos, árvores, canteiros).
 
 **Sem a rede na calçada**, cada rebaixamento das travessias com piso tátil ganha a **faixa direcional transversal** no eixo
@@ -3376,11 +3395,21 @@ quiser (as linhas ficam guardadas). Quadras com o limite por linhas não são al
   * **Testada X** ou **Testada Y**: escolhida na hora;
   * **Medida própria**: frente em cada uma das duas testadas (ex.: 15 × 20); as duas testadas começam depois dele.
 * **Chanfro da quina** (Quadra → "Chanfro das quinas" → *Chanfrar as quinas das esquinas*): em cada esquina entre duas
-  testadas a quina do lote de esquina sai em **chanfro** – a **face** (a hipotenusa, com a medida informada) recua o mesmo nas
-  duas testadas a partir do encontro dos alinhamentos (90° e face 3 m: 2,12 m em cada testada, 2,25 m² a menos). É a forma
-  que menos tira do lote para a mesma face. A **face padrão é a largura da calçada** na quina (lida das vias ao abrir a
-  janela; quinas com calçada diferente já vêm com a delas) e pode ser mudada na quadra e **em cada esquina** (seção Esquinas →
-  *Chanfro nesta quina*: a face da quadra, sem chanfro ou face própria). O triângulo é **descontado da área do lote** (quadros,
+  testadas a quina do lote de esquina sai em **chanfro**, com os catetos iguais nas duas testadas a partir do encontro dos
+  alinhamentos. **Medida do chanfro** (desde a 2.21):
+  * **Em cada lado, sobre os limites do lote (catetos)** – o recuo medido sobre cada limite, como a imagem de referência do
+    usuário ("mínimo de 1,50 m em cada lado, medido sobre os limites do terreno na esquina"): 1,50 m a 90° dá face de 2,12 m
+    e 1,125 m² a menos; a 60°, face de 1,50 m. **As quadras novas** (Loteamento novo e Reconhecer quadras) **nascem com o
+    chanfro ligado, 1,50 m em cada lado** – o padrão do loteamento (*Chanfro das quadras novas*, nas janelas do loteamento;
+    0 = quadras novas sem chanfro), **informado pelo usuário** – conferir no código de obras ou na lei municipal [a confirmar].
+    As interseções em volta são refeitas na criação, e a calçada ocupa os chanfros. Lotes por Linhas segue o limite desenhado
+    (o chanfro se liga na Quadra);
+  * **Pela face do chanfro (hipotenusa)** – a medida até a 2.20 (90° e face 3 m: 2,12 m em cada testada, 2,25 m² a menos); as
+    quadras gravadas antes abrem assim, como estavam. A **face padrão é a largura da calçada** na quina (lida das vias ao abrir
+    a janela; quinas com calçada diferente já vêm com a delas).
+
+  A medida muda na quadra e **em cada esquina** (seção Esquinas → *Chanfro nesta quina*: a medida da quadra, sem chanfro ou
+  medida própria, na forma da quadra); cada esquina mostra os catetos e a face resultantes. O triângulo é **descontado da área do lote** (quadros,
   memorial e pisos), a face é **cotada** no detalhamento (do lado de fora, na calçada) e aparece no quadro de lotes
   ("chanfro 3,00 m" na observação) e no memorial ("Chanfro: 3,00 m para a esquina da Rua A com a Rua B"); as frentes e a
   numeração continuam as mesmas. **A calçada acompanha**: ao aplicar, as interseções em volta são refeitas e o passeio da
@@ -3549,7 +3578,9 @@ Campos acrescentados na rodada LV (autorizados; opcionais – projetos antigos l
 **Remanescentes** (lista de áreas com **Contorno** e **Furos**, em m – a sobra da gleba em volta das vias, gravada ao reconhecer
 as quadras; vazia = nenhuma) e **Remanescente** (*AreaVerde* = desenhada, padrão; *SoNoQuadro*); na quadra, **Chanfro** (falso)
 e **ChanfroFace** (m; 0 = ainda não dada – a janela da quadra preenche com a largura da calçada); em cada esquina da quadra,
-**Chanfro** (m; vazio = a face da quadra, 0 = sem chanfro nela). A escala em que cada detalhe foi desenhado e os triângulos dos
+**Chanfro** (m; vazio = a medida da quadra, 0 = sem chanfro nela). Na 2.21 (Etapa 16, opcionais): no loteamento,
+**ChanfroQuadrasNovas** (1,5 m; 0 = quadras novas sem chanfro); na quadra, **ChanfroMedida** (*Face* = até a 2.20, padrão de
+quem não o tem; *Catetos*) e **ChanfroCateto** (1,5 m). A escala em que cada detalhe foi desenhado e os triângulos dos
 chanfros que a interseção ocupa ficam só em memória (não são gravados).
 
 Campos acrescentados na rodada LU (opcionais; quem não os tem lê o padrão): no loteamento, **FrenteMinimaLote** (5) e

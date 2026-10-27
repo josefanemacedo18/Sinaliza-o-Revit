@@ -89,6 +89,7 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
 | `EWAxisElementsTests` | elementos do eixo das vias comuns: canto arredondado (R, Δ, T, estacas conferidos à mão), canto vivo, curva reversa, reta, CSV |
 | `Etapa15GeracaoTests` | Etapa 15 (item 18): trecho curto entre duas esquinas com uma travessia e um par de rampas (antes duas e quatro), trecho longo com as duas, escolha pelo peso vista dos dois lados, modo manual, rotatória vizinha e a ligação no plugin |
 | `Etapa15TerrenoTests` | Etapa 15 (item 13): o pé da rampa sem folga cabia no erro da triangulação do Toposolid e com folga não; a plataforma da rampa vence a da via na terraplenagem e sai da pista; sem rampas nada muda; a ligação na terraplenagem e no Autoteste |
+| `Etapa16EsquinasTests` | Etapa 16 (itens 19, 20 e 12): chanfro de 1,50 m em cada lado sobre os limites em esquinas de 60°, 90° e 120°, medida por esquina e pela face, quadras e loteamentos antigos abrem iguais, calçada da interseção nos chanfros; faixa tátil da esquina na quina viva, paralela ao chanfro, cortando a quina com a folga e na quina estreita, a opção pela curva do meio-fio, junto à faixa de acesso; rampas no eixo das travessias, extensão em chanfro (70° e 90°), ajuste por esquina e recuo reduzido; ligação nas janelas e comandos |
 | `Etapa13DesempenhoTests` | Etapa 13: o índice da terraplenagem (`RingIndex`) dá exatamente o ponto da busca em todas as plataformas (4 000 pontos, perto e longe, com furos), a ligação nos contornos dos taludes e os volumes por via somando o total |
 | `Etapa13TrafegoTests` | Etapa 13 (F11): a mesma semente dá os mesmos números e o mesmo relatório (menos a data); a seção 9 com sementes, passo, aquecimento e medição; a assinatura muda com os parâmetros e com a rede |
 | `Etapa13ProgressoTests` | Etapa 13: fração só com total conhecido, contagem, limitador com relógio injetado, cancelamento só no ponto seguro, nenhum ponto de cancelamento depois da gravação em Atualizar Todas, Quantitativos e a janela (sem `Task.Run`, Revit desabilitado e devolvido) |
@@ -161,3 +162,6 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
 6. Desde a 2.20: num projeto com quadras curtas, atualizar as interseções e conferir uma travessia por trecho; rodar a
    Terraplenagem com rampas e interseções em relevo e olhar as rampas no 3D (o terreno não pode aparecer por cima); no
    Autoteste Completo, conferir "Terreno × rampas" e "Terreno × nós" nas verificações de cada via.
+7. Desde a 2.21: criar um loteamento numa cópia e conferir os chanfros de 1,50 m em cada lado nas quinas e a calçada da
+   interseção dentro deles; ligar o piso tátil numa via com interseção e conferir a faixa da esquina paralela ao lote, com
+   alerta em cada quina; numa interseção com extensões, informar o recuo do chanfro e conferir o meio-fio reto no 3D.

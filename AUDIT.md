@@ -471,3 +471,13 @@ Etapa 15 (2.20.0):
   plataforma 5 cm abaixo do fundo, não (`Etapa15TerrenoTests`).
 - INFERÊNCIA: era esse o "terreno comendo a via nas rampas e nas interseções" relatado; só um Autoteste no Revit confirma
   (K28).
+
+Etapa 16 (2.21.0):
+- FATO (teste): a faixa tátil da esquina seguia a curva do meio-fio deslocada para dentro – nenhum vértice com mudança de
+  direção de 30° ou mais (nenhum alerta) e, com raio de 6 m e calçada de 2,50 m, pontos além da quina do lote; agora paralela
+  ao alinhamento, com o vértice (ou os dois do chanfro) e o alerta (`Etapa16EsquinasTests`).
+- FATO (teste): com rampa de 1,80 m e a faixa direcional antes do topo dela, o ramal não liga a rampa – vale também para o
+  traçado antigo (K29).
+- FATO (código): o chanfro do lote era medido só pela face e desligado; as quadras novas agora nascem com 1,50 m em cada lado,
+  sem mudar as gravadas (`MedidaChanfro`, `ComChanfroPadrao`).
+- LACUNA: os ramais até as entradas de pedestres dos lotes da imagem 1 – o plugin não tem as entradas (Etapa 23).

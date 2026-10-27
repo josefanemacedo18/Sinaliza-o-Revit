@@ -549,3 +549,33 @@ como substituída.
   - travessia só no nó de Id menor: arbitrário para o pedestre;
   - pedir uma quadra reconhecida para decidir: as interseções existem sem loteamento.
 - **Consequências:** os volumes mudam pouco (5 cm sob a área das rampas); o que não foi visto no Revit está em K28.
+
+## D-034 – Etapa 16: chanfro pelos catetos nas quadras novas e faixa tátil pelo alinhamento predial
+- **Contexto:** itens 19, 20 e 12 do pedido de 2026-10-27: chanfro de 1,50 m por padrão, personalizável, medido sobre os
+  limites do lote (imagem 4); piso tátil na esquina como a imagem 1 (faixa paralela ao alinhamento, seguindo o chanfro, alerta
+  nas mudanças de direção, ramais às rampas e às entradas); esquina e extensão de calçada como a imagem 2.
+- **Decisão:**
+  - chanfro: nova medida pelos catetos (`MedidaChanfro.Catetos`) ao lado da face; as quadras gravadas antes leem *Face* e
+    abrem iguais. O padrão 1,50 m é do **loteamento** (`ChanfroQuadrasNovas`, informado pelo usuário, sem lei citada) e vale
+    só nas quadras **criadas** pelo Loteamento novo e pelo Reconhecer quadras (`Reconhecimento.ComChanfroPadrao`), que refazem
+    as interseções em volta; `NovaQuadra` sozinha não liga o chanfro (testes e Autoteste antigos iguais); Lotes por Linhas
+    segue o limite desenhado;
+  - faixa tátil da esquina: paralela ao alinhamento na mesma distância do lote que nos trechos retos (emenda sem degrau com a
+    da via), quina viva ou paralela ao chanfro, alerta nos vértices; o canto respeita 0,60 m lisos da pista (a folga da
+    NBR 16537, 7.8.2 a, além do meio-fio) cortando a quina; sem as duas folgas, folgas equilibradas sem tocar o meio-fio. É o
+    padrão de toda interseção na próxima atualização, com a opção de voltar à curva do meio-fio (`TatilEsquinaPeloMeioFio`) –
+    o traçado antigo passava da quina do lote nas esquinas de raio grande com calçada estreita;
+  - posição da faixa junto à faixa de acesso (imagem 1) como opção da via, desligada: a posição padrão continua a da 7.8.2;
+  - extensão em chanfro: o mesmo deslocamento da curva da esquina (`ShiftCorner`), com a face reta entre os pontos a "recuo"
+    do vértice das faces deslocadas; o limite para não entrar na calçada usa a profundidade do chanfro (r·cos²/sen), maior
+    que a do arco com os mesmos fins.
+- **Alternativas descartadas:**
+  - ligar o chanfro em `NovaQuadra`: mudaria as áreas de todos os testes e do Autoteste, que conferem a soma das áreas dos
+    lotes com a área da quadra;
+  - faixa tátil pelo meio da calçada na esquina: não é o que a imagem mostra e não emenda com a da via;
+  - mudar a posição padrão da faixa para junto ao acesso: a 7.8.2 tem fonte, a imagem é referência do usuário;
+  - barras de 0,5/0,5 m e rampas a 10 % da imagem 2: sem fonte que substitua o catálogo (MBST) e a NBR 9050 – ficam
+    configuráveis como estão.
+- **Consequências:** projetos com piso tátil mudam a esquina na próxima atualização (opção para voltar); ramais até as
+  entradas dos lotes ficam para a Etapa 23 (o plugin não conhece as entradas); o achado da rampa além da faixa é a K29; o que
+  não foi visto no Revit está em K30.
