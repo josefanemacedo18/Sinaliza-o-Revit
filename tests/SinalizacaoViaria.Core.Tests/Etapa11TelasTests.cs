@@ -343,6 +343,123 @@ public class Etapa11TelasTests
         Assert.DoesNotMatch(@"""#[0-9A-Fa-f]{3,8}""", w);
     }
 
+    // ---------------------------------------------------------------- terreno e topografia (§14)
+
+    private static TerrainMesh Malha(Func<Vec2, double> z) => TerrainMesh.FromFunction(new Vec2(0, 0), new Vec2(100, 40), 10, z);
+
+    [Fact]
+    public void Terreno_DiferencaProjetadaNaturalPorAmostragem()
+    {
+        var natural = Malha(_ => 100);
+        var aterro = TerrenoTela.Diferenca(new[] { (natural, Malha(p => p.X >= 50 ? 101 : 100)) })!;
+        Assert.Equal(1.0, aterro.AterroMaximo, 6);
+        Assert.Equal(0, aterro.CorteMaximo);
+        Assert.InRange(aterro.AreaAlterada, 2000, 2400);                           // de x ≈ 40 (rampa da malha) a 100, em 40 m
+        Assert.True(aterro.Amostras > 1000 && aterro.Passo >= 0.5);
+        var corte = TerrenoTela.Diferenca(new[] { (natural, Malha(p => p.X >= 50 ? 98 : 100)) })!;
+        Assert.Equal(2.0, corte.CorteMaximo, 6);
+        Assert.Equal(0, corte.AterroMaximo);
+        var igual = TerrenoTela.Diferenca(new[] { (natural, Malha(_ => 100.005)) })!;   // abaixo de 1 cm: igual
+        Assert.Equal(0, igual.AreaAlterada);
+        Assert.Null(TerrenoTela.Diferenca(Array.Empty<(TerrainMesh, TerrainMesh)>()));
+    }
+
+    [Fact]
+    public void Terreno_TelaComOrigemSuperficiesLimitesEImpactos()
+    {
+        var natural = Malha(_ => 100);
+        var projetada = Malha(p => p.X >= 50 ? 101 : 100);
+        var via = Via();
+        var pv = new DrainageDefinition { Type = TipoDrenagem.PocoDeVisita, Position = new Vec2(10, 5), Z = 100 };
+        var pv2 = new DrainageDefinition { Type = TipoDrenagem.PocoDeVisita, Position = new Vec2(40, 5), Z = 99.8 };
+        var defs = new MarkingDefinition[] { via, pv, pv2, new DrainagePipeDefinition { FromId = pv.Id, ToId = pv2.Id, Diameter = 0.4, Z = 100 }, new QuadraDefinition() };
+        var topos = new[]
+        {
+            new ToposolidLido("a", "Toposolid 101 – Levantamento", true, false, TerrainDiagnostics.Resumir(projetada), TerrainDiagnostics.Resumir(natural), 1200),
+            new ToposolidLido("b", "Toposolid 102", false, true, TerrainDiagnostics.Resumir(Malha(_ => 90)), null, 0),
+        };
+        var crit = new GeometricCriteria();
+        var v14 = ModelValidator.Topografia(defs, projetada, crit);
+        var dif = TerrenoTela.Diferenca(new[] { (natural, projetada) });
+        var tela = TerrenoTela.Montar(topos, TerrainDiagnostics.Resumir(projetada), TerrainDiagnostics.Resumir(natural), dif, defs, crit, null, v14);
+
+        string Linhas(string s) => Todas(tela.Secao(s).Linhas);
+        Assert.Equal(new[] { TerrenoTela.Origem, TerrenoTela.Existente, TerrenoTela.Projetada, TerrenoTela.Limites, TerrenoTela.Diagnostico }, tela.Secoes.Select(s => s.Titulo));
+        Assert.Contains("Toposolid 101 – Levantamento: 55 ponto(s), 4.000,0 m²; terreno original guardado.", Linhas(TerrenoTela.Origem));
+        Assert.Contains("Toposolid 102: 55 ponto(s), 4.000,0 m²; criado plano pela Terraplenagem (sem levantamento); sem original guardado (o atual é o natural).", Linhas(TerrenoTela.Origem));
+        Assert.Contains("O plugin não importa pontos nem gera curvas de nível", Linhas(TerrenoTela.Origem));
+        Assert.Contains("Guardado em 1 de 2 Toposolid(s) na primeira Terraplenagem; nos outros, o atual é o natural.", Linhas(TerrenoTela.Existente));
+        Assert.Contains("Cotas de 100,00 a 100,00 m", Linhas(TerrenoTela.Existente));
+        Assert.Contains("aterro de até 1,00 m. Os volumes estão nos Quantitativos.", Linhas(TerrenoTela.Projetada));
+        Assert.Contains("Área terraplenada na última aplicação: 1.200 m²", Linhas(TerrenoTela.Limites));
+        Assert.Contains(tela.Secao(TerrenoTela.Limites).Linhas, l => l.Nivel == NivelSituacao.NaoVerificado && l.Texto.StartsWith("Declividade máxima das faces não informada"));
+        Assert.Contains("Sem registro da terraplenagem aplicada", Linhas(TerrenoTela.Limites));
+        // O diagnóstico é o V14 do Validar Modelo, com o nível escrito.
+        Assert.Equal(v14.Count, tela.Secao(TerrenoTela.Diagnostico).Linhas.Count(l => l.Nivel != NivelSituacao.Ok));
+        Assert.Contains(tela.Secao(TerrenoTela.Diagnostico).Linhas, l => l.Nivel == NivelSituacao.NaoVerificado && l.Texto.StartsWith("Declividade máxima do terreno não informada"));
+        Assert.StartsWith("Terreno: 2 Toposolid(s), original guardado em 1; ", tela.Resumo);
+        // Se o terreno mudar: o que precisa de atualização, com a marca de cada módulo e o comando.
+        Assert.Equal(new[] { "Terraplenagem", "Quantitativos", "Vias e greides", "Drenagem", "Quadras e lotes", "Validação" }, tela.Impactos.Select(i => i.Modulo));
+        var terra = tela.Impactos[0];
+        Assert.Equal(EarthworkRecord.Participantes(defs).Count, terra.Marcas);   // a via e os PVs (a caixa corta o terreno)
+        Assert.Contains(via.Id, EarthworkRecord.Participantes(defs).Select(d => d.Id));
+        Assert.Contains("«Novo levantamento»", terra.Texto);
+        Assert.Contains("Sem registro da terraplenagem aplicada.", terra.Texto);
+        Assert.Equal("CmdTerraplenagem", terra.Comando);
+        Assert.Null(tela.Impactos.Single(i => i.Modulo == "Quadras e lotes").Comando);
+        var reg = EarthworkRecord.Gravar(EarthworkRecord.Participantes(defs), 0.4, 1, 1.5, T0, null);
+        Assert.Contains("A última aplicação está em dia com as marcas.", TerrenoTela.Impactos(defs, reg)[0].Texto);
+        via.LeftWidth = 4;
+        Assert.Contains("Já há 1 marca(s) mudada(s) desde a última aplicação.", TerrenoTela.Impactos(defs, reg)[0].Texto);
+        var texto = TerrenoTela.Texto(tela);
+        Assert.Contains("SUPERFÍCIE DE CADA CÁLCULO", texto);
+        Assert.Contains("Recobrimento da rede de drenagem (Relatório da Rede, V13, memorial): acabada (vias + Toposolid atual)", texto);
+        Assert.EndsWith("Nada foi alterado no projeto.", texto);
+
+        var sem = TerrenoTela.Montar(Array.Empty<ToposolidLido>(), null, null, null, Array.Empty<MarkingDefinition>(), crit, null, Array.Empty<Achado>());
+        Assert.Equal("Terreno: nenhum Toposolid no projeto – nada a diagnosticar.", sem.Resumo);
+        Assert.Contains(sem.Secao(TerrenoTela.Origem).Linhas, l => l.Nivel == NivelSituacao.NaoVerificado && l.Texto.StartsWith("Nenhum Toposolid no projeto"));
+        Assert.Equal(new[] { "Validação" }, sem.Impactos.Select(i => i.Modulo));
+    }
+
+    [Fact]
+    public void Terreno_SuperficieDeCadaCalculoConfereComOCodigo()
+    {
+        // A tabela diz o que o código lê: Ground = natural, Current/CurrentMesh = projetada, SuperficieAcabada = acabada.
+        var ribbon = Ler("RibbonBuilder.cs");
+        foreach (var u in TerrenoTela.Usos) Assert.Contains($"typeof({u.Comando})", ribbon);
+        Assert.Contains("TerrainModel.Ground(doc)", Ler("Commands", "RoadWorks.cs"));
+        Assert.Contains("RoadWorks.Ground(doc, road.BaseZ)", Ler("Commands", "ProfileCommands.cs"));
+        Assert.Contains("_ground = TerrainModel.Ground(_doc)", Ler("Infrastructure", "MarkingService.cs"));
+        var terreno = Ler("Infrastructure", "TerrainService.cs");
+        Assert.Contains("topos.Select(TerrainModel.Original)", terreno);
+        Assert.Contains("TerrainService.Quantities(", Ler("Commands", "ReportCommands.cs"));
+        Assert.Contains("terreno: TerrainModel.CurrentMesh(doc)", Ler("Commands", "ValidationCommands.cs"));
+        Assert.Contains("terrenoNatural: TerrainModel.Ground(doc)", Ler("Commands", "ValidationCommands.cs"));
+        Assert.Contains("TerrainModel.Current(_doc) is not { } terrain", Ler("Commands", "AutoTestChecks.cs"));
+        var rede = Ler("Commands", "DrainageNetworkCommands.cs");
+        Assert.Contains("var terreno = TerrainModel.Current(doc);", rede);
+        Assert.Contains("DrenagemDoModelo.SuperficieAcabada(defs, terreno)", rede);
+        Assert.Contains(TerrenoTela.Usos, u => u.Comando == "CmdRedeDrenagem" && u.Superficie == SuperficieUsada.Natural && u.Calculo.StartsWith("Talvegues"));
+        Assert.Contains(TerrenoTela.Usos, u => u.Comando == "CmdValidarModelo" && u.Superficie == SuperficieUsada.Projetada);
+    }
+
+    [Fact]
+    public void TelaDoTerreno_NaJanelaENoComando()
+    {
+        var cmd = Ler("Commands", "TerrainDiagnosticCommands.cs");
+        Assert.Contains("[Transaction(TransactionMode.ReadOnly)]", cmd);
+        Assert.Contains("TerrenoTela.Montar(", cmd);
+        Assert.Contains("new TerrainWindow(tela, texto)", cmd);
+        Assert.Contains("ContextPanelService.RunLater(c)", cmd);           // o comando escolhido roda depois, fora do somente leitura
+        Assert.DoesNotContain("CommandCatalog.Run(", cmd);
+        Assert.Contains("public static bool RunLater(string command)", Ler("Infrastructure", "ContextPanelService.cs"));
+        var w = Ler("UI", "TerrainWindow.cs");
+        foreach (var t in new[] { "\"Superfície de cada cálculo\"", "\"Se o terreno mudar\"", "\"Selecionar no modelo\"", "TerrenoTela.Texto(tela)", "\"Toposolids\"" })
+            Assert.Contains(t, w);
+        Assert.DoesNotMatch(@"""#[0-9A-Fa-f]{3,8}""", w);
+    }
+
     [Fact]
     public void GerenciadorDePavimento_NaJanelaENoComando()
     {

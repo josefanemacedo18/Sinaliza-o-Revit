@@ -44,10 +44,10 @@ public static class RibbonBuilder
         // ---------------------------------------------------------------- Terreno
         var terreno = Panel(app, TabName, "Terreno");
         Large(terreno, Data(typeof(CmdDiagnosticoTerreno), "Diagnóstico do Terreno", "terreno",
-            "Confere a superfície do Toposolid (V14) e mostra o terreno original guardado – sem alterar nada.",
-            "Pontos, triângulos, área e cotas da superfície projetada e do terreno original guardado pela terraplenagem; declividade máxima " +
-            "informada, com a fonte; dados insuficientes ou inválidos, cotas diferentes no mesmo ponto, triângulos sem área, faces acima do " +
-            "limite e eixos de vias fora da superfície – o mesmo V14 do Validar Modelo. Pode selecionar as vias com eixo fora da superfície."));
+            "Terreno natural × projetado, a superfície de cada cálculo, o V14 e o que muda com o terreno – sem alterar nada.",
+            "Origem dos dados (os Toposolids), terreno natural guardado pela terraplenagem × superfície projetada (com a diferença por amostragem), " +
+            "limites e parâmetros, o V14 do Validar Modelo (dados insuficientes ou inválidos, cotas diferentes no mesmo ponto, triângulos sem área, " +
+            "faces acima do limite, eixos fora da superfície), qual superfície cada cálculo lê e os módulos a atualizar quando o terreno muda."));
         Split(terreno, "SvImagem", "Imagem Aérea",
             Data(typeof(CmdImportarImagem), "Importar Imagem e Calibrar", "importarimagem",
                 "Importa uma imagem aérea na escala e posição certas (world file ou GeoTIFF) ou a calibra por 2 pontos.",

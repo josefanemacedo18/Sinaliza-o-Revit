@@ -60,10 +60,17 @@ public static class ContextPanelService
         catch (Exception ex) { Log.Error("Painel contextual – atualizar", ex); }
     }
 
-    private static void RequestCommand(string command)
+    private static void RequestCommand(string command) => RunLater(command);
+
+    /// <summary>
+    /// Pede o comando para rodar quando a API estiver livre – depois do comando atual, pelo mesmo ExternalEvent do painel
+    /// (Etapa 11: telas somente leitura que abrem outro comando). Falso se o evento não existe (o registro falhou ao iniciar).
+    /// </summary>
+    public static bool RunLater(string command)
     {
+        if (_event == null) return false;
         Handler.Request(command);
-        _event?.Raise();
+        return _event.Raise() is ExternalEventRequest.Accepted or ExternalEventRequest.Pending;
     }
 
     private static void OnDocumentClosing(object? sender, DocumentClosingEventArgs e) => _page?.Show(PainelContextual.Vazio());

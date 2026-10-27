@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using SinalizacaoViaria.Core.Automation;
@@ -352,22 +351,8 @@ public sealed class DrainageNetworkWindow : Window
     }
 
     // ---------------------------------------------------------------- tabelas
-    private DataGrid Tabela<T>(IReadOnlyList<T> linhas, double altura, bool multipla, params (string Header, string Path, double Peso)[] colunas)
-    {
-        var g = new DataGrid
-        {
-            AutoGenerateColumns = false, IsReadOnly = true, CanUserAddRows = false, CanUserDeleteRows = false, HeadersVisibility = DataGridHeadersVisibility.Column,
-            SelectionMode = multipla ? DataGridSelectionMode.Extended : DataGridSelectionMode.Single, MaxHeight = altura, Margin = new Thickness(0, 2, 0, 4),
-            ItemsSource = linhas,
-        };
-        foreach (var (header, path, peso) in colunas)
-        {
-            var estilo = new Style(typeof(TextBlock));
-            estilo.Setters.Add(new Setter(TextBlock.TextWrappingProperty, TextWrapping.Wrap));
-            g.Columns.Add(new DataGridTextColumn { Header = header, Binding = new Binding(path), Width = new DataGridLength(peso, DataGridLengthUnitType.Star), ElementStyle = estilo });
-        }
-        return g;
-    }
+    private static DataGrid Tabela<T>(IReadOnlyList<T> linhas, double altura, bool multipla, params (string Header, string Path, double Peso)[] colunas) =>
+        UiTables.Grid(linhas, altura, multipla, colunas);
 
     /// <summary>Botão "Selecionar no modelo" para as linhas escolhidas (nenhuma escolhida = todas); duplo clique numa linha faz o mesmo.</summary>
     private StackPanel Selecionar(DataGrid g, Func<object, IReadOnlyList<string>> ids)

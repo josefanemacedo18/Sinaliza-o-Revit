@@ -159,13 +159,16 @@ public static class TerrainModel
     }
 
     /// <summary>Superfície do terreno PROJETADO como malha (todos os Toposolids principais juntos); nula sem Toposolid.</summary>
-    public static TerrainMesh? CurrentMesh(Document doc)
+    public static TerrainMesh? CurrentMesh(Document doc) => Join(Hosts(doc).Select(Live));
+
+    /// <summary>As malhas com faces numa só (a única, se for uma); nula se nenhuma tem faces.</summary>
+    public static TerrainMesh? Join(IEnumerable<TerrainMesh> meshes)
     {
-        var meshes = Hosts(doc).Select(Live).Where(m => m.Count > 0).ToList();
-        if (meshes.Count == 0) return null;
-        if (meshes.Count == 1) return meshes[0];
+        var list = meshes.Where(m => m.Count > 0).ToList();
+        if (list.Count == 0) return null;
+        if (list.Count == 1) return list[0];
         var all = new TerrainMesh();
-        foreach (var m in meshes)
+        foreach (var m in list)
             foreach (var (a, b, c) in m.Triangles) all.Add(m.Vertices[a], m.Vertices[b], m.Vertices[c]);
         return all;
     }
