@@ -17,6 +17,7 @@
                     <TextBlock Text="QUANTITATIVO DE SINALIZAÇÃO VIÁRIA E URBANIZAÇÃO" Foreground="{StaticResource TextOnAccentMuted}" FontSize="11" FontWeight="SemiBold"/>
                     <TextBlock x:Name="TxtProject" Foreground="{StaticResource TextOnAccent}" FontSize="20" FontWeight="SemiBold"/>
                     <TextBlock x:Name="TxtHeader" Foreground="{StaticResource TextOnAccent}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TxtOrigem" Foreground="{StaticResource TextOnAccentMuted}" FontSize="11" Margin="0,2,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -46,6 +47,9 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
+        <!-- O que pede atenção na origem dos números (terraplenagem do modelo desatualizada, estado não lido) -->
+        <StackPanel DockPanel.Dock="Top" x:Name="PanelAlertas" Margin="0,0,0,6"/>
+
         <!-- Filtros -->
         <Border DockPanel.Dock="Top" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,0,0,8">
             <DockPanel>
@@ -56,14 +60,15 @@
                 <Button DockPanel.Dock="Right" Content="Recolher grupos" Click="CollapseClick" Margin="6,0,0,0"/>
                 <Button DockPanel.Dock="Right" Content="Expandir grupos" Click="ExpandClick" Margin="6,0,0,0"/>
                 <TextBlock Text="Pesquisar" Style="{StaticResource FieldLabel}" Margin="14,3,8,3"/>
-                <TextBox x:Name="TbSearch" TextChanged="FilterChanged" ToolTip="Código, descrição, subcategoria, cor, material ou família"/>
+                <TextBox x:Name="TbSearch" TextChanged="FilterChanged" ToolTip="Código, descrição, subcategoria, cor, material, família ou elemento de origem (ex.: Via 3)"/>
             </DockPanel>
         </Border>
 
         <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
             <TextBlock DockPanel.Dock="Left" Style="{StaticResource Hint}" VerticalAlignment="Center" MaxWidth="560" TextWrapping="Wrap"
-                       Text="Placas, dispositivos, mobiliário, moderação e acessibilidade: memorial por modelo (quantidade). Sinalização horizontal e pavimentação: área, extensão, cor e material. Clique numa linha para ver a referência normativa."/>
+                       Text="Placas, dispositivos, mobiliário, moderação e acessibilidade: memorial por modelo (quantidade). Sinalização horizontal e pavimentação: área, extensão, cor e material. Clique numa linha para ver a referência, a origem e o método."/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Selecionar no modelo" Click="SelectClick" ToolTip="Fecha a janela e seleciona as marcas das linhas escolhidas (itens detalhados, por via ou o loteamento), aproximando a vista."/>
                 <Button Content="Exportar planilha Excel (.xlsx)" Click="ExportXlsxClick" Style="{StaticResource Primary}" ToolTip="Planilha formatada como esta janela: miniaturas, blocos por categoria e subcategoria, subtotais e resumos."/>
                 <Button Content="Exportar CSV" Click="ExportClick" ToolTip="Texto separado por ponto e vírgula (sem formatação nem imagens), para outros sistemas."/>
                 <Button Content="Criar tabela no Revit" Click="ScheduleClick" ToolTip="Tabela 'SV - Quantitativos' agrupada por categoria, hierarquia e subcategoria, com subtotais (parâmetros SV_*)."/>
@@ -72,8 +77,8 @@
             </StackPanel>
         </DockPanel>
 
-        <TabControl>
-            <TabItem Header="Itens detalhados">
+        <TabControl x:Name="Tabs">
+            <TabItem x:Name="TabRows" Header="Itens detalhados">
                 <DataGrid x:Name="GridRows" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
                           GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderSubtle}" AlternatingRowBackground="{StaticResource AltRow}"
                           RowDetailsVisibilityMode="VisibleWhenSelected" SelectionMode="Single" BorderBrush="{StaticResource Border}" RowHeight="54">
@@ -159,6 +164,11 @@
                         <DataGridTextColumn Header="Hierarquia" Binding="{Binding HierarchyName}" Width="120"/>
                         <DataGridTextColumn x:Name="ColMaterial" Header="Material" Binding="{Binding Material}" Width="140"/>
                         <DataGridTextColumn x:Name="ColConsumption" Header="Consumo" Binding="{Binding ConsumptionText}" Width="100"/>
+                        <DataGridTextColumn Header="Origem" Binding="{Binding OrigemTexto}" Width="200">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap"/></Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
                     </DataGrid.Columns>
                     <DataGrid.RowDetailsTemplate>
                         <DataTemplate>
@@ -190,9 +200,47 @@
                         <DataGridTextColumn Header="Área (m²)" Binding="{Binding Area, StringFormat=N2, ConverterCulture=pt-BR}" Width="110"/>
                         <DataGridTextColumn Header="Extensão (m)" Binding="{Binding PaintedLength, StringFormat=N2, ConverterCulture=pt-BR}" Width="110"/>
                         <DataGridTextColumn Header="Unidades" Binding="{Binding Units}" Width="90"/>
-                        <DataGridTextColumn Header="Consumo de tinta" Binding="{Binding MaterialConsumption, StringFormat=N2, ConverterCulture=pt-BR}" Width="120"/>
+                        <DataGridTextColumn Header="Consumo de tinta" Binding="{Binding ConsumptionText}" Width="160"/>
                     </DataGrid.Columns>
                 </DataGrid>
+            </TabItem>
+            <TabItem x:Name="TabVias" Header="Por via">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Margin="2,4,2,6" TextWrapping="Wrap" Foreground="{StaticResource TextSecondary}"
+                               Text="Cada via: extensão do eixo; pavimento, calçada e meio-fio medidos nas peças geradas (os mesmos números do resumo por componente, só desta via); volume do revestimento e das camadas da estrutura; corte e aterro da parte da via na terraplenagem ('—' = não calculado: sem Toposolid ou a via não molda o terreno). Interseções e rotatórias estão no resumo por componente e nas camadas."/>
+                    <DataGrid x:Name="GridVias" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" SelectionMode="Extended"
+                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderSubtle}" RowHeight="24" BorderBrush="{StaticResource Border}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Via" Binding="{Binding Via}" Width="*" FontWeight="SemiBold"/>
+                            <DataGridTextColumn Header="Hierarquia" Binding="{Binding HierarquiaNome}" Width="120"/>
+                            <DataGridTextColumn Header="Eixo (m)" Binding="{Binding Extensao, StringFormat=N2, ConverterCulture=pt-BR}" Width="90"/>
+                            <DataGridTextColumn Header="Pavimento (m²)" Binding="{Binding Pavimento, StringFormat=N2, ConverterCulture=pt-BR}" Width="110"/>
+                            <DataGridTextColumn Header="Calçada (m²)" Binding="{Binding Calcada, StringFormat=N2, ConverterCulture=pt-BR}" Width="100"/>
+                            <DataGridTextColumn Header="Meio-fio (m)" Binding="{Binding MeioFio, StringFormat=N2, ConverterCulture=pt-BR}" Width="100"/>
+                            <DataGridTextColumn Header="Camadas (m³)" Binding="{Binding Camadas, StringFormat=N2, ConverterCulture=pt-BR}" Width="100"/>
+                            <DataGridCheckBoxColumn Header="Só revestimento" Binding="{Binding SemEstrutura, Mode=OneWay}" Width="100"/>
+                            <DataGridTextColumn Header="Corte (m³)" Binding="{Binding Corte, StringFormat=N2, ConverterCulture=pt-BR, TargetNullValue=—}" Width="100"/>
+                            <DataGridTextColumn Header="Aterro (m³)" Binding="{Binding Aterro, StringFormat=N2, ConverterCulture=pt-BR, TargetNullValue=—}" Width="100"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+            <TabItem x:Name="TabParcelamento" Header="Quadras e lotes">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Margin="2,4,2,6" TextWrapping="Wrap" Foreground="{StaticResource TextSecondary}"
+                               Text="Por loteamento: gleba, quadras, cada categoria de parcela e o sistema viário – o mesmo resumo dos Quadros e do memorial do Loteamento (divisão das quadras; sistema viário = gleba − quadras − sobra em volta das vias). Os lotes não entram nos itens detalhados."/>
+                    <DataGrid x:Name="GridParcelamento" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column" SelectionMode="Extended"
+                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderSubtle}" RowHeight="24" BorderBrush="{StaticResource Border}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Loteamento" Binding="{Binding Loteamento}" Width="*" FontWeight="SemiBold"/>
+                            <DataGridTextColumn Header="Categoria" Binding="{Binding Categoria}" Width="200"/>
+                            <DataGridTextColumn Header="Quantidade (un)" Binding="{Binding Quantidade, TargetNullValue=—}" Width="110"/>
+                            <DataGridTextColumn Header="Área (m²)" Binding="{Binding Area, StringFormat=N2, ConverterCulture=pt-BR}" Width="110"/>
+                            <DataGridTextColumn Header="% da gleba" Binding="{Binding Percentual, StringFormat=N2, ConverterCulture=pt-BR}" Width="90"/>
+                            <DataGridTextColumn Header="Tipo" Binding="{Binding Tipo}" Width="90"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
             </TabItem>
             <TabItem Header="Resumo por hierarquia viária">
                 <DataGrid x:Name="GridHierarchy" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
@@ -205,7 +253,7 @@
                         <DataGridTextColumn Header="Extensão pintada (m)" Binding="{Binding PaintedLength, StringFormat=N2, ConverterCulture=pt-BR}" Width="130"/>
                         <DataGridTextColumn Header="Placas" Binding="{Binding Signs}" Width="70"/>
                         <DataGridTextColumn Header="Elementos" Binding="{Binding Elements}" Width="80"/>
-                        <DataGridTextColumn Header="Consumo de tinta" Binding="{Binding PaintConsumption, StringFormat=N2, ConverterCulture=pt-BR}" Width="120"/>
+                        <DataGridTextColumn Header="Consumo de tinta" Binding="{Binding ConsumoTexto}" Width="160"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </TabItem>
@@ -289,6 +337,11 @@
                         <DataGridTextColumn Header="Microesferas (kg)" Binding="{Binding GlassBeadsKg, StringFormat=N2, ConverterCulture=pt-BR}" Width="120"/>
                     </DataGrid.Columns>
                 </DataGrid>
+            </TabItem>
+            <TabItem x:Name="TabOrigem" Header="Origem dos valores">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="PanelOrigem" Margin="4,6,4,6"/>
+                </ScrollViewer>
             </TabItem>
         </TabControl>
     </DockPanel>

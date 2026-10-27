@@ -78,10 +78,53 @@ public sealed class QuantityRow
         _ => c.ToString(),
     };
 
-    /// <summary>Consumo com unidade ("" quando não se aplica).</summary>
-    public string ConsumptionText => MaterialConsumption > 1e-6
-        ? MaterialConsumption.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) + " " + ConsumptionUnit
+    /// <summary>
+    /// Consumo com unidade ("" quando não se aplica); nos subtotais e resumos, somado por unidade ("12,50 L + 30,00 kg"):
+    /// litros e quilos não se somam.
+    /// </summary>
+    public string ConsumptionText => ConsumoResumo.Length > 0 ? ConsumoResumo
+        : MaterialConsumption > 1e-6 ? (MaterialConsumption.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("pt-BR")) + " " + ConsumptionUnit).Trim()
         : "";
+
+    /// <summary>Consumo dos subtotais e resumos, por unidade (<see cref="QuantityCalculator.Consumo"/>); vazio nas linhas de item.</summary>
+    public string ConsumoResumo { get; set; } = "";
+
+    /// <summary>
+    /// Unidade do consumo total a partir da taxa do catálogo de materiais: "L/m²" → "L", "kg/m²" → "kg", "m²/m²" → "m²". O total
+    /// é área × taxa – a unidade da taxa não é a do total.
+    /// </summary>
+    public static string UnidadeDoTotal(string? taxa)
+    {
+        if (string.IsNullOrWhiteSpace(taxa)) return "";
+        var t = taxa.Trim();
+        foreach (var por in new[] { "/m²", "/m2" })
+            if (t.EndsWith(por, StringComparison.OrdinalIgnoreCase)) return t[..^por.Length].Trim();
+        return t;
+    }
+
+    /// <summary>Marcas do plugin que entram na linha – a origem do número –, na ordem em que entraram.</summary>
+    public List<OrigemQuantidade> Origens { get; } = new();
+
+    /// <summary>Elementos do Revit sem marca do plugin na linha: pisos desenhados à mão com hierarquia ou instâncias de família do usuário.</summary>
+    public int ElementosDoUsuario { get; set; }
+
+    /// <summary>Como o número foi obtido: o método de cálculo e a configuração usada (material, taxa, fator); vazio nos subtotais e resumos.</summary>
+    public string Metodo { get; set; } = "";
+
+    /// <summary>A origem em texto: as marcas (até três pelo nome) e os elementos do usuário; "—" sem origem (balanço da terraplenagem).</summary>
+    public string OrigemTexto
+    {
+        get
+        {
+            var partes = new List<string>();
+            if (Origens.Count > 0)
+                partes.Add((Origens.Count == 1 ? "1 marca do plugin: " : $"{Origens.Count} marcas do plugin: ") +
+                           string.Join(", ", Origens.Take(3).Select(o => o.Nome)) + (Origens.Count > 3 ? $" e mais {Origens.Count - 3}" : ""));
+            if (ElementosDoUsuario > 0)
+                partes.Add(IsFamily ? $"{ElementosDoUsuario} instância(s) de família do Revit" : $"{ElementosDoUsuario} piso(s) desenhado(s) à mão no modelo");
+            return partes.Count == 0 ? "—" : string.Join("; ", partes);
+        }
+    }
 
     /// <summary>Detalhes da linha (referência, elementos, tipo de área, famílias).</summary>
     public string DetailText
@@ -98,6 +141,8 @@ public sealed class QuantityRow
             var text = string.Join(" · ", parts);
             if (!string.IsNullOrWhiteSpace(FamilyTypes)) text += "\nFamílias/tipos: " + FamilyTypes;
             if (!string.IsNullOrWhiteSpace(Reference)) text += "\nReferência: " + Reference;
+            text += "\nOrigem: " + OrigemTexto;
+            if (!string.IsNullOrWhiteSpace(Metodo)) text += "\nMétodo: " + Metodo;
             return text;
         }
     }
@@ -180,10 +225,23 @@ public sealed class QuantityRow
 /// <summary>Consolida áreas pintadas, extensões e unidades por código, cor e material.</summary>
 public static class QuantityCalculator
 {
-    public static List<QuantityRow> Compute(IEnumerable<(MarkingDefinition Def, MarkingGeometry Geo)> items, Catalogo catalog, string? defaultMaterial = null)
+    /// <param name="nomes">Nome de cada marca pelo Id (<see cref="Model.NomesDasMarcas"/>); nulo = montado com as marcas dos itens.</param>
+    /// <param name="doUsuario">Itens que não são marcas do plugin (pisos desenhados à mão com hierarquia): contam como elementos do
+    /// usuário na origem da linha, não como marca.</param>
+    public static List<QuantityRow> Compute(IEnumerable<(MarkingDefinition Def, MarkingGeometry Geo)> items, Catalogo catalog, string? defaultMaterial = null,
+        IReadOnlyDictionary<string, string>? nomes = null, IReadOnlySet<MarkingDefinition>? doUsuario = null)
     {
+        var lista = items.ToList();
+        bool DoUsuario(MarkingDefinition d) => doUsuario?.Contains(d) == true;
+        nomes ??= Model.NomesDasMarcas.Montar(lista.Select(i => i.Def).Where(d => !DoUsuario(d)));
+        void Origem(QuantityRow row, MarkingDefinition d)
+        {
+            if (DoUsuario(d)) row.ElementosDoUsuario++;
+            else if (!row.Origens.Any(o => o.Id == d.Id))
+                row.Origens.Add(new OrigemQuantidade(d.Id, nomes.TryGetValue(d.Id, out var n) ? n : $"{d.KindName} {d.DisplayCode}"));
+        }
         var rows = new Dictionary<(string, MarkingColor, string, HierarquiaViaria?), QuantityRow>();
-        foreach (var (def, geo) in items)
+        foreach (var (def, geo) in lista)
         {
             if (def is IAnnotationDefinition) continue;
             // Lotes e quadras têm quadro próprio (quadro de áreas do loteamento).
@@ -201,6 +259,8 @@ public static class QuantityCalculator
                             Category = QuantityRow.Categorize(plate, pi.Group), Hierarchy = def.Hierarchy, Unit = pi.Unit, Reference = pi.Reference,
                         };
                     pr.Units += 1;
+                    if (pr.Metodo.Length == 0) pr.Metodo = MetodoPlaca;
+                    Origem(pr, def);
                 }
             var info = MarkingBuilder.Describe(def, catalog);
             var matName = def.Output.Material ?? defaultMaterial ?? catalog.Materiais.FirstOrDefault()?.Nome ?? "";
@@ -213,6 +273,9 @@ public static class QuantityCalculator
             {
                 // Memorial: uma linha por modelo (todas as cores e materiais somados); horizontal: por cor e material.
                 var key = memorial ? (info.Code, MarkingColor.Preta, "", def.Hierarchy) : (info.Code, color, matName, def.Hierarchy);
+                // Consumo de tinta apenas para demarcação (não para calçadas, canteiros e dispositivos físicos).
+                var consome = !memorial && mat != null && MarkingColors.IsPaint(color) && def is not (DeviceMarkingDefinition or SignDefinition or UrbanElementDefinition or RampDefinition or TactileRouteDefinition)
+                              && !(def is LinearMarkingDefinition { Code: "PTA" or "PTD" or "PLATAFORMA" });
                 if (!rows.TryGetValue(key, out var row))
                 {
                     row = new QuantityRow
@@ -222,16 +285,16 @@ public static class QuantityCalculator
                         Category = category,
                         Subcategory = def is UrbanElementDefinition u && catalog.Movel(u.Code) is { } mv ? UrbanCategories.Label(UrbanCategories.Of(mv.Forma)) : "",
                         Hierarchy = def.Hierarchy,
-                        Unit = info.Unit, Reference = info.Reference, ConsumptionUnit = mat?.UnidadeConsumo ?? "",
+                        Unit = info.Unit, Reference = info.Reference, ConsumptionUnit = QuantityRow.UnidadeDoTotal(mat?.UnidadeConsumo),
                     };
                     rows[key] = row;
                 }
+                if (!DoUsuario(def) && row.Metodo.Length == 0) row.Metodo = Metodo(def, info.Unit, memorial, color, consome ? mat : null);
+                Origem(row, def);
                 row.Area += area;
-                // Consumo de tinta apenas para demarcação (não para calçadas, canteiros e dispositivos físicos).
-                if (!memorial && mat != null && MarkingColors.IsPaint(color) && def is not (DeviceMarkingDefinition or SignDefinition or UrbanElementDefinition or RampDefinition or TactileRouteDefinition)
-                    && !(def is LinearMarkingDefinition { Code: "PTA" or "PTD" or "PLATAFORMA" }))
+                if (consome)
                 {
-                    row.MaterialConsumption += area * mat.Consumo;
+                    row.MaterialConsumption += area * mat!.Consumo;
                     row.GlassBeadsKg += area * mat.MicroesferasKgM2;
                 }
                 if (first)
@@ -245,7 +308,56 @@ public static class QuantityCalculator
                 }
             }
         }
+        foreach (var r in rows.Values.Where(r => r.ElementosDoUsuario > 0))
+            r.Metodo = r.Metodo.Length == 0 ? MetodoPisoDoUsuario : $"{r.Metodo}; {MetodoPisoDoUsuario}";
         return Sort(rows.Values);
+    }
+
+    private const string MetodoPlaca = "contagem de placas (as empilhadas no mesmo suporte contam uma cada)";
+    private const string MetodoPisoDoUsuario = "pisos desenhados à mão com a hierarquia informada: área do piso medida no modelo";
+
+    /// <summary>
+    /// Método de cálculo de uma linha (Prompt de Interface §18.1): a geometria vem da definição da marca, só nas cores que ainda têm
+    /// elemento no modelo; nos pisos, a área é a medida no modelo (o piso editado à mão entra como está).
+    /// </summary>
+    private static string Metodo(MarkingDefinition def, string unidade, bool memorial, MarkingColor color, MaterialDef? consumo)
+    {
+        var pt = CultureInfo.GetCultureInfo("pt-BR");
+        if (def is SignDefinition) return MetodoPlaca;
+        if (def is RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition)
+            return "área em planta dos pisos no modelo (o piso editado à mão entra com a área que tem)" + (def is RoadPavementDefinition ? "; extensão de via pelo eixo" : "");
+        if (memorial)
+            return unidade switch
+            {
+                "m" => "extensão medida na geometria da marca",
+                "m²" => "área em planta medida na geometria da marca (pisos: a área no modelo)",
+                _ => "contagem de unidades da marca",
+            } + " – por modelo, todas as cores somadas";
+        var s = MarkingColors.IsPaint(color) ? "área pintada medida na geometria da marca, por cor; extensão pela linha pintada"
+            : "área em planta medida na geometria da marca (pisos: a área no modelo)";
+        if (consumo != null)
+            s += $"; consumo = área × {consumo.Consumo.ToString("0.###", pt)} {consumo.UnidadeConsumo} e microesferas = área × " +
+                 $"{consumo.MicroesferasKgM2.ToString("0.###", pt)} kg/m² ({consumo.Nome}, catálogo de materiais – estimativa)";
+        return s;
+    }
+
+    /// <summary>
+    /// Consumo somado por unidade, no padrão brasileiro ("12,50 L + 30,00 kg"); vazio sem consumo. Materiais com unidades
+    /// diferentes (tinta em litros, termoplástico em quilos) não se somam num número só.
+    /// </summary>
+    public static string Consumo(IEnumerable<QuantityRow> rows)
+    {
+        var pt = CultureInfo.GetCultureInfo("pt-BR");
+        return string.Join(" + ", rows.Where(r => r.MaterialConsumption > 1e-6).GroupBy(r => r.ConsumptionUnit)
+            .OrderBy(g => g.Key, StringComparer.Ordinal).Select(g => $"{g.Sum(r => r.MaterialConsumption).ToString("N2", pt)} {g.Key}".Trim()));
+    }
+
+    /// <summary>Total do consumo quando todas as linhas têm a mesma unidade (senão zero e unidade vazia) e o texto por unidade.</summary>
+    private static (double Total, string Unidade, string Texto) Consumos(IEnumerable<QuantityRow> rows)
+    {
+        var com = rows.Where(r => r.MaterialConsumption > 1e-6).ToList();
+        var unidades = com.Select(r => r.ConsumptionUnit).Distinct().ToList();
+        return unidades.Count == 1 ? (com.Sum(r => r.MaterialConsumption), unidades[0], Consumo(com)) : (0, "", Consumo(com));
     }
 
     private static List<QuantityRow> Sort(IEnumerable<QuantityRow> rows) => rows
@@ -281,6 +393,9 @@ public static class QuantityCalculator
                 IsFamily = true,
                 FamilyTypes = string.Join(", ", types),
                 Reference = "Família do Revit (projeto)",
+                ElementosDoUsuario = g.Count(),
+                Metodo = "contagem das instâncias de família do Revit classificadas em Elementos Urbanos › Famílias do Revit" +
+                         (g.Any(f => f.Length > 1e-6) ? "; extensão pelo comprimento das instâncias" : ""),
             });
         }
         return Sort(list);
@@ -289,18 +404,22 @@ public static class QuantityCalculator
     /// <summary>Totais por subcategoria dentro de uma categoria (ex.: iluminação, arborização).</summary>
     public static List<QuantityRow> SubcategorySummary(IEnumerable<QuantityRow> rows) =>
         rows.GroupBy(r => (r.Category, r.SubcategoryName))
-            .Select(g => new QuantityRow
+            .Select(g =>
             {
-                Code = "SUBTOTAL",
-                Name = g.Key.SubcategoryName,
-                Category = g.Key.Category,
-                Subcategory = g.Key.SubcategoryName,
-                Area = g.Sum(r => r.Area),
-                PaintedLength = g.Sum(r => r.PaintedLength),
-                Units = g.Sum(r => r.Units),
-                Elements = g.Sum(r => r.Elements),
-                MaterialConsumption = g.Sum(r => r.MaterialConsumption),
-                Unit = "",
+                var c = Consumos(g);
+                return new QuantityRow
+                {
+                    Code = "SUBTOTAL",
+                    Name = g.Key.SubcategoryName,
+                    Category = g.Key.Category,
+                    Subcategory = g.Key.SubcategoryName,
+                    Area = g.Sum(r => r.Area),
+                    PaintedLength = g.Sum(r => r.PaintedLength),
+                    Units = g.Sum(r => r.Units),
+                    Elements = g.Sum(r => r.Elements),
+                    MaterialConsumption = c.Total, ConsumptionUnit = c.Unidade, ConsumoResumo = c.Texto,
+                    Unit = "",
+                };
             })
             .OrderBy(r => r.Category).ThenBy(r => r.Name).ToList();
 
@@ -318,12 +437,18 @@ public static class QuantityCalculator
         var pt = CultureInfo.GetCultureInfo("pt-BR");
         var all = items.Where(i => i.Cut + i.Fill > 1e-6).ToList();
         if (all.Count == 0) return list;
-        QuantityRow Row(string code, string name, HierarquiaViaria? h, string reference) => new()
+        QuantityRow Row(string code, string name, HierarquiaViaria? h, string reference, string metodo) => new()
         {
             Code = code, Name = name, Group = GrupoMarca.Urbanizacao, Color = MarkingColor.Preta, Memorial = true,
             Category = CategoriaQuantitativo.ObrasDeArteTerraplenagem, Subcategory = EarthworkSubcategory, Hierarchy = h, Unit = "m³",
-            Reference = reference,
+            Reference = reference, Metodo = metodo,
         };
+        const string malha = "entre a superfície de projeto (vias e obras que moldam o terreno, com a estrutura do pavimento e os taludes) e o " +
+                             "terreno original guardado no Toposolid, pela malha – calculado agora, com as marcas atuais";
+        void Origens(QuantityRow r, IEnumerable<EarthworkItem> g)
+        {
+            foreach (var i in g.Where(i => i.Id != null && r.Origens.All(o => o.Id != i.Id))) r.Origens.Add(new OrigemQuantidade(i.Id!, i.Name));
+        }
         string Parts(IEnumerable<EarthworkItem> g, Func<EarthworkItem, double> v) =>
             string.Join("; ", g.Where(i => v(i) > 0.05).OrderByDescending(v).Select(i => $"{i.Name}: {v(i).ToString("N1", pt)} m³"));
         foreach (var g in all.GroupBy(i => i.Hierarchy))
@@ -332,16 +457,18 @@ public static class QuantityCalculator
             var fill = g.Sum(i => i.Fill);
             if (cut > 1e-6)
             {
-                var r = Row("TER-CORTE", "Corte (escavação, volume in situ)", g.Key, Parts(g, i => i.Cut));
+                var r = Row("TER-CORTE", "Corte (escavação, volume in situ)", g.Key, Parts(g, i => i.Cut), "volume de corte " + malha);
                 r.Volume = cut;
                 r.Elements = g.Count(i => i.Cut > 1e-6);
+                Origens(r, g.Where(i => i.Cut > 1e-6));
                 list.Add(r);
             }
             if (fill > 1e-6)
             {
-                var r = Row("TER-ATERRO", "Aterro (volume compactado)", g.Key, Parts(g, i => i.Fill));
+                var r = Row("TER-ATERRO", "Aterro (volume compactado)", g.Key, Parts(g, i => i.Fill), "volume de aterro " + malha);
                 r.Volume = fill;
                 r.Elements = g.Count(i => i.Fill > 1e-6);
+                Origens(r, g.Where(i => i.Fill > 1e-6));
                 list.Add(r);
             }
         }
@@ -352,9 +479,10 @@ public static class QuantityCalculator
                     "(fator de homogeneização – corte in situ por m³ de aterro compactado, DNIT)";
         if (Math.Abs(balance) > 1e-6)
         {
+            var metodo = $"balanço: corte − aterro × {homogenization.ToString("0.00", pt)} (fator de homogeneização da terraplenagem; a origem dele está no cabeçalho)";
             var b = balance > 0
-                ? Row("TER-BOTAFORA", "Bota-fora (sobra de corte, volume in situ)", null, basis)
-                : Row("TER-EMPRESTIMO", "Empréstimo (falta de material, volume in situ)", null, basis);
+                ? Row("TER-BOTAFORA", "Bota-fora (sobra de corte, volume in situ)", null, basis, metodo)
+                : Row("TER-EMPRESTIMO", "Empréstimo (falta de material, volume in situ)", null, basis, metodo);
             b.Volume = Math.Abs(balance);
             list.Add(b);
         }
@@ -373,26 +501,31 @@ public static class QuantityCalculator
                 PaintedLength = g.Where(r => r.Category == CategoriaQuantitativo.SinalizacaoHorizontal).Sum(r => r.PaintedLength),
                 Signs = g.Where(r => r.Category == CategoriaQuantitativo.SinalizacaoVertical).Sum(r => r.Units),
                 Elements = g.Sum(r => r.Elements),
-                PaintConsumption = g.Sum(r => r.MaterialConsumption),
+                PaintConsumption = Consumos(g).Total,
+                ConsumoTexto = Consumo(g),
             })
             .OrderByDescending(r => Hierarquia.Rank(r.Hierarchy)).ToList();
 
     /// <summary>Totais por categoria (área, extensão e unidades).</summary>
     public static List<QuantityRow> CategorySummary(IEnumerable<QuantityRow> rows) =>
         rows.GroupBy(r => r.Category)
-            .Select(g => new QuantityRow
+            .Select(g =>
             {
-                Code = "SUBTOTAL",
-                Name = QuantityRow.CategoryLabel(g.Key),
-                Category = g.Key,
-                Area = g.Sum(r => r.Area),
-                PaintedLength = g.Sum(r => r.PaintedLength),
-                Volume = g.Sum(r => r.Volume),
-                Units = g.Sum(r => r.Units),
-                Elements = g.Sum(r => r.Elements),
-                MaterialConsumption = g.Sum(r => r.MaterialConsumption),
-                GlassBeadsKg = g.Sum(r => r.GlassBeadsKg),
-                Unit = "m²",
+                var c = Consumos(g);
+                return new QuantityRow
+                {
+                    Code = "SUBTOTAL",
+                    Name = QuantityRow.CategoryLabel(g.Key),
+                    Category = g.Key,
+                    Area = g.Sum(r => r.Area),
+                    PaintedLength = g.Sum(r => r.PaintedLength),
+                    Volume = g.Sum(r => r.Volume),
+                    Units = g.Sum(r => r.Units),
+                    Elements = g.Sum(r => r.Elements),
+                    MaterialConsumption = c.Total, ConsumptionUnit = c.Unidade, ConsumoResumo = c.Texto,
+                    GlassBeadsKg = g.Sum(r => r.GlassBeadsKg),
+                    Unit = "m²",
+                };
             })
             .OrderBy(r => r.Category).ToList();
 
@@ -423,9 +556,13 @@ public static class QuantityCalculator
     /// um bloco por categoria e subcategoria com as colunas que fazem sentido para ela (memorial: modelo e quantidade;
     /// horizontal: cor, material, área, extensão e consumo), subtotais e resumos ao final.
     /// </summary>
+    /// <param name="origem">De onde vêm os números (<see cref="OrigemQuantitativos.Linhas"/>): sai no cabeçalho.</param>
+    /// <param name="vias">Resumo por via (<see cref="QuantitativosPorVia"/>).</param>
+    /// <param name="parcelamento">Quadras e lotes por loteamento (<see cref="QuantitativosParcelamento"/>).</param>
     public static string ToCsv(IEnumerable<QuantityRow> rows, IEnumerable<QuantityRow>? summary = null, string? projectName = null,
         IEnumerable<ComponentRow>? components = null, IEnumerable<Automation.SecoesDaVia>? sections = null,
-        IEnumerable<CamadaQuantidade>? layers = null, IReadOnlyList<string>? noStructure = null)
+        IEnumerable<CamadaQuantidade>? layers = null, IReadOnlyList<string>? noStructure = null, IEnumerable<string>? origem = null,
+        IEnumerable<LinhaPorVia>? vias = null, IEnumerable<LinhaParcelamento>? parcelamento = null)
     {
         var pt = CultureInfo.GetCultureInfo("pt-BR");
         var sb = new StringBuilder();
@@ -436,8 +573,9 @@ public static class QuantityCalculator
         if (!string.IsNullOrWhiteSpace(projectName)) sb.AppendLine(Esc("Projeto: " + projectName));
         sb.AppendLine(Esc($"Emitido em {DateTime.Now:dd/MM/yyyy HH:mm} – SinalizaBIM"));
         sb.AppendLine(Esc($"{list.Count} item(ns) em {list.Select(r => r.Category).Distinct().Count()} categoria(s)"));
+        foreach (var o in origem ?? Enumerable.Empty<string>()) sb.AppendLine(Esc(o));
         sb.AppendLine();
-        const string header = "Item;Código;Descrição;Quantidade;Un.;Área (m²);Extensão (m);Unidades;Elementos;Cor;Material;Consumo estimado;Hierarquia viária;Referência";
+        const string header = "Item;Código;Descrição;Quantidade;Un.;Área (m²);Extensão (m);Unidades;Elementos;Cor;Material;Consumo estimado;Hierarquia viária;Referência;Origem;Método";
         var n = 0;
         foreach (var g in list.GroupBy(r => r.Category).OrderBy(g => g.Key))
         {
@@ -453,23 +591,33 @@ public static class QuantityCalculator
                     sb.AppendLine(string.Join(";", n, Esc(r.Code), Esc(r.Name), Q(r.MainQuantity), Esc(r.Unit),
                         memorial ? "" : N(r.Area), memorial ? "" : N(r.PaintedLength), r.Units, r.Elements,
                         memorial || r.IsFamily ? "" : Esc(r.ColorLabel), memorial ? "" : Esc(r.Material),
-                        memorial || r.MaterialConsumption <= 1e-6 ? "" : Esc(r.ConsumptionText), Esc(r.HierarchyName), Esc(r.Reference)));
+                        memorial || r.MaterialConsumption <= 1e-6 ? "" : Esc(r.ConsumptionText), Esc(r.HierarchyName), Esc(r.Reference), Esc(r.OrigemTexto), Esc(r.Metodo)));
                 }
             }
             var sub = CategorySummary(g).First();
             sb.AppendLine(string.Join(";", "", "SUBTOTAL", "", "", "", memorial ? "" : N(sub.Area), memorial ? "" : N(sub.PaintedLength), sub.Units, sub.Elements, "", "",
-                memorial || sub.MaterialConsumption <= 1e-6 ? "" : (N(sub.MaterialConsumption) + " " + sub.ConsumptionUnit).Trim(), "", ""));
+                memorial ? "" : Esc(sub.ConsumptionText), "", "", "", ""));
             sb.AppendLine();
         }
         sb.AppendLine("RESUMO POR CATEGORIA");
         sb.AppendLine("Categoria;Itens;Área (m²);Extensão (m);Unidades;Consumo de tinta");
         foreach (var c in CategorySummary(list))
-            sb.AppendLine(string.Join(";", Esc(c.Name), c.Elements, N(c.Area), N(c.PaintedLength), c.Units, N(c.MaterialConsumption)));
+            sb.AppendLine(string.Join(";", Esc(c.Name), c.Elements, N(c.Area), N(c.PaintedLength), c.Units, Esc(c.ConsumptionText)));
         sb.AppendLine();
         sb.AppendLine("RESUMO POR HIERARQUIA VIÁRIA (CTB art. 60)");
         sb.AppendLine("Hierarquia;Extensão de vias (m);Pavimento (m²);Área pintada (m²);Extensão pintada (m);Placas (un);Elementos;Consumo de tinta");
         foreach (var h in HierarchySummary(list))
-            sb.AppendLine(string.Join(";", Esc(h.Name), N(h.RoadLength), N(h.PavementArea), N(h.PaintedArea), N(h.PaintedLength), h.Signs, h.Elements, N(h.PaintConsumption)));
+            sb.AppendLine(string.Join(";", Esc(h.Name), N(h.RoadLength), N(h.PavementArea), N(h.PaintedArea), N(h.PaintedLength), h.Signs, h.Elements, Esc(h.ConsumoTexto)));
+        if (vias != null && vias.Any())
+        {
+            sb.AppendLine();
+            sb.Append(QuantitativosPorVia.Csv(vias));
+        }
+        if (parcelamento != null && parcelamento.Any())
+        {
+            sb.AppendLine();
+            sb.Append(QuantitativosParcelamento.Csv(parcelamento));
+        }
         if (components != null && components.Any())
         {
             sb.AppendLine();
@@ -502,7 +650,8 @@ public static class QuantityCalculator
 
 /// <summary>Família do Revit classificada como elemento urbano (entrada do quantitativo).</summary>
 /// <summary>Volumes de terraplenagem de um elemento (a parte dele no projeto conjunto; m³ e m²).</summary>
-public sealed record EarthworkItem(string Name, HierarquiaViaria? Hierarchy, double Cut, double Fill, double Area);
+/// <param name="Id">Marca de origem (via, nó ou obra); nulo = não informada.</param>
+public sealed record EarthworkItem(string Name, HierarquiaViaria? Hierarchy, double Cut, double Fill, double Area, string? Id = null);
 
 public sealed record FamilyItem(string Code, string Description, string TypeName, CategoriaUrbana Category, HierarquiaViaria? Hierarchy, double Length = 0);
 
@@ -517,5 +666,8 @@ public sealed class HierarchySummaryRow
     public double PaintedLength { get; set; }
     public int Signs { get; set; }
     public int Elements { get; set; }
+    /// <summary>Consumo quando todas as linhas têm a mesma unidade (senão zero): o que vale é <see cref="ConsumoTexto"/>.</summary>
     public double PaintConsumption { get; set; }
+    /// <summary>Consumo por unidade ("12,50 L + 30,00 kg").</summary>
+    public string ConsumoTexto { get; set; } = "";
 }

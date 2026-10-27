@@ -32,7 +32,8 @@ public sealed class CmdQuantitativos : CommandBase
             return Result.Cancelled;
         }
         var sections = new List<Core.Automation.SecoesDaVia>();
-        var (items, rows) = Collect(doc, uidoc.ActiveView, defs, families, sections);
+        var earth = new List<EarthworkItem>();
+        var (items, rows) = Collect(doc, uidoc.ActiveView, defs, families, sections, earth);
         // Miniaturas da própria sinalização (face da placa, trecho da linha, unidade do dispositivo, amostra de material).
         var thumbs = QuantityThumbnails.Build(items);
         // Resumo por componente da seção (pavimento, meio-fio, sarjeta, calçada...) somado em todas as marcas.
@@ -46,8 +47,36 @@ public sealed class CmdQuantitativos : CommandBase
         var ids = defs.Select(d => d.Id).ToHashSet();
         try { layers = PavementLayerQuantities.Compute(items.Where(i => ids.Contains(i.Def.Id)), defs, noStructure); }
         catch (Exception ex) { Log.Error("Quantitativo das camadas do pavimento", ex); }
-        var w = new QuantitiesWindow(rows, doc.Title, thumbs, components, sections, layers, noStructure);
-        if (UiHelpers.ShowModal(w) == true && (w.CreateSchedule || w.SchedulesByCategory))
+        // Organizados por via e por loteamento (Etapa 12; Prompt de Interface §18) e a origem dos números (§18.1).
+        var nomes = NomesDasMarcas.Montar(defs);
+        var vias = new List<LinhaPorVia>();
+        try { vias = QuantitativosPorVia.Linhas(items.Where(i => ids.Contains(i.Def.Id)), nomes, earth, layers, noStructure); }
+        catch (Exception ex) { Log.Error("Quantitativo por via", ex); }
+        var parcelamento = new List<LinhaParcelamento>();
+        try { parcelamento = QuantitativosParcelamento.Linhas(defs); }
+        catch (Exception ex) { Log.Error("Quantitativo de quadras e lotes", ex); }
+        IReadOnlyList<Core.Automation.EstadoResultado>? estados = null;
+        var registro = EarthworkRecordStore.Load(doc);
+        try { estados = Core.Automation.EstadoDosResultados.Calcular(defs, registro); }
+        catch (Exception ex) { Log.Error("Quantitativos – estado dos resultados", ex); }
+        var origem = OrigemQuantitativos.Linhas(rows, DateTime.Now, typeof(CmdQuantitativos).Assembly.GetName().Version?.ToString(3),
+            PluginContext.Settings.DefaultMaterial, TerrainService.AppliedOptions(doc).Homogenization, registro?.Quando, estados);
+        var w = new QuantitiesWindow(rows, doc.Title, thumbs, components, sections, layers, noStructure, origem, vias, parcelamento);
+        var shown = UiHelpers.ShowModal(w) == true;
+        if (shown && w.Selecao.Count > 0)
+        {
+            var sel = w.Selecao.ToHashSet();
+            var elems = MarkingStorage.All(doc).Where(s => sel.Contains(s.MarkingId)).Select(s => s.Element.Id).Distinct().ToList();
+            if (elems.Count == 0)
+            {
+                TaskDialog.Show(AppTitle, "Os elementos dessas linhas não estão no modelo (a marca não foi desenhada ou foi apagada).");
+                return Result.Succeeded;
+            }
+            uidoc.Selection.SetElementIds(elems);
+            try { uidoc.ShowElements(elems); } catch { /* vista sem os elementos */ }
+            return Result.Succeeded;
+        }
+        if (shown && (w.CreateSchedule || w.SchedulesByCategory))
         {
             // Tabela nativa: roda com qualquer vista ativa (inclusive folha) e vai direto para a folha escolhida.
             var place = TablePlacementWindow.Ask(doc, uidoc.ActiveView, "tabela", ScheduleName, schedule: true);
@@ -61,8 +90,10 @@ public sealed class CmdQuantitativos : CommandBase
     /// Itens e quadro de quantidades do projeto (marcas do plugin, pisos com hierarquia e famílias classificadas) – o mesmo
     /// quadro da janela, das tabelas do Revit, do memorial descritivo e das pranchas.
     /// </summary>
+    /// <param name="earth">Quando dada, recebe a terraplenagem de cada elemento (resumo por via).</param>
     internal static (List<(MarkingDefinition Def, MarkingGeometry Geo)> Items, List<QuantityRow> Rows) Collect(Document doc, View? view,
-        IReadOnlyList<MarkingDefinition>? defs = null, List<FamilyItem>? families = null, List<Core.Automation.SecoesDaVia>? sections = null)
+        IReadOnlyList<MarkingDefinition>? defs = null, List<FamilyItem>? families = null, List<Core.Automation.SecoesDaVia>? sections = null,
+        List<EarthworkItem>? earth = null)
     {
         defs ??= MarkingStorage.Definitions(doc);
         families ??= FamilyClassifier.Collect(doc);
@@ -73,7 +104,9 @@ public sealed class CmdQuantitativos : CommandBase
             try { items.Add((d, service.QuantityGeometry(d))); }
             catch (Exception ex) { Log.Error($"Quantitativos {d.DisplayCode}", ex); }
         }
-        // Pisos desenhados à mão com hierarquia definida (Hierarquia e Esquinas): entram como pavimento da via.
+        // Pisos desenhados à mão com hierarquia definida (Hierarquia e Esquinas): entram como pavimento da via – na origem da linha,
+        // como elementos do usuário, não como marca.
+        var doUsuario = new HashSet<MarkingDefinition>(ReferenceEqualityComparer.Instance);
         foreach (var f in new FilteredElementCollector(doc).OfClass(typeof(Floor)).Cast<Floor>().Where(f => !MarkingStorage.IsMarking(f)))
         {
             var label = f.get_Parameter(SharedParameters.Hierarquia.Guid)?.AsString();
@@ -83,16 +116,18 @@ public sealed class CmdQuantitativos : CommandBase
             var g = new MarkingGeometry();
             g.AreaOverrides[MarkingColor.Asfalto] = MarkingService.FloorArea(f);
             items.Add((pv, g));
+            doUsuario.Add(pv);
         }
-        var rows = QuantityCalculator.Compute(items, PluginContext.Catalog, PluginContext.Settings.DefaultMaterial);
+        var rows = QuantityCalculator.Compute(items, PluginContext.Catalog, PluginContext.Settings.DefaultMaterial, NomesDasMarcas.Montar(defs), doUsuario);
         // Famílias do Revit do usuário classificadas como elementos urbanos (Elementos Urbanos → Famílias do Revit).
         if (families.Count > 0) rows = QuantityCalculator.AddFamilies(rows, families);
         // Terraplenagem: corte e aterro de cada via, interseção e obra, calculados na hora contra o terreno original guardado no
         // Toposolid (nada é gravado).
         try
         {
-            var (earth, _, _) = TerrainService.Quantities(doc, service, defs, null, sections);
-            if (earth.Count > 0) rows = QuantityCalculator.AddEarthworks(rows, earth, TerrainService.AppliedOptions(doc).Homogenization);
+            var (terra, _, _) = TerrainService.Quantities(doc, service, defs, null, sections);
+            earth?.AddRange(terra);
+            if (terra.Count > 0) rows = QuantityCalculator.AddEarthworks(rows, terra, TerrainService.AppliedOptions(doc).Homogenization);
         }
         catch (Exception ex) { Log.Error("Quantitativo de terraplenagem", ex); }
         return (items, rows);

@@ -22,9 +22,14 @@ public partial class QuantitiesWindow : Window
     private readonly List<string> _noStructure;
     private readonly string _projectName;
     private readonly ListCollectionView _view;
+    private readonly List<Core.Automation.EstadoContexto> _origem;
+    private readonly List<LinhaPorVia> _vias;
+    private readonly List<LinhaParcelamento> _parcelamento;
 
     public bool CreateSchedule { get; private set; }
     public bool SchedulesByCategory { get; private set; }
+    /// <summary>Marcas a selecionar no modelo (das linhas escolhidas).</summary>
+    public IReadOnlyList<string> Selecao { get; private set; } = Array.Empty<string>();
 
     private sealed record Option(string Label, CategoriaQuantitativo? Value)
     {
@@ -38,12 +43,29 @@ public partial class QuantitiesWindow : Window
 
     private readonly Dictionary<string, BitmapSource> _thumbs = new();
 
+    /// <param name="origem">De onde vêm os números (<see cref="OrigemQuantitativos.Linhas"/>).</param>
+    /// <param name="vias">Resumo por via (<see cref="QuantitativosPorVia"/>).</param>
+    /// <param name="parcelamento">Quadras e lotes por loteamento (<see cref="QuantitativosParcelamento"/>).</param>
     public QuantitiesWindow(List<QuantityRow> rows, string projectName, Dictionary<string, BitmapSource>? thumbnails = null,
         List<ComponentRow>? components = null, List<Core.Automation.SecoesDaVia>? sections = null,
-        List<CamadaQuantidade>? layers = null, List<string>? noStructure = null)
+        List<CamadaQuantidade>? layers = null, List<string>? noStructure = null, List<Core.Automation.EstadoContexto>? origem = null,
+        List<LinhaPorVia>? vias = null, List<LinhaParcelamento>? parcelamento = null)
     {
         InitializeComponent();
         _rows = rows;
+        _origem = origem ?? new List<Core.Automation.EstadoContexto>();
+        _vias = vias ?? new List<LinhaPorVia>();
+        _parcelamento = parcelamento ?? new List<LinhaParcelamento>();
+        // Por via e quadras e lotes (Etapa 12; Prompt de Interface §18): só com vias ou loteamentos.
+        TabVias.Visibility = _vias.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        TabParcelamento.Visibility = _parcelamento.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        GridParcelamento.ItemsSource = _parcelamento;
+        // Origem dos valores (§18.1): a aba com tudo; o que pede atenção também no alto.
+        TabOrigem.Visibility = _origem.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var l in _origem) PanelOrigem.Children.Add(ContextPanelPage.Linha(l.Nivel, l.Texto));
+        foreach (var l in _origem.Where(l => l.Nivel is Core.Automation.NivelSituacao.Aviso or Core.Automation.NivelSituacao.Erro))
+            PanelAlertas.Children.Add(ContextPanelPage.Linha(l.Nivel, l.Texto));
+        TxtOrigem.Text = _origem.Count > 0 ? _origem[0].Texto + " Origem e método de cada número: escolha a linha ou veja a aba Origem dos valores." : "";
         _layers = layers ?? new List<CamadaQuantidade>();
         _noStructure = noStructure ?? new List<string>();
         // Camadas do pavimento (Etapa 5): só com vias ou nós com pavimento.
@@ -83,7 +105,9 @@ public partial class QuantitiesWindow : Window
         if (CbHierarchy?.SelectedItem is HOption { All: false } h && r.Hierarchy != h.Value) return false;
         var q = TbSearch?.Text?.Trim();
         if (string.IsNullOrEmpty(q)) return true;
-        return r.Code.Contains(q, StringComparison.OrdinalIgnoreCase) || r.Name.Contains(q, StringComparison.OrdinalIgnoreCase)
+        // Filtrar por elemento: o nome das marcas de origem ("Via 3", "Placa R-1").
+        return r.Origens.Any(o => o.Nome.Contains(q, StringComparison.OrdinalIgnoreCase))
+               || r.Code.Contains(q, StringComparison.OrdinalIgnoreCase) || r.Name.Contains(q, StringComparison.OrdinalIgnoreCase)
                || r.Material.Contains(q, StringComparison.OrdinalIgnoreCase) || r.Color.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
                || r.GroupName.Contains(q, StringComparison.OrdinalIgnoreCase) || r.SubcategoryName.Contains(q, StringComparison.OrdinalIgnoreCase)
                || r.FamilyTypes.Contains(q, StringComparison.OrdinalIgnoreCase) || r.HierarchyName.Contains(q, StringComparison.OrdinalIgnoreCase);
@@ -98,6 +122,11 @@ public partial class QuantitiesWindow : Window
     /// <summary>Camadas do pavimento com o filtro de hierarquia.</summary>
     private List<CamadaQuantidade> VisibleLayers => _layers
         .Where(r => CbHierarchy?.SelectedItem is not HOption { All: false } h || r.Hierarquia == h.Value).ToList();
+
+    /// <summary>Vias com o filtro de hierarquia e a busca pelo nome.</summary>
+    private List<LinhaPorVia> VisibleVias => _vias
+        .Where(r => CbHierarchy?.SelectedItem is not HOption { All: false } h || r.Hierarquia == h.Value)
+        .Where(r => string.IsNullOrWhiteSpace(TbSearch?.Text) || r.Via.Contains(TbSearch.Text.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
 
     private void FilterChanged(object sender, RoutedEventArgs e)
     {
@@ -121,6 +150,7 @@ public partial class QuantitiesWindow : Window
         GridHierarchy.ItemsSource = QuantityCalculator.HierarchySummary(v);
         GridComponents.ItemsSource = VisibleComponents;
         GridLayers.ItemsSource = VisibleLayers;
+        GridVias.ItemsSource = VisibleVias;
         var cats = v.Select(r => r.Category).Distinct().Count();
         TxtHeader.Text = $"{v.Count} item(ns) em {cats} categoria(s) e {v.Select(r => (r.Category, r.SubcategoryName)).Distinct().Count()} subcategoria(s)" +
                          (Category is { } c ? $" – filtro: {QuantityRow.CategoryLabel(c)}" : "") + $" – {DateTime.Now:dd/MM/yyyy HH:mm}";
@@ -133,7 +163,7 @@ public partial class QuantitiesWindow : Window
             new Kpi("Pavimento", v.Where(r => r.Category == CategoriaQuantitativo.PavimentacaoGeometria && MarkingColors.IsPavement(r.Color)).Sum(r => r.Area).ToString("N1", pt), "m²", UiTokens.Indicadores.Pavimento),
             new Kpi("Placas", v.Where(r => r.Category == CategoriaQuantitativo.SinalizacaoVertical).Sum(r => r.Units).ToString("N0", pt), "un", UiTokens.Indicadores.Placas),
             new Kpi("Elementos urbanos", v.Where(r => r.Category == CategoriaQuantitativo.MobiliarioUrbano).Sum(r => r.Units).ToString("N0", pt), "un", UiTokens.Indicadores.ElementosUrbanos),
-            new Kpi("Tinta estimada", v.Sum(r => r.MaterialConsumption).ToString("N1", pt), v.FirstOrDefault(r => r.MaterialConsumption > 0)?.ConsumptionUnit ?? "", UiTokens.Indicadores.Tinta),
+            Tinta(v, pt),
         }.Concat(v.Any(r => r.Unit == "m³")
             ? new[]
             {
@@ -142,6 +172,19 @@ public partial class QuantitiesWindow : Window
                 new Kpi("Aterro", v.Where(r => r.Code == "TER-ATERRO").Sum(r => r.Volume).ToString("N1", pt), "m³", UiTokens.Indicadores.Aterro),
             }
             : Array.Empty<Kpi>()).ToArray();
+    }
+
+    /// <summary>
+    /// Tinta estimada: com uma unidade só, o total e a unidade (L, kg); com materiais de unidades diferentes, o total de cada uma
+    /// ("12,50 L + 30,00 kg") – litros e quilos não se somam.
+    /// </summary>
+    private static Kpi Tinta(List<QuantityRow> v, CultureInfo pt)
+    {
+        var com = v.Where(r => r.MaterialConsumption > 1e-6).ToList();
+        var unidades = com.Select(r => r.ConsumptionUnit).Distinct().ToList();
+        return unidades.Count <= 1
+            ? new Kpi("Tinta estimada", com.Sum(r => r.MaterialConsumption).ToString("N1", pt), unidades.FirstOrDefault() ?? "", UiTokens.Indicadores.Tinta)
+            : new Kpi("Tinta estimada", QuantityCalculator.Consumo(com), "", UiTokens.Indicadores.Tinta);
     }
 
     /// <summary>Resumo em árvore: subtotal da categoria seguido das subcategorias.</summary>
@@ -200,7 +243,8 @@ public partial class QuantitiesWindow : Window
                 pngCache[key] = b;
                 return b;
             }
-            File.WriteAllBytes(dlg.FileName, QuantityWorkbook.Build(v, QuantityCalculator.Summary(v), _projectName, Png, VisibleComponents, _sections, VisibleLayers, _noStructure));
+            File.WriteAllBytes(dlg.FileName, QuantityWorkbook.Build(v, QuantityCalculator.Summary(v), _projectName, Png, VisibleComponents, _sections, VisibleLayers, _noStructure,
+                OrigemTextos, VisibleVias, _parcelamento));
             MessageBox.Show(this, "Planilha exportada:\n" + dlg.FileName, "Quantitativos", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
@@ -221,13 +265,34 @@ public partial class QuantitiesWindow : Window
         if (dlg.ShowDialog(this) != true) return;
         try
         {
-            File.WriteAllText(dlg.FileName, QuantityCalculator.ToCsv(v, QuantityCalculator.Summary(v), _projectName, VisibleComponents, _sections, VisibleLayers, _noStructure), new UTF8Encoding(true));
+            File.WriteAllText(dlg.FileName, QuantityCalculator.ToCsv(v, QuantityCalculator.Summary(v), _projectName, VisibleComponents, _sections, VisibleLayers, _noStructure,
+                OrigemTextos, VisibleVias, _parcelamento), new UTF8Encoding(true));
             MessageBox.Show(this, "Arquivo exportado:\n" + dlg.FileName, "Quantitativos", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
             UiHelpers.Error("Não foi possível gravar o arquivo: " + ex.Message);
         }
+    }
+
+    /// <summary>A origem dos números no cabeçalho das exportações.</summary>
+    private IEnumerable<string> OrigemTextos => _origem.Select(l => l.Texto);
+
+    /// <summary>Seleciona no modelo as marcas das linhas escolhidas na aba aberta (itens, vias ou loteamentos).</summary>
+    private void SelectClick(object sender, RoutedEventArgs e)
+    {
+        var ids = (Tabs.SelectedItem == TabVias ? GridVias.SelectedItems.OfType<LinhaPorVia>().Select(v => v.Id)
+                : Tabs.SelectedItem == TabParcelamento ? GridParcelamento.SelectedItems.OfType<LinhaParcelamento>().Select(l => l.LoteamentoId)
+                : GridRows.SelectedItems.OfType<QuantityRow>().SelectMany(r => r.Origens.Select(o => o.Id)))
+            .Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            MessageBox.Show(this, "Escolha uma linha com marcas do plugin (itens detalhados, uma via ou um loteamento). Pisos desenhados à mão e famílias " +
+                                  "do usuário não são marcas do plugin.", "Quantitativos", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        Selecao = ids;
+        DialogResult = true;
     }
 
     private void ScheduleClick(object sender, RoutedEventArgs e)

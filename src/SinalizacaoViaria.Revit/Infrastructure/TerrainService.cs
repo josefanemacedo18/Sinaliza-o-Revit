@@ -278,7 +278,7 @@ public static class TerrainService
             var kind = d is RoadPavementDefinition ? "Via" : d.KindName;
             count[kind] = count.GetValueOrDefault(kind) + 1;
             var label = d.Hierarchy is { } h && h != HierarquiaViaria.NaoDefinida ? $" {Hierarquia.Label(h).ToLowerInvariant()}" : "";
-            items.Add(new EarthworkItem($"{kind}{label} {count[kind]}", d.Hierarchy, v.Cut, v.Fill, v.Area));
+            items.Add(new EarthworkItem($"{kind}{label} {count[kind]}", d.Hierarchy, v.Cut, v.Fill, v.Area, d.Id));
             if (sections != null && d is RoadPavementDefinition road && PathResolver.Resolve(doc, road.Path)?.Main is { Length: > 1 } axis)
             {
                 try

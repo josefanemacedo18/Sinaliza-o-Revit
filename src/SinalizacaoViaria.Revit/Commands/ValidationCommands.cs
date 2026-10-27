@@ -63,9 +63,9 @@ public sealed class CmdValidarModelo : CommandBase
             path = null;
         }
 
-        // Central de Qualidade: as marcas pelo nome (tipo e código); a que tem elementos mas não se lê é dita ilegível, não apagada.
-        var nomes = new Dictionary<string, string>();
-        foreach (var d in defs) nomes.TryAdd(d.Id, $"{d.KindName} {d.DisplayCode}");
+        // Central de Qualidade: as marcas pelo nome (vias e nós pela ordem, as demais pelo tipo e código); a que tem elementos mas não
+        // se lê é dita ilegível, não apagada.
+        var nomes = NomesDasMarcas.Montar(defs);
         string? Nome(string id) => nomes.TryGetValue(id, out var n) ? n
             : elements.ContainsKey(id) ? $"{(id.Length > 8 ? id[..8] : id)} (dados ilegíveis)" : null;
         var resumo = CentralQualidade.Montar(achados, previous, Nome, doc.Title, now, version, marcas, copias.Count);

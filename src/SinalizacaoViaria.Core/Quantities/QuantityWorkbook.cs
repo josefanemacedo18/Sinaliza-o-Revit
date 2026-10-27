@@ -15,15 +15,18 @@ public static class QuantityWorkbook
     private static readonly string[] Headers =
     {
         "Item", "Imagem", "Código", "Descrição", "Quantidade", "Un.", "Área (m²)", "Extensão (m)", "Unidades", "Elementos", "Material", "Consumo est.", "Hierarquia viária", "Referência",
+        "Origem", "Método",
     };
-    private static readonly double[] Widths = { 6, 14, 12, 46, 12, 6, 11, 12, 10, 10, 24, 13, 18, 48 };
+    private static readonly double[] Widths = { 6, 14, 12, 46, 12, 6, 11, 12, 10, 10, 24, 13, 18, 48, 40, 60 };
 
     // estilos (índices de cellXfs)
     private const int StTitle = 1, StHeader = 2, StCategory = 3, StSub = 4, StText = 5, StNum = 6, StInt = 7, StSubTotText = 8, StSubTotNum = 9, StMeta = 10, StTextCenter = 11;
 
+    /// <param name="origem">De onde vêm os números (<see cref="OrigemQuantitativos.Linhas"/>): sai no cabeçalho.</param>
     public static byte[] Build(IEnumerable<QuantityRow> rows, IEnumerable<QuantityRow>? summary, string? projectName, Func<QuantityRow, byte[]?>? thumbnail = null,
         IEnumerable<ComponentRow>? components = null, IEnumerable<Automation.SecoesDaVia>? sections = null,
-        IEnumerable<CamadaQuantidade>? layers = null, IReadOnlyList<string>? noStructure = null)
+        IEnumerable<CamadaQuantidade>? layers = null, IReadOnlyList<string>? noStructure = null, IEnumerable<string>? origem = null,
+        IEnumerable<LinhaPorVia>? vias = null, IEnumerable<LinhaParcelamento>? parcelamento = null)
     {
         var list = rows.ToList();
         var sheet = new StringBuilder();
@@ -59,6 +62,7 @@ public static class QuantityWorkbook
         if (!string.IsNullOrWhiteSpace(projectName)) Line("Projeto: " + projectName, StMeta);
         Line($"Emitido em {DateTime.Now:dd/MM/yyyy HH:mm} – SinalizaBIM", StMeta);
         Line($"{list.Count} item(ns) em {list.Select(x => x.Category).Distinct().Count()} categoria(s)", StMeta);
+        foreach (var o in origem ?? Enumerable.Empty<string>()) Line(o, StMeta);
         Row();
 
         var n = 0;
@@ -88,6 +92,8 @@ public static class QuantityWorkbook
                     Text(11, memorial || q.MaterialConsumption <= 1e-6 ? "" : q.ConsumptionText, StText);
                     Text(12, q.HierarchyName, StText);
                     Text(13, q.Reference, StText);
+                    Text(14, q.OrigemTexto, StText);
+                    Text(15, q.Metodo, StText);
                     if (png != null) images.Add((r, png));
                     Row(png != null ? 42 : null);
                 }
@@ -97,8 +103,8 @@ public static class QuantityWorkbook
             if (memorial) { Blank(6, StSubTotText); Blank(7, StSubTotText); } else { Num(6, sub.Area, StSubTotNum); Num(7, sub.PaintedLength, StSubTotNum); }
             Num(8, sub.Units, StSubTotNum); Num(9, sub.Elements, StSubTotNum);
             Blank(10, StSubTotText);
-            Text(11, memorial || sub.MaterialConsumption <= 1e-6 ? "" : (sub.MaterialConsumption.ToString("N2", CultureInfo.GetCultureInfo("pt-BR")) + " " + sub.ConsumptionUnit).Trim(), StSubTotText);
-            Blank(12, StSubTotText); Blank(13, StSubTotText);
+            Text(11, memorial ? "" : sub.ConsumptionText, StSubTotText);
+            Blank(12, StSubTotText); Blank(13, StSubTotText); Blank(14, StSubTotText); Blank(15, StSubTotText);
             Row();
             Row();
         }
@@ -109,7 +115,7 @@ public static class QuantityWorkbook
         Row();
         foreach (var c in QuantityCalculator.CategorySummary(list))
         {
-            Text(0, c.Name, StText); Num(1, c.Elements, StInt); Num(2, c.Area, StNum); Num(3, c.PaintedLength, StNum); Num(4, c.Units, StInt); Num(5, c.MaterialConsumption, StNum);
+            Text(0, c.Name, StText); Num(1, c.Elements, StInt); Num(2, c.Area, StNum); Num(3, c.PaintedLength, StNum); Num(4, c.Units, StInt); Text(5, c.ConsumptionText, StText);
             Row();
         }
         Row();
@@ -118,8 +124,37 @@ public static class QuantityWorkbook
         Row();
         foreach (var h in QuantityCalculator.HierarchySummary(list))
         {
-            Text(0, h.Name, StText); Num(1, h.RoadLength, StNum); Num(2, h.PavementArea, StNum); Num(3, h.PaintedArea, StNum); Num(4, h.PaintedLength, StNum); Num(5, h.Signs, StInt); Num(6, h.Elements, StInt); Num(7, h.PaintConsumption, StNum);
+            Text(0, h.Name, StText); Num(1, h.RoadLength, StNum); Num(2, h.PavementArea, StNum); Num(3, h.PaintedArea, StNum); Num(4, h.PaintedLength, StNum); Num(5, h.Signs, StInt); Num(6, h.Elements, StInt); Text(7, h.ConsumoTexto, StText);
             Row();
+        }
+        if (vias != null && vias.Any())
+        {
+            Row();
+            Line("RESUMO POR VIA (eixo, componentes da seção medidos nas peças, camadas do pavimento e terraplenagem da parte da via)", StCategory, 20);
+            foreach (var (h, i) in new[] { "Via", "Hierarquia", "Extensão do eixo (m)", "Pavimento (m²)", "Calçada (m²)", "Meio-fio (m)", "Camadas do pavimento (m³)", "Corte (m³)", "Aterro (m³)" }.Select((h, i) => (h, i))) Text(i, h, StHeader);
+            Row();
+            foreach (var v in vias)
+            {
+                Text(0, v.Via, StText); Text(1, v.HierarquiaNome, StText); Num(2, v.Extensao, StNum); Num(3, v.Pavimento, StNum); Num(4, v.Calcada, StNum); Num(5, v.MeioFio, StNum);
+                Num(6, v.Camadas, StNum);
+                if (v.Corte is { } c) Num(7, c, StNum); else Text(7, "não calculado", StText);
+                if (v.Aterro is { } a) Num(8, a, StNum); else Text(8, "não calculado", StText);
+                Row();
+            }
+        }
+        if (parcelamento != null && parcelamento.Any())
+        {
+            Row();
+            Line("QUADRAS E LOTES (" + QuantitativosParcelamento.Metodo + ")", StCategory, 20);
+            foreach (var (h, i) in new[] { "Loteamento", "Categoria", "Quantidade (un)", "Área (m²)", "% da gleba", "Tipo" }.Select((h, i) => (h, i))) Text(i, h, StHeader);
+            Row();
+            foreach (var l in parcelamento)
+            {
+                Text(0, l.Loteamento, StText); Text(1, l.Categoria, StText);
+                if (l.Quantidade is { } q) Num(2, q, StInt); else Blank(2, StText);
+                Num(3, l.Area, StNum); Num(4, l.Percentual, StNum); Text(5, l.Tipo, StText);
+                Row();
+            }
         }
         if (components != null && components.Any())
         {
@@ -158,13 +193,13 @@ public static class QuantityWorkbook
         }
         if (sections != null && sections.Any())
         {
-            var vias = sections.ToList();
+            var secoes = sections.ToList();
             Row();
             Line("TERRAPLENAGEM POR ESTACA (método das seções – média das áreas; a malha é a do quantitativo)", StCategory, 20);
-            foreach (var v in vias) Line(v.Comparacao, StMeta);
+            foreach (var v in secoes) Line(v.Comparacao, StMeta);
             foreach (var (h, i) in new[] { "Via", "Estaca", "Estaca (m)", "Área de corte (m²)", "Área de aterro (m²)", "Corte acumulado (m³)", "Aterro acumulado (m³)", "Massa acumulada (m³)" }.Select((h, i) => (h, i))) Text(i, h, StHeader);
             Row();
-            foreach (var e in Automation.SectionVolumes.Rows(vias))
+            foreach (var e in Automation.SectionVolumes.Rows(secoes))
             {
                 Text(0, e.Via, StText); Text(1, e.Estaca, StTextCenter); Num(2, e.EstacaM, StNum); Num(3, e.AreaCorte, StNum); Num(4, e.AreaAterro, StNum);
                 Num(5, e.CorteAcumulado, StNum); Num(6, e.AterroAcumulado, StNum); Num(7, e.Massa, StNum);
