@@ -11,8 +11,8 @@ namespace SinalizacaoViaria.Revit.Commands;
 /// <summary>
 /// Etapas do Autoteste. Layout da área de teste (coordenadas locais, m):
 /// A (plano, sem terreno) x 0–1150: vias por modelo (x 0–260), conexões (x 350–1150, y 0–1380), catálogo de sinalização
-/// (x 0–300, y 1000–2300), calçadas e travessias (x 350–1150, y 1450–1950); B (Toposolid com relevo) x 1300–2300, y 0–1000;
-/// C (plano) x ≥ 2600: nós viários.
+/// (x 0–300, y 1000–2300), calçadas e travessias (x 350–1150, y 1450–1950); B (Toposolid com relevo) x 1300–2300, y 0–1000,
+/// com o fluxo integrado em x 1330–1560, y 820–980; C (plano) x ≥ 2600: nós viários.
 /// </summary>
 internal sealed partial class AutoTestRunner
 {

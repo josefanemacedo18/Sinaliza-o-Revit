@@ -45,6 +45,8 @@ public sealed class CmdAutoteste : CommandBase
             .Check("Topografia e Perfil da Via (pesado)", () => o.Terrain, v => o.Terrain = v)
             .Check("Obras: viaduto, ponte, túnel, trincheira, muros, taludes, nó viário (pesado)", () => o.Works, v => o.Works = v)
             .Check("Edição e detalhamento", () => o.Editing, v => { o.Editing = v; o.Detailing = v; })
+            .Check("Fluxo integrado: via → interseção → terraplenagem → drenagem → quantitativos → validação (cria o terreno de teste) – sempre no Completo",
+                () => o.Integrado, v => o.Integrado = v)
             .Check("Simulador de Tráfego", () => o.Traffic, v => o.Traffic = v)
             .Check("Verificações do modelo (pintura × pisos, continuidade, terreno × via) – sempre no Completo", () => o.Checks, v => o.Checks = v)
             .Check("Loteamento (gleba, quadras, lotes, quadros, filtros e masterplan)", () => o.Loteamento, v => o.Loteamento = v);
@@ -72,6 +74,9 @@ internal sealed class AutoTestOptions
     /// <summary>Verificações do modelo; o Completo sempre as roda (RT-1.2: nunca tinham rodado nos Autotestes do usuário).</summary>
     public bool Checks { get; set; }
     public bool RunChecks => Checks || Full;
+    /// <summary>Fluxo integrado (Etapa 13): os módulos encadeados conferindo um ao outro; o Completo sempre o roda.</summary>
+    public bool Integrado { get; set; }
+    public bool RunIntegrado => Integrado || Full;
     public bool Loteamento { get; set; } = true;
     /// <summary>Completo: todas as variantes; senão, no máximo 3 etapas por bloco e 3 minutos no total.</summary>
     public bool Full { get; set; }
@@ -178,6 +183,7 @@ internal sealed partial class AutoTestRunner
             if (_opt.Vertical) Vertical();
             if (_opt.Terrain || _opt.Works) Terrain();
             if (_opt.Works) Works();
+            if (_opt.RunIntegrado) Integrado();
             if (_opt.Editing) Editing();
             if (_opt.Detailing) Detailing();
             if (_opt.Traffic) Traffic();

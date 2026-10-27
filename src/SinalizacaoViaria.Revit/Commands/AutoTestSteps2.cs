@@ -16,34 +16,7 @@ internal sealed partial class AutoTestRunner
 
     private void Terrain()
     {
-        Step("Topografia", "Toposolid de teste com relevo (encosta, 2 morros e um vale)", s =>
-        {
-            var typeId = new FilteredElementCollector(_doc).OfClass(typeof(ToposolidType)).FirstElementId();
-            if (typeId == ElementId.InvalidElementId || _level == null) { s.Error("O projeto não tem tipo de Toposolid: a parte de topografia não pode ser testada."); return; }
-            const double x0 = 1300, x1 = 2300, y0 = -50, y1 = 1000, step = 20;
-            var pts = new List<XYZ>();
-            for (var x = x0; x <= x1 + 1e-6; x += step)
-                for (var y = y0; y <= y1 + 1e-6; y += step)
-                {
-                    var w = P(x, y);
-                    pts.Add(new XYZ(UnitConv.Ft(w.X), UnitConv.Ft(w.Y), UnitConv.Ft(GroundLocal(x, y))));
-                }
-            var loop = new CurveLoop();
-            var c = new[] { P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1) }
-                .Select(v => new XYZ(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), _level.ProjectElevation)).ToList();
-            for (int i = 0; i < 4; i++) loop.Append(Line.CreateBound(c[i], c[(i + 1) % 4]));
-            using var t = new Transaction(_doc, "SV Autoteste - Toposolid");
-            t.Start();
-            _topo = Toposolid.Create(_doc, new List<CurveLoop> { loop }, pts, typeId, _level.Id);
-            t.Commit();
-            if (_topo == null || !_topo.IsValidObject) { s.Error("O Toposolid de teste não foi criado."); _topo = null; return; }
-            var g = TerrainModel.Ground(_doc);
-            var probe = g?.Invoke(P(1700, 300));
-            if (probe == null) s.Error("O plugin não consegue ler a cota do Toposolid de teste (TerrainModel.Ground).");
-            else if (Math.Abs(probe.Value - GroundLocal(1700, 300)) > 0.5)
-                s.Error($"Cota lida do Toposolid ({probe:0.00}) diferente da criada ({GroundLocal(1700, 300):0.00}).");
-            s.Note($"{pts.Count} pontos; cotas de {pts.Min(p => UnitConv.M(p.Z)) - _z0:0.0} a {pts.Max(p => UnitConv.M(p.Z)) - _z0:0.0} m acima do nível.");
-        });
+        Step("Topografia", "Toposolid de teste com relevo (encosta, 2 morros e um vale)", TerrenoDeTeste);
         if (_topo == null) return;
 
         Step("Topografia", "Via acompanhando o terreno (flanco do morro)", s =>
@@ -94,6 +67,36 @@ internal sealed partial class AutoTestRunner
             if (!hosted.OfType<TunnelDefinition>().Any()) s.Warn("O morro de 32 m não virou túnel (esperado com corte > 18 m).");
             if (!hosted.OfType<BridgeDefinition>().Any()) s.Warn("O vale de 16 m não virou viaduto/ponte (esperado com aterro > 8 m).");
         });
+    }
+
+    /// <summary>Toposolid de teste com relevo na área B (encosta, dois morros e um vale) – a Topografia e o Fluxo integrado.</summary>
+    private void TerrenoDeTeste(StepReport s)
+    {
+        var typeId = new FilteredElementCollector(_doc).OfClass(typeof(ToposolidType)).FirstElementId();
+        if (typeId == ElementId.InvalidElementId || _level == null) { s.Error("O projeto não tem tipo de Toposolid: a parte de topografia não pode ser testada."); return; }
+        const double x0 = 1300, x1 = 2300, y0 = -50, y1 = 1000, step = 20;
+        var pts = new List<XYZ>();
+        for (var x = x0; x <= x1 + 1e-6; x += step)
+            for (var y = y0; y <= y1 + 1e-6; y += step)
+            {
+                var w = P(x, y);
+                pts.Add(new XYZ(UnitConv.Ft(w.X), UnitConv.Ft(w.Y), UnitConv.Ft(GroundLocal(x, y))));
+            }
+        var loop = new CurveLoop();
+        var c = new[] { P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1) }
+            .Select(v => new XYZ(UnitConv.Ft(v.X), UnitConv.Ft(v.Y), _level.ProjectElevation)).ToList();
+        for (int i = 0; i < 4; i++) loop.Append(Line.CreateBound(c[i], c[(i + 1) % 4]));
+        using var t = new Transaction(_doc, "SV Autoteste - Toposolid");
+        t.Start();
+        _topo = Toposolid.Create(_doc, new List<CurveLoop> { loop }, pts, typeId, _level.Id);
+        t.Commit();
+        if (_topo == null || !_topo.IsValidObject) { s.Error("O Toposolid de teste não foi criado."); _topo = null; return; }
+        var g = TerrainModel.Ground(_doc);
+        var probe = g?.Invoke(P(1700, 300));
+        if (probe == null) s.Error("O plugin não consegue ler a cota do Toposolid de teste (TerrainModel.Ground).");
+        else if (Math.Abs(probe.Value - GroundLocal(1700, 300)) > 0.5)
+            s.Error($"Cota lida do Toposolid ({probe:0.00}) diferente da criada ({GroundLocal(1700, 300):0.00}).");
+        s.Note($"{pts.Count} pontos; cotas de {pts.Min(p => UnitConv.M(p.Z)) - _z0:0.0} a {pts.Max(p => UnitConv.M(p.Z)) - _z0:0.0} m acima do nível.");
     }
 
     // ================================================================== obras
