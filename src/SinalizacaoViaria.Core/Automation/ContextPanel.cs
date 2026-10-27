@@ -50,7 +50,7 @@ public static class PainelContextual
     /// <param name="selecionadas">Definições dos elementos selecionados (uma por elemento; a mesma marca pode vir várias vezes).</param>
     /// <param name="foraDoPlugin">Elementos selecionados que não são do SinalizaBIM.</param>
     /// <param name="registro">Registro da terraplenagem aplicada (estado da marca na terraplenagem).</param>
-    /// <param name="buscar">Definição pelo Id (o loteamento de uma quadra); nula = sem buscar (quadra com as categorias padrão).</param>
+    /// <param name="buscar">Definição pelo Id (o loteamento de uma quadra, as vias de um nó); nula = sem buscar (quadra com as categorias padrão, nó sem o estado da terraplenagem fora do registro).</param>
     public static ContextoSelecao De(IReadOnlyList<MarkingDefinition> selecionadas, int foraDoPlugin = 0, RegistroTerraplenagem? registro = null,
         Func<string, MarkingDefinition?>? buscar = null)
     {
@@ -184,21 +184,24 @@ public static class PainelContextual
             A("Terreno", "Molda o terreno", SimNao(obra.AdjustTerrain));
             ops.Add(new("Terraplenagem", "CmdTerraplenagem"));
         }
-        if (NaTerraplenagem(d, registro) is { } t) estado.Add(t);
+        if (NaTerraplenagem(d, registro, buscar) is { } t) estado.Add(t);
         return new(d.KindName, d.DisplayCode, p, estado, ops, notas);
     }
 
     /// <summary>
     /// Estado da marca na terraplenagem aplicada, só pela própria marca e pelo registro (sem varrer o projeto): em dia, mudou,
-    /// ou molda o terreno e não estava nela. Nulo quando não se sabe ou não se aplica (um nó só molda o terreno pelas vias).
+    /// ou molda o terreno e não estava nela. Um nó (interseção, rotatória, balão) molda o terreno pelas vias ligadas: com
+    /// <paramref name="buscar"/>, as vias dele são lidas (como na Terraplenagem); sem, o nó fora do registro fica nulo.
     /// </summary>
-    public static EstadoContexto? NaTerraplenagem(MarkingDefinition d, RegistroTerraplenagem? registro)
+    public static EstadoContexto? NaTerraplenagem(MarkingDefinition d, RegistroTerraplenagem? registro, Func<string, MarkingDefinition?>? buscar = null)
     {
         var molda = d switch
         {
             ITerrainAware t => t.AdjustTerrain,
             RoadPavementDefinition r => r.Output.Grade is { AdjustTerrain: true },
             DrainageDefinition => true,
+            IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition =>
+                buscar != null && EarthworkRecord.NodeRoads(d).Any(id => buscar(id) is RoadPavementDefinition { Output.Grade.AdjustTerrain: true }),
             _ => false,
         };
         if (registro == null) return molda ? new(NivelSituacao.NaoVerificado, "molda o terreno; sem registro da terraplenagem aplicada") : null;

@@ -108,7 +108,7 @@ public sealed class CmdConexao : CommandBase
                     d = (IntersectionDefinition)MarkingDefinition.FromJson(target.Intersection.ToJson())!;
                     (roadOptions, real) = IntersectionForms.ForEdit(uidoc, target.Intersection);
                 }
-                if (UiHelpers.ShowModal(IntersectionForms.Intersection(d, false, roadOptions, real)) != true) return Result.Cancelled;
+                if (UiHelpers.ShowModal(IntersectionForms.Intersection(d, false, roadOptions, real, uidoc.Document)) != true) return Result.Cancelled;
                 IntersectionForms.RememberDefaults(d);
                 results = IntersectionRunner.Run(uidoc, "SV - Conexão: interseção", s =>
                 {
@@ -129,7 +129,7 @@ public sealed class CmdConexao : CommandBase
                     d.Center = target.Point;
                     d.Legs = RoundaboutGenerator.LegsFromRoads(target.Point, roads, d.OuterRadius + 25);
                 }
-                if (UiHelpers.ShowModal(RoundaboutForms.Roundabout(d, target.Roundabout != null, true)) != true) return Result.Cancelled;
+                if (UiHelpers.ShowModal(RoundaboutForms.Roundabout(d, target.Roundabout != null, true, uidoc.Document)) != true) return Result.Cancelled;
                 UiHelpers.Remember("Rotatoria", d);
                 results = IntersectionRunner.Run(uidoc, "SV - Conexão: rotatória", s =>
                     target.Roundabout != null ? s.Refresh(d) : s.ConvertToRoundabout(target.Point, d));

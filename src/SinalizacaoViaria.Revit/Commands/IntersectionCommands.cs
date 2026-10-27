@@ -17,7 +17,9 @@ internal static class IntersectionForms
     /// <summary>Cena real para a pré-visualização da edição (vias da interseção, já resolvidas).</summary>
     public sealed record RealScene(List<IntersectionRoad> Roads, List<List<MarkingDefinition>> Groups, Dictionary<string, Core.Geometry.Polyline2> Paths);
 
-    public static FormWindow Intersection(IntersectionDefinition d, bool edit, IReadOnlyList<RoadOption>? roads = null, RealScene? real = null)
+    /// <param name="doc">Projeto: com ele, as seções do Prompt de Interface §12 (vias conectadas, pavimentação, terraplenagem, drenagem,
+    /// verificação e resumo) – recalculadas a cada mudança dos campos.</param>
+    public static FormWindow Intersection(IntersectionDefinition d, bool edit, IReadOnlyList<RoadOption>? roads = null, RealScene? real = null, Document? doc = null)
     {
         var example = 0;
         var exampleRoad = 1;
@@ -89,8 +91,29 @@ internal static class IntersectionForms
                 "pavimento contínuo, esquinas com raio na face do meio-fio, calçadas e canteiros refeitos, sinalização interrompida e vagas " +
                 "removidas a 5 m da esquina. Combine os tipos: I – sem refúgio; II – ilha gota na secundária; III – faixa de conversão " +
                 "livre à direita com ilhas; IV – bolsão de conversão à esquerda na principal.",
-                d, Preview, false, edit ? "Aplicar" : "Criar", 1120, 760)
-            .Number("Raio das esquinas (m)", () => d.CornerRadius, v => d.CornerRadius = v, 0, 40, tooltip: "Na face do meio-fio. Vias locais 5–6 m; coletoras/arteriais 8–12 m; veículos pesados até 15 m.");
+                d, Preview, false, edit ? "Aplicar" : "Criar", 1120, 760);
+        // Seções do §12 (Etapa 11): o arranjo é refeito com os campos atuais (com as vias reais) a cada atualização.
+        var all = doc != null ? MarkingStorage.Definitions(doc) : null;
+        var registro = doc != null ? EarthworkRecordStore.Load(doc) : null;
+        // Uma conta por atualização: as seis seções leem o mesmo contexto enquanto os campos não mudam.
+        (string Json, ContextoNo Ctx)? ultimo = null;
+        ContextoNo Ctx()
+        {
+            var json = d.ToJson();
+            if (ultimo is { } u && u.Json == json) return u.Ctx;
+            IntersectionLayout? lay = null;
+            if (real != null)
+            {
+                try { lay = IntersectionGenerator.Layout((IntersectionDefinition)MarkingDefinition.FromJson(json)!, real.Roads); }
+                catch (Exception ex) { Log.Error("Interseção – arranjo das seções", ex); }
+            }
+            var c = FormularioNo.Intersecao(d, all!.Any(x => x.Id == d.Id), lay, all!, registro);
+            ultimo = (json, c);
+            return c;
+        }
+        if (all != null) w.Status("Identificação e vias conectadas", () => Ctx().Vias);
+        w.Section("Geometria, ângulos e concordâncias")
+         .Number("Raio das esquinas (m)", () => d.CornerRadius, v => d.CornerRadius = v, 0, 40, tooltip: "Na face do meio-fio. Vias locais 5–6 m; coletoras/arteriais 8–12 m; veículos pesados até 15 m.");
 
         w.Section("Controle e sinalização");
         w.Choice("Controle", new[]
@@ -156,7 +179,18 @@ internal static class IntersectionForms
                  () => example, v => example = v)
              .Choice("Via principal do exemplo", new[] { ("Via local", 0), ("Via coletora (2 + 2 faixas)", 1), ("Avenida com canteiro central", 2) },
                  () => exampleRoad, v => exampleRoad = v);
+        if (all != null) NodeSections(w, Ctx);
         return w;
+    }
+
+    /// <summary>Pavimentação, terraplenagem, drenagem, verificação e resumo do nó (Prompt de Interface §12), no fim do formulário.</summary>
+    internal static void NodeSections(FormWindow w, Func<ContextoNo> ctx)
+    {
+        w.Status("Pavimentação", () => ctx().Pavimentacao)
+         .Status("Terraplenagem", () => ctx().Terraplenagem)
+         .Status("Drenagem", () => ctx().Drenagem)
+         .Status("Verificação", () => ctx().Verificacao, "Geométrica: os limites que o gerador confere, com a fonte ou \"sem norma citada\". Os avisos do arranjo atual aparecem também sob a pré-visualização.")
+         .Status("Resumo", () => ctx().Resumo);
     }
 
     /// <summary>
@@ -391,7 +425,7 @@ public sealed class CmdIntersecao : CommandBase
         var doc = uidoc.Document;
         var d = UiHelpers.Remembered<IntersectionDefinition>("Intersecao") ?? new IntersectionDefinition { CurbExtensionsOpposite = true };
         var all = forceAll ?? true;
-        var w = IntersectionForms.Intersection(d, false);
+        var w = IntersectionForms.Intersection(d, false, doc: doc);
         if (forceAll == null)
             w.Section("Aplicar em")
              .Choice("Cruzamentos", new[] { ("Todos os cruzamentos e entroncamentos do projeto", true), ("Somente o cruzamento que eu clicar", false) },
@@ -425,7 +459,9 @@ public sealed class CmdIntersecao : CommandBase
 
 internal static class RoundaboutForms
 {
-    public static FormWindow Roundabout(RoundaboutDefinition d, bool edit, bool hasRoads)
+    /// <param name="doc">Projeto: com ele, as seções do Prompt de Interface §12 (vias conectadas, pavimentação, terraplenagem, drenagem,
+    /// verificação e resumo) – recalculadas a cada mudança dos campos.</param>
+    public static FormWindow Roundabout(RoundaboutDefinition d, bool edit, bool hasRoads, Document? doc = null)
     {
         string? angles = hasRoads ? null : string.Join("; ", d.Legs.Select(l => l.AngleDeg.ToString("0.#", UiHelpers.PtBr)));
         var legWidth = d.Legs.FirstOrDefault()?.Width ?? 7.0;
@@ -456,7 +492,20 @@ internal static class RoundaboutForms
                            $" – {c.Legs.Count} ramo(s)";
                 return new FormPreview(g, roads, null, info);
             }, false, edit ? "Aplicar" : "Criar", 1120, 760);
-        w.Choice("Tipo de rotatória", new[]
+        var all = doc != null ? MarkingStorage.Definitions(doc) : null;
+        var registro = doc != null ? EarthworkRecordStore.Load(doc) : null;
+        (string Json, ContextoNo Ctx)? ultimo = null;
+        ContextoNo Ctx()
+        {
+            var json = d.ToJson();
+            if (ultimo is { } u && u.Json == json) return u.Ctx;
+            var c = FormularioNo.Rotatoria(d, all!.Any(x => x.Id == d.Id), all!, registro);
+            ultimo = (json, c);
+            return c;
+        }
+        if (all != null) w.Status("Identificação, parâmetros dimensionais e vias conectadas", () => Ctx().Vias);
+        w.Section("Tipo e ilha central")
+         .Choice("Tipo de rotatória", new[]
              {
                  ("Minirrotatória pintada – MIR (Ø inscrito 13–25 m)", TipoRotatoria.Mini),
                  ("Compacta urbana – 1 faixa (Ø 25–35 m)", TipoRotatoria.Compacta),
@@ -573,6 +622,7 @@ internal static class RoundaboutForms
                  () => Leg().Control, v => Leg().Control = v)
              .Choice("Placas neste ramo", new[] { ("Padrão", (bool?)null), ("Sim", (bool?)true), ("Não", (bool?)false) }, () => Leg().Signs, v => Leg().Signs = v);
         }
+        if (all != null) IntersectionForms.NodeSections(w, Ctx);
         return w;
     }
 
@@ -614,7 +664,7 @@ public sealed class CmdRotatoria : CommandBase
         if (!hasRoads && d.Legs.Count == 0)
             foreach (var a in new[] { 0.0, 90, 180, 270 }) d.Legs.Add(new RoundaboutLeg { AngleDeg = a, Width = 7, Sidewalk = d.SidewalkWidth });
         CommandBase.EnsureDetailViewPublic(uidoc, d.Output);
-        if (UiHelpers.ShowModal(RoundaboutForms.Roundabout(d, false, hasRoads)) != true) return Result.Cancelled;
+        if (UiHelpers.ShowModal(RoundaboutForms.Roundabout(d, false, hasRoads, doc)) != true) return Result.Cancelled;
         if (hasRoads) d.Legs = RoundaboutGenerator.MergeLegSettings(d.Legs, RoundaboutGenerator.LegsFromRoads(center, roads, d.OuterRadius + 25));
         UiHelpers.Remember("Rotatoria", d);
         PluginContext.SaveSettings();

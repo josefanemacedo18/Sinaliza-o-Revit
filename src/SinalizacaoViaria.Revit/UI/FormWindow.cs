@@ -155,6 +155,38 @@ public sealed class FormWindow : Window
         return this;
     }
 
+    private readonly List<(StackPanel Panel, Func<IReadOnlyList<Core.Automation.EstadoContexto>> Lines)> _status = new();
+
+    /// <summary>
+    /// Seção só de leitura com linhas de estado (o nível escrito antes do texto), recalculada a cada atualização da prévia –
+    /// o que os campos mudam aparece na hora (Etapa 11: vias conectadas, verificação, resumo dos nós).
+    /// </summary>
+    public FormWindow Status(string header, Func<IReadOnlyList<Core.Automation.EstadoContexto>> lines, string? hint = null)
+    {
+        Section(header, hint);
+        var sp = new StackPanel { Margin = new Thickness(0, 0, 0, 4) };
+        _fields.Children.Add(sp);
+        Track(sp);
+        _status.Add((sp, lines));
+        return this;
+    }
+
+    private void UpdateStatus()
+    {
+        foreach (var (sp, lines) in _status)
+        {
+            sp.Children.Clear();
+            IReadOnlyList<Core.Automation.EstadoContexto> l;
+            try { l = lines(); }
+            catch (Exception ex)
+            {
+                Log.Error("Formulário – estado", ex);
+                l = new[] { new Core.Automation.EstadoContexto(Core.Automation.NivelSituacao.NaoVerificado, "Não foi possível montar esta seção: " + ex.Message) };
+            }
+            foreach (var x in l) sp.Children.Add(ContextPanelPage.Linha(x.Nivel, x.Texto));
+        }
+    }
+
     public FormWindow Hint(string text)
     {
         _grid = null;
@@ -353,6 +385,7 @@ public sealed class FormWindow : Window
             return;
         }
         UpdateVisibility();
+        UpdateStatus();
         if (_previewFunc == null) return;
         try
         {

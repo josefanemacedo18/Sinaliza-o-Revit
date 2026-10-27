@@ -1,7 +1,9 @@
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using SinalizacaoViaria.Core.Automation;
+using SinalizacaoViaria.Core.Catalog;
 using SinalizacaoViaria.Core.Definitions;
+using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Core.Model;
 
@@ -458,6 +460,164 @@ public class Etapa11TelasTests
         foreach (var t in new[] { "\"Superfície de cada cálculo\"", "\"Se o terreno mudar\"", "\"Selecionar no modelo\"", "TerrenoTela.Texto(tela)", "\"Toposolids\"" })
             Assert.Contains(t, w);
         Assert.DoesNotMatch(@"""#[0-9A-Fa-f]{3,8}""", w);
+    }
+
+    // ---------------------------------------------------------------- interseções e rotatórias (§12)
+
+    private static readonly Catalogo Cat = CatalogService.LoadDefault();
+
+    private static (List<MarkingDefinition> Defs, RoadPavementDefinition Pav, Polyline2 Axis) Rua(int modelo, params Vec2[] eixo)
+    {
+        var defs = RoadTemplates.All[modelo].Create().Build(new PathReference(), new OutputSettings(), Cat);
+        return (defs, defs.OfType<RoadPavementDefinition>().Single(), new Polyline2(eixo));
+    }
+
+    /// <summary>Cruzamento de duas vias no ângulo dado (graus): a interseção, o arranjo e todas as marcas.</summary>
+    private static (IntersectionDefinition It, IntersectionLayout L, List<MarkingDefinition> All, RoadPavementDefinition A, RoadPavementDefinition B) Cruzamento(double angulo)
+    {
+        var a = Rua(0, new Vec2(-60, 0), new Vec2(60, 0));
+        var r = angulo * Math.PI / 180;
+        var b = Rua(1, new Vec2(-60 * Math.Cos(r), -60 * Math.Sin(r)), new Vec2(60 * Math.Cos(r), 60 * Math.Sin(r)));
+        var vias = new[] { a, b }.Select(x => new IntersectionRoad(x.Pav, x.Axis)).ToList();
+        var no = IntersectionGenerator.FindNodes(vias).Single();
+        var it = new IntersectionDefinition { Node = no.Node, RoadIds = { a.Pav.Id, b.Pav.Id } };
+        var L = IntersectionGenerator.Layout(it, no.Roads.Select(i => vias[i]).ToList());
+        return (it, L, a.Defs.Concat(b.Defs).Append(it).ToList(), a.Pav, b.Pav);
+    }
+
+    [Fact]
+    public void Intersecao_ViasAngulosPavimentoDrenagemEVerificacao()
+    {
+        var (it, L, all, a, b) = Cruzamento(90);
+        var boca = new DrainageDefinition { Type = TipoDrenagem.BocaDeLoboSimples, Position = it.Node + new Vec2(2, 2), Z = 100 };
+        all.Add(boca);
+        var c = FormularioNo.Intersecao(it, existente: true, L, all, null);
+        Assert.Contains(c.Vias, l => l.Texto.StartsWith(a.DisplayCode + ": pista de "));
+        Assert.Contains(c.Vias, l => l.Texto.EndsWith(" – principal (preferencial)."));
+        Assert.Contains(c.Vias, l => l.Texto == "4 ramo(s).");
+        Assert.Contains(c.Vias, l => l.Nivel == NivelSituacao.Ok && l.Texto == "Menor ângulo entre as vias: 90° (limite de conferência: 30°).");
+        Assert.Contains(c.Pavimentacao, l => l.Texto.StartsWith("Nenhuma via ligada tem estrutura informada"));
+        Assert.Contains(c.Terraplenagem, l => l.Texto.StartsWith("Nenhuma via ligada molda o terreno"));
+        Assert.Contains(c.Drenagem, l => l.Texto == "1 captação(ões) na área do nó.");
+        Assert.Contains(c.Drenagem, l => l.Texto.StartsWith("O nó não cria dispositivos de drenagem"));
+        // Verificação geométrica: os limites do gerador com a origem, e o que a geometria não diz.
+        Assert.Contains(c.Verificacao, l => l.Texto == $"{LimitesDeConferencia.AnguloMinimoEntreVias.Nome}: {LimitesDeConferencia.AnguloMinimoEntreVias.Rotulo}.");
+        Assert.Contains(c.Verificacao, l => l.Texto.Contains("sem norma citada"));
+        Assert.Contains(c.Verificacao, l => l.Texto.Contains("não é validação operacional de tráfego"));
+        Assert.Contains(c.Verificacao, l => l.Texto.StartsWith("Capacidade, nível de serviço (HCM)") && l.Texto.Contains("Simulador de Tráfego"));
+        Assert.Contains(c.Verificacao, l => l.Nivel == NivelSituacao.NaoVerificado && l.Texto.StartsWith("Visibilidade nas aproximações e trajetória de giro"));
+        Assert.Contains(c.Resumo, l => l.Texto.Contains("2 via(s) recortada(s)"));
+        Assert.Contains(c.Resumo, l => l.Texto.Contains("desfazível"));
+
+        // Estrutura e greide numa das vias: a caixa do nó vai até a mais funda e o nó entra na terraplenagem.
+        a.Estrutura = new EstruturaPavimento { Camadas = { new CamadaPavimento { Nome = "Base", EspessuraCm = 20 } } };
+        a.Output.Grade = new RoadGrade { AdjustTerrain = true };
+        var c2 = FormularioNo.Intersecao(it, true, L, all, null);
+        Assert.Contains(c2.Pavimentacao, l => l.Texto.StartsWith($"Estrutura informada em 1 de 2 via(s); a caixa do nó vai até a mais funda: {a.DisplayCode}, "));
+        Assert.Contains(c2.Terraplenagem, l => l.Texto.StartsWith("1 de 2 via(s) ligada(s) moldam o terreno"));
+        Assert.Contains(c2.Terraplenagem, l => l.Nivel == NivelSituacao.NaoVerificado && l.Texto == "Molda o terreno; sem registro da terraplenagem aplicada.");
+        var reg = EarthworkRecord.Gravar(EarthworkRecord.Participantes(all), 0.4, 1, 1.5, T0, null);
+        Assert.Contains(FormularioNo.Intersecao(it, true, L, all, reg).Pavimentacao, l => l.Texto.StartsWith("Com o subleito da terraplenagem aplicada (0,40 m"));
+
+        // Interseção nova aplicada a todos os cruzamentos: as vias só são conhecidas ao aplicar.
+        var nova = FormularioNo.Intersecao(new IntersectionDefinition(), false, null, all, null);
+        Assert.Contains(nova.Vias, l => l.Texto.StartsWith("As vias são lidas ao aplicar"));
+        Assert.Contains(nova.Drenagem, l => l.Nivel == NivelSituacao.NaoVerificado);
+        // Via que não existe mais.
+        var orfa = new IntersectionDefinition { RoadIds = { "via-apagada" } };
+        Assert.Contains(FormularioNo.Intersecao(orfa, true, null, new MarkingDefinition[] { orfa }, null).Vias,
+            l => l.Nivel == NivelSituacao.Aviso && l.Texto.StartsWith("A via via-apagada não existe mais"));
+    }
+
+    [Fact]
+    public void Intersecao_ViasObliquas_AbaixoDoLimiteDoPlugin()
+    {
+        var (it, L, all, _, _) = Cruzamento(25);
+        var c = FormularioNo.Intersecao(it, true, L, all, null);
+        Assert.Contains(c.Vias, l => l.Nivel == NivelSituacao.Aviso && l.Texto == $"Menor ângulo entre as vias: 25°, abaixo de {LimitesDeConferencia.AnguloMinimoEntreVias.Rotulo}.");
+        // O gerador avisa o mesmo (os avisos do arranjo aparecem na Verificação).
+        Assert.Contains(c.Verificacao, l => l.Nivel == NivelSituacao.Aviso && l.Texto.StartsWith("Vias muito oblíquas"));
+        // A 20° o arranjo não monta os ramos (ramo curto para a esquina): a tela diz isso, sem inventar ângulo.
+        var (it2, L2, all2, _, _) = Cruzamento(20);
+        Assert.Empty(L2.Legs);
+        var c2 = FormularioNo.Intersecao(it2, true, L2, all2, null);
+        Assert.Contains(c2.Vias, l => l.Nivel == NivelSituacao.Aviso && l.Texto.StartsWith("O arranjo não montou os ramos"));
+        Assert.DoesNotContain(c2.Vias, l => l.Texto.StartsWith("Menor ângulo"));
+        Assert.Contains(c2.Verificacao, l => l.Texto.StartsWith("Vias muito oblíquas"));
+    }
+
+    [Fact]
+    public void NoNaTerraplenagem_PelasViasLigadas()
+    {
+        // Regressão: o nó molda o terreno pelas vias com greide; antes, fora do registro ele ficava sem estado.
+        var (it, _, all, a, _) = Cruzamento(90);
+        a.Output.Grade = new RoadGrade { AdjustTerrain = true };
+        var porId = all.ToDictionary(d => d.Id);
+        MarkingDefinition? Buscar(string id) => porId.GetValueOrDefault(id);
+        Assert.Null(PainelContextual.NaTerraplenagem(it, null));                    // sem buscar: não se sabe
+        Assert.Equal(NivelSituacao.NaoVerificado, PainelContextual.NaTerraplenagem(it, null, Buscar)!.Nivel);
+        var reg = EarthworkRecord.Gravar(EarthworkRecord.Participantes(all), 0.4, 1, 1.5, T0, null);
+        Assert.Contains(EarthworkRecord.Participantes(all), d => d.Id == it.Id);
+        Assert.Equal(NivelSituacao.Ok, PainelContextual.NaTerraplenagem(it, reg, Buscar)!.Nivel);
+        var semNo = EarthworkRecord.Gravar(EarthworkRecord.Participantes(all).Where(d => d.Id != it.Id), 0.4, 1, 1.5, T0, null);
+        Assert.Equal(NivelSituacao.Aviso, PainelContextual.NaTerraplenagem(it, semNo, Buscar)!.Nivel);
+        Assert.Contains(PainelContextual.Uma(it, null, Buscar).Estado, e => e.Texto == "molda o terreno; sem registro da terraplenagem aplicada");
+    }
+
+    [Fact]
+    public void Rotatoria_DimensoesRamosVerificacaoEResumo()
+    {
+        var a = Rua(0, new Vec2(-60, 0), new Vec2(60, 0));
+        var rb = RoundaboutDefinition.Nova();
+        rb.Center = Vec2.Zero;
+        rb.Legs = new List<RoundaboutLeg>
+        {
+            new() { AngleDeg = 0, RoadId = a.Pav.Id }, new() { AngleDeg = 180, RoadId = a.Pav.Id }, new() { AngleDeg = 90 }, new() { AngleDeg = 270 },
+        };
+        var all = a.Defs.Append(rb).ToList();
+        var c = FormularioNo.Rotatoria(rb, false, all, null);
+        Assert.Equal($"Diâmetro inscrito de {(2 * rb.OuterRadius).ToString("0.0", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))} m; ilha central de raio " +
+            $"{rb.IslandRadius.ToString("0.0", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))} m; {rb.Lanes} faixa(s) de " +
+            $"{rb.LaneWidth.ToString("0.00", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))} m no anel.", c.Vias[0].Texto);
+        Assert.Contains(c.Vias, l => l.Texto == "4 ramo(s) a 0°; 90°; 180°; 270° (0° = leste, anti-horário).");
+        Assert.Contains(c.Vias, l => l.Texto.StartsWith(a.Pav.DisplayCode + ": pista de "));
+        Assert.Contains(c.Vias, l => l.Texto.StartsWith("2 ramo(s) sem via ligada"));
+        Assert.StartsWith("Revestimento do anel: ", c.Pavimentacao[0].Texto);
+        foreach (var lim in LimitesDeConferencia.Todos.Where(x => x.Onde == "RoundaboutGenerator"))
+            Assert.Contains(c.Verificacao, l => l.Texto == $"{lim.Nome}: {lim.Rotulo}.");
+        Assert.Contains(c.Verificacao, l => l.Nivel == NivelSituacao.NaoVerificado && l.Texto.StartsWith("Visibilidade"));
+        Assert.Contains(c.Resumo, l => l.Texto.StartsWith("Ao aplicar: remodela as entradas"));
+        // Pista giratória estreita: o aviso do gerador (com o limite e a origem) aparece na verificação; elevada: a drenagem.
+        rb.LaneWidth = 3.5;
+        rb.Raised = true;
+        rb.Integration = IntegracaoRotatoria.SomenteIlha;
+        var c2 = FormularioNo.Rotatoria(rb, true, all, null);
+        Assert.Contains(c2.Verificacao, l => l.Nivel == NivelSituacao.Aviso && l.Texto.StartsWith("Pista giratória de") && l.Texto.Contains(LimitesDeConferencia.PistaGiratoriaMinima.Rotulo));
+        Assert.Contains(c2.Drenagem, l => l.Nivel == NivelSituacao.Aviso && l.Texto.StartsWith("Rotatória elevada"));
+        Assert.Contains(c2.Resumo, l => l.Texto.StartsWith("Ao aplicar: só a ilha central"));
+        Assert.Contains(c2.Resumo, l => l.Texto.Contains("marca(s) gerada(s) pela rotatória são refeitas"));
+        rb.Legs.Add(new RoundaboutLeg { AngleDeg = 45, RoadId = "via-apagada" });
+        Assert.Contains(FormularioNo.Rotatoria(rb, true, all, null).Vias, l => l.Nivel == NivelSituacao.Aviso && l.Texto.StartsWith("A via via-apagada não existe mais"));
+    }
+
+    [Fact]
+    public void FormulariosDosNos_SecoesDoParagrafo12()
+    {
+        var cs = Ler("Commands", "IntersectionCommands.cs");
+        Assert.Contains("w.Status(\"Identificação e vias conectadas\", () => Ctx().Vias)", cs);
+        Assert.Contains("w.Status(\"Identificação, parâmetros dimensionais e vias conectadas\", () => Ctx().Vias)", cs);
+        Assert.Equal(2, Regex.Matches(cs, @"NodeSections\(w, Ctx\);").Count);
+        foreach (var s in new[] { "\"Pavimentação\"", "\"Terraplenagem\"", "\"Drenagem\"", "\"Verificação\"", "\"Resumo\"" }) Assert.Contains(s, cs);
+        Assert.Contains("FormularioNo.Intersecao(", cs);
+        Assert.Contains("FormularioNo.Rotatoria(", cs);
+        Assert.Contains("IntersectionForms.Intersection(d, false, doc: doc)", cs);
+        Assert.Contains("RoundaboutForms.Roundabout(d, false, hasRoads, doc)", cs);
+        Assert.Contains("RoundaboutForms.Roundabout(rb, true, hasRoads, uidoc.Document)", Ler("Commands", "EditCommands.cs"));
+        Assert.Contains("IntersectionForms.Intersection(inter, true, options, real, uidoc.Document)", Ler("Commands", "EditCommands.cs"));
+        Assert.Contains("uidoc.Document)) != true", Ler("Commands", "ConnectionCommands.cs"));
+        var fw = Ler("UI", "FormWindow.cs");
+        Assert.Contains("public FormWindow Status(string header, Func<IReadOnlyList<Core.Automation.EstadoContexto>> lines, string? hint = null)", fw);
+        Assert.Contains("UpdateStatus();", fw);
     }
 
     [Fact]

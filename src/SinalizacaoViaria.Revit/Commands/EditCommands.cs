@@ -60,14 +60,14 @@ public sealed class CmdEditar : CommandBase
         if (stored.Definition is RoundaboutDefinition rb)
         {
             var hasRoads = rb.Legs.Any(l => l.RoadId != null || l.GroupId != null);
-            if (UiHelpers.ShowModal(RoundaboutForms.Roundabout(rb, true, hasRoads)) != true) return Result.Cancelled;
+            if (UiHelpers.ShowModal(RoundaboutForms.Roundabout(rb, true, hasRoads, uidoc.Document)) != true) return Result.Cancelled;
             Report("Rotatória", IntersectionRunner.Run(uidoc, "SV - Editar rotatória", s => s.Refresh(rb)).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;
         }
         if (stored.Definition is IntersectionDefinition inter)
         {
             var (options, real) = IntersectionForms.ForEdit(uidoc, inter);
-            if (UiHelpers.ShowModal(IntersectionForms.Intersection(inter, true, options, real)) != true) return Result.Cancelled;
+            if (UiHelpers.ShowModal(IntersectionForms.Intersection(inter, true, options, real, uidoc.Document)) != true) return Result.Cancelled;
             Report("Interseção", IntersectionRunner.Run(uidoc, "SV - Editar interseção", s => s.Refresh(inter)).Where(r => r.Warnings.Count > 0).ToList());
             return Result.Succeeded;
         }
