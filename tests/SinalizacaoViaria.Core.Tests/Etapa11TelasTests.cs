@@ -85,6 +85,81 @@ public class Etapa11TelasTests
             a => a.Codigo == "V12");
     }
 
+    // ------------------------------------------------------------------ gerenciador de pavimentos (§15)
+
+    private static EstruturaPavimento Estrutura() => new()
+    {
+        Fonte = "projeto",
+        Camadas =
+        {
+            new CamadaPavimento { Nome = "Base", Material = "Brita graduada", EspessuraCm = 15 },
+            new CamadaPavimento { Nome = "Sub-base", Material = "Concreto", EspessuraCm = 20, Funcao = FuncaoCamada.SubBase },
+        },
+    };
+
+    [Fact]
+    public void Pavimento_EstadoDeCadaCamadaEOrigemDoMaterial()
+    {
+        var e = Estrutura();
+        e.Camadas.Add(new CamadaPavimento { Nome = "", EspessuraCm = 0 });
+        var est = GerenciadorPavimento.Estados(e, nome => nome.Equals("concreto", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(new[] { 1, 2, 3 }, est.Select(x => x.Ordem));
+        Assert.Equal(("ok", OrigemMaterial.SoNoPlugin), (est[0].Estado, est[0].Material));
+        Assert.Equal(("ok", OrigemMaterial.Revit), (est[1].Estado, est[1].Material));
+        Assert.Equal(("sem nome; espessura ausente ou nula", OrigemMaterial.NaoInformado), (est[2].Estado, est[2].Material));
+        Assert.Equal("material do Revit no projeto", GerenciadorPavimento.Nome(OrigemMaterial.Revit));
+        Assert.StartsWith("só no SinalizaBIM", GerenciadorPavimento.Nome(OrigemMaterial.SoNoPlugin));
+    }
+
+    [Fact]
+    public void Pavimento_EsquemaEQuantitativoSoComArea()
+    {
+        var e = Estrutura();
+        var f = GerenciadorPavimento.Esquema(e, 5, "CBUQ");
+        Assert.Equal(new[] { (0.0, 5.0), (5.0, 20.0), (20.0, 40.0) }, f.Select(x => (x.TopoCm, x.BaseCm)));
+        Assert.Null(f[0].Hachura);
+        Assert.Equal("CBUQ – 5 cm", f[0].Rotulo);
+        Assert.Equal("Base – 15 cm (Brita graduada)", f[1].Rotulo);
+        var q = GerenciadorPavimento.Quantidades(e, 5, 1000);
+        Assert.Equal(new[] { ("Revestimento", 50.0), ("Base", 150.0), ("Sub-base", 200.0) }, q.Select(x => (x.Camada, Math.Round(x.Volume, 9))));
+        // Sem área medida: nenhum valor (não estima).
+        Assert.Empty(GerenciadorPavimento.Quantidades(e, 5, null));
+        Assert.Empty(GerenciadorPavimento.Quantidades(e, 5, 0));
+    }
+
+    [Fact]
+    public void Pavimento_ModelosDoUsuario()
+    {
+        var lista = new List<ModeloEstruturaPavimento>();
+        Assert.Equal("informe um nome para o modelo", GerenciadorPavimento.Salvar(lista, " ", Estrutura()));
+        Assert.Equal("o modelo precisa de ao menos uma camada", GerenciadorPavimento.Salvar(lista, "Vazio", new EstruturaPavimento()));
+        var ruim = Estrutura();
+        ruim.Camadas[0].EspessuraCm = 0;
+        Assert.StartsWith("corrija antes", GerenciadorPavimento.Salvar(lista, "Ruim", ruim));
+        Assert.Null(GerenciadorPavimento.Salvar(lista, "Via local", Estrutura()));
+        Assert.Null(GerenciadorPavimento.Salvar(lista, "Arterial", Estrutura()));
+        var outra = Estrutura();
+        outra.Camadas.RemoveAt(1);
+        Assert.Null(GerenciadorPavimento.Salvar(lista, "via LOCAL", outra));                  // mesmo nome: substitui
+        Assert.Equal(new[] { "Arterial", "via LOCAL" }, lista.Select(m => m.Nome));
+        Assert.Single(lista[1].Estrutura.Camadas);
+        // O modelo guardado é uma cópia: mudar a estrutura de origem não muda o modelo.
+        outra.Camadas[0].Nome = "mudou";
+        Assert.Equal("Base", lista[1].Estrutura.Camadas[0].Nome);
+        // A biblioteca vai e volta nas configurações (arquivo JSON do usuário).
+        var arq = Path.Combine(Path.GetTempPath(), $"sv-config-{Guid.NewGuid():N}.json");
+        try
+        {
+            var cfg = new SinalizacaoViaria.Core.Settings.PluginSettings();
+            cfg.ModelosEstruturaPavimento.AddRange(lista);
+            cfg.Save(arq);
+            var lido = SinalizacaoViaria.Core.Settings.PluginSettings.Load(arq);
+            Assert.Equal(new[] { "Arterial", "via LOCAL" }, lido.ModelosEstruturaPavimento.Select(m => m.Nome));
+            Assert.Equal(15, lido.ModelosEstruturaPavimento[1].Estrutura.Camadas[0].EspessuraCm);
+        }
+        finally { File.Delete(arq); }
+    }
+
     // ------------------------------------------------------------------ fontes da camada Revit
 
     private static string Raiz([CallerFilePath] string aqui = "")
@@ -120,5 +195,18 @@ public class Etapa11TelasTests
         Assert.Contains("public void SetContext(ContextoFormularioVia ctx)", cs);
         Assert.Contains("FormularioVia.Contexto(pav,", Ler("Commands", "EditCommands.cs"));
         Assert.Contains("FormularioVia.Contexto(null,", Ler("Commands", "CreationCommands.cs"));
+    }
+
+    [Fact]
+    public void GerenciadorDePavimento_NaJanelaENoComando()
+    {
+        var cmd = Ler("Commands", "PavementStructureCommands.cs");
+        Assert.Contains("new PavementManagerWindow(", cmd);
+        Assert.Contains("PluginContext.Settings.ModelosEstruturaPavimento", cmd);
+        Assert.DoesNotContain("EstruturaPavimento.Ler(", cmd);               // a tabela substituiu o texto "nome; espessura; …"
+        var w = Ler("UI", "PavementManagerWindow.cs");
+        foreach (var t in new[] { "\"+ Camada\"", "\"Remover\"", "\"▲ Subir\"", "\"▼ Descer\"", "GerenciadorPavimento.Estados(", "GerenciadorPavimento.Esquema(",
+                     "GerenciadorPavimento.Quantidades(", "GerenciadorPavimento.Salvar(" })
+            Assert.Contains(t, w);
     }
 }

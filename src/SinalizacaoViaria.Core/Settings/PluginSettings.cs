@@ -48,6 +48,9 @@ public sealed class PluginSettings
     public double RoadFillSlope { get; set; } = 1.5;
     /// <summary>Modelos de via salvos pelo usuário (seção completa em JSON).</summary>
     public List<CustomRoadTemplate> CustomRoadTemplates { get; set; } = new();
+
+    /// <summary>Estruturas de pavimento guardadas pelo usuário para reutilizar (gerenciador de pavimentos).</summary>
+    public List<Automation.ModeloEstruturaPavimento> ModelosEstruturaPavimento { get; set; } = new();
     /// <summary>Última seção usada no "Sinalizar via" (reaberta na próxima vez).</summary>
     public string? LastRoadSetup { get; set; }
 
