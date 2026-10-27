@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-27 (Etapas 0–11 entregues; Etapa 12 a seguir)
+## Estado em 2026-10-27 (Etapas 0–12 entregues; Etapa 13 a seguir)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -42,17 +42,25 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     verificação geométrica × operacional; resultados do parcelamento; estaca da via nos formulários (K20 resolvido).
     Correções: a via refeita perdia a estrutura e o estaqueamento; o nó fora do registro ficava sem estado na
     terraplenagem. Telas não vistas no Revit (K25).
-  - `Instalar/Revit2027` tem a DLL 2.17.0. As anteriores continuam em `Releases/`.
-- **Etapa 12 (próxima):** qualidade, quantitativos e configurações (Interface §17–§19, §26): Central de Qualidade
-  (validador e Autoteste separados, filtros, localizar o elemento), central de quantitativos com a origem de cada número,
-  gerenciador de configurações (usuário × projeto) e perfis reutilizáveis (exemplo, usuário, referência citada).
+  - Etapa 12 ✅: 2.18.0 em `Releases/Etapa12` (`9102a7b`, 3 123/3 123) – D-030: **Central de Qualidade** no Validar Modelo
+    (achados com o estado diante da anterior, filtros, ordem, seleção no modelo, CSV, por categoria, resolvidos, estado dos
+    resultados; o último Autoteste numa aba própria, lido do TXT e conferido com os relatórios reais); **quantitativos com a
+    origem** e o método de cada linha, aba Origem dos valores (quando, versão, configuração, validade da terraplenagem), Por
+    via e Quadras e lotes; **gerenciador de configurações** (usuário, projeto, elemento; validação antes de aplicar e o que
+    muda; perfis exemplo / usuário / referência citada; perfis de limites); tamanho das telas grandes lembrado. Correções:
+    consumo de tinta com a unidade da taxa e litros somados com quilos; configurações salvas pela metade com um campo
+    inválido. Telas não vistas no Revit (K26).
+  - `Instalar/Revit2027` tem a DLL 2.18.0. As anteriores continuam em `Releases/`.
+- **Etapa 13 (próxima):** desempenho, validação e entrega (PLANO): medir antes de otimizar (K14, K15), progresso e
+  cancelamento nas operações longas, relatório de simulação × animação (F11), etapa integrada no Autoteste, relatório
+  técnico final (Interface §32).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros (compilar sempre também o projeto de testes antes do
   commit).
 
 ## Próxima tarefa
 
-1. Etapa 12 (PLANO): qualidade, quantitativos e configurações. Depois, a Etapa 13.
+1. Etapa 13 (PLANO): desempenho, validação e entrega – a última do plano.
 2. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer tudo**;
    enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`); rodar também o
    Validar Modelo duas vezes (a segunda mostra a comparação com a primeira).
