@@ -189,8 +189,9 @@ public static class RibbonBuilder
                 "Lê da via cada boca de lobo e grelha: declividade da sarjeta pelo greide, ponto baixo e a área que escoa até ela (pista do eixo ao meio-fio e calçada, " +
                 "entre o divisor e a captação). Mostra o que leu e preenche só os campos vazios – ou substitui todos, se você escolher."));
         Large(drenagem, Data(typeof(CmdRedeDrenagem), "Relatório da Rede", "rededren",
-            "Dimensionamento das galerias pelo método racional, captações e conferência da rede (CSV).",
-            "Planilha de dimensionamento das galerias pelo método racional, captações (sarjeta e engolimento) e conferência da rede (sentido, ligações, ciclos, recobrimento, PVs); aplica os diâmetros calculados (CSV)."));
+            "Rede em partes: geometria, conectividade, parâmetros, cálculo hidráulico e dimensionamento; perfil e CSV.",
+            "Separa a conferência geométrica, a conectividade e os parâmetros (critérios do Projeto de Drenagem) do cálculo hidráulico pelo método racional e do " +
+            "dimensionamento das galerias; perfil por ramo, dispositivos, selecionar no modelo, aplicar os diâmetros calculados e relatório CSV."));
 
         // ---------------------------------------------------------------- Urbanismo
         var urbanismo = Panel(app, TabName, "Urbanismo");

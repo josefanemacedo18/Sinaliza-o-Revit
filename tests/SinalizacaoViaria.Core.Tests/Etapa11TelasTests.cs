@@ -197,6 +197,152 @@ public class Etapa11TelasTests
         Assert.Contains("FormularioVia.Contexto(null,", Ler("Commands", "CreationCommands.cs"));
     }
 
+    // ---------------------------------------------------------------- rede de drenagem (§16)
+
+    private static DrainageDefinition Pv(double x, double z, double y = 0) =>
+        new() { Type = TipoDrenagem.PocoDeVisita, Position = new Vec2(x, y), Z = z, BoxDepth = 1.6, BoxLength = 1.0, PipeDiameter = 0.4 };
+
+    private static DrainagePipeDefinition Tubo(DrainageDefinition a, DrainageDefinition b, double d, double? fa = null, double? fb = null) =>
+        new() { FromId = a.Id, ToId = b.Id, Diameter = d, Z = a.Z, InvertFrom = fa, InvertTo = fb };
+
+    [Fact]
+    public void RedeDrenagem_TodoCriterioDoNucleoTemSuaParte()
+    {
+        // Os critérios que o núcleo emite (DrainageNetwork, DrainageHydraulics, DrenagemDoModelo e a própria tela): nenhum cai na parte errada.
+        var nucleo = Path.Combine(Raiz(), "src", "SinalizacaoViaria.Core", "Automation");
+        var criterios = new[] { "DrainageNetwork.cs", "DrainageHydraulics.cs", "DrainageModel.cs", "DrainageNetworkScreen.cs" }
+            .SelectMany(f => Regex.Matches(File.ReadAllText(Path.Combine(nucleo, f)), @"(?:\.Add\(new|new ProblemaRede)\(\s*[^,()]+,\s*""([^""]+)"",")
+                .Select(m => m.Groups[1].Value)).ToHashSet();
+        Assert.True(criterios.Count >= 19, string.Join(", ", criterios));
+        foreach (var c in criterios)
+        {
+            Assert.Contains(c, RedeDrenagemTela.CriteriosConhecidos);
+            Assert.NotEqual("Veja a descrição.", RedeDrenagemTela.Correcao(new ProblemaRede("x", c, "x", false)));
+        }
+        ProblemaRede P(string c, bool limite = true) => new("T1", c, "texto", limite);
+        Assert.Equal(CategoriaRede.Geometria, RedeDrenagemTela.Categoria(P("sentido", false)));
+        Assert.Equal(CategoriaRede.Conectividade, RedeDrenagemTela.Categoria(P("ciclo", false)));
+        Assert.Equal(CategoriaRede.Parametros, RedeDrenagemTela.Categoria(P("cobrimento")));
+        Assert.Equal(CategoriaRede.Hidraulica, RedeDrenagemTela.Categoria(P("engolimento")));
+        Assert.Equal(CategoriaRede.ViasETerreno, RedeDrenagemTela.Categoria(P("talvegue", false)));
+        // O nível é o do Validar Modelo (V13): aviso; a divergência da captação com o greide é informação.
+        Assert.Equal(NivelSituacao.Aviso, RedeDrenagemTela.Nivel(P("capacidade")));
+        Assert.Equal(NivelSituacao.Informacao, RedeDrenagemTela.Nivel(P("sarjeta-modelo", false)));
+    }
+
+    [Fact]
+    public void RedeDrenagem_SemChuva_SoGeometriaConectividadeEParametros()
+    {
+        var a = Pv(0, 100);
+        var b = Pv(30, 99.5);
+        var c = Pv(60, 99);
+        var solta = new DrainageDefinition { Type = TipoDrenagem.BocaDeLoboSimples, Position = new Vec2(100, 3), Z = 100 };
+        var contra = Tubo(a, b, 0.4, 98.0, 98.5);                                    // fundo de jusante acima do de montante
+        var fino = Tubo(b, c, 0.3);                                                  // abaixo dos 400 mm do Manual SUDERHSA
+        var laco = new DrainagePipeDefinition { FromId = c.Id, ToId = c.Id, Diameter = 0.4, Z = c.Z };
+        var defs = new MarkingDefinition[] { a, b, c, solta, contra, fino, laco };
+        var p = ProjetoDrenagem.ManualSuderhsa();
+        p.Chuva = null;
+        var tela = RedeDrenagemTela.Montar(defs, p, null, temTerreno: false, terrenoNatural: null);
+
+        var geo = tela.Secao(CategoriaRede.Geometria);
+        Assert.Equal("1. Consistência geométrica", geo.Titulo);
+        Assert.Equal(NivelSituacao.Aviso, geo.Situacao.Nivel);
+        Assert.Contains(geo.Itens, i => i.Criterio == "sentido" && i.Ids.Contains(contra.Id) && i.Correcao.Contains("cotas de fundo"));
+        Assert.Contains(geo.Notas, n => n.Texto.Contains("fora delas, sem Toposolid, pela reta entre as tampas"));
+        var con = tela.Secao(CategoriaRede.Conectividade);
+        Assert.Contains(con.Itens, i => i.Criterio == "ligação" && i.Ids.Contains(laco.Id));
+        Assert.Contains(con.Notas, n => n.Texto.StartsWith("Sem nenhum trecho: BL"));
+        Assert.Contains(con.Notas, n => n.Texto.StartsWith("Lançamento(s)") && n.Texto.Contains("PV-3"));
+        var par = tela.Secao(CategoriaRede.Parametros);
+        Assert.Contains(EquacaoChuva.FonteManual, par.Escopo);
+        Assert.Contains(par.Itens, i => i.Criterio == "diâmetro" && i.Texto.Contains("300 mm") && i.Ids.Contains(fino.Id));
+        Assert.Contains(par.Notas, n => n.Nivel == NivelSituacao.Informacao && n.Texto == "Diâmetro mínimo nas galerias: 400 mm.");
+        Assert.Contains(par.Notas, n => n.Nivel == NivelSituacao.NaoVerificado && n.Texto.StartsWith("Declividade mínima nas galerias não informada"));
+        // Sem a equação de chuva: o cálculo hidráulico e o dimensionamento não foram feitos – e a tela diz isso.
+        Assert.Equal(NivelSituacao.NaoVerificado, tela.Secao(CategoriaRede.Hidraulica).Situacao.Nivel);
+        Assert.Contains("Sem equação de chuva", tela.Secao(CategoriaRede.Hidraulica).Situacao.Texto);
+        Assert.Empty(tela.Secao(CategoriaRede.Hidraulica).Itens);
+        Assert.Equal(NivelSituacao.NaoVerificado, tela.Secao(CategoriaRede.Dimensionamento).Situacao.Nivel);
+        Assert.Empty(tela.Dimensionamento);
+        Assert.Equal(0, tela.Mudam);
+        Assert.Contains("nenhum cálculo hidráulico", tela.Resumo);
+        Assert.DoesNotContain("dimensionada", tela.Resumo);
+        Assert.Contains(tela.Secao(CategoriaRede.ViasETerreno).Notas, n => n.Nivel == NivelSituacao.NaoVerificado && n.Texto.StartsWith("Terreno natural não lido"));
+        // Nenhum problema se perde: cada um está numa parte (o dimensionamento tem os seus, que não são do relatório).
+        Assert.Equal(tela.Problemas.Count, tela.Secoes.Where(s => s.Categoria != CategoriaRede.Dimensionamento).Sum(s => s.Itens.Count));
+        Assert.Equal(new[] { "1. Consistência geométrica", "2. Conectividade da rede", "3. Verificação de parâmetros", "4. Cálculo hidráulico", "5. Dimensionamento",
+            "Drenagem × vias e terreno" }, tela.Secoes.Select(s => s.Titulo));
+        var texto = RedeDrenagemTela.Texto(tela, T0);
+        Assert.Contains("27/10/2026 09:00", texto);
+        foreach (var s in tela.Secoes) Assert.Contains(s.Titulo.ToUpperInvariant(), texto);
+        Assert.Contains("[não verificado] Sem equação de chuva", texto);
+    }
+
+    [Fact]
+    public void RedeDrenagem_ComChuva_CalculoHidraulicoEDimensionamentoSeparados()
+    {
+        var a = Pv(0, 100);
+        a.AreaContribuicao = 60000;
+        a.CoeficienteEscoamento = 0.8;
+        var b = Pv(80, 99.6);
+        var c = Pv(140, 99.4);
+        var t1 = Tubo(a, b, 0.40, 98.5, 98.1);                                       // 0,5 %: pequeno para a vazão
+        var t2 = Tubo(b, c, 1.50, 97.6, 97.3);                                       // grande demais
+        var defs = new MarkingDefinition[] { a, b, c, t1, t2 };
+        var p = ProjetoDrenagem.ManualSuderhsa();
+        var tela = RedeDrenagemTela.Montar(defs, p, null, temTerreno: true, terrenoNatural: null);
+
+        var hid = tela.Secao(CategoriaRede.Hidraulica);
+        Assert.Contains("Método racional", hid.Escopo);
+        Assert.Contains("Manning", hid.Escopo);
+        Assert.Contains("Fendrich", hid.Escopo);
+        Assert.Contains(hid.Itens, i => i.Criterio == "capacidade" && i.Ids.Contains(t1.Id));
+        Assert.Contains(hid.Notas, n => n.Texto.Contains("a lâmina nos tubos e o remanso não são calculados"));
+        Assert.Contains(hid.Notas, n => n.Texto.StartsWith("Vazão máxima"));
+        // O dimensionamento é o do "Aplicar": o cálculo refeito com os diâmetros calculados, diante do diâmetro do modelo.
+        var dim = DrainageHydraulics.Calcular(defs, p, dimensionar: true);
+        var l1 = tela.Dimensionamento.Single(l => l.Id == t1.Id);
+        Assert.Equal(SituacaoDiametro.Aumentar, l1.Situacao);
+        Assert.Equal(dim.Trechos.Single(t => t.Id == t1.Id).DiametroNecessario, l1.DiametroCalculado);
+        Assert.Equal(0.40, l1.DiametroModelo);
+        var l2 = tela.Dimensionamento.Single(l => l.Id == t2.Id);
+        Assert.Equal(SituacaoDiametro.Reduzir, l2.Situacao);
+        Assert.Equal(2, tela.Mudam);
+        var sec = tela.Secao(CategoriaRede.Dimensionamento);
+        Assert.Equal(NivelSituacao.Aviso, sec.Situacao.Nivel);
+        Assert.Equal("1 trecho(s) abaixo do calculado, 1 acima.", sec.Situacao.Texto);
+        Assert.Contains(sec.Itens, i => i.Nivel == NivelSituacao.Aviso && i.Ids.Contains(t1.Id) && i.Texto.Contains("Ø 400 mm no modelo"));
+        Assert.Contains(sec.Itens, i => i.Nivel == NivelSituacao.Informacao && i.Ids.Contains(t2.Id) && i.Correcao.Contains("mantenha o do modelo"));
+        Assert.Contains(sec.Notas, n => n.Texto.Contains("responsabilidade técnica"));
+        Assert.Contains("Cálculo hidráulico feito pelo método racional; 2 trecho(s) com diâmetro diferente do calculado.", tela.Resumo);
+        Assert.Contains(tela.Secao(CategoriaRede.Geometria).Notas, n => n.Texto.Contains("o terreno projetado (Toposolid)"));
+        // Aplicados os diâmetros, nada muda mais.
+        t1.Diameter = l1.DiametroCalculado!.Value;
+        t2.Diameter = l2.DiametroCalculado!.Value;
+        var depois = RedeDrenagemTela.Montar(defs, p, null, true, null);
+        Assert.Equal(0, depois.Mudam);
+        Assert.Equal(NivelSituacao.Ok, depois.Secao(CategoriaRede.Dimensionamento).Situacao.Nivel);
+        Assert.DoesNotContain(depois.Secao(CategoriaRede.Hidraulica).Itens, i => i.Criterio == "capacidade");
+    }
+
+    [Fact]
+    public void TelaDaRede_NaJanelaENoComando()
+    {
+        var cmd = Ler("Commands", "DrainageNetworkCommands.cs");
+        var rede = cmd[cmd.IndexOf("public sealed class CmdRedeDrenagem", StringComparison.Ordinal)..cmd.IndexOf("public sealed class CmdMemorialDrenagem", StringComparison.Ordinal)];
+        Assert.Contains("RedeDrenagemTela.Montar(defs, p, superficie, terreno != null, TerrainModel.Ground(doc))", rede);
+        Assert.Contains("new DrainageNetworkWindow(tela, path, DateTime.Now)", rede);
+        Assert.Contains("uidoc.ShowElements(elems)", rede);
+        Assert.Contains("return ApplyDiameters(uidoc, defs, p);", rede);
+        Assert.DoesNotContain("AddCommandLink", rede);                             // a caixa de diálogo de antes saiu
+        var w = Ler("UI", "DrainageNetworkWindow.cs");
+        foreach (var t in new[] { "foreach (var s in tela.Secoes)", "\"Selecionar no modelo\"", "Aplicar os diâmetros calculados", "RedeDrenagemTela.Texto(",
+                     "\"Perfil\"", "\"Dispositivos\"", "Trechos medidos", "Planilha das galerias", "MessageBox.Show(this" })
+            Assert.Contains(t, w);
+        Assert.DoesNotMatch(@"""#[0-9A-Fa-f]{3,8}""", w);
+    }
+
     [Fact]
     public void GerenciadorDePavimento_NaJanelaENoComando()
     {

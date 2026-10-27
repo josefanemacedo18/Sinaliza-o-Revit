@@ -248,29 +248,18 @@ public sealed class CmdRedeDrenagem : CommandBase
         }
         var p = DrainageDesignStore.Load(doc);
         // Recobrimento sob a superfície acabada (vias do plugin e terreno projetado) – Etapa 6; antes, a reta entre as tampas.
-        var superficie = DrenagemDoModelo.SuperficieAcabada(defs, TerrainModel.Current(doc));
-        var trechos = DrainageNetwork.Analyze(defs, superficie);
-        var problemas = DrainageNetwork.Check(defs, p, superficie);
-        var hid = DrainageHydraulics.Calcular(defs, p);
-        problemas.AddRange(hid.Problemas);
-        // Drenagem × vias e terreno: captações lidas do modelo, pontos baixos sem captação e talvegues sob aterro.
-        var captacoes = DrenagemDoModelo.Captacoes(defs);
-        problemas.AddRange(DrenagemDoModelo.Divergencias(captacoes));
-        foreach (var pb in DrenagemDoModelo.PontosBaixosSemCaptacao(defs))
-            problemas.Add(new ProblemaRede(pb.Via, "ponto-baixo", $"Ponto baixo da sarjeta sem captação: {pb.Via}, lado {DrenagemDoModelo.Lado(pb.Lado)}, estaca {pb.EstacaTexto}.",
-                false, new[] { pb.ViaId }));
-        if (TerrainModel.Ground(doc) is { } natural)
-            foreach (var tv in DrenagemDoModelo.TalveguesSemTravessia(defs, natural))
-                problemas.Add(new ProblemaRede(tv.Via, "talvegue", $"Talvegue sob o aterro da {tv.Via}, estaca {tv.EstacaTexto} (aterro {tv.Aterro.ToString("0.0", UiHelpers.PtBr)} m): sem travessia da rede – a via represa a água.",
-                    false, new[] { tv.ViaId }));
+        var terreno = TerrainModel.Current(doc);
+        var superficie = DrenagemDoModelo.SuperficieAcabada(defs, terreno);
+        // A tela (Etapa 11; Interface §16): geometria, conectividade, parâmetros, cálculo hidráulico, dimensionamento e vias × terreno.
+        var tela = RedeDrenagemTela.Montar(defs, p, superficie, terreno != null, TerrainModel.Ground(doc));
         string? path = null;
         try
         {
             Directory.CreateDirectory(PluginPaths.Root);
             path = Path.Combine(PluginPaths.Root, $"rede-drenagem-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
-            var csv = DrainageNetwork.Csv(trechos, problemas, p) + (p.TemChuva ? "\n" + DrainageHydraulics.Csv(hid, p) : "") +
-                      "\n" + PerfilRede.Csv(PerfilRede.Linhas(defs, superficie), PerfilRede.Dispositivos(defs)) +
-                      (captacoes.Count > 0 ? "\n" + DrenagemDoModelo.Csv(captacoes) : "");
+            var csv = DrainageNetwork.Csv(tela.Trechos, tela.Problemas, p) + (p.TemChuva ? "\n" + DrainageHydraulics.Csv(tela.Hidraulica, p) : "") +
+                      "\n" + PerfilRede.Csv(tela.Perfil, tela.Dispositivos) +
+                      (tela.Captacoes.Count > 0 ? "\n" + DrenagemDoModelo.Csv(tela.Captacoes) : "");
             File.WriteAllText(path, csv, new UTF8Encoding(true));
         }
         catch (Exception ex)
@@ -279,44 +268,24 @@ public sealed class CmdRedeDrenagem : CommandBase
             path = null;
         }
 
-        var extensao = trechos.Sum(t => t.Comprimento);
-        var mudar = hid.Trechos.Where(t => t.DiametroNecessario is { } dn && Math.Abs(dn - t.Diametro) > 1e-6).ToList();
-        var resumo = p.TemChuva && hid.Trechos.Count > 0
-            ? $"Vazão máxima {hid.Trechos.Max(t => t.Vazao).ToString("N1", UiHelpers.PtBr)} L/s; {mudar.Count} trecho(s) com diâmetro diferente do calculado.\n"
-            : "";
-        var td = new TaskDialog(AppTitle)
+        var w = new DrainageNetworkWindow(tela, path, DateTime.Now);
+        if (UiHelpers.ShowModal(w) != true) return Result.Succeeded;
+        switch (w.Escolha)
         {
-            MainInstruction = $"Rede de drenagem: {trechos.Count} trecho(s), {extensao.ToString("N1", UiHelpers.PtBr)} m" +
-                              (problemas.Count == 0 ? " – nenhum problema." : $" – {problemas.Count} problema(s)."),
-            MainContent = resumo + string.Join("\n", problemas.Take(12).Select(x => "• " + x.Texto)) +
-                          (problemas.Count > 12 ? $"\n… e mais {problemas.Count - 12} no relatório." : "") +
-                          (p.TemChuva ? $"\n\nCritérios: {p.FonteTexto}." :
-                              "\n\nSem equação de chuva no Projeto de Drenagem: só a geometria foi conferida (vazões não calculadas).") +
-                          "\nRecobrimento medido sob a superfície acabada (vias do plugin e terreno). O relatório traz o perfil longitudinal da rede e as captações × modelo.",
-            FooterText = path != null ? $"Relatório: {path}" : "O relatório não pôde ser gravado (ver log).",
-        };
-        var ids = problemas.SelectMany(x => x.Ids ?? Array.Empty<string>()).ToHashSet();
-        var elems = ids.Count == 0 ? new List<ElementId>()
-            : MarkingStorage.All(doc).Where(s => ids.Contains(s.MarkingId)).Select(s => s.Element.Id).Distinct().ToList();
-        if (elems.Count > 0) td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, $"Selecionar os {elems.Count} elemento(s) com problema");
-        if (mudar.Count > 0)
-            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, $"Aplicar os diâmetros calculados ({mudar.Count} trecho(s))",
-                "Menor diâmetro comercial da lista do Projeto de Drenagem que escoa a vazão a seção plena. Os tubos são redesenhados.");
-        if (path != null) td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Abrir o relatório");
-        td.AddCommandLink(TaskDialogCommandLinkId.CommandLink4, "Projeto de Drenagem (chuva e critérios)");
-        td.CommonButtons = TaskDialogCommonButtons.Close;
-        switch (td.Show())
-        {
-            case TaskDialogResult.CommandLink1:
+            case DrainageNetworkWindow.Acao.Selecionar:
+                var ids = w.Ids.ToHashSet();
+                var elems = MarkingStorage.All(doc).Where(s => ids.Contains(s.MarkingId)).Select(s => s.Element.Id).Distinct().ToList();
+                if (elems.Count == 0)
+                {
+                    TaskDialog.Show(AppTitle, "Os elementos dessas linhas não estão no modelo (a marca não foi desenhada ou foi apagada).");
+                    break;
+                }
                 uidoc.Selection.SetElementIds(elems);
+                try { uidoc.ShowElements(elems); } catch { /* vista sem os elementos */ }
                 break;
-            case TaskDialogResult.CommandLink2:
+            case DrainageNetworkWindow.Acao.AplicarDiametros:
                 return ApplyDiameters(uidoc, defs, p);
-            case TaskDialogResult.CommandLink3 when path != null:
-                try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
-                catch (Exception ex) { Log.Error("Relatório da Rede – abrir", ex); }
-                break;
-            case TaskDialogResult.CommandLink4:
+            case DrainageNetworkWindow.Acao.ProjetoDrenagem:
                 CmdProjetoDrenagem.Edit(uidoc);
                 break;
         }
