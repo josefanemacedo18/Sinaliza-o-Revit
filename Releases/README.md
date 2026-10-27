@@ -46,6 +46,7 @@ desejada. `Instalar/Revit2027` tem sempre a versão mais recente.
 | Etapa 11 – Telas dos módulos (Fase XIII) | 2.17.0 | 2026-10-27 | `70d43af` | 3 075/3 075 | não executado – [`Etapa11`](Etapa11/RELEASE.md) |
 | Etapa 12 – Qualidade, quantitativos e configurações (Fase XIII) | 2.18.0 | 2026-10-27 | `9102a7b` | 3 123/3 123 | não executado – [`Etapa12`](Etapa12/RELEASE.md) |
 | Etapa 13 – Desempenho, validação e entrega (Fases XIII e XV) | 2.19.0 | 2026-10-27 | `fdb39c2` | 3 136/3 136 | não executado – [`Etapa13`](Etapa13/RELEASE.md) |
+| Etapa 15 – Defeitos críticos: travessias em trechos curtos e terreno sob as rampas (plano 2, itens 18 e 13; a Etapa 14 só teve documentos) | 2.20.0 | 2026-10-27 | `a62975c` | 3 145/3 145 | não executado – [`Etapa15`](Etapa15/RELEASE.md) |
 
 As fases I, II, IX e XI foram concluídas antes desta pasta existir. As DLLs delas estão no histórico do git, no commit
 indicado: `git show <commit>:Instalar/Revit2027/SinalizaBIM.dll > SinalizaBIM.dll`. As fases seguintes ganham uma linha

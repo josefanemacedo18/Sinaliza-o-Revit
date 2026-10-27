@@ -57,7 +57,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     seção 9 com sementes, passo, aquecimento e assinatura); **Fluxo integrado** no Autoteste (via → interseção →
     terraplenagem → drenagem → quantitativos → validação); **relatório técnico final** em `docs/RELATORIO_TECNICO.md`.
     Não executada no Revit (K27).
-  - `Instalar/Revit2027` tem a DLL 2.19.0. As anteriores continuam em `Releases/`.
+  - `Instalar/Revit2027` tem a DLL 2.20.0 (Etapa 15). As anteriores continuam em `Releases/`.
 - **Plano unificado concluído** (14 etapas, 2.8.0 a 2.19.0). Pendências abertas: F12 (cenários de projeto comparados por
   quantitativos), K14/K15 no Revit e tudo o que depende de rodar no Revit (K3, K17, K19, K23–K27).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
@@ -69,9 +69,14 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
 - Pedido do usuário em `docs/PROMPT_INFRAWORKS.md` (19 itens); plano em `docs/PLANO_DE_ACAO_2.md` (Etapas 14–26, D-032);
   referência do InfraWorks, com a fonte de cada ferramenta, em `docs/INFRAWORKS_REFERENCIA.md`.
 - Etapa 14 ✅ (só documentos, sem DLL): estudo do InfraWorks pela ajuda oficial, lacunas por matéria, plano.
-- **Próxima: Etapa 15** – defeitos críticos: geração excessiva de rampas, extensões e travessias em trechos curtos (item 18)
-  e terreno sobre a via nas rampas, calçadas e interseções (item 13), com regressão e o Autoteste conferindo nós, rampas e
-  calçadas.
+- Etapa 15 ✅: 2.20.0 em `Releases/Etapa15` (`a62975c`, 3 145/3 145) – D-033: trecho mínimo para travessia nas duas pontas
+  da quadra (item 18, `EspacamentoTravessias`: o nó mais importante fica com a travessia; 0 = em todos os ramos) e
+  plataforma da terraplenagem 5 cm abaixo do fundo de cada rampa, da via e dos nós (item 13, `InfraRoads.RampPads`); o
+  Autoteste confere rampas e nós contra o Toposolid. NÃO VALIDADO NO REVIT (K28).
+- **Próxima: Etapa 16** – esquinas: chanfro do lote pelos catetos, 1,50 m por padrão nas quadras novas (item 19); faixa
+  tátil da esquina paralela ao alinhamento predial, seguindo o chanfro, com alerta nas mudanças de direção (item 20);
+  esquina da extensão de calçada em chanfro e rampas alinhadas às travessias (item 12). Em andamento num worktree
+  (`/home/user/e16`, ramo local `e16-wip`): se o contêiner foi reciclado, recomeçar pelo PLANO_DE_ACAO_2 §3.
 
 ## Próxima tarefa (antes do plano 2)
 
