@@ -1,16 +1,19 @@
-using System.Diagnostics;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using SinalizacaoViaria.Core.Automation;
+using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Model;
 using SinalizacaoViaria.Revit.Infrastructure;
+using SinalizacaoViaria.Revit.UI;
 
 namespace SinalizacaoViaria.Revit.Commands;
 
 /// <summary>
 /// Validar Modelo: confere as definições gravadas no projeto (ModelValidator do núcleo) sem alterar nada – modo somente
-/// leitura. Mostra o resumo, grava o relatório em TXT e pode selecionar os elementos dos achados.
+/// leitura. Grava o relatório em TXT e a validação no histórico e abre a Central de Qualidade (Etapa 12): a tabela dos achados
+/// com filtros, os resolvidos desde a anterior, o estado dos resultados e o último Autoteste; a seleção escolhida lá volta ao
+/// modelo.
 /// </summary>
 [Transaction(TransactionMode.ReadOnly)]
 public sealed class CmdValidarModelo : CommandBase
@@ -37,8 +40,13 @@ public sealed class CmdValidarModelo : CommandBase
         catch (Exception ex) { Log.Error("Validar Modelo – histórico", ex); }
         var cmp = ValidationHistory.Comparar(achados, previous);
         // Estado dos resultados derivados (Etapa 8): terraplenagem, captações lidas do modelo e o que é refeito ou calculado na hora.
+        var defs = new List<MarkingDefinition>();
         IReadOnlyList<EstadoResultado>? estados = null;
-        try { estados = EstadoDosResultados.Calcular(MarkingStorage.Definitions(doc), EarthworkRecordStore.Load(doc)); }
+        try
+        {
+            defs = MarkingStorage.Definitions(doc);
+            estados = EstadoDosResultados.Calcular(defs, EarthworkRecordStore.Load(doc));
+        }
         catch (Exception ex) { Log.Error("Estado dos resultados", ex); }
         var text = ModelValidator.Report(achados, marcas, copias.Count, doc.Title, now, version, cmp, estados);
         string? path = null;
@@ -55,37 +63,40 @@ public sealed class CmdValidarModelo : CommandBase
             path = null;
         }
 
-        var problems = achados.Where(a => a.Severidade != Severidade.NaoVerificavel).ToList();
-        int Count(Severidade s) => achados.Count(a => a.Severidade == s);
-        var since = cmp.Anterior != null ? $" Desde a anterior: {cmp.Novos.Count} novo(s), {cmp.Resolvidos.Count} resolvido(s)." : "";
-        var td = new TaskDialog(AppTitle)
-        {
-            MainInstruction = problems.Count == 0
-                ? $"Nenhum problema em {marcas} marca(s) nas verificações que rodaram ({Count(Severidade.NaoVerificavel)} não verificada(s))."
-                : $"Validação: {Count(Severidade.Erro)} erro(s), {Count(Severidade.Aviso)} aviso(s), {Count(Severidade.Info)} informação(ões), " +
-                  $"{Count(Severidade.NaoVerificavel)} não verificada(s).{since}",
-            MainContent = string.Join("\n", problems.Take(12).Select(a => $"• [{a.Codigo} · {a.Modulo}] {a.Mensagem}")) +
-                          (problems.Count > 12 ? $"\n… e mais {problems.Count - 12} no relatório." : "") +
-                          (Count(Severidade.NaoVerificavel) > 0 ? "\n\nNão verificado: " + string.Join(" ", achados.Where(a => a.Severidade == Severidade.NaoVerificavel).Select(a => a.Mensagem)) : "") +
-                          "\n\nNada foi alterado no projeto.",
-            ExpandedContent = text,
-            FooterText = path != null ? $"Relatório: {path}" : "O relatório não pôde ser gravado (ver log).",
-        };
-        var ids = achados.Where(a => a.Severidade is Severidade.Erro or Severidade.Aviso)
-            .SelectMany(a => a.Ids).Distinct()
-            .SelectMany(id => elements.TryGetValue(id, out var l) ? l : new List<ElementId>())
+        // Central de Qualidade: as marcas pelo nome (tipo e código); a que tem elementos mas não se lê é dita ilegível, não apagada.
+        var nomes = new Dictionary<string, string>();
+        foreach (var d in defs) nomes.TryAdd(d.Id, $"{d.KindName} {d.DisplayCode}");
+        string? Nome(string id) => nomes.TryGetValue(id, out var n) ? n
+            : elements.ContainsKey(id) ? $"{(id.Length > 8 ? id[..8] : id)} (dados ilegíveis)" : null;
+        var resumo = CentralQualidade.Montar(achados, previous, Nome, doc.Title, now, version, marcas, copias.Count);
+        var w = new QualityCenterWindow(resumo, path, estados, UltimoAutoteste());
+        if (UiHelpers.ShowModal(w) != true || w.Ids.Count == 0) return Result.Succeeded;
+        var ids = w.Ids.SelectMany(id => elements.TryGetValue(id, out var l) ? l : new List<ElementId>())
             .Where(id => doc.GetElement(id) != null).Distinct().ToList();
-        if (ids.Count > 0) td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, $"Selecionar os {ids.Count} elemento(s) com erro ou aviso");
-        if (path != null) td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Abrir o relatório");
-        td.CommonButtons = TaskDialogCommonButtons.Close;
-        var r = td.Show();
-        if (r == TaskDialogResult.CommandLink1) uidoc.Selection.SetElementIds(ids);
-        else if (r == TaskDialogResult.CommandLink2 && path != null)
+        if (ids.Count == 0)
         {
-            try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
-            catch (Exception ex) { Log.Error("Validar Modelo – abrir relatório", ex); }
+            TaskDialog.Show(AppTitle, "Os elementos dessas linhas não estão no modelo (a marca foi apagada ou não tem elementos).");
+            return Result.Succeeded;
         }
+        uidoc.Selection.SetElementIds(ids);
+        try { uidoc.ShowElements(ids); } catch { /* vista sem os elementos */ }
         return Result.Succeeded;
+    }
+
+    /// <summary>O relatório mais recente do Autoteste neste computador (testes do plugin); nulo se não há ou não se lê.</summary>
+    internal static ResumoAutoteste? UltimoAutoteste()
+    {
+        try
+        {
+            if (!Directory.Exists(PluginPaths.Root)) return null;
+            var arquivo = RelatorioAutoteste.MaisRecente(Directory.GetFiles(PluginPaths.Root, "autoteste-*.txt"));
+            return arquivo == null ? null : RelatorioAutoteste.Ler(arquivo, File.ReadAllText(arquivo));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Validar Modelo – Autoteste", ex);
+            return null;
+        }
     }
 
     /// <summary>Arquivo da última validação do projeto, pelo caminho do arquivo (ou pelo título, se ainda não foi salvo).</summary>

@@ -253,11 +253,13 @@ public static class RibbonBuilder
         // ---------------------------------------------------------------- Análise
         var analise = Panel(app, TabName, "Análise");
         Large(analise, Data(typeof(CmdValidarModelo), "Validar Modelo", "validar",
-            "Confere o projeto sem alterar nada (V01 a V17) e mostra o estado dos resultados derivados.",
+            "Confere o projeto sem alterar nada (V01 a V17) e abre a Central de Qualidade com os achados.",
             "Dados ilegíveis ou de versão mais nova, cópias divergentes, referências quebradas, dependências circulares, elementos do Revit apagados, " +
             "contornos inválidos, quadras e lotes, interseções, traçado e greide (limites informados), drenagem, topografia, terraplenagem desatualizada, " +
             "parcelamento e resultados lidos do modelo que ficaram desatualizados. Cada achado traz módulo, severidade, confiança, ação recomendada e se pede " +
-            "revisão humana; o que não pôde ser conferido aparece como não verificado. O relatório é gravado em TXT e comparado com a validação anterior."));
+            "revisão humana; o que não pôde ser conferido aparece como não verificado. O relatório é gravado em TXT e comparado com a validação anterior; " +
+            "na Central, a tabela filtra por categoria, gravidade, estado (novo, persistente) e texto, exporta em CSV, lista os resolvidos e seleciona os elementos no modelo; " +
+            "abas próprias mostram o estado dos resultados derivados e o último Autoteste (testes do plugin, separados do diagnóstico do modelo)."));
         Split(analise, "SvTrafego", "Tráfego",
             Data(typeof(CmdSimuladorTrafego), "Simulador de Tráfego", "trafego",
                 "Capacidade e nível de serviço (HCM) de cruzamentos e trechos, semáforos, microssimulação e diagnóstico.",
