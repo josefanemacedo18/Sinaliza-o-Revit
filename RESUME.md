@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-27 (Etapas 0–13 entregues: plano unificado concluído)
+## Estado em 2026-10-27 (plano unificado concluído – Etapas 0–13; plano 2 – Etapas 14–16 entregues)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -57,7 +57,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     seção 9 com sementes, passo, aquecimento e assinatura); **Fluxo integrado** no Autoteste (via → interseção →
     terraplenagem → drenagem → quantitativos → validação); **relatório técnico final** em `docs/RELATORIO_TECNICO.md`.
     Não executada no Revit (K27).
-  - `Instalar/Revit2027` tem a DLL 2.20.0 (Etapa 15). As anteriores continuam em `Releases/`.
+  - `Instalar/Revit2027` tem a DLL 2.21.0 (Etapa 16). As anteriores continuam em `Releases/`.
 - **Plano unificado concluído** (14 etapas, 2.8.0 a 2.19.0). Pendências abertas: F12 (cenários de projeto comparados por
   quantitativos), K14/K15 no Revit e tudo o que depende de rodar no Revit (K3, K17, K19, K23–K27).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
@@ -73,10 +73,15 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
   da quadra (item 18, `EspacamentoTravessias`: o nó mais importante fica com a travessia; 0 = em todos os ramos) e
   plataforma da terraplenagem 5 cm abaixo do fundo de cada rampa, da via e dos nós (item 13, `InfraRoads.RampPads`); o
   Autoteste confere rampas e nós contra o Toposolid. NÃO VALIDADO NO REVIT (K28).
-- **Próxima: Etapa 16** – esquinas: chanfro do lote pelos catetos, 1,50 m por padrão nas quadras novas (item 19); faixa
-  tátil da esquina paralela ao alinhamento predial, seguindo o chanfro, com alerta nas mudanças de direção (item 20);
-  esquina da extensão de calçada em chanfro e rampas alinhadas às travessias (item 12). Em andamento num worktree
-  (`/home/user/e16`, ramo local `e16-wip`): se o contêiner foi reciclado, recomeçar pelo PLANO_DE_ACAO_2 §3.
+- Etapa 16 ✅: 2.21.0 em `Releases/Etapa16` (`0ef734a`, 3 163/3 163) – D-034: chanfro do lote pelos catetos, 1,50 m em
+  cada lado nas quadras novas (padrão do loteamento, `Reconhecimento.ComChanfroPadrao`; as gravadas abrem iguais) – item 19;
+  faixa tátil da esquina paralela ao alinhamento predial, seguindo o chanfro, alerta nas quinas, corte da quina com 0,60 m
+  lisos da pista (`IntersectionGenerator.AlignmentCorner`; opção de voltar à curva do meio-fio) e faixa junto ao acesso
+  (opção da via) – item 20; esquina da extensão de calçada em chanfro (`ShiftCorner`) e rampas no eixo das travessias
+  conferidas – item 12. NÃO VALIDADO NO REVIT (K30); achado K29 (rampa além da faixa direcional não liga à rede).
+- **Próxima: Etapa 17** – rampas como Pisos (item 2: categoria Pisos, inclinação, abas e recortes, nos quantitativos e na
+  conferência piso × terreno) e materiais realistas (item 1: ativo de aparência coerente e escala real, sem mudar a cor de
+  Cores consistentes) – PLANO_DE_ACAO_2 §3. Conferir na ajuda da API 2027 cada método antes de usar (Toposolid não é Floor).
 
 ## Próxima tarefa (antes do plano 2)
 
