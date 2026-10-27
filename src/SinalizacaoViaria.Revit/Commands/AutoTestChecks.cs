@@ -278,7 +278,28 @@ internal sealed partial class AutoTestRunner
             if (edge.Pontos > edge.Conferidos * 0.1) s.Error(edge.Texto + ".");
             else s.Warn(edge.Texto + ".");
         }
+        // 4) Rampas e nós que a via toca (Etapa 15, item 13): o terreno não pode passar do topo. A conferência acima pula os nós,
+        //    e o pé das rampas fica a milímetros do fundo delas – o terreno aparecia por cima sem nenhum aviso.
+        if (box == null) return;
+        bool Toca(StoredMarking r) => r.Element.get_BoundingBox(null) is { } b && AutoTestGeo.Overlap(b, box);
+        var rampas = all.Where(r => r.Definition is RampDefinition && Toca(r)).ToList();
+        var noRampa = rampas.SelectMany(r => AutoTestGeo.TopSamples(r.Element, 24)
+            .Select(t => new AmostraPiso(t.P, t.Z, null, "rampa " + r.Definition.DisplayCode, r.MarkingId))).ToList();
+        var rampAchados = FloorTerrainCheck.Pisos(noRampa, terrain, 0.0);
+        s.Note($"Terreno × rampas: {noRampa.Count} ponto(s) no topo de {rampas.Select(r => r.MarkingId).Distinct().Count()} rampa(s) – o terreno não pode passar do topo.");
+        foreach (var a in rampAchados) s.Error(a.Texto + ".");
+        var nos = nodes.Where(n => Toca(n) && _nosConferidos.Add(n.MarkingId + "|" + n.Element.Id)).ToList();
+        if (nos.Count == 0) return;
+        var noNo = nos.SelectMany(n => AutoTestGeo.TopSamples(n.Element, 64)
+            .Select(t => new AmostraPiso(t.P, t.Z, null, "nó " + n.Definition.DisplayCode, n.MarkingId))).ToList();
+        var noAchados = FloorTerrainCheck.Pisos(noNo, terrain);
+        s.Note($"Terreno × nós: {noNo.Count} ponto(s) no topo dos pisos de {nos.Select(n => n.MarkingId).Distinct().Count()} nó(s) " +
+               $"(tolerância {FloorTerrainCheck.Tolerancia * 100:0} cm).");
+        foreach (var a in noAchados) s.Error(a.Texto + ".");
     }
+
+    /// <summary>Pisos de nós já conferidos contra o terreno (cada um uma vez, mesmo tocando várias vias).</summary>
+    private readonly HashSet<string> _nosConferidos = new();
 
     private static BoundingBoxXYZ? Box(IEnumerable<Element> els)
     {

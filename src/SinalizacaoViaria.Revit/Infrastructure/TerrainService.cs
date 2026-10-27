@@ -156,6 +156,18 @@ public static class TerrainService
                 }
                 foreach (var c in roadCorr) c.Owner = road.Id;
                 corridors.AddRange(roadCorr.Select(c => c.WithOffset(z0)));
+                // Rampas da via (do grupo dela ou sobre a calçada dela, fora dos nós): plataforma própria abaixo do fundo (Etapa 15).
+                if (g != null && all != null)
+                {
+                    var surf = service?.SurfaceFor(road, axis) ?? new Core.Geometry.GradeSurface(axis, g);
+                    var deNos = ChildrenOfNodes(all);
+                    var reach = Math.Max(left, -right) + 0.5;
+                    var ramps = all.OfType<RampDefinition>().Where(r => !deNos.Contains(r.Id)).Select(r => (Def: r, Path: PathResolver.Resolve(doc, r.Path)?.Main))
+                        .Where(x => x.Path is { Points.Count: >= 2 } && (x.Def.GroupId != null && x.Def.GroupId == road.GroupId
+                                    || Core.Generators.IntersectionGenerator.Project(axis, x.Path.Points[0]) is var pr && pr.Distance <= reach && pr.Station >= s0 && pr.Station <= s1))
+                        .Select(x => (Core.Generators.RampGenerator.Footprint(x.Def, x.Path!), (Func<Vec2, double>)(q => surf.Z(q) + z0)));
+                    pads.AddRange(InfraRoads.RampPads(ramps, roadCorr.SelectMany(c => c.Paved).ToList(), road.Id));
+                }
                 break;
             }
             case IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition:
@@ -170,6 +182,17 @@ public static class TerrainService
                 var depth = EarthworkRecord.ProfundidadeDoNo(def, all ?? Array.Empty<MarkingDefinition>(), opt.Subgrade);
                 // Por camadas: estrutura sob a pista do nó, fundo das lajes sob calçadas e ilhas, topo das calçadas na quina do lote.
                 var (paved, rise) = InfraRoads.PadLayers(onGround);
+                // Rampas das travessias do nó (filhas dele): plataforma própria abaixo do fundo, antes da do nó (Etapa 15). A
+                // geometria do nó tira o corpo das rampas da calçada; sem isto o terreno ali ficava no fundo da laje – o mesmo
+                // nível do pé da rampa – ou, fora das faixas das vias, sem plataforma nenhuma.
+                if (all != null && service != null)
+                {
+                    var filhos = def switch { IntersectionDefinition it => it.ChildIds, RoundaboutDefinition rb => rb.ChildIds, _ => new List<string>() };
+                    var ramps = all.OfType<RampDefinition>().Where(r => filhos.Contains(r.Id)).Select(r => (Def: r, Path: PathResolver.Resolve(doc, r.Path)?.Main))
+                        .Where(x => x.Path is { Points.Count: >= 2 })
+                        .Select(x => (Core.Generators.RampGenerator.Footprint(x.Def, x.Path!), service.MemberSurface(x.Def) ?? (node != null ? node.Z : (Func<Vec2, double>)(_ => z0))));
+                    pads.AddRange(InfraRoads.RampPads(ramps, paved, def.Id));
+                }
                 foreach (var u in union.Where(u => u.Area > 1))
                 {
                     var pad = new GradePad(u, z0 - depth)
@@ -211,6 +234,10 @@ public static class TerrainService
         }
         return (corridors, pads);
     }
+
+    /// <summary>Marcas geradas pelos nós (interseções e rotatórias) – as rampas delas entram pelo nó, não pela via.</summary>
+    private static HashSet<string> ChildrenOfNodes(IReadOnlyCollection<MarkingDefinition> all) =>
+        all.OfType<IntersectionDefinition>().SelectMany(i => i.ChildIds).Concat(all.OfType<RoundaboutDefinition>().SelectMany(r => r.ChildIds)).ToHashSet();
 
     /// <summary>
     /// Opções da última terraplenagem aplicada (registro, Etapa 5): subleito, taludes padrão, alcance e homogeneização. Sem

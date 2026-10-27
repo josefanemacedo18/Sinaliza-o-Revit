@@ -417,6 +417,32 @@ public static class InfraRoads
     }
 
     /// <summary>
+    /// Folga entre o terreno e o fundo de uma rampa (m; padrão do plugin, sem norma citada). Sob a calçada o terreno fica no
+    /// fundo da laje, que é também o fundo da rampa; o pé dela tem milímetros de espessura (a placa do rebaixamento total, 5 mm)
+    /// e a triangulação do Toposolid pode passar até <see cref="TerrainRebuild.RefineTolerance"/> acima da superfície de projeto:
+    /// o terreno aparecia por cima da rampa (Etapa 15, item 13 do pedido de 2026-10-27). Com a folga o terreno fica abaixo
+    /// mesmo com o erro da triangulação.
+    /// </summary>
+    public const double FolgaSobRampas = 0.05;
+
+    /// <summary>
+    /// Plataformas sob as rampas: a área de cada uma (fora da pista, onde o terreno já está no fundo da estrutura), sem talude,
+    /// <see cref="FolgaSobRampas"/> abaixo do fundo dela (<c>Bottom</c>, cota absoluta). Entram antes das plataformas do nó: na
+    /// terraplenagem a primeira plataforma que contém o ponto vale.
+    /// </summary>
+    public static List<GradePad> RampPads(IEnumerable<(Polygon2 Area, Func<Vec2, double> Bottom)> ramps, IReadOnlyCollection<Polygon2> paved, string? owner)
+    {
+        var res = new List<GradePad>();
+        foreach (var (area, bottom) in ramps)
+        {
+            var parts = paved.Count == 0 ? new List<Polygon2> { area } : PolygonOps.Difference(new[] { area }, paved);
+            foreach (var a in parts.Where(a => a.Area > 0.01))
+                res.Add(new GradePad(a, 0) { Daylight = false, Label = "Rampa", ZAt = q => bottom(q) - FolgaSobRampas, Owner = owner });
+        }
+        return res;
+    }
+
+    /// <summary>
     /// Camadas de uma plataforma de nó a partir das peças no chão: pista = peças rentes à pista (pavimento, sarjeta – topo abaixo
     /// de 5 cm; a pintura não conta), onde fica a estrutura do pavimento; o resto (calçadas, meios-fios, ilhas, canteiros) fica no fundo
     /// das lajes. <c>EdgeRise</c> dá o topo da peça elevada junto ao ponto (o acabamento no contorno externo).
