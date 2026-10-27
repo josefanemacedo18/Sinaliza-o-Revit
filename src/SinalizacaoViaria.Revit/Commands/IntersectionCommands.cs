@@ -11,6 +11,16 @@ namespace SinalizacaoViaria.Revit.Commands;
 
 internal static class IntersectionForms
 {
+    /// <summary>Cópia da interseção com os nós vizinhos do projeto (regra do trecho mínimo das travessias, Etapa 15).</summary>
+    private static IntersectionDefinition ComVizinhos(IntersectionDefinition copia, IReadOnlyCollection<MarkingDefinition>? all)
+    {
+        if (all != null) copia.NeighborCrossings = EspacamentoTravessias.Vizinhos(copia, all, copia.Node);
+        return copia;
+    }
+
+    private static IntersectionDefinition ComVizinhos(IntersectionDefinition copia, Document? doc) =>
+        doc == null ? copia : ComVizinhos(copia, MarkingStorage.Definitions(doc));
+
     /// <summary>Via disponível para ser a preferencial (edição).</summary>
     public sealed record RoadOption(string Id, string Label);
 
@@ -28,7 +38,7 @@ internal static class IntersectionForms
         IntersectionLayout? legsLayout = null;
         if (real != null)
         {
-            try { legsLayout = IntersectionGenerator.Layout((IntersectionDefinition)MarkingDefinition.FromJson(d.ToJson())!, real.Roads); }
+            try { legsLayout = IntersectionGenerator.Layout(ComVizinhos((IntersectionDefinition)MarkingDefinition.FromJson(d.ToJson())!, doc), real.Roads); }
             catch (Exception ex) { Log.Error("Ramos da interseção", ex); }
             if (legsLayout is { IsBend: true } || legsLayout?.Legs.Count < 3) legsLayout = null;
         }
@@ -104,7 +114,7 @@ internal static class IntersectionForms
             IntersectionLayout? lay = null;
             if (real != null)
             {
-                try { lay = IntersectionGenerator.Layout((IntersectionDefinition)MarkingDefinition.FromJson(json)!, real.Roads); }
+                try { lay = IntersectionGenerator.Layout(ComVizinhos((IntersectionDefinition)MarkingDefinition.FromJson(json)!, all), real.Roads); }
                 catch (Exception ex) { Log.Error("Interseção – arranjo das seções", ex); }
             }
             var c = FormularioNo.Intersecao(d, all!.Any(x => x.Id == d.Id), lay, all!, registro);
@@ -131,6 +141,9 @@ internal static class IntersectionForms
          .Check("Faixas de pedestres em cada ramo", () => d.Crosswalks, v => d.Crosswalks = v)
          .Number("Largura da faixa de pedestres (m)", () => d.CrosswalkWidth, v => d.CrosswalkWidth = v, 3, 10)
          .Number("Recuo da faixa a partir do fim da curva (m)", () => d.CrosswalkSetback, v => d.CrosswalkSetback = v, 0, 20)
+         .Number("Trecho mínimo para travessia nas duas pontas da quadra (m) – 0 = em todos os ramos", () => d.TravessiaTrechoMinimo,
+             v => d.TravessiaTrechoMinimo = v, 0, 400,
+             tooltip: "Padrão do plugin (sem norma citada): num trecho mais curto até a interseção ou rotatória vizinha na mesma via, a travessia, as rampas e as extensões do lado contínuo ficam só num dos dois nós – o de mais vias ou controle mais forte. O ajuste do ramo (Sim/Não) vale mais.")
          .Check("Esquinas com a mesma composição das calçadas das vias (meio-fio + faixa gramada + passeio)", () => d.MatchRoadSection, v => d.MatchRoadSection = v,
              "Repete nas esquinas a faixa de serviço gramada definida na seção das vias que se cruzam, alinhando o desenho com as vias.");
 

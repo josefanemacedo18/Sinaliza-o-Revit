@@ -1750,6 +1750,16 @@ public sealed class IntersectionDefinition : MarkingDefinition
     /// orelha exige (com aviso). Projetos salvos guardam o valor que tinham.
     /// </summary>
     public double CrosswalkSetback { get; set; } = 0.0;
+    /// <summary>
+    /// Trecho mínimo entre esquinas para ter travessia nas duas pontas (m; padrão do plugin, sem norma citada). Num trecho mais
+    /// curto até a interseção ou rotatória vizinha na mesma via, só um dos dois nós faz a travessia sobre ela – com as rampas e
+    /// as extensões do lado contínuo (<see cref="Generators.EspacamentoTravessias"/>). 0 = travessia em todos os ramos, como
+    /// antes. O ajuste do ramo ("Sim"/"Não") vale mais que esta regra.
+    /// </summary>
+    public double TravessiaTrechoMinimo { get; set; } = Generators.EspacamentoTravessias.TrechoMinimoPadrao;
+    /// <summary>Nós vizinhos com travessias (para a regra do trecho mínimo). Lido do projeto a cada geração; não gravado.</summary>
+    [JsonIgnore]
+    public List<Generators.NoVizinho> NeighborCrossings { get; set; } = new();
     public bool StopLines { get; set; } = true;
     public bool Ramps { get; set; } = true;
     /// <summary>Esquinas com a mesma composição da calçada das vias (meio-fio + faixa de serviço gramada + passeio).</summary>

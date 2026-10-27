@@ -867,7 +867,12 @@ public static partial class IntersectionGenerator
     }
 
     /// <summary>O ramo tem faixa de pedestres.</summary>
-    public static bool CrosswalkOn(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) => LegSet(d, L, leg)?.Crosswalk ?? d.Crosswalks;
+    /// <summary>
+    /// A travessia do ramo: o ajuste do ramo ("Sim"/"Não") ou a opção geral, menos os ramos de trecho curto em que a
+    /// travessia fica no nó vizinho (<see cref="EspacamentoTravessias"/>).
+    /// </summary>
+    public static bool CrosswalkOn(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
+        LegSet(d, L, leg)?.Crosswalk ?? (d.Crosswalks && !EspacamentoTravessias.Suprimida(d, L, leg));
 
     /// <summary>Largura da faixa de pedestres do ramo (m).</summary>
     public static double CrosswalkWidthOf(IntersectionDefinition d, IntersectionLayout L, IntersectionLeg leg) =>
@@ -2210,7 +2215,12 @@ public static partial class IntersectionGenerator
 
     public static MarkingGeometry Build(IntersectionDefinition d, BuildContext ctx)
     {
-        if (ctx.AllDefinitions != null) d.ChanfrosLote = Parcelamento.LotDivider.Triangulos(ctx.AllDefinitions(), d.Node);
+        if (ctx.AllDefinitions != null)
+        {
+            var all = ctx.AllDefinitions();
+            d.ChanfrosLote = Parcelamento.LotDivider.Triangulos(all, d.Node);
+            d.NeighborCrossings = EspacamentoTravessias.Vizinhos(d, all, d.Node);
+        }
         var roads = ResolveRoads(d, ctx);
         var L = Layout(d, roads);
         var geo = new MarkingGeometry();

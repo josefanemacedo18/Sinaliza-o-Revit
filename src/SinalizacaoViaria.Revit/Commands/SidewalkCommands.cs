@@ -559,6 +559,7 @@ internal static class IntersectionEarEdit
         var doc = uidoc.Document;
         var svc = new IntersectionService(doc, new MarkingService(doc, uidoc.ActiveView));
         var roads = svc.Roads();
+        List<MarkingDefinition>? todas = null;
         foreach (var it in (only != null ? new[] { only } : MarkingStorage.Definitions<IntersectionDefinition>(doc).ToArray())
                      .OrderBy(i => i.Node.DistanceTo(p)))
         {
@@ -567,7 +568,9 @@ internal static class IntersectionEarEdit
             if (rs.Count < 2) continue;
             try
             {
-                var L = IntersectionGenerator.Layout((IntersectionDefinition)MarkingDefinition.FromJson(it.ToJson())!, rs);
+                var copia = (IntersectionDefinition)MarkingDefinition.FromJson(it.ToJson())!;
+                copia.NeighborCrossings = EspacamentoTravessias.Vizinhos(copia, todas ??= MarkingStorage.Definitions(doc), copia.Node);
+                var L = IntersectionGenerator.Layout(copia, rs);
                 if (L.IsBend || L.Legs.Count < 3) continue;
                 if (only == null && !L.Zone.Contains(p) && L.Zone.Outer.Min(v => v.DistanceTo(p)) > 15) continue;
                 return (it, L);

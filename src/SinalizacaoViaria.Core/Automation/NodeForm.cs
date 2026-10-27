@@ -134,6 +134,17 @@ public static class FormularioNo
                     ? L(NivelSituacao.Aviso, $"Menor ângulo entre as vias: {M(menor, "0")}°, abaixo de {lim.Rotulo}.")
                     : L(NivelSituacao.Ok, $"Menor ângulo entre as vias: {M(menor, "0")}° (limite de conferência: {lim.ValorTexto})."));
             }
+            // Travessias que ficam no nó vizinho pelo trecho mínimo (Etapa 15): o projetista vê quais e por quê, e pode manter.
+            var def = layout.Definition ?? d;
+            if (d.Crosswalks && !layout.IsBend)
+                for (var k = 0; k < layout.Legs.Count; k++)
+                {
+                    var leg = layout.Legs[k];
+                    if (IntersectionGenerator.LegSet(def, layout, leg)?.Crosswalk != null) continue;
+                    if (EspacamentoTravessias.Suprimida(def, layout, leg, out var motivo))
+                        vias.Add(L(NivelSituacao.Informacao, $"Ramo {k + 1} ({layout.Roads[leg.Road].Def.DisplayCode}) sem travessia – {motivo}. " +
+                            "Para manter, marque \"Sim\" em Faixa de pedestres neste ramo ou mude o trecho mínimo."));
+                }
         }
         else if (existente) vias.Add(L(NivelSituacao.NaoVerificado, "Os ângulos entre os ramos saem do arranjo com as vias do projeto, que não pôde ser calculado aqui."));
 
