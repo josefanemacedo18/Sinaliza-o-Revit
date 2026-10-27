@@ -48,12 +48,18 @@ public static class LotForms
             .Choice("Área remanescente", RemanescenteOptions, () => lot.Remanescente, v => lot.Remanescente = v);
     }
 
-    /// <summary>Frente e área mínimas do lote (informadas no projeto – conferir na legislação aplicável).</summary>
+    /// <summary>Frente e área mínimas do lote (informadas no projeto – conferir na legislação aplicável) e o chanfro das quadras novas.</summary>
     private static FormWindow Minimos(FormWindow w, LoteamentoDefinition lot) => w
         .Section("Lote mínimo", "Valores informados no projeto (padrão 5 m e 125 m²) – conferir na Lei Federal nº 6.766/1979 e na lei municipal [a confirmar]. " +
                                 "A sobra de testada só vira lote quando atinge os dois; lotes abaixo deles são avisados.")
         .Number("Frente mínima (m)", () => lot.FrenteMinimaLote, v => lot.FrenteMinimaLote = v, 0, 100)
-        .Number("Área mínima (m²)", () => lot.AreaMinimaLote, v => lot.AreaMinimaLote = v, 0, 100000);
+        .Number("Área mínima (m²)", () => lot.AreaMinimaLote, v => lot.AreaMinimaLote = v, 0, 100000)
+        .Section("Chanfro das esquinas", "As quadras novas (reconhecidas pelas vias) nascem com as quinas das esquinas chanfradas, medidas " +
+                                         "sobre os limites do lote em cada lado; a calçada da interseção ocupa o chanfro. Padrão 1,50 m, " +
+                                         "informado pelo usuário – conferir no código de obras ou na lei municipal [a confirmar]. As quadras " +
+                                         "que já existem ficam como estão (cada quadra e cada esquina se ajustam em Quadra).")
+        .Number("Chanfro das quadras novas – em cada lado, sobre os limites (m; 0 = sem chanfro)", () => lot.ChanfroQuadrasNovas,
+            v => lot.ChanfroQuadrasNovas = v, 0, 30);
 
     public static readonly (string Label, bool Value)[] SentidoOptions = { ("Horário", true), ("Anti-horário", false) };
 
@@ -85,7 +91,7 @@ public static class LotForms
     {
         List<QuadraDefinition> Quadras() => rec.Quadras.Select(r =>
         {
-            var q = Reconhecimento.NovaQuadra(r, lot, opt.Frente, opt.Profundidade);
+            var q = Reconhecimento.ComChanfroPadrao(Reconhecimento.NovaQuadra(r, lot, opt.Frente, opt.Profundidade), lot);
             q.Sobra = opt.Sobra;
             q.Miolo = opt.Miolo;
             q.SentidoHorario = opt.SentidoHorario;
@@ -132,9 +138,15 @@ public static class LotForms
 
     private static readonly (string Label, int Value)[] ChanfroEsquinaOptions =
     {
-        ("A face da quadra", 0),
+        ("A medida da quadra", 0),
         ("Sem chanfro nesta quina", 1),
-        ("Face própria", 2),
+        ("Medida própria", 2),
+    };
+
+    private static readonly (string Label, MedidaChanfro Value)[] MedidaChanfroOptions =
+    {
+        ("Em cada lado, sobre os limites do lote (catetos)", MedidaChanfro.Catetos),
+        ("Pela face do chanfro (hipotenusa)", MedidaChanfro.Face),
     };
 
     /// <summary>
@@ -144,8 +156,9 @@ public static class LotForms
     public static FormWindow Quadra(QuadraDefinition q, LoteamentoDefinition? lot, Action<AcaoQuadra> acao, Func<Vec2, double?>? calcada = null)
     {
         var div = LotDivider.Divide(q, lot);
-        // Face do chanfro ainda não dada: a largura da calçada mais comum nas esquinas (as quinas com outra calçada ficam com a delas).
-        var prefill = q.ChanfroFace <= 0.05;
+        // Face do chanfro ainda não dada (medida pela face): a largura da calçada mais comum nas esquinas (as quinas com outra
+        // calçada ficam com a delas). Pelos catetos, a medida é a da quadra (1,50 m nas quadras novas).
+        var prefill = q.ChanfroMedida == MedidaChanfro.Face && q.ChanfroFace <= 0.05;
         if (prefill)
         {
             var larguras = div.Esquinas.Select(e => calcada?.Invoke(e.Ponto)).Where(x => x is > 0.05).Select(x => Math.Round(x!.Value, 2)).ToList();
@@ -177,10 +190,14 @@ public static class LotForms
             .Choice("Miolo da quadra (atrás dos lotes)", MioloOptions, () => q.Miolo, v => q.Miolo = v)
             .Choice("Categoria do miolo (área própria ou o que nenhum lote alcança)", CategoryOptions(lot), () => q.MioloCategoria, v => q.MioloCategoria = v)
             .Section("Chanfro das quinas", "Nas esquinas entre duas testadas a quina do lote de esquina sai em chanfro: a face (cotada no " +
-                                           "detalhamento) é descontada da área do lote e a calçada da interseção ocupa o triângulo. O padrão " +
-                                           "é a largura da calçada; cada esquina pode ter a sua (em Esquinas).")
+                                           "detalhamento) é descontada da área do lote e a calçada da interseção ocupa o triângulo. A medida " +
+                                           "é o recuo sobre cada limite do lote (1,50 m nas quadras novas, informado pelo usuário – conferir " +
+                                           "na lei municipal) ou a face; cada esquina pode ter a sua (em Esquinas).")
             .Check("Chanfrar as quinas das esquinas", () => q.Chanfro, v => q.Chanfro = v)
-            .If(() => q.Chanfro, f => f.Number("Face do chanfro (m)", () => q.ChanfroFace, v => q.ChanfroFace = v, 0.1, 30))
+            .If(() => q.Chanfro, f => f
+                .Choice("Medida do chanfro", MedidaChanfroOptions, () => q.ChanfroMedida, v => q.ChanfroMedida = v)
+                .If(() => q.ChanfroMedida == MedidaChanfro.Catetos, g => g.Number("Recuo em cada lado, sobre os limites (m)", () => q.ChanfroCateto, v => q.ChanfroCateto = v, 0.1, 30))
+                .If(() => q.ChanfroMedida == MedidaChanfro.Face, g => g.Number("Face do chanfro (m)", () => q.ChanfroFace, v => q.ChanfroFace = v, 0.1, 30)))
             .Section("Numeração", "De 1 a N nesta quadra; institucionais e áreas verdes com prefixo (AI-1, AV-1).")
             .Choice("Sentido", SentidoOptions, () => q.SentidoHorario, v => q.SentidoHorario = v)
             .Hint(q.LoteInicial == null ? "Lote 1: o lote de esquina mais a noroeste." : $"Lote 1: {q.LoteInicial}.")
@@ -230,13 +247,14 @@ public static class LotForms
                     ($"Testada {e.Posterior}", ModoEsquina.TestadaPosterior),
                     ("Medida própria", ModoEsquina.MedidaPropria),
                 };
-                // Chanfro nesta quina: o da quadra (nulo), nenhum (0) ou face própria.
+                // Chanfro nesta quina: o da quadra (nulo), nenhum (0) ou medida própria (na medida da quadra: cateto ou face).
                 var largura = calcada?.Invoke(e.Ponto);
                 if (prefill && esq.Chanfro == null && largura is > 0.05 && Math.Abs(largura.Value - q.ChanfroFace) > 0.005)
                     esq.Chanfro = Math.Round(largura.Value, 2);
                 var modo = esq.Chanfro == null ? 0 : esq.Chanfro < 0.05 ? 1 : 2;
-                var face = esq.Chanfro is > 0.05 ? esq.Chanfro.Value : largura ?? q.ChanfroFace;
+                var face = esq.Chanfro is > 0.05 ? esq.Chanfro.Value : q.ChanfroMedida == MedidaChanfro.Catetos ? q.ChanfroCateto : largura ?? q.ChanfroFace;
                 void Grava() => esq.Chanfro = modo switch { 0 => null, 1 => 0, _ => face };
+                var feito = div.Chanfros.FirstOrDefault(c => c.Vertice.DistanceTo(e.Ponto) < 5);
                 w.Section($"Esquina {k++} – testadas {e.Anterior} × {e.Posterior} ({e.Ponto.X:0.0}; {e.Ponto.Y:0.0})")
                     .Choice("Lote de esquina", opts, () => esq.Modo, v => esq.Modo = v)
                     .If(() => esq.Modo == ModoEsquina.MedidaPropria, f => f
@@ -245,7 +263,9 @@ public static class LotForms
                     .If(() => q.Chanfro, f =>
                     {
                         f.Choice("Chanfro nesta quina", ChanfroEsquinaOptions, () => modo, v => { modo = v; Grava(); })
-                            .If(() => modo == 2, g => g.Number("Face do chanfro nesta quina (m)", () => face, v => { face = v; Grava(); }, 0.1, 30));
+                            .If(() => modo == 2, g => g.Number(q.ChanfroMedida == MedidaChanfro.Catetos ? "Recuo em cada lado nesta quina (m)" : "Face do chanfro nesta quina (m)",
+                                () => face, v => { face = v; Grava(); }, 0.1, 30));
+                        if (feito != null) f.Hint($"Chanfro desta quina: {LotReport.M(feito.Cateto)} m em cada lado, face de {LotReport.M(feito.Face)} m.");
                         if (largura is > 0.05) f.Hint($"Calçada nesta quina: {LotReport.M(largura.Value)} m.");
                     });
             }

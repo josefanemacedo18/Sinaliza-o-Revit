@@ -150,4 +150,17 @@ public static class Reconhecimento
         foreach (var p in r.Testadas) q.Testadas.Add(new TestadaLote { Id = "T" + ++i, Ponto = p });
         return q;
     }
+
+    /// <summary>
+    /// Chanfro das quinas de uma quadra nova (D-034): pelos catetos, com a medida do loteamento sobre cada limite
+    /// (<see cref="LoteamentoDefinition.ChanfroQuadrasNovas"/>, 1,50 m por padrão); medida 0 = a quadra nasce sem chanfro. As
+    /// quadras que já existem não passam por aqui (abrem como estavam).
+    /// </summary>
+    public static QuadraDefinition ComChanfroPadrao(QuadraDefinition q, LoteamentoDefinition lot)
+    {
+        q.ChanfroMedida = MedidaChanfro.Catetos;
+        q.Chanfro = lot.ChanfroQuadrasNovas > 0.05;
+        q.ChanfroCateto = q.Chanfro ? lot.ChanfroQuadrasNovas : LoteamentoDefinition.ChanfroCatetoPadrao;
+        return q;
+    }
 }

@@ -670,7 +670,9 @@ internal static class IntersectionEarEdit
           .Number("Comprimento da transição das pontas (m) – 0 = automático (2 × a largura)", () => d.CurbExtensionTaper ?? 0,
               v => d.CurbExtensionTaper = v < 0.05 ? null : Math.Clamp(v, 0.3, 20), 0, 20)
           .Number("Raio da curva da esquina na extensão (m) – 0 = o raio da esquina", () => d.CurbExtensionCornerRadius ?? 0,
-              v => d.CurbExtensionCornerRadius = v < 0.05 ? null : Math.Clamp(v, 0.5, 60), 0, 60);
+              v => d.CurbExtensionCornerRadius = v < 0.05 ? null : Math.Clamp(v, 0.5, 60), 0, 60)
+          .Number("Esquina da extensão em chanfro – recuo em cada face (m); 0 = curva com o raio", () => d.CurbExtensionCornerChamfer ?? 0,
+              v => d.CurbExtensionCornerChamfer = v < 0.05 ? null : Math.Clamp(v, 0.3, 30), 0, 30);
     }
 
     /// <summary>Forma desta esquina: largura e transição de cada lado e contorno livre (pontos clicados).</summary>
@@ -684,6 +686,8 @@ internal static class IntersectionEarEdit
           .Choice("Pontas na outra via", new (string, TipoTransicao?)[] { ("Iguais", null), ("Curvas reversas", TipoTransicao.Curva), ("Chanfro", TipoTransicao.Chanfro), ("Reta", TipoTransicao.Reta) },
               () => s.CurbExtensionEndsOther, v => s.CurbExtensionEndsOther = v)
           .Number("Raio da curva da esquina (m) – 0 = geral", () => s.CurbExtensionCornerRadius ?? 0, v => s.CurbExtensionCornerRadius = v < 0.05 ? null : Math.Clamp(v, 0.5, 60), 0, 60)
+          .Number("Esquina em chanfro – recuo em cada face (m); −1 = geral, 0 = curva", () => s.CurbExtensionCornerChamfer ?? -1,
+              v => s.CurbExtensionCornerChamfer = v < -0.5 ? null : v < 0.05 ? 0 : Math.Clamp(v, 0.3, 30), -1, 30)
           .Choice("Contorno", new[]
               {
                   ("Forma padrão (pelas medidas)", 0), ("Contorno livre – clicar os pontos depois de Aplicar", 1), ("Manter o contorno livre já desenhado", 2),
@@ -716,6 +720,7 @@ internal static class IntersectionEarEdit
         to.CurbExtensionEndRadius = from.CurbExtensionEndRadius;
         to.CurbExtensionTaper = from.CurbExtensionTaper;
         to.CurbExtensionCornerRadius = from.CurbExtensionCornerRadius;
+        to.CurbExtensionCornerChamfer = from.CurbExtensionCornerChamfer;
     }
 
     /// <summary>Forma da esquina (largura e transição de cada lado, raio, contorno livre) de um ajuste para outro.</summary>
@@ -727,6 +732,7 @@ internal static class IntersectionEarEdit
         to.CurbExtensionTaperOther = from.CurbExtensionTaperOther;
         to.CurbExtensionEndsOther = from.CurbExtensionEndsOther;
         to.CurbExtensionCornerRadius = from.CurbExtensionCornerRadius;
+        to.CurbExtensionCornerChamfer = from.CurbExtensionCornerChamfer;
         to.CurbExtensionFace = from.CurbExtensionFace;
         to.CurbExtensionFaceRadius = from.CurbExtensionFaceRadius;
     }

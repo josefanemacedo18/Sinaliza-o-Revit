@@ -345,8 +345,12 @@
                         <CheckBox Grid.Row="7" Grid.ColumnSpan="2" x:Name="CkPhysical" Content="Gerar calçadas, meios-fios e canteiros físicos (3D)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
                         <CheckBox Grid.Row="8" Grid.ColumnSpan="2" x:Name="CkGutterAdds" Content="Somar a sarjeta à largura da pista (as faixas mantêm a largura útil)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
                                   ToolTip="Marcado: pista entre meios-fios = faixas + sarjetas (ex.: 3,50 + 0,30 = 3,80 m até a face da guia). Desmarcado: a sarjeta ocupa a borda da última faixa (vias criadas antes desta versão)."/>
-                        <CheckBox Grid.Row="9" Grid.ColumnSpan="2" x:Name="CkTactile" Content="Piso tátil nas calçadas (faixa direcional ligada às rampas)" Checked="AnyChanged" Unchecked="AnyChanged"
-                                  ToolTip="Faixa direcional no meio da faixa livre de cada calçada, ligada a cada rampa por um ramal perpendicular, com alerta no topo da rampa e nas junções (NBR 16537). Acompanha a via quando ela é editada."/>
+                        <StackPanel Grid.Row="9" Grid.ColumnSpan="2">
+                            <CheckBox x:Name="CkTactile" Content="Piso tátil nas calçadas (faixa direcional ligada às rampas)" Checked="AnyChanged" Unchecked="AnyChanged"
+                                      ToolTip="Faixa direcional na faixa livre de cada calçada (posição pela largura dela – NBR 16537, 7.8.2), ligada a cada rampa por um ramal perpendicular, com alerta nas junções e nas mudanças de direção. Nas esquinas, paralela ao alinhamento predial, seguindo o chanfro do lote. Acompanha a via quando ela é editada."/>
+                            <CheckBox x:Name="CkTactileAccess" Margin="20,2,0,0" Content="Faixa direcional junto à faixa de acesso aos lotes (imagem de referência)" Checked="AnyChanged" Unchecked="AnyChanged"
+                                      ToolTip="Encostada na faixa de acesso, na borda da faixa livre do lado do lote (meio-fio 15, mobiliário 70, percurso 145, faixa tátil 30, acesso 40 cm – informado pelo usuário), quando sobram pelo menos 1,20 m de faixa livre. Desmarcado: a posição pela largura da faixa livre (NBR 16537, 7.8.2)."/>
+                        </StackPanel>
                         <CheckBox Grid.Row="10" Grid.ColumnSpan="2" x:Name="CkArrows" Content="Mão única: setas de sentido no meio de cada faixa" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
                                   ToolTip="Seta &quot;siga em frente&quot; (PEM-F) repetida a cada 50 m (espaçamento [a confirmar] no MBST Vol. IV) em cada faixa de rolamento, no sentido do eixo. Precisa das legendas e símbolos ligados."/>
                         <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Text="Sinalização vertical automática (refeita ao editar a via; o que for editado à mão fica):" Style="{StaticResource FieldLabel}"/>

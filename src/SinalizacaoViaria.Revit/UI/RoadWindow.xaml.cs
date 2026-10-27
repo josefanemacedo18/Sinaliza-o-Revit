@@ -288,6 +288,7 @@ public partial class RoadWindow : Window
         _loading = true;
         Select(CbHierarchy, s.Hierarchy);
         CkTactile.IsChecked = s.PisoTatil;
+        CkTactileAccess.IsChecked = s.PisoTatilJuntoAoAcesso;
         // Via existente sem a opção: mantém (sem setas); via nova: com setas na mão única.
         CkArrows.IsChecked = s.SetasSentido ?? !_editing;
         // Sinalização automática: via nova com os três grupos; via existente sem a opção, desligada.
@@ -384,6 +385,7 @@ public partial class RoadWindow : Window
         s.LargurasVariaveis = _widths.Select(w => w.P.Clone()).OrderBy(p => p.Estaca).ToList();
         s.Recuos = _recesses.Select(r => r.R.Clone()).ToList();
         s.PisoTatil = CkTactile.IsChecked == true;
+        s.PisoTatilJuntoAoAcesso = CkTactileAccess.IsChecked == true;
         s.SetasSentido = CkArrows.IsChecked == true;
         var auto = new SinalizacaoAutomatica
         {

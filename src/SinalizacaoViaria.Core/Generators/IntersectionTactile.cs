@@ -122,7 +122,14 @@ public static partial class IntersectionGenerator
                 if (clean.Count >= 2) chains.Add(new Polyline2(clean));
                 continue;
             }
-            // Esquina: o meio-fio (reto de A, curva, reto de B) deslocado para dentro da calçada (à direita do caminho).
+            // Esquina: paralela ao alinhamento predial (imagem de referência do item 20) – ou pela curva do meio-fio (opção da
+            // interseção, ou quando o traçado pelo lote não cabe na calçada).
+            if (L.Definition?.TatilEsquinaPeloMeioFio != true && AlignmentCorner(L, la, lb, sa, sb, oa, ob, ta, tb) is { } al)
+            {
+                chains.Add(new Polyline2(al));
+                continue;
+            }
+            // O meio-fio (reto de A, curva, reto de B) deslocado para dentro da calçada (à direita do caminho).
             var curb = CornerPath(L, L.Pavement, la, lb, Math.Max(0.5, ta - la.Clear), Math.Max(0.5, tb - lb.Clear), true);
             if (curb == null) continue;
             var lenA = Math.Max(0.5, ta - la.Clear);
@@ -167,6 +174,125 @@ public static partial class IntersectionGenerator
             res.Add(route);
         }
         return res;
+    }
+
+    /// <summary>
+    /// Faixa direcional da esquina paralela ao alinhamento predial (imagem de referência do pedido de 2026-10-27, item 20): a reta
+    /// de cada ramo, na mesma distância do lote que nos trechos retos (largura da calçada menos o afastamento da faixa), segue
+    /// até o encontro com a do outro ramo – a quina viva do lote – ou, com o lote de esquina chanfrado
+    /// (<see cref="IntersectionDefinition.ChanfrosLote"/>), até a paralela ao chanfro, na distância média dos dois lados. Quando
+    /// o canto da faixa ficaria a menos de 0,60 m lisos da pista (além do meio-fio – a folga da NBR 16537, 7.8.2 a), a faixa corta
+    /// a quina com um trecho reto perpendicular à bissetriz, o mais perto possível do canto com essa folga; se a calçada da quina
+    /// não comporta as folgas dos dois lados (raio grande, calçada estreita), o trecho fica com as folgas equilibradas entre a
+    /// pista e o lote, sem tocar o meio-fio. As mudanças de direção ficam nos vértices (alerta, 7.4.3). Nulo quando o traçado não
+    /// cabe: retas paralelas, vértice além do fim da rede no ramo, ou a faixa sobre a pista – a esquina fica com a faixa pela
+    /// curva do meio-fio.
+    /// </summary>
+    private static List<Vec2>? AlignmentCorner(IntersectionLayout L, IntersectionLeg la, IntersectionLeg lb, RoadSetup.LadoVia sa, RoadSetup.LadoVia sb,
+        double oa, double ob, double ta, double tb)
+    {
+        const double w = 0.25;                              // largura da faixa (um módulo, como a rede)
+        var cMin = L.CurbWidth + 0.60 + w / 2;               // eixo da faixa até a face do meio-fio
+        const double lotMin = 0.60 + w / 2;                  // eixo da faixa até o lote
+        var (da, db) = (sa.SidewalkWidth - oa, sb.SidewalkWidth - ob);
+        if (da < 0.1 || db < 0.1) return null;
+        Vec2 PA(double t) => L.At(la, t, L.HiEdge(la, t) + oa);
+        Vec2 PB(double t) => L.At(lb, t, -(L.LoEdge(lb, t) + ob));
+        // Retas de cada lado pelo começo do trecho reto, no sentido do nó; o alinhamento predial é paralelo a elas.
+        var sA = Math.Clamp(la.Clear, 0.5, Math.Max(0.5, ta - 0.5));
+        var sB = Math.Clamp(lb.Clear, 0.5, Math.Max(0.5, tb - 0.5));
+        var pa = PA(sA);
+        var pb = PB(sB);
+        var ua = (pa - PA(sA + 1)).Normalized();
+        var ub = (pb - PB(sB + 1)).Normalized();
+        var na = (L.At(la, sA, L.HiEdge(la, sA) + oa + 1) - pa).Normalized();      // para o lote
+        var nb = (L.At(lb, sB, -(L.LoEdge(lb, sB) + ob + 1)) - pb).Normalized();
+        if (LineHit(pa + na * da, ua, pb + nb * db, ub) is not { } quina) return null;
+        // Canto da faixa: o vértice das duas retas ou, com o chanfro do lote, a paralela a ele. Ponto do lote na bissetriz,
+        // direção para a pista e onde o canto está.
+        List<Vec2> corner;
+        Vec2 lotPt, toStreet;
+        double uBase;
+        var tri = L.Definition?.ChanfrosLote.Where(t => t.Outer.Count == 3 && t.Outer.Min(p => p.DistanceTo(quina)) < 1.0)
+            .OrderBy(t => t.Outer.Min(p => p.DistanceTo(quina))).FirstOrDefault();
+        if (tri != null)
+        {
+            // Chanfro do lote de esquina: a face vai do limite do ramo A ao do B; a faixa fica do lado da calçada (o da quina).
+            var v = tri.Outer.OrderBy(p => p.DistanceTo(quina)).First();
+            var ends = tri.Outer.Where(p => p.DistanceTo(v) > 1e-9).OrderBy(p => Math.Abs((p - (pa + na * da)).Cross(ua))).ToList();
+            if (ends.Count != 2) return null;
+            var (c1, c2) = (ends[0], ends[1]);
+            var face = (c2 - c1).Normalized();
+            var n = face.PerpLeft;
+            if ((v - c1).Dot(n) < 0) n = -n;
+            uBase = (da + db) / 2;
+            var q = c1 + n * uBase;
+            if (LineHit(pa, ua, q, face) is not { } x1 || LineHit(q, face, pb, ub) is not { } x2 || (x2 - x1).Dot(face) <= 0.05) return null;
+            corner = new List<Vec2> { x1, x2 };
+            (lotPt, toStreet) = ((c1 + c2) / 2, n);
+        }
+        else if (LineHit(pa, ua, pb, ub) is { } x)
+        {
+            corner = new List<Vec2> { x };
+            toStreet = -(na + nb).Normalized();
+            lotPt = quina;
+            uBase = (x - quina).Dot(toStreet);
+        }
+        else return null;
+        // Folga da pista nos vértices do canto (a menor da faixa: a curva do meio-fio é côncava para a calçada); negativa = sobre a pista.
+        double Clear(IEnumerable<Vec2> vs) => vs.Min(p => L.Pavement.Any(g => g.Contains(p)) ? -1 : L.Pavement.Count == 0 ? 99 : L.Pavement.Min(g => g.DistanceTo(p)));
+        if (Clear(corner) < cMin)
+        {
+            // Corta a quina com um trecho perpendicular à bissetriz, a u do lote: o primeiro (o mais perto da quina de antes) com os
+            // 0,60 m lisos do lado da pista; se nenhum, o de folgas equilibradas dos dois lados, com a faixa fora do meio-fio e do lote.
+            var hardCurb = L.CurbWidth + w / 2 + 0.05;
+            const double hardLot = w / 2 + 0.05;
+            List<Vec2>? best = null;
+            var bestMargin = double.MinValue;
+            List<Vec2>? ideal = null;
+            for (var u = uBase - 0.01; u >= hardLot - 1e-9; u -= 0.01)
+            {
+                var q0 = lotPt + toStreet * u;
+                if (LineHit(pa, ua, q0, toStreet.PerpLeft) is not { } e1 || LineHit(q0, toStreet.PerpLeft, pb, ub) is not { } e2 || e1.DistanceTo(e2) < 0.05) continue;
+                var cut = new List<Vec2> { e1, e2 };
+                var vc = Clear(cut);
+                if (vc >= cMin && u >= lotMin) { ideal = cut; break; }
+                var margin = Math.Min(vc - hardCurb, u - hardLot);
+                if (margin > bestMargin) (best, bestMargin) = (cut, margin);
+            }
+            if (ideal != null) corner = ideal;
+            else if (best != null && bestMargin >= 0) corner = best;
+            else return null;
+        }
+        // Trechos retos de cada ramo até o canto (o canto pode cair no trecho reto quando o chanfro é maior que a curva).
+        var tA = (corner[0] - L.Node).Dot(la.Dir);
+        var tB = (corner[^1] - L.Node).Dot(lb.Dir);
+        if (tA >= ta - 0.3 || tB >= tb - 0.3) return null;
+        var pts = new List<Vec2>();
+        for (var t = ta; t > Math.Max(tA, sA) + 0.05; t -= 0.5) pts.Add(PA(t));
+        pts.AddRange(corner);
+        var bs = new List<Vec2>();
+        for (var t = tb; t > Math.Max(tB, sB) + 0.05; t -= 0.5) bs.Add(PB(t));
+        bs.Reverse();
+        pts.AddRange(bs);
+        var path = CleanFacePath(pts);
+        if (path.Count < 2) return null;
+        // A faixa inteira na calçada.
+        var line = new Polyline2(path);
+        for (var s = 0.0; s <= line.Length; s += 0.25)
+        {
+            var p = line.PointAt(s);
+            if (L.Pavement.Any(g => g.Contains(p) || g.DistanceTo(p) < w / 2 + 0.05)) return null;
+        }
+        return path;
+    }
+
+    /// <summary>Encontro das retas p + u·s e q + v·r (nulo = paralelas).</summary>
+    private static Vec2? LineHit(Vec2 p, Vec2 u, Vec2 q, Vec2 v)
+    {
+        var den = u.Cross(v);
+        if (Math.Abs(den) < 1e-6) return null;
+        return p + u * ((q - p).Cross(v) / den);
     }
 
     /// <summary>

@@ -57,9 +57,17 @@ public sealed partial class RoadSetup
     /// </summary>
     public bool PisoTatil { get; set; }
 
+    /// <summary>
+    /// Faixa direcional junto à faixa de acesso aos lotes, na borda da faixa livre do lado do lote (imagem de referência do
+    /// pedido de 2026-10-27, item 20: meio-fio 15, mobiliário 70, percurso 145, faixa tátil 30, acesso 40 cm – informado pelo
+    /// usuário), quando a faixa livre que sobra tem pelo menos 1,20 m. Falso (padrão) = a posição pela largura da faixa livre
+    /// (NBR 16537, 7.8.2).
+    /// </summary>
+    public bool PisoTatilJuntoAoAcesso { get; set; }
+
     /// <summary>Um lado da via: face do meio-fio (afastamento do eixo), calçada, estacionamento junto ao meio-fio e sarjeta.</summary>
     public sealed record LadoVia(int Sigma, double Face, bool HasSidewalk, double SidewalkWidth, double CurbW, double Service, double Free,
-        double Access, double Top, double? Parking, double Gutter, bool Grass = false)
+        double Access, double Top, double? Parking, double Gutter, bool Grass = false, bool TactileAtAccess = false)
     {
         /// <summary>Afastamento (a partir da face do meio-fio) do meio da faixa livre.</summary>
         public double FreeCenter => CurbW + Service + Free / 2;
@@ -68,9 +76,12 @@ public sealed partial class RoadSetup
         /// Afastamento (a partir da face do meio-fio) do eixo da faixa direcional de largura <paramref name="width"/> (NBR 16537,
         /// 7.8.2): faixa livre de 1,45 m ou mais – no eixo dela, com 0,60 m lisos de cada lado (a); entre 1,20 e 1,45 m – fora
         /// do eixo, com os 0,60 m lisos do lado do lote (b); menor que 1,20 m – no eixo (c, com alerta de 0,50 m nas pontas).
+        /// Com <see cref="TactileAtAccess"/> (imagem de referência do usuário): encostada na faixa de acesso, quando sobram pelo
+        /// menos 1,20 m de faixa livre do lado da pista.
         /// </summary>
         public double TactileCenter(double width = 0.25) =>
-            Free >= 1.45 - 1e-9 || Free < 1.20 - 1e-9 ? FreeCenter : CurbW + Service + Free - 0.60 - width / 2;
+            TactileAtAccess && Free - width >= 1.20 - 1e-9 ? CurbW + Service + Free - width / 2
+            : Free >= 1.45 - 1e-9 || Free < 1.20 - 1e-9 ? FreeCenter : CurbW + Service + Free - 0.60 - width / 2;
     }
 
     /// <summary>Medidas de um lado da via, como a geração das calçadas as usa.</summary>
@@ -93,7 +104,7 @@ public sealed partial class RoadSetup
                 var free = width - cw - service - access;
                 double? park = i > 0 && side[i - 1].Tipo == TipoElementoSecao.Estacionamento && !side[i - 1].Elevado ? side[i - 1].Largura + added : null;
                 return new LadoVia(sigma, a, true, width, cw, service, free, access, e.AlturaEfetiva, park, park != null ? added : 0,
-                    e.ServicoGramado && service > 0.02);
+                    e.ServicoGramado && service > 0.02, PisoTatilJuntoAoAcesso);
             }
             a += Math.Max(0.05, e.Largura);
         }

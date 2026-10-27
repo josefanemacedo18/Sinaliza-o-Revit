@@ -849,6 +849,7 @@ public static partial class IntersectionGenerator
             s.CurbExtensionTaper = src.CurbExtensionTaper;
             s.CurbExtensionTaperOther = src.CurbExtensionTaperOther;
             s.CurbExtensionCornerRadius = src.CurbExtensionCornerRadius;
+            s.CurbExtensionCornerChamfer = src.CurbExtensionCornerChamfer;
             s.CurbExtensionCrosswalkMargin = src.CurbExtensionCrosswalkMargin;
             // O contorno livre é de cada esquina (coordenadas do ramo dela): não é copiado.
         }

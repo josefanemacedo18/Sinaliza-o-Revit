@@ -351,6 +351,8 @@ public sealed class IntersectionService
             .Where(p => p.DistanceTo(node) > 3 && p.DistanceTo(node) < 400).ToList();
         // Nós vizinhos com travessias: num trecho curto, só um dos dois faz a travessia (Etapa 15).
         it.NeighborCrossings = EspacamentoTravessias.Vizinhos(it, all, node);
+        // Chanfros dos lotes de esquina em volta: a calçada ocupa cada um e a faixa tátil da esquina segue o chanfro (Etapa 16).
+        it.ChanfrosLote = Core.Parcelamento.LotDivider.Triangulos(all, node);
         var layout = IntersectionGenerator.Layout(it, roads);
         if (layout.Roads.Count > 0) it.Hierarchy = layout.Roads[layout.Main].Def.Hierarchy;
 

@@ -69,6 +69,9 @@ public sealed record EsquinaInfo(Vec2 Ponto, string Anterior, string Posterior, 
 /// </summary>
 public sealed record ChanfroQuina(Vec2 Vertice, Vec2 A, Vec2 B, double Face, Polygon2 Triangulo)
 {
+    /// <summary>Recuo sobre cada limite do lote, a partir do encontro dos alinhamentos (m) – o cateto.</summary>
+    public double Cateto => Vertice.DistanceTo(A);
+
     /// <summary>O lado <paramref name="a"/>–<paramref name="b"/> é a face deste chanfro (em qualquer sentido).</summary>
     public bool EFace(Vec2 a, Vec2 b, double tol = 0.02) =>
         a.DistanceTo(A) < tol && b.DistanceTo(B) < tol || a.DistanceTo(B) < tol && b.DistanceTo(A) < tol;
@@ -274,13 +277,13 @@ public static class LotDivider
     // ------------------------------------------------------------------ chanfro das quinas
 
     /// <summary>A quadra tem chanfro ligado, com alguma face maior que zero (a dela ou a de alguma esquina).</summary>
-    public static bool TemChanfro(QuadraDefinition q) => q.Chanfro && !q.Inteira && (q.ChanfroFace > 0.05 || q.Esquinas.Any(e => e.Chanfro > 0.05));
+    public static bool TemChanfro(QuadraDefinition q) => q.Chanfro && !q.Inteira && (q.ChanfroMedidaQuadra > 0.05 || q.Esquinas.Any(e => e.Chanfro > 0.05));
 
     /// <summary>
     /// Chanfros das quinas da quadra (com <see cref="QuadraDefinition.Chanfro"/> ligado): em cada esquina convexa entre duas
-    /// testadas, a face (hipotenusa) com a medida da esquina (<see cref="EsquinaLote.Chanfro"/>; 0 = sem chanfro nela) ou a da
-    /// quadra (<see cref="QuadraDefinition.ChanfroFace"/>), com os catetos iguais ao longo das duas testadas a partir do encontro
-    /// dos alinhamentos. Vazio sem chanfro.
+    /// testadas, com a medida da esquina (<see cref="EsquinaLote.Chanfro"/>; 0 = sem chanfro nela) ou a da quadra, os catetos
+    /// iguais ao longo das duas testadas a partir do encontro dos alinhamentos – a medida é o próprio cateto, sobre cada limite
+    /// (<see cref="MedidaChanfro.Catetos"/>), ou a face (hipotenusa, <see cref="MedidaChanfro.Face"/>). Vazio sem chanfro.
     /// </summary>
     public static List<ChanfroQuina> Chanfros(QuadraDefinition q)
     {
@@ -325,8 +328,8 @@ public static class LotDivider
             if (testada(c) == null || testada(nx) == null || c.GiroFim <= 1) continue;
             var corner = c.Pontos[^1];
             var esq = q.Esquinas.Where(e => e.Ponto.DistanceTo(corner) < 5).OrderBy(e => e.Ponto.DistanceTo(corner)).FirstOrDefault();
-            var face = esq?.Chanfro ?? q.ChanfroFace;
-            if (face < 0.05) continue;
+            var medida = esq?.Chanfro ?? q.ChanfroMedidaQuadra;
+            if (medida < 0.05) continue;
             var la = c.Linha;
             var lb = nx.Linha;
             var v = la.Points[^1];
@@ -334,8 +337,10 @@ public static class LotDivider
             var ub = (lb.Points[1] - v).Normalized();
             var half = Math.Acos(Math.Clamp(ua.Dot(ub), -1, 1)) / 2;
             if (half < 1e-3) continue;
-            // Catetos iguais: face = 2 × cateto × sen(ângulo/2); no máximo 45 % de cada testada.
-            var leg = Math.Min(face / (2 * Math.Sin(half)), 0.45 * Math.Min(la.Length, lb.Length));
+            // Catetos iguais: pelos catetos, a própria medida sobre cada limite; pela face, face = 2 × cateto × sen(ângulo/2). No
+            // máximo 45 % de cada testada.
+            var cateto = q.ChanfroMedida == MedidaChanfro.Catetos ? medida : medida / (2 * Math.Sin(half));
+            var leg = Math.Min(cateto, 0.45 * Math.Min(la.Length, lb.Length));
             var a = la.PointAt(la.Length - leg);
             var b = lb.PointAt(leg);
             var tri = new Polygon2(new[] { a, v, b });

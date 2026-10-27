@@ -266,6 +266,8 @@ internal static class IntersectionForms
          .Number("Comprimento da transição da outra via (m) – 0 = igual à deste ramo", () => cur().CurbExtensionTaperOther ?? 0, v => cur().CurbExtensionTaperOther = v < 0.05 ? null : Math.Clamp(v, 0.3, 20), 0, 20)
          .Number("Raio da curva da esquina na extensão (m) – 0 = geral (raio da esquina)", () => cur().CurbExtensionCornerRadius ?? 0, v => cur().CurbExtensionCornerRadius = v < 0.05 ? null : Math.Clamp(v, 0.5, 60), 0, 60,
              tooltip: "Raio do veículo de projeto. Raio que faria a curva entrar na calçada é reduzido, com aviso.")
+         .Number("Esquina da extensão em chanfro – recuo em cada face (m); −1 = geral, 0 = curva", () => cur().CurbExtensionCornerChamfer ?? -1,
+             v => cur().CurbExtensionCornerChamfer = v < -0.5 ? null : v < 0.05 ? 0 : Math.Clamp(v, 0.3, 30), -1, 30)
          .Number("Folga além da faixa e das rampas (m) – −1 = geral", () => cur().CurbExtensionCrosswalkMargin ?? -1, v => cur().CurbExtensionCrosswalkMargin = v < -0.5 ? null : Math.Clamp(v, 0, 20), -1, 20)
          .Choice("Rampa na borda desta extensão de calçada", triState, () => cur().CurbExtensionRamp, v => cur().CurbExtensionRamp = v)
          .Choice("Piso tátil na rampa desta extensão de calçada", triState, () => cur().CurbExtensionTactile, v => cur().CurbExtensionTactile = v)
@@ -326,6 +328,9 @@ internal static class IntersectionForms
          .Number("Raio da curva da esquina na extensão (m) – 0 = o raio da esquina", () => d.CurbExtensionCornerRadius ?? 0,
              v => d.CurbExtensionCornerRadius = v < 0.05 ? null : Math.Clamp(v, 0.5, 60), 0, 60,
              tooltip: "A face da extensão contorna a esquina com este raio, tangente às faces deslocadas (padrão: o raio da esquina – veículo de projeto).")
+         .Number("Esquina da extensão em chanfro – recuo em cada face (m); 0 = curva com o raio", () => d.CurbExtensionCornerChamfer ?? 0,
+             v => d.CurbExtensionCornerChamfer = v < 0.05 ? null : Math.Clamp(v, 0.3, 30), 0, 30,
+             tooltip: "Face reta na esquina da extensão (imagem de referência), entre os pontos a esta distância do encontro das faces deslocadas. Chanfro que entraria na calçada é reduzido, com aviso.")
          .Number("Folga além da faixa de pedestres e das rampas (m)", () => d.CurbExtensionCrosswalkMargin ?? 0.30,
              v => d.CurbExtensionCrosswalkMargin = Math.Abs(v - 0.30) < 1e-6 ? null : Math.Clamp(v, 0, 20), 0, 20)
          .Check("Terminar onde começa o estacionamento", () => d.CurbExtensionToParking, v => d.CurbExtensionToParking = v,
@@ -356,6 +361,13 @@ internal static class IntersectionForms
              tooltip: "NBR 9050: no mínimo 1,20 m. Calçada que não comporta a rampa e a faixa livre recebe rebaixamento total.")
          .Choice("Piso tátil (NBR 16537)", new[] { ("Sem piso tátil", 0), ("Alerta na rampa", 1), ("Alerta + direcional no eixo da rampa", 2) },
              () => tactile, v => { tactile = v; d.RampTactile = v > 0; d.RampDirectional = v == 2; })
+         .Choice("Faixa tátil das esquinas (vias com piso tátil nas calçadas)", new[]
+             {
+                 ("Paralela ao alinhamento predial, seguindo o chanfro do lote, com alerta nas mudanças de direção", false),
+                 ("Pela curva do meio-fio (como até a 2.20)", true),
+             }, () => d.TatilEsquinaPeloMeioFio, v => d.TatilEsquinaPeloMeioFio = v,
+             "Paralela ao lote: na mesma distância do alinhamento que nos trechos retos (imagem de referência do usuário). Esquina em que esse " +
+             "traçado não cabe na calçada (ângulo agudo, calçada estreita) fica pela curva do meio-fio.")
          .Number("Altura do meio-fio na rampa (m) – 0 = a da via", () => d.RampCurbHeight ?? 0, v => d.RampCurbHeight = v < 0.01 ? null : Math.Clamp(v, 0.05, 0.40), 0, 0.40,
              tooltip: "Desnível vencido pela rampa. Automática (0): a altura do meio-fio de cada via.");
     }

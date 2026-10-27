@@ -187,13 +187,16 @@ public sealed class CmdLoteamento : CommandBase
         if (UiHelpers.ShowModal(LotForms.Novo(lot, opt, rec, Reconhecimento.Ocupacao(occ))) != true) return Result.Cancelled;
         var quadras = rec.Quadras.Select(r =>
         {
-            var q = Reconhecimento.NovaQuadra(r, lot, opt.Frente, opt.Profundidade);
+            var q = Reconhecimento.ComChanfroPadrao(Reconhecimento.NovaQuadra(r, lot, opt.Frente, opt.Profundidade), lot);
             q.Sobra = opt.Sobra;
             q.Miolo = opt.Miolo;
             q.SentidoHorario = opt.SentidoHorario;
             return q;
         }).ToList();
         var results = LotCommands.Commit(uidoc, lot, quadras, "SV - Loteamento");
+        // Quadras novas com chanfro (D-034): as calçadas das interseções em volta passam a ocupar os chanfros.
+        results.AddRange(LotCommands.RefazerInterseccoes(uidoc, Array.Empty<ChanfroQuina>(), quadras.SelectMany(LotDivider.Chanfros).ToList(),
+            "SV - Loteamento (calçadas dos chanfros)"));
         var lots = quadras.Sum(q => LotDivider.Divide(q, lot).Parcelas.Count(p => p.Categoria == CategoriaLote.Lote));
         LotCommands.Report($"Loteamento \"{lot.Nome}\": {quadras.Count} quadra(s) e {lots} lote(s).", results, rec.Avisos.Concat(notes).Append(
             "Próximos passos: Quadra (testadas, esquinas, numeração), Lote (medidas e categoria), Nomear Vias, Detalhar Lotes, Quadros, Memorial e Masterplan. " +
@@ -281,6 +284,7 @@ public sealed class CmdLoteamento : CommandBase
         var occ = Reconhecimento.SemChanfros(LotService.Ocupacao(doc, service, gleba, nativeFloors: true), quadras);
         var rec = Reconhecimento.Quadras(gleba, occ);
         var changed = new List<QuadraDefinition>();
+        var novas = new List<QuadraDefinition>();
         var matched = new HashSet<string>();
         // Quadra gravada que é a sobra da gleba em volta das vias (a gleba inteira, sem o furo – versões anteriores): sai; a sobra
         // passa a ser a área remanescente do loteamento.
@@ -309,7 +313,7 @@ public sealed class CmdLoteamento : CommandBase
                 continue;
             }
             names.MoveNext();
-            var nq = Reconhecimento.NovaQuadra(r with { Nome = names.Current ?? r.Nome }, lot, template?.Frente ?? 12, template?.Profundidade ?? 30);
+            var nq = Reconhecimento.ComChanfroPadrao(Reconhecimento.NovaQuadra(r with { Nome = names.Current ?? r.Nome }, lot, template?.Frente ?? 12, template?.Profundidade ?? 30), lot);
             if (template != null)
             {
                 nq.Sobra = template.Sobra;
@@ -318,6 +322,7 @@ public sealed class CmdLoteamento : CommandBase
                 nq.MioloCategoria = template.MioloCategoria;
             }
             changed.Add(nq);
+            novas.Add(nq);
         }
         var lost = quadras.Where(q => !matched.Contains(q.Id)).Select(q => q.Nome).ToList();
         List<RenderResult> results;
@@ -334,6 +339,9 @@ public sealed class CmdLoteamento : CommandBase
             results = LotCommands.Commit(uidoc, lot, changed, "SV - Loteamento – reconhecer quadras");
             tg.Assimilate();
         }
+        // Quadras novas com chanfro (D-034): as calçadas das interseções em volta passam a ocupar os chanfros.
+        results.AddRange(LotCommands.RefazerInterseccoes(uidoc, Array.Empty<ChanfroQuina>(), novas.SelectMany(LotDivider.Chanfros).ToList(),
+            "SV - Loteamento – calçadas dos chanfros"));
         var extra = rec.Avisos.ToList();
         if (removed.Count > 0)
             extra.Add($"Quadra(s) {string.Join(", ", removed.Select(q => q.Nome))} removida(s): era(m) a sobra da gleba em volta das vias – agora é a área remanescente ({LotReport.M(rec.Remanescentes.Sum(x => x.Area))} m²).");

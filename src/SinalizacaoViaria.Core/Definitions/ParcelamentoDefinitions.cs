@@ -110,10 +110,25 @@ public sealed class EsquinaLote
     public double FrenteAnterior { get; set; } = 15;
     /// <summary>Medida própria: frente (m) na testada que sai da esquina.</summary>
     public double FrentePosterior { get; set; } = 15;
-    /// <summary>Chanfro da quina nesta esquina: comprimento da face (m). Nulo = o da quadra; 0 = sem chanfro aqui.</summary>
+    /// <summary>
+    /// Chanfro da quina nesta esquina (m), na medida da quadra (<see cref="QuadraDefinition.ChanfroMedida"/>: a face ou o recuo
+    /// sobre cada limite). Nulo = o da quadra; 0 = sem chanfro aqui.
+    /// </summary>
     public double? Chanfro { get; set; }
 
     public EsquinaLote Clone() => (EsquinaLote)MemberwiseClone();
+}
+
+/// <summary>Como a medida do chanfro da quina é dada.</summary>
+public enum MedidaChanfro
+{
+    /// <summary>Pela face (hipotenusa), com o mesmo recuo nas duas testadas – a medida das quadras até a 2.20.</summary>
+    Face,
+    /// <summary>
+    /// Pelos catetos: o recuo medido sobre cada limite do lote a partir do encontro dos alinhamentos (imagem de referência do
+    /// pedido de 2026-10-27: "mínimo de 1,50 m em cada lado, medido sobre os limites do terreno na esquina").
+    /// </summary>
+    Catetos,
 }
 
 /// <summary>Como os lotes da quadra são formados.</summary>
@@ -198,6 +213,16 @@ public sealed class LoteamentoDefinition : MarkingDefinition
     public double FrenteMinimaLote { get; set; } = 5;
     /// <summary>Área mínima de um lote (m²). Padrão 125 m², informado pela usuária ([a confirmar]).</summary>
     public double AreaMinimaLote { get; set; } = 125;
+    /// <summary>
+    /// Chanfro padrão das quinas (m sobre cada limite do lote): 1,50 m, informado pelo usuário (pedido de 2026-10-27, item 19, e a
+    /// imagem de referência "mínimo de 1,50 m em cada lado") – conferir no código de obras ou na lei municipal [a confirmar].
+    /// </summary>
+    public const double ChanfroCatetoPadrao = 1.5;
+    /// <summary>
+    /// Chanfro das quinas das quadras novas (reconhecidas pelas vias), medido sobre os limites do lote em cada lado (m); 0 = as
+    /// quadras novas nascem sem chanfro. As quadras que já existem ficam como estão.
+    /// </summary>
+    public double ChanfroQuadrasNovas { get; set; } = ChanfroCatetoPadrao;
     /// <summary>Município/UF (memorial). Vazio = campo a preencher no Word.</summary>
     public string? Municipio { get; set; }
     /// <summary>Nomes das vias (memorial, confrontações e detalhamento), dados pelo usuário selecionando as vias.</summary>
@@ -298,6 +323,15 @@ public sealed class QuadraDefinition : MarkingDefinition
     public bool Chanfro { get; set; }
     /// <summary>Comprimento da face do chanfro (m) – a hipotenusa, recuando o mesmo nas duas testadas; o padrão é a largura da calçada.</summary>
     public double ChanfroFace { get; set; }
+    /// <summary>
+    /// Como a medida do chanfro é dada: pela face (<see cref="ChanfroFace"/> – as quadras até a 2.20 abrem assim) ou pelos
+    /// catetos sobre os limites (<see cref="ChanfroCateto"/> – as quadras novas, D-034).
+    /// </summary>
+    public MedidaChanfro ChanfroMedida { get; set; }
+    /// <summary>Recuo do chanfro sobre cada limite do lote, a partir do encontro dos alinhamentos (m), na medida pelos catetos.</summary>
+    public double ChanfroCateto { get; set; } = LoteamentoDefinition.ChanfroCatetoPadrao;
+    /// <summary>A medida do chanfro da quadra na forma escolhida (face ou cateto).</summary>
+    [JsonIgnore] public double ChanfroMedidaQuadra => ChanfroMedida == MedidaChanfro.Catetos ? ChanfroCateto : ChanfroFace;
     /// <summary>Como os lotes são formados: pela testada (medidas) ou pelas linhas desenhadas (Lotes por Linhas).</summary>
     public ModoDivisao Divisao { get; set; }
     /// <summary>Linhas que dividem os lotes no modo por linhas (pontos e UniqueId de cada linha do Revit).</summary>

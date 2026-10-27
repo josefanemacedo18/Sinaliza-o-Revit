@@ -1859,6 +1859,12 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public bool RampDirectional { get; set; } = true;
     /// <summary>Altura do meio-fio junto à rampa (m). Nulo = a altura do meio-fio da via.</summary>
     public double? RampCurbHeight { get; set; }
+    /// <summary>
+    /// Faixa tátil das esquinas pela curva do meio-fio, como até a 2.20. Falso (padrão) = paralela ao alinhamento predial, na
+    /// mesma distância do lote dos trechos retos, seguindo o chanfro do lote de esquina, com alerta em cada mudança de direção
+    /// (imagem de referência do pedido de 2026-10-27, item 20; alerta nas mudanças de direção – NBR 16537, 7.4.3).
+    /// </summary>
+    public bool TatilEsquinaPeloMeioFio { get; set; }
 
     /// <summary>Copia as medidas das rampas e das orelhas de outra interseção (janela lembrada, alterar todas de uma vez).</summary>
     /// <summary>
@@ -1887,6 +1893,7 @@ public sealed class IntersectionDefinition : MarkingDefinition
         RampTactile = o.RampTactile;
         RampDirectional = o.RampDirectional;
         RampCurbHeight = o.RampCurbHeight;
+        TatilEsquinaPeloMeioFio = o.TatilEsquinaPeloMeioFio;
         MedianCrossing = o.MedianCrossing;
         CurbExtensions = o.CurbExtensions;
         CurbExtensionLength = o.CurbExtensionLength;
@@ -1897,6 +1904,7 @@ public sealed class IntersectionDefinition : MarkingDefinition
         CurbExtensionsOpposite = o.CurbExtensionsOpposite;
         CurbExtensionTaper = o.CurbExtensionTaper;
         CurbExtensionCornerRadius = o.CurbExtensionCornerRadius;
+        CurbExtensionCornerChamfer = o.CurbExtensionCornerChamfer;
         CurbExtensionCrosswalkMargin = o.CurbExtensionCrosswalkMargin;
     }
 
@@ -1925,6 +1933,11 @@ public sealed class IntersectionDefinition : MarkingDefinition
     public double? CurbExtensionTaper { get; set; }
     /// <summary>Raio da curva da esquina na face das extensões (m). Nulo = o raio da esquina da interseção (veículo de projeto).</summary>
     public double? CurbExtensionCornerRadius { get; set; }
+    /// <summary>
+    /// Esquina das extensões em chanfro reto (imagem de referência do pedido de 2026-10-27, item 12): recuo do chanfro em cada
+    /// face a partir do encontro das faces deslocadas (m). Nulo = a curva com o raio (<see cref="CurbExtensionCornerRadius"/>).
+    /// </summary>
+    public double? CurbExtensionCornerChamfer { get; set; }
     /// <summary>Folga (m) da extensão além da faixa de pedestres e das rampas, antes da transição. Nulo = 0,30 m.</summary>
     public double? CurbExtensionCrosswalkMargin { get; set; }
 
@@ -1993,6 +2006,8 @@ public sealed class IntersectionLegSettings
     public double? CurbExtensionTaperOther { get; set; }
     /// <summary>Raio da curva da esquina na face da extensão (m). Nulo = o geral (raio da esquina).</summary>
     public double? CurbExtensionCornerRadius { get; set; }
+    /// <summary>Esquina da extensão em chanfro: recuo em cada face (m). Nulo = o geral; 0 = curva (mesmo com o geral em chanfro).</summary>
+    public double? CurbExtensionCornerChamfer { get; set; }
     /// <summary>Folga da extensão além da faixa e das rampas (m). Nulo = o geral.</summary>
     public double? CurbExtensionCrosswalkMargin { get; set; }
     /// <summary>
@@ -2030,7 +2045,7 @@ public sealed class IntersectionLegSettings
                            && OppositeExtensionEnds == null && OppositeExtensionEndRadius == null && OppositeExtensionRamp == null && OppositeExtensionTactile == null
                            && RightTurnChannel == null && RightTurnRadius == null
                            && CurbExtensionDepthOther == null && CurbExtensionEndsOther == null && CurbExtensionTaper == null
-                           && CurbExtensionTaperOther == null && CurbExtensionCornerRadius == null && CurbExtensionCrosswalkMargin == null
+                           && CurbExtensionTaperOther == null && CurbExtensionCornerRadius == null && CurbExtensionCornerChamfer == null && CurbExtensionCrosswalkMargin == null
                            && CurbExtensionFace == null && CurbExtensionFaceRadius == null && OppositeExtensionTaper == null;
 }
 

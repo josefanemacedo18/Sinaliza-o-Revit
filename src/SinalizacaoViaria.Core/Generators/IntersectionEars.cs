@@ -267,7 +267,9 @@ public static partial class IntersectionGenerator
             // acompanham o novo fim da curva.
             var cf0 = L.CornerFillets.TryGetValue((la.Road, la.Sign), out var cfx) ? cfx : null;
             var rx = ls?.CurbExtensionCornerRadius ?? d.CurbExtensionCornerRadius;
-            var shifted = ShiftCorner(L, pav, la, lb, A.On ? A.Face : 0, B.On ? B.Face : 0, rx is > 0.05 ? rx.Value : cf0?.R ?? 0, notes);
+            // Esquina da extensão em chanfro: o ajuste da esquina (0 = curva) ou o geral.
+            var chamfer = ls?.CurbExtensionCornerChamfer ?? d.CurbExtensionCornerChamfer;
+            var shifted = ShiftCorner(L, pav, la, lb, A.On ? A.Face : 0, B.On ? B.Face : 0, rx is > 0.05 ? rx.Value : cf0?.R ?? 0, notes, chamfer);
             // Estação até onde a largura toda precisa ir para a travessia e as rampas deste lado ficarem sobre a extensão.
             double? Cover(IntersectionLeg leg, int side)
             {
@@ -368,7 +370,7 @@ public static partial class IntersectionGenerator
             if (cf0 is { Span: < 179, R: > 0.01 } cfe)
             {
                 tpl.ArcCenters = new List<Vec2> { cfe.V + (cfe.Ua + cfe.Ub).Normalized() * (cfe.R / Math.Sin(cfe.Span * Math.PI / 360)) };
-                if (shifted != null) tpl.ArcCenters.Add(shifted.Center);
+                if (shifted is { Chamfer: false }) tpl.ArcCenters.Add(shifted.Center);
             }
             // Trechos de cada lado com a largura toda.
             var ramp = ls?.CurbExtensionRamp ?? true;
@@ -452,8 +454,11 @@ public static partial class IntersectionGenerator
         return (p - L.Node).Dot(leg.Dir);
     }
 
-    /// <summary>Curva da esquina deslocada pelas extensões: face nova (arco), os novos fins da curva e os de antes, centro e raio.</summary>
-    private sealed record ShiftedCorner(List<Vec2> Arc, double TA, double TB, double TA0, double TB0, Vec2 Center, double R);
+    /// <summary>
+    /// Curva da esquina deslocada pelas extensões: face nova (arco, ou o chanfro reto com <paramref name="Chamfer"/>), os novos
+    /// fins da curva e os de antes, centro e raio (no chanfro, o raio da curva com os mesmos fins).
+    /// </summary>
+    private sealed record ShiftedCorner(List<Vec2> Arc, double TA, double TB, double TA0, double TB0, Vec2 Center, double R, bool Chamfer = false);
 
     /// <summary><see cref="IntersectionLayout.TangentT"/> = o maior dos dois lados de cada ramo.</summary>
     private static void SyncTangents(IntersectionLayout L)
@@ -470,11 +475,15 @@ public static partial class IntersectionGenerator
     /// da curva antiga no lado sem extensão). Nulo quando a esquina não segue o modelo dos bordos retos.
     /// </summary>
     private static ShiftedCorner? ShiftCorner(IntersectionLayout L, List<Polygon2> pav, IntersectionLeg la, IntersectionLeg lb, double fA, double fB, double r,
-        List<string> notes)
+        List<string> notes, double? chamfer = null)
     {
         if (!L.CornerFillets.TryGetValue((la.Road, la.Sign), out var cf) || cf.Span >= 179 || cf.R <= 0.01 || r <= 0.01) return null;
         var (ua, ub, V) = (cf.Ua, cf.Ub, cf.V);
         var half = cf.Span * Math.PI / 360;
+        // Esquina em chanfro (imagem de referência do item 12): face reta entre os pontos a <paramref name="chamfer"/> do vértice
+        // das faces deslocadas – os mesmos fins da curva de raio chanfro × tg(ângulo/2).
+        var chamf = chamfer is > 0.05;
+        if (chamf) r = chamfer!.Value * Math.Tan(half);
         var T0 = cf.R / Math.Tan(half);
         var node = L.Node;
         // Só quando o fim da curva calculado pelo vértice vale (sem correção pela medida).
@@ -492,14 +501,18 @@ public static partial class IntersectionGenerator
         var rMax = double.MaxValue;
         if (fA < 1e-6) rMax = Math.Min(rMax, ((V + ua * T0 - node).Dot(la.Dir) - (V2 - node).Dot(la.Dir)) * Math.Tan(half) / ua.Dot(la.Dir));
         if (fB < 1e-6) rMax = Math.Min(rMax, ((V + ub * T0 - node).Dot(lb.Dir) - (V2 - node).Dot(lb.Dir)) * Math.Tan(half) / ub.Dot(lb.Dir));
-        // Arco novo fora da calçada: o ponto do meio dele não passa do ponto do meio do arco antigo (ao longo da bissetriz).
+        // Face nova fora da calçada: o ponto do meio dela não passa do ponto do meio do arco antigo (ao longo da bissetriz). O
+        // meio do arco fica a r·(1/sen − 1) do vértice; o do chanfro, a T·cos = r·cos²/sen (mais fundo, com os mesmos fins).
         var mid0 = (cf.R / Math.Sin(half) - cf.R);
         var shift = (V2 - V).Dot(bis);
-        rMax = Math.Min(rMax, (mid0 - shift) / (1 / Math.Sin(half) - 1));
+        var depth = chamf ? Math.Cos(half) * Math.Cos(half) / Math.Sin(half) : 1 / Math.Sin(half) - 1;
+        rMax = Math.Min(rMax, (mid0 - shift) / depth);
         if (r > rMax + 1e-6)
         {
-            if (rMax < 0.3) return null;
-            notes.Add($"raio da curva da extensão de calçada reduzido de {r:0.00} m para {rMax:0.00} m (a curva nova não pode entrar na calçada)");
+            if (rMax < 0.3 * (chamf ? Math.Tan(half) : 1)) return null;
+            notes.Add(chamf
+                ? $"recuo do chanfro da esquina da extensão de calçada reduzido de {TOf(r):0.00} m para {TOf(rMax):0.00} m (o chanfro não pode entrar na calçada)"
+                : $"raio da curva da extensão de calçada reduzido de {r:0.00} m para {rMax:0.00} m (a curva nova não pode entrar na calçada)");
             r = rMax;
         }
         var T = TOf(r);
@@ -514,7 +527,8 @@ public static partial class IntersectionGenerator
         while (da > Math.PI) da -= 2 * Math.PI;
         while (da < -Math.PI) da += 2 * Math.PI;
         var n = Math.Max(4, (int)Math.Ceiling(Math.Abs(da) / (Math.PI / 180)));
-        for (int i = 0; i <= n; i++) pts.Add(c + Vec2.FromAngle(a0 + da * i / n) * r);
+        if (chamf) pts.AddRange(new[] { ta, tb });
+        else for (int i = 0; i <= n; i++) pts.Add(c + Vec2.FromAngle(a0 + da * i / n) * r);
         var tA = (ta - node).Dot(la.Dir);
         var tB = (tb - node).Dot(lb.Dir);
         L.SideTangentT[keyA] = tA;
@@ -525,7 +539,7 @@ public static partial class IntersectionGenerator
         foreach (var leg in new[] { la, lb })
             if (L.SideTangentT.ContainsKey((leg.Road, leg.Sign, 1)) && L.SideTangentT.ContainsKey((leg.Road, leg.Sign, -1)))
                 L.ClearCap[(leg.Road, leg.Sign)] = L.TangentT[(leg.Road, leg.Sign)];
-        return new ShiftedCorner(pts, tA, tB, tA0, tB0, c, r);
+        return new ShiftedCorner(pts, tA, tB, tA0, tB0, c, r, chamf);
     }
 
     /// <summary>

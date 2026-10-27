@@ -415,7 +415,7 @@ public class LVCorrecoesTests
     }
 
     /// <summary>Peças de tudo o que a cena gera, com o projeto inteiro (loteamento e quadras) à vista dos geradores.</summary>
-    private static List<Y34TipTests.Part> GeometriaComLoteamento(Y34TipTests.World w, LoteamentoDefinition lot, IEnumerable<QuadraDefinition> quadras)
+    public static List<Y34TipTests.Part> GeometriaComLoteamento(Y34TipTests.World w, LoteamentoDefinition lot, IEnumerable<QuadraDefinition> quadras)
     {
         var all = w.Defs.Append(lot).Concat(quadras).ToList();
         var ctx = new BuildContext
