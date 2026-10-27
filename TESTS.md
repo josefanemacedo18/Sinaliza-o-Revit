@@ -15,6 +15,13 @@ dotnet build src/SinalizacaoViaria.Revit -c Release -p:EnableWindowsTargeting=tr
 
 Não compile enquanto a suíte roda com `--no-build`: a compilação troca as DLLs em uso.
 
+```bash
+# Desempenho do núcleo (Etapa 13): projetos de 4, 16 e 64 vias e o piso tátil longo, sem o Revit
+dotnet run -c Release --project tools/Desempenho > docs/evidencias/AAAA-MM-DD-desempenho-nucleo.txt
+```
+
+A saída de 2026-10-27 está em `docs/evidencias/2026-10-27-desempenho-nucleo.txt`. O programa não entra no CI nem no plugin.
+
 ## Linha de base
 
 | Data | Commit | Testes | Resultado | Duração | Observação |
@@ -78,6 +85,10 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
 | `EVAlignmentElementsTests` | elementos do traçado (TS/SC/CS/ST, curva circular calculada à mão, espirais, reduzida, sem curva) e do greide (convexa ±2 %, côncava com piso K, vão curto, extremo fora da curva, consistência com `Z(s)`), CSV e estacas |
 | `EVSectionVolumesTests` | volumes por seções: corte/aterro constantes, terreno linear (exato) e quadrático (erro h²/12 esperado), última seção no fim, eixo em curva, conferência com a malha de `Grading.Volumes`, CSV |
 | `EWAxisElementsTests` | elementos do eixo das vias comuns: canto arredondado (R, Δ, T, estacas conferidos à mão), canto vivo, curva reversa, reta, CSV |
+| `Etapa13DesempenhoTests` | Etapa 13: o índice da terraplenagem (`RingIndex`) dá exatamente o ponto da busca em todas as plataformas (4 000 pontos, perto e longe, com furos), a ligação nos contornos dos taludes e os volumes por via somando o total |
+| `Etapa13TrafegoTests` | Etapa 13 (F11): a mesma semente dá os mesmos números e o mesmo relatório (menos a data); a seção 9 com sementes, passo, aquecimento e medição; a assinatura muda com os parâmetros e com a rede |
+| `Etapa13ProgressoTests` | Etapa 13: fração só com total conhecido, contagem, limitador com relógio injetado, cancelamento só no ponto seguro, nenhum ponto de cancelamento depois da gravação em Atualizar Todas, Quantitativos e a janela (sem `Task.Run`, Revit desabilitado e devolvido) |
+| `Etapa13IntegradoTests` | Etapa 13: a sequência do fluxo integrado no núcleo (registro com vias e nó, grelha lida na via certa e acusada como nova, leitura sem mudar a assinatura, edição do talude → V15 e impacto, terraplenagem refeita limpa) e a ligação da etapa no Autoteste (opção, ordem, etapas juntas, motores reais) |
 | `Etapa04ViasTests` | Etapa 4: limites dos avisos num registro com a origem dita (sem fonte = "sem norma citada"; espaço que o gerador precisa); avisos de minirrotatória, pista giratória, compacta com duas faixas e canalização; estaqueamento (padrão igual ao de sempre, estaca inicial, intervalo, equação com lacuna e equação que repete estacas, leitura e escrita das equações, problemas antes de aplicar, CSV do eixo, texto do V12 e ida e volta JSON) |
 | `Etapa03TerrenoTests` | Etapa 3: diagnóstico da superfície (`TerrainDiagnostics`) – superfície boa sem achados, sem superfície ou pontos numa reta, o mesmo ponto com cotas diferentes (5 mm não conta), coordenada não numérica, triângulo sem área, declividade só com limite informado, consultas fora da superfície; V14 no validador (via que molda o terreno fora dele, declividade com limite, "não verificado" sem terreno ou sem limite) |
 | `Etapa02DiagnosticoTests` | Etapa 2: regras V01–V14 com módulo e ação (V04 por tipo de dependência), "não verificado" só quando pedido (V12 sem limites, V13 sem Projeto ou sem chuva, V06 sem o documento), histórico da validação (chaves, JSON, novo × persistente × resolvido pela chave e não pela mensagem), relatório com versão, módulos, ação, comparação e "Não verificado", registro de tolerâncias coerente |
@@ -140,3 +151,6 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
    contornos dos pisos e definições – o bastante para reproduzir no núcleo sem repetir o teste).
 4. Rodar **Análise → Validar Modelo** num projeto existente: não altera nada (comando somente leitura) e grava
    `validacao-*.txt`.
+5. Desde a 2.19: **Projeto → Atualizar Todas** numa cópia com muitas marcas – cancelar no meio (o modelo fica igual, nada
+   novo no Desfazer) e depois deixar terminar; abrir **Quantitativos** e cancelar. No Autoteste, marcar **Fluxo integrado**
+   (ou o Completo) e conferir as cinco etapas do bloco sem erro.

@@ -34,9 +34,9 @@ no Revit; cada fase concluída gera uma DLL em `Releases/FaseNN` (ver `Releases/
 | X – Compatibilização | 🔄 **atual** | `ModelValidator` V01–V13 com severidade, confiança e revisão humana; comando Validar Modelo no Revit (EV4–EV5); pisos sobrepostos classificados e pisos × terreno no núcleo e no Autoteste (Etapa 1 do plano, 2.8.0); validação com módulo, ação, "não verificado" e histórico, e o terreno no V14 (Etapas 2 e 3, 2.9.0); terraplenagem desatualizada no V15 (Etapa 5, 2.11.0); estado dos resultados, leitura com origem e V17 (Etapa 8, 2.14.0) | Central do Projeto com o estado na tela (Etapa 10) | Validar Modelo (2026-10-19) |
 | XI – Mobilidade e tráfego | ✅ | simulador auditado (AUDIT §6.11): modelo, hipóteses e limites registrados; não calibrado, sem dados de campo (K6) | — (calibração depende de contagens reais) | validada (Autoteste) |
 | XII – Cenários e otimização | 🔄 | cenários e soluções de tráfego (rodadas anteriores) | cenários de projeto comparados por quantitativos (F12) | — |
-| XIII – Interface e experiência | 🔄 | janelas existentes (rodadas anteriores); design system (tokens e componentes) e faixa de opções por tema em duas guias, com o Diagnóstico do Terreno (Etapa 9, 2.15.0); Central do Projeto e painel contextual (Etapa 10, 2.16.0); telas dos módulos – via em seções, pavimento, drenagem, terreno, nós, parcelamento – e estaca da via nos formulários (Etapa 11, 2.17.0); Central de Qualidade, quantitativos com a origem de cada número e gerenciador de configurações e perfis (Etapa 12, 2.18.0) | desempenho e entrega (13) | DLL 2.18.0 (`Releases/Etapa12`) não executada no Revit (K23–K26) |
+| XIII – Interface e experiência | 🔄 | janelas existentes (rodadas anteriores); design system (tokens e componentes) e faixa de opções por tema em duas guias, com o Diagnóstico do Terreno (Etapa 9, 2.15.0); Central do Projeto e painel contextual (Etapa 10, 2.16.0); telas dos módulos – via em seções, pavimento, drenagem, terreno, nós, parcelamento – e estaca da via nos formulários (Etapa 11, 2.17.0); Central de Qualidade, quantitativos com a origem de cada número e gerenciador de configurações e perfis (Etapa 12, 2.18.0); progresso e cancelamento em Atualizar Todas e Quantitativos (Etapa 13, 2.19.0) | ver as telas no Revit (K23–K27); progresso nas demais operações longas | DLL 2.19.0 (`Releases/Etapa13`) não executada no Revit (K23–K27) |
 | XIV – Regras da API do Revit | 🔄 | transações e falhas tratadas; avisos do Revit medidos e reduzidos pelos Autotestes (EW–FC): retas fora do eixo 1 385 → 85 → 8 → 1 (corrigida no FC); tipo de piso do usuário só onde ele trocou (D-012); forma direta confere cada objeto; rotatória oval sem lascas na extrusão (FC) | Autoteste completo sem pares persistentes nem retas fora do eixo evitáveis | 4 Autotestes completos; FC pendente |
-| XV – Testes, desempenho, resiliência e entrega | 🔄 | 2 869 testes do núcleo; seis Autotestes no Revit, quatro completos (o 4º em 36 min, era 1 h 41 min); leitura das marcas sem interpretar o que não precisa (D-013), recortes só perto do contorno, tempo por trecho do plugin e arquivo de dados completo no Autoteste, conferência final de todos os pisos (FB); 4º Autoteste reproduzido no núcleo pelo arquivo de dados (FC) | etapas que restarem lentas (K14, K15); pacote de entrega final | 4 Autotestes completos |
+| XV – Testes, desempenho, resiliência e entrega | 🔄 | 2 869 testes do núcleo; seis Autotestes no Revit, quatro completos (o 4º em 36 min, era 1 h 41 min); leitura das marcas sem interpretar o que não precisa (D-013), recortes só perto do contorno, tempo por trecho do plugin e arquivo de dados completo no Autoteste, conferência final de todos os pisos (FB); 4º Autoteste reproduzido no núcleo pelo arquivo de dados (FC); medição do núcleo em três tamanhos de projeto e terraplenagem linear, com o mesmo resultado (Etapa 13, 2.19.0); fluxo integrado no Autoteste; relatório técnico final (`docs/RELATORIO_TECNICO.md`) | K14 e K15 no Revit (medidos, não mudados – D-031); 5º Autoteste completo | 4 Autotestes completos; 2.8.0–2.19.0 não executadas |
 
 ## Concluído
 
@@ -68,6 +68,16 @@ Desde 2026-10-26 a lista de próximas etapas é o **plano unificado** dos três 
 [docs/PLANO_DE_ACAO.md](docs/PLANO_DE_ACAO.md) (D-022). Ele tem 14 etapas (0–13), cada uma com a origem, a situação e o
 critério de aceite. Os itens que estavam aqui (X1–X5, P6–P8, K11, K12, F10–F12, K14/K15) foram para as etapas 1–13 do plano.
 
+As 14 etapas foram entregues (2.8.0 a 2.19.0). O que vem depois, em ordem de risco, está no relatório técnico final
+([docs/RELATORIO_TECNICO.md](docs/RELATORIO_TECNICO.md) §15):
+1. 5º Autoteste completo no Revit com a 2.19.0, com o Fluxo integrado (K3, K11, K12, K16, K17, K19, K27);
+2. abrir as telas no Revit (K23–K27);
+3. K15 pelo plano registrado, medido pelos contadores do Autoteste;
+4. K14 (relevos do piso tátil agrupados por placa);
+5. progresso na Terraplenagem e no Validar Modelo;
+6. cenários de projeto comparados por quantitativos (F12);
+7. desfazer ciclos entre pastas do Core quando a mudança já tocar o código (K18).
+
 ## Fora do escopo até haver especificação
 
 - Aprovação legal de loteamento, critérios de visibilidade sem norma citada e calibração de tráfego sem dados de campo.
@@ -92,5 +102,5 @@ técnicas entre IV, V, VI, VII, VIII, XIV e XV, tratadas na ordem do roteiro.
 | RT-1.3 Classificação dos pisos sobrepostos | Etapa 1 (Fase X) – **feito** | `OverlapClassifier` nas cinco classes, com motivo e ação, no núcleo e no Autoteste (etapas e modelo final) | corrigir só os conflitos reais e as duplicações que o 5º Autoteste apontar, pela causa (K11) | ✅ `Fase10CompatibilizacaoTests`; nada apagado; Autoteste NÃO VALIDADO NO REVIT |
 | RT-1.4 Superfície projetada e transições | Fase VII (complemento) e XIV | plataformas, taludes de corte e aterro e reaterros no Toposolid | conferir os encontros pavimento, calçada e talude × terreno, as emendas entre segmentos e os taludes por parâmetro (sem inclinação universal) | testes no núcleo |
 | RT-1.5 Drenagem × greide e terreno | Fase VIII (complemento) e X | feito no núcleo na Etapa 6 (2.12.0): sarjeta e área lidas da via (Ler do Modelo), pontos baixos sem captação e talvegues sob aterro (V13), recobrimento sob a superfície acabada | área dos lotes e quadras (K5); Autoteste no Revit | `Etapa06DrenagemTests` |
-| RT-1.6 API e validação integrada | Fases XIV e XV | transações e falhas tratadas; quatro Autotestes completos | operações do Toposolid e dos pisos conferidas na documentação da API 2027; etapa integrada no Autoteste | Autoteste no Revit (não executável neste ambiente) |
+| RT-1.6 API e validação integrada | Fases XIV e XV | transações e falhas tratadas; quatro Autotestes completos | operações do Toposolid e dos pisos conferidas na documentação da API 2027; etapa integrada no Autoteste **feita no código** (Fluxo integrado, 2.19.0) | `Etapa13IntegradoTests`; Autoteste no Revit (não executável neste ambiente) |
 

@@ -474,3 +474,38 @@ como substituída.
   - formatar os números pela cultura do Windows: o plugin é em português e o CSV segue o padrão brasileiro (";" e vírgula),
     que é o do Excel em português; as unidades são SI e ficam fixas.
 - **Consequências:** cada número e cada configuração diz de onde vem e o que afeta; o que não foi visto no Revit está em K26.
+
+## D-031 – Etapa 13: medir antes de mudar, cancelar só antes de gravar, fluxo integrado com os motores de verdade
+- **Contexto:** a última etapa do plano pede medir o desempenho antes de otimizar (K14, K15), progresso e cancelamento nas
+  operações longas (Interface §21), relatório do tráfego que separe simulação de animação (F11), uma etapa integrada no
+  Autoteste e o relatório técnico final (Interface §32). Neste ambiente não há Revit: o que muda o que o Revit cria ou lê não
+  pode ser conferido aqui.
+- **Decisão:**
+  - medir o núcleo num programa à parte (`tools/Desempenho`), em três tamanhos de projeto, e o Revit pelos tempos por trecho
+    que o Autoteste já grava; otimizar só o que a medida mostrou e só quando o resultado puder ser provado igual (a
+    terraplenagem: o mesmo SHA-256 antes e depois);
+  - K14 (um sólido por relevo do piso tátil) e K15 (varreduras do documento) ficam como estão: as duas mudanças mexem no que
+    o Revit cria ou lê, e um erro nelas apaga ou duplica elementos – risco que só um Autoteste no Revit descarta. O plano e a
+    medida de antes ficam registrados;
+  - progresso: a operação roda no fio do Revit (a API não aceita outro); a janela processa as mensagens dela a cada
+    atualização, limitada, e a janela principal do Revit fica desabilitada enquanto isso;
+  - cancelar só em ponto seguro, antes de gravar: a exceção de cancelamento sai de dentro da transação e o `Dispose` sem
+    `Commit` desfaz tudo; depois de gravar, as etapas restantes terminam sem cancelar e a janela diz isso;
+  - barra só com total conhecido; sem total, indicador de atividade – nada de percentual estimado;
+  - F11: o relatório diz o que é determinístico (análise), o que é estocástico (microssimulação, com as sementes) e que a
+    animação só reproduz a rodada; a assinatura da rede e dos parâmetros identifica o cenário;
+  - o fluxo integrado do Autoteste chama os mesmos comandos e motores do usuário (Terraplenagem, Drenagem encaixada no
+    meio-fio, Ler do Modelo, Quantitativos, Validar Modelo), nenhum atalho de teste, e confere cada módulo pelo que o anterior
+    gravou; as etapas vão juntas para o modo rápido não cortar o fluxo no meio;
+  - o relatório técnico final é um documento novo (`docs/RELATORIO_TECNICO.md`), porque o §32 pede um relatório de entrega;
+    ele remete aos documentos de controle em vez de repeti-los, e não tem capturas de tela (não há Revit aqui).
+- **Alternativas descartadas:**
+  - operação num fio separado com a janela no fio do Revit: a API do Revit só pode ser chamada no fio dele;
+  - cancelar a qualquer momento, inclusive durante a gravação ou os recortes: deixaria o modelo pela metade;
+  - percentual estimado pelo tempo: inventaria um número;
+  - otimizar a varredura do documento (K15) por um filtro do parâmetro do id, sem rodar no Revit: um filtro errado deixa
+    elementos para trás e a marca seguinte os duplica;
+  - imagens ilustrativas da interface no relatório: o §32 aceita a falta das capturas reais, desde que dita, e proíbe
+    passar imagem conceitual por real.
+- **Consequências:** a terraplenagem cresce linear com o projeto; as duas operações mais longas do dia a dia mostram onde
+  estão e podem ser canceladas sem deixar o modelo pela metade; o que não foi visto no Revit está em K27.

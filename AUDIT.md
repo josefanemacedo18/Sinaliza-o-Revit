@@ -356,7 +356,7 @@ a Fase VIII (o dimensionamento existe e é testado; ver a linha acima dela). Foi
 | 5 | Resultado velho apresentado como atual | terraplenagem desatualizada depois de mudar a via, sem aviso | feito na Etapa 5: registro com a assinatura das marcas e V15 |
 | 6 | Cálculo com dado incoerente | estrutura do pavimento diferente entre o corte (camadas) e a terraplenagem (0,40 m); quantitativo de terraplenagem sempre com 0,40 m | feito na Etapa 5: estrutura na via usada pelos três; quantitativo com as opções da terraplenagem aplicada |
 | 7 | Acoplamento entre pastas do Core (R15) | referências mútuas (§8.1) | sem reestruturação em bloco (Prompt Master §2); código novo sem nova referência mútua; um ciclo é desfeito quando a mudança já toca aquele código |
-| 8 | Demais | F12, F11, K14/K15, revisão da interface (XIII) | depois dos itens acima |
+| 8 | Demais | F12, F11, K14/K15, revisão da interface (XIII) | interface nas Etapas 9–12; F11 e a medição de K14/K15 na Etapa 13 (terraplenagem linear; K14 e K15 medidos e não mudados, D-031); F12 aberto |
 
 ## 9. Motores e interface (Prompts de Motores e de Interface, 2026-10-26)
 
@@ -398,7 +398,7 @@ pedem e a §8 não cobria: a interface (Etapa Zero do Prompt de Interface) e a c
 | Gerenciador de configurações (usuário × projeto, perfis) – §19 | FEITO na 2.18 (Etapa 12): do usuário, do projeto e de cada elemento, com onde ficam, o valor e o que afetam; validação de tudo antes de aplicar e o que muda ao salvar; perfis rotulados como exemplo, do usuário ou referência citada; perfis de limites (`RegistroConfiguracoes`). As do projeto são editadas nos comandos que já existiam. NÃO VISTO NO REVIT (K26) | 12 ✅ |
 | Personalização e persistência – §26 | FEITO na 2.18 (Etapa 12): tamanho das telas grandes lembrado (limitado à tela; sem valor, o padrão) e restaurável; últimas escolhas e perfis nas configurações do usuário, fora do modelo; configuração ausente, de versão anterior ou corrompida abre no padrão (testado). Filtros e colunas não são lembrados | 12 ✅ |
 | Estados de atualização – §20 | PARCIAL: atualizado, desatualizado, não verificado e informação vêm da comparação real (Etapa 8, D-026) e aparecem no Validar Modelo, na Central e no painel; "recalculando" e "falha na atualização" não são estados guardados (a atualização automática roda na transação do usuário e falha com mensagem) | 8 → 10 ✅ |
-| Progresso e cancelamento – §21 | PARCIAL | 13 |
+| Progresso e cancelamento – §21 | PARCIAL na 2.19 (Etapa 13, D-031): Atualizar Todas e Quantitativos com etapa, item, quantos de quantos (barra só com total conhecido) e Cancelar só antes de gravar (a transação é desfeita); o Simulador já tinha barra; Terraplenagem, Validar Modelo e Autoteste sem janela de progresso. NÃO VISTA NO REVIT (K27) | 13 ✅ |
 
 ### 9.2a Elementos urbanos e viários complementares (Prompt de Motores §12, auditoria da Etapa 7)
 
@@ -434,4 +434,19 @@ As linhas da AUDIT §8.2 marcadas P ou A, com a prioridade. A coluna "Etapa" rem
 | P2 | Interseção que não se resolve sem explicar os parâmetros | interseções | 4 | usuário sem saber o que mudar |
 | P2 | ~~Indicadores urbanísticos configuráveis~~ feito (2.13.0: indicadores, fonte dos mínimos, V16) | urbanismo | 7 | — |
 | P2 | ~~Perfil longitudinal da rede e lista de dispositivos~~ feito (2.12.0, `PerfilRede`) | drenagem | 6 | — |
-| P3 | Cenários de projeto comparados (F12), relatório do tráfego (F11), desempenho (K14/K15) | vários | 5, 13 | — |
+| P3 | ~~Relatório do tráfego (F11)~~ feito (2.19.0, seção 9 com sementes e assinatura); desempenho: terraplenagem linear (2.19.0), K14/K15 medidos e não mudados (D-031); cenários de projeto comparados por quantitativos (F12) **não feito** | vários | 5, 13 | F12: comparar alternativas de projeto inteiras continua manual (a Terraplenagem já compara a simulação com a aplicada) |
+
+## 10. Etapa 13 – desempenho, validação e entrega (2026-10-27)
+
+Base: commit `9c7824d` e o da versão 2.19.0. Nada executado no Revit. Relatório técnico final: `docs/RELATORIO_TECNICO.md`.
+
+| Item | Situação | Evidência |
+|---|---|---|
+| Medição do núcleo (Motores §18) | FATO: 14 operações do núcleo em 4, 16 e 64 vias; depois da correção da terraplenagem, nenhuma cresce ao quadrado – de 4 para 64 vias (16× as marcas), no máximo ~10× (as abaixo de 1 ms variam com o ruído) | `tools/Desempenho`; `docs/evidencias/2026-10-27-desempenho-nucleo.txt` |
+| Terraplenagem quadrática | FATO: corrigida com resultado idêntico (mesmo SHA-256 nos três tamanhos); 64 vias 12,1–14,6 s → 2,9–4,0 s | `RingIndex` em `Grading.cs`; `Etapa13DesempenhoTests` |
+| K14 piso tátil longo | FATO: núcleo 2,3 ms para 3 120 relevos; INFERÊNCIA: os 171 s do 3º Autoteste são a criação de um sólido por relevo no Revit | evidência acima; KNOWN_ISSUES K14 |
+| K15 leitura das marcas | FATO (4º Autoteste): ~28 % do tempo, 34,5 milhões de elementos visitados em 11 350 varreduras; não mudado (D-031) | evidência acima; KNOWN_ISSUES K15 |
+| Progresso e cancelamento (Interface §21) | PARCIAL: duas operações (Atualizar Todas, Quantitativos); cancelamento só antes de gravar | `ProgressWindow`, `Progress.cs`; `Etapa13ProgressoTests`; K27 |
+| Simulação × animação (F11) | FEITO: seção 9 do relatório, sementes, passo, aquecimento, medição e assinatura; FATO: mesma semente, mesmos números | `TrafficReport.Reproducao`; `Etapa13TrafegoTests` |
+| Etapa integrada no Autoteste (RT-1.6) | FEITO no código, NÃO EXECUTADA NO REVIT: via → interseção → terraplenagem → drenagem → quantitativos → validação, cada módulo conferido pelo anterior | `AutoTestSteps5.cs`; `Etapa13IntegradoTests`; K27 |
+| Cenários de projeto comparados (F12) | NÃO FEITO | ROADMAP fase XII |

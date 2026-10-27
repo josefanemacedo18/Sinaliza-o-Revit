@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-27 (Etapas 0–12 entregues; Etapa 13 a seguir)
+## Estado em 2026-10-27 (Etapas 0–13 entregues: plano unificado concluído)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -50,20 +50,29 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     muda; perfis exemplo / usuário / referência citada; perfis de limites); tamanho das telas grandes lembrado. Correções:
     consumo de tinta com a unidade da taxa e litros somados com quilos; configurações salvas pela metade com um campo
     inválido. Telas não vistas no Revit (K26).
-  - `Instalar/Revit2027` tem a DLL 2.18.0. As anteriores continuam em `Releases/`.
-- **Etapa 13 (próxima):** desempenho, validação e entrega (PLANO): medir antes de otimizar (K14, K15), progresso e
-  cancelamento nas operações longas, relatório de simulação × animação (F11), etapa integrada no Autoteste, relatório
-  técnico final (Interface §32).
+  - Etapa 13 ✅: 2.19.0 em `Releases/Etapa13` (`§§C§§`, 3 136/3 136) – D-031: medição do núcleo (`tools/Desempenho`,
+    4/16/64 vias) e **terraplenagem linear** com o mesmo resultado (`RingIndex`: 64 vias 12–15 s → 3–4 s, mesmo SHA-256);
+    K14 e K15 medidos e não mudados (mexem no que o Revit cria ou lê); **progresso e cancelamento** em Atualizar Todas e
+    Quantitativos (cancelar só antes de gravar – a transação é desfeita); **relatório do tráfego reprodutível** (F11:
+    seção 9 com sementes, passo, aquecimento e assinatura); **Fluxo integrado** no Autoteste (via → interseção →
+    terraplenagem → drenagem → quantitativos → validação); **relatório técnico final** em `docs/RELATORIO_TECNICO.md`.
+    Não executada no Revit (K27).
+  - `Instalar/Revit2027` tem a DLL 2.19.0. As anteriores continuam em `Releases/`.
+- **Plano unificado concluído** (14 etapas, 2.8.0 a 2.19.0). Pendências abertas: F12 (cenários de projeto comparados por
+  quantitativos), K14/K15 no Revit e tudo o que depende de rodar no Revit (K3, K17, K19, K23–K27).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros (compilar sempre também o projeto de testes antes do
   commit).
 
 ## Próxima tarefa
 
-1. Etapa 13 (PLANO): desempenho, validação e entrega – a última do plano.
-2. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer tudo**;
-   enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`); rodar também o
-   Validar Modelo duas vezes (a segunda mostra a comparação com a primeira).
+1. No Revit (quando houver): 5º Autoteste completo com a DLL 2.19.0, numa cópia, com **Fluxo integrado**, terminando com
+   **Desfazer tudo**; enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`);
+   rodar também o Validar Modelo duas vezes (a segunda mostra a comparação com a primeira) e cancelar um Atualizar Todas.
+   Os defeitos do relatório são reproduzidos no núcleo pelo arquivo de dados.
+2. Sem o Revit: as recomendações do `docs/RELATORIO_TECNICO.md` §15 que não dependem dele – progresso na Terraplenagem e
+   no Validar Modelo (mesmo `IProgressoOperacao`), F12 (cenários comparados por quantitativos) e K18 quando a mudança tocar
+   o código. K14 e K15 só com um Autoteste para medir antes e depois (D-031).
 
 ## Como retomar
 
@@ -80,7 +89,7 @@ dotnet test tests/SinalizacaoViaria.Core.Tests -c Release                       
 
 O contêiner pode ser reciclado sem aviso (em 2026-10-26 perdeu-se trabalho não commitado): commit e push a cada passo verde.
 
-Leia nesta ordem: docs/PLANO_DE_ACAO.md (plano e situação) → docs/PROMPT_MASTER.md (escopo e regras) → AUDIT.md (estado e evidências; §8 pelo Prompt Master) → KNOWN_ISSUES.md → ROADMAP.md → DECISIONS.md.
+Leia nesta ordem: docs/RELATORIO_TECNICO.md (estado final do plano) → docs/PLANO_DE_ACAO.md (plano e situação) → docs/PROMPT_MASTER.md (escopo e regras) → AUDIT.md (estado e evidências; §8 pelo Prompt Master) → KNOWN_ISSUES.md → ROADMAP.md → DECISIONS.md.
 
 ## Regras de trabalho em vigor
 

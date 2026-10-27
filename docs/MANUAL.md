@@ -839,7 +839,11 @@ partir do pavimento – confira antes de aplicar.
 * **Atualização automática**: ao mover/editar linhas de referência, as marcas associadas são
   regeneradas na mesma operação (pode ser desativada em Configurações).
 * **Atualizar Todas**: regenera todo o projeto (após alterar o catálogo, as superfícies ou as
-  configurações).
+  configurações). Uma **janela de progresso** mostra a etapa (gerando as marcas, refazendo interseções, rotatórias e
+  balões, gravando, refazendo os recortes), a marca da vez e quantas de quantas. **Cancelar** para no próximo ponto seguro
+  antes de gravar: nada é alterado e o modelo fica como estava. Depois que o Revit começa a gravar não dá mais para
+  cancelar – a janela diz isso e os recortes de sobreposição terminam. Fechar a janela é o mesmo que Cancelar. Enquanto
+  ela está aberta, a janela do Revit fica bloqueada (volta ao terminar).
 * **Cópias**: copiar/colar uma marca cria uma marca independente, com o caminho convertido em pontos
   na nova posição.
 
@@ -998,7 +1002,8 @@ O Autoteste **saiu da faixa de opções** (era fácil clicar sem querer e o Revi
 fica em **SinalizaBIM → Configurações → Autoteste (diagnóstico)…** e abre com o **teste rápido**: só os blocos Vias,
 Tráfego, Conexões, Horizontal, Vertical e Calçadas, **no máximo 3 etapas por bloco** e **3 minutos no total** – o que
 passar disso é pulado e contado no relatório (linha *Modo*). Para o teste de tudo, marque **Completo** e os demais
-blocos (Topografia, Obras, Edição, Detalhamento, Verificações) – só em um arquivo de testes, pois leva de 10 a 40 min.
+blocos (Topografia, Obras, Edição, Detalhamento, Fluxo integrado, Verificações) – só em um arquivo de testes, pois leva de
+10 a 40 min.
 
 Roda sozinho, sem janelas, as ferramentas do plugin numa **área de teste**
 criada 400 m à direita de tudo o que existe no projeto:
@@ -1016,6 +1021,7 @@ criada 400 m à direita de tudo o que existe no projeto:
 | Edição | editar linha/interseção/rotatória, mover eixo (atualização automática), Apagar Trecho (na via, fora da via, zebrado, sem linha de referência, devolver peças), 2D/3D, excluir, Atualizar Todas |
 | Detalhamento | detalhe de placas, anotação, legenda, cota de seção + perfil, detalhe típico, quadros, notas, norte, eixos, quantitativos e tabelas |
 | Tráfego | Simulador de Tráfego sobre a área de teste: leitura da rede, análise HCM e diagnóstico, microssimulação de 5 min, cenários (rotatória × semáforo coordenado × contagem) com comparação, cenários gravados e lidos do projeto, plano semafórico gravado na interseção, sinalização interpretada (placas, marcas, dispositivos e semáforos associados a trechos e cruzamentos), resultados nos parâmetros SV_NivelServico/SV_Trafego e mapa de níveis de serviço na planta; **contatos entre veículos (deve ser zero) e setas**, **planta real no mapa**, **recomendação de tempos e onda verde**, **semáforo de travessia do cenário** e **soluções testadas** para o pior cruzamento |
+| Fluxo integrado (sempre no Completo) | duas vias que se cruzam sobre o terreno de teste → interseção → terraplenagem → grelha encaixada no meio-fio → quantitativos → validação, cada etapa conferindo o que a anterior fez: o registro da terraplenagem com as vias e a interseção, a grelha lida na sarjeta da via certa e acusada como nova pela terraplenagem, o resumo por via com a terraplenagem da própria via, a V15 e o impacto da edição depois de mudar o talude da via e o terreno refeito sem pendências. As cinco etapas vão juntas (o teste rápido não corta o fluxo); sem a Topografia, o fluxo cria o mesmo terreno de teste |
 | Verificações (sempre no Completo) | pintura escondida sob o piso ou flutuando, buracos e degraus entre pisos da pista, **terreno projetado** (o Toposolid depois da terraplenagem) acima da pista ou com degrau na borda da seção – o talude começa no topo do acabamento –, estruturas invadindo outras vias, formas sem geometria |
 
 Cada erro do plugin (inclusive os que antes só iam para o log), cada erro/aviso do Revit e cada verificação que falha
@@ -1066,6 +1072,9 @@ máximo o mesmo desvio já aceito no ajuste do contorno (Configurações › des
 quando isso faria a peça se tocar. Retas mais inclinadas que 0,2° são de projeto e ficam como estão.
 
 ## 10. Quantitativos
+
+**Progresso.** Ao abrir, uma janela mostra a leitura das marcas (quantas de quantas) e o cálculo da terraplenagem. Os
+quantitativos só leem o modelo: **Cancelar** fecha sem resultado e nada muda.
 
 **Miniaturas.** Cada linha mostra a **imagem da própria sinalização**, não do trecho do projeto: a face da placa, um
 trecho da linha com o seu tracejado, o símbolo, a legenda, o zebrado, uma unidade do dispositivo em perspectiva ou a
@@ -2905,6 +2914,14 @@ velocidade (1× a 20×) e linha do tempo.
 de cada sentido, o nível e o atraso de cada cruzamento, título e legenda; desenhar de novo substitui o anterior nessa
 vista). **Exportar relatório** grava o texto (.txt) e a tabela das aproximações (.csv, abre no Excel) em
 `%AppData%\SinalizaBIM`. **Copiar relatório** leva o texto para a área de transferência.
+
+**Reproduzir um resultado (seção 9 do relatório).** O relatório separa o que é **análise** (HCM: determinística – o mesmo
+projeto e os mesmos parâmetros dão sempre os mesmos números), o que é **microssimulação** (estocástica: chegadas e rotas
+sorteadas com a **semente** informada e o perfil de cada motorista com uma semente derivada dela; o passo, o aquecimento e o
+tempo medido estão ali) e o que é **animação** (só a reprodução dos quadros da mesma rodada – nenhum número vem dela). As
+alternativas de *O que fazer para resolver* usam três sementes. A seção lista todos os parâmetros do cenário e uma
+**assinatura** da rede lida e dos parâmetros: a mesma assinatura com a mesma semente dá os mesmos números; outra semente dá
+outra amostra do mesmo cenário (para comparar alternativas, use várias).
 
 > A demanda padrão é **estimada**. Para decidir a implantação de semáforos, faixas adicionais ou rotatórias, use contagens
 > classificadas na hora de pico e confirme os critérios com contagens de 8 horas (MBST Vol. V).

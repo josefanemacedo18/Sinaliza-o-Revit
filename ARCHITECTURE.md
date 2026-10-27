@@ -121,6 +121,13 @@ dois pisos sai igual nos dois (ajustada uma vez); entre marcas diferentes valem 
   as telas. `RegistroConfiguracoes` descreve cada configuração do usuário uma vez (valor, grupo, o que afeta) e lê as do
   projeto; a janela edita uma cópia (`PluginSettings.Clone`) e só aplica com `CopiarDe` depois de validar. O tamanho das
   telas grandes fica em `LastUsed` (`TamanhosDeJanela`), aplicado no `UiHelpers.ShowModal`.
+- **Progresso e cancelamento** (desde a 2.19, D-031): o núcleo define o estado (`EstadoProgresso`: etapa, item, quantos de
+  quantos – fração só com total conhecido), quem o mostra (`IProgressoOperacao`), o limitador das atualizações e os pontos
+  de parada (`Progresso.Passo`, que lança `OperacaoCanceladaException`, e `Progresso.SemCancelar`, depois de gravar). A
+  operação roda no fio do Revit; `ProgressWindow` processa as mensagens dela a cada atualização e desabilita a janela
+  principal do Revit enquanto está aberta (`EnableWindow`, devolvida no `Dispose`). O cancelamento sai de dentro do `using`
+  da transação: o `Dispose` sem `Commit` desfaz tudo. Usado por `CmdAtualizarTodas.RefreshAll` e `CmdQuantitativos.Collect`;
+  sem janela (Autoteste), nada muda.
 - **Design system** (desde a 2.15): cores, tamanhos de texto e espaçamentos em `UI/Styles.xaml` (para o XAML) e
   `UI/UiTokens.cs` (para o código), com as mesmas chaves e valores; componentes (cartão, faixas de mensagem, status, valores,
   botões, tabelas, foco) no `Styles.xaml`. Os desenhos – mapa do tráfego, prévia, miniaturas, ícones – têm paleta de dados
@@ -129,7 +136,10 @@ dois pisos sai igual nos dois (ajustada uma vez); entre marcas diferentes valem 
 ## 6. Testes
 
 Ver [TESTS.md](TESTS.md). Testes xUnit no Core (`tests/SinalizacaoViaria.Core.Tests`). O comportamento dentro do Revit é
-coberto pelo **Autoteste** (`CmdAutoteste`), que roda só dentro do Revit e gera um relatório.
+coberto pelo **Autoteste** (`CmdAutoteste`), que roda só dentro do Revit e gera um relatório; desde a 2.19 ele tem o **Fluxo
+integrado** (`AutoTestSteps5.cs`), que encadeia via, interseção, terraplenagem, drenagem, quantitativos e validação pelos
+mesmos comandos do usuário. O desempenho do núcleo é medido por `tools/Desempenho` (programa de console fora do plugin e
+do CI), sem o Revit.
 
 ## 7. Distribuição
 

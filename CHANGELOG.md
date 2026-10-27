@@ -3,6 +3,61 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-27 – Etapa 13: desempenho, validação e entrega (versão 2.19.0)
+
+Etapa 13, a última do plano unificado (Master §21, §27; Motores §18, Fase 7; Interface §21, §32). Entrega:
+`Releases/Etapa13` (não executada no Revit 2027). Relatório técnico final em [docs/RELATORIO_TECNICO.md](docs/RELATORIO_TECNICO.md)
+(D-031).
+
+### Medir antes de otimizar (K14, K15)
+- **`tools/Desempenho`** (programa de console, fora do plugin): mede o núcleo, sem o Revit, em projetos sintéticos de 4, 16 e
+  64 vias e no piso tátil longo. Saída em `docs/evidencias/2026-10-27-desempenho-nucleo.txt`, com a análise dos tempos por
+  trecho do 4º Autoteste completo.
+- **Terraplenagem linear no tamanho do projeto:** os contornos dos taludes procuravam o ponto mais próximo percorrendo todos
+  os lados de todas as plataformas – quadrático (10,8 s dos 13 s com 64 vias). Um índice em grade (`RingIndex`) dá **o mesmo
+  ponto**: mesmo SHA-256 de todos os pontos de projeto, dos pés dos taludes, dos volumes e da área nos três tamanhos. 64 vias:
+  12,1–14,6 s → 2,9–4,0 s.
+- **K14** (piso tátil de alerta de 30 m, 171 s no 3º Autoteste): o núcleo gera os 3 120 relevos em 2,3 ms; o tempo é do Revit,
+  que cria um sólido por relevo. **K15**: a leitura das marcas no documento é ~28 % do 4º Autoteste (34,5 milhões de
+  elementos visitados em 11 350 varreduras), o custo está em visitar os elementos, não no JSON. Nenhum dos dois foi mudado:
+  as duas correções mexem no que o Revit cria ou lê e precisam ser vistas no Revit (KNOWN_ISSUES, com o plano e a medida).
+
+### Progresso e cancelamento (Interface §21)
+- **Atualizar Todas** e **Quantitativos** abrem uma janela de progresso: a etapa, o que está sendo feito (a marca), quantos de
+  quantos e **Cancelar**. A barra só aparece com o total conhecido; sem total, o indicador de atividade, sem percentual
+  inventado. Atualizações limitadas a uma a cada 100 ms, mais as trocas de etapa.
+- **Cancelar só em ponto seguro:** em Atualizar Todas, antes de gravar – a transação é desfeita e o modelo fica como estava
+  ("cancelado pelo usuário – nada foi alterado"); depois da gravação, os recortes de sobreposição terminam e o botão diz que
+  não dá mais para cancelar. Nos Quantitativos, que só leem, cancelar fecha sem resultado. Fechar a janela é pedir para
+  cancelar.
+- A operação continua no fio do Revit (a API não aceita outro); a janela principal do Revit fica desabilitada enquanto ela
+  roda e volta ao fechar, mesmo com erro. O Autoteste chama as mesmas rotinas sem janela.
+
+### Relatório do tráfego reprodutível (F11)
+- Seção **9. Análise, simulação e animação – parâmetros para reproduzir** no relatório do Simulador de Tráfego: a análise
+  (HCM) é determinística; a microssimulação é estocástica, com as **sementes** (chegadas e perfis de motorista), o passo, o
+  aquecimento e o tempo medido; a animação é a reprodução dos quadros da mesma rodada e nenhum número vem dela; as
+  alternativas usam três sementes. Todos os parâmetros do cenário e uma **assinatura** (SHA-256) da rede e dos parâmetros.
+  A linha de resumo diz a semente.
+
+### Fluxo integrado no Autoteste
+- Opção **Fluxo integrado** (sempre no Completo): duas vias que se cruzam sobre o terreno de teste → interseção →
+  terraplenagem → grelha na sarjeta → quantitativos → validação. Cada etapa confere o que a anterior fez: o registro da
+  terraplenagem tem as vias e o nó; a grelha é lida na sarjeta da via certa e a terraplenagem acusa a caixa nova; o resumo
+  por via traz a terraplenagem da própria via; editar o talude da via faz a V15 e o impacto da edição apontarem a via, e a
+  terraplenagem refeita limpa tudo. As cinco etapas vão juntas (o modo rápido não corta o fluxo).
+- O Toposolid de teste passou a um método comum (`TerrenoDeTeste`), usado pela Topografia e pelo fluxo.
+
+### Testes
+- `Etapa13DesempenhoTests` (3): o índice dá o mesmo ponto que a busca em todos (4 000 pontos, perto e longe), a ligação na
+  terraplenagem e os volumes por via somando o total.
+- `Etapa13TrafegoTests` (3): a mesma semente dá os mesmos números e o mesmo relatório; a seção 9; a assinatura muda com a
+  rede e os parâmetros.
+- `Etapa13ProgressoTests` (5): fração só com total, contagem, limitador (relógio injetado), cancelamento só no ponto seguro e
+  a ligação nos comandos e na janela.
+- `Etapa13IntegradoTests` (2): a sequência do fluxo no núcleo e a ligação da etapa no Autoteste.
+- Janela de progresso e fluxo integrado NÃO EXECUTADOS NO REVIT (K27).
+
 ## 2026-10-27 – Etapa 12: qualidade, quantitativos e configurações (versão 2.18.0)
 
 Etapa 12 do plano unificado (Prompt de Interface §17–§19, §26; Master §13, §17; Motores §17). Entrega: `Releases/Etapa12`
