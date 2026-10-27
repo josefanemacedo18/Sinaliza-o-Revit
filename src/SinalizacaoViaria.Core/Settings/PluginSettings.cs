@@ -60,6 +60,9 @@ public sealed class PluginSettings
     /// </summary>
     public Geometry.GeometricCriteria CriteriosGeometricos { get; set; } = new();
 
+    /// <summary>Perfis de limites geométricos guardados pelo usuário (gerenciador de configurações; com a fonte citada, quando há).</summary>
+    public List<PerfilCriterios> PerfisCriterios { get; set; } = new();
+
     public double DefaultSpeed { get; set; } = 60;
     public string FontFamily { get; set; } = "Arial";
     public bool FontBold { get; set; } = true;
@@ -91,6 +94,17 @@ public sealed class PluginSettings
     {
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         File.WriteAllText(file, JsonSerializer.Serialize(this, JsonConfig.Options));
+    }
+
+    /// <summary>Cópia independente (listas e limites inclusive): a janela edita a cópia e só aplica depois de validar tudo.</summary>
+    public PluginSettings Clone() =>
+        JsonSerializer.Deserialize<PluginSettings>(JsonSerializer.Serialize(this, JsonConfig.Options), JsonConfig.Options) ?? new PluginSettings();
+
+    /// <summary>Passa os valores de outra configuração para esta (o mesmo objeto continua em uso no plugin).</summary>
+    public void CopiarDe(PluginSettings outra)
+    {
+        foreach (var p in typeof(PluginSettings).GetProperties().Where(p => p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0))
+            p.SetValue(this, p.GetValue(outra));
     }
 
     public string? Get(string key) => LastUsed.TryGetValue(key, out var v) ? v : null;

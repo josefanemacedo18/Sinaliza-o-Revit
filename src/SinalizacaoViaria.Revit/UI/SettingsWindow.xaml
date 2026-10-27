@@ -1,7 +1,7 @@
 <Window x:Class="SinalizacaoViaria.Revit.UI.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Configurações – SinalizaBIM" Width="560" Height="620" MinHeight="480" MinWidth="480">
+        Title="Configurações – SinalizaBIM" Width="860" Height="700" MinHeight="480" MinWidth="600">
     <Window.Resources>
         <ResourceDictionary Source="pack://application:,,,/SinalizaBIM;component/UI/Styles.xaml"/>
     </Window.Resources>
@@ -15,9 +15,15 @@
             <Button Content="Salvar" Style="{StaticResource Primary}" Click="SaveClick" IsDefault="True"/>
             <Button Content="Cancelar" IsCancel="True"/>
         </StackPanel>
+        <TextBlock DockPanel.Dock="Top" x:Name="TxtCabecalho" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="0,0,0,6"
+                   Text="Configurações do usuário ficam neste computador (não vão com o projeto); as do projeto ficam gravadas no modelo e as de cada elemento, nele. Salvar valida tudo antes e diz o que muda – nada é alterado nos elementos existentes sem um comando."/>
+        <TabControl x:Name="Tabs">
+        <TabItem Header="Do usuário (este computador)">
+        <DockPanel>
+        <StackPanel DockPanel.Dock="Top" x:Name="PanelValidacao" Margin="0,4,0,6"/>
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <GroupBox Header="Padrões de criação">
+                <GroupBox Header="Geral e documentação (padrões de criação)">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -32,7 +38,7 @@
                         <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkBold" Content="Legendas em negrito"/>
                     </Grid>
                 </GroupBox>
-                <GroupBox Header="Modelo 3D">
+                <GroupBox Header="Desempenho e modelo 3D">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -45,7 +51,7 @@
                         <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbPiece"/>
                     </Grid>
                 </GroupBox>
-                <GroupBox Header="Comportamento">
+                <GroupBox Header="Sistema viário e comportamento">
                     <StackPanel>
                         <CheckBox x:Name="CkAuto" Content="Atualizar marcas automaticamente quando as linhas de referência mudarem"/>
                         <CheckBox x:Name="CkAutoIntersect" Content="Criar/atualizar interseções automaticamente quando as vias se cruzam" IsChecked="True"/>
@@ -62,12 +68,23 @@
                         <CheckBox x:Name="CkBoundary" Content="Contorno visível nas regiões 2D (recomendado para marcas brancas)"/>
                     </StackPanel>
                 </GroupBox>
-                <GroupBox Header="Limites geométricos do traçado e do greide">
+                <GroupBox Header="Geometria, topografia e diagnósticos – limites geométricos do traçado e do greide">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <TextBlock Grid.ColumnSpan="2" Style="{StaticResource Hint}" TextWrapping="Wrap"
                                    Text="Informe os limites da norma e da classe da via adotadas no projeto. O plugin não traz valores normativos: campo vazio não é conferido. O resultado sai no Perfil da Via (CSV de verificação) e no Validar Modelo (V12; a declividade do terreno, no V14)."/>
+                        <StackPanel Grid.Row="11" Grid.ColumnSpan="2" Margin="0,6,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Perfil" Style="{StaticResource FieldLabel}" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="CbPerfil" MinWidth="220" SelectionChanged="PerfilChanged"
+                                          ToolTip="Limites guardados com um nome (e a fonte, quando informada) para reaplicar em outros projetos."/>
+                                <Button Content="Aplicar" Click="AplicarPerfilClick" ToolTip="Preenche os limites com os do perfil escolhido (só salvar grava)."/>
+                                <Button Content="Salvar como perfil…" Click="SalvarPerfilClick" ToolTip="Guarda os limites e a fonte atuais com um nome."/>
+                                <Button Content="Excluir" Click="ExcluirPerfilClick"/>
+                            </StackPanel>
+                            <TextBlock x:Name="TxtPerfil" Style="{StaticResource Hint}" TextWrapping="Wrap"/>
+                        </StackPanel>
                         <TextBlock Grid.Row="1" Text="Fonte (norma, edição, tabela, classe)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbCritFonte"/>
                         <TextBlock Grid.Row="2" Text="Raio mínimo das curvas horizontais (m)" Style="{StaticResource FieldLabel}"/>
@@ -92,7 +109,17 @@
                                  ToolTip="Faces do Toposolid mais íngremes que isto são apontadas no Validar Modelo (V14). Vazio: a declividade do terreno não é conferida."/>
                     </Grid>
                 </GroupBox>
-                <GroupBox Header="Catálogo normativo">
+                <GroupBox Header="Aparência – janelas">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
+                                   Text="As telas grandes (Central do Projeto, Central de Qualidade, Quantitativos, rede de drenagem, terreno, janela da via…) reabrem no tamanho em que foram fechadas. Sem tamanho guardado, abrem no padrão."/>
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <Button Content="Restaurar o tamanho das janelas" Click="RestaurarJanelasClick" Margin="0"/>
+                            <TextBlock x:Name="TxtJanelas" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </GroupBox>
+                <GroupBox Header="Documentação – catálogo normativo">
                     <StackPanel>
                         <TextBlock Style="{StaticResource Hint}" Text="Arquivo JSON com os tipos de marca, dimensões, cores, símbolos, vagas e materiais. Itens com o mesmo código substituem os padrões do plugin."/>
                         <DockPanel>
@@ -108,5 +135,23 @@
                 </GroupBox>
             </StackPanel>
         </ScrollViewer>
+        </DockPanel>
+        </TabItem>
+        <TabItem x:Name="TabProjeto" Header="Do projeto">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="PanelProjeto" Margin="4,6,4,6"/>
+            </ScrollViewer>
+        </TabItem>
+        <TabItem Header="Perfis reutilizáveis">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="PanelPerfis" Margin="4,6,4,6"/>
+            </ScrollViewer>
+        </TabItem>
+        <TabItem Header="Onde fica cada configuração">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="PanelRegistro" Margin="4,6,4,6"/>
+            </ScrollViewer>
+        </TabItem>
+        </TabControl>
     </DockPanel>
 </Window>

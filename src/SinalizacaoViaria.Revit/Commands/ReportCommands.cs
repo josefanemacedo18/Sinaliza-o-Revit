@@ -225,20 +225,32 @@ public sealed class CmdQuantitativos : CommandBase
     }
 }
 
-/// <summary>Configurações do plugin.</summary>
+/// <summary>
+/// Configurações do plugin (Etapa 12; Prompt de Interface §19): as do usuário, as do projeto aberto e de cada elemento (lidas do
+/// modelo, sem alterar nada), os perfis reutilizáveis e onde fica cada configuração. Uma configuração do projeto é editada no
+/// comando dela, aberto daqui.
+/// </summary>
 [Transaction(TransactionMode.Manual)]
 [NoDocumentRequired]
 public sealed class CmdConfiguracoes : CommandBase
 {
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
-        var w = new SettingsWindow();
+        var doc = uidoc?.Document;
+        IReadOnlyList<Core.Settings.ItemConfiguracao>? projeto = null;
+        if (doc != null && !doc.IsFamilyDocument)
+        {
+            try { projeto = Core.Settings.RegistroConfiguracoes.DoProjeto(DrainageDesignStore.Load(doc), EarthworkRecordStore.Load(doc), MarkingStorage.Definitions(doc)); }
+            catch (Exception ex) { Log.Error("Configurações do projeto", ex); }
+        }
+        var w = new SettingsWindow(projeto, doc?.Title);
         var ok = UiHelpers.ShowModal(w) == true;
         if (w.RunAutoTest)
         {
             if (uidoc?.Document == null) { UiHelpers.Error("Abra um projeto (de preferência uma cópia ou um arquivo vazio) para rodar o Autoteste."); return Result.Cancelled; }
             return CmdAutoteste.Start(app, uidoc);
         }
+        if (w.Comando is { } cmd) return CommandCatalog.Run(cmd, app);
         return ok ? Result.Succeeded : Result.Cancelled;
     }
 }

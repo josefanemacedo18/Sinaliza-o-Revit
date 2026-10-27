@@ -20,6 +20,7 @@ public static class UiHelpers
     {
         // Painéis roláveis da janela também na horizontal (nada cortado em janela estreita ou com rótulo longo).
         w.Loaded += (_, _) => FitScrollViewers(w);
+        LembrarTamanho(w);
         // WindowStartupLocation não é propriedade de dependência: não pode ficar no estilo XAML.
         if (RevitHandle != IntPtr.Zero)
         {
@@ -31,6 +32,38 @@ public static class UiHelpers
             w.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
         return w.ShowDialog();
+    }
+
+    // ------------------------------------------------------------------ tamanho das janelas (§26)
+
+    /// <summary>Telas grandes e redimensionáveis que reabrem no tamanho em que foram fechadas (Prompt de Interface §26).</summary>
+    internal static readonly HashSet<string> TamanhoLembrado = new(StringComparer.Ordinal)
+    {
+        nameof(ProjectCentralWindow), nameof(QualityCenterWindow), nameof(QuantitiesWindow), nameof(DrainageNetworkWindow), nameof(TerrainWindow),
+        nameof(LotResultsWindow), nameof(PavementManagerWindow), nameof(RoadWindow), nameof(SettingsWindow), nameof(AutoTestWindow), nameof(TrafficWindow),
+    };
+
+    /// <summary>
+    /// Reabre a janela no último tamanho (sem tamanho guardado, ilegível ou menor que o mínimo: o padrão dela; maior que a tela:
+    /// limitado à tela) e guarda o tamanho ao fechar. Preferência pessoal, nas configurações do usuário – não no modelo.
+    /// </summary>
+    private static void LembrarTamanho(Window w)
+    {
+        var tipo = w.GetType().Name;
+        if (!TamanhoLembrado.Contains(tipo) || w.SizeToContent != SizeToContent.Manual) return;
+        var chave = Core.Settings.TamanhosDeJanela.Chave(tipo);
+        var area = SystemParameters.WorkArea;
+        if (Core.Settings.TamanhosDeJanela.Ler(PluginContext.Settings.Get(chave), w.MinWidth, w.MinHeight, area.Width, area.Height) is { } t)
+        {
+            w.Width = t.Largura;
+            w.Height = t.Altura;
+        }
+        w.Closing += (_, _) =>
+        {
+            if (w.WindowState != WindowState.Normal || w.ActualWidth < 1 || w.ActualHeight < 1) return;
+            PluginContext.Settings.Set(chave, Core.Settings.TamanhosDeJanela.Escrever(w.ActualWidth, w.ActualHeight));
+            PluginContext.SaveSettings();
+        };
     }
 
     // ------------------------------------------------------------------ rolagem horizontal
