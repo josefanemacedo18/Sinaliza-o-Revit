@@ -157,7 +157,7 @@ public class Etapa08IntegracaoTests
         var defs = new MarkingDefinition[] { via, outra, vale, no };
         var reg = EarthworkRecord.Gravar(EarthworkRecord.Participantes(defs), 0.4, 1, 1.5, T0, "2.14.0");
         DrenagemDoModelo.Aplicar(DrenagemDoModelo.Captacoes(defs), quando: T0);
-        Assert.Empty(EstadoDosResultados.Impacto(new[] { via }, defs, reg).Where(i => i.Resultado is "Terraplenagem" or "Drenagem"));
+        Assert.DoesNotContain(EstadoDosResultados.Impacto(new[] { via }, defs, reg), i => i.Resultado is "Terraplenagem" or "Drenagem");
 
         Greide(via, 130);
         var imp = EstadoDosResultados.Impacto(new[] { via }, defs, reg);
