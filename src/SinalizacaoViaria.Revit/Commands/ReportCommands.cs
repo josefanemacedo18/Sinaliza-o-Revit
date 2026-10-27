@@ -33,7 +33,19 @@ public sealed class CmdQuantitativos : CommandBase
         }
         var sections = new List<Core.Automation.SecoesDaVia>();
         var earth = new List<EarthworkItem>();
-        var (items, rows) = Collect(doc, uidoc.ActiveView, defs, families, sections, earth);
+        // Progresso e cancelamento (Etapa 13): o quantitativo só lê o modelo – cancelar não deixa nada pela metade.
+        List<(MarkingDefinition Def, MarkingGeometry Geo)> items;
+        List<QuantityRow> rows;
+        try
+        {
+            using var progresso = ProgressWindow.Abrir("Quantitativos", "marcas", "Lendo as marcas do projeto");
+            (items, rows) = Collect(doc, uidoc.ActiveView, defs, families, sections, earth, progresso);
+        }
+        catch (Core.Automation.OperacaoCanceladaException ex)
+        {
+            TaskDialog.Show(AppTitle, ex.Message);
+            return Result.Cancelled;
+        }
         // Miniaturas da própria sinalização (face da placa, trecho da linha, unidade do dispositivo, amostra de material).
         var thumbs = QuantityThumbnails.Build(items);
         // Resumo por componente da seção (pavimento, meio-fio, sarjeta, calçada...) somado em todas as marcas.
@@ -91,19 +103,26 @@ public sealed class CmdQuantitativos : CommandBase
     /// quadro da janela, das tabelas do Revit, do memorial descritivo e das pranchas.
     /// </summary>
     /// <param name="earth">Quando dada, recebe a terraplenagem de cada elemento (resumo por via).</param>
+    /// <param name="progresso">Janela de progresso; cancelar lança <see cref="Core.Automation.OperacaoCanceladaException"/> (nada é
+    /// gravado – o quantitativo só lê).</param>
     internal static (List<(MarkingDefinition Def, MarkingGeometry Geo)> Items, List<QuantityRow> Rows) Collect(Document doc, View? view,
         IReadOnlyList<MarkingDefinition>? defs = null, List<FamilyItem>? families = null, List<Core.Automation.SecoesDaVia>? sections = null,
-        List<EarthworkItem>? earth = null)
+        List<EarthworkItem>? earth = null, Core.Automation.IProgressoOperacao? progresso = null)
     {
+        const string operacao = "Quantitativos";
+        var limite = new Core.Automation.LimitadorDeProgresso();
         defs ??= MarkingStorage.Definitions(doc);
         families ??= FamilyClassifier.Collect(doc);
         var service = new MarkingService(doc, view);
         var items = new List<(MarkingDefinition, MarkingGeometry)>();
-        foreach (var d in defs)
+        for (int i = 0; i < defs.Count; i++)
         {
+            var d = defs[i];
+            Core.Automation.Progresso.Passo(progresso, limite, operacao, "Medindo as marcas no modelo", i, defs.Count, $"{d.KindName} {d.DisplayCode}");
             try { items.Add((d, service.QuantityGeometry(d))); }
             catch (Exception ex) { Log.Error($"Quantitativos {d.DisplayCode}", ex); }
         }
+        Core.Automation.Progresso.Passo(progresso, limite, operacao, "Medindo as marcas no modelo", defs.Count, defs.Count);
         // Pisos desenhados à mão com hierarquia definida (Hierarquia e Esquinas): entram como pavimento da via – na origem da linha,
         // como elementos do usuário, não como marca.
         var doUsuario = new HashSet<MarkingDefinition>(ReferenceEqualityComparer.Instance);
@@ -123,6 +142,8 @@ public sealed class CmdQuantitativos : CommandBase
         if (families.Count > 0) rows = QuantityCalculator.AddFamilies(rows, families);
         // Terraplenagem: corte e aterro de cada via, interseção e obra, calculados na hora contra o terreno original guardado no
         // Toposolid (nada é gravado).
+        Core.Automation.Progresso.Passo(progresso, limite, operacao, "Calculando a terraplenagem (corte e aterro)",
+            descricao: "contra o terreno original guardado no Toposolid – sem contagem: o tempo depende da área");
         try
         {
             var (terra, _, _) = TerrainService.Quantities(doc, service, defs, null, sections);

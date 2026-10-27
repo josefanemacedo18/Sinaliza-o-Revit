@@ -361,45 +361,79 @@ public sealed class CmdAtualizarTodas : CommandBase
             TaskDialog.Show(AppTitle, "Nenhuma marca de sinalização encontrada neste projeto.");
             return Result.Cancelled;
         }
-        Report("Atualização", RefreshAll(uidoc, null), alwaysShow: true);
+        // Progresso e cancelamento (Etapa 13): cancelar antes de gravar desfaz tudo – o modelo fica como estava.
+        List<RenderResult> results;
+        try
+        {
+            using var progresso = ProgressWindow.Abrir("Atualizar todas as marcas", "marcas");
+            results = RefreshAll(uidoc, null, progresso);
+        }
+        catch (OperacaoCanceladaException ex)
+        {
+            TaskDialog.Show(AppTitle, ex.Message);
+            return Result.Cancelled;
+        }
+        Report("Atualização", results, alwaysShow: true);
         return Result.Succeeded;
     }
 
     /// <summary>Regenera as marcas (todas, ou só as de <paramref name="only"/>), as conexões e os recortes de sobreposição.</summary>
-    internal static List<RenderResult> RefreshAll(UIDocument uidoc, ISet<string>? only)
+    /// <param name="progresso">Janela de progresso; cancelar antes da gravação lança <see cref="OperacaoCanceladaException"/> e a
+    /// transação é desfeita (o modelo não muda). Depois da gravação os recortes terminam sem cancelar.</param>
+    internal static List<RenderResult> RefreshAll(UIDocument uidoc, ISet<string>? only, IProgressoOperacao? progresso = null)
     {
+        const string operacao = "Atualizar todas as marcas";
         var doc = uidoc.Document;
         bool In(MarkingDefinition d) => only == null || only.Contains(d.Id);
         var defs = MarkingStorage.Definitions(doc).Where(In).ToList();
         var results = new List<RenderResult>();
+        var limite = new LimitadorDeProgresso();
         using (MarkingService.RenderScope())
         using (var t = new Transaction(doc, "SV - Atualizar todas"))
         {
             t.Start();
             var service = new MarkingService(doc, uidoc.ActiveView);
-            foreach (var d in MarkingService.DependencyOrder(defs.Where(d => d is not (IntersectionDefinition or RoundaboutDefinition)))) results.Add(service.Render(d));
+            var ordem = MarkingService.DependencyOrder(defs.Where(d => d is not (IntersectionDefinition or RoundaboutDefinition))).ToList();
+            for (int i = 0; i < ordem.Count; i++)
+            {
+                // Ponto seguro: a transação ainda não foi gravada – sair daqui desfaz tudo (Dispose sem Commit).
+                Progresso.Passo(progresso, limite, operacao, "Gerando as marcas", i, ordem.Count, $"{ordem[i].KindName} {ordem[i].DisplayCode}");
+                results.Add(service.Render(ordem[i]));
+            }
             var inter = new IntersectionService(doc, service);
+            // Cada tipo de nó é relido na sua vez, depois de refazer os anteriores (como sempre); a leitura inicial só dá o total.
+            const string etapaNos = "Refazendo interseções, rotatórias e balões";
+            var totalNos = defs.Count(d => d is IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition { RoadId: not null });
+            var feitos = 0;
             foreach (var it in MarkingStorage.Definitions<IntersectionDefinition>(doc).Where(In))
             {
+                Progresso.Passo(progresso, limite, operacao, etapaNos, feitos++, totalNos, $"{it.KindName} {it.DisplayCode}");
                 try { results.AddRange(inter.Refresh(it).Where(r => r.Warnings.Count > 0)); }
                 catch (Exception ex) { Log.Error("Refresh interseção", ex); }
             }
             foreach (var rb in MarkingStorage.Definitions<RoundaboutDefinition>(doc).Where(In))
             {
+                Progresso.Passo(progresso, limite, operacao, etapaNos, feitos++, totalNos, $"{rb.KindName} {rb.DisplayCode}");
                 try { results.AddRange(inter.Refresh(rb).Where(r => r.Warnings.Count > 0)); }
                 catch (Exception ex) { Log.Error("Refresh rotatória", ex); }
             }
             foreach (var cds in MarkingStorage.Definitions<CulDeSacDefinition>(doc).Where(c => c.RoadId != null && In(c)).ToList())
             {
+                Progresso.Passo(progresso, limite, operacao, etapaNos, feitos++, totalNos, $"{cds.KindName} {cds.DisplayCode}");
                 try { results.AddRange(inter.Refresh(cds).Where(r => r.Warnings.Count > 0)); }
                 catch (Exception ex) { Log.Error("Refresh cul-de-sac", ex); }
             }
+            // Último ponto seguro antes de gravar.
+            Progresso.Passo(progresso, limite, operacao, etapaNos, feitos, Math.Max(feitos, totalNos));
+            Progresso.SemCancelar(progresso, limite, "Gravando no modelo", descricao: "o Revit grava a transação – não dá mais para cancelar");
             t.Commit();
         }
-        // Marcas sobrepostas (faixas de pedestres, zebrados) e lombadas invertidas refazem os recortes.
-        foreach (var d in MarkingStorage.Definitions(doc).Where(d => In(d) && (d.Overlay || d is TrafficCalmingDefinition { Type: TipoModeracao.LombadaInvertida } or DrainageDefinition { CutFloors: true })))
+        // Marcas sobrepostas (faixas de pedestres, zebrados) e lombadas invertidas refazem os recortes (já gravado: sem cancelar).
+        var cortes = MarkingStorage.Definitions(doc).Where(d => In(d) && (d.Overlay || d is TrafficCalmingDefinition { Type: TipoModeracao.LombadaInvertida } or DrainageDefinition { CutFloors: true })).ToList();
+        for (int i = 0; i < cortes.Count; i++)
         {
-            try { FootprintCutter.ApplyFor(uidoc, d); }
+            Progresso.SemCancelar(progresso, limite, "Refazendo os recortes de sobreposição", i, cortes.Count);
+            try { FootprintCutter.ApplyFor(uidoc, cortes[i]); }
             catch (Exception ex) { Log.Error("Recortes de sobreposição", ex); }
         }
         return results;
