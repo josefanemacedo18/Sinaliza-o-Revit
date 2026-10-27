@@ -1,0 +1,55 @@
+SINALIZABIM – DESEMPENHO DO NÚCLEO (sem o Revit)
+Data: 27/10/2026 13:41   .NET 10.0.12   4 processador(es)   Unix 6.18.44.165
+Mediana de 3 rodadas depois de uma de aquecimento. O Revit (criação de elementos, transação, leitura das marcas no
+documento) não entra: é medido pelo Autoteste (tempo por trecho).
+
+K14 – PISO TÁTIL DE ALERTA (PTA) AO LONGO DE UMA LINHA
+  6 m: geometria do núcleo 0,5 ms; 624 peça(s), 0 sólido(s), 0 unidade(s)
+  30 m: geometria do núcleo 2,3 ms; 3.120 peça(s), 0 sólido(s), 0 unidade(s)
+  No 3º Autoteste completo, a etapa com PTA de 30 m levou 171 s no Revit; a diferença para o tempo acima é a criação
+  de um sólido por relevo no Revit.
+
+OPERAÇÕES DO NÚCLEO POR TAMANHO DO PROJETO (vias de 200 m, a 40 m uma da outra)
+  Operação                                                4 vias / 48 marcas  16 vias / 192 marcas  64 vias / 768 marcas   crescimento (×4 marcas)
+  Geometria de todas as marcas (BuildGeometry)                        1,6 ms                4,0 ms               16,3 ms   2,4× e 4,1×
+  Gravar as definições em JSON                                        1,3 ms                1,8 ms               11,6 ms   1,3× e 6,6×
+  Ler as definições do JSON                                           1,6 ms                2,5 ms               15,6 ms   1,6× e 6,4×
+  Nomes das marcas                                                    0,1 ms                0,0 ms                0,1 ms   0,4× e —
+  Quantitativo por item (com a origem)                                0,5 ms                0,3 ms                2,5 ms   0,6× e 8,3×
+  Resumo por componente da seção                                      0,4 ms                0,2 ms                1,2 ms   0,4× e 7,7×
+  Camadas do pavimento                                                0,1 ms                0,1 ms                0,3 ms   0,5× e 5,8×
+  Resumo por via                                                      0,7 ms                0,3 ms                1,8 ms   0,5× e 5,8×
+  CSV do quantitativo                                                 0,5 ms                0,1 ms                0,2 ms   0,2× e 2,0×
+  Validar Modelo (V01–V17, sem terreno)                               5,3 ms                6,7 ms               40,9 ms   1,3× e 6,1×
+  Central de Qualidade (linhas e contagens)                           0,1 ms                0,0 ms                0,0 ms   0,1× e —
+  Estado dos resultados (terraplenagem e captações)                   0,8 ms                0,8 ms                3,8 ms   1,0× e 5,0×
+  Central do Projeto (indicadores)                                    0,9 ms                0,8 ms                4,3 ms   0,9× e 5,2×
+  Terraplenagem (malha de projeto e volumes)                        292,8 ms              659,8 ms                2,85 s   2,3× e 4,3×
+
+Leitura: ≈4× a cada 4× marcas é linear; ≈16× seria quadrático. Tempos abaixo de 1 ms variam com o ruído da máquina.
+
+TERRAPLENAGEM – ANTES × DEPOIS DA CORREÇÃO DA ETAPA 13 (mesma máquina, terreno sem tendência, 4 / 16 / 64 vias)
+  Fases medidas com instrumentação provisória (não gravada no código). Antes, 64 vias: 12,1 a 14,6 s, dos quais 10,8 s nos
+  contornos dos taludes a 0,3 e 0,6 m das plataformas – cada ponto procurava o ponto mais próximo percorrendo todos os lados
+  de todas as plataformas (160 ms → 1,34 s → 10,8 s: ×8 a cada ×4 vias, quadrático). Depois, com o índice em grade
+  (RingIndex): 64 vias em 2,9 a 4,0 s, crescimento linear.
+  Resultado idêntico ao de antes nos três tamanhos: o mesmo SHA-256 (16 primeiros dígitos) de todos os pontos de projeto, dos
+  pontos do terreno natural (pés dos taludes), dos volumes, da área e do número de contornos –
+  4 vias 5D054496C23D3412, 16 vias 191744ED4171A981, 64 vias 3E6BE764E98CF1E9.
+
+4º AUTOTESTE COMPLETO (2026-10-21, DLL 2.1.0, Revit 2027.3) – ONDE O TEMPO VAI NO REVIT (docs/evidencias/2026-10-21-autoteste-completo-4.txt)
+  Total 36 min 13 s em 180 etapas. Tempo por trecho do plugin (os trechos se sobrepõem):
+    Gerar marcas (Render)                    1.351,2 s   3.832×
+    Refazer interseções, rotatórias e balões   843,2 s      55×   (15 s por vez)
+    Ler marcas do projeto (varredura + JSON)   608,7 s  11.537×
+    Revit: gravar a transação (Commit)         552,6 s     393×
+    Geometria do núcleo (BuildGeometry)        255,0 s   9.341×   (27 ms por vez)
+  Contadores das 171 etapas que os gravaram: 11.350 varreduras, 34.519.264 elementos visitados (3.041 por varredura) e 922.191
+  definições interpretadas (81 por varredura). A leitura das marcas é cerca de 28 % do Autoteste e o custo está em visitar os
+  elementos (ler o id gravado em cada um), não no JSON: cada geração de marca varre o projeto cerca de três vezes – os
+  elementos da própria marca (MarkingStorage.ById), as definições das outras (Lookup) e os elementos presentes (Present).
+  K15: não corrigido nesta etapa. Mudar a varredura do documento sem rodar no Revit arrisca deixar elementos para trás
+  (marcas duplicadas); o plano e a medida de antes e depois estão no KNOWN_ISSUES.md (K15).
+  K14 (piso tátil de alerta de 30 m, 171 s no 3º Autoteste): o núcleo gera os 3.120 relevos em 2,3 ms (acima); o tempo é do
+  Revit, que cria um sólido por relevo. Não corrigido: a troca de representação (relevos agrupados) muda o modelo e precisa
+  ser vista no Revit.

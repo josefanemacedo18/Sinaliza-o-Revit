@@ -731,8 +731,11 @@ public static class Grading
         return Z;
     }
 
-    /// <summary>Ponto mais próximo do contorno dos polígonos (externos e furos).</summary>
-    private static Vec2? Nearest(IEnumerable<Polygon2> polys, Vec2 p)
+    /// <summary>
+    /// Ponto mais próximo do contorno dos polígonos (externos e furos), percorrendo todos os lados. É a referência de
+    /// <see cref="RingIndex"/>, que dá o mesmo ponto sem percorrer todos.
+    /// </summary>
+    internal static Vec2? Nearest(IEnumerable<Polygon2> polys, Vec2 p)
     {
         Vec2? best = null;
         var bd = double.MaxValue;
@@ -892,6 +895,9 @@ public static class Grading
         {
             var plats = PolygonOps.Union(res.Pads.Select(p => p.Area).Concat(res.PlatformAreas).Where(a => a.Area > 1e-4));
             var inside3 = TerrainRebuild.Mask(res.Pads.Select(p => p.Area).Concat(res.PlatformAreas), 0.25);
+            // Ponto mais próximo das plataformas por um índice: percorrer todos os lados de todas as plataformas para cada ponto
+            // do contorno era quadrático no tamanho do projeto (Etapa 13: 10,8 s de 13 s com 64 vias).
+            var nearest = new RingIndex(plats);
             foreach (var (off, step, msk) in new[] { (0.3, 0.25, inside3), (0.6, 1.0, inside) })
                 foreach (var g in PolygonOps.Offset(plats, off))
                     foreach (var ring in g.Holes.Prepend(g.Outer))
@@ -904,7 +910,7 @@ public static class Grading
                             if (off > 0.4) continue;
                             // Pé do talude perto da borda: procurado na normal, entre a borda e este contorno (vale natural colado na
                             // pista) ou daqui até 3 m adiante.
-                            var bp = Nearest(plats, q);
+                            var bp = nearest.Nearest(q);
                             if (bp == null || q.DistanceTo(bp.Value) < 1e-6) continue;
                             var nrm = (q - bp.Value).Normalized();
                             var q0 = bp.Value + nrm * 0.02;
@@ -1317,6 +1323,64 @@ public static class Grading
 }
 
 /// <summary>Distância (até um teto ≤ 2 m) a contornos de polígonos ou a segmentos, com índice em malha – plataformas por camadas.</summary>
+/// <summary>
+/// Ponto mais próximo do contorno de polígonos com um índice em grade (Etapa 13): o mesmo resultado de
+/// <see cref="Grading.Nearest"/> – os lados a até uma célula do ponto são todos candidatos, percorridos na mesma ordem e com a
+/// mesma conta; quando nenhum candidato está a até uma célula, procura em todos.
+/// </summary>
+internal sealed class RingIndex
+{
+    private const double Cell = 2.0;
+    private readonly List<Polygon2> _polys;
+    private readonly List<(Vec2 A, Vec2 B)> _segs = new();
+    private readonly Dictionary<(int, int), List<int>> _grid = new();
+
+    public RingIndex(IEnumerable<Polygon2> polys)
+    {
+        _polys = polys.ToList();
+        foreach (var g in _polys)
+            foreach (var ring in g.Holes.Prepend(g.Outer))
+                for (int i = 0; i < ring.Count; i++)
+                {
+                    var (a, b) = (ring[i], ring[(i + 1) % ring.Count]);
+                    var k = _segs.Count;
+                    _segs.Add((a, b));
+                    int x0 = K(Math.Min(a.X, b.X)), x1 = K(Math.Max(a.X, b.X)), y0 = K(Math.Min(a.Y, b.Y)), y1 = K(Math.Max(a.Y, b.Y));
+                    for (var x = x0; x <= x1; x++)
+                        for (var y = y0; y <= y1; y++)
+                        {
+                            if (!_grid.TryGetValue((x, y), out var l)) _grid[(x, y)] = l = new();
+                            l.Add(k);
+                        }
+                }
+    }
+
+    private static int K(double v) => (int)Math.Floor(v / Cell);
+
+    public Vec2? Nearest(Vec2 p)
+    {
+        // Lados com algum ponto a até uma célula de p estão nas células vizinhas da de p (o índice guarda a caixa de cada lado).
+        var cand = new SortedSet<int>();
+        int cx = K(p.X), cy = K(p.Y);
+        for (var x = cx - 1; x <= cx + 1; x++)
+            for (var y = cy - 1; y <= cy + 1; y++)
+                if (_grid.TryGetValue((x, y), out var l)) cand.UnionWith(l);
+        Vec2? best = null;
+        var bd = double.MaxValue;
+        foreach (var k in cand)
+        {
+            var (a, b) = _segs[k];
+            var ab = b - a;
+            var t = ab.Dot(ab) < 1e-12 ? 0 : Math.Clamp((p - a).Dot(ab) / ab.Dot(ab), 0, 1);
+            var q = a + ab * t;
+            var d = p.DistanceTo(q);
+            if (d < bd) { bd = d; best = q; }
+        }
+        // O mais próximo entre os candidatos só é o de todos se estiver a até uma célula (os demais lados estão mais longe).
+        return bd <= Cell ? best : Grading.Nearest(_polys, p);
+    }
+}
+
 internal sealed class NearField
 {
     private const double Cell = 2.0;

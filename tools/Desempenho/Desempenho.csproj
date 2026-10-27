@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Medição de desempenho do núcleo (Etapa 13; Prompt de Motores §18: medir antes de otimizar). Fora do CI e do plugin.
+       Uso: dotnet run, com -c Release e o projeto tools/Desempenho, gravando a saída em docs/evidencias. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <!-- Código já otimizado desde a primeira chamada: o crescimento entre tamanhos não se mistura com a compilação em camadas. -->
+    <TieredCompilation>false</TieredCompilation>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/SinalizacaoViaria.Core/SinalizacaoViaria.Core.csproj" />
+  </ItemGroup>
+</Project>
