@@ -424,10 +424,14 @@ public static class RampGenerator
             var top = len + Math.Max(0, d.LandingDepth > 0.05 ? d.LandingDepth : 0);
             return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw + flare, top), f.P(-hw - flare, top) });
         }
+        // O lado inclinado do recorte é a hipotenusa da aba prolongada até os 5 cm sobre a pista: com a ponta da aba em
+        // ±(hw + flare) também a −e, o recorte cortava a aba junto ao meio-fio e sobrava meio-fio sob a ponta dela (Etapa 17,
+        // rampas como pisos: os pisos ficariam sobrepostos).
+        var tip = hw + flare + (len > 1e-6 ? e * flare / len : 0);
         if (d.LandingDepth > 0.05)
-            return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw, len), f.P(hw, len + d.LandingDepth),
+            return new Polygon2(new[] { f.P(-tip, -e), f.P(tip, -e), f.P(hw, len), f.P(hw, len + d.LandingDepth),
                 f.P(-hw, len + d.LandingDepth), f.P(-hw, len) });
-        return new Polygon2(new[] { f.P(-hw - flare, -e), f.P(hw + flare, -e), f.P(hw, len), f.P(-hw, len) });
+        return new Polygon2(new[] { f.P(-tip, -e), f.P(tip, -e), f.P(hw, len), f.P(-hw, len) });
     }
 
     public static MarkingGeometry Generate(RampDefinition d, Polyline2 path)

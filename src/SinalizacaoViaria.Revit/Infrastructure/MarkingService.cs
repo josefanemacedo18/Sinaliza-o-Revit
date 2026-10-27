@@ -678,6 +678,11 @@ public sealed class MarkingService
             solidPieces = geo.Pieces;
         }
 
+        // Rampas como Pisos (item 2 do pedido de 2026-10-27): cada corpo de concreto vira um piso de fundo plano e topo inclinado.
+        var rampParts = def is RampDefinition rampDef && def.Output.Mode == OutputMode.Modelo3D && settings.PhysicalAsFloors && settings.RampsAsFloors
+            ? Core.Generators.RampFloors.Parts(rampDef, geo) : new List<Core.Generators.RampFloorPart>();
+        var rampDone = new HashSet<MarkingPiece>();
+
         // Pavimento, calçada, meio-fio, sarjeta e grama como Piso do Revit (editáveis com as ferramentas nativas).
         if (def.Output.Mode == OutputMode.Modelo3D && (settings.PhysicalAsFloors || paintFloors))
         {
@@ -690,7 +695,7 @@ public sealed class MarkingService
             }
             var floorPieces = geo.Pieces.Where(p => settings.PhysicalAsFloors && FloorEligible(def, p) || paintFloors && PaintFloorEligible(p)).ToList();
             var oldFloors = existing.Where(r => r.Element is Floor).ToList();
-            if (floorPieces.Count > 0 || oldFloors.Count > 0)
+            if (floorPieces.Count > 0 || oldFloors.Count > 0 || rampParts.Count > 0)
             {
                 // Tipo de piso trocado pelo usuário em pisos anteriores é mantido (ver UserFloorTypes).
                 var userTypes = UserFloorTypes(oldFloors);
@@ -755,6 +760,22 @@ public sealed class MarkingService
                         }
                     }
                 }
+                // Partes da rampa: piso de camada variável (o topo de cada vértice pela edição de forma). Cor com piso editado à mão:
+                // o piso do usuário fica e o corpo não volta como forma direta. Recusada pelo Revit: o corpo fica forma direta.
+                foreach (var part in rampParts)
+                {
+                    if (locked.Contains(part.Color)) { rampDone.Add(part.Piece!); continue; }
+                    var f = CreateRampFloor(part, baseZ + def.Output.ElevationOffset, UserType(userTypes, part.Color, part.TypeThickness), ref reason);
+                    if (f == null) continue;
+                    try { f.get_Parameter(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)?.Set($"SV {info.Code}"); } catch { /* opcional */ }
+                    Tag(f, def, info, part.Color, StyleService.ColorName(part.Color), FloorArea(f, part.Shape.Area), geo, primary);
+                    keep.Add(f.Id);
+                    primary = false;
+                    rampDone.Add(part.Piece!);
+                }
+                if (rampParts.Count > rampDone.Count)
+                    result.Warnings.Add($"{info.Code}: {rampParts.Count - rampDone.Count} parte(s) da rampa não puderam virar Piso do Revit e ficaram como forma direta" +
+                                        (reason != null ? $" ({reason})." : "."));
                 _sharedFits.Clear();
                 foreach (var f in pool) if (f.IsValidObject && !keep.Contains(f.Id)) SafeDelete(f.Id);
                 _reuse = null;
@@ -766,7 +787,7 @@ public sealed class MarkingService
                 if (_skippedContours > 0)
                     result.Warnings.Add($"{info.Code}: {_skippedContours} contorno(s) degenerado(s) da pintura ficaram de fora do piso (detalhes no log).");
                 _skippedContours = 0;
-                solidPieces = geo.Pieces.Where(p => !floorPieces.Contains(p)).Concat(failed).ToList();
+                solidPieces = geo.Pieces.Where(p => !floorPieces.Contains(p) && !rampDone.Contains(p)).Concat(failed).ToList();
             }
         }
         // Volume de escavação (túneis): Massa que escava o Toposolid – separada das peças da obra.
@@ -1906,6 +1927,92 @@ public sealed class MarkingService
         return ft.Id;
     }
 
+    private readonly Dictionary<(MarkingColor, int), ElementId> _rampFloorTypes = new();
+
+    /// <summary>
+    /// Tipo "SV - {material} rampa {espessura}" de uma camada de espessura VARIÁVEL (CompoundStructure.VariableLayerIndex): na
+    /// edição de forma só o topo do piso inclina e o fundo fica plano (ajuda do Revit, "Modify the Layer Thickness of a Roof or
+    /// Structural Floor"). Se o Revit não aceitar a camada variável (CanLayerBeVariable), o tipo fica de espessura constante e
+    /// a parte inclina inteira – avisado no log.
+    /// </summary>
+    private ElementId RampFloorType(MarkingColor color, double thicknessM)
+    {
+        var mm = (int)Math.Round(thicknessM * 1000);
+        if (_rampFloorTypes.TryGetValue((color, mm), out var id)) return id;
+        var name = $"SV - {StyleService.ColorName(color)} rampa {mm / 10.0:0.#} cm";
+        var types = new FilteredElementCollector(_doc).OfClass(typeof(FloorType)).Cast<FloorType>().ToList();
+        var ft = types.FirstOrDefault(t => t.Name == name);
+        if (ft == null)
+        {
+            var baseType = types.FirstOrDefault(t => !t.IsFoundationSlab) ?? types.FirstOrDefault();
+            if (baseType == null) return ElementId.InvalidElementId;
+            ft = (FloorType)baseType.Duplicate(name);
+        }
+        try
+        {
+            var cs = ft.GetCompoundStructure() ?? CompoundStructure.CreateSingleLayerCompoundStructure(MaterialFunctionAssignment.Structure, UnitConv.Ft(thicknessM), Styles.Material(color));
+            var keep = Math.Max(0, cs.StructuralMaterialIndex);
+            for (int i = cs.LayerCount - 1; i >= 0; i--) if (i != keep && cs.LayerCount > 1) cs.DeleteLayer(i);
+            cs.SetLayerWidth(0, UnitConv.Ft(thicknessM));
+            cs.SetMaterialId(0, Styles.Material(color));
+            cs.SetLayerFunction(0, MaterialFunctionAssignment.Structure);
+            cs.EndCap = EndCapCondition.NoEndCap;
+            if (cs.CanLayerBeVariable(0)) cs.VariableLayerIndex = 0;
+            else Log.Info($"Tipo de piso \"{name}\": o Revit não aceita a camada variável – a rampa inclina com espessura constante.");
+            ft.SetCompoundStructure(cs);
+        }
+        catch (Exception ex) { Log.Error("Tipo de piso da rampa", ex); }
+        _rampFloorTypes[(color, mm)] = ft.Id;
+        return ft.Id;
+    }
+
+    /// <summary>
+    /// Piso de uma parte da rampa (item 2): criado plano com o topo a <see cref="Core.Generators.RampFloorPart.TypeThickness"/>
+    /// do fundo e levado à cota do topo em cada vértice do contorno pela edição de forma (tipo de camada variável: o fundo fica
+    /// plano, a espessura nunca chega a zero). Nulo se o Revit recusar – a parte fica forma direta.
+    /// </summary>
+    private Floor? CreateRampFloor(Core.Generators.RampFloorPart part, double baseZm, ElementId? userType, ref string? reason)
+    {
+        var t = part.TypeThickness;
+        var topFt = UnitConv.Ft(baseZm + part.Bottom + t);
+        var level = LevelFor(topFt);
+        if (level == null) { reason = "o projeto não tem níveis"; return null; }
+        ElementId typeId;
+        try
+        {
+            typeId = userType != null && userType != ElementId.InvalidElementId && _doc.GetElement(userType) is FloorType ? userType : RampFloorType(part.Color, t);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Tipo de piso da rampa", ex);
+            reason = "não foi possível criar o tipo de piso da rampa: " + ex.Message;
+            return null;
+        }
+        if (typeId == ElementId.InvalidElementId) { reason = "o projeto não tem nenhum tipo de piso"; return null; }
+        var loops = ToCurveLoops(part.Shape, level.ProjectElevation, raw: true);
+        if (loops.Count == 0) return null;
+        Floor? f = null;
+        try
+        {
+            if (!BoundaryValidation.IsValidHorizontalBoundary(loops)) { reason = "contorno inválido para o esboço do piso"; return null; }
+            var key = FloorSignature.Key(loops, typeId, level.Id, topFt, "rampa|" + string.Join(";", part.Top.Select(v => FormattableString.Invariant($"{v.Z:0.000}"))));
+            if (Reuse(key) is { } same) return same;
+            f = Floor.Create(_doc, loops, typeId, level.Id, false, null, 0.0);
+            f.get_Parameter(BuiltInParameter.FLOOR_HEIGHTABOVELEVEL_PARAM)?.Set(topFt - level.ProjectElevation);
+            FloorSignature.Write(f, loops);
+            FloorSignature.WriteKey(f, key);
+            _shapeEdits.Add(new ShapeEdit(f, null, null, null, topFt) { VertexZ = v => UnitConv.Ft(baseZm + part.TopAt(v)) });
+            return f;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Piso da rampa", ex);
+            reason = ex.Message;
+            if (f != null) SafeDelete(f.Id);
+            return null;
+        }
+    }
+
     private Level? LevelFor(double zFt)
     {
         _levels ??= new FilteredElementCollector(_doc).OfClass(typeof(Level)).Cast<Level>().OrderBy(l => l.ProjectElevation).ToList();
@@ -2158,7 +2265,11 @@ public sealed class MarkingService
         };
     }
 
-    private sealed record ShapeEdit(Floor Floor, Plane3? Plane, Polygon2? Shape, ISurface? Terrain, double GroundFt);
+    private sealed record ShapeEdit(Floor Floor, Plane3? Plane, Polygon2? Shape, ISurface? Terrain, double GroundFt)
+    {
+        /// <summary>Cota de cada vértice do contorno (pés, absoluta) – partes da rampa; vale mais que o plano e o terreno.</summary>
+        public Func<Vec2, double>? VertexZ { get; init; }
+    }
 
     private readonly List<ShapeEdit> _shapeEdits = new();
     private Dictionary<string, Floor>? _reuse;
@@ -2212,7 +2323,8 @@ public sealed class MarkingService
                 {
                     var p = v.Position;
                     double off;
-                    if (e.Plane is { } plane) off = UnitConv.Ft(plane.Z(new Vec2(UnitConv.M(p.X), UnitConv.M(p.Y)))) - e.GroundFt;
+                    if (e.VertexZ is { } vz) off = vz(new Vec2(UnitConv.M(p.X), UnitConv.M(p.Y))) - e.GroundFt;
+                    else if (e.Plane is { } plane) off = UnitConv.Ft(plane.Z(new Vec2(UnitConv.M(p.X), UnitConv.M(p.Y)))) - e.GroundFt;
                     else if (e.Terrain != null && e.Terrain.TrySample(p.X, p.Y, e.GroundFt, out var z, out _)) off = z - e.GroundFt;
                     else continue;
                     if (Math.Abs(off) > 1e-5) ed.ModifySubElement(v, off);

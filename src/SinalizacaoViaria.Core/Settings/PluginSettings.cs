@@ -30,6 +30,16 @@ public sealed class PluginSettings
     public bool AutoCrosswalks { get; set; }
     /// <summary>Pavimento, calçada, meio-fio, sarjeta e grama gerados como Piso do Revit (em vez de forma direta).</summary>
     public bool PhysicalAsFloors { get; set; } = true;
+    /// <summary>
+    /// Rampas de acessibilidade e guias rebaixadas como Piso do Revit (com <see cref="PhysicalAsFloors"/>): cada corpo da rampa
+    /// um piso de fundo plano e topo inclinado (pedido de 2026-10-27, item 2). Desligado = forma direta, como até a 2.21.
+    /// </summary>
+    public bool RampsAsFloors { get; set; } = true;
+    /// <summary>
+    /// Materiais do plugin com a aparência realista da biblioteca do Revit (asfalto, concreto, grama...) para o modo Realista – a
+    /// cor de Cores consistentes não muda; materiais que já têm aparência não são tocados (pedido de 2026-10-27, item 1).
+    /// </summary>
+    public bool RealisticAppearance { get; set; } = true;
     /// <summary>Sinalização horizontal (pintura) gerada como Piso do Revit fino sobre o pavimento – editável como os demais pisos.</summary>
     public bool PaintAsFloors { get; set; } = true;
     /// <summary>

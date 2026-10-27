@@ -67,9 +67,11 @@ public partial class SettingsWindow : Window
         CkAutoConnect.IsChecked = s.AutoConnect;
         CkAutoCrosswalks.IsChecked = s.AutoCrosswalks;
         CkFloors.IsChecked = s.PhysicalAsFloors;
+        CkRampFloors.IsChecked = s.RampsAsFloors;
         CkPaintFloors.IsChecked = s.PaintAsFloors;
         TbBoundaryTol.Text = UiHelpers.F(s.BoundaryTolerance * 1000, "0.##");
         CkBoundary.IsChecked = s.VisibleBoundary2D;
+        CkRealistic.IsChecked = s.RealisticAppearance;
         MostrarCriterios(s.CriteriosGeometricos ?? new GeometricCriteria());
         TbCatalog.Text = PluginContext.UserCatalogPath;
         UpdateStatus();
@@ -252,9 +254,11 @@ public partial class SettingsWindow : Window
         c.AutoConnect = CkAutoConnect.IsChecked == true;
         c.AutoCrosswalks = CkAutoCrosswalks.IsChecked == true;
         c.PhysicalAsFloors = CkFloors.IsChecked == true;
+        c.RampsAsFloors = CkRampFloors.IsChecked == true;
         c.PaintAsFloors = CkPaintFloors.IsChecked == true;
         c.BoundaryTolerance = UiHelpers.Parse(TbBoundaryTol, 5, "Desvio máximo dos contornos", 0, 50) / 1000;
         c.VisibleBoundary2D = CkBoundary.IsChecked == true;
+        c.RealisticAppearance = CkRealistic.IsChecked == true;
         c.CriteriosGeometricos = LerCriterios();
         c.PerfisCriterios = _perfis.Select(p => new PerfilCriterios { Nome = p.Nome, Criterios = p.Criterios.Clone() }).ToList();
         c.UserCatalogPath = string.Equals(TbCatalog.Text, PluginPaths.DefaultUserCatalog, StringComparison.OrdinalIgnoreCase) ? null : TbCatalog.Text;

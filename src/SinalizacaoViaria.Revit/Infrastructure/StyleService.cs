@@ -89,8 +89,45 @@ public sealed class StyleService
                 mat.CutForegroundPatternColor = c;
             }
         }
+        if (PluginContext.Settings.RealisticAppearance) Appearance(mat, color);
         _materials[color] = mat.Id;
         return mat.Id;
+    }
+
+    /// <summary>Ativos de aparência da biblioteca instalada com o Revit (lidos uma vez por sessão – a lista é grande).</summary>
+    private static IList<Autodesk.Revit.DB.Visual.Asset>? _library;
+
+    /// <summary>
+    /// Aparência realista do material (item 1 do pedido de 2026-10-27): o ativo da biblioteca do Revit escolhido pelo título
+    /// (<see cref="MaterialAppearance.Choose"/>), copiado para o projeto como "SV - {material} (aparência)" e ligado ao material
+    /// (Material.AppearanceAssetId). A escala é a do ativo da biblioteca. A cor do material fica como estava e o modo
+    /// Sombreado/Cores consistentes continua com ela (UseRenderAppearanceForShading = falso). Material que já tem aparência –
+    /// dada pelo usuário ou antes – não é tocado; pinturas e cores sem textura ficam na cor lisa.
+    /// </summary>
+    private void Appearance(Material mat, MarkingColor color)
+    {
+        if (mat.AppearanceAssetId != ElementId.InvalidElementId || !MaterialAppearance.Textured(color)) return;
+        try
+        {
+            var name = $"{Prefix}{ColorName(color)} (aparência)";
+            var aae = new FilteredElementCollector(_doc).OfClass(typeof(AppearanceAssetElement)).Cast<AppearanceAssetElement>().FirstOrDefault(a => a.Name == name);
+            if (aae == null)
+            {
+                _library ??= _doc.Application.GetAssets(Autodesk.Revit.DB.Visual.AssetType.Appearance);
+                var pick = MaterialAppearance.Choose(color, _library.Select(a => new MaterialAppearance.Candidate(a.Name ?? "", a.Title ?? "", a.LibraryName ?? "")));
+                if (pick == null)
+                {
+                    Log.Info($"Aparência de \"{mat.Name}\": nenhum ativo da biblioteca do Revit serve – fica a cor lisa.");
+                    return;
+                }
+                var asset = _library.First(a => (a.Name ?? "") == pick.Name && (a.LibraryName ?? "") == pick.Library);
+                aae = AppearanceAssetElement.Create(_doc, name, asset);
+                Log.Info($"Aparência de \"{mat.Name}\": \"{pick.Title}\" ({pick.Library}).");
+            }
+            mat.AppearanceAssetId = aae.Id;
+            mat.UseRenderAppearanceForShading = false;
+        }
+        catch (Exception ex) { Log.Error($"Aparência do material {mat.Name}", ex); }
     }
 
     /// <summary>Tipo de região preenchida sólida para cada cor.</summary>
