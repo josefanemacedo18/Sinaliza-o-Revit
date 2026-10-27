@@ -243,7 +243,7 @@ public sealed class CmdRedeDrenagem : CommandBase
         var defs = MarkingStorage.Definitions(doc);
         if (!defs.Any(d => d is DrainagePipeDefinition))
         {
-            TaskDialog.Show(AppTitle, "Nenhum trecho de rede neste projeto. Ligue os dispositivos com Trecho de Rede (guia SinalizaBIM Infra › Drenagem).");
+            TaskDialog.Show(AppTitle, "Nenhum trecho de rede neste projeto. Ligue os dispositivos com Trecho de Rede (guia SinalizaBIM › Drenagem).");
             return Result.Cancelled;
         }
         var p = DrainageDesignStore.Load(doc);

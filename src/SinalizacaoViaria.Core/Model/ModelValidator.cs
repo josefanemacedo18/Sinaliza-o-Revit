@@ -154,8 +154,7 @@ public static class ModelValidator
                 yield return N("V14", "Superfície do terreno não lida: os dados do terreno e as vias sobre ele não foram conferidos.", "validar com o Toposolid no projeto");
         }
         else if (criterios?.DeclividadeMaximaTerreno == null)
-            yield return N("V14", "Declividade máxima do terreno não informada: a declividade das faces não foi conferida.",
-                "informar a declividade máxima em Configurações › Limites geométricos");
+            yield return SemDeclividade();
         if (terraplenagem == null && Automation.EarthworkRecord.Participantes(lista).Count is > 0 and var n)
             yield return N("V15", $"Sem registro da terraplenagem aplicada (nunca aplicada, aplicada por versão anterior à 2.11 ou validação sem o documento): " +
                 $"não se sabe se o terreno acompanha as {n} marca(s) que o moldam.", "rodar a Terraplenagem uma vez para gravar o registro");
@@ -165,6 +164,25 @@ public static class ModelValidator
         if (terrenoNatural == null && lista.OfType<RoadPavementDefinition>().Any(r => r.Output.Grade is { AdjustTerrain: true }))
             yield return N("V13", "Terreno natural não lido: os talvegues sob o aterro das vias (água represada pela via) não foram conferidos.",
                 "validar com o Toposolid no projeto");
+    }
+
+    /// <summary>V14 não verificado: há superfície, mas a declividade máxima das faces não foi informada.</summary>
+    private static Achado SemDeclividade() => new("V14", Severidade.NaoVerificavel, Confianca.Alta, false,
+        "Declividade máxima do terreno não informada: a declividade das faces não foi conferida.", Array.Empty<string>(),
+        "informar a declividade máxima em Configurações › Limites geométricos");
+
+    /// <summary>
+    /// Só a topografia (V14), para o Diagnóstico do Terreno: os achados da superfície do terreno projetado – os mesmos do
+    /// Validar Modelo – e, como não verificada, a declividade das faces quando o limite não foi informado.
+    /// </summary>
+    public static List<Achado> Topografia(IEnumerable<MarkingDefinition> defs, Automation.TerrainMesh terreno, GeometricCriteria? criterios)
+    {
+        var porId = new Dictionary<string, MarkingDefinition>();
+        foreach (var d in defs) porId.TryAdd(d.Id, d);
+        var res = new List<Achado>();
+        CheckTerrain(porId, terreno, criterios?.DeclividadeMaximaTerreno, res);
+        if (criterios?.DeclividadeMaximaTerreno == null) res.Add(SemDeclividade());
+        return res.OrderBy(a => a.Severidade).ToList();
     }
 
     /// <summary>

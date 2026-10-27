@@ -47,7 +47,7 @@ internal static class DetailForms
         w.Section("Camadas do pavimento (perfil)", "Sob o revestimento da via, de cima para baixo. Espessura 0 = sem a camada. " +
             "Valores indicativos – ajuste ao projeto de pavimentação.")
          .Check("Usar a estrutura do pavimento da via cortada (sem ela, as camadas típicas)", () => useRoad, v => { useRoad = v; Save(); },
-            "A estrutura é informada por via em SinalizaBIM Infra › Estrutura do pavimento e também vai à terraplenagem e ao quantitativo.");
+            "A estrutura é informada por via em SinalizaBIM › Pavimentação › Estrutura do Pavimento e também vai à terraplenagem e ao quantitativo.");
         for (int i = 0; i < rows.Count; i++)
         {
             var r = rows[i];

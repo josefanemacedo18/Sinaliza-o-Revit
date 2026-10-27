@@ -361,7 +361,7 @@
         <DockPanel Grid.Column="1">
             <TextBlock DockPanel.Dock="Top" Text="Pré-visualização (trecho reto de 50 m – eixo em magenta)" Style="{StaticResource Title}"/>
             <TextBlock DockPanel.Dock="Bottom" x:Name="TxtSummary" TextWrapping="Wrap" Margin="0,6,0,0"/>
-            <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource Border}" BorderThickness="1" Background="#F4F7FB" Padding="8,6" Margin="0,6,0,0">
+            <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource Border}" BorderThickness="1" Background="{StaticResource Panel}" Padding="8,6" Margin="0,6,0,0">
                 <TextBlock x:Name="TxtWidths" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"/>
             </Border>
             <Border BorderBrush="{StaticResource Border}" BorderThickness="1">

@@ -11,12 +11,12 @@
     </Window.Style>
     <DockPanel Margin="12">
         <!-- Cabeçalho -->
-        <Border DockPanel.Dock="Top" Background="#1F5FA8" CornerRadius="6" Padding="14,10" Margin="0,0,0,10">
+        <Border DockPanel.Dock="Top" Background="{StaticResource Accent}" CornerRadius="6" Padding="14,10" Margin="0,0,0,10">
             <DockPanel>
                 <StackPanel>
-                    <TextBlock Text="QUANTITATIVO DE SINALIZAÇÃO VIÁRIA E URBANIZAÇÃO" Foreground="#CFE0F5" FontSize="11" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="TxtProject" Foreground="White" FontSize="20" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="TxtHeader" Foreground="#E3ECF7" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                    <TextBlock Text="QUANTITATIVO DE SINALIZAÇÃO VIÁRIA E URBANIZAÇÃO" Foreground="{StaticResource TextOnAccentMuted}" FontSize="11" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="TxtProject" Foreground="{StaticResource TextOnAccent}" FontSize="20" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="TxtHeader" Foreground="{StaticResource TextOnAccent}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -30,14 +30,14 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Border Background="White" BorderBrush="#D5DBE3" BorderThickness="1" CornerRadius="6" Margin="0,0,8,0" Padding="10,6">
+                    <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="6" Margin="0,0,8,0" Padding="10,6">
                         <DockPanel>
                             <Border DockPanel.Dock="Left" Width="4" CornerRadius="2" Background="{Binding Accent}" Margin="0,0,8,0"/>
                             <StackPanel>
-                                <TextBlock Text="{Binding Label}" Foreground="#5F6B7A" FontSize="11"/>
+                                <TextBlock Text="{Binding Label}" Foreground="{StaticResource TextSecondary}" FontSize="11"/>
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Value}" FontSize="19" FontWeight="SemiBold" Foreground="#1B2330"/>
-                                    <TextBlock Text="{Binding Unit}" FontSize="12" Foreground="#5F6B7A" Margin="4,0,0,2" VerticalAlignment="Bottom"/>
+                                    <TextBlock Text="{Binding Value}" FontSize="19" FontWeight="SemiBold" Foreground="{StaticResource Text}"/>
+                                    <TextBlock Text="{Binding Unit}" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="4,0,0,2" VerticalAlignment="Bottom"/>
                                 </StackPanel>
                             </StackPanel>
                         </DockPanel>
@@ -47,7 +47,7 @@
         </ItemsControl>
 
         <!-- Filtros -->
-        <Border DockPanel.Dock="Top" Background="#F4F6F9" BorderBrush="#D5DBE3" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,0,0,8">
+        <Border DockPanel.Dock="Top" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,0,0,8">
             <DockPanel>
                 <TextBlock Text="Categoria" Style="{StaticResource FieldLabel}"/>
                 <ComboBox x:Name="CbCategory" Width="290" SelectionChanged="FilterChanged"/>
@@ -75,8 +75,8 @@
         <TabControl>
             <TabItem Header="Itens detalhados">
                 <DataGrid x:Name="GridRows" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
-                          GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" AlternatingRowBackground="#FAFBFD"
-                          RowDetailsVisibilityMode="VisibleWhenSelected" SelectionMode="Single" BorderBrush="#D5DBE3" RowHeight="54">
+                          GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderSubtle}" AlternatingRowBackground="{StaticResource AltRow}"
+                          RowDetailsVisibilityMode="VisibleWhenSelected" SelectionMode="Single" BorderBrush="{StaticResource Border}" RowHeight="54">
                     <DataGrid.GroupStyle>
                         <!-- Nível 1: categoria -->
                         <GroupStyle>
@@ -87,9 +87,9 @@
                                             <ControlTemplate TargetType="{x:Type GroupItem}">
                                                 <Expander IsExpanded="True" Margin="0,6,0,0" Tag="group">
                                                     <Expander.Header>
-                                                        <DockPanel Background="#E8EFF8" MinWidth="700">
-                                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" Foreground="#174A83" Margin="6,4"/>
-                                                            <TextBlock Text="{Binding Converter={x:Static ui:GroupSummaryConverter.Instance}}" Foreground="#174A83" Margin="12,4" VerticalAlignment="Center"/>
+                                                        <DockPanel Background="{StaticResource SelectionBackground}" MinWidth="700">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource AccentDark}" Margin="6,4"/>
+                                                            <TextBlock Text="{Binding Converter={x:Static ui:GroupSummaryConverter.Instance}}" Foreground="{StaticResource AccentDark}" Margin="12,4" VerticalAlignment="Center"/>
                                                         </DockPanel>
                                                     </Expander.Header>
                                                     <ItemsPresenter/>
@@ -110,8 +110,8 @@
                                                 <Expander IsExpanded="True" Margin="16,2,0,0" Tag="group">
                                                     <Expander.Header>
                                                         <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#2B3A4E" Margin="2,2"/>
-                                                            <TextBlock Text="{Binding Converter={x:Static ui:GroupSummaryConverter.Instance}}" Foreground="#5F6B7A" Margin="10,2"/>
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource Text}" Margin="2,2"/>
+                                                            <TextBlock Text="{Binding Converter={x:Static ui:GroupSummaryConverter.Instance}}" Foreground="{StaticResource TextSecondary}" Margin="10,2"/>
                                                         </StackPanel>
                                                     </Expander.Header>
                                                     <ItemsPresenter/>
@@ -127,7 +127,7 @@
                         <DataGridTemplateColumn Header="Imagem" Width="92">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Border Background="#3E4248" CornerRadius="3" Margin="3,2" Width="80" Height="48" ClipToBounds="True">
+                                    <Border Background="{StaticResource Asphalt}" CornerRadius="3" Margin="3,2" Width="80" Height="48" ClipToBounds="True">
                                         <Image Source="{Binding Converter={x:Static ui:ThumbnailConverter.Instance}}" Stretch="Uniform"/>
                                     </Border>
                                 </DataTemplate>
@@ -162,9 +162,9 @@
                     </DataGrid.Columns>
                     <DataGrid.RowDetailsTemplate>
                         <DataTemplate>
-                            <Border Background="#F4F6F9" BorderBrush="#D5DBE3" BorderThickness="0,1,0,1" Padding="88,6,8,6">
+                            <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="0,1,0,1" Padding="88,6,8,6">
                                 <StackPanel>
-                                    <TextBlock Text="{Binding DetailText}" TextWrapping="Wrap" Foreground="#2B3A4E"/>
+                                    <TextBlock Text="{Binding DetailText}" TextWrapping="Wrap" Foreground="{StaticResource Text}"/>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>
@@ -173,13 +173,13 @@
             </TabItem>
             <TabItem Header="Resumo por categoria e subcategoria">
                 <DataGrid x:Name="GridCategories" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
-                          GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" RowHeight="26" BorderBrush="#D5DBE3">
+                          GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderSubtle}" RowHeight="26" BorderBrush="{StaticResource Border}">
                     <DataGrid.RowStyle>
                         <Style TargetType="DataGridRow">
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Code}" Value="SUBTOTAL">
                                     <Setter Property="FontWeight" Value="Bold"/>
-                                    <Setter Property="Background" Value="#E8EFF8"/>
+                                    <Setter Property="Background" Value="{StaticResource SelectionBackground}"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
@@ -196,7 +196,7 @@
             </TabItem>
             <TabItem Header="Resumo por hierarquia viária">
                 <DataGrid x:Name="GridHierarchy" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
-                          GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" RowHeight="26" BorderBrush="#D5DBE3">
+                          GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderSubtle}" RowHeight="26" BorderBrush="{StaticResource Border}">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Hierarquia (CTB art. 60)" Binding="{Binding Name}" Width="*" FontWeight="SemiBold"/>
                         <DataGridTextColumn Header="Extensão de vias (m)" Binding="{Binding RoadLength, StringFormat=N2, ConverterCulture=pt-BR}" Width="130"/>
@@ -211,10 +211,10 @@
             </TabItem>
             <TabItem Header="Resumo por componente da seção">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Margin="2,4,2,6" TextWrapping="Wrap" Foreground="#5A6472"
+                    <TextBlock DockPanel.Dock="Top" Margin="2,4,2,6" TextWrapping="Wrap" Foreground="{StaticResource TextSecondary}"
                                Text="Pavimento, meio-fio, sarjeta, calçada, gramado e ilhas somados em todas as vias, interseções, rotatórias, extensões de calçada e cul-de-sac – medidos nas peças geradas, depois dos recortes. A extensão do meio-fio é a do eixo das peças. Pisos editados no modelo entram com a área medida."/>
                     <DataGrid x:Name="GridComponents" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
-                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" RowHeight="26" BorderBrush="#D5DBE3">
+                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderSubtle}" RowHeight="26" BorderBrush="{StaticResource Border}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Componente" Binding="{Binding Name}" Width="*" FontWeight="SemiBold"/>
                             <DataGridTextColumn Header="Material" Binding="{Binding ColorLabel}" Width="110"/>
@@ -229,11 +229,11 @@
             </TabItem>
             <TabItem x:Name="TabLayers" Header="Camadas do pavimento">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Margin="2,4,2,2" TextWrapping="Wrap" Foreground="#5A6472"
-                               Text="Revestimento e camadas da estrutura do pavimento de cada via (SinalizaBIM Infra › Estrutura do pavimento); interseções, rotatórias e balões usam a estrutura da via ligada mais funda. Área = pavimento em planta medido nas peças geradas; volume = área × espessura, sem a sobrelargura das camadas sob a sarjeta e o meio-fio. As espessuras são do projeto de pavimentação – o plugin não dimensiona."/>
+                    <TextBlock DockPanel.Dock="Top" Margin="2,4,2,2" TextWrapping="Wrap" Foreground="{StaticResource TextSecondary}"
+                               Text="Revestimento e camadas da estrutura do pavimento de cada via (SinalizaBIM › Pavimentação › Estrutura do Pavimento); interseções, rotatórias e balões usam a estrutura da via ligada mais funda. Área = pavimento em planta medido nas peças geradas; volume = área × espessura, sem a sobrelargura das camadas sob a sarjeta e o meio-fio. As espessuras são do projeto de pavimentação – o plugin não dimensiona."/>
                     <TextBlock x:Name="TxtLayers" DockPanel.Dock="Top" Margin="2,2,2,6" TextWrapping="Wrap" FontWeight="SemiBold"/>
                     <DataGrid x:Name="GridLayers" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
-                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" RowHeight="24" BorderBrush="#D5DBE3">
+                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderSubtle}" RowHeight="24" BorderBrush="{StaticResource Border}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Origem" Binding="{Binding Origem}" Width="*" FontWeight="SemiBold"/>
                             <DataGridTextColumn Header="Hierarquia" Binding="{Binding HierarquiaNome}" Width="110"/>
@@ -250,11 +250,11 @@
             </TabItem>
             <TabItem x:Name="TabStations" Header="Terraplenagem por estaca">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Margin="2,4,2,2" TextWrapping="Wrap" Foreground="#5A6472"
+                    <TextBlock DockPanel.Dock="Top" Margin="2,4,2,2" TextWrapping="Wrap" Foreground="{StaticResource TextSecondary}"
                                Text="Método das seções (média das áreas), a cada 20 m, sobre a mesma superfície de projeto da terraplenagem e o terreno original do Toposolid – só na parte que é de cada via (interseções e rotatórias ficam fora). Para conferir com a malha, que é a do quantitativo; sem correção de curvatura."/>
                     <TextBlock x:Name="TxtStations" DockPanel.Dock="Top" Margin="2,2,2,6" TextWrapping="Wrap" FontWeight="SemiBold"/>
                     <DataGrid x:Name="GridStations" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
-                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" RowHeight="24" BorderBrush="#D5DBE3">
+                              GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderSubtle}" RowHeight="24" BorderBrush="{StaticResource Border}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Via" Binding="{Binding Via}" Width="*" FontWeight="SemiBold"/>
                             <DataGridTextColumn Header="Estaca" Binding="{Binding Estaca}" Width="90"/>
@@ -269,13 +269,13 @@
             </TabItem>
             <TabItem Header="Pintura por cor e material">
                 <DataGrid x:Name="GridSummary" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
-                          GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#E6EAF0" RowHeight="26" BorderBrush="#D5DBE3">
+                          GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderSubtle}" RowHeight="26" BorderBrush="{StaticResource Border}">
                     <DataGrid.Columns>
                         <DataGridTemplateColumn Header="Cor" Width="120">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Border Width="14" Height="14" CornerRadius="3" BorderBrush="#8893A2" BorderThickness="1" Margin="4,0,6,0"
+                                        <Border Width="14" Height="14" CornerRadius="3" BorderBrush="{StaticResource BorderStrong}" BorderThickness="1" Margin="4,0,6,0"
                                                 Background="{Binding Color, Converter={x:Static ui:MarkingColorBrushConverter.Instance}}"/>
                                         <TextBlock Text="{Binding ColorLabel}" VerticalAlignment="Center"/>
                                     </StackPanel>

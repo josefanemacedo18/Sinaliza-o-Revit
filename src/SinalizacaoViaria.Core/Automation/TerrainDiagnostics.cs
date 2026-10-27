@@ -23,6 +23,15 @@ public enum ProblemaTerreno
 public sealed record AchadoTerreno(ProblemaTerreno Tipo, string Texto, int Quantidade, Vec2? Onde);
 
 /// <summary>
+/// Resumo de uma superfície (Diagnóstico do Terreno): triângulos, pontos distintos em planta (5 cm – os do levantamento), área
+/// em planta (soma das faces), cotas mínima e máxima e o retângulo em planta. Só entram os vértices com coordenadas numéricas.
+/// </summary>
+public sealed record ResumoSuperficie(int Triangulos, int Pontos, double AreaPlanta, double? CotaMinima, double? CotaMaxima, Vec2? Min, Vec2? Max)
+{
+    public double? Desnivel => CotaMaxima - CotaMinima;
+}
+
+/// <summary>
 /// Diagnóstico da superfície do terreno (Prompt Master §6, Motores §6): dados insuficientes, coordenadas inválidas, cotas
 /// diferentes no mesmo ponto, triângulos degenerados, declividade acima do limite **informado** (sem limite, não conferida) e
 /// consultas fora da superfície. Lê a malha como ela é (original ou projetada – quem chama diz qual) e não corrige nada.
@@ -105,6 +114,74 @@ public static class TerrainDiagnostics
                 res.Add(new(ProblemaTerreno.ForaDaSuperficie, $"{fora.Count} ponto(s) consultado(s) fora da superfície – ali o cálculo seria extrapolação", fora.Count, fora[0]));
         }
         return res;
+    }
+
+    /// <summary>Resumo da malha: o que o Diagnóstico do Terreno mostra de cada superfície (projetada e original).</summary>
+    public static ResumoSuperficie Resumir(TerrainMesh m)
+    {
+        var v = m.Vertices.Where(p => double.IsFinite(p.X) && double.IsFinite(p.Y) && double.IsFinite(p.Z)).ToList();
+        var area = 0.0;
+        foreach (var (ia, ib, ic) in m.Triangles)
+        {
+            var (a, b, c) = (m.Vertices[ia], m.Vertices[ib], m.Vertices[ic]);
+            var d = (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
+            if (double.IsFinite(d)) area += Math.Abs(d) / 2;
+        }
+        if (v.Count == 0) return new(m.Count, 0, area, null, null, null, null);
+        var pontos = v.Select(p => ((long)Math.Round(p.X * 20), (long)Math.Round(p.Y * 20))).Distinct().Count();
+        return new(m.Count, pontos, area, v.Min(p => p.Z), v.Max(p => p.Z), new Vec2(v.Min(p => p.X), v.Min(p => p.Y)), new Vec2(v.Max(p => p.X), v.Max(p => p.Y)));
+    }
+
+    /// <summary>
+    /// Texto do Diagnóstico do Terreno (somente leitura): a superfície projetada (o Toposolid como está), o terreno original
+    /// guardado pela terraplenagem, o limite de declividade com a fonte e os achados do V14 – os mesmos do Validar Modelo.
+    /// </summary>
+    /// <param name="toposolids">Toposolids principais do projeto.</param>
+    /// <param name="projetado">Resumo da superfície atual (todos os Toposolids juntos); nulo se não há faces.</param>
+    /// <param name="comOriginal">Quantos Toposolids têm o terreno original guardado.</param>
+    /// <param name="original">Resumo dos terrenos originais guardados; nulo se nenhum.</param>
+    /// <param name="declividadePct">Declividade máxima das faces (%), informada pelo usuário; nula = não conferida.</param>
+    /// <param name="fonte">Fonte dos limites geométricos (a do usuário ou o aviso de que não foi informada).</param>
+    /// <param name="achados">Achados do V14 (<see cref="Model.ModelValidator.Topografia"/>).</param>
+    public static string Relatorio(int toposolids, ResumoSuperficie? projetado, int comOriginal, ResumoSuperficie? original,
+        double? declividadePct, string fonte, IReadOnlyList<Model.Achado> achados)
+    {
+        var sb = new System.Text.StringBuilder();
+        string F(double x, string f = "N2") => x.ToString(f, Pt);
+        void Superficie(ResumoSuperficie r)
+        {
+            sb.AppendLine($"• {F(r.Triangulos, "N0")} triângulo(s), {F(r.Pontos, "N0")} ponto(s) distinto(s) em planta, {F(r.AreaPlanta, "N1")} m² em planta (soma das faces).");
+            if (r is { CotaMinima: { } zmin, CotaMaxima: { } zmax, Min: { } a, Max: { } b })
+                sb.AppendLine($"• Cotas de {F(zmin)} a {F(zmax)} m (desnível de {F(zmax - zmin)} m); retângulo em planta de {F(b.X - a.X, "N1")} × {F(b.Y - a.Y, "N1")} m.");
+        }
+        sb.AppendLine("SUPERFÍCIE PROJETADA (o Toposolid como está agora)");
+        sb.AppendLine($"• {toposolids} Toposolid(s) principal(is) no projeto.");
+        if (projetado != null) Superficie(projetado);
+        else sb.AppendLine("• Nenhuma face de topo lida dos Toposolids.");
+        sb.AppendLine();
+        sb.AppendLine("TERRENO ORIGINAL (o natural, guardado na primeira terraplenagem)");
+        if (comOriginal == 0 || original == null)
+            sb.AppendLine("• Nenhum Toposolid tem o terreno original guardado: a Terraplenagem ainda não foi aplicada, e o terreno atual é tratado como o natural.");
+        else
+        {
+            sb.AppendLine($"• Guardado em {comOriginal} de {toposolids} Toposolid(s).");
+            Superficie(original);
+        }
+        sb.AppendLine();
+        sb.AppendLine("DECLIVIDADE MÁXIMA DAS FACES");
+        sb.AppendLine(declividadePct is { } d
+            ? $"• {F(d, "0.#")} % – {fonte}."
+            : "• Não informada: a declividade das faces não foi conferida (Configurações › Limites geométricos).");
+        sb.AppendLine();
+        sb.AppendLine("DIAGNÓSTICO (V14 – o mesmo do Validar Modelo)");
+        var problemas = achados.Where(a => a.Severidade != Model.Severidade.NaoVerificavel).ToList();
+        if (problemas.Count == 0) sb.AppendLine("• Nenhum problema nas verificações que rodaram.");
+        foreach (var a in problemas) sb.AppendLine($"• [{Model.ModelValidator.Nome(a.Severidade)}] {a.Mensagem} → {a.AcaoRecomendada}");
+        foreach (var a in achados.Where(a => a.Severidade == Model.Severidade.NaoVerificavel))
+            sb.AppendLine($"• [{Model.ModelValidator.Nome(a.Severidade)}] {a.Mensagem} → {a.AcaoRecomendada}");
+        sb.AppendLine();
+        sb.Append("Nada foi alterado no projeto.");
+        return sb.ToString();
     }
 
     private static bool Colineares(List<Vec2> pts)

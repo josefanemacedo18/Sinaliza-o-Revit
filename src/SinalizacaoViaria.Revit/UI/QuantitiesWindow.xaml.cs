@@ -127,19 +127,19 @@ public partial class QuantitiesWindow : Window
         var pt = CultureInfo.GetCultureInfo("pt-BR");
         Kpis.ItemsSource = new[]
         {
-            new Kpi("Elementos no modelo", v.Sum(r => r.Elements).ToString("N0", pt), "un", "#1F5FA8"),
-            new Kpi("Área pintada", v.Where(r => MarkingColors.IsPaint(r.Color) && !r.IsFamily).Sum(r => r.Area).ToString("N1", pt), "m²", "#E0A800"),
-            new Kpi("Extensão pintada", v.Where(r => r.Category == CategoriaQuantitativo.SinalizacaoHorizontal).Sum(r => r.PaintedLength).ToString("N1", pt), "m", "#F2F2F2"),
-            new Kpi("Pavimento", v.Where(r => r.Category == CategoriaQuantitativo.PavimentacaoGeometria && MarkingColors.IsPavement(r.Color)).Sum(r => r.Area).ToString("N1", pt), "m²", "#3E4248"),
-            new Kpi("Placas", v.Where(r => r.Category == CategoriaQuantitativo.SinalizacaoVertical).Sum(r => r.Units).ToString("N0", pt), "un", "#C62828"),
-            new Kpi("Elementos urbanos", v.Where(r => r.Category == CategoriaQuantitativo.MobiliarioUrbano).Sum(r => r.Units).ToString("N0", pt), "un", "#4E8F3A"),
-            new Kpi("Tinta estimada", v.Sum(r => r.MaterialConsumption).ToString("N1", pt), v.FirstOrDefault(r => r.MaterialConsumption > 0)?.ConsumptionUnit ?? "", "#7A5AA6"),
+            new Kpi("Elementos no modelo", v.Sum(r => r.Elements).ToString("N0", pt), "un", UiTokens.Indicadores.Elementos),
+            new Kpi("Área pintada", v.Where(r => MarkingColors.IsPaint(r.Color) && !r.IsFamily).Sum(r => r.Area).ToString("N1", pt), "m²", UiTokens.Indicadores.Pintura),
+            new Kpi("Extensão pintada", v.Where(r => r.Category == CategoriaQuantitativo.SinalizacaoHorizontal).Sum(r => r.PaintedLength).ToString("N1", pt), "m", UiTokens.Indicadores.ExtensaoPintada),
+            new Kpi("Pavimento", v.Where(r => r.Category == CategoriaQuantitativo.PavimentacaoGeometria && MarkingColors.IsPavement(r.Color)).Sum(r => r.Area).ToString("N1", pt), "m²", UiTokens.Indicadores.Pavimento),
+            new Kpi("Placas", v.Where(r => r.Category == CategoriaQuantitativo.SinalizacaoVertical).Sum(r => r.Units).ToString("N0", pt), "un", UiTokens.Indicadores.Placas),
+            new Kpi("Elementos urbanos", v.Where(r => r.Category == CategoriaQuantitativo.MobiliarioUrbano).Sum(r => r.Units).ToString("N0", pt), "un", UiTokens.Indicadores.ElementosUrbanos),
+            new Kpi("Tinta estimada", v.Sum(r => r.MaterialConsumption).ToString("N1", pt), v.FirstOrDefault(r => r.MaterialConsumption > 0)?.ConsumptionUnit ?? "", UiTokens.Indicadores.Tinta),
         }.Concat(v.Any(r => r.Unit == "m³")
             ? new[]
             {
                 // Terraplenagem (corte e aterro no terreno, calculados contra o terreno original).
-                new Kpi("Corte", v.Where(r => r.Code == "TER-CORTE").Sum(r => r.Volume).ToString("N1", pt), "m³", "#B5651D"),
-                new Kpi("Aterro", v.Where(r => r.Code == "TER-ATERRO").Sum(r => r.Volume).ToString("N1", pt), "m³", "#6D8B3A"),
+                new Kpi("Corte", v.Where(r => r.Code == "TER-CORTE").Sum(r => r.Volume).ToString("N1", pt), "m³", UiTokens.Indicadores.Corte),
+                new Kpi("Aterro", v.Where(r => r.Code == "TER-ATERRO").Sum(r => r.Volume).ToString("N1", pt), "m³", UiTokens.Indicadores.Aterro),
             }
             : Array.Empty<Kpi>()).ToArray();
     }
@@ -162,10 +162,8 @@ public partial class QuantitiesWindow : Window
         return res;
     }
 
-    public sealed record Kpi(string Label, string Value, string Unit, string Color)
-    {
-        public Brush Accent { get; } = (Brush)new BrushConverter().ConvertFromString(Color)!;
-    }
+    /// <summary>Cartão de indicador: o nome, o valor, a unidade e a cor da categoria (<see cref="UiTokens.Indicadores"/>).</summary>
+    public sealed record Kpi(string Label, string Value, string Unit, Brush Accent);
 
     private void ExpandClick(object sender, RoutedEventArgs e) => SetExpanded(GridRows, true);
 

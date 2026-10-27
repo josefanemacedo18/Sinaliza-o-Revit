@@ -77,7 +77,7 @@ public sealed class TrafficWindow : Window
     private readonly Button _quick = new() { Content = "Só a análise (rápida)" };
     private readonly Button _cancel = new() { Content = "Parar", IsEnabled = false };
     private readonly ProgressBar _progress = new() { Height = 8, Minimum = 0, Maximum = 1, Margin = new Thickness(0, 8, 0, 2) };
-    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)) };
+    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Foreground = UiTokens.TextSecondary };
 
     private readonly ComboBox _colorBy = new() { Width = 190 };
     private readonly CheckBox _showVeh = new() { Content = "Veículos", IsChecked = true, Margin = new Thickness(12, 0, 0, 0) };
@@ -119,7 +119,7 @@ public sealed class TrafficWindow : Window
     private readonly StackPanel _diagSolutions = new() { Margin = new Thickness(0, 4, 0, 0) };
     private readonly ListBox _nodeList = new();
     private readonly TextBox _nodeDetail = Mono();
-    private readonly Canvas _timing = new() { Height = 96, Background = Brushes.White, ClipToBounds = true };
+    private readonly Canvas _timing = new() { Height = 96, Background = UiTokens.Surface, ClipToBounds = true };
     private readonly ComboBox _ovControl = new() { Width = 170 };
     private readonly TextBox _ovCycle = new() { Width = 60 };
     private readonly TextBox _ovGreens = new() { Width = 150, ToolTip = "Verdes de cada fase, em segundos, na ordem das fases (ex.: 42; 30; 12). Vazio = calculados." };
@@ -141,7 +141,7 @@ public sealed class TrafficWindow : Window
     private List<SignalAdvice> _advice = new();
     // Semáforo de travessia no meio da quadra.
     private readonly StackPanel _xsPanel = new() { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 8, 0, 0) };
-    private readonly TextBlock _xsTitle = new() { FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(0x17, 0x4A, 0x83)) };
+    private readonly TextBlock _xsTitle = new() { FontWeight = FontWeights.SemiBold, Foreground = UiTokens.AccentDark };
     private readonly CheckBox _xsOn = new() { Content = "Ativo", IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBox _xsCycle = new() { Width = 40 };
     private readonly TextBox _xsPed = new() { Width = 40, ToolTip = "Verde dos pedestres (s) – NBR/Contran: travessia a 1,2 m/s mais 3–5 s de reação." };
@@ -212,7 +212,7 @@ public sealed class TrafficWindow : Window
         var hint = new TextBlock
         {
             Text = "A demanda é estimada pela hierarquia das vias: informe as contagens nas entradas para resultados de projeto. Botão direito no mapa = semáforos (criar, editar, remover) e enquadrar. Aba 🚦 Semáforos = todos os semáforos e seus tempos.",
-            Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = 700,
+            Foreground = UiTokens.TextSecondary, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = 700,
         };
         DockPanel.SetDock(hint, Dock.Left);
         bottom.Children.Add(hint);
@@ -267,7 +267,7 @@ public sealed class TrafficWindow : Window
         VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
     };
 
-    private static TextBlock Head(string s) => new() { Text = s, FontSize = 13.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(0x17, 0x4A, 0x83)), Margin = new Thickness(0, 10, 0, 2) };
+    private static TextBlock Head(string s) => new() { Text = s, FontSize = 13.5, FontWeight = FontWeights.SemiBold, Foreground = UiTokens.AccentDark, Margin = new Thickness(0, 10, 0, 2) };
 
     private static Grid Field(string label, FrameworkElement input, string? hint = null)
     {
@@ -286,13 +286,13 @@ public sealed class TrafficWindow : Window
     private FrameworkElement BuildOptions()
     {
         var sp = new StackPanel { Margin = new Thickness(0, 0, 10, 0) };
-        sp.Children.Add(new TextBlock { Text = "Simulador de Tráfego", FontSize = 17, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(0x17, 0x4A, 0x83)) });
+        sp.Children.Add(new TextBlock { Text = "Simulador de Tráfego", FontSize = 17, FontWeight = FontWeights.SemiBold, Foreground = UiTokens.AccentDark });
         var zones = _net.Nodes.Where(n => n.IsZone).ToList();
         var inter = _net.Nodes.Count(n => !n.IsZone && n.Kind != TipoNo.Continuacao);
         sp.Children.Add(new TextBlock
         {
             Text = $"Rede lida do projeto: {_net.Roads.Count} via(s), {inter} cruzamento(s)/rotatória(s), {zones.Count} entrada(s)/saída(s), {_net.Signs.Count} placa(s), {_net.Crosswalks.Count} faixa(s) de pedestres.",
-            TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)), Margin = new Thickness(0, 2, 0, 4),
+            TextWrapping = TextWrapping.Wrap, Foreground = UiTokens.TextSecondary, Margin = new Thickness(0, 2, 0, 4),
         });
 
         sp.Children.Add(Head("Cenário"));
@@ -357,12 +357,12 @@ public sealed class TrafficWindow : Window
         if (zones.Count > 0)
         {
             sp.Children.Add(Head("Volumes nas entradas (veh/h)"));
-            sp.Children.Add(new TextBlock { Text = "Em branco = estimado pela hierarquia. Informe as contagens para resultados de projeto.", TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)) });
+            sp.Children.Add(new TextBlock { Text = "Em branco = estimado pela hierarquia. Informe as contagens para resultados de projeto.", TextWrapping = TextWrapping.Wrap, Foreground = UiTokens.TextSecondary });
             foreach (var z in zones)
             {
                 var road = z.RoadIds.Select(_net.Road).FirstOrDefault(r => r != null);
                 var box = new TextBox();
-                var hint = new TextBlock { FontSize = 10.5, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)) };
+                var hint = new TextBlock { FontSize = 10.5, Foreground = UiTokens.TextSecondary };
                 var g = Field($"{z.Label} – {road?.Name ?? ""}", box);
                 var wrap = new StackPanel();
                 wrap.Children.Add(g);
@@ -432,7 +432,7 @@ public sealed class TrafficWindow : Window
         bar.Children.Add(fit);
         g.Children.Add(bar);
 
-        var border = new Border { BorderBrush = new SolidColorBrush(Color.FromRgb(0xD5, 0xDB, 0xE3)), BorderThickness = new Thickness(1), Child = _map };
+        var border = new Border { BorderBrush = UiTokens.Border, BorderThickness = new Thickness(1), Child = _map };
         Grid.SetRow(border, 1);
         g.Children.Add(border);
         _map.SelectionChanged += OnMapSelection;
@@ -560,7 +560,7 @@ public sealed class TrafficWindow : Window
         _nodeDetail.Margin = new Thickness(0, 6, 0, 0);
         Grid.SetRow(_nodeDetail, 1);
         ng.Children.Add(_nodeDetail);
-        var tb = new Border { BorderBrush = new SolidColorBrush(Color.FromRgb(0xD5, 0xDB, 0xE3)), BorderThickness = new Thickness(1), Margin = new Thickness(0, 6, 0, 0), Child = _timing };
+        var tb = new Border { BorderBrush = UiTokens.Border, BorderThickness = new Thickness(1), Margin = new Thickness(0, 6, 0, 0), Child = _timing };
         Grid.SetRow(tb, 2);
         ng.Children.Add(tb);
         _timing.SizeChanged += (_, _) => DrawTiming();
@@ -608,7 +608,7 @@ public sealed class TrafficWindow : Window
         {
             Text = "Tudo o que a sinalização do projeto significa para o tráfego: placas R-1/R-2/R-3/R-4/R-5/R-6/R-7/R-8/R-9/R-10/R-19/R-25/R-26/R-32, " +
                    "linhas (LFO, LMS, LRE, LDP, LRV), legendas, setas por faixa, zebrados e canalizações, barreiras, balizadores, cones e semáforos. Duplo clique = ver no mapa.",
-            TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)), Margin = new Thickness(0, 4, 0, 4),
+            TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = UiTokens.TextSecondary, Margin = new Thickness(0, 4, 0, 4),
         };
         DockPanel.SetDock(regHint, Dock.Top);
         rg.Children.Add(regHint);
@@ -647,7 +647,7 @@ public sealed class TrafficWindow : Window
         {
             Text = "Roda a análise de cada cenário salvo (e do atual) sobre a mesma rede e mostra os indicadores lado a lado. " +
                    "Use para decidir entre alternativas: rotatória × semáforo, com ou sem baia, horizonte de projeto.",
-            TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)), Margin = new Thickness(0, 0, 0, 6),
+            TextWrapping = TextWrapping.Wrap, Foreground = UiTokens.TextSecondary, Margin = new Thickness(0, 0, 0, 6),
         };
         DockPanel.SetDock(cHint, Dock.Top);
         cg.Children.Add(cHint);
@@ -893,7 +893,7 @@ public sealed class TrafficWindow : Window
             var txt = new StackPanel();
             txt.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
             if (!string.IsNullOrWhiteSpace(detail))
-                txt.Children.Add(new TextBlock { Text = detail, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x3A, 0x44, 0x52)) });
+                txt.Children.Add(new TextBlock { Text = detail, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = UiTokens.Text });
             row.Children.Add(txt);
             list.Items.Add(new ListBoxItem { Content = row, Tag = tag, HorizontalContentAlignment = HorizontalAlignment.Stretch });
         }
@@ -909,9 +909,9 @@ public sealed class TrafficWindow : Window
         var notApplied = _net.Regulations.Where(x => !x.Applied && x.Kind != TipoRegra.Informativa).ToList();
         Header($"Não interpretado: {_net.Uninterpreted.Count + notApplied.Count}");
         foreach (var u in _net.Uninterpreted)
-            Row(Color.FromRgb(0xC6, 0x28, 0x28), u.What, u.Why, u);
+            Row(UiTokens.Error.Color, u.What, u.Why, u);
         foreach (var r in notApplied)
-            Row(Color.FromRgb(0xC6, 0x28, 0x28), $"{r.Source} – {TrafficRegulation.KindLabel(r.Kind)}", r.Effect, r);
+            Row(UiTokens.Error.Color, $"{r.Source} – {TrafficRegulation.KindLabel(r.Kind)}", r.Effect, r);
         if (_net.Uninterpreted.Count + notApplied.Count == 0)
             list.Items.Add(new ListBoxItem { Content = "Tudo o que foi encontrado no projeto foi interpretado.", IsEnabled = false });
         list.MouseDoubleClick += (_, _) =>
@@ -930,7 +930,7 @@ public sealed class TrafficWindow : Window
                    "selecionados antes de abrir) e as linhas de modelo selecionadas como eixo. Faixas e sentidos saem da sinalização pintada sobre " +
                    "elas (linha amarela, divisórias, bordos, setas); PARE, preferência e semáforos dão o controle; faixas de pedestres, as travessias. " +
                    "No mapa, as vias que não são do plugin têm contorno tracejado na cor da origem.",
-            TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)), Margin = new Thickness(0, 4, 0, 4),
+            TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = UiTokens.TextSecondary, Margin = new Thickness(0, 4, 0, 4),
         };
         DockPanel.SetDock(hint, Dock.Top);
         dock.Children.Add(hint);
@@ -954,14 +954,14 @@ public sealed class TrafficWindow : Window
                 _ => true,
             };
             if (!ok) continue;
-            var color = r.Applied ? Color.FromRgb(0x2E, 0x7D, 0x32) : r.Kind == TipoRegra.Informativa ? Color.FromRgb(0x9E, 0xA7, 0xB3) : Color.FromRgb(0xC6, 0x28, 0x28);
+            var color = r.Applied ? UiTokens.Success.Color : r.Kind == TipoRegra.Informativa ? UiTokens.Disabled.Color : UiTokens.Error.Color;
             var row = new DockPanel { Margin = new Thickness(0, 2, 0, 2) };
             var bar = new Border { Width = 5, Background = new SolidColorBrush(color), Margin = new Thickness(0, 0, 8, 0), CornerRadius = new CornerRadius(2) };
             DockPanel.SetDock(bar, Dock.Left);
             row.Children.Add(bar);
             var txt = new StackPanel();
             txt.Children.Add(new TextBlock { Text = $"{r.Source} – {TrafficRegulation.KindLabel(r.Kind)}", FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
-            txt.Children.Add(new TextBlock { Text = r.Effect, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x3A, 0x44, 0x52)) });
+            txt.Children.Add(new TextBlock { Text = r.Effect, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = UiTokens.Text });
             row.Children.Add(txt);
             _regList.Items.Add(new ListBoxItem { Content = row, Tag = r, HorizontalContentAlignment = HorizontalAlignment.Stretch });
         }
@@ -989,14 +989,14 @@ public sealed class TrafficWindow : Window
                 _ => true,
             };
             if (!ok) continue;
-            var color = d.Severity switch { Gravidade.Critico => Color.FromRgb(0xC6, 0x28, 0x28), Gravidade.Atencao => Color.FromRgb(0xE0, 0x7B, 0x00), _ => Color.FromRgb(0x1F, 0x5F, 0xA8) };
+            var color = d.Severity switch { Gravidade.Critico => UiTokens.Error.Color, Gravidade.Atencao => UiTokens.Warning.Color, _ => UiTokens.Accent.Color };
             var row = new DockPanel { Margin = new Thickness(0, 2, 0, 2) };
             var icon = new Border { Width = 6, Background = new SolidColorBrush(color), Margin = new Thickness(0, 0, 8, 0), CornerRadius = new CornerRadius(2) };
             DockPanel.SetDock(icon, Dock.Left);
             row.Children.Add(icon);
             var txt = new StackPanel();
             txt.Children.Add(new TextBlock { Text = d.Title, TextWrapping = TextWrapping.Wrap, FontWeight = d.Severity == Gravidade.Critico ? FontWeights.SemiBold : FontWeights.Normal });
-            txt.Children.Add(new TextBlock { Text = $"{d.Icon} {d.Category}", FontSize = 10.5, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)) });
+            txt.Children.Add(new TextBlock { Text = $"{d.Icon} {d.Category}", FontSize = 10.5, Foreground = UiTokens.TextSecondary });
             row.Children.Add(txt);
             _diagList.Items.Add(new ListBoxItem { Content = row, Tag = d, HorizontalContentAlignment = HorizontalAlignment.Stretch });
         }
@@ -1017,7 +1017,7 @@ public sealed class TrafficWindow : Window
         _diagDetail.Inlines.Add(new System.Windows.Documents.Run(d.Title + "\n") { FontWeight = FontWeights.SemiBold });
         if (!string.IsNullOrWhiteSpace(d.Detail)) _diagDetail.Inlines.Add(new System.Windows.Documents.Run(d.Detail + "\n"));
         if (!string.IsNullOrWhiteSpace(d.Recommendation))
-            _diagDetail.Inlines.Add(new System.Windows.Documents.Run("\nO que fazer: " + d.Recommendation) { Foreground = new SolidColorBrush(Color.FromRgb(0x17, 0x4A, 0x83)) });
+            _diagDetail.Inlines.Add(new System.Windows.Documents.Run("\nO que fazer: " + d.Recommendation) { Foreground = UiTokens.AccentDark });
         _diagMap.IsEnabled = d.Location != null || d.Node != null || d.Link != null;
         _diagSolve.IsEnabled = d.Node != null || d.Link != null;
         _diagSolutions.Children.Clear();
@@ -1040,7 +1040,7 @@ public sealed class TrafficWindow : Window
         target.Children.Add(new TextBlock
         {
             Text = $"Testando as alternativas: cada uma aplicada numa cópia do modelo e microssimulada {TrafficSolutions.DefaultSeeds} vezes (sementes diferentes)…",
-            Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap,
+            Foreground = UiTokens.TextSecondary, TextWrapping = TextWrapping.Wrap,
         });
         var baseRes = _res;
         ModelSnapshot? snap = null;
@@ -1067,13 +1067,13 @@ public sealed class TrafficWindow : Window
         {
             var box = new Border
             {
-                BorderBrush = new SolidColorBrush(t.Improves ? Color.FromRgb(0x2E, 0x7D, 0x32) : Color.FromRgb(0xD5, 0xDB, 0xE3)), BorderThickness = new Thickness(t.Improves ? 2 : 1),
+                BorderBrush = t.Improves ? UiTokens.Success : UiTokens.Border, BorderThickness = new Thickness(t.Improves ? 2 : 1),
                 CornerRadius = new CornerRadius(4), Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 4),
             };
             var sp = new StackPanel();
             sp.Children.Add(new TextBlock { Text = t.Summary(UiHelpers.PtBr), TextWrapping = TextWrapping.Wrap });
-            sp.Children.Add(new TextBlock { Text = t.Description, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)) });
-            sp.Children.Add(new TextBlock { Text = "No projeto: " + t.InProject, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x17, 0x4A, 0x83)) });
+            sp.Children.Add(new TextBlock { Text = t.Description, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = UiTokens.TextSecondary });
+            sp.Children.Add(new TextBlock { Text = "No projeto: " + t.InProject, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = UiTokens.AccentDark });
             var trial = t;
             if (t.Package is { } pk)
             {
@@ -1151,13 +1151,13 @@ public sealed class TrafficWindow : Window
         {
             var b = new Border
             {
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0xD5, 0xDB, 0xE3)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4),
-                Background = new SolidColorBrush(Color.FromRgb(0xF7, 0xF9, 0xFB)), Padding = new Thickness(10, 6, 10, 6), Margin = new Thickness(0, 0, 0, 6),
+                BorderBrush = UiTokens.Border, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4),
+                Background = UiTokens.Panel, Padding = new Thickness(10, 6, 10, 6), Margin = new Thickness(0, 0, 0, 6),
             };
             var sp = new StackPanel();
-            sp.Children.Add(new TextBlock { Text = title, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)) });
-            sp.Children.Add(new TextBlock { Text = value, FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(accent ?? Color.FromRgb(0x17, 0x4A, 0x83)) });
-            if (!string.IsNullOrEmpty(sub)) sp.Children.Add(new TextBlock { Text = sub, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)) });
+            sp.Children.Add(new TextBlock { Text = title, Foreground = UiTokens.TextSecondary });
+            sp.Children.Add(new TextBlock { Text = value, FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(accent ?? UiTokens.AccentDark.Color) });
+            if (!string.IsNullOrEmpty(sub)) sp.Children.Add(new TextBlock { Text = sub, TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = UiTokens.TextSecondary });
             b.Child = sp;
             _kpis.Children.Add(b);
         }
@@ -1172,7 +1172,7 @@ public sealed class TrafficWindow : Window
         Card("Emissões estimadas", $"{r.CO2kg:0} kg CO₂/h", "Pelo consumo médio de combustível conforme a velocidade de cada trecho.");
         var crashes = r.Safety.Values.Sum(x => x.CrashesPerYear);
         Card("Segurança (referência HSM)", $"{crashes:0.0} acidentes/ano", $"{r.Safety.Values.Sum(x => x.Total)} pontos de conflito nos cruzamentos; {r.Safety.Values.Sum(x => x.InjuryCrashesPerYear):0.0}/ano com vítimas. Compare alternativas – não é previsão calibrada.",
-            crashes > 10 ? Color.FromRgb(0xC6, 0x28, 0x28) : null);
+            crashes > 10 ? UiTokens.Error.Color : null);
         var e = r.Economics;
         Card("Custo anual da operação", $"R$ {e.Total / 1e6:0.00} mi/ano",
             $"tempo R$ {e.DelayCost / 1e3:0} mil · combustível R$ {e.FuelCost / 1e3:0} mil ({e.FuelLitersPerHour:0} L/h) · CO₂ R$ {e.Co2Cost / 1e3:0} mil · acidentes R$ {e.CrashCost / 1e3:0} mil");
@@ -1185,7 +1185,7 @@ public sealed class TrafficWindow : Window
         }
         var crit = r.Diagnostics.Count(d => d.Severity == Gravidade.Critico);
         var warn = r.Diagnostics.Count(d => d.Severity == Gravidade.Atencao);
-        Card("Diagnóstico", $"{crit} crítico(s), {warn} atenção", $"{r.Diagnostics.Count - crit - warn} informação(ões) – veja a aba Diagnóstico.", crit > 0 ? Color.FromRgb(0xC6, 0x28, 0x28) : null);
+        Card("Diagnóstico", $"{crit} crítico(s), {warn} atenção", $"{r.Diagnostics.Count - crit - warn} informação(ões) – veja a aba Diagnóstico.", crit > 0 ? UiTokens.Error.Color : null);
     }
 
     // ------------------------------------------------------------------------------------------------ cenários
@@ -1317,7 +1317,7 @@ public sealed class TrafficWindow : Window
     private FrameworkElement BuildOverridePanel()
     {
         var sp = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
-        sp.Children.Add(new TextBlock { Text = "Ajustes deste cruzamento no cenário", FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(0x17, 0x4A, 0x83)) });
+        sp.Children.Add(new TextBlock { Text = "Ajustes deste cruzamento no cenário", FontWeight = FontWeights.SemiBold, Foreground = UiTokens.AccentDark });
         foreach (var (l, _) in Controls) _ovControl.Items.Add(l);
         _ovControl.SelectedIndex = 0;
         var row1 = new WrapPanel { Margin = new Thickness(0, 2, 0, 2) };
@@ -1334,7 +1334,7 @@ public sealed class TrafficWindow : Window
         sp.Children.Add(row1);
         foreach (var (h, prop, w) in new[] { ("Aproximação", "Name", 150.0), ("Total veh/h", "Total", 62.0), ("Esq. %", "Left", 44.0), ("Frente %", "Through", 52.0), ("Dir. %", "Right", 44.0), ("Ret. %", "UTurn", 44.0) })
             _ovTurns.Columns.Add(new DataGridTextColumn { Header = h, Binding = new System.Windows.Data.Binding(prop) { UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged }, Width = w, IsReadOnly = prop == "Name" });
-        sp.Children.Add(new TextBlock { Text = "Contagem classificada (deixe em branco para usar a alocação):", FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)), Margin = new Thickness(0, 2, 0, 2) });
+        sp.Children.Add(new TextBlock { Text = "Contagem classificada (deixe em branco para usar a alocação):", FontSize = 11, Foreground = UiTokens.TextSecondary, Margin = new Thickness(0, 2, 0, 2) });
         sp.Children.Add(_ovTurns);
         var row2 = new WrapPanel { Margin = new Thickness(0, 4, 0, 0) };
         row2.Children.Add(_ovApply);
@@ -1399,7 +1399,7 @@ public sealed class TrafficWindow : Window
     private FrameworkElement BuildRecommendPanel()
     {
         var sp = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
-        sp.Children.Add(new TextBlock { Text = "Recomendação de tempos semafóricos", FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(0x17, 0x4A, 0x83)) });
+        sp.Children.Add(new TextBlock { Text = "Recomendação de tempos semafóricos", FontWeight = FontWeights.SemiBold, Foreground = UiTokens.AccentDark });
         foreach (var t in new[] { "Este semáforo", "Todos os semáforos do cenário", "Todos os cruzamentos de uma via" }) _recScope.Items.Add(t);
         _recScope.SelectedIndex = 0;
         foreach (var r in _net.Roads.OrderBy(r => r.Name)) _recRoad.Items.Add(new ComboBoxItem { Content = r.Name, Tag = r.Id });
@@ -1508,7 +1508,7 @@ public sealed class TrafficWindow : Window
         _xsPanel.Children.Add(new TextBlock
         {
             Text = "Desmarque \"Ativo\" para testar a travessia sem semáforo. O ajuste vale no cenário; para o projeto, coloque o grupo focal com a ferramenta Placas/Dispositivos.",
-            TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(0x5F, 0x6B, 0x7A)),
+            TextWrapping = TextWrapping.Wrap, FontSize = 11, Foreground = UiTokens.TextSecondary,
         });
         apply.Click += (_, _) =>
         {
@@ -1636,7 +1636,7 @@ public sealed class TrafficWindow : Window
         var sp = new StackPanel { Margin = new Thickness(2) };
         sp.Children.Add(new Border
         {
-            Background = new SolidColorBrush(Color.FromRgb(0xE8, 0xF1, 0xFB)), CornerRadius = new CornerRadius(4), Padding = new Thickness(8), Margin = new Thickness(0, 0, 0, 6),
+            Background = UiTokens.SelectionBackground, CornerRadius = new CornerRadius(4), Padding = new Thickness(8), Margin = new Thickness(0, 0, 0, 6),
             Child = new TextBlock
             {
                 TextWrapping = TextWrapping.Wrap,
@@ -1988,7 +1988,7 @@ public sealed class TrafficWindow : Window
         _timing.Children.Clear();
         if (SelectedNode() is not { } nr || nr.Phases.Count == 0 || nr.Cycle <= 0)
         {
-            _timing.Children.Add(new TextBlock { Text = "Diagrama de tempos: selecione um cruzamento semaforizado.", Margin = new Thickness(6), Foreground = Brushes.Gray });
+            _timing.Children.Add(new TextBlock { Text = "Diagrama de tempos: selecione um cruzamento semaforizado.", Margin = new Thickness(6), Foreground = UiTokens.TextSecondary });
             return;
         }
         var w = Math.Max(100, _timing.ActualWidth - 110);

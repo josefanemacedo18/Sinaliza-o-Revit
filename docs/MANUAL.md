@@ -1,8 +1,8 @@
 # Manual de uso – SinalizaBIM
 
-Os comandos ficam em duas guias da faixa de opções: **SinalizaBIM** (vias, sinalização, detalhamento, edição) e
-**SinalizaBIM Infra** (drenagem, obras de arte, contenções, relevo e terreno, nós viários) – separadas para que todos os
-botões tenham espaço para o nome. As janelas mostram uma
+Os comandos ficam em duas guias da faixa de opções, organizadas por tema e na ordem do trabalho (desde a 2.15):
+**SinalizaBIM**, com os 11 painéis do fluxo de projeto – do terreno à documentação –, e **SinalizaBIM Sinalização**, com a
+sinalização horizontal, a vertical e a segurança viária. As janelas mostram uma
 **pré-visualização ao vivo** (com área pintada e extensão) gerada pelo mesmo motor que cria os
 elementos no Revit, e avisos quando uma dimensão sai do intervalo de referência do MBST.
 
@@ -19,27 +19,73 @@ Convenções usadas em todo o plugin:
 
 ### Organização da faixa de opções
 
-| Painel | Ferramentas |
-|---|---|
-| **Vias** | **Via** (Via · Pista · **Via Férrea** · Desenhar Eixo) · **Conexões** (**Rotatória** · Interseção · Trocar Conexão · **Distância entre Vias** · **Mover Via** · Alterar Largura por Trecho · Recuo na Via) · **Calçadas** (Meio-fio/Calçada/Sarjeta · Extensão de Calçada · Área de Calçada · Canteiros · Cul-de-sac · Rampas) · Hierarquia Viária · **Elementos Urbanos** (do plugin · trocar elementos · famílias do Revit) · Mostrar/Ocultar Eixos |
-| **Sinalização Horizontal** | **Linhas** (longitudinal · transversal · faixa de pedestres) · **Zebrado** (inclui área de conflito MAC) · **Inscrições** (setas/símbolos · legendas) · Vagas · **Complementos** (piso tátil · ciclovia · quebra-mola · cruzamento rodoferroviário) |
-| **Sinalização Vertical** | **Placas** (placas · detalhar placas · mover chamada de placa · quadro de placas · quadro de legenda) · **Bloqueios Físicos** (todos os dispositivos, inclusive **tachas e tachões** e guard rail) |
-| **Detalhamento** | **Detalhar** (anotar · cotar seção com perfil transversal · detalhe típico · quadro de quantitativos · notas · norte) · **Pranchas** · **Memorial Descritivo** · Quantitativos |
-| **Tráfego** | **Simulador de Tráfego** (capacidade, nível de serviço, microssimulação animada e diagnóstico do projeto – seção 26) |
-| **Editar** | Editar · Apagar Trecho · **Validar Modelo** · Atualizar Todas · Selecionar Conjunto · Alternar 2D/3D · Configurações · Catálogo · Normas |
-
-Guia **SinalizaBIM Infra**:
+Guia **SinalizaBIM** – o fluxo de projeto:
 
 | Painel | Ferramentas |
 |---|---|
-| **Drenagem** | boca de lobo / PV · grelha · Trecho de Rede · Projeto de Drenagem · Relatório da Rede · Ler do Modelo · Memorial de Drenagem |
-| **Obras de Arte** | **Pontes e Viadutos** (viaduto · ponte · passarela) · **Túneis e Trincheiras** (túnel · trincheira) |
-| **Contenções** | muro de arrimo · talude |
-| **Relevo e Terreno** | Perfil da Via · Estrutura do Pavimento · Terraplenagem |
-| **Nós Viários** | Nó Viário (interseção em desnível) |
-| **Loteamento** | **Loteamento** · **Quadra e Lote** (quadra · lote · unir lotes) · Nomear Vias · Categorias e Filtros · **Detalhar e Quadros** (detalhar lotes · quadros do loteamento · memorial do loteamento) · **Masterplan** (seção 27) |
+| **Projeto** | **Atualizar Todas** · **Editar** · Selecionar Conjunto · Alternar 2D/3D |
+| **Terreno** | **Diagnóstico do Terreno** (seção 9.3.1) · **Imagem Aérea ▾** (Importar Imagem e Calibrar · Calibrar Escala da Imagem) |
+| **Sistema Viário** | **Via ▾** (Via · Via Férrea) · **Eixos ▾** (Desenhar Eixo · Mostrar/Ocultar Eixos) · **Perfil da Via** · **Seções Transversais ▾** (Corte Transversal · Cotar Seção) · **Ajustar Via ▾** (Alterar Largura por Trecho · Recuo na Via (baia / faixa auxiliar) · Distância entre Vias · Mover Via · Hierarquia e Esquinas) · **Calçadas ▾** (Meio-fio, Calçada e Sarjeta · Extensão de Calçada · Área de Calçada · Rampas) · **Obras de Arte ▾** (Viaduto · Ponte · Passarela · Túnel · Trincheira) |
+| **Interseções** | **Interseção** · **Rotatória** · **Nó Viário** · Trocar Conexão · Cul-de-sac |
+| **Terraplenagem** | **Terraplenagem** · **Contenções ▾** (Talude · Muro de Arrimo) |
+| **Pavimentação** | **Estrutura do Pavimento** · **Pista** |
+| **Drenagem** | **Dispositivos ▾** (Boca de Lobo / PV · Grelha de Drenagem) · Trecho de Rede · Projeto de Drenagem · Ler do Modelo · **Relatório da Rede** |
+| **Urbanismo** | **Loteamento** · **Quadra e Lote ▾** (Quadra · Lotes por Linhas · Categoria do Lote · Lote · Unir Lotes) · Nomear Vias · Categorias e Filtros · **Quadros e Áreas ▾** (Quadros do Loteamento · Quadro da Quadra · Detalhar Lotes) · **Elementos Urbanos ▾** (Elementos Urbanos · Trocar Elementos · Famílias do Revit · Canteiros) · **Masterplan** (seção 27) |
+| **Análise** | **Validar Modelo** (seção 9.3) · **Tráfego ▾** (Simulador de Tráfego · Semáforos – seção 26) |
+| **Documentação** | **Quantitativos** · **Pranchas** · **Memoriais ▾** (Memorial Descritivo · Memorial de Drenagem · Memorial do Loteamento) · **Detalhar ▾** (Anotar · Detalhe Típico · Quadro de Quantitativos · Notas Gerais · Norte) |
+| **Sistema** | Configurações · Catálogo · Normas / Sobre |
 
-Os botões com seta (▾) agrupam ferramentas afins; o botão mostra a última usada do grupo.
+Guia **SinalizaBIM Sinalização**:
+
+| Painel | Ferramentas |
+|---|---|
+| **Sinalização Horizontal** | **Linhas ▾** (Linha Longitudinal · Linha Transversal · Faixa de Pedestres) · **Zebrado ▾** (Zebrado · Canalização (MTL / MAO / MAP)) · **Inscrições ▾** (Setas e Símbolos · Legendas) · **Vagas** · **Ciclovia e Piso Tátil ▾** (Ciclovia / Faixa de Caminhada · Marcas de Ciclovia Avulsas · Piso Tátil) · **Apagar Trecho** |
+| **Sinalização Vertical** | **Placas ▾** (Placas · Detalhar Placas · Mover Chamada de Placa · Quadro de Placas · Quadro de Legenda) |
+| **Segurança Viária** | **Dispositivos de Segurança ▾** (Bloqueios Físicos · Tachas e Tachões · Sonorizador Longitudinal · Área de Escape) · **Quebra-mola e Lombadas** · **Cruzamento Rodoferroviário** |
+
+Os botões com seta (▾) agrupam ferramentas afins; o botão mostra a última usada do grupo. Cada botão tem uma **dica curta**;
+mantendo o cursor sobre ele, aparece a **descrição completa**. Cada ferramenta tem o seu ícone. Os botões ficam
+**desabilitados** sem um projeto (.rvt) aberto e no editor de famílias – onde os comandos não funcionam –, exceto
+Configurações, Catálogo e Normas / Sobre, que funcionam sempre.
+
+**Onde ficou cada ferramenta (2.15).** Até a 2.14 a faixa era organizada por tipo de elemento, nas guias *SinalizaBIM* e
+*SinalizaBIM Infra*. Nenhum comando saiu nem mudou de nome; os que mudaram de lugar:
+
+| Antes (até a 2.14) | Agora (2.15) |
+|---|---|
+| Vias › Via ▾ → Via, Via Férrea | Sistema Viário › Via ▾ |
+| Vias › Via ▾ → Pista | Pavimentação |
+| Vias › Via ▾ → Desenhar Eixo; Vias › Mostrar/Ocultar Eixos | Sistema Viário › Eixos ▾ |
+| Vias › Calibrar Imagem ▾ (Calibrar Escala da Imagem, Importar Imagem e Calibrar) | Terreno › Imagem Aérea ▾ |
+| Vias › Conexões ▾ → Rotatória, Interseção, Trocar Conexão | Interseções |
+| Vias › Conexões ▾ → Distância entre Vias, Mover Via, Alterar Largura por Trecho, Recuo na Via; Vias › Hierarquia e Esquinas | Sistema Viário › Ajustar Via ▾ |
+| Vias › Calçadas ▾ → Canteiros; Vias › Elementos Urbanos ▾ (Elementos Urbanos, Trocar Elementos, Famílias do Revit) | Urbanismo › Elementos Urbanos ▾ |
+| Vias › Calçadas ▾ → Cul-de-sac | Interseções |
+| Painéis Sinalização Horizontal e Sinalização Vertical | guia SinalizaBIM Sinalização |
+| Sinalização Horizontal › Complementos ▾ → Piso Tátil, Ciclovia / Faixa de Caminhada, Marcas de Ciclovia Avulsas | Sinalização Horizontal › Ciclovia e Piso Tátil ▾ |
+| Sinalização Horizontal › Complementos ▾ → Quebra-mola e Lombadas, Cruzamento Rodoferroviário | Segurança Viária |
+| Sinalização Vertical › Bloqueios Físicos ▾ (Bloqueios Físicos, Tachas e Tachões, Sonorizador Longitudinal, Área de Escape) | Segurança Viária › Dispositivos de Segurança ▾ |
+| Detalhamento › Detalhar ▾ → Cotar Seção, Corte Transversal | Sistema Viário › Seções Transversais ▾ |
+| Detalhamento › Detalhar ▾ → Anotar, Detalhe Típico, Quadro de Quantitativos, Notas Gerais, Norte | Documentação › Detalhar ▾ |
+| Detalhamento › Pranchas, Quantitativos | Documentação |
+| Detalhamento › Memorial Descritivo | Documentação › Memoriais ▾ |
+| Tráfego › Simulador de Tráfego, Semáforos | Análise › Tráfego ▾ |
+| Editar › Editar, Atualizar Todas, Selecionar Conjunto, Alternar 2D/3D | Projeto |
+| Editar › Apagar Trecho | Sinalização Horizontal |
+| Editar › Validar Modelo | Análise |
+| Editar › Configurações, Catálogo, Normas / Sobre | Sistema |
+| Infra › Drenagem (Boca de Lobo / PV, Grelha de Drenagem, Trecho de Rede, Projeto de Drenagem, Relatório da Rede, Ler do Modelo) | Drenagem (Boca de Lobo e Grelha em Dispositivos ▾) |
+| Infra › Drenagem → Memorial de Drenagem | Documentação › Memoriais ▾ |
+| Infra › Obras de Arte (Pontes e Viadutos ▾, Túneis e Trincheiras ▾) | Sistema Viário › Obras de Arte ▾ |
+| Infra › Contenções ▾ (Muro de Arrimo, Talude) | Terraplenagem › Contenções ▾ |
+| Infra › Relevo e Terreno → Perfil da Via | Sistema Viário |
+| Infra › Relevo e Terreno → Estrutura do Pavimento | Pavimentação |
+| Infra › Relevo e Terreno → Terraplenagem | Terraplenagem |
+| Infra › Nós Viários → Nó Viário | Interseções |
+| Infra › Loteamento (Loteamento, Quadra e Lote ▾, Nomear Vias, Categorias e Filtros, Masterplan) | Urbanismo |
+| Infra › Loteamento › Detalhar e Quadros ▾ → Detalhar Lotes, Quadro da Quadra, Quadros do Loteamento | Urbanismo › Quadros e Áreas ▾ |
+| Infra › Loteamento › Detalhar e Quadros ▾ → Memorial do Loteamento | Documentação › Memoriais ▾ |
+| – (novo) | Terreno › Diagnóstico do Terreno |
 
 ---
 
@@ -181,7 +227,7 @@ ponto B 10,50 m; um muro antigo avança sobre a calçada. No quadro **Largura va
 * **Quem absorve a variação na pista**: a faixa junto ao meio-fio (as outras mantêm a largura), todas as faixas
   proporcionalmente, ou o acostamento/estacionamento. A linha de bordo, a sarjeta, o meio-fio e as calçadas
   acompanham o bordo; o alinhamento estreita (ou alarga) a **faixa livre** – aviso se ela ficar abaixo de 1,20 m (NBR 9050).
-* **Alterar largura por trecho (A–B)**: a ferramenta **Conexões ▾ → Alterar Largura por Trecho** (ou o botão no quadro, com as
+* **Alterar largura por trecho (A–B)**: a ferramenta **Sistema Viário › Ajustar Via ▾ → Alterar Largura por Trecho** (ou o botão no quadro, com as
   estacas digitadas) muda a largura de **um elemento** – calçada esquerda/direita, pista, estacionamento esquerdo/direito
   ou canteiro central – entre o **início (A)** e o **fim (B)**, com uma **transição antes de A e outra depois de B**
   (comprimentos livres, retas ou em curva S). Os outros elementos mantêm a largura (a via alarga ou estreita): na calçada o
@@ -214,7 +260,7 @@ Se o recuo for maior que a faixa livre da calçada, ela some no trecho e o alinh
 (aviso com o valor) – sarjeta, meio-fio e grama nunca passam por cima da calçada nem do lote.
 O simulador de tráfego lê as baias (ônibus param fora da faixa) e as faixas auxiliares (§ 26).
 
-**Recuo numa via já criada.** **Conexões → Recuo na Via (baia / faixa auxiliar)**: clique junto ao bordo da via, no
+**Recuo numa via já criada.** **Ajustar Via ▾ → Recuo na Via (baia / faixa auxiliar)**: clique junto ao bordo da via, no
 início do recuo e do lado dele – a janela abre com a estaca e o lado já preenchidos, os valores pela velocidade e a
 prévia sobre a seção da própria via. A via é refeita com o recuo (meio-fio, calçada, sarjeta, linhas, MVE, LCO,
 setas, placa e abrigo) mantendo eixo, greide, trechos apagados e conexões. Para **alterar ou remover** um recuo
@@ -322,13 +368,13 @@ concordância das esquinas / guia*) e na **Pista** (*Raio das esquinas*) informe
 exemplo 3 m para uma rua local estreita ou 12 m para acesso de caminhões. Vazio (ou 0) usa o padrão da
 hierarquia. O valor fica gravado no pavimento e, no encontro de vias com raios diferentes, prevalece o
 da **via de menor hierarquia** (a que faz a conversão). Para mudar o raio de vias já desenhadas use
-**Via → Hierarquia e Esquinas**: selecione as vias, informe o novo raio e as interseções são refeitas.
+**Ajustar Via ▾ → Hierarquia e Esquinas**: selecione as vias, informe o novo raio e as interseções são refeitas.
 
 Para delimitar uma via por **qualquer linha ou piso**, use **Hierarquia e Esquinas** selecionando linhas de
 eixo/borda ou **pisos desenhados à mão**: as marcas que usam essas linhas/bordas recebem a hierarquia, e os pisos
 ganham o parâmetro SV_Hierarquia e entram nos quantitativos (código PAV-PISO).
 
-Para vias já existentes (ou criadas por versões anteriores) use **Via → Hierarquia Viária**: selecione
+Para vias já existentes (ou criadas por versões anteriores) use **Ajustar Via ▾ → Hierarquia e Esquinas**: selecione
 elementos das vias e escolha a hierarquia (opcionalmente ajustando a velocidade das linhas); as
 interseções, rotatórias e cul-de-sacs dessas vias são atualizados.
 
@@ -347,7 +393,7 @@ Quando uma via ligada é **movida**, as vias que chegam nela **acompanham**: a p
 cruzamento é levada ao novo eixo. O mesmo ímã vale ao criar a via (desenhada ou por linhas
 selecionadas). Pode ser desligado em **Configurações → Ímã de conexão**.
 
-**Via → Via** com *Desenhar a via por pontos* (o antigo botão *Nova Via* foi unificado com *Sinalizar Via* – é a
+**Sistema Viário › Via ▾ → Via** com *Desenhar a via por pontos* (o antigo botão *Nova Via* foi unificado com *Sinalizar Via* – é a
 mesma ferramenta) desenha a via clicando os pontos do
 eixo, como no InfraWorks, e o sistema viário se ajusta sozinho:
 
@@ -377,7 +423,7 @@ Depois de criada, a via continua ligada: mover ou editar o eixo refaz interseç�
 
 ### 2.2.1 Distância entre vias e Mover via
 
-**Conexões → Distância entre Vias**: clique a **via A** (fica parada) e a **via B** (vai se mover), no trecho onde quer
+**Ajustar Via ▾ → Distância entre Vias**: clique a **via A** (fica parada) e a **via B** (vai se mover), no trecho onde quer
 medir. A janela mostra a distância atual medida na seção perpendicular ao eixo de A, no ponto clicado em B:
 
 * **entre eixos**;
@@ -391,20 +437,20 @@ posicionados sobre ela (placas, mobiliário, drenagem) –, as vias ligadas a el
 Com vias não paralelas, as larguras de B são medidas ao longo da normal de A (divididas pelo cosseno do ângulo entre os
 eixos) e a distância vale no ponto clicado; acima de 75° as vias se cruzam e a ferramenta pede **Mover Via**.
 
-**Conexões → Mover Via**: clique a via e informe o deslocamento **ΔX / ΔY** (m) ou marque *Indicar por dois cliques* (de /
+**Ajustar Via ▾ → Mover Via**: clique a via e informe o deslocamento **ΔX / ΔY** (m) ou marque *Indicar por dois cliques* (de /
 para). O resto é igual: a via inteira, as vias ligadas e as interseções.
 
 As duas ferramentas são **uma única operação** – um **Ctrl+Z** desfaz tudo. O eixo continua sendo a fonte única: as
 linhas do eixo são movidas e a via, as extensões, o piso tátil, a sinalização e as interseções são refeitos a partir
 dele (o eixo não pode ser a borda de outro elemento nem estar fixado).
 
-**Via → Conexão** muda o tratamento de uma conexão existente: clique num **encontro de vias** ou numa
+**Interseções → Trocar Conexão** muda o tratamento de uma conexão existente: clique num **encontro de vias** ou numa
 **rotatória** para escolher *Interseção*, *Rotatória* ou *Sem tratamento*, ou na **ponta livre** de uma via
 para *Cul-de-sac* ou *Sem tratamento*. A geometria e a sinalização das vias são refeitas.
 
 ## 2.3 Pista – montagem da via passo a passo
 
-**Via ▾ → Pista** cria só a **parte dos veículos** (asfalto, bloquete, concreto ou terra) com a hierarquia, as
+**Pavimentação → Pista** cria só a **parte dos veículos** (asfalto, bloquete, concreto ou terra) com a hierarquia, as
 larguras à direita e à esquerda do eixo, mão dupla/única e, opcionalmente, linha de eixo e linhas de
 bordo – já **conectada** às vias existentes (interseção simples).
 
@@ -431,7 +477,7 @@ asfalto → **Editar** → *Raio das curvas do eixo* (0 = cantos como desenhados
 
 ## 2.5 Sonorizador longitudinal (rumble strip)
 
-**Bloqueios Físicos → Sonorizador Longitudinal.** Elementos em série ao longo de uma linha – no **acostamento**, sobre
+**Segurança Viária › Dispositivos de Segurança ▾ → Sonorizador Longitudinal.** Elementos em série ao longo de uma linha – no **acostamento**, sobre
 o **bordo** (LBO) ou no **eixo** – que vibram e fazem ruído quando o pneu passa por cima, alertando o motorista que sai
 da faixa por sono ou distração (saídas de pista e colisões frontais).
 
@@ -449,7 +495,7 @@ de 16 mm; acostamento sem interrupções para bicicletas.
 
 ## 2.6 Área de escape de caminhões (caixa de retenção)
 
-**Bloqueios Físicos → Área de Escape.** Para descidas longas e íngremes, onde o caminhão pode perder o freio
+**Segurança Viária › Dispositivos de Segurança ▾ → Área de Escape.** Para descidas longas e íngremes, onde o caminhão pode perder o freio
 (superaquecimento). Desenhe o **eixo da caixa** começando no bordo da pista, no sentido em que o veículo entra
 (saída tangente, à direita).
 
@@ -464,7 +510,7 @@ de 16 mm; acostamento sem interrupções para bicicletas.
 
 ## 2.7 Calibrar Escala da Imagem – referência aérea na medida certa
 
-Guia **SinalizaBIM → Vias → Calibrar Imagem**. Serve para usar uma imagem aérea (captura do Google Earth ou do Google Maps,
+Guia **SinalizaBIM → Terreno → Imagem Aérea**. Serve para usar uma imagem aérea (captura do Google Earth ou do Google Maps,
 ortofoto, voo de drone) como referência para desenhar o eixo, com **1 m na imagem = 1 m no Revit**.
 
 ### Calibrar Escala da Imagem
@@ -504,11 +550,11 @@ imagens aéreas tem erro de alguns metros; para projeto executivo, ortofoto ofic
 
 ## 2.4 Bloqueios físicos
 
-Comando **Bloqueios Físicos** (painel *Sinalização Vertical*) – **uma única ferramenta** para todos os
+Comando **Bloqueios Físicos** (painel *Segurança Viária*, botão *Dispositivos de Segurança ▾*) – **uma única ferramenta** para todos os
 dispositivos físicos. As **tachas e tachões refletivos** fazem parte dela: aparecem no topo da lista (grupo *Tachas e
 tachões refletivos*); ao escolher um e clicar *Continuar ›* abre a janela das tachas já nesse tipo (variante mono/
-bidirecional, cor, cadência pela velocidade, caminho). O botão *Tachas e Tachões* saiu de *Complementos* e ficou como
-atalho no menu de **Bloqueios Físicos**. Também estão aqui inclusive as **defensas metálicas (guard rail)**, que antes tinham um botão próprio
+bidirecional, cor, cadência pela velocidade, caminho). O botão *Tachas e Tachões* fica como atalho no
+mesmo grupo (*Dispositivos de Segurança ▾*). Também estão aqui inclusive as **defensas metálicas (guard rail)**, que antes tinham um botão próprio
 (o que duplicava a ferramenta). A lista é agrupada por família: *segregadores e tachões*, *balizadores,
 pilaretes e frades*, *barreiras de concreto*, *defensas metálicas (guard rail)*, *gradis e floreiras* e
 *canalização provisória (obras)*. Na **Sinalizar Via**, um mesmo dispositivo nunca é repetido no mesmo
@@ -530,7 +576,7 @@ unidades ou metros:
 * **Defensa metálica**: postes, espaçadores e **lâmina em "W"** (31 cm, chapa fina) de um ou dos dois
   lados; **defensa de cabos** com três cabos.
 
-## 3. Linha Longitudinal / Transversal / Complementos
+## 3. Linha Longitudinal / Transversal / Ciclovia e Piso Tátil
 
 A mesma janela atende marcas longitudinais, transversais, tachas, piso tátil e ciclovia; muda apenas
 a lista de tipos.
@@ -734,7 +780,7 @@ desfazer a marca (pavimento, calçadas, placas e dispositivos não entram).
 
 ### 9.3 Validar Modelo (conferência sem alterar nada)
 
-**Editar → Validar Modelo** lê as definições gravadas em todos os elementos do plugin e aponta problemas. É **somente
+**Análise → Validar Modelo** lê as definições gravadas em todos os elementos do plugin e aponta problemas. É **somente
 leitura**: o projeto não é alterado (nem entra no Desfazer). Cada achado traz:
 - a **severidade**: erro, aviso, informação ou **não verificado**. "Não verificado" é a verificação que não pôde rodar por
   falta de dado ou configuração – nunca quer dizer "sem problema";
@@ -807,6 +853,23 @@ mesma transação da terraplenagem: Desfazer a terraplenagem desfaz o registro.
 **Marcas de versão mais nova.** Um projeto aberto com um SinalizaBIM mais antigo que o que o criou mostra essas marcas
 como estão. Editar, Atualizar e o ajuste de escala não as alteram (aparece um aviso), para não apagar o que a versão
 nova gravou.
+
+### 9.3.1 Diagnóstico do Terreno (só a topografia)
+
+**Terreno → Diagnóstico do Terreno** (desde a 2.15) confere só o terreno, sem rodar o resto da validação, e também é
+**somente leitura**. A janela mostra:
+- a **superfície projetada** – o Toposolid como está agora (todos os principais juntos): triângulos, pontos distintos em
+  planta, área em planta (soma das faces), cotas mínima e máxima com o desnível e o retângulo em planta;
+- o **terreno original** – o natural, guardado no Toposolid na primeira Terraplenagem: em quantos Toposolids está guardado e
+  o mesmo resumo. Sem ele, a Terraplenagem ainda não foi aplicada e o terreno atual é tratado como o natural;
+- a **declividade máxima das faces** informada em Configurações › Limites geométricos, com a fonte – ou o aviso de que não
+  foi informada (então a declividade das faces não é conferida);
+- os achados do **V14**, os mesmos do Validar Modelo (dados insuficientes ou inválidos, cotas diferentes no mesmo ponto,
+  triângulos sem área, faces acima do limite, eixos de vias que moldam o terreno passando fora da superfície), com a ação
+  recomendada.
+
+Com vias fora da superfície, **Selecionar os elementos das vias com eixo fora da superfície** os seleciona no modelo. Sem
+Toposolid no projeto, o comando avisa e não faz nada.
 
 ---
 
@@ -949,7 +1012,7 @@ desdobrar por cor nem por material da chapa. Cores e materiais (consumo de tinta
   **SV_Unidade**, preenchidos também nos elementos antigos ao criar a tabela. A **miniatura** de cada item vai para o
   parâmetro *Imagem* dos elementos e a tabela é colocada numa **folha SV-Q01** – o Revit só desenha imagens de
   tabela em folhas. **Tabelas por categoria** cria uma tabela para cada categoria. O parâmetro compartilhado **SV_Categoria** também pode ser usado em filtros de vista.
-* Para a prancha, use **Detalhamento → Quadro de Quantitativos** (seção 16).
+* Para a prancha, use **Documentação › Detalhar ▾ → Quadro de Quantitativos** (seção 16).
 
 **Terraplenagem no quantitativo.** O corte e o aterro feitos no terreno entram na categoria **10. Obras de arte,
 contenções e terraplenagem**, subcategoria *Terraplenagem (corte e aterro no terreno)*, em **m³**:
@@ -1114,7 +1177,7 @@ sinalização vertical obrigatória (ex.: A-18).
 
 ## 15. Ciclofaixa com medidas personalizadas
 
-**Complementos ▾ → Ciclovia / Faixa de caminhada** monta tudo de uma vez, com pré-visualização:
+**Ciclovia e Piso Tátil ▾ → Ciclovia / Faixa de Caminhada** monta tudo de uma vez, com pré-visualização:
 ciclofaixa unidirecional ou bidirecional, ciclovia ou faixa de caminhada; largura, pintura de fundo
 (vermelha, ou azul/verde na caminhada) **entre as linhas, sem sobreposição**, linhas de bordo (direita,
 esquerda, ambas ou nenhuma; contínuas ou seccionadas), linha central amarela, bicicletas/pedestres e
@@ -1257,7 +1320,7 @@ ligados à marca de origem: editar a placa/marca atualiza o detalhe, e apagá-la
   **Grupos**: o perfil – camadas, cotas, níveis, legenda e título – é um grupo (*SV - Perfil transversal A-A*) e a
   parte da planta – linha de corte, marcas e cadeia de cotas – outro (*SV - Cotas da seção A-A*): selecionar e mover
   leva as cotas junto.
-* **Corte Transversal** (Detalhar → Corte Transversal): **só o perfil transversal**, sem precisar cotar a seção antes – um
+* **Corte Transversal** (Sistema Viário › Seções Transversais ▾ → Corte Transversal): **só o perfil transversal**, sem precisar cotar a seção antes – um
   clique sobre a via (ou dois pontos) e outro onde colocar o perfil. **Nada é desenhado na planta** – nem antes nem depois
   do perfil: o único desenho é o perfil final. A linha de corte fica guardada só como dados (um elemento de dados do
   projeto, sem desenho), ligando o perfil à via e mantendo-o atualizado; ESC no clique do perfil não deixa nada, e
@@ -1328,7 +1391,7 @@ arraste-a do Navegador de projeto (*Legendas*). **Editar** um quadro: abra a vis
 
 ### 16.1 Pranchas
 
-**Detalhamento → Pranchas** monta as folhas de uma via. Antes, carregue no projeto a família de folha (carimbo) do
+**Documentação → Pranchas** monta as folhas de uma via. Antes, carregue no projeto a família de folha (carimbo) do
 escritório (*Inserir → Carregar família → Anotações / Folhas de título*); sem nenhum carimbo carregado o comando avisa e
 para. Abra a **vista em planta** que servirá de base (as vistas dos trechos são cópias dela, sem os detalhes 2D) e clique
 sobre a via.
@@ -1355,7 +1418,7 @@ sobre a via.
 
 ### 16.2 Memorial descritivo
 
-**Detalhamento → Memorial Descritivo** grava um **.docx** (Word) gerado do modelo:
+**Documentação › Memoriais ▾ → Memorial Descritivo** grava um **.docx** (Word) gerado do modelo:
 
 1. Identificação – **nome do projeto, responsável técnico, ART** e local em branco (campos para preencher no Word);
 2. Objetivo; 3. Normas e referências (as citadas pelo plugin; edições [a confirmar] com o órgão);
@@ -1443,7 +1506,7 @@ por cima da pista existente.
 
 ### 18.1 Estrutura do pavimento
 
-**SinalizaBIM Infra → Relevo e Terreno → Estrutura do Pavimento.** Clique a via (pista, calçada ou linha dela) e informe:
+**SinalizaBIM → Pavimentação → Estrutura do Pavimento.** Clique a via (pista, calçada ou linha dela) e informe:
 - a **espessura do revestimento** (o próprio piso da pista – muda a espessura do piso);
 - as **camadas sob o revestimento**, uma por linha, de cima para baixo, no formato
   `nome; espessura em cm; material; função`, com material e função opcionais. Funções: base, sub-base, reforço do
@@ -1846,7 +1909,7 @@ tipos e o controle escolhidos a todas as interseções do projeto.
 
 ### 19.4 Abrir acesso numa via existente (retorno em U, nova via em T ou travessia no canteiro)
 
-**Conexões → Trocar Conexão → "Abrir acesso numa via"**: clique na via, no ponto do acesso, do lado de quem vai retornar (ou
+**Interseções → Trocar Conexão → "Abrir acesso numa via"**: clique na via, no ponto do acesso, do lado de quem vai retornar (ou
 do lado da nova via). Tudo é feito numa **só operação** (um *Desfazer* volta tudo).
 
 **Retorno em U** – escolha a forma e o **veículo de projeto** (DNIT, raios mínimos de giro, editáveis):
@@ -2011,7 +2074,7 @@ separadora (**física, pintada ou nenhuma**) e seu comprimento, **travessia** (s
 saída**, **controle** (Dê a preferência ou **PARE** – LRE de 0,40 m + legenda) e placas. As escolhas ficam
 guardadas por via: ao redetectar os ramos (mover eixos, ligar outra via) elas são preservadas.
 
-**Vias → Conexões → Rotatória** (seta do botão *Conexões*): clique o centro (o ponto é encaixado no cruzamento de vias mais próximo). Os ramos
+**Interseções → Rotatória**: clique o centro (o ponto é encaixado no cruzamento de vias mais próximo). Os ramos
 são detectados das vias que passam pelo centro (ou informados por ângulo, para uma rotatória isolada).
 Parâmetros: raio da **ilha central** (ajardinada, com árvores opcionais), **faixa galgável** em bloquete
 para ônibus e caminhões, número e largura das **faixas da pista giratória** (linha divisória quando há 2
@@ -2021,11 +2084,11 @@ entrada (circulação anti-horária), **travessia de pedestres** passando pela i
 placas **R-2** e **R-33**. As vias ligadas são recortadas e a interseção existente no mesmo nó é
 substituída (com os recortes que ela fazia). A rotatória ligada às vias **acompanha o nó** quando os eixos
 são movidos e ganha um **ramo novo** quando uma via é desenhada até ela (**Via** desenhada por pontos, clicando dentro da
-rotatória); também pode ser criada direto na conexão (**Via → Rotatória** ou **Conexões → Trocar Conexão**). Confira as dimensões com o manual do DNIT / órgão local e com o veículo de projeto.
+rotatória); também pode ser criada direto na conexão (**Interseções → Rotatória** ou **Interseções → Trocar Conexão**). Confira as dimensões com o manual do DNIT / órgão local e com o veículo de projeto.
 
 ## 21. Piso tátil (ABNT NBR 16537:2024)
 
-**Complementos → Piso Tátil** desenha a **rota tátil** com placas moduladas de 0,25, 0,30 ou 0,40 m **sobrepostas** ao piso e
+**Ciclovia e Piso Tátil ▾ → Piso Tátil** desenha a **rota tátil** com placas moduladas de 0,25, 0,30 ou 0,40 m **sobrepostas** ao piso e
 com **relevo** (visível em 3D e em planta). Medidas conferidas com a ABNT NBR 16537:2024 (o PDF da norma foi a referência
 desta rodada):
 
@@ -2069,7 +2132,7 @@ material escolhido; o plugin usa amarelo e evita verde com vermelho), limite de 
 
 ## 22.1 Famílias do Revit como elementos urbanos
 
-**Via → Elementos Urbanos → Famílias do Revit**: use **suas próprias famílias de componente** (mobiliário,
+**Urbanismo › Elementos Urbanos ▾ → Famílias do Revit**: use **suas próprias famílias de componente** (mobiliário,
 luminárias, plantio, modelo genérico, equipamentos…) com o design que quiser:
 
 * escolha a família carregada (ou **carregue um .rfa**), a **subcategoria urbana** (sugerida pelo nome:
@@ -2096,7 +2159,7 @@ apoios de aço com braços; **lixeira** cônica com tampa; **poste** cônico com
 **floreira** com arbustos; **placa de rua** e **semáforo** com anteparo e pestanas. Elementos urbanos e
 placas são assentados no **topo da calçada** (nível da base 0,15 m, ajustável na janela; 0 = nível da pista).
 
-**Trocar Elementos** (Elementos Urbanos ▾, desde a 2.13): selecione vários elementos urbanos do plugin e escolha o novo tipo
+**Trocar Elementos** (Urbanismo › Elementos Urbanos ▾, desde a 2.13): selecione vários elementos urbanos do plugin e escolha o novo tipo
 do catálogo (ex.: todas as lixeiras de uma calçada viram paraciclos). Posição, direção, caminho, afastamento, recuos, rotação e
 nível ficam. Escolha se as **medidas e a cor próprias** de cada elemento ficam ou voltam às do novo tipo, e se, ao longo de
 linhas, o **espaçamento** passa a ser o do novo tipo. Desfazer volta ao que estava. Famílias do Revit trocam pelo seletor de
@@ -2106,7 +2169,7 @@ tipo do próprio Revit.
 
 ## 23. Cruzamento rodoferroviário (MCF)
 
-**Complementos ▾ → Cruzamento Rodoferroviário**: clique o ponto onde a ferrovia cruza uma via do SinalizaBIM
+**Segurança Viária → Cruzamento Rodoferroviário**: clique o ponto onde a ferrovia cruza uma via do SinalizaBIM
 (sem via, clique dois pontos do eixo) e, opcionalmente, dois pontos sobre o trilho para a **esconsidade**. A ferramenta
 monta o conjunto do **MBST Vol. IX / Vol. IV 5.8** e do **DER-SP (projeto-tipo 13)**, em cada aproximação:
 
@@ -2148,7 +2211,7 @@ sinalização da passagem em nível use o **Cruzamento Rodoferroviário** (seç�
 
 ## 24. Infraestrutura – drenagem, obras de arte, contenções e nós viários
 
-Painel **Infraestrutura**. Todas as obras são paramétricas, editáveis (Editar), regeneradas quando o eixo muda e entram no
+Painéis **Sistema Viário** (Obras de Arte ▾), **Interseções** (Nó Viário), **Terraplenagem** (Contenções ▾) e **Drenagem**. Todas as obras são paramétricas, editáveis (Editar), regeneradas quando o eixo muda e entram no
 quantitativo (categorias *9. Drenagem* e *10. Obras de arte, contenções e terraplenagem*). As peças são sólidos 3D
 (formas diretas) com materiais próprios: concreto, aço, asfalto, brita, solo compactado, grama e água.
 
@@ -2172,8 +2235,8 @@ quantitativo (categorias *9. Drenagem* e *10. Obras de arte, contenções e terr
 * Apagar um dispositivo devolve a continuidade dos pisos recortados. Referências: DNIT 030/2004-ES, NBR 10160, PMSP.
 
 ### 24.1a Rede de drenagem, vazões e memorial (Fase VIII)
-Guia **SinalizaBIM Infra › Drenagem**: **Trecho de Rede**, **Projeto de Drenagem**, **Relatório da Rede**, **Ler do Modelo**
-e **Memorial de Drenagem**. Nada disso foi executado no Revit 2027 ainda (o cálculo é testado no núcleo).
+Guia **SinalizaBIM › Drenagem**: **Trecho de Rede**, **Projeto de Drenagem**, **Relatório da Rede** e **Ler do Modelo**; o
+**Memorial de Drenagem** fica em **Documentação › Memoriais ▾**. Nada disso foi executado no Revit 2027 ainda (o cálculo é testado no núcleo).
 
 1. **Projeto de Drenagem** (uma vez por projeto; fica gravado no arquivo do Revit). Escolha a **predefinição** e clique em
    *Aplicar a predefinição*:
@@ -2573,7 +2636,7 @@ tamanho do SDP, altura das legendas e largura das linhas longitudinais.
 
 ## 26. Simulador de Tráfego
 
-**Tráfego → Simulador de Tráfego** lê o projeto inteiro e responde: *a rede funciona? onde trava? por quê? o que fazer?*
+**Análise › Tráfego ▾ → Simulador de Tráfego** lê o projeto inteiro e responde: *a rede funciona? onde trava? por quê? o que fazer?*
 
 **O que é lido do projeto.** Vias (eixo, sentidos, número de faixas por sentido, faixas de ônibus, estacionamento,
 ciclofaixa, canteiro central, largura entre meios-fios, velocidade e **hierarquia** – CTB art. 60/61 – e o **greide**),
@@ -2826,7 +2889,7 @@ O Autoteste confere que não há sobreposição de veículos na animação.
 
 ### 26.11 Semáforos no simulador: escolher, temporizar e recomendar
 
-**Onde fica:** botão **🚦 Semáforos** na faixa de opções (painel Tráfego) – abre o simulador direto na aba
+**Onde fica:** botão **🚦 Semáforos** na faixa de opções (painel Análise, botão Tráfego ▾) – abre o simulador direto na aba
 **🚦 Semáforos**. Também: aba *🚦 Semáforos* dentro do simulador, ou **clique com o botão direito** em qualquer
 cruzamento ou trecho do mapa → *Tornar … semaforizado*, *Editar tempos de …*, *Recomendar tempos deste semáforo*,
 *Remover o semáforo (cenário)*, *Criar semáforo de travessia aqui*, *Testar soluções para este cruzamento*.
@@ -2988,7 +3051,7 @@ mesmo. Velocidade das vias inferidas: 50 km/h, ou a da placa R-19 sobre elas [a 
 
 ## 27. Loteamento
 
-Guia **SinalizaBIM Infra → Loteamento**. Do limite da gleba aos lotes numerados, com quadros, memorial e masterplan.
+Guia **SinalizaBIM → Urbanismo**. Do limite da gleba aos lotes numerados, com quadros, memorial e masterplan.
 
 ### 27.1 Fluxo
 
@@ -3195,7 +3258,7 @@ as divisas por baixo) – por isso aparece também no masterplan.
   lote tem uma frente só** – a da testada dele; no lote de esquina o lado para a outra rua é o lado direito ou esquerdo,
   confrontando com essa rua (nada de frente somada). Ao escolher: **todas as quadras** num quadro (continua em colunas ao lado a cada 40 linhas),
   **uma quadra** (clique um lote dela; título "QUADRO DE LOTES – QUADRA A" – também direto pelo botão **Quadro da Quadra**, em
-  Detalhar e Quadros: clique um lote e escolha se o quadro vai para uma Legenda própria, que entra em qualquer folha, ou para a
+  Quadros e Áreas: clique um lote e escolha se o quadro vai para uma Legenda própria, que entra em qualquer folha, ou para a
   vista ativa, no ponto clicado) ou **um quadro por quadra** (cada um na sua Legenda,
   e todos na mesma folha se você pedir).
 * **Tabela do Revit**: "SV - Lotes do loteamento", nativa (quadra, lote, categoria, área), atualizada pelo próprio Revit.

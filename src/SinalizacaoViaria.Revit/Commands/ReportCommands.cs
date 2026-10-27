@@ -192,10 +192,9 @@ public sealed class CmdQuantitativos : CommandBase
 
 /// <summary>Configurações do plugin.</summary>
 [Transaction(TransactionMode.Manual)]
+[NoDocumentRequired]
 public sealed class CmdConfiguracoes : CommandBase
 {
-    protected override bool RequiresDocument => false;
-
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
         var w = new SettingsWindow();
@@ -211,10 +210,9 @@ public sealed class CmdConfiguracoes : CommandBase
 
 /// <summary>Abre, recarrega ou restaura o catálogo normativo.</summary>
 [Transaction(TransactionMode.Manual)]
+[NoDocumentRequired]
 public sealed class CmdCatalogo : CommandBase
 {
-    protected override bool RequiresDocument => false;
-
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
         var path = PluginContext.UserCatalogPath;
@@ -252,10 +250,9 @@ public sealed class CmdCatalogo : CommandBase
 
 /// <summary>Normas de referência e informações do plugin.</summary>
 [Transaction(TransactionMode.Manual)]
+[NoDocumentRequired]
 public sealed class CmdSobre : CommandBase
 {
-    protected override bool RequiresDocument => false;
-
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
         var cat = PluginContext.Catalog;

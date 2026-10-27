@@ -29,7 +29,7 @@ public sealed class AutoTestWindow : Window
             Text = $"Relatório salvo em: {path}\nEnvie este arquivo (ou copie o texto abaixo) para que os problemas encontrados sejam corrigidos.",
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 6, 0, 8),
-            Foreground = new SolidColorBrush(Color.FromRgb(90, 96, 106)),
+            Foreground = UiTokens.TextSecondary,
         });
         root.Children.Add(head);
 

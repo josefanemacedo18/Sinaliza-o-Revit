@@ -267,7 +267,8 @@ public static class IconFactory
                 dc.DrawLine(P(Yellow, 1.2), new Point(8, 7.5), new Point(14, 7.5));
                 dc.DrawLine(P(Yellow, 1.2), new Point(18, 7.5), new Point(24, 7.5));
                 break;
-            case "ferrovia":
+            case "passagemnivel":
+                // Passagem em nível: a cruz de Santo André sobre a pista e a linha de retenção.
                 RoadBackground(dc);
                 dc.DrawLine(P(White, 2), new Point(6, 6), new Point(26, 26));
                 dc.DrawLine(P(White, 2), new Point(26, 6), new Point(6, 26));
@@ -714,6 +715,105 @@ public static class IconFactory
             case "filtrolote":
                 dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(3, 4), new Point(29, 4), new Point(19, 16), new Point(19, 28), new Point(13, 24), new Point(13, 16))));
                 dc.DrawRectangle(B(Color.FromRgb(155, 203, 138)), null, new Rect(22, 20, 8, 8));
+                break;
+            case "ferrovia":
+                // Via férrea: lastro, dormentes e os dois trilhos.
+                dc.DrawRectangle(B(Color.FromRgb(160, 158, 152)), null, new Rect(3, 1, 26, 30));
+                for (int y = 3; y < 31; y += 5) dc.DrawRectangle(B(Color.FromRgb(120, 78, 44)), null, new Rect(5, y, 22, 2.5));
+                dc.DrawLine(P(Asphalt, 2.2), new Point(10, 1), new Point(10, 31));
+                dc.DrawLine(P(Asphalt, 2.2), new Point(22, 1), new Point(22, 31));
+                break;
+            case "terreno":
+            {
+                // Superfície triangulada do Toposolid e a lupa do diagnóstico.
+                dc.DrawGeometry(B(Color.FromRgb(150, 118, 84)), null, Close(Poly(new Point(1, 22), new Point(9, 15), new Point(17, 20), new Point(24, 13),
+                    new Point(31, 18), new Point(31, 31), new Point(1, 31))));
+                var aresta = P(Color.FromRgb(214, 196, 160), 1);
+                foreach (var (p0, p1) in new[] { (new Point(9, 15), new Point(8, 31)), (new Point(17, 20), new Point(8, 31)), (new Point(17, 20), new Point(21, 31)),
+                                                 (new Point(24, 13), new Point(21, 31)), (new Point(31, 18), new Point(21, 31)), (new Point(1, 22), new Point(8, 31)) })
+                    dc.DrawLine(aresta, p0, p1);
+                dc.DrawEllipse(B(White), P(Blue, 2.2), new Point(10, 8), 5.5, 5.5);
+                dc.DrawLine(P(Blue, 3), new Point(14, 12), new Point(18.5, 16.5));
+                break;
+            }
+            case "cortetransversal":
+                // Só o perfil em corte: terreno, camadas, pista com abaulamento, meios-fios e a linha de corte A–A.
+                dc.DrawRectangle(B(Color.FromRgb(150, 118, 84)), null, new Rect(1, 22, 30, 9));
+                dc.DrawRectangle(B(Color.FromRgb(214, 196, 160)), null, new Rect(5, 18, 22, 4));
+                dc.DrawGeometry(B(Asphalt), null, Close(Poly(new Point(5, 18), new Point(16, 15), new Point(27, 18), new Point(27, 19), new Point(5, 19))));
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(1, 13, 4, 9));
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(27, 13, 4, 9));
+                dc.DrawLine(new Pen(B(Red), 1.4) { DashStyle = DashStyles.Dash }, new Point(9, 6), new Point(23, 6));
+                Text(dc, "A", 8, Red, new Point(4.5, 1), true);
+                Text(dc, "A", 8, Red, new Point(27.5, 1), true);
+                break;
+            case "largura":
+                // Trecho em que a largura muda (transição) e a cota da nova largura.
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(1, 1, 30, 30));
+                dc.DrawGeometry(B(Asphalt), null, Close(Poly(new Point(1, 10), new Point(10, 10), new Point(18, 5), new Point(31, 5), new Point(31, 27),
+                    new Point(18, 27), new Point(10, 22), new Point(1, 22))));
+                dc.DrawLine(new Pen(B(White), 1.2) { DashStyle = DashStyles.Dash }, new Point(1, 16), new Point(31, 16));
+                dc.DrawLine(P(Yellow, 1.5), new Point(25, 9), new Point(25, 23));
+                dc.DrawGeometry(B(Yellow), null, Close(Poly(new Point(22, 10), new Point(28, 10), new Point(25, 6))));
+                dc.DrawGeometry(B(Yellow), null, Close(Poly(new Point(22, 22), new Point(28, 22), new Point(25, 26))));
+                break;
+            case "trocar":
+                // Um elemento urbano trocado por outro no mesmo lugar (árvore ⇄ banco).
+                dc.DrawEllipse(B(Color.FromRgb(98, 158, 74)), null, new Point(7, 20), 5, 5);
+                dc.DrawRectangle(B(Color.FromRgb(120, 78, 44)), null, new Rect(6, 24, 2, 7));
+                dc.DrawRectangle(B(Color.FromRgb(120, 78, 44)), null, new Rect(17, 23, 14, 3));
+                dc.DrawRectangle(B(Color.FromRgb(140, 146, 154)), null, new Rect(18, 26, 2, 5));
+                dc.DrawRectangle(B(Color.FromRgb(140, 146, 154)), null, new Rect(28, 26, 2, 5));
+                dc.DrawLine(P(Blue, 2), new Point(5, 5), new Point(24, 5));
+                dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(24, 1.5), new Point(29, 5), new Point(24, 8.5))));
+                dc.DrawLine(P(Blue, 2), new Point(27, 11.5), new Point(10, 11.5));
+                dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(10, 8), new Point(5, 11.5), new Point(10, 15))));
+                break;
+            case "memlote":
+                // Folha do memorial do loteamento com a quadra dividida em lotes.
+                dc.DrawRectangle(B(White), P(Muted, 1.2), new Rect(6, 2, 20, 28));
+                dc.DrawLine(P(Blue, 2), new Point(9, 7), new Point(23, 7));
+                for (var y = 11.0; y <= 14; y += 3) dc.DrawLine(P(Muted, 1), new Point(9, y), new Point(23, y));
+                dc.DrawRectangle(B(Color.FromRgb(242, 215, 166)), P(Asphalt, 0.8), new Rect(9, 18, 14, 9));
+                for (var x = 12.5; x < 23; x += 3.5) dc.DrawLine(P(Asphalt, 0.8), new Point(x, 18), new Point(x, 27));
+                break;
+            case "sobre":
+                // Livro das normas de referência e o "i" das informações do plugin.
+                dc.DrawGeometry(B(White), P(Asphalt, 1.3), Close(Poly(new Point(2, 6), new Point(15, 8), new Point(15, 27), new Point(2, 25))));
+                dc.DrawGeometry(B(White), P(Asphalt, 1.3), Close(Poly(new Point(17, 8), new Point(30, 6), new Point(30, 25), new Point(17, 27))));
+                for (var y = 12.0; y <= 20; y += 4) dc.DrawLine(P(Muted, 1), new Point(5, y - 1), new Point(12, y));
+                dc.DrawEllipse(B(Blue), P(White, 1.2), new Point(24, 22), 7, 7);
+                Text(dc, "i", 11, White, new Point(24, 14.5), true);
+                break;
+            case "chamadaplaca":
+                // Símbolo da placa levado para outro lugar: linha de chamada pelos vértices clicados.
+                dc.DrawRectangle(B(White), P(Color.FromRgb(160, 166, 174), 1), new Rect(1, 1, 30, 30));
+                dc.DrawGeometry(null, P(Red, 1.5), Poly(new Point(5, 27), new Point(9, 17), new Point(17, 13)));
+                foreach (var pt in new[] { new Point(5, 27), new Point(9, 17) }) dc.DrawEllipse(B(Red), null, pt, 2, 2);
+                dc.DrawEllipse(B(Red), null, new Point(23, 10), 6.5, 6.5);
+                dc.DrawEllipse(B(White), null, new Point(23, 10), 4.5, 4.5);
+                dc.DrawLine(P(Red, 1.5), new Point(20, 13), new Point(26, 7));
+                dc.DrawLine(P(Blue, 1.6), new Point(17, 24), new Point(27, 24));
+                dc.DrawGeometry(B(Blue), null, Close(Poly(new Point(27, 21), new Point(30.5, 24), new Point(27, 27))));
+                break;
+            case "ciclomarcas":
+                // Marcas de ciclovia ao longo de linhas: linha tracejada e a marcação do cruzamento rodocicloviário.
+                RoadBackground(dc);
+                for (int y = 2; y < 30; y += 7) dc.DrawRectangle(B(White), null, new Rect(5, y, 2, 4));
+                for (int i = 0; i < 4; i++)
+                {
+                    dc.DrawRectangle(B(i % 2 == 0 ? Red : White), null, new Rect(12 + i * 4.5, 12, 3.5, 3.5));
+                    dc.DrawRectangle(B(i % 2 == 0 ? White : Red), null, new Rect(12 + i * 4.5, 16.5, 3.5, 3.5));
+                }
+                break;
+            case "quadroquadra":
+                // Quadro de lotes de uma quadra: a letra da quadra no círculo e as linhas dos lotes.
+                dc.DrawRectangle(B(White), P(Asphalt, 1.5), new Rect(2, 3, 28, 26));
+                for (int i = 0; i < 4; i++) dc.DrawLine(P(Asphalt, 0.8), new Point(2, 11 + i * 4.5), new Point(30, 11 + i * 4.5));
+                dc.DrawLine(P(Asphalt, 0.8), new Point(11, 11), new Point(11, 29));
+                dc.DrawEllipse(B(White), P(Red, 1.4), new Point(7, 7), 3.2, 3.2);
+                Text(dc, "A", 5.5, Red, new Point(7, 3.6), true);
+                dc.DrawRectangle(B(Asphalt), null, new Rect(13, 6, 14, 1.8));
                 break;
             default:
                 dc.DrawEllipse(B(Blue), null, new Point(16, 16), 13, 13);

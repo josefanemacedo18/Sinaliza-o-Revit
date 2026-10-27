@@ -62,7 +62,7 @@ public static class LotMemorial
         var vias = lot.Vias.Where(v => !string.IsNullOrWhiteSpace(v.Nome)).ToList();
         if (vias.Count > 0)
             b.Add(new MemBullets(vias.Select(v => $"{v.Nome}: extensão de {LotReport.M(ExtensaoNaGleba(v, gleba))} m no loteamento.").ToList()));
-        else b.Add(new MemParagraph("Vias sem nome: use Loteamento → Nomear Vias para que as confrontações tragam o nome das ruas.", Italic: true));
+        else b.Add(new MemParagraph("Vias sem nome: use Urbanismo › Nomear Vias para que as confrontações tragam o nome das ruas.", Italic: true));
 
         b.Add(new MemHeading(1, SecQuadras));
         b.Add(QuadroQuadras(r));

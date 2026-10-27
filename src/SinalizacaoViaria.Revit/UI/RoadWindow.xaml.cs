@@ -523,12 +523,12 @@ public partial class RoadWindow : Window
             TxtNominal.Text = $"Seção atual (do eixo): bordo esq. {UiHelpers.F(nbl)} m · dir. {UiHelpers.F(nbr)} m; alinhamento esq. {UiHelpers.F(nal)} m · dir. {UiHelpers.F(nar)} m.";
             TxtSummary.Text = $"Elementos gerados: {string.Join(", ", counts)}." +
                               (warnings.Count > 0 ? "\n⚠ " + string.Join("\n⚠ ", warnings) : "");
-            TxtSummary.Foreground = warnings.Count > 0 ? System.Windows.Media.Brushes.SaddleBrown : System.Windows.Media.Brushes.Black;
+            TxtSummary.Foreground = warnings.Count > 0 ? UiTokens.Warning : UiTokens.Text;
         }
         catch (Exception ex)
         {
             TxtSummary.Text = ex.Message;
-            TxtSummary.Foreground = System.Windows.Media.Brushes.DarkRed;
+            TxtSummary.Foreground = UiTokens.Error;
         }
     }
 

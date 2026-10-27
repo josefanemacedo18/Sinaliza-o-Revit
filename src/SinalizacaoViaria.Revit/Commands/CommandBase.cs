@@ -56,7 +56,8 @@ public abstract class CommandBase : IExternalCommand
         }
     }
 
-    protected virtual bool RequiresDocument => true;
+    /// <summary>Exige um projeto (.rvt) ativo; os comandos com <see cref="NoDocumentRequiredAttribute"/> rodam sem ele.</summary>
+    private bool RequiresDocument => !NoDocumentRequiredAttribute.On(GetType());
 
     protected abstract Result Run(UIApplication app, UIDocument uidoc);
 
