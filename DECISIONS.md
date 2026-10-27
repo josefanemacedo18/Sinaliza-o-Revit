@@ -442,3 +442,35 @@ como substituída.
   - análise operacional nos formulários de nó: o Simulador de Tráfego já faz, com a demanda estimada ou informada;
     visibilidade e trajetória de giro não existem no motor e não são inventadas na tela.
 - **Consequências:** as telas dizem o que não foi calculado em vez de esconder; o que não foi visto no Revit está em K25.
+
+## D-030 – Qualidade, quantitativos e configurações: os mesmos motores, com a origem e o lugar de cada coisa
+- **Contexto:** o Prompt de Interface (§17–§19, §26) pede uma central de qualidade que reúna os verificadores sem trocá-los
+  por conferências superficiais e separe o diagnóstico do modelo dos testes do código; quantitativos com a origem de cada
+  número; um gerenciador de configurações que distinga usuário e projeto, valide antes de aplicar, diga o que a mudança
+  afeta e ofereça perfis sem fingir que são norma; e preferências da interface guardadas fora do modelo.
+- **Decisão:**
+  - a Central de Qualidade é o Validar Modelo com outra tela: os achados do `ModelValidator`, o estado de cada um pela mesma
+    chave do histórico (`ValidationHistory`), o relatório TXT e o histórico como antes; o Autoteste é lido do TXT que ele
+    grava (`RelatorioAutoteste`), numa aba própria – não há outro formato de dados para manter;
+  - não há botão "validar de novo": a janela é modal e o modelo não muda com ela aberta; validar de novo é rodar o comando;
+  - a origem de cada linha do quantitativo é registrada no próprio cálculo (`QuantityRow.Origens`, `Metodo`), não deduzida
+    depois; pisos desenhados à mão e famílias contam como elementos do usuário, não como marcas;
+  - o total do consumo vai na unidade do total (a taxa do catálogo menos "/m²"), e totais de unidades diferentes não se
+    somam: aparecem por unidade;
+  - as vias têm um nome só em todas as telas (`NomesDasMarcas`, a numeração das camadas do pavimento);
+  - as configurações têm um registro único no núcleo (`RegistroConfiguracoes`): o mesmo descritor dá o valor mostrado, o
+    "o que muda ao salvar" e o teste que exige que toda configuração nova apareça; as do projeto são lidas do modelo e
+    editadas nos comandos que já existem;
+  - a janela de configurações edita uma cópia e só aplica depois de validar tudo;
+  - perfis: as seções-tipo do plugin são *exemplo*; perfis com fonte são *referência citada pelo usuário*, sem conferência
+    pelo plugin; o plugin não traz perfis de limites nem de estrutura;
+  - tamanho das janelas: só nas telas grandes, por tipo, nas configurações do usuário; sem valor ou ilegível, o padrão.
+- **Alternativas descartadas:**
+  - verificações novas só para a Central: duplicariam o validador e poderiam divergir dele;
+  - guardar o quantitativo no modelo para ter "data da atualização": o quantitativo é calculado na hora e não fica velho; o
+    que pode ficar velho (o terreno aplicado) é mostrado pelo estado da terraplenagem;
+  - perfis de limites ou de estrutura "da norma" embutidos: o plugin não traz valores normativos (K8) e o §19.2 proíbe
+    predefinições que aparentem ser oficiais;
+  - formatar os números pela cultura do Windows: o plugin é em português e o CSV segue o padrão brasileiro (";" e vírgula),
+    que é o do Excel em português; as unidades são SI e ficam fixas.
+- **Consequências:** cada número e cada configuração diz de onde vem e o que afeta; o que não foi visto no Revit está em K26.

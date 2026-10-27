@@ -901,9 +901,30 @@ A correção é sempre sua, com Editar, Atualizar ou apagando o elemento.
 | V16 | **parcelamento**: percentual da gleba (sistema viário, áreas públicas, uma categoria) abaixo do **mínimo informado no loteamento**, e lotes abaixo do **lote mínimo** informado (frente e área), com a fonte que você escreveu | reveja as quadras, as categorias ou o mínimo informado. Sem mínimos informados, o relatório diz "não verificado" |
 | V17 | **integração**: área ou declividade de uma captação **lida do modelo** (Ler do Modelo) que o modelo agora dá diferente – a via mudou, outra captação entrou acima ou o dispositivo saiu da sarjeta. As editadas à mão não entram | **Ler do Modelo › Atualizar só as desatualizadas**: relê só elas e troca só os campos que ainda eram os lidos |
 
-O resumo aparece numa janela (com **Selecionar os elementos com erro ou aviso** e **Abrir o relatório**). O relatório
-completo é gravado em `%AppData%\SinalizaBIM\validacao-AAAAMMDD-HHMMSS.txt`. A validação confere os **dados**; a
-geometria gerada no Revit é conferida pelo Autoteste.
+O resultado abre na **Central de Qualidade** (desde a 2.18). O relatório completo continua gravado em
+`%AppData%\SinalizaBIM\validacao-AAAAMMDD-HHMMSS.txt`. A validação confere os **dados**; a geometria gerada no Revit é
+conferida pelo Autoteste.
+
+**Central de Qualidade.** Os mesmos verificadores, numa tela com abas:
+- **Diagnóstico do modelo**: a tabela dos achados – gravidade, categoria, código, elementos (o nome das marcas: *Via 2*,
+  *Placa R-1*; a marca que não existe mais aparece como tal), descrição, estado diante da validação anterior (**novo**,
+  **persistente**, **primeira validação** ou **não verificado**) e ação recomendada. Filtros por categoria, gravidade,
+  estado e texto, e a ordem (gravidade, categoria, código ou estado). Escolha uma linha para ver o achado inteiro, a regra,
+  a confiança e se pede revisão humana. **Selecionar no modelo** fecha a janela e seleciona os elementos das linhas
+  escolhidas (nenhuma escolhida = as do filtro), aproximando a vista; duplo clique numa linha faz o mesmo. **Exportar CSV**
+  grava as linhas do filtro com a data e a versão da verificação.
+- **Por categoria**: todas as categorias que têm verificador, com zero quando a verificação não achou nada (a que não pôde
+  ser conferida conta em *não verificadas*). Pavimentação não tem verificador próprio: a mudança da estrutura de uma via
+  que molda o terreno aparece na terraplenagem (V15).
+- **Resolvidos**: os achados da validação anterior que sumiram.
+- **Estado dos resultados**: a mesma seção do relatório (terraplenagem e captações lidas).
+- **Autoteste (testes do plugin)**: o último relatório do Autoteste deste computador – etapas executadas, aprovadas, com
+  aviso e com erro, as não executadas (modo rápido), a duração, as versões do Revit e do plugin, o projeto e as mensagens
+  das etapas com erro ou aviso, com o botão para abrir o relatório. São **testes do plugin**, não o diagnóstico deste
+  modelo, e ficam separados dele.
+
+Nada na Central altera o projeto. Para conferir de novo depois de corrigir, rode o Validar Modelo outra vez: a comparação
+mostra o que é novo e o que foi resolvido.
 
 O relatório começa por um resumo:
 - a versão do plugin;
@@ -1146,6 +1167,36 @@ revestimento e são listadas no alto da aba. As vias são numeradas pela ordem n
 código PAV-ASF é o mesmo de todas. Pisos desenhados à mão com hierarquia não entram (não têm espessura nem estrutura
 conhecidas). O CSV e a planilha trazem o mesmo bloco; o filtro de hierarquia vale para a aba.
 
+**De onde vem cada número** (desde a 2.18). Os quantitativos são **calculados na hora**, a partir do modelo aberto – nenhum
+número vem de valor guardado. Para conferir a origem:
+* cada linha diz as **marcas de origem** (coluna *Origem*: *2 marcas do plugin: Via 1, Via 2*; pisos desenhados à mão e
+  instâncias de família do usuário aparecem como tais) e, nos detalhes da linha, o **método**: área em planta dos pisos no
+  modelo, área pintada medida na geometria da marca, contagem de placas, volume pela malha entre a superfície de projeto e o
+  terreno original, o balanço com o fator de homogeneização – com a configuração usada (material, taxa de consumo do
+  catálogo, fator);
+* a pesquisa também acha pelo **elemento de origem** (*Via 3*), e **Selecionar no modelo** seleciona as marcas das linhas
+  escolhidas (itens detalhados, uma via ou um loteamento);
+* a aba **Origem dos valores** diz quando o quantitativo foi calculado e com que versão, de quantas marcas e elementos do
+  usuário, o material de pintura padrão, de onde vem o fator de homogeneização (a última terraplenagem aplicada ou o padrão)
+  e se o **terreno do modelo confere** com os volumes (terraplenagem aplicada em dia, desatualizada – V15 – ou sem
+  registro); o que pede atenção aparece também no alto da janela;
+* as unidades: m, m², m³ e un; o consumo de tinta na unidade do material (L, kg ou m²) e as microesferas em kg. A tela e o
+  CSV mostram 2 casas e a planilha 4; os valores não são arredondados no cálculo.
+
+**Consumo de tinta na unidade certa** (correção da 2.18). Até a 2.17, o consumo total saía com a unidade da taxa do
+catálogo (*6,60 L/m²*); o total é área × taxa e sai agora em **L**, **kg** ou **m²** (a taxa continua no método da linha).
+Materiais com unidades diferentes – tinta em litros, termoplástico em quilos – **não são mais somados**: os subtotais, os
+resumos, o cartão *Tinta estimada* e as exportações trazem o total de cada unidade (*12,50 L + 30,00 kg*).
+
+**Por via e quadras e lotes** (desde a 2.18):
+* aba **Por via**: cada via com a extensão do eixo, o pavimento, a calçada e o meio-fio do grupo da via (as calçadas,
+  meios-fios e sarjetas criados com ela), o volume do revestimento e das camadas (com *só revestimento* quando a via não tem
+  estrutura informada) e o corte e o aterro da parte dela na terraplenagem (— = não calculado);
+* aba **Quadras e lotes**: por loteamento, a gleba, as quadras, cada categoria de parcela (quantidade, área, % da gleba,
+  pública ou privada) e o sistema viário – o mesmo resumo dos *Quadros do Loteamento*;
+* o CSV e a planilha trazem as colunas *Origem* e *Método*, a origem dos valores no cabeçalho e os blocos por via e de
+  quadras e lotes.
+
 **Janela redesenhada**: cabeçalho com o projeto, **cartões de resumo** (elementos, área pintada, extensão
 pintada, pavimento, placas, elementos urbanos e tinta estimada), filtros e **grupos recolhíveis** por
 **categoria → subcategoria** com subtotais no cabeçalho de cada grupo (itens, m², m e un). A coluna *Cor*
@@ -1161,7 +1212,36 @@ subcategoria.
 
 ## 11. Configurações e catálogo
 
-* **Configurações**: representação e material padrão, velocidade padrão, fonte das legendas,
+**Sistema › Configurações** (desde a 2.18) é o gerenciador de configurações, em abas:
+* **Do usuário (este computador)**: o que vale para todos os seus projetos – padrões de criação, desempenho e modelo 3D,
+  sistema viário e comportamento, limites geométricos, janelas e catálogo. No alto, a **conferência** de todos os valores
+  (faixas, rampa mínima maior que a máxima, material fora do catálogo, catálogo do usuário que não existe, limites sem
+  fonte). **Salvar** confere tudo antes e mostra **o que muda e para quem** (ex.: *Material de pintura padrão: … → … –
+  marcas novas…*); nada é alterado nos elementos existentes sem um comando (Atualizar, Editar, Terraplenagem). Com um valor
+  inválido nada é salvo – até a 2.17, os campos lidos antes do inválido ficavam aplicados na sessão.
+* **Do projeto**: o que fica gravado no modelo e vai com o arquivo – a equação de chuva, os critérios e a fonte do
+  *Projeto de Drenagem* e as opções da última *Terraplenagem* aplicada – e o que fica em cada elemento (seção, estaqueamento
+  e estrutura do pavimento das vias, mínimos dos loteamentos), com o comando que edita cada um (*Abrir o comando da linha
+  escolhida*). Sem projeto aberto, a aba diz isso.
+* **Perfis reutilizáveis**: as seções-tipo de **exemplo** do plugin (larguras típicas para começar – nenhuma representa
+  norma) e as do usuário, as estruturas de pavimento guardadas e os **perfis de limites geométricos**, cada um marcado como
+  *exemplo do plugin*, *do usuário (sem referência)* ou *referência citada pelo usuário* (a fonte que você escreveu; o
+  plugin não a confere). O plugin não traz perfis de limites nem de estrutura. Parcelamento: as categorias e os mínimos
+  ficam em cada loteamento.
+* **Onde fica cada configuração**: a lista completa, com o grupo (Geral, Unidades, Geometria, Topografia, Sistema viário,
+  Seções-tipo, Pavimentação, Terraplenagem, Drenagem, Urbanismo, Diagnósticos, Documentação, Aparência, Desempenho), onde
+  fica (usuário, projeto ou elemento), o valor e o que afeta. As unidades (SI, vírgula decimal) são fixas.
+
+**Perfis de limites.** No grupo dos limites geométricos, *Salvar como perfil…* guarda os limites e a fonte atuais com um
+nome; *Aplicar* preenche os campos com os de um perfil (só Salvar grava); *Excluir* remove o perfil.
+
+**Tamanho das janelas.** As telas grandes (Central do Projeto, Central de Qualidade, Quantitativos, rede de drenagem,
+terreno, resultados do parcelamento, estrutura do pavimento, janela da via, Configurações, Autoteste e Simulador de
+Tráfego) reabrem no tamanho em que foram fechadas; maior que a tela, fica do tamanho da tela; sem tamanho guardado, abrem no
+padrão. *Restaurar o tamanho das janelas* volta todas ao padrão. É preferência sua, nas configurações do usuário – não vai
+para o modelo.
+
+* **Configurações do usuário**: representação e material padrão, velocidade padrão, fonte das legendas,
   espessura mínima, elevação adicional, projeção sobre superfícies, atualização automática, contorno
   das regiões 2D e caminho do catálogo do usuário.
 * **Limites geométricos do traçado e do greide**: raio mínimo das curvas horizontais, tangente mínima entre curvas,

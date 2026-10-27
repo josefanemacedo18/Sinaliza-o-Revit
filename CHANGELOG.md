@@ -3,6 +3,67 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-27 – Etapa 12: qualidade, quantitativos e configurações (versão 2.18.0)
+
+Etapa 12 do plano unificado (Prompt de Interface §17–§19, §26; Master §13, §17; Motores §17). Entrega: `Releases/Etapa12`
+(não executada no Revit 2027). O conteúdo das telas vem do núcleo e é testado; as janelas só mostram (D-029, D-030).
+
+### Central de Qualidade (§17)
+- **Validar Modelo** abre a Central de Qualidade no lugar da caixa de diálogo (`CentralQualidade`, no núcleo; os mesmos
+  verificadores V01–V17, nenhum trocado por conferência superficial). Tabela com gravidade, categoria, código, elementos (o
+  nome das marcas), descrição, **estado diante da validação anterior** (novo, persistente, primeira validação, não
+  verificado) e ação recomendada; filtros por categoria, gravidade, estado e texto, ordem escolhida, detalhes do achado,
+  **Selecionar no modelo** (com a vista aproximada) e **Exportar CSV** com a data e a versão.
+- **Por categoria** com todas as categorias que têm verificador (zero = conferida sem achado); **Resolvidos** desde a
+  anterior; **Estado dos resultados**.
+- **Autoteste (testes do plugin)**, separado do diagnóstico do modelo: o último relatório lido do TXT (`RelatorioAutoteste`)
+  – executadas, aprovadas, com aviso, com erro, não executadas, duração, versões, projeto e as mensagens; conferido com os
+  seis relatórios reais em `docs/evidencias`.
+- O relatório TXT e o histórico continuam como antes; o comando continua somente leitura. Não há botão "validar de novo": a
+  janela é modal e o modelo não muda com ela aberta – roda-se o comando outra vez.
+
+### Quantitativos com a origem de cada número (§18)
+- **Origem e método em cada linha**: as marcas de origem (nome e Id), os pisos desenhados à mão e as famílias do usuário, e
+  o método de cálculo com a configuração usada (material, taxa do catálogo, fator). Coluna *Origem*, detalhes da linha,
+  pesquisa pelo elemento e **Selecionar no modelo**.
+- **Aba Origem dos valores** (`OrigemQuantitativos`): calculado agora (data e versão), quantas marcas e elementos do
+  usuário, material padrão, de onde vem o fator de homogeneização e se o terreno do modelo confere com os volumes (estado da
+  terraplenagem); o que pede atenção também no alto.
+- **Por via** (`QuantitativosPorVia`): eixo, pavimento, calçada e meio-fio do grupo da via, camadas e corte e aterro da parte
+  da via. **Quadras e lotes** (`QuantitativosParcelamento`): o mesmo resumo dos Quadros do Loteamento.
+- CSV e planilha com as colunas *Origem* e *Método*, a origem no cabeçalho e os blocos novos. As vias têm os mesmos nomes em
+  todas as telas (`NomesDasMarcas`: *Via 1*, *Via 2*… – inclusive na Central de Qualidade).
+
+### Gerenciador de configurações e perfis (§19, §26)
+- **Configurações em abas** (`RegistroConfiguracoes`): do usuário (este computador), do projeto e de cada elemento (lidas do
+  modelo, com o comando que as edita), perfis reutilizáveis e onde fica cada configuração – grupo, lugar, valor e o que
+  afeta. Um teste garante que toda configuração nova do usuário aparece no gerenciador.
+- **Validação antes de aplicar**: faixas, valores não numéricos, rampa mínima maior que a máxima, material fora do catálogo,
+  catálogo do usuário inexistente, limites sem fonte. **O que muda ao salvar**, de quanto para quanto e para quem; nada é
+  alterado nos elementos existentes sem um comando.
+- **Perfis reutilizáveis** rotulados como *exemplo do plugin* (as seções-tipo, que não representam norma), *do usuário* ou
+  *referência citada pelo usuário* (não conferida pelo plugin); **perfis de limites geométricos** com nome e fonte. O plugin
+  não traz perfis de limites nem de estrutura.
+- **Tamanho das janelas** das telas grandes lembrado entre sessões (limitado à tela; sem tamanho guardado, o padrão), com
+  *Restaurar o tamanho das janelas*. Preferência do usuário, fora do modelo.
+
+### Correções
+- **Consumo de tinta na unidade do total:** o consumo saía com a unidade da taxa do catálogo (*6,60 L/m²* em vez de
+  *6,60 L*), e os subtotais, os resumos, o cartão *Tinta estimada* e as exportações somavam litros com quilos quando havia
+  materiais diferentes. O total vai em L, kg ou m² (`QuantityRow.UnidadeDoTotal`) e as somas são por unidade
+  (`QuantityCalculator.Consumo`), com testes.
+- **Configurações salvas pela metade:** salvar com um campo inválido deixava os campos lidos antes dele aplicados na sessão
+  (sem gravar). A janela edita uma cópia (`PluginSettings.Clone`) e só aplica depois de validar tudo (`CopiarDe`).
+
+### Testes
+- `Etapa12QualidadeTests` (19): estados, chaves repetidas, ordem, filtros, contagens, CSV, leitura dos relatórios reais do
+  Autoteste e as fontes da janela e do comando.
+- `Etapa12QuantitativosTests` (18): unidade do consumo e somas por unidade, origem e método (marcas, pisos do usuário,
+  famílias, terraplenagem), por via, quadras e lotes, origem dos valores, exportações e as fontes da janela e do comando.
+- `Etapa12ConfiguracoesTests` (11): registro, cobertura de toda configuração, impacto, validação, projeto e elementos,
+  perfis, persistência (sem arquivo, versão anterior, corrompido), cópia e tamanho das janelas.
+- Telas NÃO VISTAS NO REVIT (K26).
+
 ## 2026-10-27 – Etapa 11: telas dos módulos (versão 2.17.0)
 
 Etapa 11 do plano unificado (Prompt de Interface §10–§16; Master §7, §13). Entrega: `Releases/Etapa11` (não executada no

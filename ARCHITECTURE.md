@@ -114,6 +114,13 @@ dois pisos sai igual nos dois (ajustada uma vez); entre marcas diferentes valem 
   mudança dos campos. A estaca é mostrada e lida pela estaca da via (`EstacasDaVia`); as definições continuam guardando a
   distância ao longo do eixo (D-023), e a seção carregada de uma via (`RoadSetup.DaVia`) leva o estaqueamento dela, sem
   gravá-lo.
+- **Qualidade, quantitativos e configurações** (desde a 2.18, D-030): `CentralQualidade` monta as linhas do Validar Modelo
+  com o estado de cada achado pela chave do `ValidationHistory`; `RelatorioAutoteste` lê o TXT do Autoteste. Cada
+  `QuantityRow` guarda as marcas de origem e o método no próprio cálculo; `OrigemQuantitativos`, `QuantitativosPorVia` e
+  `QuantitativosParcelamento` montam a origem dos valores e os resumos; `NomesDasMarcas` dá às vias o mesmo nome em todas
+  as telas. `RegistroConfiguracoes` descreve cada configuração do usuário uma vez (valor, grupo, o que afeta) e lê as do
+  projeto; a janela edita uma cópia (`PluginSettings.Clone`) e só aplica com `CopiarDe` depois de validar. O tamanho das
+  telas grandes fica em `LastUsed` (`TamanhosDeJanela`), aplicado no `UiHelpers.ShowModal`.
 - **Design system** (desde a 2.15): cores, tamanhos de texto e espaçamentos em `UI/Styles.xaml` (para o XAML) e
   `UI/UiTokens.cs` (para o código), com as mesmas chaves e valores; componentes (cartão, faixas de mensagem, status, valores,
   botões, tabelas, foco) no `Styles.xaml`. Os desenhos – mapa do tráfego, prévia, miniaturas, ícones – têm paleta de dados
