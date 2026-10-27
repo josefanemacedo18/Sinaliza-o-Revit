@@ -164,6 +164,12 @@ public sealed class SimResult
 public static class TrafficSimulation
 {
     private const double Dt = 0.25;
+    /// <summary>Passo de tempo da microssimulação (s) – sai no relatório (reprodução).</summary>
+    public const double Passo = Dt;
+    /// <summary>Intervalo dos quadros gravados para a animação (s de tempo simulado).</summary>
+    public const double IntervaloDosQuadros = 1.0;
+    /// <summary>Quadros gravados desde este tempo (s) antes do fim do aquecimento: a animação começa com a rede já carregada.</summary>
+    public const double QuadrosAntesDaMedicao = 60;
     public static bool Debug { get; set; }
 
     // ---------------------------------------------------------------- calibração (referências no manual, seção do simulador)
@@ -1269,7 +1275,7 @@ public static class TrafficSimulation
                     if (n >= 2 && q > res.Approaches[link].MaxQueue) res.Approaches[link].MaxQueue = q;
                 }
             res.MaxVehicles = Math.Max(res.MaxVehicles, vehicles.Count);
-            if (time - lastFrame >= 1.0 - 1e-6)
+            if (time - lastFrame >= IntervaloDosQuadros - 1e-6)
             {
                 lastFrame = time;
                 var data = new float[vehicles.Count * SimFrame.Stride];
@@ -1339,7 +1345,7 @@ public static class TrafficSimulation
                         }
                     }
                 }
-                if (time >= opt.WarmupSeconds - 60) res.Frames.Add(new SimFrame { Time = time - opt.WarmupSeconds, Data = data, SignalPhase = sig, Info = info, Peds = pedPts.ToArray() });
+                if (time >= opt.WarmupSeconds - QuadrosAntesDaMedicao) res.Frames.Add(new SimFrame { Time = time - opt.WarmupSeconds, Data = data, SignalPhase = sig, Info = info, Peds = pedPts.ToArray() });
             }
             progress?.Report(time / total);
         }

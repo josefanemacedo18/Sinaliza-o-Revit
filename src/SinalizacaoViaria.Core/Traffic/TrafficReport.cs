@@ -99,7 +99,7 @@ public static class TrafficReport
         if (worst != null) L($"Nó mais carregado: {worst.Node.Label} – nível {worst.LOS} ({LosMeaning(worst.LOS)}), atraso médio {F(worst.Delay, "0.0")} s/veh.");
         L($"Diagnóstico: {crit} crítico(s), {warn} ponto(s) de atenção, {r.Diagnostics.Count - crit - warn} informação(ões).");
         if (sim != null)
-            L($"Microssimulação ({F(sim.Duration / 60.0)} min após {F(o.WarmupSeconds / 60.0)} min de aquecimento): {sim.Completed} viagens concluídas, " +
+            L($"Microssimulação ({F(sim.Duration / 60.0)} min após {F(o.WarmupSeconds / 60.0)} min de aquecimento, semente {o.Seed}): {sim.Completed} viagens concluídas, " +
               $"tempo médio {F(sim.MeanTravelTime)} s, atraso médio {F(sim.MeanDelay)} s, {F(sim.StopsPerTrip, "0.0")} paradas por viagem" +
               (sim.Backlog > 0 ? $"; {sim.Backlog} veículo(s) não conseguiram entrar na rede." : "."));
 
@@ -243,7 +243,65 @@ public static class TrafficReport
         L("• Segurança: HSM (Highway Safety Manual, cap. 12) e CMF de rotatórias/bolsões – referência internacional sem calibração.");
         L("• A demanda é ESTIMADA pela hierarquia das vias. Para decisões de projeto, informe os volumes contados nas entradas");
         L("  (contagens classificadas na hora de pico) e confirme os critérios de semáforo com contagens de 8 horas (MBST Vol. V).");
+
+        // ------------------------------------------------------------------ reprodução (F11)
+        H("9. Análise, simulação e animação – parâmetros para reproduzir");
+        foreach (var l in Reproducao(r, sim)) L(l);
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// O que é análise, o que é microssimulação e o que é animação, com os parâmetros e as sementes usados e a assinatura do
+    /// cenário (Etapa 13, F11): o mesmo projeto com os mesmos parâmetros e a mesma semente dá os mesmos números.
+    /// </summary>
+    public static List<string> Reproducao(TrafficResult r, SimResult? sim)
+    {
+        var o = r.Options;
+        var res = new List<string>
+        {
+            "• Análise (seções 1 a 7, sem a microssimulação): determinística – capacidade, níveis de serviço, segurança e custos pelas",
+            "  fórmulas do método, sem sorteio; os mesmos dados dão sempre os mesmos números.",
+        };
+        if (sim != null)
+        {
+            res.Add($"• Microssimulação: estocástica – chegadas de Poisson e rotas sorteadas com a semente {o.Seed}; perfil de cada motorista com a");
+            res.Add($"  semente {o.Seed * 31 + 7} (derivada da primeira). Passo de {F(TrafficSimulation.Passo, "0.00")} s; aquecimento de {F(o.WarmupSeconds)} s e medição de " +
+                    $"{F(o.SimSeconds)} s.");
+            res.Add("  Os números da microssimulação (resumo e as colunas \"simulação\" das seções 4 e 5) são as estatísticas da medição, depois do");
+            res.Add("  aquecimento. Outra semente dá outra amostra do mesmo cenário: para comparar alternativas, use várias.");
+            res.Add($"• Animação: reprodução dos quadros gravados por esta mesma rodada – um a cada {F(TrafficSimulation.IntervaloDosQuadros)} s simulado, desde " +
+                    $"{F(TrafficSimulation.QuadrosAntesDaMedicao)} s antes do fim do aquecimento ({sim.Frames.Count} quadro(s)). É ilustração: nenhum número deste");
+            res.Add("  relatório vem dela, e a velocidade de reprodução não muda os resultados.");
+        }
+        else res.Add("• Microssimulação e animação: não rodadas neste relatório (só a análise).");
+        res.Add($"• Alternativas (O que fazer para resolver): cada uma é microssimulada com {TrafficSolutions.DefaultSeeds} sementes ({o.Seed} a " +
+                $"{o.Seed + TrafficSolutions.DefaultSeeds - 1}) – média e faixa entre a melhor e a pior.");
+        res.Add("Parâmetros do cenário:");
+        res.Add($"  demanda {o.DemandLabel} (fator {F(o.DemandFactor, "0.00")}), crescimento {F(o.Growth * 100)} %; pesados {F(o.HeavyVehicles * 100)} %, ônibus " +
+                $"{F(o.Buses * 100)} %; FHP {F(o.PeakHourFactor, "0.00")}; pedestres {F(o.PedestriansPerHour)}/h por travessia;");
+        res.Add($"  semáforos {(o.OptimizeSignals ? "otimizados (Webster)" : $"com ciclo fixo de {F(o.FixedCycle)} s")}, planos gravados " +
+                $"{(o.UseStoredPlans ? "respeitados" : "ignorados")}, coordenação {(o.Coordinate ? $"ligada (progressão {(o.ProgressionSpeed > 0 ? F(o.ProgressionSpeed) + " km/h" : "na velocidade livre")})" : "desligada")};");
+        res.Add($"  ônibus {F(o.BusesPerHourPerStop)}/h por ponto, parada de {F(o.BusDwell)} s; fator K {F(o.KFactor, "0.00")}; volumes informados em " +
+                $"{o.ZoneVolumes.Count + o.ZoneVolumeKeys.Count} entrada(s); ajustes em {o.Nodes.Count(x => !x.IsEmpty)} cruzamento(s); " +
+                $"{o.Crossings.Count} semáforo(s) de travessia;");
+        res.Add($"  custos: tempo R$ {F(o.ValueOfTime, "0.00")}/h, ocupação {F(o.Occupancy, "0.0")}, combustível R$ {F(o.FuelPrice, "0.00")}/L, CO₂ R$ {F(o.Co2Price)}/t, " +
+                $"acidente R$ {F(o.CrashCost)}, {F(o.AnnualHours)} h/ano.");
+        res.Add($"Assinatura do cenário (rede lida do projeto + parâmetros): {Assinatura(r)}. Mesma assinatura e mesma semente = mesmos números.");
+        return res;
+    }
+
+    /// <summary>
+    /// Assinatura da rede e dos parâmetros (SHA-256, 16 primeiros dígitos): nós (chave, tipo, controle, posição), trechos (origem,
+    /// destino, faixas, comprimento) e as opções do cenário. Muda se o projeto ou um parâmetro mudar.
+    /// </summary>
+    public static string Assinatura(TrafficResult r)
+    {
+        var ci = CultureInfo.InvariantCulture;
+        var sb = new StringBuilder();
+        foreach (var n in r.Network.Nodes) sb.Append($"N{n.Key}|{n.Kind}|{n.Control}|{n.Pos.X.ToString("0.00", ci)}|{n.Pos.Y.ToString("0.00", ci)};");
+        foreach (var l in r.Network.Links) sb.Append($"L{l.From}>{l.To}|{l.Lanes}|{l.Length.ToString("0.00", ci)};");
+        sb.Append(System.Text.Json.JsonSerializer.Serialize(r.Options));
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString())))[..16];
     }
 
     /// <summary>Tabela das aproximações (separador ";", decimal com vírgula – abre direto no Excel em português).</summary>
