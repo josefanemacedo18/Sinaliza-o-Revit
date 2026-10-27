@@ -460,6 +460,10 @@ public class Etapa11TelasTests
         var w = Ler("UI", "TerrainWindow.cs");
         foreach (var t in new[] { "\"Superfície de cada cálculo\"", "\"Se o terreno mudar\"", "\"Selecionar no modelo\"", "TerrenoTela.Texto(tela)", "\"Toposolids\"" })
             Assert.Contains(t, w);
+        // O comando da linha vem do objeto escolhido, não da posição; e as tabelas não reordenam números em texto.
+        Assert.Contains("g.SelectedItem is LinhaUso u", w);
+        Assert.DoesNotContain("_tela.Usos[g.SelectedIndex]", w);
+        Assert.Contains("CanUserSortColumns = false", Ler("UI", "UiTables.cs"));
         Assert.DoesNotMatch(@"""#[0-9A-Fa-f]{3,8}""", w);
     }
 

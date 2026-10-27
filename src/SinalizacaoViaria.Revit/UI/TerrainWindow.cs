@@ -14,7 +14,7 @@ namespace SinalizacaoViaria.Revit.UI;
 public sealed class TerrainWindow : Window
 {
     public sealed record LinhaToposolid(string Nome, string Pontos, string Area, string Cotas, string Original, string Terraplenada);
-    public sealed record LinhaUso(string Calculo, string Superficie, string Detalhe, string Comando);
+    public sealed record LinhaUso(string Calculo, string Superficie, string Detalhe, string Comando, string Cmd);
     public sealed record LinhaAchado(string Nivel, string Mensagem, string Acao, IReadOnlyList<string> Ids);
 
     private readonly TelaTerreno _tela;
@@ -158,15 +158,16 @@ public sealed class TerrainWindow : Window
             Text = "Natural: o original guardado na primeira terraplenagem (sem ele, o Toposolid atual). Projetada: o Toposolid como está. Acabada: as vias do plugin " +
                    "e, fora delas, a projetada. Nenhum cálculo mistura duas superfícies sem dizer.",
         });
-        var linhas = _tela.Usos.Select(u => new LinhaUso(u.Calculo, TerrenoTela.Nome(u.Superficie), u.Detalhe, RibbonBuilder.LabelOf(u.Comando) ?? u.Comando)).ToList();
+        var linhas = _tela.Usos.Select(u => new LinhaUso(u.Calculo, TerrenoTela.Nome(u.Superficie), u.Detalhe, RibbonBuilder.LabelOf(u.Comando) ?? u.Comando, u.Comando)).ToList();
         var g = UiTables.Grid(linhas, 420, false, ("Cálculo", nameof(LinhaUso.Calculo), 2.0), ("Superfície", nameof(LinhaUso.Superficie), 1.1),
             ("Detalhe", nameof(LinhaUso.Detalhe), 1.8), ("Onde", nameof(LinhaUso.Comando), 0.9));
         sp.Children.Add(g);
         var abrir = new Button { Content = "Abrir o comando da linha", Style = S("Secondary"), HorizontalAlignment = HorizontalAlignment.Left, MinWidth = 0,
             Padding = new Thickness(10, 3, 10, 3), ToolTip = "Fecha esta janela e abre o comando da linha escolhida (ou dê um duplo clique na linha)." };
+        // Pela linha escolhida (o objeto), não pela posição na tabela.
         void Linha()
         {
-            if (g.SelectedIndex >= 0 && g.SelectedIndex < _tela.Usos.Count) Abrir(_tela.Usos[g.SelectedIndex].Comando);
+            if (g.SelectedItem is LinhaUso u) Abrir(u.Cmd);
         }
         abrir.Click += (_, _) => Linha();
         g.MouseDoubleClick += (_, _) => Linha();
