@@ -64,7 +64,16 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros (compilar sempre também o projeto de testes antes do
   commit).
 
-## Próxima tarefa
+## Plano 2 – "InfraWorks dentro do Revit" (desde 2026-10-27)
+
+- Pedido do usuário em `docs/PROMPT_INFRAWORKS.md` (19 itens); plano em `docs/PLANO_DE_ACAO_2.md` (Etapas 14–26, D-032);
+  referência do InfraWorks, com a fonte de cada ferramenta, em `docs/INFRAWORKS_REFERENCIA.md`.
+- Etapa 14 ✅ (só documentos, sem DLL): estudo do InfraWorks pela ajuda oficial, lacunas por matéria, plano.
+- **Próxima: Etapa 15** – defeitos críticos: geração excessiva de rampas, extensões e travessias em trechos curtos (item 18)
+  e terreno sobre a via nas rampas, calçadas e interseções (item 13), com regressão e o Autoteste conferindo nós, rampas e
+  calçadas.
+
+## Próxima tarefa (antes do plano 2)
 
 1. No Revit (quando houver): 5º Autoteste completo com a DLL 2.19.0, numa cópia, com **Fluxo integrado**, terminando com
    **Desfazer tudo**; enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`);

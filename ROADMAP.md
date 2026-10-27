@@ -68,7 +68,10 @@ Desde 2026-10-26 a lista de próximas etapas é o **plano unificado** dos três 
 [docs/PLANO_DE_ACAO.md](docs/PLANO_DE_ACAO.md) (D-022). Ele tem 14 etapas (0–13), cada uma com a origem, a situação e o
 critério de aceite. Os itens que estavam aqui (X1–X5, P6–P8, K11, K12, F10–F12, K14/K15) foram para as etapas 1–13 do plano.
 
-As 14 etapas foram entregues (2.8.0 a 2.19.0). O que vem depois, em ordem de risco, está no relatório técnico final
+Desde 2026-10-27 o trabalho segue o **plano 2** – "InfraWorks dentro do Revit": [docs/PLANO_DE_ACAO_2.md](docs/PLANO_DE_ACAO_2.md)
+(Etapas 14–26, D-032), com a referência do InfraWorks em [docs/INFRAWORKS_REFERENCIA.md](docs/INFRAWORKS_REFERENCIA.md).
+
+As 14 etapas do plano unificado foram entregues (2.8.0 a 2.19.0). O que vem depois, em ordem de risco, está no relatório técnico final
 ([docs/RELATORIO_TECNICO.md](docs/RELATORIO_TECNICO.md) §15):
 1. 5º Autoteste completo no Revit com a 2.19.0, com o Fluxo integrado (K3, K11, K12, K16, K17, K19, K27);
 2. abrir as telas no Revit (K23–K27);

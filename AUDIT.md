@@ -450,3 +450,14 @@ Base: commit `9c7824d` e o da versão 2.19.0. Nada executado no Revit. Relatóri
 | Simulação × animação (F11) | FEITO: seção 9 do relatório, sementes, passo, aquecimento, medição e assinatura; FATO: mesma semente, mesmos números | `TrafficReport.Reproducao`; `Etapa13TrafegoTests` |
 | Etapa integrada no Autoteste (RT-1.6) | FEITO no código, NÃO EXECUTADA NO REVIT: via → interseção → terraplenagem → drenagem → quantitativos → validação, cada módulo conferido pelo anterior | `AutoTestSteps5.cs`; `Etapa13IntegradoTests`; K27 |
 | Cenários de projeto comparados (F12) | NÃO FEITO | ROADMAP fase XII |
+
+## 11. Plano 2 – "InfraWorks dentro do Revit" (2026-10-27)
+
+Pedido do usuário em `docs/PROMPT_INFRAWORKS.md`. O estudo do InfraWorks (ajuda oficial, cada tópico citado) e a comparação
+com o plugin, ferramenta por ferramenta, estão em `docs/INFRAWORKS_REFERENCIA.md`; as lacunas por matéria, em
+`docs/PLANO_DE_ACAO_2.md` §2. Fatos do código que orientam a Etapa 15:
+- FATO: a conferência piso × terreno do Autoteste (`AutoTestChecks.CheckRoad`) pula os nós e as obras (`Skip`): o terreno
+  sobre a via nas interseções não é detectado pelo Autoteste;
+- FATO: as rampas são sólidos gerados pelo `RampGenerator` (não pisos) e entram na terraplenagem só pela via;
+- FATO: nenhum material do plugin tem ativo de aparência (`AppearanceAssetElement` não aparece no código);
+- FATO: o chanfro das quadras existe, medido pela face (hipotenusa) e desligado por padrão (`QuadraDefinition.Chanfro`).

@@ -509,3 +509,24 @@ como substituída.
     passar imagem conceitual por real.
 - **Consequências:** a terraplenagem cresce linear com o projeto; as duas operações mais longas do dia a dia mostram onde
   estão e podem ser canceladas sem deixar o modelo pela metade; o que não foi visto no Revit está em K27.
+
+## D-032 – "InfraWorks dentro do Revit": um segundo plano, com a ajuda oficial como fonte
+- **Contexto:** em 2026-10-27 o usuário pediu que o plugin seja "um InfraWorks dentro do Revit" (19 pedidos, docs/PROMPT_INFRAWORKS.md),
+  com dois defeitos críticos (geração excessiva de rampas, extensões e travessias em trechos curtos; terreno sobre a via nas
+  rampas e interseções) e o estudo do InfraWorks como prioridade máxima. O plano unificado (Etapas 0–13) está concluído.
+- **Decisão:**
+  - um plano novo, `docs/PLANO_DE_ACAO_2.md` (Etapas 14–26), com as mesmas regras de entrega (D-022);
+  - o InfraWorks é estudado pela ajuda oficial da Autodesk (help.autodesk.com, InfraWorks), consultada pela ferramenta
+    Autodesk Product Help; cada ferramenta da `docs/INFRAWORKS_REFERENCIA.md` cita o tópico; nada vem de memória ou de vídeo;
+  - adaptação, não cópia: o que no InfraWorks é edição direta no canvas vira, no Revit, uma janela com a seção ou o perfil e
+    campos editáveis, ou um comando de clique na vista; o que o Revit já faz não é refeito;
+  - os defeitos críticos vêm antes (Etapa 15); as esquinas depois deles, porque dependem da regra de geração;
+  - ficam fora, com o motivo dito: veículo de projeto, distância de visibilidade e otimização por custo (sem método ou custo
+    citado pelo usuário – K8), simulação de cheias (software de terceiros), redes de água, esgoto e iluminação (sem as normas
+    da concessionária e do município);
+  - as imagens de referência não são guardadas no repositório (de terceiros, sem licença); a descrição delas fica no prompt
+    transcrito e no plano.
+- **Alternativas descartadas:**
+  - seguir a ordem numérica dos pedidos: os defeitos críticos ficariam para o fim;
+  - reproduzir a interface do InfraWorks: o Revit não tem o mesmo canvas; os mesmos resultados vêm por janelas e comandos.
+- **Consequências:** cada entrega diz que pedido avança e em que estado (A/B/C), na tabela do PLANO_DE_ACAO_2 §1.
