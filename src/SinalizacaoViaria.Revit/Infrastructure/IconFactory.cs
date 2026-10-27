@@ -815,6 +815,34 @@ public static class IconFactory
                 Text(dc, "A", 5.5, Red, new Point(7, 3.6), true);
                 dc.DrawRectangle(B(Asphalt), null, new Rect(13, 6, 14, 1.8));
                 break;
+            case "central":
+            {
+                // Central do Projeto: quatro cartões – um indicador, um gráfico, uma conferência e um alerta.
+                dc.DrawRoundedRectangle(B(Blue), null, new Rect(2, 2, 13, 13), 2, 2);
+                Text(dc, "12", 7.5, White, new Point(8.5, 4), true);
+                dc.DrawRoundedRectangle(B(White), P(Asphalt, 1.2), new Rect(17, 2, 13, 13), 2, 2);
+                dc.DrawRectangle(B(Yellow), null, new Rect(19.5, 9, 2.5, 4));
+                dc.DrawRectangle(B(Blue), null, new Rect(22.8, 6, 2.5, 7));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(26.1, 4, 2.5, 9));
+                dc.DrawRoundedRectangle(B(White), P(Asphalt, 1.2), new Rect(2, 17, 13, 13), 2, 2);
+                dc.DrawGeometry(null, P(Blue, 2), Poly(new Point(5, 23.5), new Point(8, 26.5), new Point(12.5, 20)));
+                dc.DrawRoundedRectangle(B(White), P(Asphalt, 1.2), new Rect(17, 17, 13, 13), 2, 2);
+                dc.DrawEllipse(B(Red), null, new Point(23.5, 23.5), 3.5, 3.5);
+                break;
+            }
+            case "painel":
+                // Painel contextual: a janela do Revit com o painel de propriedades à direita.
+                dc.DrawRectangle(B(White), P(Asphalt, 1.5), new Rect(2, 4, 28, 24));
+                dc.DrawRectangle(B(Asphalt), null, new Rect(2, 4, 28, 3.5));
+                dc.DrawRectangle(B(Color.FromRgb(232, 239, 248)), P(Blue, 1.2), new Rect(19, 9, 9, 17));
+                for (var y = 12.0; y <= 22; y += 3.5)
+                {
+                    dc.DrawLine(P(Blue, 1.2), new Point(20.5, y), new Point(23, y));
+                    dc.DrawLine(P(Muted, 1.2), new Point(24, y), new Point(26.5, y));
+                }
+                dc.DrawLine(new Pen(B(Magenta), 1.6) { DashStyle = DashStyles.Dash }, new Point(5, 22), new Point(16, 12));
+                dc.DrawEllipse(B(Blue), null, new Point(10.5, 17), 2.2, 2.2);
+                break;
             default:
                 dc.DrawEllipse(B(Blue), null, new Point(16, 16), 13, 13);
                 Text(dc, "i", 16, White, new Point(16, 5), true);

@@ -125,6 +125,20 @@ public static class MarkingStorage
 
     public static bool IsMarking(Element e) => Read(e) != null;
 
+    /// <summary>Id da marca gravada no elemento, sem interpretar a definição (nulo = não é do plugin). Barato: o painel contextual
+    /// lê só o Id de cada elemento selecionado e interpreta uma definição por marca.</summary>
+    public static string? IdOf(Element e)
+    {
+        var schema = Schema.Lookup(SchemaGuid);
+        if (schema == null) return null;
+        try
+        {
+            var entity = e.GetEntity(schema);
+            return entity != null && entity.IsValid() ? entity.Get<string>(FId) : null;
+        }
+        catch { return null; }
+    }
+
     /// <summary>
     /// Elementos com o esquema e o id da marca gravado, sem interpretar o JSON. Ler o id é barato; interpretar a definição de
     /// cada elemento a cada consulta deixava o projeto quadrático (o Autoteste completo passava de 1 h e meia): cada geração

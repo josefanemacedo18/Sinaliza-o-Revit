@@ -14,10 +14,17 @@ public abstract class CommandBase : IExternalCommand
 {
     public const string AppTitle = "SinalizaBIM";
 
-    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+    public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements) => Invoke(commandData.Application);
+
+    /// <summary>
+    /// Executa o comando com as mesmas validações e o mesmo tratamento de erros do botão da faixa. Usado também pela Central do
+    /// Projeto (depois de fechar a janela, ainda dentro do comando dela) e pelo painel contextual (por um ExternalEvent): só
+    /// num contexto válido da API do Revit.
+    /// </summary>
+    public Result Invoke(UIApplication app)
     {
-        UiHelpers.RevitHandle = commandData.Application.MainWindowHandle;
-        var uidoc = commandData.Application.ActiveUIDocument;
+        UiHelpers.RevitHandle = app.MainWindowHandle;
+        var uidoc = app.ActiveUIDocument;
         if (RequiresDocument && uidoc == null)
         {
             TaskDialog.Show(AppTitle, "Abra um projeto do Revit antes de usar este comando.");
@@ -30,7 +37,7 @@ public abstract class CommandBase : IExternalCommand
         }
         try
         {
-            return Run(commandData.Application, uidoc!);
+            return Run(app, uidoc!);
         }
         catch (UserMessageException ex)
         {

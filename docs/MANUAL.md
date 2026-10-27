@@ -23,7 +23,7 @@ Guia **SinalizaBIM** – o fluxo de projeto:
 
 | Painel | Ferramentas |
 |---|---|
-| **Projeto** | **Atualizar Todas** · **Editar** · Selecionar Conjunto · Alternar 2D/3D |
+| **Projeto** | **Central do Projeto** (abaixo) · **Atualizar Todas** · **Editar** · Selecionar Conjunto · Alternar 2D/3D · **Painel Contextual** (abaixo) |
 | **Terreno** | **Diagnóstico do Terreno** (seção 9.3.1) · **Imagem Aérea ▾** (Importar Imagem e Calibrar · Calibrar Escala da Imagem) |
 | **Sistema Viário** | **Via ▾** (Via · Via Férrea) · **Eixos ▾** (Desenhar Eixo · Mostrar/Ocultar Eixos) · **Perfil da Via** · **Seções Transversais ▾** (Corte Transversal · Cotar Seção) · **Ajustar Via ▾** (Alterar Largura por Trecho · Recuo na Via (baia / faixa auxiliar) · Distância entre Vias · Mover Via · Hierarquia e Esquinas) · **Calçadas ▾** (Meio-fio, Calçada e Sarjeta · Extensão de Calçada · Área de Calçada · Rampas) · **Obras de Arte ▾** (Viaduto · Ponte · Passarela · Túnel · Trincheira) |
 | **Interseções** | **Interseção** · **Rotatória** · **Nó Viário** · Trocar Conexão · Cul-de-sac |
@@ -86,6 +86,71 @@ Configurações, Catálogo e Normas / Sobre, que funcionam sempre.
 | Infra › Loteamento › Detalhar e Quadros ▾ → Detalhar Lotes, Quadro da Quadra, Quadros do Loteamento | Urbanismo › Quadros e Áreas ▾ |
 | Infra › Loteamento › Detalhar e Quadros ▾ → Memorial do Loteamento | Documentação › Memoriais ▾ |
 | – (novo) | Terreno › Diagnóstico do Terreno |
+| – (novo na 2.16) | Projeto › Central do Projeto e Painel Contextual |
+
+### Central do Projeto
+
+**Projeto → Central do Projeto** (desde a 2.16) abre o resumo do projeto. É somente leitura: nada é alterado.
+
+- **Cabeçalho:** o nome do projeto (das Informações do projeto; sem nome, o título do arquivo), o arquivo, a versão do plugin e a
+  **situação geral** – o pior estado entre a última verificação e os resultados derivados: *existem erros na última
+  verificação*, *há resultados a refazer*, *existem avisos*, *verificação não executada* ou *sem erros nem avisos na última
+  verificação e resultados derivados atualizados*. A Central nunca diz que o projeto está "validado".
+- **Situação do projeto:** a última verificação (Validar Modelo), com a data e as contagens, e o estado de cada resultado
+  derivado (terraplenagem, captações lidas do modelo, nós, quantitativos), com o atalho para refazer o que ficou para trás.
+- **Resumo do projeto:** um cartão por indicador – vias, extensão das vias, interseções, rotatórias, área das quadras, lotes,
+  área parcelada, volume de corte, volume de aterro, pavimento, rede de drenagem e inconsistências. Cada cartão diz a
+  **situação do valor**:
+
+  | Situação | Quando |
+  |---|---|
+  | calculado | o valor veio do modelo agora ou de um resultado gravado e em dia |
+  | não calculado | a operação que produz o valor não rodou (terraplenagem nunca aplicada, verificação não executada) ou ele só é medido quando você pede (pavimento) |
+  | indisponível | faltam os dados para calculá-lo (nenhuma via com o traçado do eixo guardado) |
+  | DESATUALIZADO | o valor foi gravado, mas o modelo mudou depois (volumes da terraplenagem com uma via editada depois) |
+  | inválido | há dado que não pôde entrar (quadra com contorno inválido, marca que não pôde ser medida) |
+
+  Valor desconhecido aparece como "—", nunca como zero. Cada cartão tem o atalho para o módulo ou o relatório.
+  - **Pavimento:** medido nas peças das pistas e dos nós só quando você clica **Calcular** (percorrer as peças leva alguns
+    segundos em projeto grande) – a mesma medida do resumo por componente dos Quantitativos.
+  - **Corte e aterro:** os volumes gravados com a última Terraplenagem aplicada; se uma marca que molda o terreno mudou
+    depois, o cartão diz DESATUALIZADO.
+  - **Lotes e área parcelada:** as quadras divididas como no quadro do loteamento; lotes são as parcelas da categoria Lote, e
+    a área parcelada soma as parcelas de todas as categorias.
+  - **Inconsistências:** erros e avisos da última verificação gravada, com a data – o projeto pode ter mudado depois; rode o
+    Validar Modelo para atualizar.
+- **Módulos:** Sistema Viário, Interseções, Terraplenagem, Pavimentação, Drenagem, Urbanismo, Sinalização, Análise e
+  Documentação, com o estado (quantos elementos, o que falta) e a operação principal.
+- **Copiar resumo** copia tudo como texto. Operações recentes não aparecem: o plugin não guarda esse histórico.
+
+Num atalho, a Central fecha e o comando abre como pelo botão da faixa, com as mesmas conferências.
+
+### Painel Contextual
+
+**Projeto → Painel Contextual** (desde a 2.16) mostra ou oculta um painel acoplável do Revit – na primeira vez, como aba junto
+da paleta Propriedades; depois, onde você o deixar. Ele acompanha a seleção e só mostra:
+
+- **Nada do SinalizaBIM selecionado:** orientação e atalhos (Central do Projeto, Validar Modelo, Diagnóstico do Terreno, nova
+  via). Elementos do Revit continuam com a paleta Propriedades.
+- **Uma marca:** o tipo, o código e só as propriedades daquele tipo:
+  - via: seção (pista, calçadas, sentido, revestimento), eixo (extensão, estaqueamento), perfil (greide e se molda o terreno)
+    e pavimento (a estrutura e cada camada, com a fonte);
+  - interseção (controle, tipo, vias ligadas, esquinas, faixas de pedestres, plano semafórico), rotatória (tipo, diâmetro,
+    ilha central, anel, ramos, by-pass), balão e nó viário;
+  - drenagem (dispositivo, área de contribuição, declividade da sarjeta, ponto baixo, caixa, tubo de saída) e trecho de rede
+    (diâmetro, cotas de fundo);
+  - quadra (área, lote padrão, divisão, testadas, lotes e parcelas abaixo do lote mínimo) e loteamento (gleba, categorias,
+    lote mínimo, mínimos da gleba e a fonte);
+  - obras (se moldam o terreno) e as demais marcas (tipo, código, hierarquia, representação).
+
+  O **estado** vem escrito, com o nível: se a marca está em dia com a terraplenagem aplicada ou mudou depois dela, se a área de
+  uma captação foi lida da via (e quando) ou informada à mão. As **operações** compatíveis – Editar, Selecionar Conjunto,
+  Perfil da Via, Estrutura do Pavimento, Trocar Conexão, Ler do Modelo, Quadro da Quadra… – abrem o comando como o botão da
+  faixa.
+- **Várias marcas do mesmo tipo:** só as propriedades iguais em todas; nenhuma alteração em lote – edite uma por vez.
+- **Tipos diferentes:** quantas marcas de cada tipo.
+
+Numa seleção muito grande, o painel considera as 50 primeiras marcas e avisa.
 
 ---
 

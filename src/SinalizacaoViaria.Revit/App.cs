@@ -4,7 +4,7 @@ using SinalizacaoViaria.Revit.Updater;
 
 namespace SinalizacaoViaria.Revit;
 
-/// <summary>Ponto de entrada do plugin: cria a faixa de opções e registra o atualizador automático.</summary>
+/// <summary>Ponto de entrada do plugin: cria a faixa de opções, registra o atualizador automático e o painel contextual.</summary>
 public sealed class App : IExternalApplication
 {
     public Result OnStartup(UIControlledApplication application)
@@ -13,6 +13,9 @@ public sealed class App : IExternalApplication
         {
             RibbonBuilder.Build(application);
             MarkingUpdater.Register(application.ActiveAddInId);
+            // Painel contextual: se falhar, o plugin continua (o botão avisa e o log tem o motivo).
+            try { ContextPanelService.Register(application); }
+            catch (Exception ex) { Log.Error("Painel contextual – registro", ex); }
             return Result.Succeeded;
         }
         catch (Exception ex)
@@ -28,6 +31,7 @@ public sealed class App : IExternalApplication
         try
         {
             MarkingUpdater.Unregister(application.ActiveAddInId);
+            ContextPanelService.Unregister(application);
             PluginContext.SaveSettings();
         }
         catch (Exception ex)

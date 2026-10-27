@@ -89,7 +89,7 @@ public sealed class CmdValidarModelo : CommandBase
     }
 
     /// <summary>Arquivo da última validação do projeto, pelo caminho do arquivo (ou pelo título, se ainda não foi salvo).</summary>
-    private static string HistoryPath(Document doc)
+    internal static string HistoryPath(Document doc)
     {
         var key = string.IsNullOrWhiteSpace(doc.PathName) ? doc.Title : doc.PathName;
         var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key.ToLowerInvariant())))[..16];

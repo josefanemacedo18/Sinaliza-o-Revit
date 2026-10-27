@@ -24,11 +24,22 @@ public static class RibbonBuilder
 
         // ---------------------------------------------------------------- Projeto
         var projeto = Panel(app, TabName, "Projeto");
+        Large(projeto, Data(typeof(CmdCentralProjeto), "Central do Projeto", "central",
+            "Resumo do projeto: indicadores, situação, módulos e atalhos – sem alterar nada.",
+            "Indicadores com dados reais – vias, extensão, interseções, rotatórias, quadras, lotes, área parcelada, corte e aterro, pavimento, " +
+            "drenagem e inconsistências –, cada um com a situação (calculado, não calculado, indisponível, desatualizado ou inválido) e nunca zero " +
+            "para o que não se sabe; a situação do projeto (última verificação e resultados a refazer) e os módulos com a operação principal. " +
+            "O pavimento é medido só quando pedido."));
         Large(projeto, Data(typeof(CmdAtualizarTodas), "Atualizar Todas", "atualizar", "Regenera todas as marcas do projeto."));
         Large(projeto, Data(typeof(CmdEditar), "Editar", "editar", "Edita os parâmetros de uma marca, via, interseção ou rotatória e a regenera."));
-        StackTwo(projeto,
+        Stack(projeto,
             Data(typeof(CmdSelecionarConjunto), "Selecionar Conjunto", "selecionar", "Seleciona todos os elementos da mesma marca ou da mesma via."),
-            Data(typeof(CmdAlternar2D3D), "Alternar 2D/3D", "alternar", "Converte as marcas selecionadas entre modelo 3D e detalhe 2D."));
+            Data(typeof(CmdAlternar2D3D), "Alternar 2D/3D", "alternar", "Converte as marcas selecionadas entre modelo 3D e detalhe 2D."),
+            Data(typeof(CmdPainelContextual), "Painel Contextual", "painel",
+                "Mostra ou oculta o painel com as propriedades do elemento do SinalizaBIM selecionado.",
+                "Painel acoplável – na primeira vez, como aba junto da paleta Propriedades do Revit – que acompanha a seleção: identifica a via, " +
+                "interseção, rotatória, drenagem, quadra ou marca e mostra só as propriedades dela, o estado e as operações compatíveis. " +
+                "Vários elementos: só o que é igual em todos, sem alteração em lote."));
 
         // ---------------------------------------------------------------- Terreno
         var terreno = Panel(app, TabName, "Terreno");
@@ -378,8 +389,14 @@ public static class RibbonBuilder
     /// Botão de um comando: rótulo, ícone (<see cref="IconFactory"/>), dica curta e, quando há, o detalhe (descrição longa,
     /// mostrada ao manter o cursor sobre o botão). Habilitado só com um projeto ativo, salvo os comandos que rodam sem ele.
     /// </summary>
+    private static readonly Dictionary<string, string> Labels = new();
+
+    /// <summary>Rótulo do botão de um comando (classe Cmd*), para os atalhos da Central; nulo se o comando não está na faixa.</summary>
+    public static string? LabelOf(string command) => Labels.TryGetValue(command, out var l) ? l : null;
+
     private static PushButtonData Data(Type cmd, string text, string icon, string tooltip, string? details = null)
     {
+        Labels[cmd.Name] = text;
         var d = new PushButtonData(cmd.Name, text, AssemblyPath, cmd.FullName)
         {
             ToolTip = tooltip,
