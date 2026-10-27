@@ -154,11 +154,14 @@ public sealed class CmdLoteamento : CommandBase
             td.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "Reconhecer as quadras de novo", "As vias mudaram: refaz o contorno das quadras (mantém testadas, lotes personalizados e nomes).");
             td.AddCommandLink(TaskDialogCommandLinkId.CommandLink2, "Categorias, cores, mínimos e filtros");
             td.AddCommandLink(TaskDialogCommandLinkId.CommandLink3, "Criar outro loteamento (outra gleba)");
+            td.AddCommandLink(TaskDialogCommandLinkId.CommandLink4, "Resultados do parcelamento",
+                "Quadras, lotes, áreas parcelada, pública e residual, parâmetros e a verificação contra os mínimos informados – sem alterar nada.");
             switch (td.Show())
             {
                 case TaskDialogResult.CommandLink1: return Rerecognize(uidoc, existing);
                 case TaskDialogResult.CommandLink2: return CategoriasCommand.Run(uidoc);
                 case TaskDialogResult.CommandLink3: break;
+                case TaskDialogResult.CommandLink4: return Resultados(app, uidoc, existing);
                 default: return Result.Cancelled;
             }
         }
@@ -193,7 +196,32 @@ public sealed class CmdLoteamento : CommandBase
         var results = LotCommands.Commit(uidoc, lot, quadras, "SV - Loteamento");
         var lots = quadras.Sum(q => LotDivider.Divide(q, lot).Parcelas.Count(p => p.Categoria == CategoriaLote.Lote));
         LotCommands.Report($"Loteamento \"{lot.Nome}\": {quadras.Count} quadra(s) e {lots} lote(s).", results, rec.Avisos.Concat(notes).Append(
-            "Próximos passos: Quadra (testadas, esquinas, numeração), Lote (medidas e categoria), Nomear Vias, Detalhar Lotes, Quadros, Memorial e Masterplan."));
+            "Próximos passos: Quadra (testadas, esquinas, numeração), Lote (medidas e categoria), Nomear Vias, Detalhar Lotes, Quadros, Memorial e Masterplan. " +
+            "Os resultados (quadras, lotes, áreas e verificação) ficam em Loteamento › Resultados do parcelamento."));
+        return Result.Succeeded;
+    }
+
+    /// <summary>
+    /// Resultados do parcelamento (Etapa 11; Prompt de Interface §13): a tela só lê; depois dela, seleciona as quadras ou os lotes
+    /// escolhidos, ou abre o comando escolhido (quadros, memorial).
+    /// </summary>
+    private static Result Resultados(UIApplication app, UIDocument uidoc, LoteamentoDefinition lot)
+    {
+        var doc = uidoc.Document;
+        var tela = ResultadosParcelamento.Montar(lot, LotService.Quadras(doc, lot.Id));
+        var w = new LotResultsWindow(tela);
+        if (UiHelpers.ShowModal(w) != true) return Result.Succeeded;
+        if (w.Comando is { } c) return CommandCatalog.Run(c, app);
+        var quer = w.Selecao.ToList();
+        var ids = MarkingStorage.All(doc).Where(st => quer.Any(q => q.QuadraId == st.MarkingId && (q.Chave == null || LotService.KeyOf(st.Element) == q.Chave)))
+            .Select(st => st.Element.Id).Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            TaskDialog.Show(AppTitle, "Os elementos dessas linhas não estão no modelo (a quadra não foi gerada de novo depois da mudança?).");
+            return Result.Succeeded;
+        }
+        uidoc.Selection.SetElementIds(ids);
+        try { uidoc.ShowElements(ids); } catch { /* vista sem os elementos */ }
         return Result.Succeeded;
     }
 

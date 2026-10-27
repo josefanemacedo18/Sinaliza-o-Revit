@@ -6,6 +6,7 @@ using SinalizacaoViaria.Core.Definitions;
 using SinalizacaoViaria.Core.Generators;
 using SinalizacaoViaria.Core.Geometry;
 using SinalizacaoViaria.Core.Model;
+using SinalizacaoViaria.Core.Parcelamento;
 
 namespace SinalizacaoViaria.Core.Tests;
 
@@ -738,6 +739,90 @@ public class Etapa11TelasTests
                      "NivelAlinhamento.Parse(TbNiveis.Text, _estacas)", "s.Estaqueamento = _estacas.Estaqueamento;", "_estacas = new EstacasDaVia(s.Estaqueamento);" })
             Assert.Contains(t, w);
         Assert.Contains("x:Name=\"HintLarguras\"", Ler("UI", "RoadWindow.xaml"));
+    }
+
+    // ---------------------------------------------------------------- quadras e lotes (§13)
+
+    /// <summary>A cena da Etapa 7: gleba de 122 × 80 m, uma quadra de 102 × 60 m (testada sul), 9 lotes e o miolo como área verde.</summary>
+    private static (LoteamentoDefinition Lot, QuadraDefinition Q) Loteamento()
+    {
+        var lot = new LoteamentoDefinition { Nome = "Jardim Teste", Gleba = new() { new(-10, -10), new(112, -10), new(112, 70), new(-10, 70) } };
+        var q = LTScenes.Q("S", new List<Vec2> { new(0, 0), new(102, 0), new(102, 60), new(0, 60) }, new Vec2(51, 0));
+        q.Miolo = ModoMiolo.AreaPropria;
+        q.LoteamentoId = lot.Id;
+        return (lot, q);
+    }
+
+    [Fact]
+    public void Parcelamento_ResultadosPorParte()
+    {
+        var (lot, q) = Loteamento();
+        var t = ResultadosParcelamento.Montar(lot, new[] { q });
+        Assert.Equal(new[] { ResultadosParcelamento.Area, ResultadosParcelamento.Quadras, ResultadosParcelamento.Lotes, ResultadosParcelamento.Viario,
+            ResultadosParcelamento.Publicas, ResultadosParcelamento.Parametros, ResultadosParcelamento.Residuais, ResultadosParcelamento.Verificacao }, t.Secoes.Select(x => x.Titulo));
+        string Linhas(string secao) => Todas(t.Secao(secao).Linhas);
+        Assert.Contains("Gleba de 9.760,00 m² (0,9760 ha).", Linhas(ResultadosParcelamento.Area));
+        Assert.Contains("1 quadra(s), 6.120,00 m² (62,70 % da gleba).", Linhas(ResultadosParcelamento.Area));
+        Assert.Contains("Área parcelada: 6.120,00 m² – a soma das parcelas de todas as categorias.", Linhas(ResultadosParcelamento.Area));
+        Assert.Contains("Maior: quadra S, 6.120,00 m²", Linhas(ResultadosParcelamento.Quadras));
+        Assert.Contains("Lotes: 9.", Linhas(ResultadosParcelamento.Lotes));
+        Assert.Contains("Densidade bruta (lotes por hectare da gleba): 9,2.", Linhas(ResultadosParcelamento.Lotes));
+        Assert.Contains("3.640,00 m² (37,30 % da gleba): a gleba menos as quadras e a área remanescente", Linhas(ResultadosParcelamento.Viario));
+        Assert.Contains($"{CategoriaLote.AreaVerde}: 1 área(s), 3.060,00 m² (31,35 %).", Linhas(ResultadosParcelamento.Publicas));
+        Assert.Contains("Total público (sistema viário e categorias públicas): 6.700,00 m² (68,65 % da gleba).", Linhas(ResultadosParcelamento.Publicas));
+        Assert.Contains("Lote mínimo: frente de 5 m e área de 125 m² – fonte não informada.", Linhas(ResultadosParcelamento.Parametros));
+        Assert.Contains($"Quadra(s) S: lotes de 12 × 30 m; sobra de testada vira o último lote", Linhas(ResultadosParcelamento.Parametros));
+        Assert.Contains($"miolo como {CategoriaLote.AreaVerde}.", Linhas(ResultadosParcelamento.Parametros));
+        Assert.Contains("Miolos de quadra em área própria: 1, 3.060,00 m².", Linhas(ResultadosParcelamento.Residuais));
+        Assert.Contains("1 lote(s) feitos com a sobra da testada", Linhas(ResultadosParcelamento.Residuais));
+        var ver = t.Secao(ResultadosParcelamento.Verificacao).Linhas;
+        Assert.Contains(ver, l => l.Nivel == NivelSituacao.Ok && l.Texto == "Nenhum lote abaixo do lote mínimo informado (fonte não informada).");
+        Assert.Contains(ver, l => l.Nivel == NivelSituacao.NaoVerificado && l.Texto.StartsWith("Percentuais mínimos (sistema viário, áreas públicas, categorias) não informados"));
+        Assert.Contains(ver, l => l.Texto.StartsWith("Conformidade legal ou urbanística não é afirmada"));
+        Assert.Equal("Loteamento \"Jardim Teste\": 1 quadra(s), 9 lote(s), 6.120,00 m² parcelados.", t.Resumo);
+        Assert.Equal(10, t.Lotes.Count);                                           // 9 lotes e o miolo
+        Assert.Single(t.Quadras);
+        Assert.Contains(CategoriaLote.AreaVerde, t.Quadras[0].Categorias);
+
+        // Mínimo informado com a fonte e lote mínimo maior: a verificação diz quais não atendem – e uma vez só.
+        lot.Minimos[ResumoLoteamento.SistemaViario] = 40;
+        lot.FonteMinimos = "Lei municipal 123/2020, art. 8º";
+        lot.AreaMinimaLote = 400;                                                  // 7 lotes de 360 m² ficam abaixo (a sobra vai para o último)
+        var t2 = ResultadosParcelamento.Montar(lot, new[] { q });
+        var ver2 = t2.Secao(ResultadosParcelamento.Verificacao).Linhas;
+        Assert.Single(ver2, l => l.Texto.Contains("Sistema viário: 37,30 % da gleba"));
+        Assert.Contains(ver2, l => l.Nivel == NivelSituacao.Aviso && l.Texto == "Sistema viário: 37,30 % da gleba, abaixo do mínimo informado de 40,00 % (Lei municipal 123/2020, art. 8º).");
+        Assert.Contains(ver2, l => l.Nivel == NivelSituacao.Aviso && l.Texto.StartsWith("7 lote(s) abaixo do lote mínimo informado (Lei municipal 123/2020, art. 8º)"));
+        Assert.Equal(7, t2.ComProblema.Count());
+        Assert.All(t2.ComProblema, l => Assert.Equal(q.Id, l.QuadraId));
+        Assert.EndsWith("; 7 lote(s) abaixo do lote mínimo informado.", t2.Resumo);
+        lot.Minimos[ResumoLoteamento.SistemaViario] = 30;
+        Assert.Contains(ResultadosParcelamento.Montar(lot, new[] { q }).Secao(ResultadosParcelamento.Verificacao).Linhas,
+            l => l.Nivel == NivelSituacao.Ok && l.Texto.StartsWith("Sistema viário: 37,30 % da gleba – mínimo informado de 30,00 %"));
+        var texto = ResultadosParcelamento.Texto(t2);
+        foreach (var x in t2.Secoes) Assert.Contains(x.Titulo.ToUpperInvariant(), texto);
+
+        // Sem gleba: dito, sem inventar o sistema viário.
+        var sem = ResultadosParcelamento.Montar(new LoteamentoDefinition(), Array.Empty<QuadraDefinition>());
+        Assert.Contains(sem.Secao(ResultadosParcelamento.Area).Linhas, l => l.Nivel == NivelSituacao.Aviso && l.Texto.StartsWith("Gleba não definida"));
+        Assert.Contains(sem.Secao(ResultadosParcelamento.Viario).Linhas, l => l.Nivel == NivelSituacao.NaoVerificado);
+        Assert.Contains(sem.Secao(ResultadosParcelamento.Quadras).Linhas, l => l.Texto == "Nenhuma quadra neste loteamento.");
+    }
+
+    [Fact]
+    public void Parcelamento_NaJanelaENoLoteamento()
+    {
+        var cmd = Ler("Commands", "LoteamentoCommands.cs");
+        Assert.Contains("\"Resultados do parcelamento\"", cmd);
+        Assert.Contains("case TaskDialogResult.CommandLink4: return Resultados(app, uidoc, existing);", cmd);
+        Assert.Contains("ResultadosParcelamento.Montar(lot, LotService.Quadras(doc, lot.Id))", cmd);
+        Assert.Contains("new LotResultsWindow(tela)", cmd);
+        Assert.Contains("LotService.KeyOf(st.Element) == q.Chave", cmd);         // seleciona o lote pela chave, não só a quadra
+        var w = Ler("UI", "LotResultsWindow.cs");
+        foreach (var x in new[] { "foreach (var s in tela.Secoes)", "\"Selecionar no modelo\"", "\"CmdQuadrosLoteamento\"", "\"CmdMemorialLoteamento\"",
+                     "ResultadosParcelamento.Texto(_tela)", "Quadro de áreas por categoria", "Lotes abaixo do lote mínimo informado" })
+            Assert.Contains(x, w);
+        Assert.DoesNotMatch(@"""#[0-9A-Fa-f]{3,8}""", w);
     }
 
     [Fact]
