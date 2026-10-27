@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-27 (plano unificado concluído – Etapas 0–13; plano 2 – Etapas 14–16 entregues)
+## Estado em 2026-10-27 (plano unificado concluído – Etapas 0–13; plano 2 – Etapas 14–17 entregues)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -57,7 +57,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     seção 9 com sementes, passo, aquecimento e assinatura); **Fluxo integrado** no Autoteste (via → interseção →
     terraplenagem → drenagem → quantitativos → validação); **relatório técnico final** em `docs/RELATORIO_TECNICO.md`.
     Não executada no Revit (K27).
-  - `Instalar/Revit2027` tem a DLL 2.21.0 (Etapa 16). As anteriores continuam em `Releases/`.
+  - `Instalar/Revit2027` tem a DLL 2.22.0 (Etapa 17). As anteriores continuam em `Releases/`.
 - **Plano unificado concluído** (14 etapas, 2.8.0 a 2.19.0). Pendências abertas: F12 (cenários de projeto comparados por
   quantitativos), K14/K15 no Revit e tudo o que depende de rodar no Revit (K3, K17, K19, K23–K27).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
@@ -79,9 +79,16 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
   lisos da pista (`IntersectionGenerator.AlignmentCorner`; opção de voltar à curva do meio-fio) e faixa junto ao acesso
   (opção da via) – item 20; esquina da extensão de calçada em chanfro (`ShiftCorner`) e rampas no eixo das travessias
   conferidas – item 12. NÃO VALIDADO NO REVIT (K30); achado K29 (rampa além da faixa direcional não liga à rede).
-- **Próxima: Etapa 17** – rampas como Pisos (item 2: categoria Pisos, inclinação, abas e recortes, nos quantitativos e na
-  conferência piso × terreno) e materiais realistas (item 1: ativo de aparência coerente e escala real, sem mudar a cor de
-  Cores consistentes) – PLANO_DE_ACAO_2 §3. Conferir na ajuda da API 2027 cada método antes de usar (Toposolid não é Floor).
+- Etapa 17 ✅: 2.22.0 em `Releases/Etapa17` (`3dc933a`, 3 183/3 183) – D-035: rampas como Pisos de camada variável (um
+  por corpo de concreto, fundo plano 5 cm abaixo, topo pela edição de forma – `RampFloors`, `MarkingService.CreateRampFloor`)
+  e recorte da rampa contendo as abas inteiras – item 2; materiais com o ativo de aparência da biblioteca do Revit escolhido
+  pelo título, cor de Cores consistentes intacta (`MaterialAppearance`, `StyleService.Appearance`) – item 1. Duas opções
+  novas nas Configurações. NÃO VALIDADO NO REVIT (K31).
+- **Próxima: Etapa 18** – estacas, greide e seção (itens 4 e 21): visualizador de seção por estaca (setas, estaca digitada,
+  exagero vertical, corte/aterro com áreas), PIVs acrescentados/movidos/removidos com o perfil à vista e corte e aterro
+  recalculados na hora, trecho de estacas nos volumes, gráficos (perfil terreno × greide, corte e aterro por estaca, áreas e
+  diagrama de massas) – PLANO_DE_ACAO_2 §3. No núcleo: volumes por média das áreas iguais aos atuais e diagrama de massas
+  conferido à mão.
 
 ## Próxima tarefa (antes do plano 2)
 
