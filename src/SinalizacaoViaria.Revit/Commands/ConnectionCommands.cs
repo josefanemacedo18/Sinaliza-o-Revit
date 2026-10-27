@@ -474,7 +474,7 @@ internal static class RoadAccessCommand
     public static Result EditRetornos(UIDocument uidoc, RoadPavementDefinition pav, Vec2? near = null)
     {
         var doc = uidoc.Document;
-        var setup = RoadTemplates.FromJson(pav.SetupJson) ?? throw new UserMessageException("A via não guardou a seção transversal.");
+        var setup = RoadSetup.DaVia(pav) ?? throw new UserMessageException("A via não guardou a seção transversal.");
         if (setup.Retornos.Count == 0) throw new UserMessageException("Esta via não tem retornos.");
         var axis = PathResolver.Resolve(doc, pav.PathRef)?.Main;
         var idx = 0;
@@ -484,14 +484,18 @@ internal static class RoadAccessCommand
             idx = setup.Retornos.Select((x, i) => (D: Math.Abs(x.Estaca - s0), i)).OrderBy(x => x.D).First().i;
         }
         var work = setup.Retornos.Select(x => x.Clone()).ToList();
+        var est = new EstacasDaVia(setup.Estaqueamento, axis?.Length ?? double.PositiveInfinity);
         var remove = new bool[work.Count];
         RetornoVia Cur() => work[Math.Clamp(idx, 0, work.Count - 1)];
         var fw = new FormWindow("Retornos da via", "Retornos em U desta via",
                 "Escolha o retorno e altere o que precisar – a via é refeita com a abertura, os alargamentos/bolsões e a sinalização.",
                 null, null, false, "Aplicar", 680, 600)
-            .Choice("Retorno", work.Select((x, i) => ($"Estaca {UiHelpers.F(x.Estaca, "0.0")} m – {x.Tipo} – {x.Veiculo}", i)).ToList(), () => idx, v => idx = v, preset: v => idx = v)
-            .Number("Estaca do início do giro (m)", () => Cur().Estaca, v => Cur().Estaca = v, 0, 100000, "0.0")
-            .Choice("Forma", new[] { ("Abertura no canteiro", TipoRetorno.AberturaCanteiro), ("Bolsão de espera", TipoRetorno.Bolsao), ("Alargamento da pista oposta", TipoRetorno.Alargamento) },
+            .Choice("Retorno", work.Select((x, i) => ($"Estaca {(est.EhPadrao ? UiHelpers.F(x.Estaca, "0.0") + " m" : est.Mostrar(x.Estaca))} – {x.Tipo} – {x.Veiculo}", i)).ToList(),
+                () => idx, v => idx = v, preset: v => idx = v);
+        // A estaca da via (K20): com estaqueamento próprio, a dela; no padrão, a distância como sempre.
+        if (est.EhPadrao) fw.Number("Estaca do início do giro (m)", () => Cur().Estaca, v => Cur().Estaca = v, 0, 100000, "0.0");
+        else fw.Text($"Estaca do início do giro ({est.Formato})", () => est.Mostrar(Cur().Estaca), v => Cur().Estaca = est.Ler(v) ?? Cur().Estaca);
+        fw.Choice("Forma", new[] { ("Abertura no canteiro", TipoRetorno.AberturaCanteiro), ("Bolsão de espera", TipoRetorno.Bolsao), ("Alargamento da pista oposta", TipoRetorno.Alargamento) },
                 () => Cur().Tipo, v => Cur().Tipo = v)
             .Choice("Veículo de projeto", Vehicles, () => Cur().Veiculo, v => Cur().Veiculo = v)
             .Number("Raio externo (m) – 0 = o do veículo", () => Cur().RaioExterno ?? 0, v => Cur().RaioExterno = v > 0.5 ? v : null, 0, 40)

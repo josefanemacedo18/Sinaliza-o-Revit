@@ -620,6 +620,126 @@ public class Etapa11TelasTests
         Assert.Contains("UpdateStatus();", fw);
     }
 
+    // ---------------------------------------------------------------- K20: estaca da via nos formulários e avisos
+
+    /// <summary>Estaca 100+0,00 no início, a cada 20 m, e a equação 107+10,00 = 110+0,00 a 150 m do início.</summary>
+    private static Estaqueamento EstacasProprias() => new() { Inicio = 2000, Equacoes = { new EquacaoEstaca { Distancia = 150, Frente = 2200 } } };
+
+    [Fact]
+    public void EstacasDaVia_MostraELeAEstacaDaVia()
+    {
+        var pad = EstacasDaVia.Padrao;
+        Assert.True(pad.EhPadrao);
+        Assert.Equal(PontoLargura.FormatEstaca(110), pad.Mostrar(110));
+        Assert.Equal("5+10,00", pad.Mostrar(110));
+        Assert.Equal(110, pad.Ler("5+10"));
+        Assert.Equal(110, pad.Ler("110"));                                         // no padrão, o número é a distância (como sempre)
+        Assert.Null(pad.Ler("abc"));
+        Assert.Equal("m ou 5+10", pad.Formato);
+        Assert.True(new EstacasDaVia(new Estaqueamento()).EhPadrao);
+
+        var via = new EstacasDaVia(EstacasProprias(), 300);
+        Assert.False(via.EhPadrao);
+        Assert.Equal("100+0,00", via.Mostrar(0));
+        Assert.Equal("105+10,00", via.Mostrar(110));
+        Assert.Equal("110+0,00", via.Mostrar(150));                                // na equação, a estaca à frente
+        Assert.Equal("110+10,00", via.Mostrar(160));
+        Assert.Equal(110, via.Ler("105+10,00")!.Value, 9);
+        Assert.Equal(160, via.Ler("110+10")!.Value, 9);
+        Assert.Equal(110, via.Ler("2110")!.Value, 9);                              // o valor da estaca em metros
+        Assert.Null(via.Ler("50"));                                                // antes do início do eixo
+        Assert.Null(via.Ler("108+10"));                                            // na lacuna da equação (107+10 a 110+0)
+        Assert.Equal("estaca da via, ex.: 100+0,00", via.Formato);
+        foreach (var d in new[] { 0.0, 37.5, 149.99, 150, 200, 299 }) Assert.Equal(d, via.Ler(via.Mostrar(d))!.Value, 2);
+
+        // Níveis da calçada: estaca da via na leitura e na escrita; no padrão, o texto de sempre.
+        var niveis = NivelAlinhamento.Parse("105+10,00:0,40; 110+10:0,55", via);
+        Assert.Equal(new[] { 110.0, 160.0 }, niveis.Select(n => Math.Round(n.Estaca, 6)));
+        Assert.Equal("105+10,00:0,40; 110+10,00:0,55", NivelAlinhamento.Format(niveis, via));
+        Assert.Equal("110:0,40; 160:0,55", NivelAlinhamento.Format(niveis));
+        Assert.Equal(110, NivelAlinhamento.Parse("5+10:0,40").Single().Estaca);
+    }
+
+    [Fact]
+    public void AvisosDaSecao_CitamAEstacaDaVia()
+    {
+        var eixo = new Polyline2(new[] { new Vec2(0, 0), new Vec2(300, 0) });
+        RoadSetup Secao()
+        {
+            var s = RoadTemplates.All[0].Create();
+            s.TrechosLargura.Add(new TrechoLargura { Elemento = ElementoTrecho.CalcadaDireita, NovaLargura = 0.2, EstacaA = 110, EstacaB = 140 });
+            return s;
+        }
+        var padrao = Secao();
+        padrao.Build(PathReference.FromPoints(eixo.Points, 0), new OutputSettings(), Cat, axis: eixo);
+        Assert.Contains(padrao.Warnings, w => w.Contains(" de 5+10,00 a 7+0,00: largura de "));
+        var propria = Secao();
+        propria.Estaqueamento = EstacasProprias();
+        propria.Build(PathReference.FromPoints(eixo.Points, 0), new OutputSettings(), Cat, axis: eixo);
+        Assert.Contains(propria.Warnings, w => w.Contains(" de 105+10,00 a 107+0,00: largura de "));
+        Assert.Equal("105+10,00", propria.Estaca(110));
+        // O estaqueamento vem da via e não é gravado com a seção.
+        var pav = propria.Build(new PathReference(), new OutputSettings(), Cat).OfType<RoadPavementDefinition>().Single();
+        pav.SetupJson = RoadTemplates.ToJson(propria);
+        Assert.DoesNotContain("Equacoes", pav.SetupJson);
+        pav.Estaqueamento = EstacasProprias();
+        Assert.Equal(2000, RoadSetup.DaVia(pav)!.Estaqueamento!.Inicio);
+        Assert.Null(RoadSetup.DaVia(new RoadPavementDefinition()));
+    }
+
+    [Fact]
+    public void ViaRefeita_HerdaEstruturaEstaqueamentoEOResto()
+    {
+        // Regressão: editar a seção (ou pôr recuo, retorno, largura por trecho) refazia o pavimento sem a estrutura (Etapa 5)
+        // nem o estaqueamento (Etapa 4) – a seção não os guarda.
+        var setup = RoadTemplates.All[0].Create();
+        var antigo = setup.Build(new PathReference(), new OutputSettings(), Cat).OfType<RoadPavementDefinition>().Single();
+        antigo.Estrutura = new EstruturaPavimento { Fonte = "projeto", Camadas = { new CamadaPavimento { Nome = "Base", EspessuraCm = 20 } } };
+        antigo.Estaqueamento = EstacasProprias();
+        antigo.CornerRadius = 9;
+        antigo.MergeStart = true;
+        antigo.Hierarchy = HierarquiaViaria.Coletora;
+        var novo = setup.Build(new PathReference(), new OutputSettings(), Cat, existingPavementId: antigo.Id).OfType<RoadPavementDefinition>().Single();
+        Assert.Null(novo.Estrutura);
+        Assert.Null(novo.Estaqueamento);
+        RoadSetup.HerdarDoAnterior(novo, antigo);
+        Assert.Equal(20, novo.Estrutura!.Camadas.Single().EspessuraCm);
+        Assert.Equal("projeto", novo.Estrutura.Fonte);
+        Assert.NotSame(antigo.Estrutura, novo.Estrutura);
+        Assert.Equal(2000, novo.Estaqueamento!.Inicio);
+        Assert.Single(novo.Estaqueamento.Equacoes);
+        Assert.Equal(9, novo.CornerRadius);
+        Assert.True(novo.MergeStart);
+        Assert.Equal(setup.Hierarchy, novo.Hierarchy);                            // a hierarquia é a da seção nova (escolhida na janela)
+        var regen = Ler("Commands", "RecessCommands.cs");
+        Assert.Contains("if (newPav != null) RoadSetup.HerdarDoAnterior(newPav, pav);", regen);
+        Assert.Contains("setup.Estaqueamento = pav.Estaqueamento;", regen);
+    }
+
+    [Fact]
+    public void FormulariosDaVia_UsamAEstacaDaVia()
+    {
+        // K20: as ferramentas leem a seção com o estaqueamento da via e nenhum formulário formata a estaca pelo padrão fixo.
+        foreach (var f in new[] { "WidthStretchCommands.cs", "RecessCommands.cs", "ConnectionCommands.cs", "ExtensionCommands.cs", "EditCommands.cs" })
+        {
+            var cs = Ler("Commands", f);
+            Assert.DoesNotContain("var setup = RoadTemplates.FromJson(pav.SetupJson)", cs);
+            Assert.DoesNotContain("PontoLargura.FormatEstaca(", cs);
+        }
+        Assert.Contains("RoadSetup.DaVia(pav)", Ler("Commands", "WidthStretchCommands.cs"));
+        Assert.Contains("est.Mostrar(t.A)", Ler("Commands", "WidthStretchCommands.cs"));
+        Assert.Contains("var est = new EstacasDaVia(setup.Estaqueamento);", Ler("Commands", "RecessCommands.cs"));
+        Assert.Contains("est.Mostrar(Cur().Estaca)", Ler("Commands", "ConnectionCommands.cs"));
+        Assert.Contains("setup.Estaca(e.Estaca)", Ler("Commands", "ExtensionCommands.cs"));
+        var w = Ler("UI", "RoadWindow.xaml.cs");
+        Assert.DoesNotContain("PontoLargura.FormatEstaca(", w);
+        Assert.DoesNotContain("PontoLargura.ParseEstaca(", w);
+        foreach (var t in new[] { "new WidthRow(p.Clone(), _estacas)", "new RecessRow(r.Clone(), _estacas)", "NivelAlinhamento.Format(e.NiveisAlinhamento, _estacas)",
+                     "NivelAlinhamento.Parse(TbNiveis.Text, _estacas)", "s.Estaqueamento = _estacas.Estaqueamento;", "_estacas = new EstacasDaVia(s.Estaqueamento);" })
+            Assert.Contains(t, w);
+        Assert.Contains("x:Name=\"HintLarguras\"", Ler("UI", "RoadWindow.xaml"));
+    }
+
     [Fact]
     public void GerenciadorDePavimento_NaJanelaENoComando()
     {

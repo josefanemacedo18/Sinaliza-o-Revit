@@ -235,7 +235,7 @@ public static class RoadFeatures
                     tpl.SidewalkDepth = lado.SidewalkWidth;
                     tpl.Slope = IntersectionGenerator.TotalSideSlope;
                     tpl.DirectionalTactile = false;
-                    res.Warnings.Add($"Travessia na estaca {PontoLargura.FormatEstaca(sc)}: calçada estreita para a rampa e a faixa livre de 1,20 m – feito o rebaixamento total.");
+                    res.Warnings.Add($"Travessia na estaca {s.Estaca(sc)}: calçada estreita para a rampa e a faixa livre de 1,20 m – feito o rebaixamento total.");
                 }
                 var curb = At(sc, lado.Sigma * (lado.Face - face));
                 var up = (At(sc, lado.Sigma * (lado.Face - face + 1)) - curb).Normalized();
@@ -270,7 +270,7 @@ public static class RoadFeatures
 
         // 5. Mobiliário e canteiro nas extensões, fora da travessia.
         foreach (var p in planos)
-            furniture.AddRange(Mobiliario(p, axis, z, cat, res, AddD));
+            furniture.AddRange(Mobiliario(p, axis, z, cat, res, AddD, s.Estaca));
 
         // 6. Piso tátil: faixa direcional na faixa livre de cada calçada, ligada a cada rampa da via; sem ela, faixa transversal
         // no eixo de cada rebaixamento até o alinhamento do lote (NBR 16537, 7.8.5 b).
@@ -344,7 +344,7 @@ public static class RoadFeatures
     /// <summary>Trecho, caminho na face do meio-fio e contorno de uma extensão; nulo (com aviso) quando não cabe.</summary>
     private static Plano? Planejar(RoadSetup s, ExtensaoCalcada e, RoadSetup.LadoVia lado, Polyline2 axis, string id, List<string> warnings)
     {
-        var tag = $"Extensão de calçada na estaca {PontoLargura.FormatEstaca(e.Estaca)}";
+        var tag = $"Extensão de calçada na estaca {s.Estaca(e.Estaca)}";
         if (!lado.HasSidewalk) { warnings.Add($"{tag}: o lado da via não tem calçada."); return null; }
         var depth = e.Profundidade is > 0.1 ? e.Profundidade.Value : lado.Parking;
         if (depth == null) { warnings.Add($"{tag}: o lado não tem estacionamento junto ao meio-fio – informe a profundidade."); return null; }
@@ -408,7 +408,7 @@ public static class RoadFeatures
     /// Devolve as áreas ocupadas (para o piso tátil não passar por elas).
     /// </summary>
     private static List<Polygon2> Mobiliario(Plano p, Polyline2 axis, double z, Catalogo? cat, ElementosDerivados res,
-        Func<MarkingDefinition, string, MarkingDefinition> add)
+        Func<MarkingDefinition, string, MarkingDefinition> add, Func<double, string> estaca)
     {
         var e = p.Spec;
         var used = new List<Polygon2>();
@@ -462,7 +462,7 @@ public static class RoadFeatures
                 used.Add(new Polygon2(new[] { c - t * hl - n * hw, c + t * hl - n * hw, c + t * hl + n * hw, c - t * hl + n * hw }));
                 placed++;
             }
-            if (placed < count) res.Warnings.Add($"Extensão de calçada na estaca {PontoLargura.FormatEstaca(e.Estaca)}: sem espaço para {count - placed} {label}.");
+            if (placed < count) res.Warnings.Add($"Extensão de calçada na estaca {estaca(e.Estaca)}: sem espaço para {count - placed} {label}.");
         }
         Item("BANCO", 2.2, Vec2.Zero, e.Bancos, "banco(s)");
         Item("PARACICLO", 0.9, Vec2.Zero, e.Paraciclos, "paraciclo(s)");
@@ -473,7 +473,7 @@ public static class RoadFeatures
             ext.Planter = true;
             ext.PlanterRanges = free.Where(f => f.B - f.A > 1.0).Select(f => new StationRange { Start = f.A, End = f.B }).ToList();
             ext.Trees = ext.PlanterRanges.Count > 0 ? e.Arvores : 0;
-            if (ext.PlanterRanges.Count == 0) res.Warnings.Add($"Extensão de calçada na estaca {PontoLargura.FormatEstaca(e.Estaca)}: sem espaço para o canteiro.");
+            if (ext.PlanterRanges.Count == 0) res.Warnings.Add($"Extensão de calçada na estaca {estaca(e.Estaca)}: sem espaço para o canteiro.");
             foreach (var r in ext.PlanterRanges)
                 used.Add(PolygonOps.Strip(new Polyline2(path.SubPoints(r.Start, r.End)).Offset(toRoad * p.Face / 2).Points, p.Face, roundJoins: false).OrderByDescending(x => x.Area).First());
         }

@@ -217,7 +217,7 @@
                 </GroupBox>
                 <GroupBox Header="Largura variável ao longo do eixo (levantamento)">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource Hint}" Text="Medidas do levantamento em cada estaca: distância do EIXO ao bordo da pista (face do meio-fio/sarjeta) e ao alinhamento (muro, divisa do lote). Vazio = medida da seção. Entre as estacas a largura varia gradualmente; antes do primeiro e depois do último ponto fica constante. Estaca em metros (110) ou em estacas de 20 m (5+10)."/>
+                        <TextBlock x:Name="HintLarguras" Style="{StaticResource Hint}" Text="Medidas do levantamento em cada estaca: distância do EIXO ao bordo da pista (face do meio-fio/sarjeta) e ao alinhamento (muro, divisa do lote). Vazio = medida da seção. Entre as estacas a largura varia gradualmente; antes do primeiro e depois do último ponto fica constante. Estaca em metros (110) ou em estacas de 20 m (5+10)."/>
                         <DataGrid x:Name="GridWidths" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
                                   HeadersVisibility="Column" Height="130" SelectionMode="Single" CellEditEnding="CellEdited">
                             <DataGrid.Columns>

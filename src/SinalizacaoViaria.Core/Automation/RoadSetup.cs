@@ -983,6 +983,40 @@ public sealed partial class RoadSetup
         return s;
     }
 
+    /// <summary>
+    /// Estaqueamento da via que está sendo gerada (K20): os avisos e os formulários citam a estaca dela. Não é gravado com a
+    /// seção – vem da via (<see cref="DaVia"/>).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Estaqueamento? Estaqueamento { get; set; }
+
+    /// <summary>Estaca mostrada para a distância ao longo do eixo: a do estaqueamento da via, ou o padrão de 20 m.</summary>
+    public string Estaca(double distancia) => new EstacasDaVia(Estaqueamento).Mostrar(distancia);
+
+    /// <summary>A seção guardada na via, com o estaqueamento dela; nula se a via não guardou a seção (versão anterior).</summary>
+    public static RoadSetup? DaVia(RoadPavementDefinition pav)
+    {
+        if (RoadTemplates.FromJson(pav.SetupJson) is not { } s) return null;
+        s.Estaqueamento = pav.Estaqueamento;
+        return s;
+    }
+
+    /// <summary>
+    /// O que o pavimento refeito com a seção nova herda do anterior – o que não vem da seção: raio das esquinas e hierarquia
+    /// informados, emendas nas pontas, recortes, a estrutura do pavimento (Etapa 5) e o estaqueamento (Etapa 4). Até a Etapa 10
+    /// a estrutura e o estaqueamento se perdiam ao editar a seção, ao pôr um recuo ou um retorno.
+    /// </summary>
+    public static void HerdarDoAnterior(RoadPavementDefinition novo, RoadPavementDefinition anterior)
+    {
+        novo.CornerRadius ??= anterior.CornerRadius;
+        novo.MergeStart = anterior.MergeStart;
+        novo.MergeEnd = anterior.MergeEnd;
+        novo.Hierarchy ??= anterior.Hierarchy;
+        novo.Exclusions.AddRange(anterior.Exclusions);
+        novo.Estrutura ??= anterior.Estrutura?.Clone();
+        novo.Estaqueamento ??= anterior.Estaqueamento?.Clone();
+    }
+
     public RoadSetup Clone()
     {
         var c = (RoadSetup)MemberwiseClone();

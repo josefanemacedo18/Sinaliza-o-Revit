@@ -39,7 +39,7 @@ internal static class RoadExtensionCommand
     {
         if (RoadAt(uidoc, pt) is not { } road) return null;
         var pav = road.Def;
-        var setup = RoadTemplates.FromJson(pav.SetupJson)
+        var setup = RoadSetup.DaVia(pav)
                     ?? throw new UserMessageException("Esta via não guardou a seção transversal (versão anterior ou Pista): use Editar → A via inteira uma vez e depois crie a extensão.");
         var (st, signed) = road.Axis.Project(pt);
         var e = _last.Clone();
@@ -78,7 +78,7 @@ internal static class RoadExtensionCommand
     /// <summary>Editar (ou remover) uma extensão de calçada da via.</summary>
     public static Result Edit(UIDocument uidoc, RoadPavementDefinition pav, string extId)
     {
-        var setup = RoadTemplates.FromJson(pav.SetupJson) ?? throw new UserMessageException("Esta via não guardou a seção transversal.");
+        var setup = RoadSetup.DaVia(pav) ?? throw new UserMessageException("Esta via não guardou a seção transversal.");
         var e = setup.ExtensoesCalcada.FirstOrDefault(x => x.Id == extId) ?? throw new UserMessageException("Extensão de calçada não encontrada na seção da via.");
         var axis = PathResolver.Resolve(uidoc.Document, pav.PathRef)?.Main ?? throw new UserMessageException("Eixo da via não encontrado.");
         var work = e.Clone();
@@ -174,7 +174,7 @@ internal static class RoadExtensionCommand
             catch { /* prévia */ }
         }
         var warn = c.Warnings.Distinct().ToList();
-        return new FormPreview(geo, null, null, $"Trecho: estaca {PontoLargura.FormatEstaca(e.Estaca)} a {PontoLargura.FormatEstaca(e.Estaca + e.Comprimento)} ({UiHelpers.F(e.Comprimento, "0.0")} m)." +
+        return new FormPreview(geo, null, null, $"Trecho: estaca {setup.Estaca(e.Estaca)} a {setup.Estaca(e.Estaca + e.Comprimento)} ({UiHelpers.F(e.Comprimento, "0.0")} m)." +
             (warn.Count > 0 ? "\n⚠ " + string.Join("\n⚠ ", warn) : ""));
     }
 }

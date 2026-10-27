@@ -209,7 +209,7 @@ public sealed partial class RoadSetup
             var w = Math.Max(1.0, tv.Largura);
             var hw = w / 2;
             var tpl = MedianRampTemplate(w);
-            var tag = $"Travessia na estaca {PontoLargura.FormatEstaca(s)}";
+            var tag = $"Travessia na estaca {Estaca(s)}";
             foreach (var msg in MedianCrossing.Warnings(MedianWidth, tpl, tv.Tipo)) Warnings.Add($"{tag}: {msg}.");
             var mode = MedianCrossing.Resolve(MedianWidth, tpl, tv.Tipo);
             if (!tv.Faixa && pav != null && ExtensoesCalcada.Any(e => e.Id == tv.Id && !e.Rampa)) mode = TipoTravessiaCanteiro.NivelDaPista;

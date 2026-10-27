@@ -23,6 +23,7 @@ internal static class WidthStretchForm
         if (elements.Count == 0) throw new UserMessageException("Esta via não tem elementos cuja largura possa mudar por trecho.");
         if (!elements.Contains(t.Elemento)) t.Elemento = elements[0];
         if (t.NovaLargura <= 0) t.NovaLargura = setup.LarguraAtual(t.Elemento) ?? 1;
+        var est = new EstacasDaVia(setup.Estaqueamento);                    // a estaca da via (K20)
         var w = new FormWindow(title, "Alterar largura por trecho",
             "Entre o início (A) e o fim (B) o elemento escolhido fica com a nova largura; antes de A e depois de B, as transições voltam à " +
             "largura da seção. Os outros elementos mantêm a largura. A via é refeita a partir do eixo (interseções, linhas e pisos acompanham).",
@@ -31,8 +32,8 @@ internal static class WidthStretchForm
                 v => t.Elemento = v, preset: v => { t.Elemento = v; t.NovaLargura = setup.LarguraAtual(v) ?? t.NovaLargura; })
          .Number("Nova largura (m)", () => t.NovaLargura, v => t.NovaLargura = Math.Max(0, v), 0, 60, "0.00",
              tooltip: "Largura do elemento entre A e B. Calçada: o meio-fio fica e o alinhamento se desloca. Pista: metade para cada lado. Canteiro: os dois lados se afastam.")
-         .Text("Início (A) – estaca (m ou 5+10)", () => PontoLargura.FormatEstaca(t.A), v => t.EstacaA = PontoLargura.ParseEstaca(v) ?? t.EstacaA)
-         .Text("Fim (B) – estaca (m ou 5+10)", () => PontoLargura.FormatEstaca(t.B), v => t.EstacaB = PontoLargura.ParseEstaca(v) ?? t.EstacaB)
+         .Text($"Início (A) – estaca ({est.Formato})", () => est.Mostrar(t.A), v => t.EstacaA = est.Ler(v) ?? t.EstacaA)
+         .Text($"Fim (B) – estaca ({est.Formato})", () => est.Mostrar(t.B), v => t.EstacaB = est.Ler(v) ?? t.EstacaB)
          .Number("Transição antes de A (m)", () => t.TransicaoA, v => t.TransicaoA = Math.Max(0, v), 0, 500)
          .Number("Transição depois de B (m)", () => t.TransicaoB, v => t.TransicaoB = Math.Max(0, v), 0, 500)
          .Check("Transições em curva S (suave)", () => t.CurvaS, v => t.CurvaS = v);
@@ -79,8 +80,8 @@ internal static class WidthStretchForm
                 geo.Annotations.Add(new AnnotationText(new Vec2(x + 2.2, (lo + hi) / 2), $"{UiHelpers.F(t.NovaLargura)} m", 2.5) { Rotation = Math.PI / 2 });
             }
         }
-        var info = $"{TrechoLargura.Rotulo(t.Elemento)}: {UiHelpers.F(now)} → {UiHelpers.F(t.NovaLargura)} m entre A (estaca {PontoLargura.FormatEstaca(t.A)}) " +
-                   $"e B (estaca {PontoLargura.FormatEstaca(t.B)}); transições de {UiHelpers.F(t.TransicaoA)} m antes de A e {UiHelpers.F(t.TransicaoB)} m depois de B.";
+        var info = $"{TrechoLargura.Rotulo(t.Elemento)}: {UiHelpers.F(now)} → {UiHelpers.F(t.NovaLargura)} m entre A (estaca {setup.Estaca(t.A)}) " +
+                   $"e B (estaca {setup.Estaca(t.B)}); transições de {UiHelpers.F(t.TransicaoA)} m antes de A e {UiHelpers.F(t.TransicaoB)} m depois de B.";
         if (t.B - t.A < 0.5) info += "\n⚠ A e B quase coincidem.";
         return new FormPreview(geo, null, guides, info, ViewScale: 500);
     }
@@ -100,7 +101,7 @@ public sealed class CmdLarguraTrecho : CommandBase
         if (RoadExtensionCommand.RoadAt(uidoc, UnitConv.ToVec2(pick)) is not { } road)
             throw new UserMessageException("Nenhuma via do plugin junto ao ponto clicado.");
         var pav = road.Def;
-        var setup = RoadTemplates.FromJson(pav.SetupJson)
+        var setup = RoadSetup.DaVia(pav)
                     ?? throw new UserMessageException("Esta via não guardou a seção transversal (versão anterior): use Editar → A via inteira uma vez e repita.");
         var len = road.Axis.Length;
         var sa = Math.Round(road.Axis.Project(UnitConv.ToVec2(pick)).Station, 2);
@@ -181,7 +182,7 @@ public sealed class CmdLarguraTrecho : CommandBase
                         var tip = p + n * (sg * outer);
                         Seg(tip, tip + n * (sg * 5));
                         Arrow(tip, -n * sg);
-                        var text = $"{label}: estaca {PontoLargura.FormatEstaca(st)}\n{TrechoLargura.Rotulo(t.Elemento)}: {UiHelpers.F(t.NovaLargura)} m (hoje {UiHelpers.F(now)} m)";
+                        var text = $"{label}: estaca {setup.Estaca(st)}\n{TrechoLargura.Rotulo(t.Elemento)}: {UiHelpers.F(t.NovaLargura)} m (hoje {UiHelpers.F(now)} m)";
                         TextNote.Create(doc, view.Id, UnitConv.ToXyz(tip + n * (sg * 5.5), z), text, textType);
                     }
                     drawn = true;
@@ -198,8 +199,8 @@ public sealed class CmdLarguraTrecho : CommandBase
             {
                 MainInstruction = "Aplicar o trecho com a nova largura?",
                 MainContent = (drawn ? "A planta mostra as setas e as cotas em A e B. " : "(Esta vista não aceita linhas de detalhe – sem setas na planta.) ") +
-                              $"{TrechoLargura.Rotulo(t.Elemento)}: {UiHelpers.F(now)} → {UiHelpers.F(t.NovaLargura)} m de {PontoLargura.FormatEstaca(t.A)} a " +
-                              $"{PontoLargura.FormatEstaca(t.B)}, transições de {UiHelpers.F(t.TransicaoA)} m e {UiHelpers.F(t.TransicaoB)} m.",
+                              $"{TrechoLargura.Rotulo(t.Elemento)}: {UiHelpers.F(now)} → {UiHelpers.F(t.NovaLargura)} m de {setup.Estaca(t.A)} a " +
+                              $"{setup.Estaca(t.B)}, transições de {UiHelpers.F(t.TransicaoA)} m e {UiHelpers.F(t.TransicaoB)} m.",
                 CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
                 DefaultButton = TaskDialogResult.Yes,
             };

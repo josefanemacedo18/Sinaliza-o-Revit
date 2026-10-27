@@ -226,7 +226,7 @@ public sealed partial class RoadSetup
         if (plans.Count == 0) return;
         foreach (var p in plans)
         {
-            foreach (var w in p.Warnings) Warnings.Add($"Retorno na estaca {PontoLargura.FormatEstaca(p.Spec.Estaca)}: {w}.");
+            foreach (var w in p.Warnings) Warnings.Add($"Retorno na estaca {Estaca(p.Spec.Estaca)}: {w}.");
             if (p.Opening != null && pav != null) pav.MedianOpenings.Add(p.Opening);
             var sigmaFar = p.Spec.SentidoDoEixo ? 1 : -1;
             // Canteiro e linhas junto a ele interrompidos no trecho refeito pela abertura.

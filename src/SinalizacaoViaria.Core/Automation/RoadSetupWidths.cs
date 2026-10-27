@@ -611,19 +611,19 @@ public sealed partial class RoadSetup
                 var z = Zones(sideLeft ? Left : Right);
                 var absW = z.General.A1 - z.General.A0;
                 if (Math.Abs(dc) > 1e-3 && absW > 0.05 && absW + dc < 1.0)
-                    Warnings.Add($"Estaca {PontoLargura.FormatEstaca(p.Estaca)} ({(sideLeft ? "esquerda" : "direita")}): a variação de {dc:0.00} m deixa o elemento que a absorve com {absW + dc:0.00} m.");
+                    Warnings.Add($"Estaca {Estaca(p.Estaca)} ({(sideLeft ? "esquerda" : "direita")}): a variação de {dc:0.00} m deixa o elemento que a absorve com {absW + dc:0.00} m.");
                 if (walk)
                 {
                     var free = z.General.F1 - z.General.F0 + (dl - dc);
                     if (free < 1.20 - 1e-6)
-                        Warnings.Add($"Estaca {PontoLargura.FormatEstaca(p.Estaca)} ({(sideLeft ? "esquerda" : "direita")}): faixa livre da calçada com {Math.Max(0, free):0.00} m – a NBR 9050 exige 1,20 m.");
+                        Warnings.Add($"Estaca {Estaca(p.Estaca)} ({(sideLeft ? "esquerda" : "direita")}): faixa livre da calçada com {Math.Max(0, free):0.00} m – a NBR 9050 exige 1,20 m.");
                 }
             }
         }
 
         foreach (var t in TrechosLargura)
         {
-            var tag = $"{TrechoLargura.Rotulo(t.Elemento)} de {PontoLargura.FormatEstaca(t.A)} a {PontoLargura.FormatEstaca(t.B)}";
+            var tag = $"{TrechoLargura.Rotulo(t.Elemento)} de {Estaca(t.A)} a {Estaca(t.B)}";
             if (LarguraAtual(t.Elemento) is not { } now) { Warnings.Add($"{tag}: a via não tem esse elemento – trecho ignorado."); continue; }
             if (t.NovaLargura < 0.3) Warnings.Add($"{tag}: largura de {t.NovaLargura:0.00} m pequena demais.");
             if (t.Elemento is ElementoTrecho.CalcadaEsquerda or ElementoTrecho.CalcadaDireita)
@@ -640,9 +640,9 @@ public sealed partial class RoadSetup
             if (!z.Walk) continue;
             var free = z.General.F1 - z.General.F0 - r.Profundidade;
             if (free < -1e-3)
-                Warnings.Add($"{RecuoVia.Rotulo(r.Tipo)} na estaca {PontoLargura.FormatEstaca(r.Estaca)}: o recuo de {r.Profundidade:0.00} m é maior que a faixa livre da calçada ({z.General.F1 - z.General.F0:0.00} m) – a calçada some no trecho e o alinhamento avança {-free:0.00} m sobre o lote.");
+                Warnings.Add($"{RecuoVia.Rotulo(r.Tipo)} na estaca {Estaca(r.Estaca)}: o recuo de {r.Profundidade:0.00} m é maior que a faixa livre da calçada ({z.General.F1 - z.General.F0:0.00} m) – a calçada some no trecho e o alinhamento avança {-free:0.00} m sobre o lote.");
             else if (free < 1.20 - 1e-6)
-                Warnings.Add($"{RecuoVia.Rotulo(r.Tipo)} na estaca {PontoLargura.FormatEstaca(r.Estaca)}: o recuo de {r.Profundidade:0.00} m deixa a faixa livre da calçada com {Math.Max(0, free):0.00} m (NBR 9050: 1,20 m) – desloque a calçada ou reduza a profundidade.");
+                Warnings.Add($"{RecuoVia.Rotulo(r.Tipo)} na estaca {Estaca(r.Estaca)}: o recuo de {r.Profundidade:0.00} m deixa a faixa livre da calçada com {Math.Max(0, free):0.00} m (NBR 9050: 1,20 m) – desloque a calçada ou reduza a profundidade.");
         }
 
         // Recuos: marcas próprias, bordo interrompido na boca das baias e placa/abrigo.

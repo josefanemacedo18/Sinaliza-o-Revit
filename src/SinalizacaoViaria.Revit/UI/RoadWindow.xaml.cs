@@ -62,29 +62,39 @@ public sealed class SectionRow : INotifyPropertyChanged
     private void OnChanged([CallerMemberName] string? n = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 }
 
-/// <summary>Linha da tabela de larguras medidas (texto em pt-BR; vazio = medida da seção).</summary>
+/// <summary>Linha da tabela de larguras medidas (texto em pt-BR; vazio = medida da seção). A estaca é a da via (K20).</summary>
 public sealed class WidthRow
 {
+    private readonly EstacasDaVia _e;
     public PontoLargura P { get; }
-    public WidthRow(PontoLargura p) => P = p;
+    public WidthRow(PontoLargura p, EstacasDaVia? estacas = null)
+    {
+        P = p;
+        _e = estacas ?? EstacasDaVia.Padrao;
+    }
     private static string T(double? v) => v is { } x ? UiHelpers.F(x) : "";
     private static double? V(string? t) => UiHelpers.ParseOpt(t) is { } x and > 0 and < 200 ? x : null;
-    public string Estaca { get => UiHelpers.F(P.Estaca, "0.##"); set { if (PontoLargura.ParseEstaca(value) is { } e && e >= 0) P.Estaca = e; } }
+    public string Estaca { get => _e.EhPadrao ? UiHelpers.F(P.Estaca, "0.##") : _e.Mostrar(P.Estaca); set { if (_e.Ler(value) is { } e && e >= 0) P.Estaca = e; } }
     public string BordoEsq { get => T(P.BordoEsquerdo); set => P.BordoEsquerdo = V(value); }
     public string BordoDir { get => T(P.BordoDireito); set => P.BordoDireito = V(value); }
     public string AlinhEsq { get => T(P.AlinhamentoEsquerdo); set => P.AlinhamentoEsquerdo = V(value); }
     public string AlinhDir { get => T(P.AlinhamentoDireito); set => P.AlinhamentoDireito = V(value); }
 }
 
-/// <summary>Linha da tabela de recuos (baias, faixas auxiliares).</summary>
+/// <summary>Linha da tabela de recuos (baias, faixas auxiliares). A estaca é a da via (K20).</summary>
 public sealed class RecessRow
 {
+    private readonly EstacasDaVia _e;
     public RecuoVia R { get; }
-    public RecessRow(RecuoVia r) => R = r;
+    public RecessRow(RecuoVia r, EstacasDaVia? estacas = null)
+    {
+        R = r;
+        _e = estacas ?? EstacasDaVia.Padrao;
+    }
     private static double N(string? t, double cur, double min = 0) => UiHelpers.ParseOpt(t) is { } x && x >= min ? x : cur;
     public string TipoTexto => RecuoVia.Rotulo(R.Tipo);
     public bool Esquerdo { get => R.LadoEsquerdo; set => R.LadoEsquerdo = value; }
-    public string Estaca { get => UiHelpers.F(R.Estaca, "0.##"); set { if (PontoLargura.ParseEstaca(value) is { } e && e >= 0) R.Estaca = e; } }
+    public string Estaca { get => _e.EhPadrao ? UiHelpers.F(R.Estaca, "0.##") : _e.Mostrar(R.Estaca); set { if (_e.Ler(value) is { } e && e >= 0) R.Estaca = e; } }
     public string Comprimento { get => UiHelpers.F(R.Comprimento, "0.##"); set => R.Comprimento = N(value, R.Comprimento); }
     public string Profundidade { get => UiHelpers.F(R.Profundidade); set => R.Profundidade = N(value, R.Profundidade, 0.1); }
     public string TaperIn { get => UiHelpers.F(R.TaperEntrada, "0.##"); set => R.TaperEntrada = N(value, R.TaperEntrada); }
@@ -110,6 +120,8 @@ public partial class RoadWindow : Window
     private bool _editing;
     /// <summary>Seção carregada na edição: retornos, travessias e extensões de calçada passam para a seção nova.</summary>
     private RoadSetup? _loaded;
+    /// <summary>Estacas da via editada (K20): as tabelas, os níveis e os trechos mostram e leem a estaca dela.</summary>
+    private EstacasDaVia _estacas = EstacasDaVia.Padrao;
 
     public RoadSetup? Setup { get; private set; }
     public TipoConexao Connection { get; private set; } = TipoConexao.Intersecao;
@@ -255,6 +267,9 @@ public partial class RoadWindow : Window
     {
         _editing = true;
         _loaded = s.Clone();
+        _estacas = new EstacasDaVia(s.Estaqueamento);
+        if (!_estacas.EhPadrao && HintLarguras != null)
+            HintLarguras.Text += $" Esta via tem estaqueamento próprio: as estacas aqui são as dela ({_estacas.Formato}).";
         Title = "Editar via – seção transversal";
         LoadSetup(s);
         if (CbTemplate.Items.Count > 0) CbTemplate.SelectedIndex = -1;
@@ -305,12 +320,12 @@ public partial class RoadWindow : Window
         _left.Clear();
         foreach (var e in s.Left) Attach(_left, e.Clone());
         _widths.Clear();
-        foreach (var p in s.LargurasVariaveis.OrderBy(p => p.Estaca)) _widths.Add(new WidthRow(p.Clone()));
+        foreach (var p in s.LargurasVariaveis.OrderBy(p => p.Estaca)) _widths.Add(new WidthRow(p.Clone(), _estacas));
         _stretches.Clear();
         _stretches.AddRange(s.TrechosLargura.Select(t => t.Clone()));
         UpdateStretchText();
         _recesses.Clear();
-        foreach (var r in s.Recuos) _recesses.Add(new RecessRow(r.Clone()));
+        foreach (var r in s.Recuos) _recesses.Add(new RecessRow(r.Clone(), _estacas));
         Select(CbAbsorb, s.Absorcao);
         CkSmoothWidth.IsChecked = s.TransicaoSuave;
         _loading = was;
@@ -376,6 +391,7 @@ public partial class RoadWindow : Window
         };
         s.Sinalizacao = auto.Empty ? null : auto;
         s.TrechosLargura = _stretches.Select(t => t.Clone()).ToList();
+        s.Estaqueamento = _estacas.Estaqueamento;
         if (_loaded != null)
         {
             // O que fica gravado na via e não aparece nesta janela segue com ela.
@@ -405,7 +421,7 @@ public partial class RoadWindow : Window
     private void AddWidthClick(object sender, RoutedEventArgs e)
     {
         var next = _widths.Count == 0 ? 0 : _widths.Max(w => w.P.Estaca) + 20;
-        _widths.Add(new WidthRow(new PontoLargura { Estaca = next }));
+        _widths.Add(new WidthRow(new PontoLargura { Estaca = next }, _estacas));
         SchedulePreview();
     }
 
@@ -453,7 +469,7 @@ public partial class RoadWindow : Window
     {
         if (TxtStretches == null) return;
         TxtStretches.Text = _stretches.Count == 0 ? "Nenhum trecho com largura alterada." : string.Join("\n", _stretches.OrderBy(x => x.A).Select(x =>
-            $"• {TrechoLargura.Rotulo(x.Elemento)}: {UiHelpers.F(x.NovaLargura)} m de {PontoLargura.FormatEstaca(x.A)} (A) a {PontoLargura.FormatEstaca(x.B)} (B), " +
+            $"• {TrechoLargura.Rotulo(x.Elemento)}: {UiHelpers.F(x.NovaLargura)} m de {_estacas.Mostrar(x.A)} (A) a {_estacas.Mostrar(x.B)} (B), " +
             $"transições {UiHelpers.F(x.TransicaoA)} / {UiHelpers.F(x.TransicaoB)} m"));
     }
 
@@ -464,7 +480,7 @@ public partial class RoadWindow : Window
         var lane = _right.Where(r => ElementoSecao.EhFaixaDeTrafego(r.Tipo)).Select(r => r.Element.Largura).DefaultIfEmpty(3.5).Last();
         var r = RecuoVia.Padrao(t, speed, lane);
         r.Estaca = _recesses.Count == 0 ? 20 : _recesses.Max(x => x.R.S3) + 20;
-        _recesses.Add(new RecessRow(r));
+        _recesses.Add(new RecessRow(r, _estacas));
         SchedulePreview();
     }
 
@@ -766,7 +782,7 @@ public partial class RoadWindow : Window
             TbSarjeta.Text = UiHelpers.F(e.Sarjeta);
             TbMeioFio.Text = UiHelpers.F(e.LarguraMeioFio);
             TbInclinacao.Text = UiHelpers.F(e.InclinacaoTransversal, "0.##");
-            TbNiveis.Text = NivelAlinhamento.Format(e.NiveisAlinhamento);
+            TbNiveis.Text = NivelAlinhamento.Format(e.NiveisAlinhamento, _estacas);
             Select(CbCorCaminhada, e.CorCaminhada);
             TbLarguraLinha.Text = UiHelpers.F(parking ? e.LarguraDelimitacao ?? 0.10 : e.LarguraLinha);
             CkSeccionada.IsChecked = e.LinhaSeccionada;
@@ -812,7 +828,7 @@ public partial class RoadWindow : Window
         el.Sarjeta = Num(TbSarjeta, el.Sarjeta);
         el.LarguraMeioFio = Num(TbMeioFio, el.LarguraMeioFio, 0.05);
         el.InclinacaoTransversal = UiHelpers.ParseOpt(TbInclinacao.Text) is { } inc and >= -8 and <= 8 ? inc : el.InclinacaoTransversal;
-        if (sender == TbNiveis) el.NiveisAlinhamento = NivelAlinhamento.Parse(TbNiveis.Text);
+        if (sender == TbNiveis) el.NiveisAlinhamento = NivelAlinhamento.Parse(TbNiveis.Text, _estacas);
         if (CbCorCaminhada.SelectedItem is Option<MarkingColor> cc) el.CorCaminhada = cc.Value;
         if (el.Tipo == TipoElementoSecao.Estacionamento)
         {

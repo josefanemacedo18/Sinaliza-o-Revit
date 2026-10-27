@@ -12,8 +12,8 @@ public sealed class NivelAlinhamento
     public double Nivel { get; set; }
     public NivelAlinhamento Clone() => (NivelAlinhamento)MemberwiseClone();
 
-    /// <summary>Lê "0:0,15; 40:0,40; 5+10:0,40" (estaca:nível).</summary>
-    public static List<NivelAlinhamento> Parse(string? text)
+    /// <summary>Lê "0:0,15; 40:0,40; 5+10:0,40" (estaca:nível); com <paramref name="estacas"/>, a estaca é a da via (K20).</summary>
+    public static List<NivelAlinhamento> Parse(string? text, EstacasDaVia? estacas = null)
     {
         var res = new List<NivelAlinhamento>();
         if (string.IsNullOrWhiteSpace(text)) return res;
@@ -21,15 +21,17 @@ public sealed class NivelAlinhamento
         {
             var kv = tok.Split(new[] { ':', '=' }, 2);
             if (kv.Length != 2) continue;
-            var st = PontoLargura.ParseEstaca(kv[0]);
+            var st = estacas is { EhPadrao: false } ? estacas.Ler(kv[0]) : PontoLargura.ParseEstaca(kv[0]);
             var lv = PontoLargura.ParseEstaca(kv[1]);
             if (st is { } s && lv is { } l && l > -3 && l < 5) res.Add(new NivelAlinhamento { Estaca = s, Nivel = l });
         }
         return res.OrderBy(x => x.Estaca).ToList();
     }
 
-    public static string Format(IEnumerable<NivelAlinhamento> list) =>
-        string.Join("; ", list.Select(x => $"{x.Estaca.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))}:{x.Nivel.ToString("0.00", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))}"));
+    /// <summary>"estaca:nível; …"; com <paramref name="estacas"/> próprias da via, a estaca dela ("n+resto").</summary>
+    public static string Format(IEnumerable<NivelAlinhamento> list, EstacasDaVia? estacas = null) =>
+        string.Join("; ", list.Select(x => (estacas is { EhPadrao: false } ? estacas.Mostrar(x.Estaca) : x.Estaca.ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))) +
+            $":{x.Nivel.ToString("0.00", System.Globalization.CultureInfo.GetCultureInfo("pt-BR"))}"));
 }
 
 /// <summary>
@@ -119,11 +121,11 @@ public sealed partial class RoadSetup
                 d2 = lot;
                 accIn = accOut = lot;
                 if (Math.Abs(k) > 0.03 + 1e-6)
-                    Warnings.Add($"Calçada ({side}), estaca {PontoLargura.FormatEstaca(n.Estaca)}: inclinação transversal de {k * 100:0.0}% – a NBR 9050 admite até 3 %. Use faixa de acesso para vencer o desnível do lote.");
+                    Warnings.Add($"Calçada ({side}), estaca {Estaca(n.Estaca)}: inclinação transversal de {k * 100:0.0}% – a NBR 9050 admite até 3 %. Use faixa de acesso para vencer o desnível do lote.");
             }
             var ramp = access > 0.05 ? (accOut - accIn) / access : 0;
             if (Math.Abs(ramp) > 0.0833 + 1e-6)
-                Warnings.Add($"Calçada ({side}), estaca {PontoLargura.FormatEstaca(n.Estaca)}: a faixa de acesso vence {Math.Abs(accOut - accIn):0.00} m em {access:0.00} m ({Math.Abs(ramp) * 100:0}%) – acima de 8,33 %: prever degraus na faixa de acesso (NBR 9050) ou alargá-la.");
+                Warnings.Add($"Calçada ({side}), estaca {Estaca(n.Estaca)}: a faixa de acesso vence {Math.Abs(accOut - accIn):0.00} m em {access:0.00} m ({Math.Abs(ramp) * 100:0}%) – acima de 8,33 %: prever degraus na faixa de acesso (NBR 9050) ou alargá-la.");
             serviceDef?.LevelProfile.Add(new SidewalkLevelPoint { Station = n.Estaca, Inner = top + slope * cw - (serviceDef.Height ?? top), Outer = d1 - (serviceDef.Height ?? top) });
             freeDef?.LevelProfile.Add(new SidewalkLevelPoint { Station = n.Estaca, Inner = d1 - top, Outer = d2 - top });
             accessDef?.LevelProfile.Add(new SidewalkLevelPoint { Station = n.Estaca, Inner = accIn - top, Outer = accOut - top });
@@ -133,7 +135,7 @@ public sealed partial class RoadSetup
         {
             var g = Math.Abs(list[i + 1].Nivel - list[i].Nivel) / Math.Max(0.01, list[i + 1].Estaca - list[i].Estaca);
             if (g > 0.0833 + 1e-6)
-                Warnings.Add($"Calçada ({side}): entre as estacas {PontoLargura.FormatEstaca(list[i].Estaca)} e {PontoLargura.FormatEstaca(list[i + 1].Estaca)} o nível no alinhamento varia {g * 100:0}% – acima de 8,33 %: afaste os pontos ou use degraus/patamar.");
+                Warnings.Add($"Calçada ({side}): entre as estacas {Estaca(list[i].Estaca)} e {Estaca(list[i + 1].Estaca)} o nível no alinhamento varia {g * 100:0}% – acima de 8,33 %: afaste os pontos ou use degraus/patamar.");
         }
     }
 }

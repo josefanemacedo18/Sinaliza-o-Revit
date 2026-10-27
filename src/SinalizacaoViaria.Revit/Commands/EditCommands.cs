@@ -269,7 +269,7 @@ public sealed class CmdEditar : CommandBase
     private Result EditWholeRoad(UIDocument uidoc, RoadPavementDefinition pav, List<MarkingDefinition> members)
     {
         var doc = uidoc.Document;
-        var setup = RoadTemplates.FromJson(pav.SetupJson);
+        var setup = RoadSetup.DaVia(pav);
         if (setup == null)
         {
             // Via de versão anterior (sem a seção guardada): reconstrói o básico a partir do pavimento.
@@ -285,6 +285,7 @@ public sealed class CmdEditar : CommandBase
             TaskDialog.Show(AppTitle, "Esta via foi criada por uma versão anterior e não guardou a seção completa: a janela abre com pista e calçadas " +
                                       "reconstruídas a partir do pavimento. Confira faixas, linhas e elementos antes de aplicar.");
         }
+        setup.Estaqueamento ??= pav.Estaqueamento;                          // a janela mostra as estacas da via (K20)
         var w = new RoadWindow(false);
         w.LoadForEdit(setup);
         // Perfil, pavimentação, terraplenagem, drenagem, validação e o que a edição pode afetar (Etapa 11).

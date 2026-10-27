@@ -151,3 +151,45 @@ public sealed class Estaqueamento
         return res;
     }
 }
+
+/// <summary>
+/// A estaca que o usuário vê e digita numa via (K20; D-023): as definições guardam a distância ao longo do eixo; os
+/// formulários e os avisos mostram e leem a estaca do estaqueamento da via (início, intervalo, equações). No padrão (0, 20 m,
+/// sem equações) é o "n+resto" de sempre e um número digitado é a própria distância.
+/// </summary>
+public sealed class EstacasDaVia
+{
+    private static readonly Estaqueamento Base = new();
+
+    /// <summary>O padrão (estaca 0 no início do eixo, a cada 20 m).</summary>
+    public static EstacasDaVia Padrao { get; } = new(null);
+
+    /// <param name="estaqueamento">O da via; nulo ou padrão = o padrão.</param>
+    /// <param name="comprimento">Comprimento do eixo (m), para achar a distância de uma estaca depois de equações; infinito = desconhecido.</param>
+    public EstacasDaVia(Estaqueamento? estaqueamento, double comprimento = double.PositiveInfinity)
+    {
+        Estaqueamento = estaqueamento is { EhPadrao: false } e ? e.Clone() : null;
+        Comprimento = double.IsFinite(comprimento) && comprimento > 0 ? comprimento : double.PositiveInfinity;
+    }
+
+    /// <summary>O estaqueamento próprio da via; nulo = o padrão.</summary>
+    public Estaqueamento? Estaqueamento { get; }
+    public double Comprimento { get; }
+    public bool EhPadrao => Estaqueamento == null;
+
+    /// <summary>A estaca mostrada para a distância ao longo do eixo.</summary>
+    public string Mostrar(double distancia) => (Estaqueamento ?? Base).Rotulo(distancia);
+
+    /// <summary>
+    /// A distância ao longo do eixo da estaca digitada ("n+resto" ou o valor em metros). No padrão, o valor é a distância; com o
+    /// estaqueamento da via, nulo se a estaca não estiver no eixo (antes do início ou na lacuna de uma equação).
+    /// </summary>
+    public double? Ler(string? texto)
+    {
+        if ((Estaqueamento ?? Base).Ler(texto) is not { } v) return null;
+        return Estaqueamento == null ? v : Estaqueamento.Distancia(v, Comprimento);
+    }
+
+    /// <summary>Como digitar, para o rótulo do campo.</summary>
+    public string Formato => Estaqueamento == null ? "m ou 5+10" : $"estaca da via, ex.: {Mostrar(0)}";
+}

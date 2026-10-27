@@ -18,19 +18,14 @@ internal static class RoadRegen
         OutputSettings output, Polyline2? axis)
     {
         var doc = uidoc.Document;
+            setup.Estaqueamento = pav.Estaqueamento;                                                        // avisos com a estaca da via (K20)
             var defs = setup.Build(pav.PathRef, output, PluginContext.Catalog, pav.GroupId, pav.Id, axis);   // Build clona o caminho por marca
             // Sinalização automática editada à mão: fica como está e não é gerada outra igual no lugar.
             var manual = members.Where(m => m.Id != pav.Id && m.EditadoManualmente).ToList();
             defs = Core.Automation.AutoSignage.Preserve(defs, manual);
             var newPav = defs.OfType<RoadPavementDefinition>().FirstOrDefault();
-            if (newPav != null)
-            {
-                newPav.CornerRadius ??= pav.CornerRadius;
-                newPav.MergeStart = pav.MergeStart;
-                newPav.MergeEnd = pav.MergeEnd;
-                newPav.Hierarchy ??= pav.Hierarchy;
-                newPav.Exclusions.AddRange(pav.Exclusions);
-            }
+            // O que não vem da seção: raio, emendas, hierarquia, recortes, estrutura do pavimento e estaqueamento.
+            if (newPav != null) RoadSetup.HerdarDoAnterior(newPav, pav);
             // Trechos apagados à mão (Apagar Trecho) passam para a marca equivalente da seção nova (mesmo tipo e código).
             var used = new HashSet<string>();
             foreach (var d in defs.Where(d => d is not RoadPavementDefinition))
@@ -126,9 +121,12 @@ internal static class RecessCommand
                 r.Legenda = p.Legenda; r.PlacaEAbrigo = p.PlacaEAbrigo;
                 r.Estaca = st; r.LadoEsquerdo = left;
             })
-         .Check("Lado esquerdo do eixo (senão, direito)", () => r.LadoEsquerdo, v => r.LadoEsquerdo = v)
-         .Number("Estaca do início da transição (m)", () => r.Estaca, v => r.Estaca = v, 0, 100000, "0.0")
-         .Number("Taper de entrada (m)", () => r.TaperEntrada, v => r.TaperEntrada = v, 0, 300, "0.0")
+         .Check("Lado esquerdo do eixo (senão, direito)", () => r.LadoEsquerdo, v => r.LadoEsquerdo = v);
+        // A estaca da via (K20): com estaqueamento próprio, o campo mostra e lê a estaca dela; no padrão, a distância como sempre.
+        var est = new EstacasDaVia(setup.Estaqueamento);
+        if (est.EhPadrao) w.Number("Estaca do início da transição (m)", () => r.Estaca, v => r.Estaca = v, 0, 100000, "0.0");
+        else w.Text($"Estaca do início da transição ({est.Formato})", () => est.Mostrar(r.Estaca), v => r.Estaca = est.Ler(v) ?? r.Estaca);
+        w.Number("Taper de entrada (m)", () => r.TaperEntrada, v => r.TaperEntrada = v, 0, 300, "0.0")
          .Number("Extensão com a profundidade total (m)", () => r.Comprimento, v => r.Comprimento = v, 1, 1000, "0.0")
          .Number("Taper de saída (m)", () => r.TaperSaida, v => r.TaperSaida = v, 0, 300, "0.0")
          .Number("Profundidade do recuo (m)", () => r.Profundidade, v => r.Profundidade = v, 0.5, 8, "0.00")
@@ -154,7 +152,7 @@ internal static class RecessCommand
             .OrderBy(x => Math.Abs(x.Pr.Signed)).Select(x => (IntersectionRoad?)x.R).FirstOrDefault();
         if (road == null) throw new UserMessageException("Nenhuma via do plugin no ponto clicado. Clique sobre a pista ou a calçada, junto ao bordo onde será o recuo.");
         var pav = road.Def;
-        var setup = RoadTemplates.FromJson(pav.SetupJson)
+        var setup = RoadSetup.DaVia(pav)
                     ?? throw new UserMessageException("Esta via não guardou a seção transversal (versão anterior ou Pista): use Editar → A via inteira uma vez e depois crie o recuo.");
         var (st, signed) = road.Axis.Project(pt);
         var r = RecuoVia.Padrao(TipoRecuo.BaiaOnibus, setup.Speed,
@@ -174,7 +172,7 @@ internal static class RecessCommand
         var members = MarkingStorage.InGroup(doc, rec.GroupId);
         var pav = members.OfType<RoadPavementDefinition>().FirstOrDefault()
                   ?? throw new UserMessageException("A via deste recuo não foi encontrada.");
-        var setup = RoadTemplates.FromJson(pav.SetupJson) ?? throw new UserMessageException("A via não guardou a seção transversal: edite a via inteira.");
+        var setup = RoadSetup.DaVia(pav) ?? throw new UserMessageException("A via não guardou a seção transversal: edite a via inteira.");
         var r = setup.Recuos.Where(x => x.Tipo == rec.Type && x.LadoEsquerdo == rec.Left).OrderBy(x => Math.Abs(x.Estaca - rec.S0)).FirstOrDefault()
                 ?? throw new UserMessageException("O recuo não foi encontrado na seção da via: edite a via inteira (quadro Recuos).");
         var remove = false;
