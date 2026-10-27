@@ -50,7 +50,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     muda; perfis exemplo / usuário / referência citada; perfis de limites); tamanho das telas grandes lembrado. Correções:
     consumo de tinta com a unidade da taxa e litros somados com quilos; configurações salvas pela metade com um campo
     inválido. Telas não vistas no Revit (K26).
-  - Etapa 13 ✅: 2.19.0 em `Releases/Etapa13` (`§§C§§`, 3 136/3 136) – D-031: medição do núcleo (`tools/Desempenho`,
+  - Etapa 13 ✅: 2.19.0 em `Releases/Etapa13` (`fdb39c2`, 3 136/3 136) – D-031: medição do núcleo (`tools/Desempenho`,
     4/16/64 vias) e **terraplenagem linear** com o mesmo resultado (`RingIndex`: 64 vias 12–15 s → 3–4 s, mesmo SHA-256);
     K14 e K15 medidos e não mudados (mexem no que o Revit cria ou lê); **progresso e cancelamento** em Atualizar Todas e
     Quantitativos (cancelar só antes de gravar – a transação é desfeita); **relatório do tráfego reprodutível** (F11:
