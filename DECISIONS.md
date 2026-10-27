@@ -579,3 +579,26 @@ como substituída.
 - **Consequências:** projetos com piso tátil mudam a esquina na próxima atualização (opção para voltar); ramais até as
   entradas dos lotes ficam para a Etapa 23 (o plugin não conhece as entradas); o achado da rampa além da faixa é a K29; o que
   não foi visto no Revit está em K30.
+
+## D-035 – Etapa 17: rampas como pisos de camada variável e aparência da biblioteca do Revit
+- **Contexto:** itens 2 e 1 do pedido de 2026-10-27: "Rampas devem entrar para os pisos também" e "Os materiais devem ser bem
+  vistos e claros com a realidade no modo realista do Revit e não só no modo cores consistentes".
+- **Decisão:**
+  - rampa: um piso por corpo de concreto (cada um tem topo plano e base plana), tipo de camada variável e edição de forma só
+    nos vértices do contorno – a ajuda do Revit diz que, com camada variável, só o topo inclina e o fundo fica horizontal;
+    fundo 5 cm abaixo da base (a folga da Etapa 15) para a espessura nunca ser zero no pé; espessura do tipo em centímetros
+    inteiros (poucos tipos); parte recusada fica forma direta; opção para voltar à forma direta;
+  - o recorte da rampa passa a conter as abas inteiras (a ponta delas passava do recorte – defeito de antes, achado pelo
+    teste de sobreposição das partes);
+  - aparência: ativo da biblioteca instalada com o Revit, escolhido pelo título por palavras inteiras (inglês e português,
+    sem acento), com telhado, bloco, alvenaria e cerâmica de fora; copiado para o projeto e ligado ao material; a cor e o
+    Sombreado ficam como estavam; material que já tem aparência não muda; pinturas na cor lisa.
+- **Alternativas descartadas:**
+  - piso inclinado pela seta de inclinação (`Floor.Create` com `slopeArrow`): a laje inteira inclinaria, com o fundo abaixo
+    da pista no pé da rampa;
+  - piso de espessura constante com a edição de forma: o mesmo problema do fundo;
+  - texturas próprias (imagens) ou editar as propriedades do ativo (escala, cor): o pedido restringe às texturas da
+    biblioteca do Revit, e a escala dela já é a real;
+  - ativo genérico tingido para as pinturas: a tinta real é lisa; ficou a cor do material.
+- **Consequências:** projetos salvos mudam na próxima atualização das rampas e na próxima geração de cada cor; nada disso foi
+  visto no Revit (K31).

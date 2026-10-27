@@ -800,6 +800,27 @@ Painel **Representação no Revit** (em todas as janelas):
   Projetos feitos em versões anteriores: use **Atualizar Todas** para converter pavimentos, calçadas,
   meios-fios e sarjetas em pisos. Desligue em **Configurações** para voltar à forma direta. A sinalização
   pintada e os dispositivos continuam como modelo genérico.
+* **Rampas como Pisos (desde a 2.22)**: cada parte de concreto da rampa de acessibilidade e da guia rebaixada – rampa,
+  abas, platô e rampas laterais do rebaixamento total, patamar e cantos nivelados – vira um **Piso** (tipo *SV - {material}
+  rampa {espessura}*), com **fundo plano e topo inclinado**: o tipo tem a camada de **espessura variável** e a inclinação é
+  a **edição de forma** do piso (os vértices do contorno nas cotas da rampa) – só o topo inclina, como na ajuda do Revit
+  ("Modify the Layer Thickness of a Roof or Structural Floor"). O fundo fica **5 cm abaixo** da base da rampa, sobre a
+  plataforma que a terraplenagem deixa sob ela (24.8): a espessura nunca chega a zero no pé da rampa. As rampas passam a
+  entrar nas **tabelas de pisos** do Revit e na conferência **piso × terreno** do Autoteste; as placas táteis continuam
+  sólidos sobre o piso. Parte que o Revit recusar fica forma direta (aviso). **Configurações → Rampas e guias rebaixadas
+  também como Piso** (ligada; desligada = forma direta, como até a 2.21). Projetos salvos: a rampa vira piso na próxima
+  atualização. O recorte da rampa na calçada também mudou: a ponta das abas, junto ao meio-fio, passava uns 4 cm do recorte
+  e sobrava meio-fio debaixo dela – agora o lado do recorte segue a aba.
+* **Aparência realista dos materiais (desde a 2.22)**: no modo **Realista**, os materiais com textura de verdade –
+  **asfalto, concreto, bloquete, terra, brita, grama, folhagem, metal, vidro, madeira e água** – recebem o **ativo de
+  aparência da biblioteca de materiais instalada com o Revit**, escolhido pelo título (em inglês ou português; telhas,
+  blocos de alvenaria e cerâmicas ficam de fora), copiado para o projeto como *SV - {material} (aparência)*, **na escala
+  do próprio ativo** (a da biblioteca, real). Nenhuma textura vem de fora do Revit. A **cor do material não muda** e os
+  modos **Sombreado / Cores consistentes** continuam com ela (*Usar aparência de renderização* desligado). As **pinturas**
+  (branca, amarela, vermelha, azul, preta) ficam na cor lisa – o aspecto real da tinta. Material que **já tem aparência**
+  (dada por você ou antes) **não é tocado**; sem nenhum ativo que sirva na biblioteca instalada, fica a cor lisa (log).
+  **Configurações → Materiais com a aparência realista da biblioteca do Revit** (ligada). Projetos salvos: cada material do
+  plugin ainda sem aparência a recebe na próxima geração de uma marca daquela cor.
 * **Modelo 3D**: sólido fino (Modelos genéricos). A espessura padrão é a do material, com mínimo
   modelável de 3 mm (configurável) – películas de tinta reais são finas demais para sólidos do Revit.
   Os quantitativos usam sempre a **área**, independentemente da espessura.
@@ -1337,7 +1358,8 @@ vigente do manual. O catálogo pode ser alterado (seção `placas`, campo `picto
   das abas, **desnível residual** no meio-fio, **patamar** plano no topo, **material** (concreto, bloquete...),
   piso tátil (largura, comprimento ao longo do meio-fio, afastamento, cor) e largura do direcional.
   A rampa é um sólido inclinado (0 na pista → altura do meio-fio no topo, com a inclinação
-  escolhida), as abas são cunhas triangulares com a inclinação das abas e o piso tátil de alerta
+  escolhida), as abas são cunhas triangulares com a inclinação das abas – **desde a 2.22, como Piso do Revit** (ver 8,
+  "Rampas como Pisos") – e o piso tátil de alerta
   acompanha a rampa: faixa de **0,40 m a 0,50 m da guia** por padrão (ABNT NBR 16537:2024, 6.6, Figuras 22 a 26;
   afastamento e largura configuráveis), na largura da rampa; direcional opcional no eixo, do alerta até o fim da subida
   (7.8.5 b, Figura 69). Tipos:

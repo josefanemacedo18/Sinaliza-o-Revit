@@ -3,6 +3,36 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-27 – Etapa 17: rampas como Pisos e materiais realistas (versão 2.22.0)
+
+Itens 2 e 1 do [plano 2](docs/PLANO_DE_ACAO_2.md) (D-035). Entrega: `Releases/Etapa17` (não executada no Revit 2027).
+
+### Rampas como Pisos (item 2)
+- Cada parte de concreto da rampa e da guia rebaixada – rampa, abas, platô e rampas laterais do rebaixamento total, patamar,
+  cantos nivelados – vira um **Piso do Revit** de **fundo plano e topo inclinado**: tipo *SV - {material} rampa
+  {espessura}* com a camada de espessura variável (`CompoundStructure.VariableLayerIndex`, conferido com
+  `CanLayerBeVariable`), criado plano e levado à cota de cada vértice pela edição de forma. O fundo fica 5 cm abaixo da base
+  da rampa, sobre a plataforma do terreno da Etapa 15. As rampas entram nas tabelas de pisos e na conferência piso × terreno;
+  as placas táteis continuam sólidos. Parte recusada pelo Revit fica forma direta, com aviso.
+- **Configurações → Rampas e guias rebaixadas também como Piso** (ligada; desligada = forma direta, como até a 2.21).
+- **Recorte da rampa:** a ponta das abas, junto ao meio-fio, passava ~4 cm do recorte e sobrava meio-fio sob ela (0,036 m²
+  por aba – com pisos, seriam pisos sobrepostos). O lado inclinado do recorte segue agora a hipotenusa da aba.
+
+### Aparência realista dos materiais (item 1)
+- Asfalto, concreto, bloquete, terra, brita, grama, folhagem, metal, vidro, madeira e água recebem o **ativo de aparência
+  da biblioteca instalada com o Revit** (`Application.GetAssets`, `AppearanceAssetElement.Create`), escolhido pelo título em
+  inglês ou português, na escala do próprio ativo. A **cor do material não muda** e o Sombreado/Cores consistentes
+  continua com ela (`UseRenderAppearanceForShading` = falso). Material que já tem aparência não é tocado; pinturas ficam na
+  cor lisa; sem ativo que sirva, cor lisa (log).
+- **Configurações → Materiais com a aparência realista da biblioteca do Revit** (ligada).
+
+### Testes
+- `Etapa17PisosMateriaisTests` (20): partes da rampa com e sem cantos e com desnível (um piso por corpo, topo plano, fundo
+  5 cm abaixo, espessura do tipo, inclinação, sem sobreposição e dentro do recorte), rebaixamento total, rampa no relevo;
+  escolha do ativo para cada material, pinturas sem ativo, telhas e blocos de fora, título em português; as duas
+  configurações registradas; a ligação no plugin.
+- NÃO EXECUTADO NO REVIT (K31).
+
 ## 2026-10-27 – Etapa 16: esquinas – chanfro de 1,50 m, piso tátil e extensão em chanfro (versão 2.21.0)
 
 Itens 19, 20 e 12 do [plano 2](docs/PLANO_DE_ACAO_2.md) (D-034). Entrega: `Releases/Etapa16` (não executada no Revit 2027).

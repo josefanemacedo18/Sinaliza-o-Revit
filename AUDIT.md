@@ -481,3 +481,12 @@ Etapa 16 (2.21.0):
 - FATO (código): o chanfro do lote era medido só pela face e desligado; as quadras novas agora nascem com 1,50 m em cada lado,
   sem mudar as gravadas (`MedidaChanfro`, `ComChanfroPadrao`).
 - LACUNA: os ramais até as entradas de pedestres dos lotes da imagem 1 – o plugin não tem as entradas (Etapa 23).
+
+Etapa 17 (2.22.0):
+- FATO (teste): o recorte da rampa na calçada não continha a ponta das abas – ~4 cm junto ao meio-fio, 0,036 m² por aba sob
+  meio-fio; corrigido (`Etapa17PisosMateriaisTests`).
+- FATO (documentação da API 2027): `CompoundStructure.CanLayerBeVariable`/`VariableLayerIndex`, `Application.GetAssets`,
+  `AppearanceAssetElement.Create`, `Material.AppearanceAssetId` e `UseRenderAppearanceForShading` existem na 2027 (o plugin
+  compila contra a referência dela); com camada variável a edição de forma inclina só o topo (ajuda do Revit).
+- INFERÊNCIA: as rampas como pisos de camada variável e os ativos escolhidos pelo título funcionam no Revit; só um teste nele
+  confirma (K31).
