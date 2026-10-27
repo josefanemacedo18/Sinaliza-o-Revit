@@ -17,7 +17,12 @@ que o plugin usa dentro do Revit.*
 
 ## O que o plugin faz
 
-| Guia **SinalizaBIM** | Recursos |
+A faixa de opções tem duas guias (desde a 2.15): **SinalizaBIM**, com os painéis do fluxo de projeto – Projeto, Terreno,
+Sistema Viário, Interseções, Terraplenagem, Pavimentação, Drenagem, Urbanismo, Análise, Documentação e Sistema – e
+**SinalizaBIM Sinalização**, com a sinalização horizontal, a vertical e a segurança viária. O
+[manual](docs/MANUAL.md) mostra onde fica cada ferramenta.
+
+| Ferramenta | Recursos |
 |---|---|
 | **Sinalizar Via** | Monta a **seção transversal completa** a partir do eixo, com modelos prontos: faixas de rolamento, **exclusivas e preferenciais** de ônibus (linha MFE + legenda ÔNIBUS repetida + **fundo colorido opcional**), **ciclofaixas** (pintura vermelha, bicicletas, setas, segregadores), **faixa de estacionamento** (vagas de qualquer tipo), **acostamento**, **faixa de segurança/transição** zebrada, **canteiros central e laterais** (físicos ou pintados), **calçadas** (meio-fio, faixa de serviço, faixa livre NBR 9050, faixa de acesso) e dispositivos de segregação. As linhas entre os elementos (LFO, LMS, MFE, CIC-LD, LBO) são escolhidas automaticamente pela velocidade. **Várias linhas selecionadas de uma vez viram várias vias** (as alinhadas continuam a mesma via; as que se encontram em T ou em cruz viram vias próprias) **com todas as interseções criadas**; uma via nova na **ponta** de outra, em ângulo, vira uma **emenda concordada** (pista, calçadas, canteiro e linhas seguem por uma curva, com transição de largura) em vez de um cruzamento com falhas. **Pistas feitas com Piso comum** (projetos antigos) viram vias do plugin: selecione os pisos e os eixos, larguras e encontros são reconhecidos, sem duplicar o pavimento. |
 | **Linha Longitudinal** | LFO-1…4, LMS-1/2, LBO, LCO, faixa exclusiva, faixa reversível, LCA, LPP – ao longo de linhas, arcos e splines. Deslocamento lateral, fase, alinhamento do tracejado (início/fim/centro/ajuste), recuos, inversão de lados (LFO-4). |

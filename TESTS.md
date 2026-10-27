@@ -129,9 +129,10 @@ testes de reprodução do defeito relatado e testes de regressão. Classes trans
 ## Validação manual no Revit (roteiro mínimo)
 
 1. Copiar `Instalar/Revit2027/*` para `%AppData%\Autodesk\Revit\Addins\2027` e abrir o Revit 2027.
-2. Verificar que a guia **SinalizaBIM** aparece, sem erro ao iniciar. O log fica em `%AppData%\SinalizaBIM\log.txt`.
+2. Verificar que as guias **SinalizaBIM** (11 painéis) e **SinalizaBIM Sinalização** (3 painéis) aparecem, sem erro ao
+   iniciar, e que sem projeto aberto só o painel **Sistema** fica habilitado. O log fica em `%AppData%\SinalizaBIM\log.txt`.
 3. Num arquivo de teste (nunca no projeto real), rodar **Autoteste → Rápido** e guardar o relatório **e** o arquivo de
    dados `autoteste-…-dados.jsonl` da mesma pasta (todos os avisos, pares de pisos sobrepostos, retas fora do eixo,
    contornos dos pisos e definições – o bastante para reproduzir no núcleo sem repetir o teste).
-4. Rodar **Editar → Validar Modelo** num projeto existente: não altera nada (comando somente leitura) e grava
+4. Rodar **Análise → Validar Modelo** num projeto existente: não altera nada (comando somente leitura) e grava
    `validacao-*.txt`.
