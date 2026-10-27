@@ -524,12 +524,54 @@ public partial class RoadWindow : Window
             TxtSummary.Text = $"Elementos gerados: {string.Join(", ", counts)}." +
                               (warnings.Count > 0 ? "\n⚠ " + string.Join("\n⚠ ", warnings) : "");
             TxtSummary.Foreground = warnings.Count > 0 ? UiTokens.Warning : UiTokens.Text;
+            // Abas Validação e Resumo: os avisos e o que a seção gera, da mesma pré-visualização.
+            PanelValidacaoPrevia.Children.Clear();
+            if (warnings.Count == 0) PanelValidacaoPrevia.Children.Add(ContextPanelPage.Linha(NivelSituacao.Ok, "Nenhum aviso na seção."));
+            foreach (var w in warnings) PanelValidacaoPrevia.Children.Add(ContextPanelPage.Linha(NivelSituacao.Aviso, w));
+            PanelResumoPrevia.Children.Clear();
+            PanelResumoPrevia.Children.Add(ContextPanelPage.Linha(NivelSituacao.Informacao,
+                $"A seção gera, por trecho de via: {string.Join(", ", counts)} – largura total de {UiHelpers.F(wd.Total)} m e pista de {UiHelpers.F(wd.EntreMeiosFios)} m entre meios-fios."));
+            if (warnings.Count > 0)
+                PanelResumoPrevia.Children.Add(ContextPanelPage.Linha(NivelSituacao.Aviso, $"{warnings.Count} aviso(s) na seção – veja a aba Validação."));
         }
         catch (Exception ex)
         {
             TxtSummary.Text = ex.Message;
             TxtSummary.Foreground = UiTokens.Error;
+            PanelValidacaoPrevia.Children.Clear();
+            PanelValidacaoPrevia.Children.Add(ContextPanelPage.Linha(NivelSituacao.Erro, ex.Message));
         }
+    }
+
+    /// <summary>
+    /// Perfil, pavimentação, terraplenagem, drenagem, validação e resumo da via (núcleo: <see cref="FormularioVia"/>): da via
+    /// sendo editada ou, na via nova, o que acontece ao aplicar.
+    /// </summary>
+    public void SetContext(ContextoFormularioVia ctx)
+    {
+        void Fill(StackPanel panel, IReadOnlyList<EstadoContexto> linhas)
+        {
+            panel.Children.Clear();
+            foreach (var l in linhas) panel.Children.Add(ContextPanelPage.Linha(l.Nivel, l.Texto));
+        }
+        Fill(PanelPerfil, ctx.Perfil);
+        Fill(PanelPavimento, ctx.Pavimentacao);
+        Fill(PanelTerraplenagem, ctx.Terraplenagem);
+        Fill(PanelDrenagem, ctx.Drenagem);
+        Fill(PanelValidacao, ctx.Validacao);
+        Fill(PanelResumo, ctx.Resumo);
+    }
+
+    private void ValidateClick(object sender, RoutedEventArgs e)
+    {
+        UpdatePreview();
+        Tabs.SelectedItem = TabValidacao;
+    }
+
+    private void SummaryClick(object sender, RoutedEventArgs e)
+    {
+        UpdatePreview();
+        Tabs.SelectedItem = TabResumo;
     }
 
     // ------------------------------------------------------------------ eventos gerais

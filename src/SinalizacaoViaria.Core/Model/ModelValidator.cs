@@ -426,15 +426,25 @@ public static class ModelValidator
     /// eixo vem do cache do caminho: se a linha de referência mudou depois da última geração, a via precisa ser atualizada
     /// (confiança média).
     /// </summary>
+    /// <summary>
+    /// Traçado e greide de uma via contra os limites informados (V12): os elementos fora dos limites, com as estacas da via.
+    /// Usado pelo Validar Modelo e pela aba Validação da janela da via.
+    /// </summary>
+    public static List<Violacao> Tracado(RoadPavementDefinition road, GeometricCriteria c)
+    {
+        var v = new List<Violacao>();
+        if (c.IsEmpty) return v;
+        if (StoredAxis(road.PathRef) is { } axis) v.AddRange(GeometricCheck.Axis(AlignmentElements.FromAxis(axis), c));
+        if (road.Output.Grade is { } grade && grade.SortedPoints().Count >= 2) v.AddRange(GeometricCheck.Vertical(AlignmentElements.Vertical(grade), c));
+        return v.Select(x => x with { Estacas = road.Estaqueamento }).ToList();
+    }
+
     private static void CheckAlignment(Dictionary<string, MarkingDefinition> defs, GeometricCriteria c, List<Achado> res)
     {
         foreach (var road in defs.Values.OfType<RoadPavementDefinition>())
         {
-            var v = new List<Violacao>();
-            if (StoredAxis(road.PathRef) is { } axis) v.AddRange(GeometricCheck.Axis(AlignmentElements.FromAxis(axis), c));
-            if (road.Output.Grade is { } grade && grade.SortedPoints().Count >= 2) v.AddRange(GeometricCheck.Vertical(AlignmentElements.Vertical(grade), c));
+            var v = Tracado(road, c);
             if (v.Count == 0) continue;
-            v = v.Select(x => x with { Estacas = road.Estaqueamento }).ToList();
             var lista = string.Join("; ", v.Take(4).Select(x => x.Texto)) + (v.Count > 4 ? $"; … e mais {v.Count - 4}" : "");
             res.Add(new("V12", Severidade.Aviso, Confianca.Media, true,
                 $"{road.DisplayCode}: {v.Count} elemento(s) fora dos limites informados ({c.FonteTexto}): {lista}.", new[] { road.Id }));

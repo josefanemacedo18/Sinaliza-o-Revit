@@ -252,7 +252,7 @@ public class Etapa09InterfaceTests
         foreach (var f in Directory.GetFiles(Revit("UI"), "*.xaml").Where(f => Path.GetFileName(f) != "Styles.xaml"))
         {
             var t = File.ReadAllText(f);
-            faltas.AddRange(Regex.Matches(t, @"""#[0-9A-Fa-f]{6,8}""").Select(m => $"{Path.GetFileName(f)}: {m.Value}"));
+            faltas.AddRange(Regex.Matches(t, @"""#[0-9A-Fa-f]{3,8}""").Select(m => $"{Path.GetFileName(f)}: {m.Value}"));
             faltas.AddRange(Regex.Matches(t, @"(Foreground|Background|BorderBrush)=""(White|Black|Gray|Red|Green|Blue|DarkRed|SaddleBrown)""").Select(m => $"{Path.GetFileName(f)}: {m.Value}"));
         }
         // Código das janelas: as cores de interface vêm de UiTokens. Os desenhos (mapa, pré-visualização, miniaturas, ícones)
@@ -263,7 +263,7 @@ public class Etapa09InterfaceTests
         {
             var t = File.ReadAllText(f);
             faltas.AddRange(cromaticas.Where(t.Contains).Select(c => $"{Path.GetFileName(f)}: FromRgb({c})"));
-            faltas.AddRange(Regex.Matches(t, @"""#[0-9A-Fa-f]{6}""").Select(m => $"{Path.GetFileName(f)}: {m.Value}"));
+            faltas.AddRange(Regex.Matches(t, @"""#[0-9A-Fa-f]{3,8}""").Select(m => $"{Path.GetFileName(f)}: {m.Value}"));
             faltas.AddRange(Regex.Matches(t, @"Brushes\.(Gray|DarkRed|SaddleBrown|DimGray)\b").Select(m => $"{Path.GetFileName(f)}: {m.Value}"));
         }
         Assert.True(faltas.Count == 0, "cor fora dos tokens: " + string.Join(", ", faltas));

@@ -287,6 +287,13 @@ public sealed class CmdEditar : CommandBase
         }
         var w = new RoadWindow(false);
         w.LoadForEdit(setup);
+        // Perfil, pavimentação, terraplenagem, drenagem, validação e o que a edição pode afetar (Etapa 11).
+        try
+        {
+            w.SetContext(Core.Automation.FormularioVia.Contexto(pav, MarkingStorage.Definitions(doc), EarthworkRecordStore.Load(doc),
+                PluginContext.Settings.CriteriosGeometricos, TerrainModel.Hosts(doc).Count > 0));
+        }
+        catch (Exception ex) { Log.Error("Editar via – contexto da janela", ex); }
         if (UiHelpers.ShowModal(w) != true || w.Setup == null || w.OutputSettings == null) return Result.Cancelled;
         PluginContext.SaveSettings();
         EnsureDetailView(uidoc, w.OutputSettings, keepExistingView: true);

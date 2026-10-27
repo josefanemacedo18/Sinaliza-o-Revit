@@ -23,6 +23,12 @@ public class CmdSinalizarVia : CommandBase
     {
         var doc = uidoc.Document;
         var w = new RoadWindow(DrawByDefault || PluginContext.Settings.LastDrawRoad);
+        try
+        {
+            w.SetContext(Core.Automation.FormularioVia.Contexto(null, Array.Empty<Core.Definitions.MarkingDefinition>(), null,
+                PluginContext.Settings.CriteriosGeometricos, TerrainModel.Hosts(doc).Count > 0));
+        }
+        catch (Exception ex) { Log.Error("Via – contexto da janela", ex); }
         if (UiHelpers.ShowModal(w) != true || w.Setup == null || w.OutputSettings == null) return Result.Cancelled;
         PluginContext.Settings.LastDrawRoad = w.DrawPath;
         PluginContext.SaveSettings();

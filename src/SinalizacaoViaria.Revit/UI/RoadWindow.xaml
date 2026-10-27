@@ -11,7 +11,7 @@
     </Window.Style>
     <Grid Margin="12">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="470"/>
+            <ColumnDefinition Width="520"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
@@ -19,11 +19,12 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
-            <StackPanel>
-                <TextBlock Text="Seção transversal" Style="{StaticResource Title}"/>
+        <TabControl x:Name="Tabs" Margin="0,0,12,0">
+            <TabItem Header="Identificação">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,8,0">
+                <TextBlock Text="Identificação da via" Style="{StaticResource Title}"/>
                 <TextBlock Style="{StaticResource Hint}" Text="Desenhe (ou selecione) o EIXO da via. Monte cada lado do eixo para fora: faixas, ciclofaixa, estacionamento, canteiros, calçada... O lado direito é o da direita de quem percorre o eixo no sentido em que foi desenhado. A pista e as conexões são criadas como na ferramenta Pista; calçadas, meios-fios e sarjetas entram em seguida junto ao bordo."/>
-
                 <GroupBox Header="Modelo (prontos e personalizados ★)">
                     <StackPanel>
                         <DockPanel>
@@ -36,19 +37,40 @@
                         </StackPanel>
                     </StackPanel>
                 </GroupBox>
-
                 <GroupBox Header="Hierarquia viária (CTB art. 60) – obrigatória">
                     <StackPanel>
                         <ComboBox x:Name="CbHierarchy" SelectionChanged="HierarchyChanged"/>
                         <TextBlock Style="{StaticResource Hint}" Text="Gravada em todos os elementos da via (parâmetro SV_Hierarquia) e usada nos quantitativos, na escolha da via preferencial das interseções e na velocidade padrão (CTB art. 61)."/>
                     </StackPanel>
                 </GroupBox>
-
+                <GroupBox Header="Sentido de circulação">
                 <StackPanel Orientation="Horizontal">
                     <RadioButton x:Name="RbTwoWay" Content="Mão dupla" IsChecked="True" Checked="AnyChanged"/>
                     <RadioButton x:Name="RbOneWay" Content="Mão única (todas as faixas no sentido do eixo)" Checked="AnyChanged"/>
                 </StackPanel>
-
+                </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Geometria">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,8,0">
+                <TextBlock Text="Geometria horizontal" Style="{StaticResource SectionTitle}" Margin="0,0,0,4"/>
+                <GroupBox Header="Caminho (eixo)">
+                    <StackPanel>
+                        <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar a via por pontos (conecta-se às vias existentes)" IsChecked="True"/>
+                        <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas existentes"/>
+                        <RadioButton x:Name="RbFloors" GroupName="path" Content="Reconhecer em pisos existentes (eixo e largura do contorno do piso)"
+                                     ToolTip="Para pistas modeladas com Piso comum (projetos antigos, formas complexas): selecione os pisos e o plugin acha os eixos, as larguras e os encontros. Use o pavimento &quot;Nenhum (pista já modelada)&quot; para não duplicar o piso."/>
+                        <CheckBox x:Name="CkSnap" Content="Encaixar nas pontas e nos eixos das vias existentes" IsChecked="True" Margin="18,3,0,3"
+                                  ToolTip="Clique sobre uma via para ligar a nova via ao eixo dela (entroncamento/cruzamento) ou perto da ponta para continuá-la."/>
+                        <Grid Margin="18,0,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Raio das curvas do eixo (m, mín. = meia largura + 1,5)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Grid.Column="1" x:Name="TbCurveRadius" Text="30" ToolTip="Raio das curvas do eixo: concorda os vértices clicados e arredonda os cantos vivos das linhas selecionadas (nunca menor que a meia largura + 1,5 m, para a borda interna também fazer curva)."/>
+                        </Grid>
+                    </StackPanel>
+                </GroupBox>
                 <GroupBox x:Name="GbCenter" Header="Eixo / canteiro central">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
@@ -70,7 +92,6 @@
                         </Grid>
                     </Grid>
                 </GroupBox>
-
                 <GroupBox Header="Lado direito (do eixo para fora)">
                     <StackPanel>
                         <DataGrid x:Name="GridRight" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
@@ -90,7 +111,6 @@
                         </StackPanel>
                     </StackPanel>
                 </GroupBox>
-
                 <GroupBox Header="Lado esquerdo (do eixo para fora)">
                     <StackPanel>
                         <DataGrid x:Name="GridLeft" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
@@ -110,7 +130,6 @@
                         </StackPanel>
                     </StackPanel>
                 </GroupBox>
-
                 <GroupBox x:Name="GbDetails" Header="Elemento selecionado">
                     <StackPanel>
                         <TextBlock x:Name="TxtSelected" Style="{StaticResource Hint}" Text="Selecione um elemento em uma das listas."/>
@@ -196,44 +215,6 @@
                         </Grid>
                     </StackPanel>
                 </GroupBox>
-
-                <GroupBox Header="Linhas e opções">
-                    <Grid>
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <TextBlock Text="Velocidade regulamentada (km/h)" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Column="1" x:Name="TbSpeed" Text="60" TextChanged="AnyChanged"/>
-                        <TextBlock Grid.Row="1" Text="Entre faixas de mesmo sentido" Style="{StaticResource FieldLabel}"/>
-                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbDivider" SelectionChanged="AnyChanged"/>
-                        <CheckBox Grid.Row="2" x:Name="CkEdges" Content="Linhas de bordo" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
-                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CbEdge" SelectionChanged="AnyChanged"/>
-                        <TextBlock Grid.Row="3" Text="Afastamento do bordo (m)" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbEdgeInset" Text="0,10" TextChanged="AnyChanged"/>
-                        <TextBlock Grid.Row="4" Text="Recuo início / fim (m)" Style="{StaticResource FieldLabel}"/>
-                        <Grid Grid.Row="4" Grid.Column="1">
-                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="6"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                            <TextBox x:Name="TbStart" Text="0" TextChanged="AnyChanged"/>
-                            <TextBox Grid.Column="2" x:Name="TbEnd" Text="0" TextChanged="AnyChanged"/>
-                        </Grid>
-                        <CheckBox Grid.Row="5" x:Name="CkStuds" Content="Tachas no eixo" Checked="AnyChanged" Unchecked="AnyChanged"/>
-                        <ComboBox Grid.Row="5" Grid.Column="1" x:Name="CbStuds" SelectionChanged="AnyChanged"/>
-                        <CheckBox Grid.Row="6" Grid.ColumnSpan="2" x:Name="CkInscriptions" Content="Legendas e símbolos repetidos (ÔNIBUS, bicicletas, setas)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
-                        <CheckBox Grid.Row="7" Grid.ColumnSpan="2" x:Name="CkPhysical" Content="Gerar calçadas, meios-fios e canteiros físicos (3D)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
-                        <CheckBox Grid.Row="8" Grid.ColumnSpan="2" x:Name="CkGutterAdds" Content="Somar a sarjeta à largura da pista (as faixas mantêm a largura útil)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
-                                  ToolTip="Marcado: pista entre meios-fios = faixas + sarjetas (ex.: 3,50 + 0,30 = 3,80 m até a face da guia). Desmarcado: a sarjeta ocupa a borda da última faixa (vias criadas antes desta versão)."/>
-                        <CheckBox Grid.Row="9" Grid.ColumnSpan="2" x:Name="CkTactile" Content="Piso tátil nas calçadas (faixa direcional ligada às rampas)" Checked="AnyChanged" Unchecked="AnyChanged"
-                                  ToolTip="Faixa direcional no meio da faixa livre de cada calçada, ligada a cada rampa por um ramal perpendicular, com alerta no topo da rampa e nas junções (NBR 16537). Acompanha a via quando ela é editada."/>
-                        <CheckBox Grid.Row="10" Grid.ColumnSpan="2" x:Name="CkArrows" Content="Mão única: setas de sentido no meio de cada faixa" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
-                                  ToolTip="Seta &quot;siga em frente&quot; (PEM-F) repetida a cada 50 m (espaçamento [a confirmar] no MBST Vol. IV) em cada faixa de rolamento, no sentido do eixo. Precisa das legendas e símbolos ligados."/>
-                        <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Text="Sinalização vertical automática (refeita ao editar a via; o que for editado à mão fica):" Style="{StaticResource FieldLabel}"/>
-                        <CheckBox Grid.Row="12" Grid.ColumnSpan="2" x:Name="CkAutoSpeed" Content="R-19 – velocidade máxima da via no início de cada sentido" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
-                                  ToolTip="Legenda = velocidade regulamentada (pela hierarquia – CTB art. 61). A 20 m do início de cada sentido, na calçada à direita de quem trafega (posição [a confirmar] no MBST Vol. I)."/>
-                        <CheckBox Grid.Row="13" Grid.ColumnSpan="2" x:Name="CkAutoOneWay" Content="R-24a – sentido de circulação (vias de mão única)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
-                        <CheckBox Grid.Row="14" Grid.ColumnSpan="2" x:Name="CkAutoCrossing" Content="A-32b – passagem sinalizada de pedestres nas travessias da via (antecipada e na travessia)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
-                                  ToolTip="Nas travessias no meio da quadra (extensões de calçada e canteiro). R-1/R-2, retenção e legenda das aproximações controladas vêm da interseção."/>
-                    </Grid>
-                </GroupBox>
-
                 <GroupBox Header="Largura variável ao longo do eixo (levantamento)">
                     <StackPanel>
                         <TextBlock Style="{StaticResource Hint}" Text="Medidas do levantamento em cada estaca: distância do EIXO ao bordo da pista (face do meio-fio/sarjeta) e ao alinhamento (muro, divisa do lote). Vazio = medida da seção. Entre as estacas a largura varia gradualmente; antes do primeiro e depois do último ponto fica constante. Estaca em metros (110) ou em estacas de 20 m (5+10)."/>
@@ -270,7 +251,6 @@
                         <TextBlock x:Name="TxtNominal" Style="{StaticResource Hint}"/>
                     </StackPanel>
                 </GroupBox>
-
                 <GroupBox Header="Recuos do meio-fio: baias de ônibus, faixas de aceleração/desaceleração">
                     <StackPanel>
                         <DataGrid x:Name="GridRecess" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
@@ -295,18 +275,6 @@
                         <TextBlock Style="{StaticResource Hint}" Text="Estaca = início da transição de entrada; comprimento = trecho com a profundidade total. Os valores iniciais seguem a velocidade da via (DNIT/AASHTO, indicativos). Baia: MVE amarela, ÔNIBUS, LCO na boca, placa e abrigo. Faixas auxiliares: LCO e setas. Calçada recua = o alinhamento fica e a calçada estreita."/>
                     </StackPanel>
                 </GroupBox>
-
-                <GroupBox Header="Pavimento">
-                    <Grid>
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <TextBlock Text="Pavimento da pista" Style="{StaticResource FieldLabel}"/>
-                        <ComboBox Grid.Column="1" x:Name="CbPavement" SelectionChanged="AnyChanged"/>
-                        <TextBlock Grid.Row="1" Text="Espessura (m, vazio = padrão)" Style="{StaticResource FieldLabel}"/>
-                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbPavThickness" TextChanged="AnyChanged" ToolTip="Padrão: asfalto 0,05 m; bloquete 0,08 m; concreto 0,15 m (indicativo – confira o dimensionamento)."/>
-                    </Grid>
-                </GroupBox>
-
                 <GroupBox Header="Conexão com as vias existentes">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
@@ -321,7 +289,14 @@
                         <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="CkIntRamps" Content="Rebaixamentos de calçada nas travessias (NBR 9050)" IsChecked="False"/>
                     </Grid>
                 </GroupBox>
-
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Perfil">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,8,0">
+                <TextBlock Text="Perfil longitudinal" Style="{StaticResource SectionTitle}" Margin="0,0,0,4"/>
+                <StackPanel x:Name="PanelPerfil" Margin="0,0,0,6"/>
                 <GroupBox Header="Relevo sobre o terreno nativo (Massa e terreno → Toposolid)">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
@@ -334,29 +309,114 @@
                         <TextBox Grid.Row="2" Grid.Column="1" x:Name="TbCutSlope" Text="1"/>
                         <TextBlock Grid.Row="3" Text="Talude de aterro (H : 1 V)" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbFillSlope" Text="1,5"/>
-                        <TextBlock Grid.Row="4" Grid.ColumnSpan="2" TextWrapping="Wrap" Foreground="#666" Margin="0,4,0,0"
+                        <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Style="{StaticResource Hint}" Margin="0,4,0,0"
                                    Text="Com Toposolid sob a via, o terreno é cortado e aterrado automaticamente (taludes, degraus nos muros). Sem Toposolid a via fica plana. Depois, Perfil da Via ajusta o greide e cria viadutos/túneis onde o relevo pede."/>
                     </Grid>
                 </GroupBox>
-
-                <GroupBox Header="Caminho (eixo)">
-                    <StackPanel>
-                        <RadioButton x:Name="RbDraw" GroupName="path" Content="Desenhar a via por pontos (conecta-se às vias existentes)" IsChecked="True"/>
-                        <RadioButton x:Name="RbCurves" GroupName="path" Content="Selecionar linhas existentes"/>
-                        <RadioButton x:Name="RbFloors" GroupName="path" Content="Reconhecer em pisos existentes (eixo e largura do contorno do piso)"
-                                     ToolTip="Para pistas modeladas com Piso comum (projetos antigos, formas complexas): selecione os pisos e o plugin acha os eixos, as larguras e os encontros. Use o pavimento &quot;Nenhum (pista já modelada)&quot; para não duplicar o piso."/>
-                        <CheckBox x:Name="CkSnap" Content="Encaixar nas pontas e nos eixos das vias existentes" IsChecked="True" Margin="18,3,0,3"
-                                  ToolTip="Clique sobre uma via para ligar a nova via ao eixo dela (entroncamento/cruzamento) ou perto da ponta para continuá-la."/>
-                        <Grid Margin="18,0,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                            <TextBlock Text="Raio das curvas do eixo (m, mín. = meia largura + 1,5)" Style="{StaticResource FieldLabel}"/>
-                            <TextBox Grid.Column="1" x:Name="TbCurveRadius" Text="30" ToolTip="Raio das curvas do eixo: concorda os vértices clicados e arredonda os cantos vivos das linhas selecionadas (nunca menor que a meia largura + 1,5 m, para a borda interna também fazer curva)."/>
-                        </Grid>
                     </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Seção">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,8,0">
+                <TextBlock Text="Seção transversal e sinalização" Style="{StaticResource SectionTitle}" Margin="0,0,0,4"/>
+                <TextBlock Style="{StaticResource Hint}" Text="O esquema da seção (à direita) mostra pista, faixas, canteiros, calçadas e a sinalização com as medidas usadas no cálculo – atualizado a cada mudança."/>
+                <GroupBox Header="Linhas e opções">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Velocidade regulamentada (km/h)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Column="1" x:Name="TbSpeed" Text="60" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="1" Text="Entre faixas de mesmo sentido" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CbDivider" SelectionChanged="AnyChanged"/>
+                        <CheckBox Grid.Row="2" x:Name="CkEdges" Content="Linhas de bordo" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CbEdge" SelectionChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="3" Text="Afastamento do bordo (m)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="3" Grid.Column="1" x:Name="TbEdgeInset" Text="0,10" TextChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="4" Text="Recuo início / fim (m)" Style="{StaticResource FieldLabel}"/>
+                        <Grid Grid.Row="4" Grid.Column="1">
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="6"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <TextBox x:Name="TbStart" Text="0" TextChanged="AnyChanged"/>
+                            <TextBox Grid.Column="2" x:Name="TbEnd" Text="0" TextChanged="AnyChanged"/>
+                        </Grid>
+                        <CheckBox Grid.Row="5" x:Name="CkStuds" Content="Tachas no eixo" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <ComboBox Grid.Row="5" Grid.Column="1" x:Name="CbStuds" SelectionChanged="AnyChanged"/>
+                        <CheckBox Grid.Row="6" Grid.ColumnSpan="2" x:Name="CkInscriptions" Content="Legendas e símbolos repetidos (ÔNIBUS, bicicletas, setas)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="7" Grid.ColumnSpan="2" x:Name="CkPhysical" Content="Gerar calçadas, meios-fios e canteiros físicos (3D)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="8" Grid.ColumnSpan="2" x:Name="CkGutterAdds" Content="Somar a sarjeta à largura da pista (as faixas mantêm a largura útil)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
+                                  ToolTip="Marcado: pista entre meios-fios = faixas + sarjetas (ex.: 3,50 + 0,30 = 3,80 m até a face da guia). Desmarcado: a sarjeta ocupa a borda da última faixa (vias criadas antes desta versão)."/>
+                        <CheckBox Grid.Row="9" Grid.ColumnSpan="2" x:Name="CkTactile" Content="Piso tátil nas calçadas (faixa direcional ligada às rampas)" Checked="AnyChanged" Unchecked="AnyChanged"
+                                  ToolTip="Faixa direcional no meio da faixa livre de cada calçada, ligada a cada rampa por um ramal perpendicular, com alerta no topo da rampa e nas junções (NBR 16537). Acompanha a via quando ela é editada."/>
+                        <CheckBox Grid.Row="10" Grid.ColumnSpan="2" x:Name="CkArrows" Content="Mão única: setas de sentido no meio de cada faixa" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
+                                  ToolTip="Seta &quot;siga em frente&quot; (PEM-F) repetida a cada 50 m (espaçamento [a confirmar] no MBST Vol. IV) em cada faixa de rolamento, no sentido do eixo. Precisa das legendas e símbolos ligados."/>
+                        <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Text="Sinalização vertical automática (refeita ao editar a via; o que for editado à mão fica):" Style="{StaticResource FieldLabel}"/>
+                        <CheckBox Grid.Row="12" Grid.ColumnSpan="2" x:Name="CkAutoSpeed" Content="R-19 – velocidade máxima da via no início de cada sentido" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
+                                  ToolTip="Legenda = velocidade regulamentada (pela hierarquia – CTB art. 61). A 20 m do início de cada sentido, na calçada à direita de quem trafega (posição [a confirmar] no MBST Vol. I)."/>
+                        <CheckBox Grid.Row="13" Grid.ColumnSpan="2" x:Name="CkAutoOneWay" Content="R-24a – sentido de circulação (vias de mão única)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"/>
+                        <CheckBox Grid.Row="14" Grid.ColumnSpan="2" x:Name="CkAutoCrossing" Content="A-32b – passagem sinalizada de pedestres nas travessias da via (antecipada e na travessia)" IsChecked="True" Checked="AnyChanged" Unchecked="AnyChanged"
+                                  ToolTip="Nas travessias no meio da quadra (extensões de calçada e canteiro). R-1/R-2, retenção e legenda das aproximações controladas vêm da interseção."/>
+                    </Grid>
                 </GroupBox>
                 <ui:OutputPanel x:Name="Output"/>
-            </StackPanel>
-        </ScrollViewer>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Pavimento">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,8,0">
+                <TextBlock Text="Pavimentação" Style="{StaticResource SectionTitle}" Margin="0,0,0,4"/>
+                <GroupBox Header="Pavimento">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="Pavimento da pista" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox Grid.Column="1" x:Name="CbPavement" SelectionChanged="AnyChanged"/>
+                        <TextBlock Grid.Row="1" Text="Espessura (m, vazio = padrão)" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" x:Name="TbPavThickness" TextChanged="AnyChanged" ToolTip="Padrão: asfalto 0,05 m; bloquete 0,08 m; concreto 0,15 m (indicativo – confira o dimensionamento)."/>
+                    </Grid>
+                </GroupBox>
+                <StackPanel x:Name="PanelPavimento" Margin="0,0,0,6"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Terraplenagem">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,8,0">
+                <TextBlock Text="Terraplenagem" Style="{StaticResource SectionTitle}" Margin="0,0,0,4"/>
+                <StackPanel x:Name="PanelTerraplenagem" Margin="0,0,0,6"/>
+                <TextBlock Style="{StaticResource Hint}" Text="O greide e os taludes da via nova ficam na aba Perfil (relevo)."/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Drenagem">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,8,0">
+                <TextBlock Text="Drenagem" Style="{StaticResource SectionTitle}" Margin="0,0,0,4"/>
+                <StackPanel x:Name="PanelDrenagem" Margin="0,0,0,6"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Validação" x:Name="TabValidacao">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,8,0">
+                <TextBlock Text="Validação" Style="{StaticResource SectionTitle}" Margin="0,0,0,4"/>
+                <TextBlock Text="Pré-visualização da seção" Style="{StaticResource Subtitle}"/>
+                <StackPanel x:Name="PanelValidacaoPrevia" Margin="0,0,0,6"/>
+                <TextBlock Text="Traçado e greide" Style="{StaticResource Subtitle}"/>
+                <StackPanel x:Name="PanelValidacao" Margin="0,0,0,6"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Resumo" x:Name="TabResumo">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,8,8,0">
+                <TextBlock Text="Resumo da operação" Style="{StaticResource SectionTitle}" Margin="0,0,0,4"/>
+                <StackPanel x:Name="PanelResumoPrevia" Margin="0,0,0,6"/>
+                <StackPanel x:Name="PanelResumo" Margin="0,0,0,6"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
 
         <DockPanel Grid.Column="1">
             <TextBlock DockPanel.Dock="Top" Text="Pré-visualização (trecho reto de 50 m – eixo em magenta)" Style="{StaticResource Title}"/>
@@ -370,6 +430,9 @@
         </DockPanel>
 
         <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <TextBlock Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="0,0,12,0" Text="A pré-visualização acompanha cada mudança."/>
+            <Button Content="Validar" Click="ValidateClick" ToolTip="Atualiza a pré-visualização e mostra a aba Validação: avisos da seção e conferência do traçado e do greide."/>
+            <Button Content="Resumo" Click="SummaryClick" ToolTip="Mostra o que será criado ou atualizado e o que a operação pode afetar."/>
             <Button x:Name="BtnOk" Content="Criar" Style="{StaticResource Primary}" Click="OkClick"/>
             <Button Content="Cancelar" IsCancel="True"/>
         </StackPanel>
