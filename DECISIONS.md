@@ -371,3 +371,24 @@ como substituída.
 - **Consequências:** o estado vale também para mudanças que não passam pelo plugin (por exemplo, outra captação colocada
   acima). Cobre a terraplenagem e as captações; outros resultados derivados entram quando guardarem o que os gerou.
 
+## D-027 – Faixa de opções por tema em duas guias; o comando e o botão com a mesma regra de disponibilidade
+- **Contexto:** o Prompt de Interface (§7) pede a faixa organizada pelo fluxo de trabalho, nos painéis Projeto, Terreno,
+  Sistema Viário, Interseções, Terraplenagem, Pavimentação, Drenagem, Urbanismo, Análise, Documentação e Sistema, sem
+  perder nem duplicar comandos, com dicas curtas e estados coerentes. A faixa da 2.14 era por tipo de elemento, em duas
+  guias (SinalizaBIM e SinalizaBIM Infra). O usuário pediu a reorganização completa (2026-10-26: "mude assim como foi
+  pedido").
+- **Decisão:**
+  - a guia *SinalizaBIM* tem exatamente os 11 painéis do §7, nessa ordem;
+  - a sinalização – horizontal, vertical e segurança viária, 23 botões – fica numa guia própria, *SinalizaBIM
+    Sinalização*: o §7 não tem painel para ela, e dentro de um painel temático ela esconderia os demais;
+  - cada comando aparece uma vez e com o nome de antes; ferramentas afins num botão com seta; ícone próprio por botão;
+  - dica curta (até 120 caracteres) e o texto completo na descrição longa;
+  - o atributo `NoDocumentRequired` diz se o comando roda sem projeto, e o mesmo atributo escolhe a disponibilidade do
+    botão: habilitado só com um projeto .rvt ativo, salvo Configurações, Catálogo e Normas / Sobre.
+- **Alternativas descartadas:**
+  - manter a faixa por tipo de elemento e mudar só o visual: o usuário recusou;
+  - pôr a sinalização dentro de Sistema Viário: sete grupos a mais num painel que já tem sete;
+  - disponibilidade escrita à parte para cada botão: duas fontes para a mesma regra divergiriam.
+- **Consequências:** quem usava a 2.14 encontra cada ferramenta pelo mapa antigo → novo do MANUAL. A guia principal tem
+  36 colunas: em tela estreita o Revit recolhe os painéis em botões com seta (K23). A cobertura, a ordem dos painéis, os
+  ícones e as dicas são conferidos em teste (`Etapa09InterfaceTests`).

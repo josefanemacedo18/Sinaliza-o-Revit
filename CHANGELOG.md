@@ -3,6 +3,71 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-27 – Etapa 9: design system e faixa de opções por tema (versão 2.15.0)
+
+Etapa 9 do plano unificado (Prompt de Interface §5, §7, §22–§24; Master §20). Entrega: `Releases/Etapa09` (não
+executada no Revit 2027).
+
+### Faixa de opções por tema (D-027)
+- **Guia SinalizaBIM** com os 11 painéis do fluxo pedidos no Prompt de Interface (§7): Projeto, Terreno, Sistema Viário,
+  Interseções, Terraplenagem, Pavimentação, Drenagem, Urbanismo, Análise, Documentação e Sistema.
+- **Guia SinalizaBIM Sinalização** com a sinalização horizontal, a vertical e a segurança viária. A lista do §7 não tem
+  painel para a sinalização, que soma 23 botões.
+- A guia *SinalizaBIM Infra* deixou de existir: os painéis dela foram para os temas.
+- Os 98 botões continuam, cada um uma vez e com o mesmo nome. O MANUAL tem o mapa antigo → novo.
+- **Diagnóstico do Terreno** (novo, painel Terreno), somente leitura:
+  - resumo da superfície projetada e do terreno original guardado;
+  - declividade máxima informada, com a fonte;
+  - o V14, o mesmo do Validar Modelo (`ModelValidator.Topografia`);
+  - pode selecionar as vias com eixo fora da superfície.
+- **Dicas curtas** (até 120 caracteres), com o texto completo na descrição longa, que o Revit mostra ao manter o cursor. A
+  dica do Validar Modelo, desatualizada, foi reescrita (V01–V17 e o estado dos resultados).
+- **Disponibilidade coerente:** o botão só fica habilitado com um projeto (.rvt) ativo, as mesmas condições que o comando
+  exige. Exceções: Configurações, Catálogo e Normas / Sobre. O atributo `NoDocumentRequired` é a única fonte da regra, para
+  o comando e para o botão.
+- **Ícones:** 10 desenhos novos, e cada botão tem o seu. Antes, 8 desenhos se repetiam em botões diferentes e Normas / Sobre
+  caía no ícone padrão. A Via Férrea ganhou trilhos e dormentes; a cruz de Santo André ficou para o Cruzamento
+  Rodoferroviário.
+
+### Design system (Interface §5, §22, §23)
+- **Tokens** num só lugar, com o mesmo nome e valor no XAML (`Styles.xaml`) e no código (`UiTokens`):
+  - superfícies, texto, primária, seleção e bordas;
+  - estados – sucesso, aviso e erro, cada um com o seu fundo – e desabilitado;
+  - tipografia (Segoe UI, cinco tamanhos) e espaçamento (escala de 4).
+
+  As chaves antigas continuam.
+- **Componentes:**
+  - texto: título de seção, subtítulo, legenda, valor (algarismos alinhados), valor grande, texto de validação, status
+    (ok, aviso, erro, informação, não verificado);
+  - contêineres: cartão e faixas de mensagem;
+  - controles: botões secundário e de perigo, tabelas (cabeçalho e linhas alternadas), barra de progresso, expansor e dicas
+    que quebram linha.
+- **Acessibilidade:**
+  - foco de teclado visível nos controles;
+  - contraste do texto de pelo menos 4,5 : 1, conferido em teste;
+  - o aviso passou a âmbar escuro #8F5D00 (antes #A8561F);
+  - a cor nunca é o único sinal: o texto diz o estado.
+- **Cores soltas** passaram aos tokens:
+  - Quantitativos: 29 linhas do XAML e as cores dos indicadores;
+  - Simulador de Tráfego: as cores da interface;
+  - resumo da janela da via e Autoteste.
+
+  Os desenhos (mapa, prévia, miniaturas, ícones) mantêm as cores de dados.
+
+### Mensagens
+- As mensagens que apontavam a guia *SinalizaBIM Infra* ou o painel *Loteamento* apontam os painéis novos. Isso inclui a
+  frase do memorial do loteamento sobre vias sem nome.
+
+### Testes
+- `Etapa09InterfaceTests` (14):
+  - faixa: cada comando uma vez (menos os três fora de propósito), painéis na ordem, ícone próprio e desenhado, dicas curtas
+    e disponibilidade;
+  - design system: tokens iguais no XAML e no código, contraste, componentes, foco e contêineres sem cor de texto própria;
+  - janelas: as chaves de estilo usadas estão definidas (antes, uma chave ausente só falharia ao abrir a janela no Revit) e
+    não há cores soltas;
+  - Diagnóstico do Terreno: o mesmo V14 do Validar Modelo, o resumo e o relatório;
+  - o manual cita todos os painéis e rótulos.
+
 ## 2026-10-26 – Etapa 8: integração associativa – estado dos resultados (versão 2.14.0)
 
 Etapa 8 do plano unificado (Fase X; Prompt Master §14; Motores §14–§15). Entrega: `Releases/Etapa08` (não executada no

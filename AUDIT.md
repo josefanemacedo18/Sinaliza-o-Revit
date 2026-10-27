@@ -383,8 +383,8 @@ pedem e a §8 não cobria: a interface (Etapa Zero do Prompt de Interface) e a c
 
 | Pedido (Interface §) | Situação | Etapa do plano |
 |---|---|---|
-| Design system central (tokens, componentes, estados) – §5, §22 | PARCIAL: paleta e estilos básicos; faltam estados (sucesso, erro, desatualizado, indisponível), cartões, tabelas, indicadores | 9 |
-| Faixa de opções por tarefa – §7 | PARCIAL: organizada por tipo de elemento, não por etapa de trabalho | 9 |
+| Design system central (tokens, componentes, estados) – §5, §22 | FEITO na 2.15 (Etapa 9): tokens iguais no `Styles.xaml` e no `UiTokens` (cores, estados com fundo, desabilitado, tipografia, espaçamento) e componentes (cartão, faixas, status, valores, botões, tabelas, foco); cores soltas das janelas passadas aos tokens; contraste conferido em teste. Janelas NÃO VISTAS NO REVIT (K23) | 9 ✅ |
+| Faixa de opções por tarefa – §7 | FEITO na 2.15 (Etapa 9, D-027): guia SinalizaBIM com os 11 painéis do §7 e guia SinalizaBIM Sinalização; os 98 botões, cada um uma vez, mais o Diagnóstico do Terreno; dicas curtas, ícone próprio e disponibilidade coerente. NÃO VISTA NO REVIT (K23) | 9 ✅ |
 | Central do Projeto – §8 | AUSENTE | 10 |
 | Painel contextual – §9 | AUSENTE (nenhum `DockablePane`) | 10 |
 | Formulário de vias em seções com Pré-visualizar / Validar / Aplicar – §10 | PARCIAL: `RoadWindow` com prévia; sem seções de terraplenagem e drenagem nem resumo do impacto | 11 |

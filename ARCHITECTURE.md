@@ -8,7 +8,7 @@ cada módulo estão em [AUDIT.md](AUDIT.md); as decisões e seus motivos, em [DE
 ```
 ┌──────────────────────── SinalizaBIM.dll (net10.0-windows, WPF) – carregada pelo Revit 2027 ────────────────────────┐
 │  SinalizacaoViaria.Revit                                                                                           │
-│   App / RibbonBuilder ─ Commands (IExternalCommand, 93 Cmd*) ─ UI (janelas WPF com prévia do Core)                 │
+│   App / RibbonBuilder ─ Commands (IExternalCommand, 102 Cmd*) ─ UI (janelas WPF com prévia do Core)                │
 │   Infrastructure: MarkingService (render) · MarkingStorage (Extensible Storage) · PathResolver · SurfaceSampler    │
 │                   StyleService · SharedParameters · TerrainService · LotService · IntersectionService · Log …      │
 │                   DrainageDesignStore (Projeto de Drenagem nas Informações do projeto) · TrafficScenarioStore      │
@@ -23,7 +23,7 @@ cada módulo estão em [AUDIT.md](AUDIT.md); as decisões e seus motivos, em [DE
 │   Parcelamento LotDivider · DivisaoPorLinhas · LotDrawing · LotReport · LotMemorial · Masterplan                   │
 │   Traffic      TrafficNetwork · TrafficAnalysis · TrafficSimulation · cenários · soluções · diagnóstico            │
 │   Quantities (por marca e por componente) / Reports (DocxWriter, Memorial, DrainageMemorial) / Geo / Catalog       │
-│   Model        ModelGraph (dependências) · ModelValidator (V01–V13, severidade e confiança)                        │
+│   Model        ModelGraph (dependências) · ModelValidator (V01–V17, severidade e confiança)                        │
 └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -95,6 +95,15 @@ dois pisos sai igual nos dois (ajustada uma vez); entre marcas diferentes valem 
 - **Falhas:** `TerrainFailures` reverte quando há erro e registra no log os avisos que suprime.
 - **Elementos:** sempre relidos por `UniqueId`, com `doc.GetElement(...) is {}` antes de usar. Elementos ausentes caem no
   cache do traçado (`PathReference.Cache`).
+- **Faixa de opções** (desde a 2.15, D-027): `RibbonBuilder` monta a guia *SinalizaBIM* com os 11 painéis do fluxo e a guia
+  *SinalizaBIM Sinalização*; cada comando aparece uma vez (99 dos 102 `Cmd*`: o Autoteste abre por Configurações e
+  `CmdAreaConflito`/`CmdNovaVia` são K4), com ícone próprio (`IconFactory`), dica curta e descrição longa. A disponibilidade
+  do botão (`ProjectDocumentAvailability` ou `AlwaysAvailable`) e a exigência de documento no `CommandBase` vêm do mesmo
+  atributo, `NoDocumentRequired`.
+- **Design system** (desde a 2.15): cores, tamanhos de texto e espaçamentos em `UI/Styles.xaml` (para o XAML) e
+  `UI/UiTokens.cs` (para o código), com as mesmas chaves e valores; componentes (cartão, faixas de mensagem, status, valores,
+  botões, tabelas, foco) no `Styles.xaml`. Os desenhos – mapa do tráfego, prévia, miniaturas, ícones – têm paleta de dados
+  própria. `Etapa09InterfaceTests` confere a faixa, os tokens, o contraste e as chaves de estilo usadas pelas janelas.
 
 ## 6. Testes
 

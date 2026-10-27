@@ -209,6 +209,14 @@ public class Etapa09InterfaceTests
         Assert.Contains("<Setter Property=\"FocusVisualStyle\" Value=\"{StaticResource FocusVisual}\"/>", xaml);
         Assert.Contains("<Trigger Property=\"IsKeyboardFocused\" Value=\"True\">", xaml);
         Assert.Contains("Typography.NumeralAlignment", xaml);
+        // Contêineres sem cor de texto própria: o conteúdo herda a do texto (um expansor com cor pintaria as linhas da tabela
+        // agrupada dos Quantitativos).
+        foreach (var t in new[] { "Expander", "GroupBox", "TabItem", "DataGrid", "ListBox" })
+        {
+            var m = Regex.Match(xaml, $@"<Style TargetType=""{t}"">(.*?)</Style>", RegexOptions.Singleline);
+            Assert.True(m.Success, t);
+            Assert.DoesNotContain("\"Foreground\"", m.Groups[1].Value);
+        }
     }
 
     [Fact]

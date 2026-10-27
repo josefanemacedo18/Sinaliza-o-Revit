@@ -269,9 +269,9 @@
         <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
         <Setter Property="Height" Value="8"/>
     </Style>
+    <!-- Sem cor própria: o conteúdo do expansor herda a cor do texto (linhas das tabelas agrupadas, listas). -->
     <Style TargetType="Expander">
         <Setter Property="Margin" Value="0,4"/>
-        <Setter Property="Foreground" Value="{StaticResource AccentDark}"/>
     </Style>
     <Style TargetType="TabItem">
         <Setter Property="Padding" Value="10,4"/>
