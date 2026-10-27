@@ -197,6 +197,26 @@ centros, mais próximo).
 
 ## 2. Sinalizar Via – seção transversal completa
 
+### 2.0 A janela da via em seções (desde a 2.17)
+
+A janela da via (Via, Sinalizar Via, Pista e Editar › a via inteira) tem nove abas, cada uma rolando nas duas direções:
+**Identificação**, **Geometria**, **Perfil**, **Seção**, **Pavimento**, **Terraplenagem**, **Drenagem**, **Validação** e
+**Resumo**. Os campos de antes estão nelas (seção, faixas, larguras medidas, recuos, pavimento, conexão, relevo). As abas
+Perfil, Pavimento, Terraplenagem e Drenagem dizem, com o nível escrito antes do texto:
+- **via existente:** o que ela tem – greide (PIVs, curva padrão, se molda o terreno), estaqueamento, estrutura do pavimento
+  (camadas e fonte, ou "não informada"), o estado na terraplenagem aplicada, as captações na sarjeta dela (em dia,
+  desatualizadas, editadas à mão, nunca lidas) e os trechos de rede ligados a elas;
+- **via nova:** o que acontece ao aplicar (o greide sai do relevo escolhido; com Toposolid, o terreno é cortado e aterrado;
+  a estrutura e as captações vêm depois de criar).
+
+**Validação** confere o traçado e o greide da via existente contra os limites geométricos informados (V12), com a fonte; sem
+limites, diz que não conferiu; na via nova, a conferência fica para o Validar Modelo, depois de aplicar. Ela traz também os
+avisos da seção na prévia. **Resumo** diz o que Aplicar faz: a via é refeita com a seção nova, as conexões ligadas
+acompanham, as marcas dependentes, a terraplenagem a refazer quando a via molda o terreno e as captações lidas dela que podem
+ficar desatualizadas – tudo numa operação desfazível. Os botões **Validar** e **Resumo**, antes de Aplicar, abrem essas
+abas. Editar a seção (ou pôr um recuo, ou editar um retorno) mantém a estrutura do pavimento e o estaqueamento da via –
+até a 2.16 eles se perdiam.
+
 1. Escolha um **modelo pronto** (via local, coletora, avenida com canteiro, corredor de ônibus,
    faixa preferencial, ciclofaixa segregada, canteiros laterais, rodovias, mão única) ou um **modelo
    personalizado ★** e clique *Aplicar* – ou monte a seção do zero. **Salvar como modelo…** guarda a seção
@@ -287,6 +307,10 @@ ponto B 10,50 m; um muro antigo avança sobre a calçada. No quadro **Largura va
 
 * **Estaca** em metros (`110`) ou em estacas de 20 m (`5+10` = 110 m). *Adicionar entre meios-fios* cria a linha já com a
   largura total pedida na estaca (ex.: 10,50 m), dividida pelos dois lados.
+* **Via com estaqueamento próprio** (Perfil da Via: estaca inicial, intervalo, equações): desde a 2.17 as estacas desta
+  tabela, dos recuos, dos níveis da calçada, da largura por trecho, dos retornos e das extensões de calçada são as da via
+  (ex.: `105+10,00`, ou o valor em metros da estaca, `2110`), e os avisos da seção citam a estaca dela. Estaca fora do
+  eixo ou na lacuna de uma equação não é aceita. No estaqueamento padrão nada muda.
 * Entre as estacas a largura varia **gradualmente** (linear ou em **curva S suave**); antes do primeiro e depois do
   último ponto fica constante.
 * **Quem absorve a variação na pista**: a faixa junto ao meio-fio (as outras mantêm a largura), todas as faixas
@@ -921,20 +945,29 @@ nova gravou.
 
 ### 9.3.1 Diagnóstico do Terreno (só a topografia)
 
-**Terreno → Diagnóstico do Terreno** (desde a 2.15) confere só o terreno, sem rodar o resto da validação, e também é
-**somente leitura**. A janela mostra:
-- a **superfície projetada** – o Toposolid como está agora (todos os principais juntos): triângulos, pontos distintos em
-  planta, área em planta (soma das faces), cotas mínima e máxima com o desnível e o retângulo em planta;
-- o **terreno original** – o natural, guardado no Toposolid na primeira Terraplenagem: em quantos Toposolids está guardado e
-  o mesmo resumo. Sem ele, a Terraplenagem ainda não foi aplicada e o terreno atual é tratado como o natural;
-- a **declividade máxima das faces** informada em Configurações › Limites geométricos, com a fonte – ou o aviso de que não
-  foi informada (então a declividade das faces não é conferida);
-- os achados do **V14**, os mesmos do Validar Modelo (dados insuficientes ou inválidos, cotas diferentes no mesmo ponto,
-  triângulos sem área, faces acima do limite, eixos de vias que moldam o terreno passando fora da superfície), com a ação
-  recomendada.
+**Terreno → Diagnóstico do Terreno** (desde a 2.15) confere só o terreno, sem rodar o resto da validação, e é **somente
+leitura**. Desde a 2.17 abre a janela **Terreno e topografia** (Prompt de Interface §14), com as abas:
+- **Origem dos dados**: cada Toposolid principal (pontos, área, cotas, se tem o terreno original guardado, se foi criado plano
+  pela Terraplenagem, a área terraplenada da última vez). Levantamento, pontos e curvas de nível são ferramentas do Revit
+  para o Toposolid: o plugin não importa pontos nem gera curvas de nível;
+- **Superfície existente (terreno natural)**: o original guardado na primeira Terraplenagem (em quantos Toposolids) e o
+  resumo dele; sem ele, o Toposolid atual é tratado como o natural;
+- **Superfície projetada**: o Toposolid como está agora e a **diferença para o natural por amostragem** (área alterada,
+  maior corte e maior aterro) – não é volume: os volumes estão nos Quantitativos;
+- **Limites de análise e parâmetros**: a área terraplenada (é ali que a próxima Terraplenagem troca os pontos), a declividade
+  máxima das faces com a fonte (ou "não informada: não conferida"), a terraplenagem aplicada (subleito e taludes) e as
+  tolerâncias do diagnóstico;
+- **Resultados e diagnóstico**: os achados do **V14**, os mesmos do Validar Modelo, com o nível e a ação; **Selecionar no
+  modelo** seleciona os elementos dos achados;
+- **Superfície de cada cálculo**: que superfície cada cálculo lê – natural (greide pelo relevo, Perfil da Via, obras,
+  Terraplenagem, quantitativos de terraplenagem, talvegues), projetada (V14, pisos × terreno do Autoteste) ou acabada (vias e,
+  fora delas, o Toposolid: o recobrimento da rede);
+- **Se o terreno mudar**: o que pode precisar de atualização – a terraplenagem (edições à mão no Toposolid dentro da área
+  terraplenada são refeitas a partir do original na próxima Terraplenagem; para adotar um novo levantamento, marque nela
+  *Novo levantamento*), os quantitativos, as vias e greides, as obras, a drenagem, os lotes e a validação, com o comando de
+  cada um.
 
-Com vias fora da superfície, **Selecionar os elementos das vias com eixo fora da superfície** os seleciona no modelo. Sem
-Toposolid no projeto, o comando avisa e não faz nada.
+O comando escolhido na janela abre depois que ela fecha. Sem Toposolid no projeto, o comando avisa e não faz nada.
 
 ---
 
@@ -1571,20 +1604,23 @@ por cima da pista existente.
 
 ### 18.1 Estrutura do pavimento
 
-**SinalizaBIM → Pavimentação → Estrutura do Pavimento.** Clique a via (pista, calçada ou linha dela) e informe:
+**SinalizaBIM → Pavimentação → Estrutura do Pavimento.** Clique a via (pista, calçada ou linha dela). Desde a 2.17 abre o
+**gerenciador da estrutura** (antes, um texto por linha):
 - a **espessura do revestimento** (o próprio piso da pista – muda a espessura do piso);
-- as **camadas sob o revestimento**, uma por linha, de cima para baixo, no formato
-  `nome; espessura em cm; material; função`, com material e função opcionais. Funções: base, sub-base, reforço do
-  subleito, regularização, outra. Exemplo:
+- a **tabela das camadas sob o revestimento**, de cima para baixo: Nº, nome, material, espessura (cm), função (base,
+  sub-base, reforço do subleito, regularização, outra), o **estado** de cada uma ("ok" ou o problema) e de onde vem o
+  material – **material do Revit no projeto** (o mesmo nome), **só no SinalizaBIM** ou **não informado**. Botões **+ Camada**,
+  **Remover**, **▲ Subir** e **▼ Descer**;
+- o **corte esquemático** das camadas, com a hachura de cada uma;
+- o **quantitativo previsto** (volume de cada camada) só com a área da pista desta via medida nas peças; sem a área, nada é
+  estimado;
+- os **modelos guardados**: *Usar modelo*, *Guardar como modelo…* e *Excluir modelo*. Ficam nas configurações do plugin,
+  deste usuário – o projeto guarda só a estrutura de cada via;
+- a **fonte** (projeto de pavimentação, dimensionamento) e, com a via moldando um terreno, *Refazer a terraplenagem com a nova
+  profundidade*.
 
-  ```
-  Base; 15; brita graduada simples; base
-  Sub-base; 20; solo-brita; sub-base
-  ```
-- a **fonte** (projeto de pavimentação, dimensionamento).
-
-O plugin **não dimensiona** pavimento: as espessuras e a fonte são as do seu projeto. Linha ilegível, função desconhecida,
-camada sem nome, espessura nula ou acima de 2 m impedem a gravação, e nada muda no modelo. Texto vazio = sem estrutura.
+O plugin **não dimensiona** pavimento: as espessuras e a fonte são as do seu projeto. Camada sem nome, espessura nula ou
+acima de 2 m impedem a gravação, e nada muda no modelo. Sem camadas = sem estrutura.
 
 Onde a estrutura é usada:
 - **Terraplenagem**: sob a pista o terreno fica no **fundo da estrutura** (revestimento + camadas). Interseções,
@@ -1598,6 +1634,17 @@ Onde a estrutura é usada:
   registro tem a via com a definição atual.
 
 ## 19. Interseções
+
+> **Seções do formulário (desde a 2.17).** Os formulários de interseção e de rotatória abrem com **Identificação e vias
+> conectadas** (cada via ligada com pista, calçadas, sentido e estrutura; a principal; os ramos; o menor ângulo entre as vias
+> diante do limite de conferência do plugin – 30°, sem norma citada; vias que não existem mais) e terminam com
+> **Pavimentação** (a caixa do nó vai até a estrutura da via ligada mais funda), **Terraplenagem** (se o nó molda o terreno
+> pelas vias e o estado na terraplenagem aplicada), **Drenagem** (captações e pontos baixos da sarjeta na área do nó – o nó
+> não cria dispositivos), **Verificação** e **Resumo** (o que Aplicar refaz). A Verificação separa a **geométrica** – os
+> limites que o gerador confere, com a origem, e os avisos do arranjo – da **operacional**: capacidade, nível de serviço,
+> filas e semáforos estão no **Simulador de Tráfego**, com a demanda estimada ou informada; **visibilidade** nas aproximações e
+> **trajetória de giro** dos veículos de projeto não são calculadas pelo plugin. As seções são refeitas a cada mudança dos
+> campos.
 
 > **Conexões automáticas são sempre simples**: esquinas com o raio da hierarquia, **PARE** (linha de
 > retenção, legenda e placa R-1) na via secundária e as **linhas da via principal contínuas** – só o bordo é
@@ -2337,12 +2384,27 @@ Guia **SinalizaBIM › Drenagem**: **Trecho de Rede**, **Projeto de Drenagem**, 
 3. **Trecho de Rede**: escolha o diâmetro, clique no dispositivo de **montante** e depois no de **jusante**; o de jusante
    vira o montante do próximo trecho (Esc termina). O tubo de concreto sai de parede a parede, no fundo das caixas; para
    outras cotas, Editar o trecho › *Informar as cotas de fundo*. Mover ou editar uma caixa redesenha os tubos ligados a ela.
-4. **Relatório da Rede**: planilha de dimensionamento das galerias (trecho, extensão, i, área, vazão, diâmetro, vazão
-   máxima, cotas de terreno e de galeria, declividade, profundidades, velocidade e o **diâmetro necessário**), a verificação
-   das captações (vazão na sarjeta, capacidade, lâmina, velocidade, engolimento e excesso) e os problemas (contrafluxo,
-   ligações, ciclos, recobrimento, diâmetros, espaçamento dos PVs, PV de queda, geratriz superior, capacidade e
-   velocidades), em CSV. *Aplicar os diâmetros calculados* troca o diâmetro dos trechos pelo menor diâmetro comercial que
-   escoa a vazão a seção plena e redesenha os tubos – rode o relatório de novo para conferir recobrimento e PVs.
+4. **Relatório da Rede**: desde a 2.17 abre a janela **Rede de drenagem**, que separa o que é conferido do que é calculado
+   (Prompt de Interface §16):
+   - **1. Consistência geométrica**: extensão, cotas de fundo, declividade e menor recobrimento de cada trecho (a tabela dos
+     trechos medidos) e o sentido do escoamento – conferido sempre;
+   - **2. Conectividade da rede**: trechos que não ligam duas caixas existentes, trecho do dispositivo para ele mesmo e
+     ciclos; os lançamentos, os dispositivos sem nenhum trecho, os de mais de uma saída e quantas redes separadas há;
+   - **3. Verificação de parâmetros**: os critérios do Projeto de Drenagem, com a fonte – cada critério não informado aparece
+     como não conferido;
+   - **4. Cálculo hidráulico**: só com a equação de chuva – a planilha das galerias (área, C, i, vazão, diâmetro, capacidade
+     a seção plena, velocidade, ocupação) e das captações; sem a equação, a parte diz que nada foi calculado. Os tubos são
+     verificados a seção plena: a lâmina nos tubos e o remanso não são calculados;
+   - **5. Dimensionamento**: o diâmetro de cada trecho no modelo ao lado do calculado (o menor da lista que escoa a vazão a
+     seção plena), dizendo se aumenta, reduz, se nenhum diâmetro da lista atende ou se o trecho não é dimensionável
+     (declividade nula ou contrária). *Aplicar os diâmetros calculados* pede confirmação dizendo quantos aumentam e quantos
+     reduzem, troca os diâmetros e redesenha os tubos numa operação – rode o relatório de novo para conferir recobrimento e PVs;
+   - **Drenagem × vias e terreno**: captações × greide, pontos baixos sem captação e talvegues sob aterro;
+   - **Perfil** (o perfil longitudinal de cada ramo, desenhado: tampas, fundo e geratriz superior) e **Dispositivos**.
+
+   Cada problema traz o elemento, o que está errado e o que fazer; **Selecionar no modelo** (ou duplo clique na linha) fecha
+   a janela, seleciona os elementos e aproxima a vista. A janela abre também o **Projeto de Drenagem** e o relatório em CSV,
+   que continua o mesmo de antes (trechos, problemas, planilha, perfil, dispositivos e captações × modelo).
    O **recobrimento** é medido sob a **superfície acabada**: sobre a pista de uma via do plugin, a cota dela; sobre a
    calçada, a sarjeta mais a altura do meio-fio; fora das vias, o Toposolid como está; sem nenhum dos dois, a reta entre as
    tampas (como até a 2.11). O CSV traz também o **perfil longitudinal da rede** (por ramo, de montante para jusante:
@@ -3138,7 +3200,15 @@ Guia **SinalizaBIM → Urbanismo**. Do limite da gleba aos lotes numerados, com 
 5. **Nomear Vias**, **Detalhar Lotes**, **Quadros do Loteamento**, **Memorial do Loteamento** e **Masterplan**.
 
 Num projeto que já tem loteamento, **Loteamento** oferece **reconhecer as quadras de novo** (as vias mudaram: refaz o contorno
-das quadras e mantém testadas, lotes personalizados e nomes; quadras novas recebem o próximo nome livre) ou abrir as categorias.
+das quadras e mantém testadas, lotes personalizados e nomes; quadras novas recebem o próximo nome livre), abrir as categorias
+ou, desde a 2.17, os **Resultados do parcelamento** (Prompt de Interface §13): uma aba para cada parte – área de intervenção e
+limites (gleba, quadras, área parcelada), quadras (tabela com a área por categoria), lotes (indicadores e a tabela de todas
+as parcelas), sistema viário associado, áreas públicas (quadro por categoria), parâmetros dimensionais (lote mínimo com a
+fonte, medidas, sobra e miolo de cada quadra), áreas residuais (remanescente, miolos, lotes feitos com a sobra) e
+verificação (lotes abaixo do lote mínimo informado e os mínimos informados, um a um). Os números são os do mesmo resumo dos
+quadros e do memorial. Conformidade legal ou urbanística não é afirmada: só os mínimos e o lote mínimo informados são
+conferidos, com a fonte que você escreveu. **Selecionar no modelo** seleciona a quadra ou o lote; a janela abre também os
+Quadros e o Memorial do Loteamento.
 Cada quadra gravada é reencontrada pela **maior área em comum** com a reconhecida (antes era pelo centro, que numa quadra grande
 podia cair dentro de outra e trocar os nomes). Uma quadra gravada que era a sobra da gleba em volta das vias (projetos de
 versões anteriores) é **removida** com aviso, e a sobra passa a ser a área remanescente.

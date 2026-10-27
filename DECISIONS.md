@@ -417,3 +417,28 @@ como substituída.
 - **Consequências:** a Central abre rápido e nunca mostra um valor que não saiba de onde veio; o painel não altera nada. O que
   não foi visto no Revit está em K24.
 
+## D-029 – Telas dos módulos: o conteúdo no núcleo, a janela só mostra; nada calculado que o motor não calcule
+- **Contexto:** o Prompt de Interface (§10–§16) pede telas por módulo – via em seções, interseções e rotatórias, quadras e
+  lotes, terreno, pavimentação e drenagem – que mostrem estado, origem e limites, separem verificação geométrica de cálculo
+  e de análise operacional, e não apresentem estimativa como resultado.
+- **Decisão:**
+  - cada tela tem um modelo de apresentação no núcleo (`FormularioVia`, `GerenciadorPavimento`, `RedeDrenagemTela`,
+    `TerrenoTela`, `FormularioNo`, `ResultadosParcelamento`), feito só com o que os motores já calculam, cada linha com o
+    nível escrito; a janela WPF só mostra e devolve a escolha ao comando;
+  - a drenagem é separada pelo critério que o núcleo emite (um teste garante que todo critério tem parte e correção); sem
+    equação de chuva, cálculo e dimensionamento aparecem como não feitos;
+  - a tabela "superfície de cada cálculo" do terreno é conferida contra o código;
+  - telas somente leitura que abrem outro comando: depois de fechar, dentro do comando (quando ele é `Manual`) ou pelo
+    `ExternalEvent` do painel (`RunLater`) quando o comando da tela é `ReadOnly`;
+  - as seções dos formulários de nó são refeitas a cada mudança dos campos (`FormWindow.Status`), com o último resultado
+    guardado enquanto os campos não mudam;
+  - estaca mostrada e lida pela estaca da via (`EstacasDaVia`), guardada sempre como distância ao longo do eixo (D-023); a
+    seção carregada de uma via leva o estaqueamento dela, sem gravá-lo na seção.
+- **Alternativas descartadas:**
+  - XAML para cada tela nova: as telas são listas e tabelas montadas a partir do núcleo; código segue o padrão da Central e do
+    gerenciador de pavimento;
+  - converter o Diagnóstico do Terreno para `Manual` para abrir outros comandos: um teste da Etapa 9 exige que ele não abra
+    transação;
+  - análise operacional nos formulários de nó: o Simulador de Tráfego já faz, com a demanda estimada ou informada;
+    visibilidade e trajetória de giro não existem no motor e não são inventadas na tela.
+- **Consequências:** as telas dizem o que não foi calculado em vez de esconder; o que não foi visto no Revit está em K25.

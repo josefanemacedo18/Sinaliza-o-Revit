@@ -3,6 +3,74 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-27 – Etapa 11: telas dos módulos (versão 2.17.0)
+
+Etapa 11 do plano unificado (Prompt de Interface §10–§16; Master §7, §13). Entrega: `Releases/Etapa11` (não executada no
+Revit 2027). O conteúdo de cada tela é montado no núcleo e testado; as janelas só mostram (D-029).
+
+### Janela da via em nove seções (§10, §11)
+- **Abas:** Identificação, Geometria, Perfil, Seção, Pavimento, Terraplenagem, Drenagem, Validação e Resumo; cada uma rola nas
+  duas direções. Botões **Validar** e **Resumo** antes de Aplicar.
+- **Conteúdo** (`FormularioVia`, no núcleo): na via existente, o greide, o estaqueamento, a estrutura do pavimento, o estado na
+  terraplenagem, as captações na sarjeta e os trechos ligados; na via nova, o que acontece ao aplicar. A Validação confere o
+  traçado e o greide contra os limites informados (V12, `ModelValidator.Tracado`); o Resumo diz o que Aplicar refaz e o que
+  fica a refazer (terraplenagem, captações lidas).
+
+### Gerenciador de estruturas de pavimento (§15)
+- **Estrutura do Pavimento** abre uma tabela de camadas (nome, material, espessura, função, estado e se o material existe no
+  Revit), com adicionar, remover e reordenar, o corte esquemático e o quantitativo previsto só com a área medida da via
+  (`GerenciadorPavimento`).
+- **Modelos do usuário:** guardar, usar e excluir estruturas; ficam nas configurações do plugin.
+
+### Rede de drenagem (§16)
+- **Relatório da Rede** abre uma janela com as partes separadas (`RedeDrenagemTela`): consistência geométrica, conectividade,
+  verificação de parâmetros, cálculo hidráulico, dimensionamento e drenagem × vias e terreno; mais o perfil de cada ramo
+  (desenhado) e os dispositivos.
+- **Sem cálculo inventado:** sem equação de chuva, o cálculo hidráulico e o dimensionamento aparecem como não feitos;
+  critério não informado aparece como não conferido; tubos a seção plena (lâmina e remanso não calculados).
+- **Dimensionamento:** diâmetro do modelo × calculado (aumenta, reduz, sem diâmetro, não dimensionável); aplicar pede
+  confirmação com quantos aumentam e quantos reduzem.
+- Cada problema tem o elemento, o texto e o que fazer; **Selecionar no modelo** aproxima a vista. Um teste garante que todo
+  critério emitido pelo núcleo tem a sua parte e a sua correção.
+
+### Terreno e topografia (§14)
+- **Diagnóstico do Terreno** abre a janela do terreno (`TerrenoTela`), ainda somente leitura: origem dos dados (cada
+  Toposolid), superfície existente e projetada, a diferença entre elas por amostragem, limites e parâmetros, o V14, **qual
+  superfície cada cálculo lê** (conferido contra o código num teste) e o que precisa de atualização quando o terreno muda.
+- O comando escolhido roda depois que a janela fecha, pelo evento externo do painel contextual
+  (`ContextPanelService.RunLater`). Cada Toposolid é triangulado uma vez só.
+
+### Interseções e rotatórias (§12)
+- **Seções novas** nos formulários (`FormularioNo`): identificação e vias conectadas (com a principal, os ramos, o menor
+  ângulo diante do limite do plugin e as vias que não existem mais), pavimentação, terraplenagem, drenagem (captações e
+  pontos baixos na área do nó), verificação e resumo – refeitas a cada mudança dos campos (`FormWindow.Status`).
+- **Verificação geométrica × operacional:** os limites do gerador com a origem; capacidade e nível de serviço são do
+  Simulador de Tráfego; visibilidade e trajetória de giro não são calculadas.
+
+### Quadras e lotes (§13)
+- **Loteamento › Resultados do parcelamento** (`ResultadosParcelamento`): área de intervenção e limites, quadras, lotes,
+  sistema viário associado, áreas públicas, parâmetros dimensionais, áreas residuais e verificação, com as tabelas, sem
+  afirmar conformidade legal; seleciona a quadra ou o lote no modelo.
+
+### Estaca da via nos formulários (K20)
+- As larguras medidas, os recuos, os níveis da calçada, a largura por trecho, os retornos e as extensões de calçada mostram e
+  leem a estaca do estaqueamento da via; os avisos da seção também a citam (`EstacasDaVia`; `RoadSetup.Estaqueamento`, que
+  não é gravado com a seção). No estaqueamento padrão nada muda. **K20 resolvido.**
+
+### Correções
+- **Via refeita sem perder dados:** editar a seção da via, pôr um recuo ou editar um retorno refazia o pavimento sem a
+  estrutura das camadas (Etapa 5) nem o estaqueamento (Etapa 4). A herança do pavimento anterior foi para o núcleo
+  (`RoadSetup.HerdarDoAnterior`), com teste.
+- **Estado da terraplenagem de um nó:** interseção, rotatória ou balão fora do registro ficava sem estado no painel; agora o
+  nó molda o terreno pelas vias ligadas (`PainelContextual.NaTerraplenagem` com a busca das vias), com teste.
+
+### Testes
+- `Etapa11TelasTests`: 27 testes – conteúdo das seções da via, gerenciador de pavimento, rede de drenagem (classificação,
+  sem chuva, com chuva e dimensionamento), terreno (diferença, partes, impactos, superfície de cada cálculo), nós (vias,
+  ângulos, verificação, terraplenagem do nó), parcelamento, estacas da via e herança do pavimento; e as fontes das janelas e
+  dos comandos.
+- Telas NÃO VISTAS NO REVIT (K25).
+
 ## 2026-10-27 – Etapa 10: Central do Projeto e painel contextual (versão 2.16.0)
 
 Etapa 10 do plano unificado (Prompt de Interface §8, §9, §20). Entrega: `Releases/Etapa10` (não executada no Revit 2027).

@@ -105,6 +105,15 @@ dois pisos sai igual nos dois (ajustada uma vez); entre marcas diferentes valem 
   registrado no `OnStartup`; o evento `SelectionChanged` só lê (a API proíbe alterar o documento ou a seleção nele), e as
   operações rodam por `ExternalEvent`. Central e painel executam os comandos por `CommandBase.Invoke` – as mesmas
   conferências e mensagens do botão da faixa.
+- **Telas dos módulos** (desde a 2.17, D-029): cada tela tem o modelo de apresentação no núcleo – `FormularioVia` (abas da
+  via), `GerenciadorPavimento`, `RedeDrenagemTela`, `TerrenoTela`, `FormularioNo` (interseção e rotatória) e
+  `ResultadosParcelamento` –, testado sem o Revit; as janelas (`RoadWindow`, `PavementManagerWindow`, `DrainageNetworkWindow`,
+  `TerrainWindow`, `LotResultsWindow`) são montadas em código com `UiTables` e devolvem a escolha ao comando. Tela somente
+  leitura que abre outro comando: depois de fechar, no próprio comando, ou por `ContextPanelService.RunLater` (o
+  `ExternalEvent` do painel) quando o comando da tela é `ReadOnly`. `FormWindow.Status` é uma seção de estado refeita a cada
+  mudança dos campos. A estaca é mostrada e lida pela estaca da via (`EstacasDaVia`); as definições continuam guardando a
+  distância ao longo do eixo (D-023), e a seção carregada de uma via (`RoadSetup.DaVia`) leva o estaqueamento dela, sem
+  gravá-lo.
 - **Design system** (desde a 2.15): cores, tamanhos de texto e espaçamentos em `UI/Styles.xaml` (para o XAML) e
   `UI/UiTokens.cs` (para o código), com as mesmas chaves e valores; componentes (cartão, faixas de mensagem, status, valores,
   botões, tabelas, foco) no `Styles.xaml`. Os desenhos – mapa do tráfego, prévia, miniaturas, ícones – têm paleta de dados
