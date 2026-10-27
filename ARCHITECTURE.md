@@ -100,6 +100,11 @@ dois pisos sai igual nos dois (ajustada uma vez); entre marcas diferentes valem 
   `CmdAreaConflito`/`CmdNovaVia` são K4), com ícone próprio (`IconFactory`), dica curta e descrição longa. A disponibilidade
   do botão (`ProjectDocumentAvailability` ou `AlwaysAvailable`) e a exigência de documento no `CommandBase` vêm do mesmo
   atributo, `NoDocumentRequired`.
+- **Central do Projeto e painel contextual** (desde a 2.16, D-028): o núcleo calcula o resumo (`CentralDoProjeto`) e as
+  propriedades da seleção (`PainelContextual`); a camada Revit só lê o modelo e mostra. O painel é um `DockablePane`
+  registrado no `OnStartup`; o evento `SelectionChanged` só lê (a API proíbe alterar o documento ou a seleção nele), e as
+  operações rodam por `ExternalEvent`. Central e painel executam os comandos por `CommandBase.Invoke` – as mesmas
+  conferências e mensagens do botão da faixa.
 - **Design system** (desde a 2.15): cores, tamanhos de texto e espaçamentos em `UI/Styles.xaml` (para o XAML) e
   `UI/UiTokens.cs` (para o código), com as mesmas chaves e valores; componentes (cartão, faixas de mensagem, status, valores,
   botões, tabelas, foco) no `Styles.xaml`. Os desenhos – mapa do tráfego, prévia, miniaturas, ícones – têm paleta de dados

@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-27 (Etapas 0–9 entregues; Etapa 10 a seguir)
+## Estado em 2026-10-27 (Etapas 0–9 entregues; Etapa 10 implementada, entrega a seguir)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -31,15 +31,18 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     descrição longa, ícone próprio por botão e botão habilitado só com projeto (`NoDocumentRequired`). Mapa antigo →
     novo no MANUAL. Faixa e janelas não vistas no Revit (K23).
   - `Instalar/Revit2027` tem a DLL 2.15.0. As anteriores continuam em `Releases/`.
-- **Etapa 10 (próxima):** Central do Projeto com indicadores reais e os estados da Etapa 8, e painel contextual
-  (DockablePane) com as propriedades do elemento do plugin selecionado (Interface §8, §9).
+- **Etapa 10 (implementada, 2.16.0; suíte completa e `Releases/Etapa10` a seguir):** Central do Projeto (indicadores
+  reais com a situação de cada valor, nunca zero para o desconhecido; situação do projeto sem "validado"; módulos; atalhos
+  pelo `CommandBase.Invoke`) e painel contextual (`DockablePane` que acompanha a seleção, só leitura; propriedades por
+  tipo, estado e operações; sem edição em lote) – D-028, K24.
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros (compilar sempre também o projeto de testes antes do
   commit).
 
 ## Próxima tarefa
 
-1. Etapa 10 (PLANO): Central do Projeto e painel contextual. Depois, as Etapas 11–13 na ordem do plano.
+1. Fechar a Etapa 10: suíte completa no commit final, `bash tools/release.sh E10 "<resultado>"`, linhas do TESTS,
+   Releases/README, PLANO e deste arquivo. Depois, as Etapas 11–13 na ordem do plano (11: telas dos módulos).
 2. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer tudo**;
    enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`); rodar também o
    Validar Modelo duas vezes (a segunda mostra a comparação com a primeira).

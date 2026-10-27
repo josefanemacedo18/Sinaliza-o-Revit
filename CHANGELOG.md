@@ -3,6 +3,54 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-27 – Etapa 10: Central do Projeto e painel contextual (versão 2.16.0)
+
+Etapa 10 do plano unificado (Prompt de Interface §8, §9, §20). Entrega: `Releases/Etapa10` (não executada no Revit 2027).
+
+### Central do Projeto (D-028)
+- **Botão Central do Projeto** (painel Projeto). Janela somente leitura com:
+  - cabeçalho: projeto, arquivo, versão e a situação geral;
+  - situação do projeto: a última verificação e o estado dos resultados derivados, com atalhos;
+  - cartões dos indicadores;
+  - os módulos, com a operação principal.
+- **Indicadores** (`CentralDoProjeto`, no núcleo):
+  - vias, extensão das vias, interseções e rotatórias;
+  - área das quadras, lotes e área parcelada (as quadras divididas como no quadro do loteamento);
+  - volumes de corte e de aterro (do registro da terraplenagem);
+  - pavimento, medido nas peças só quando você clica Calcular;
+  - rede de drenagem;
+  - inconsistências da última validação gravada, com a data.
+- **A situação de cada valor** é dita: calculado, não calculado, indisponível, desatualizado ou inválido. Valor
+  desconhecido aparece como "—", nunca como zero.
+- **Sem estado inventado:** a situação geral é o pior nível entre a última verificação e os resultados a refazer, e nunca
+  diz "validado". As operações recentes não aparecem, porque o plugin não guarda esse histórico.
+- **Atalhos:** abrem o comando depois que a Central fecha, pelo mesmo caminho do botão (`CommandBase.Invoke`: as mesmas
+  conferências e mensagens). **Copiar resumo** copia o texto.
+
+### Painel contextual
+- **Botão Painel Contextual** (painel Projeto): mostra ou oculta um painel acoplável do Revit. Na primeira vez, ele abre
+  como aba junto da paleta Propriedades.
+- **Propriedades por tipo** (`PainelContextual`, no núcleo):
+  - via: seção, eixo, estaqueamento, greide e estrutura do pavimento, camada por camada, com a fonte;
+  - nós: interseção, rotatória, balão e nó viário;
+  - drenagem: dispositivo e trecho de rede;
+  - urbanismo: quadra (com os lotes) e loteamento;
+  - obras e demais marcas.
+- **Estado e operações:** o estado vem com o nível (em dia ou não com a terraplenagem aplicada; área lida da via ou
+  informada à mão), e as operações compatíveis abrem os comandos existentes.
+- **Vários elementos:** só as propriedades iguais em todos, sem edição em lote. Tipos diferentes mostram a contagem por
+  tipo.
+- **Funcionamento no Revit:** o evento de seleção só lê, como a API exige. As operações rodam por `ExternalEvent`. Numa
+  seleção grande, o painel considera as 50 primeiras marcas e avisa.
+
+### Testes
+- `Etapa10CentralTests` (12):
+  - Central: nada de zero inventado, situação dos valores, volumes em dia e desatualizados, lotes e área parcelada,
+    drenagem e inconsistências, situação geral e todo tipo de marca com módulo;
+  - painel: vazio, via, seleção múltipla sem lote, drenagem e quadra;
+  - nas fontes: os comandos citados existem na faixa, o painel só lê na seleção e a Central roda o comando pelo
+    `Invoke`.
+
 ## 2026-10-27 – Etapa 9: design system e faixa de opções por tema (versão 2.15.0)
 
 Etapa 9 do plano unificado (Prompt de Interface §5, §7, §22–§24; Master §20). Entrega: `Releases/Etapa09` (não

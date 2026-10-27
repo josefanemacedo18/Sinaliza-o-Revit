@@ -385,14 +385,14 @@ pedem e a §8 não cobria: a interface (Etapa Zero do Prompt de Interface) e a c
 |---|---|---|
 | Design system central (tokens, componentes, estados) – §5, §22 | FEITO na 2.15 (Etapa 9): tokens iguais no `Styles.xaml` e no `UiTokens` (cores, estados com fundo, desabilitado, tipografia, espaçamento) e componentes (cartão, faixas, status, valores, botões, tabelas, foco); cores soltas das janelas passadas aos tokens; contraste conferido em teste. Janelas NÃO VISTAS NO REVIT (K23) | 9 ✅ |
 | Faixa de opções por tarefa – §7 | FEITO na 2.15 (Etapa 9, D-027): guia SinalizaBIM com os 11 painéis do §7 e guia SinalizaBIM Sinalização; os 98 botões, cada um uma vez, mais o Diagnóstico do Terreno; dicas curtas, ícone próprio e disponibilidade coerente. NÃO VISTA NO REVIT (K23) | 9 ✅ |
-| Central do Projeto – §8 | AUSENTE | 10 |
-| Painel contextual – §9 | AUSENTE (nenhum `DockablePane`) | 10 |
+| Central do Projeto – §8 | FEITO na 2.16 (Etapa 10): indicadores de dados reais com a situação de cada valor (sem zero para o desconhecido), situação do projeto pela última verificação e pelo estado dos resultados, módulos com a operação; operações recentes não mostradas (sem histórico confiável). NÃO VISTA NO REVIT (K24) | 10 ✅ |
+| Painel contextual – §9 | FEITO na 2.16 (Etapa 10): `DockablePane` que acompanha a seleção (só leitura), propriedades por tipo, estado e operações; seleção múltipla só com o que é igual, sem edição em lote. NÃO VISTO NO REVIT (K24) | 10 ✅ |
 | Formulário de vias em seções com Pré-visualizar / Validar / Aplicar – §10 | PARCIAL: `RoadWindow` com prévia; sem seções de terraplenagem e drenagem nem resumo do impacto | 11 |
 | Gerenciador de pavimentos – §15 | AUSENTE (depende da estrutura de pavimento, Etapa 5) | 5 → 11 |
 | Central de Qualidade – §17 | PARCIAL: relatório de texto; sem filtro, sem localizar o elemento | 2 → 12 |
 | Central de quantitativos com a origem dos números – §18 | PARCIAL: a janela existe; sem a origem e a validade de cada valor | 12 |
 | Gerenciador de configurações (usuário × projeto, perfis) – §19 | PARCIAL: as do usuário numa janela, as do projeto espalhadas | 12 |
-| Estados de atualização – §20 | AUSENTE (depende da Etapa 8) | 8 → 10 |
+| Estados de atualização – §20 | PARCIAL: atualizado, desatualizado, não verificado e informação vêm da comparação real (Etapa 8, D-026) e aparecem no Validar Modelo, na Central e no painel; "recalculando" e "falha na atualização" não são estados guardados (a atualização automática roda na transação do usuário e falha com mensagem) | 8 → 10 ✅ |
 | Progresso e cancelamento – §21 | PARCIAL | 13 |
 
 ### 9.2a Elementos urbanos e viários complementares (Prompt de Motores §12, auditoria da Etapa 7)

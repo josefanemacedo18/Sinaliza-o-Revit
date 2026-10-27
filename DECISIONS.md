@@ -392,3 +392,28 @@ como substituída.
 - **Consequências:** quem usava a 2.14 encontra cada ferramenta pelo mapa antigo → novo do MANUAL. A guia principal tem
   36 colunas: em tela estreita o Revit recolhe os painéis em botões com seta (K23). A cobertura, a ordem dos painéis, os
   ícones e as dicas são conferidos em teste (`Etapa09InterfaceTests`).
+
+## D-028 – Central do Projeto e painel contextual: só dados reais, só leitura, comandos pelo mesmo caminho do botão
+- **Contexto:** o Prompt de Interface (§8, §9, §20) pede uma Central com indicadores e a situação do projeto e um painel com as
+  propriedades do elemento selecionado, sem inventar dado, data ou estado, sem zero para o desconhecido, sem "validado" por
+  uma operação concluída e sem alteração em lote sem validação.
+- **Decisão:**
+  - o núcleo calcula o resumo e as propriedades (testáveis sem o Revit); a camada Revit lê o modelo e mostra;
+  - cada indicador tem a situação do valor – calculado, não calculado, indisponível, desatualizado ou inválido – e o valor
+    desconhecido é "—"; o que é caro (medir os pisos do pavimento) só é calculado quando o usuário pede;
+  - a situação vem da última validação gravada (com a data) e do estado dos resultados (D-026); a situação geral é o pior
+    nível, dito pelo que se sabe;
+  - o painel só mostra: o evento de seleção só lê, como a API exige; várias marcas mostram só o que é igual em todas, e não há
+    edição em lote;
+  - a Central e o painel abrem os comandos existentes por `CommandBase.Invoke`, com as conferências e mensagens do botão; a
+    Central depois de fechar, dentro do comando dela; o painel por `ExternalEvent`;
+  - sem "operações recentes": o plugin não guarda histórico confiável delas.
+- **Alternativas descartadas:**
+  - `PostCommand` com o identificador do botão: o formato do identificador de um botão dentro de um botão com seta não é
+    documentado, e um engano falharia em silêncio;
+  - rodar a validação inteira ao abrir a Central: lenta em projeto grande; a última validação gravada, com a data, já diz o
+    estado conhecido e o atalho refaz;
+  - editar propriedades no painel: duplicaria as janelas de edição e abriria espaço para alteração em lote sem validação.
+- **Consequências:** a Central abre rápido e nunca mostra um valor que não saiba de onde veio; o painel não altera nada. O que
+  não foi visto no Revit está em K24.
+
