@@ -46,6 +46,7 @@ Não compile enquanto a suíte roda com `--no-build`: a compilação troca as DL
 | 2026-10-26 | `ab92d46` (Etapa 6, 2.12.0) | 3 011 | 3 011 aprovados, 0 falhas | 14 min 20 s (Linux, SDK 10.0.401 pelo Nix) | +11 `Etapa06DrenagemTests`; entrega `Releases/Etapa06` |
 | 2026-10-26 | `e3a27c4` (Etapa 7, 2.13.0) | 3 016 | 3 016 aprovados, 0 falhas | 15 min 5 s (Linux, SDK 10.0.401 pelo Nix) | +5 `Etapa07UrbanismoTests`; entrega `Releases/Etapa07` |
 | 2026-10-26 | `072b683` (Etapa 8, 2.14.0) | 3 022 | 3 022 aprovados, 0 falhas | 13 min 14 s (Linux, SDK 10.0.401 pelo Nix) | +6 `Etapa08IntegracaoTests`; entrega `Releases/Etapa08` |
+| 2026-10-27 | `d074465` (Etapa 9, 2.15.0) | 3 036 | 3 036 aprovados, 0 falhas | 14 min 35 s (Linux, SDK 10.0.401 pelo Nix) | +14 `Etapa09InterfaceTests` (faixa, ícones, dicas, disponibilidade, tokens, contraste, chaves de estilo, Diagnóstico do Terreno, manual); entrega `Releases/Etapa09` |
 
 Compilação na linha de base:
 - Core e plugin: 0 avisos.

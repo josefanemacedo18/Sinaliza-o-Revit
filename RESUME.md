@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-27 (Etapas 0–8 entregues; Etapa 9 implementada, entrega a seguir)
+## Estado em 2026-10-27 (Etapas 0–9 entregues; Etapa 10 a seguir)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -24,22 +24,22 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     V16 e Trocar Elementos (auditoria dos elementos urbanos em AUDIT §9.2a).
   - Etapa 8 ✅: 2.14.0 em `Releases/Etapa08` (`072b683`, 3 022/3 022) – estado dos resultados (D-026), leitura com
     origem nas captações, atualização seletiva, impacto da edição, V17 (K22).
-  - `Instalar/Revit2027` tem a DLL 2.14.0. As anteriores continuam em `Releases/`.
-- **Etapa 9 (implementada, 2.15.0; suíte completa e `Releases/Etapa09` a seguir):** design system (tokens iguais no
-  `Styles.xaml` e no `UiTokens`, componentes, foco visível, contraste conferido em teste, cores soltas das janelas nos
-  tokens) e faixa de opções por tema (D-027): guia *SinalizaBIM* com os 11 painéis do Prompt de Interface §7 e guia
-  *SinalizaBIM Sinalização*; os 98 botões, cada um uma vez, mais o **Diagnóstico do Terreno**; dicas curtas com
-  descrição longa, ícone próprio por botão e botão habilitado só com projeto (`NoDocumentRequired`). Mapa antigo → novo
-  no MANUAL. Faixa e janelas não vistas no Revit (K23).
+  - Etapa 9 ✅: 2.15.0 em `Releases/Etapa09` (`d074465`, 3 036/3 036) – design system (tokens iguais no
+    `Styles.xaml` e no `UiTokens`, componentes, foco visível, contraste conferido em teste, cores soltas das janelas nos
+    tokens) e faixa de opções por tema (D-027): guia *SinalizaBIM* com os 11 painéis do Prompt de Interface §7 e guia
+    *SinalizaBIM Sinalização*; os 98 botões, cada um uma vez, mais o **Diagnóstico do Terreno**; dicas curtas com
+    descrição longa, ícone próprio por botão e botão habilitado só com projeto (`NoDocumentRequired`). Mapa antigo →
+    novo no MANUAL. Faixa e janelas não vistas no Revit (K23).
+  - `Instalar/Revit2027` tem a DLL 2.15.0. As anteriores continuam em `Releases/`.
+- **Etapa 10 (próxima):** Central do Projeto com indicadores reais e os estados da Etapa 8, e painel contextual
+  (DockablePane) com as propriedades do elemento do plugin selecionado (Interface §8, §9).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
 - **Compilação:** Core, plugin e testes com 0 avisos e 0 erros (compilar sempre também o projeto de testes antes do
   commit).
 
 ## Próxima tarefa
 
-1. Fechar a Etapa 9: suíte completa no commit final, `bash tools/release.sh E9 "<resultado>"`, linhas do TESTS,
-   Releases/README, PLANO e deste arquivo. Depois, as Etapas 10–13 na ordem do plano (10: Central do Projeto e painel
-   contextual).
+1. Etapa 10 (PLANO): Central do Projeto e painel contextual. Depois, as Etapas 11–13 na ordem do plano.
 2. No Revit (quando houver): 5º Autoteste completo com a DLL mais recente, numa cópia, terminando com **Desfazer tudo**;
    enviar o relatório `autoteste-….txt` **e** o `autoteste-…-dados.jsonl` (`%AppData%\SinalizaBIM`); rodar também o
    Validar Modelo duas vezes (a segunda mostra a comparação com a primeira).
