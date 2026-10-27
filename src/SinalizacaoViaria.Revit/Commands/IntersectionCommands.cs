@@ -504,7 +504,7 @@ internal static class RoundaboutForms
             return c;
         }
         if (all != null) w.Status("Identificação, parâmetros dimensionais e vias conectadas", () => Ctx().Vias);
-        w.Section("Tipo e ilha central")
+        w.Section("Tipo")
          .Choice("Tipo de rotatória", new[]
              {
                  ("Minirrotatória pintada – MIR (Ø inscrito 13–25 m)", TipoRotatoria.Mini),
