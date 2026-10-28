@@ -25,9 +25,9 @@ Guia **SinalizaBIM** – o fluxo de projeto:
 |---|---|
 | **Projeto** | **Central do Projeto** (abaixo) · **Atualizar Todas** · **Editar** · Selecionar Conjunto · Alternar 2D/3D · **Painel Contextual** (abaixo) |
 | **Terreno** | **Diagnóstico do Terreno** (seção 9.3.1) · **Imagem Aérea ▾** (Importar Imagem e Calibrar · Calibrar Escala da Imagem) |
-| **Sistema Viário** | **Via ▾** (Via · Via Férrea) · **Eixos ▾** (Desenhar Eixo · Mostrar/Ocultar Eixos) · **Perfil da Via** · **Seções Transversais ▾** (Corte Transversal · Cotar Seção) · **Ajustar Via ▾** (Alterar Largura por Trecho · Recuo na Via (baia / faixa auxiliar) · Distância entre Vias · Mover Via · Hierarquia e Esquinas) · **Calçadas ▾** (Meio-fio, Calçada e Sarjeta · Extensão de Calçada · Área de Calçada · Rampas) · **Obras de Arte ▾** (Viaduto · Ponte · Passarela · Túnel · Trincheira) |
+| **Sistema Viário** | **Via ▾** (Via · Via Férrea) · **Eixos ▾** (Desenhar Eixo · Mostrar/Ocultar Eixos) · **Perfil da Via** · **Seções Transversais ▾** (Corte Transversal · Cotar Seção) · **Ajustar Via ▾** (Alterar Largura por Trecho · Componentes por Trecho · Recuo na Via (baia / faixa auxiliar) · Distância entre Vias · Mover Via · Hierarquia e Esquinas) · **Calçadas ▾** (Meio-fio, Calçada e Sarjeta · Extensão de Calçada · Área de Calçada · Rampas) · **Obras de Arte ▾** (Viaduto · Ponte · Passarela · Túnel · Trincheira) |
 | **Interseções** | **Interseção** · **Rotatória** · **Nó Viário** · Trocar Conexão · Cul-de-sac |
-| **Terraplenagem** | **Terraplenagem** · **Contenções ▾** (Talude · Muro de Arrimo) |
+| **Terraplenagem** | **Terraplenagem** · **Contenções ▾** (Talude · Taludes por Trecho · Muro de Arrimo) |
 | **Pavimentação** | **Estrutura do Pavimento** · **Pista** |
 | **Drenagem** | **Dispositivos ▾** (Boca de Lobo / PV · Grelha de Drenagem) · Trecho de Rede · Projeto de Drenagem · Ler do Modelo · **Relatório da Rede** |
 | **Urbanismo** | **Loteamento** · **Quadra e Lote ▾** (Quadra · Lotes por Linhas · Categoria do Lote · Lote · Unir Lotes) · Nomear Vias · Categorias e Filtros · **Quadros e Áreas ▾** (Quadros do Loteamento · Quadro da Quadra · Detalhar Lotes) · **Elementos Urbanos ▾** (Elementos Urbanos · Trocar Elementos · Famílias do Revit · Canteiros) · **Masterplan** (seção 27) |
@@ -326,6 +326,23 @@ ponto B 10,50 m; um muro antigo avança sobre a calçada. No quadro **Largura va
   **setas e cotas** provisórias em A e B. O trecho fica gravado na seção da via (refeito a partir do eixo); outro trecho do
   mesmo elemento sobre o mesmo intervalo o substitui, e há a opção de só remover. Substitui a antiga medida "entre
   meios-fios na estaca". Aviso se a faixa livre da calçada ficar abaixo de 1,20 m (NBR 9050).
+* **Componentes por trecho (desde a 2.24)**: a ferramenta **Sistema Viário › Ajustar Via ▾ → Componentes por Trecho** (ou o botão
+  *Componente por trecho (A–B)…* no quadro, com as estacas digitadas) **acrescenta**, **tira** ou **muda a largura** de qualquer
+  elemento de um lado da seção – faixa de rolamento, exclusiva ou preferencial, ciclofaixa, estacionamento, acostamento, faixa de
+  segurança, canteiro físico ou pintado, faixa de caminhada, calçada – entre o **início (A)** e o **fim (B)**, com uma
+  **transição antes de A e outra depois de B** (retas ou em curva S; 0 = degrau). Escolha o **elemento de referência** (lado e
+  posição): *Acrescentar* põe o elemento novo **antes** dele (ou no fim do lado – a calçada só entra como último elemento);
+  *Tirar* e *Mudar a largura* agem sobre ele. Os elementos de fora se deslocam (a via alarga ou estreita) e a sarjeta, o
+  meio-fio e a linha de bordo vão com o lado de fora. As marcas que só a seção do trecho tem (linha da ciclofaixa, meios-fios e
+  grama de um canteiro, vagas, bordo novo) são feitas **só entre A e B**; as que a seção do trecho não tem são **interrompidas**
+  – entre A e B quando se acrescenta, desde o início da transição quando se tira (o elemento afunila até sumir). O canteiro
+  acrescentado recorta o pavimento só no trecho; o tirado fecha o pavimento no trecho. Os trechos ficam gravados na seção da via
+  (a via é refeita a partir do eixo; interseções e rotatórias leem a seção da estaca onde ficam). Na mesma janela, os
+  **trechos gravados** podem ser **removidos** ou **divididos** numa estaca (duas partes iguais, sem transição na emenda).
+  Trechos do mesmo lado não podem se sobrepor (transições incluídas): o segundo é ignorado com aviso; um trecho cujo elemento
+  mudou de tipo na seção também (não mexe no elemento errado). A baia e a extensão de calçada por trecho continuam nas
+  ferramentas próprias (Recuo na Via, Extensão de Calçada). As pontas de um canteiro acrescentado são retas e a transição é só
+  pavimento: zebrado de aproximação e sinalização de mudança de faixa ficam a cargo do projeto (K33).
 * **Ler do desenho**: marque *Depois de indicar o eixo, ler do desenho os meios-fios e muros existentes* e, depois do
   eixo, clique as linhas do levantamento (meio-fio direito, esquerdo, alinhamento direito, esquerdo – **ESC** pula o
   lado). O plugin mede a distância a cada 5 m e cria os pontos sozinho (remove os colineares).
@@ -2704,6 +2721,17 @@ de outro o substitui. O texto dos PIVs, o gráfico, as áreas e os volumes se re
   Toposolid ligava a face ao terreno por triângulos soltos, com dentes e zigue-zague nas pontas. No **corte**, a **canaleta de
   crista** fica 1,5 m além da crista **sobre o terreno** (ou sobre a face do talude, se a encosta continuar subindo) – antes
   ela seguia a cota da crista e ficava solta no ar.
+
+* **Taludes por Trecho (desde a 2.24)**: em **Terraplenagem › Contenções ▾ → Taludes por Trecho**, clique a via (com greide) e
+  defina, por **lado** (esquerdo, direito ou os dois) e por **trecho** (estaca A e B – B vazio = até o fim; um trecho de 0 até o
+  fim vale como o talude daquele lado na via inteira), o **método**: **talude fixo** (corte e aterro H : 1 V, com **largura máxima**
+  opcional – onde o talude não alcança o terreno dentro dela, o terreno fica natural além do limite, numa face quase vertical: prever
+  contenção) ou **largura fixa** (o talude chega ao terreno exatamente nessa largura; a inclinação resulta do terreno). As
+  **transições** antes de A e depois de B passam dos taludes da via aos do trecho. A janela mostra a **seção numa estaca** com o
+  resultado (áreas de corte e aterro) antes de aplicar; os trechos gravados podem ser removidos. Os trechos ficam no greide da via:
+  a Terraplenagem, as seções e volumes do **Perfil da Via** e o Autoteste usam os mesmos taludes; o Perfil da Via mantém os trechos
+  ao regravar o greide. As pontas livres da via (testas) continuam com os taludes da via. Valores informados pelo usuário – a
+  inclinação admissível é do projeto geotécnico.
 
 ### 24.7 Nó viário (interseção em desnível) sobre as vias
 **Diamante**, **diamante com rotatórias**, **trevo completo**, **trevo parcial**, **trombeta** e **rotatória em dois níveis**.

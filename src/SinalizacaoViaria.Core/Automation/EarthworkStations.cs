@@ -12,7 +12,9 @@ namespace SinalizacaoViaria.Core.Automation;
 /// <param name="LeftHalf">Largura da plataforma à esquerda do eixo (m).</param>
 /// <param name="RightHalf">Largura da plataforma à direita do eixo (m).</param>
 /// <param name="Reach">Alcance máximo dos taludes a partir da borda da plataforma (m).</param>
-public sealed record SecaoTipo(double LeftHalf, double RightHalf, double CutSlope, double FillSlope, double Reach = 60);
+/// <param name="Trechos">Taludes por lado e por trecho (<see cref="RoadGrade.Taludes"/>) sobre <paramref name="CutSlope"/> e <paramref name="FillSlope"/>.</param>
+public sealed record SecaoTipo(double LeftHalf, double RightHalf, double CutSlope, double FillSlope, double Reach = 60,
+    IReadOnlyList<TrechoTalude>? Trechos = null);
 
 /// <summary>Seção transversal numa estaca: terreno, projeto (plataforma e taludes), corte e aterro e as áreas deles.</summary>
 public sealed class SecaoTransversal
@@ -68,10 +70,14 @@ public static class EstacasTerraplenagem
             var ge = G(edge);
             if (ge is not { } g0) return (pts, false);
             var cut = g0 > ze;
-            var slope = Math.Max(0.01, cut ? tipo.CutSlope : tipo.FillSlope);
+            // Talude do lado nesta estaca (por lado e por trecho), com a largura fixa e o limite – a mesma conta da Terraplenagem.
+            var spec = TaludesDaVia.Resolver(tipo.CutSlope, tipo.FillSlope, tipo.Trechos, dir > 0, axis.Length, tipo.Reach)(s);
+            var (rc, rf, lim) = spec.NoVertice(c + nrm * edge, ze, nrm * dir, ground);
+            var slope = Math.Max(0.01, cut ? rc : rf);
+            var reach = Math.Clamp(lim, 0.1, tipo.Reach);
             double Z(double d) => cut ? ze + d / slope : ze - d / slope;
             var prev = (D: 0.0, Diff: g0 - ze);
-            for (var d = step; d <= tipo.Reach + 1e-9; d += step)
+            for (var d = step; d <= reach + 1e-9; d += step)
             {
                 var o = edge + dir * d;
                 if (G(o) is not { } g) break;
@@ -86,6 +92,13 @@ public static class EstacasTerraplenagem
                 }
                 pts.Add(new Vec2(o, Z(d)));
                 prev = (d, diff);
+            }
+            // Limite do talude (por trecho): no limite, face vertical até o terreno (contenção).
+            if (reach < tipo.Reach - 1e-6 && G(edge + dir * reach) is { } gl)
+            {
+                pts.Add(new Vec2(edge + dir * reach, Z(reach)));
+                pts.Add(new Vec2(edge + dir * reach, gl));
+                return (pts, true);
             }
             return (pts, false);
         }

@@ -23,6 +23,16 @@ public sealed class SlopeEdge
     public List<double> Day { get; } = new();
     /// <summary>Marca dona da borda (volumes por via/interseção).</summary>
     public string? Owner { get; set; }
+    /// <summary>
+    /// Taludes por vértice (mesma contagem de <see cref="Line"/>; taludes por lado e por trecho): inclinação de corte e de
+    /// aterro e largura máxima – além dela a borda não altera o terreno. Nulos = <see cref="Cut"/>, <see cref="Fill"/> e o alcance.
+    /// </summary>
+    public List<double>? CutV { get; set; }
+    public List<double>? FillV { get; set; }
+    public List<double>? MaxV { get; set; }
+
+    internal double CutAt(int k) => CutV is { } c && k < c.Count ? c[k] : Cut;
+    internal double FillAt(int k) => FillV is { } f && k < f.Count ? f[k] : Fill;
 
     private const double DayMargin = 2.0;
 
@@ -39,7 +49,13 @@ public sealed class SlopeEdge
     internal void SetReach(double groundMin, double groundMax, double maxDist)
     {
         var r = 0.0;
-        foreach (var v in Line) r = Math.Max(r, Math.Max(Math.Max(0.1, Cut) * (groundMax - v.Z), Math.Max(0.1, Fill) * (v.Z - groundMin)));
+        for (int k = 0; k < Line.Count; k++)
+        {
+            var v = Line[k];
+            var rk = Math.Max(Math.Max(0.1, CutAt(k)) * (groundMax - v.Z), Math.Max(0.1, FillAt(k)) * (v.Z - groundMin));
+            if (MaxV is { } m && k < m.Count) rk = Math.Min(rk, m[k]);
+            r = Math.Max(r, rk);
+        }
         Reach = Math.Min(maxDist + DayMargin, r + 1);
     }
 }
@@ -306,11 +322,16 @@ public sealed class GradingResult
             u = Math.Clamp(u, 0, 1);
             var d = p.DistanceTo(a.XY + ab * u);
             if (d > ed.Reach) continue;
+            var k1 = (k + 1) % n;
+            // Largura máxima do talude neste ponto da borda (taludes por trecho): além dela o terreno fica natural.
+            if (ed.MaxV is { } mv && k1 < mv.Count && d > mv[k] + (mv[k1] - mv[k]) * u + 1e-6) continue;
             var z = a.Z + (b.Z - a.Z) * u;
             // Todo trecho de borda dá os dois planos (separar por corte/aterro fazia a superfície saltar onde a borda cruza o
             // terreno); onde cada um vale decidem as regiões ligadas às bordas (Reach).
-            var zc = z + d / Math.Max(0.1, ed.Cut);
-            var zf = z - d / Math.Max(0.1, ed.Fill);
+            var rc = ed.CutV == null ? ed.Cut : ed.CutAt(k) + (ed.CutAt(k1) - ed.CutAt(k)) * u;
+            var rf = ed.FillV == null ? ed.Fill : ed.FillAt(k) + (ed.FillAt(k1) - ed.FillAt(k)) * u;
+            var zc = z + d / Math.Max(0.1, rc);
+            var zf = z - d / Math.Max(0.1, rf);
             if (zc < cut) { cut = zc; ce = e; }
             if (zf > fill) { fill = zf; fe = e; }
             var eg = _edgeGround![e];
@@ -557,9 +578,9 @@ public static class Grading
             var faceStart = c.WallStart && !c.EndSpill;
             var faceEnd = c.WallEnd && !c.EndSpill;
             // Taludes: do lado de fora de cada borda (superfície contínua pela distância); muros: degrau até o terreno natural.
-            var dayL = c.DaylightLeft ? SlopeLine(res, left, right, c.CutSlope, c.FillSlope, ground, maxDaylight, step, !faceStart, !faceEnd, c.Owner)
+            var dayL = c.DaylightLeft ? SlopeLine(res, left, right, c.CutSlope, c.FillSlope, ground, maxDaylight, step, !faceStart, !faceEnd, c.Owner, c.TaludesEsquerda)
                 : c.WallLeft ? WallBand(res, left, right, ground) : left;
-            var dayR = c.DaylightRight ? SlopeLine(res, right, left, c.CutSlope, c.FillSlope, ground, maxDaylight, step, !faceStart, !faceEnd, c.Owner)
+            var dayR = c.DaylightRight ? SlopeLine(res, right, left, c.CutSlope, c.FillSlope, ground, maxDaylight, step, !faceStart, !faceEnd, c.Owner, c.TaludesDireita)
                 : c.WallRight ? WallBand(res, right, left, ground) : right;
             // Testas: a seção inteira da ponta (bordas e linhas internas, da esquerda para a direita) – com a reta de borda a borda
             // a testa ignorava o abaulamento e as camadas da plataforma.
@@ -1172,17 +1193,45 @@ public static class Grading
     /// área alterada e pontos do terreno).
     /// </summary>
     private static List<Vec3> SlopeLine(GradingResult res, List<Vec3> edge, List<Vec3> other, double cut, double fill, Func<Vec2, double?> ground,
-        double maxDist, double step, bool openStart, bool openEnd, string? owner = null)
+        double maxDist, double step, bool openStart, bool openEnd, string? owner = null, IReadOnlyList<TaludeNoPonto>? specs = null)
     {
         var day = new List<Vec3>();
+        var per = specs != null && specs.Count >= edge.Count;
+        var cv = per ? new List<double>(edge.Count) : null;
+        var fv = per ? new List<double>(edge.Count) : null;
+        var mv = per ? new List<double>(edge.Count) : null;
         for (int i = 0; i < edge.Count; i++)
         {
             var e = edge[i].XY;
             var o = other[i].XY;
             var n = (e - o).Length < 1e-9 ? Vec2.UnitY : (e - o).Normalized();
-            day.Add(Daylight(e, edge[i].Z, n, cut, fill, ground, maxDist, step));
+            if (!per)
+            {
+                day.Add(Daylight(e, edge[i].Z, n, cut, fill, ground, maxDist, step));
+                continue;
+            }
+            // Talude por lado e por trecho: inclinações e largura máxima deste vértice (a largura fixa vira inclinação).
+            var (ci, fi, li) = specs![i].NoVertice(e, edge[i].Z, n, ground);
+            li = Math.Clamp(li, 0.1, maxDist);
+            cv!.Add(ci);
+            fv!.Add(fi);
+            mv!.Add(li);
+            var dl = Daylight(e, edge[i].Z, n, ci, fi, ground, li, step);
+            var g0 = ground(e);
+            var cutHere = g0 is { } gz && gz > edge[i].Z;
+            var planeAt = edge[i].Z + (cutHere ? 1 : -1) * li / Math.Max(0.1, cutHere ? ci : fi);
+            if (li < maxDist - 1e-6 && dl.XY.DistanceTo(e) > li - 1e-3 && Math.Abs(dl.Z - planeAt) > 0.05)
+            {
+                // Não chegou ao terreno dentro do limite: crista/pé no plano do talude e, logo além, o terreno natural –
+                // face quase vertical (contenção), como o degrau de muro.
+                var lim = e + n * li;
+                res.Points.Add(Vec3.At(lim, planeAt));
+                var beyond = e + n * (li + WallGap);
+                dl = Vec3.At(beyond, ground(beyond) ?? planeAt);
+            }
+            day.Add(dl);
         }
-        var se = new SlopeEdge { Cut = cut, Fill = fill, OpenStart = openStart, OpenEnd = openEnd, Owner = owner };
+        var se = new SlopeEdge { Cut = cut, Fill = fill, OpenStart = openStart, OpenEnd = openEnd, Owner = owner, CutV = cv, FillV = fv, MaxV = mv };
         se.Line.AddRange(edge);
         se.Day.AddRange(day.Select((d, i) => d.XY.DistanceTo(edge[i].XY)));
         se.Finish(maxDist);

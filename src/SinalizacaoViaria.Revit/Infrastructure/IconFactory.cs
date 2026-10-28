@@ -757,6 +757,24 @@ public static class IconFactory
                 dc.DrawGeometry(B(Yellow), null, Close(Poly(new Point(22, 10), new Point(28, 10), new Point(25, 6))));
                 dc.DrawGeometry(B(Yellow), null, Close(Poly(new Point(22, 22), new Point(28, 22), new Point(25, 26))));
                 break;
+            case "componentes":
+                // Elemento acrescentado num trecho da via (ciclofaixa vermelha entre duas transições).
+                dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(1, 1, 30, 30));
+                dc.DrawGeometry(B(Asphalt), null, Close(Poly(new Point(1, 8), new Point(31, 8), new Point(31, 27), new Point(24, 27), new Point(19, 23),
+                    new Point(12, 23), new Point(7, 27), new Point(1, 27))));
+                dc.DrawLine(new Pen(B(White), 1.2) { DashStyle = DashStyles.Dash }, new Point(1, 15), new Point(31, 15));
+                dc.DrawGeometry(B(Color.FromRgb(196, 64, 52)), null, Close(Poly(new Point(9, 19), new Point(22, 19), new Point(26, 23), new Point(5, 23))));
+                dc.DrawLine(P(Yellow, 1.5), new Point(5, 4), new Point(5, 30));
+                dc.DrawLine(P(Yellow, 1.5), new Point(26, 4), new Point(26, 30));
+                break;
+            case "taludetrecho":
+                // Plataforma da via com taludes diferentes de cada lado (um mais abatido, outro com limite e face).
+                dc.DrawGeometry(B(Color.FromRgb(98, 158, 74)), null, Close(Poly(new Point(1, 30), new Point(1, 24), new Point(10, 14), new Point(22, 14),
+                    new Point(26, 18), new Point(26, 25), new Point(31, 25), new Point(31, 30))));
+                dc.DrawLine(P(Asphalt, 2.5), new Point(10, 14), new Point(22, 14));
+                dc.DrawLine(P(Yellow, 1.2), new Point(16, 4), new Point(16, 11));
+                dc.DrawLine(P(Color.FromRgb(188, 186, 180), 1.5), new Point(26, 18), new Point(26, 25));
+                break;
             case "trocar":
                 // Um elemento urbano trocado por outro no mesmo lugar (árvore ⇄ banco).
                 dc.DrawEllipse(B(Color.FromRgb(98, 158, 74)), null, new Point(7, 20), 5, 5);

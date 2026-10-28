@@ -254,6 +254,7 @@ public static class Infra
             var z = prof.Z(s) - depthBelow;
             c.Left.Add(Vec3.At(p + n * left, z));
             c.Right.Add(Vec3.At(p + n * right, z));
+            c.Stations.Add(s);
         }
         return c;
     }

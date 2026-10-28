@@ -340,7 +340,8 @@ internal static class RoadWorks
                 try { res.AddRange(SetGrade(uidoc, o.Def.GroupId, g)); }
                 catch (Exception ex) { Log.Error("Patamar da via existente no nó", ex); }
             }
-        TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { road.Pavement }, quiet: true);
+        // O pavimento gravado com o greide novo (o lido antes ainda tem o greide anterior, e a terraplenagem usa o que recebe).
+        TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { RoadByGroup(doc, road.GroupId)?.Pavement ?? road.Pavement }, quiet: true);
         var r = new RenderResult();
         r.Warnings.Add((relief == RelevoVia.AcompanharTerreno ? "Relevo: a via acompanha o terreno" : "Relevo: greide suavizado") +
                        $" – corte {perfil.CutM2:0} m² / aterro {perfil.FillM2:0} m² no eixo; Toposolid ajustado (corte, aterro e taludes).");

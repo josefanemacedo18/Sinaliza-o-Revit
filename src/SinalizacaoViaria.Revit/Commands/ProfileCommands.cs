@@ -45,7 +45,7 @@ public sealed class CmdPerfilVia : CommandBase
         var est = road.Pavement.Estaqueamento?.Clone() ?? new Estaqueamento();
         // Terraplenagem por estaca estimada pela seção-tipo (Etapa 18): plataforma da via (pista e calçadas) e os taludes.
         Func<Vec2, double?> ground = p => hasTerrain ? groundFn(p) : null;
-        SecaoTipo Tipo() => new(road.Pavement.TotalLeft, road.Pavement.TotalRight, o.CutSlope, o.FillSlope);
+        SecaoTipo Tipo() => new(road.Pavement.TotalLeft, road.Pavement.TotalRight, o.CutSlope, o.FillSlope, Trechos: road.Grade.Taludes);
         var grafico = 0;
         double estacaVer = 0, exagero = 2, trechoDe = 0, trechoAte = L;
         var pivNum = 1;
@@ -210,6 +210,8 @@ public sealed class CmdPerfilVia : CommandBase
         var res = RoadProfileDesigner.Design(L, s => hasTerrain ? groundFn(road.Axis.PointAt(s)) : road.Grade.Z(s), o);
         var baseGrade = res.Grade;
         baseGrade.AdjustTerrain = true;
+        // Os taludes por lado e por trecho da via não são desta janela: ficam como estão.
+        baseGrade.Taludes = road.Grade.Taludes.Select(t => t.Clone()).ToList();
         var results = new List<RenderResult>();
         var keep = hosted;
         if (o.AutoStructures && replace && hosted.Count > 0)
@@ -265,7 +267,9 @@ public sealed class CmdPerfilVia : CommandBase
         var grade = RoadWorks.Compose(doc, road, keep.Concat(created), baseGrade);
         foreach (var c in created) c.Output.Grade = grade.Clone();
         results.AddRange(RoadWorks.SetGrade(uidoc, road.GroupId, grade, created, est, estacas != null));
-        TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { road.Pavement }.Concat(created).ToList());
+        // O pavimento gravado com o greide novo (o lido antes ainda tem o greide anterior, e a terraplenagem usa o que recebe).
+        var gravado = RoadWorks.RoadByGroup(doc, road.GroupId)?.Pavement ?? road.Pavement;
+        TerrainActions.AfterCreate(uidoc, new MarkingDefinition[] { gravado }.Concat(created).ToList());
         var summary = res.Summary() + (created.Count > 0 ? $"\n{created.Count} obra(s) criada(s) na via." : "\nNenhuma obra necessária: a via fica em aterro/corte no terreno.");
         // Elementos do greide aplicado (PIV, rampas, L, K, PCV/PTV, ponto alto/baixo) – um CSV por via, refeito a cada aplicação.
         try

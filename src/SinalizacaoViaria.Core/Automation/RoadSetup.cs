@@ -333,7 +333,7 @@ public sealed partial class RoadSetup
         GutterAdds && PhysicalElements && side[i].Tipo == TipoElementoSecao.Calcada && !(i > 0 && side[i - 1].Elevado)
             ? Math.Max(0, side[i].Sarjeta) : 0;
 
-    public List<string> Warnings { get; } = new();
+    public List<string> Warnings { get; private set; } = new();
 
     /// <summary>Largura da pista, calçada e faixas sem pavimento de um lado (do eixo para fora).</summary>
     private (double Carriage, double Sidewalk, List<PavementGap> Gaps) SideInfo(List<ElementoSecao> side, int sigma)
@@ -603,12 +603,14 @@ public sealed partial class RoadSetup
             res.Add(d);
             return d;
         }
-        ApplyVariation(res, axis, new Dictionary<MarkingDefinition, (int, double, double)>(), AddVar);
+        // Componentes por trecho (acrescentados ou tirados entre duas estacas): marcas próprias do trecho e interrupções.
+        var axisLine = axis ?? (path.Points.Count >= 2 ? new Polyline2(path.Points) : null);
+        var (ownDefs, ownGaps) = ApplyComponentes(res, pavement, path, output, catalog, groupId, axisLine);
+        ApplyVariation(res, axis, new Dictionary<MarkingDefinition, (int, double, double)>(), AddVar, ownDefs, ownGaps);
         // Retornos em U: abertura do canteiro, vagas e linhas interrompidas e a sinalização.
-        ApplyRetornos(res, pavement, retornos, axis ?? (path.Points.Count >= 2 ? new Polyline2(path.Points) : null), AddVar);
+        ApplyRetornos(res, pavement, retornos, axisLine, AddVar);
         // Travessias de pedestres sobre o canteiro (meio da quadra): passagem rebaixada ou rampas, piso tátil e faixa. As
         // travessias das extensões de calçada também atravessam o canteiro (a faixa é pintada com a extensão).
-        var axisLine = axis ?? (path.Points.Count >= 2 ? new Polyline2(path.Points) : null);
         var crossings = TravessiasCanteiro.ToList();
         if (TwoWay && Center == CenterTreatment.Canteiro && MedianType == TipoCanteiro.Fisico && MedianWidth > 0.3)
             crossings.AddRange(ExtensoesCalcada.Where(e => e.Travessia).Select(e => new TravessiaCanteiro
@@ -1020,6 +1022,8 @@ public sealed partial class RoadSetup
     public RoadSetup Clone()
     {
         var c = (RoadSetup)MemberwiseClone();
+        // Avisos próprios: gerar a cópia (prévias, seções dos componentes por trecho) não apaga os avisos da original.
+        c.Warnings = new List<string>();
         c.Right = Right.Select(e => e.Clone()).ToList();
         c.Left = Left.Select(e => e.Clone()).ToList();
         c.LargurasVariaveis = LargurasVariaveis.Select(p => p.Clone()).ToList();
@@ -1028,6 +1032,7 @@ public sealed partial class RoadSetup
         c.TravessiasCanteiro = TravessiasCanteiro.Select(t => t.Clone()).ToList();
         c.ExtensoesCalcada = ExtensoesCalcada.Select(e => e.Clone()).ToList();
         c.TrechosLargura = TrechosLargura.Select(t => t.Clone()).ToList();
+        c.ComponentesTrecho = ComponentesTrecho.Select(t => t.Clone()).ToList();
         c.Sinalizacao = Sinalizacao?.Clone();
         return c;
     }

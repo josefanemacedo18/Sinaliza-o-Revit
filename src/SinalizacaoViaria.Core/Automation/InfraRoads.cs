@@ -103,9 +103,13 @@ public static class InfraRoads
     }
 
     /// <summary>Faixas de terraplenagem da via fora dos trechos em obra (plataforma no greide, taludes, faces junto às obras).</summary>
+    /// <param name="taludes">Taludes por lado e por trecho da via (<see cref="RoadGrade.Taludes"/>): cada vértice das bordas recebe o do lado na estaca dele.</param>
     public static List<GradeCorridor> RoadCorridors(Polyline2 axis, VerticalProfile prof, double right, double left, double s0, double s1, double subgrade,
-        double cut, double fill, IEnumerable<MarkingDefinition> works)
+        double cut, double fill, IEnumerable<MarkingDefinition> works, IReadOnlyList<TrechoTalude>? taludes = null, double reach = 60)
     {
+        var per = taludes != null && taludes.Any(t => t.Valido);
+        var rl = per ? TaludesDaVia.Resolver(cut, fill, taludes, true, axis.Length, reach) : null;
+        var rr = per ? TaludesDaVia.Resolver(cut, fill, taludes, false, axis.Length, reach) : null;
         var res = new List<GradeCorridor>();
         var cursor = s0;
         (bool Face, double? Cap, bool Spill) before = (false, null, false);
@@ -126,6 +130,11 @@ public static class InfraRoads
                 // Pontas livres da via (sem obra): fecham em talude até o terreno.
                 c.SpillStart = !c.WallStart && Math.Abs(cursor - s0) < 1e-6;
                 c.SpillEnd = !c.WallEnd && e >= s1 - 1e-6;
+                if (rl != null && rr != null)
+                {
+                    c.TaludesEsquerda = c.Stations.Select(rl).ToList();
+                    c.TaludesDireita = c.Stations.Select(rr).ToList();
+                }
                 res.Add(c);
             }
             before = (face, cap, spill);
@@ -202,8 +211,9 @@ public static class InfraRoads
             var v = fn(s);
             var pl = Math.Max(0, road.LeftWidth + v.CurbL);
             var pr = -Math.Max(0.5, road.RightWidth + v.CurbR);
-            var ol = road.LeftSidewalk > 0.01 ? Math.Max(pl + 0.2, road.TotalLeft + v.LotL) : pl;
-            var or = road.RightSidewalk > 0.01 ? Math.Min(pr - 0.2, -(road.TotalRight + v.LotR)) : pr;
+            // Sem calçada na seção, o alinhamento só passa do bordo onde um componente por trecho acrescenta uma.
+            var ol = road.LeftSidewalk > 0.01 ? Math.Max(pl + 0.2, road.TotalLeft + v.LotL) : Math.Max(pl, road.TotalLeft + v.LotL);
+            var or = road.RightSidewalk > 0.01 ? Math.Min(pr - 0.2, -(road.TotalRight + v.LotR)) : Math.Min(pr, -(road.TotalRight + v.LotR));
             return new PlatformEdges(pr, pl, or, ol, riseR(s), riseL(s));
         };
     }

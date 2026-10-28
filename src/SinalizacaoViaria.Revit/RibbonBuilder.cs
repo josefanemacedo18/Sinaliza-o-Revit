@@ -89,6 +89,11 @@ public static class RibbonBuilder
             Data(typeof(CmdLarguraTrecho), "Alterar Largura por Trecho", "largura",
                 "Muda a largura da calçada, pista, estacionamento ou canteiro entre dois pontos do eixo, com transição.",
                 "Clique o início (A) e o fim (B) no eixo – ou digite as estacas – e mude a largura da calçada, da pista, do estacionamento ou do canteiro, com transição em cada ponta. Setas e cotas na planta antes de confirmar."),
+            Data(typeof(CmdComponentesTrecho), "Componentes por Trecho", "componentes",
+                "Acrescenta, tira ou muda a largura de faixa, ciclofaixa, estacionamento, canteiro ou calçada entre duas estacas.",
+                "Clique o início (A) e o fim (B) no eixo – ou digite as estacas – e acrescente, tire ou mude a largura de qualquer elemento de um lado da seção " +
+                "(faixa, ciclofaixa, estacionamento, canteiro, calçada), com transição em cada ponta. Os trechos gravados podem ser divididos ou removidos; " +
+                "a via é refeita a partir do eixo."),
             Data(typeof(CmdRecuoVia), "Recuo na Via (baia / faixa auxiliar)", "recuo",
                 "Baia de ônibus, faixa de desaceleração/aceleração ou recuo de embarque numa via já criada.",
                 "Numa via já criada: clique junto ao bordo e crie baia de ônibus, faixa de desaceleração/aceleração ou recuo de embarque – a via é refeita com meio-fio, calçada e sinalização do recuo. Editar no recuo altera ou remove."),
@@ -154,6 +159,10 @@ public static class RibbonBuilder
             Data(typeof(CmdTalude), "Talude", "talude",
                 "Taludes de corte e aterro com bermas, canaletas, descidas d'água e revestimento, no Toposolid.",
                 "Taludes de corte e aterro com bermas, canaletas de crista, pé e bermas, descidas d'água e revestimento – aplicados ao Toposolid."),
+            Data(typeof(CmdTaludesTrecho), "Taludes por Trecho", "taludetrecho",
+                "Taludes da via por lado e por trecho: talude fixo com limite ou largura fixa, com transições.",
+                "Na via clicada, taludes laterais por lado e por trecho: talude fixo (corte e aterro, com limite de largura – onde não alcança o terreno, " +
+                "face quase vertical) ou largura fixa, com transições; a seção numa estaca mostra o resultado antes de aplicar."),
             Data(typeof(CmdMuroArrimo), "Muro de Arrimo", "muro",
                 "Muros de flexão, gravidade, contrafortes, gabião, terra armada e cortina atirantada, com reaterro.",
                 "Muros de flexão, gravidade, contrafortes, gabião, terra armada e cortina atirantada – base no terreno, barbacãs, coroamento e reaterro no Toposolid."));

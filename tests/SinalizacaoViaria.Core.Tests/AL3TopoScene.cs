@@ -424,7 +424,7 @@ public static class TopoScene
         var left = road.TotalLeft;
         var s0 = Math.Max(0, road.StartSetback);
         var s1 = Math.Max(s0 + 0.5, axis.Length - Math.Max(0, road.EndSetback));
-        var corr = InfraRoads.RoadCorridors(axis, prof, right, left, s0, s1, Scene.Subgrade, g.CutSlope, g.FillSlope, Array.Empty<MarkingDefinition>());
+        var corr = InfraRoads.RoadCorridors(axis, prof, right, left, s0, s1, Scene.Subgrade, g.CutSlope, g.FillSlope, Array.Empty<MarkingDefinition>(), g.Taludes);
         InfraRoads.FitToSection(corr, left, right, sc.Surfaces[i], InfraRoads.Edges(road, axis), Scene.Subgrade, InfraRoads.SectionBreaks(g));
         foreach (var c in corr) c.Owner = road.Id;
         // Nós em que a via é secundária: a crista da via principal, prolongada, cruza a concordância.

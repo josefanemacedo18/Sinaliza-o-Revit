@@ -37,6 +37,11 @@ public sealed class RoadGrade
     public double CutSlope { get; set; } = 1.0;
     public double FillSlope { get; set; } = 1.5;
     /// <summary>
+    /// Taludes por lado e por trecho (método, inclinações, limite ou largura fixa, transições) sobre <see cref="CutSlope"/> e
+    /// <see cref="FillSlope"/>. Vazio = os da via dos dois lados, na via inteira.
+    /// </summary>
+    public List<TrechoTalude> Taludes { get; set; } = new();
+    /// <summary>
     /// Greide de projeto da via SEM as obras hospedadas (pontes elevam, trincheiras rebaixam): as obras são reaplicadas sobre ele
     /// sempre que uma delas muda – editar ou apagar uma obra não bagunça o greide das outras.
     /// </summary>
@@ -52,6 +57,7 @@ public sealed class RoadGrade
         Points = Points.Select(p => new GradePoint(p.S, p.Z, p.Curve)).ToList(),
         DefaultCurve = DefaultCurve, Crossfall = Crossfall, CrossfallWidth = CrossfallWidth,
         Superelevation = new List<Vec2>(Superelevation), AdjustTerrain = AdjustTerrain, CutSlope = CutSlope, FillSlope = FillSlope,
+        Taludes = Taludes.Select(t => t.Clone()).ToList(),
         WithoutWorks = WithoutWorks?.Clone(),
     };
 

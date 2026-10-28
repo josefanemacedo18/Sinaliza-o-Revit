@@ -1556,6 +1556,49 @@ public sealed record PavementGap(double Offset, double Width, bool Median = true
 {
     /// <summary>Deslocamento da faixa sem pavimento ao longo do eixo (vias de largura variável).</summary>
     public LateralProfile? Lateral { get; init; }
+    /// <summary>Estacas do eixo entre as quais a faixa existe (componente por trecho); nulas = a via inteira.</summary>
+    public double? From { get; init; }
+    public double? To { get; init; }
+    /// <summary>Trechos (estacas do eixo) em que a faixa não existe – o elemento foi tirado da seção ali (componente por trecho).</summary>
+    public List<StationRange>? Except { get; init; }
+
+    /// <summary>Intervalos de estaca, dentro de [s0, s1], em que a faixa existe.</summary>
+    public List<(double A, double B)> Ranges(double s0, double s1, Polyline2? axis = null)
+    {
+        var res = new List<(double A, double B)>();
+        var a = Math.Max(s0, From ?? s0);
+        var b = Math.Min(s1, To ?? s1);
+        if (b - a < 0.05) return res;
+        res.Add((a, b));
+        foreach (var ex in Except ?? new List<StationRange>())
+        {
+            var (e0, e1) = axis != null ? ex.On(axis) : (Math.Min(ex.Start, ex.End), Math.Max(ex.Start, ex.End));
+            var next = new List<(double A, double B)>();
+            foreach (var (x, y) in res)
+            {
+                if (e1 <= x || e0 >= y) { next.Add((x, y)); continue; }
+                if (e0 - x > 0.05) next.Add((x, e0));
+                if (y - e1 > 0.05) next.Add((e1, y));
+            }
+            res = next;
+        }
+        return res;
+    }
+
+    /// <summary>A faixa existe na estaca.</summary>
+    public bool ExistsAt(double station, Polyline2? axis = null)
+    {
+        if (From is { } f && station < f - 1e-6 || To is { } t && station > t + 1e-6) return false;
+        foreach (var ex in Except ?? new List<StationRange>())
+        {
+            var (e0, e1) = axis != null ? ex.On(axis) : (Math.Min(ex.Start, ex.End), Math.Max(ex.Start, ex.End));
+            if (station > e0 + 1e-6 && station < e1 - 1e-6) return false;
+        }
+        return true;
+    }
+
+    [JsonIgnore]
+    public bool IsPartial => From != null || To != null || Except is { Count: > 0 };
 }
 
 /// <summary>
@@ -1599,6 +1642,11 @@ public sealed class RoadPavementDefinition : MarkingDefinition
     public bool TwoWay { get; set; } = true;
     /// <summary>Faixas sem pavimento (canteiros físicos, sarjetas), offset + à esquerda.</summary>
     public List<PavementGap> Gaps { get; set; } = new();
+    /// <summary>
+    /// Faixas sem pavimento só num trecho (canteiro acrescentado entre duas estacas – componente por trecho): só a pista as
+    /// recorta; as conexões (interseções, rotatórias) continuam lendo <see cref="Gaps"/>, a seção da via inteira.
+    /// </summary>
+    public List<PavementGap> StretchGaps { get; set; } = new();
     /// <summary>Aberturas no canteiro central (retornos): pista contínua no vão, pontas do canteiro arredondadas e bolsão.</summary>
     public List<MedianOpening> MedianOpenings { get; set; } = new();
     public double StartSetback { get; set; }
@@ -1670,14 +1718,22 @@ public sealed class RoadPavementDefinition : MarkingDefinition
     public RoadPavementDefinition Local(double station, Polyline2? axis = null)
     {
         var c = (RoadPavementDefinition)FromJson(ToJson())!;
-        if (!HasEdgeVariation) return c;
+        if (!HasEdgeVariation && StretchGaps.Count == 0 && !Gaps.Any(g => g.IsPartial)) return c;
         var (fn, _) = EdgeFunctions(axis);
         var v = fn(station);
         c.RightWidth = Math.Max(0.5, RightWidth + v.CurbR);
         c.LeftWidth = Math.Max(0, LeftWidth + v.CurbL);
         if (RightSidewalk > 0.01) c.RightSidewalk = Math.Max(0.2, RightSidewalk + v.LotR - v.CurbR);
         if (LeftSidewalk > 0.01) c.LeftSidewalk = Math.Max(0.2, LeftSidewalk + v.LotL - v.CurbL);
-        c.Gaps = Gaps.Select(g => g with { Offset = g.Offset + (g.Lateral is { IsEmpty: false } gl ? gl.ShiftAt(station, axis) : 0), Lateral = null }).ToList();
+        // Faixas do trecho: as que existem na estaca entram como da seção; as tiradas ali saem.
+        c.Gaps = Gaps.Concat(StretchGaps).Where(g => g.ExistsAt(station, axis))
+            .Select(g => g with
+            {
+                Offset = g.Offset + (g.Lateral is { IsEmpty: false } gl ? gl.ShiftAt(station, axis) : 0),
+                Width = g.Width + (g.Lateral is { IsEmpty: false } gw ? gw.WidenAt(station, axis) : 0),
+                Lateral = null, From = null, To = null, Except = null,
+            }).Where(g => g.Width > 0.05).ToList();
+        c.StretchGaps = new List<PavementGap>();
         c.EdgeVariation = new List<EdgeVariationPoint>();
         return c;
     }

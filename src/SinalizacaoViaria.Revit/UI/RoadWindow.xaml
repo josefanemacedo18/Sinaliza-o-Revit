@@ -240,6 +240,13 @@
                             <Button Content="Remover trechos" Click="ClearStretchesClick"/>
                         </StackPanel>
                         <TextBlock x:Name="TxtStretches" Style="{StaticResource Hint}"/>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,6,0,0" Text="Acrescentar, tirar ou mudar a largura de um elemento de um lado (faixa, ciclofaixa, estacionamento, canteiro, calçada) entre duas estacas, com transições:"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <Button Content="Componente por trecho (A–B)…" Click="AddComponentClick" Margin="0"
+                                    ToolTip="Mesma janela da ferramenta Componentes por Trecho (na planta, os pontos A e B são clicados no eixo)."/>
+                            <Button Content="Remover componentes" Click="ClearComponentsClick"/>
+                        </StackPanel>
+                        <TextBlock x:Name="TxtComponents" Style="{StaticResource Hint}"/>
                         <Grid Margin="0,6,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
                             <TextBlock Text="Quem absorve a variação na pista" Style="{StaticResource FieldLabel}"/>

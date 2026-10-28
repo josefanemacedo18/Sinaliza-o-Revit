@@ -96,13 +96,18 @@ public sealed class TrechoLargura
     [JsonIgnore] public double Fim => B + Math.Max(0, TransicaoB);
 
     /// <summary>Fração da mudança na estaca: 0 fora do trecho e das transições, 1 entre A e B.</summary>
-    public double Fator(double s)
+    public double Fator(double s) => FatorTransicao(s, A, B, TransicaoA, TransicaoB, CurvaS);
+
+    /// <summary>Fração de uma mudança entre A e B com transições de <paramref name="ta"/> e <paramref name="tb"/> m (retas ou em S).</summary>
+    public static double FatorTransicao(double s, double a, double b, double ta, double tb, bool curvaS)
     {
-        double U(double u) => CurvaS ? u * u * (3 - 2 * u) : u;
-        if (s < Inicio - 1e-9 || s > Fim + 1e-9) return 0;
-        if (s < A) return TransicaoA < 1e-6 ? 1 : U((s - Inicio) / TransicaoA);
-        if (s <= B) return 1;
-        return TransicaoB < 1e-6 ? 1 : U(1 - (s - B) / TransicaoB);
+        double U(double u) => curvaS ? u * u * (3 - 2 * u) : u;
+        ta = Math.Max(0, ta);
+        tb = Math.Max(0, tb);
+        if (s < a - ta - 1e-9 || s > b + tb + 1e-9) return 0;
+        if (s < a) return ta < 1e-6 ? 1 : U((s - (a - ta)) / ta);
+        if (s <= b) return 1;
+        return tb < 1e-6 ? 1 : U(1 - (s - b) / tb);
     }
 
     public static string Rotulo(ElementoTrecho e) => e switch
@@ -212,7 +217,7 @@ public sealed partial class RoadSetup
     public List<TrechoLargura> TrechosLargura { get; set; } = new();
 
     [JsonIgnore]
-    public bool HasVariableWidth => LargurasVariaveis.Count > 0 || Recuos.Count > 0 || TrechosLargura.Count > 0;
+    public bool HasVariableWidth => LargurasVariaveis.Count > 0 || Recuos.Count > 0 || TrechosLargura.Count > 0 || ComponentesTrecho.Count > 0;
 
     /// <summary>Largura atual (da seção) de um elemento; nulo quando a via não tem o elemento.</summary>
     public double? LarguraAtual(ElementoTrecho e)
@@ -472,6 +477,18 @@ public sealed partial class RoadSetup
                 for (var s = t.B + 1; s < t.Fim - 0.5; s += 1) st.Add(s);
             }
         }
+        foreach (var c in ComponentesTrecho)
+        {
+            st.AddRange(new[] { c.Inicio, c.A, c.B, c.Fim });
+            // Degrau sem transição: dois pontos quase coincidentes.
+            if (c.TransicaoA < 0.05) st.Add(c.A - 0.05);
+            if (c.TransicaoB < 0.05) st.Add(c.B + 0.05);
+            if (c.CurvaS || TransicaoSuave)
+            {
+                for (var s = c.Inicio + 1; s < c.A - 0.5; s += 1) st.Add(s);
+                for (var s = c.B + 1; s < c.Fim - 0.5; s += 1) st.Add(s);
+            }
+        }
         foreach (var r in Recuos)
         {
             st.AddRange(new[] { r.Estaca, r.S1, r.S2, r.S3 });
@@ -490,12 +507,25 @@ public sealed partial class RoadSetup
     /// <summary>Deslocamento total (para fora) de um lado, na estaca e na distância d do eixo.</summary>
     private Func<double, double, double> SideWarp(bool left, List<PontoLargura> pts)
     {
+        var f = SideWarp(left, pts, null, null);
+        return (s, d) => f(s, d, 0);
+    }
+
+    /// <summary>
+    /// Deslocamento total (para fora) de um lado, na estaca e na distância d do eixo. <c>interior</c>: de que lado do ponto fica
+    /// a faixa da marca (+1 fora, −1 dentro, 0 linha) – decide, na costura de um componente acrescentado, se a ponta da faixa
+    /// fica ou vai com os elementos de fora. <paramref name="sem"/>: componente por trecho deixado de fora (as marcas próprias
+    /// dele já estão na seção do trecho).
+    /// </summary>
+    private Func<double, double, int, double> SideWarp(bool left, List<PontoLargura> pts, List<ComponenteAtivo>? comps, ComponenteTrecho? sem)
+    {
+        var mine = (comps ?? ComponentesAtivos()).Where(c => c.Left == left && !ReferenceEquals(c.T, sem)).ToList();
         var side = left ? Left : Right;
         var z = Zones(side);
         var recs = Recuos.Where(r => r.LadoEsquerdo == left && r.Profundidade > 0.01).ToList();
         var stretches = TrechosLargura.Select(t => (T: t, Z: StretchZone(t, left))).Where(x => x.Z != null)
             .Select(x => (x.T, x.Z!.Value.Zone, x.Z.Value.Delta)).ToList();
-        return (s, d) =>
+        return (s, d, interior) =>
         {
             var (dc, dl) = Surveyed(left, s, pts);
             var total = Warp(z.General, dc, dl, d);
@@ -503,6 +533,11 @@ public sealed partial class RoadSetup
             {
                 var f = t.Fator(s);
                 if (f > 1e-9) total += Warp(zone, delta * f, delta * f, d);
+            }
+            foreach (var c in mine)
+            {
+                var f = c.T.Fator(s);
+                if (f > 1e-9) total += Warp(c.Zona, c.Delta * f, c.Delta * f, d + interior * 1e-5);
             }
             foreach (var r in recs)
             {
@@ -523,7 +558,7 @@ public sealed partial class RoadSetup
     /// bordas variáveis no pavimento, interrupção da linha de bordo nas bocas das baias e as marcas dos recuos.
     /// </summary>
     private void ApplyVariation(List<MarkingDefinition> res, Polyline2? axis, Dictionary<MarkingDefinition, (int Sigma, double D0, double D1)> bands,
-        Func<MarkingDefinition, MarkingDefinition> add)
+        Func<MarkingDefinition, MarkingDefinition> add, Dictionary<MarkingDefinition, MarcaDoTrecho>? own = null, List<VaoDoTrecho>? vaos = null)
     {
         if (!HasVariableWidth) return;
         var pts = LargurasVariaveis.OrderBy(p => p.Estaca).Select(p => p.Clone()).ToList();
@@ -531,9 +566,33 @@ public sealed partial class RoadSetup
         if (stations.Count == 0) return;
         if (axis != null) stations = stations.Where(s => s <= axis.Length + 1e-6).ToList();
         Vec2? Anchor(double s) => axis == null ? null : axis.PointAt(Math.Clamp(s, 0, axis.Length));
-        var wl = SideWarp(true, pts);
-        var wr = SideWarp(false, pts);
-        double W(int sigma, double s, double d) => sigma > 0 ? wl(s, d) : wr(s, d);
+        var comps = ComponentesAtivos();
+        var wl3 = SideWarp(true, pts, comps, null);
+        var wr3 = SideWarp(false, pts, comps, null);
+        double wl(double s, double d) => wl3(s, d, 0);
+        double wr(double s, double d) => wr3(s, d, 0);
+        double W(int sigma, double s, double d, int interior = 0) => sigma > 0 ? wl3(s, d, interior) : wr3(s, d, interior);
+        // Deslocamento dos outros trechos para as marcas próprias de um componente (na seção do trecho, já deslocadas por ele).
+        var others = new Dictionary<ComponenteTrecho, Func<double, double, int, double>>();
+        Func<double, double, int, double> Others(ComponenteAtivo c)
+        {
+            if (!others.TryGetValue(c.T, out var f)) others[c.T] = f = SideWarp(c.Left, pts, comps, c.T);
+            return f;
+        }
+        // Perfil lateral de uma faixa [d0, d1] da seção de um componente (estacas de A a B, no caminho recortado).
+        LateralProfile OwnProfile(ComponenteAtivo c, int sigma, double d0, double d1)
+        {
+            var f = Others(c);
+            var (a, b) = (Math.Max(0, c.T.A), axis == null ? c.T.B : Math.Min(axis.Length, c.T.B));
+            var prof = new LateralProfile();
+            foreach (var s in stations.Where(x => x > a + 1e-6 && x < b - 1e-6).Prepend(a).Append(b))
+            {
+                var x0 = f(s, NaVia(c, d0), d1 > d0 + 1e-6 ? 1 : 0);
+                var x1 = d1 > d0 + 1e-6 ? f(s, NaVia(c, d1), -1) : x0;
+                prof.Points.Add(new LateralPoint(s - a, sigma * (x0 + x1) / 2, x1 - x0, Anchor(s)));
+            }
+            return prof;
+        }
 
         foreach (var def in res.ToList())
         {
@@ -541,10 +600,15 @@ public sealed partial class RoadSetup
             {
                 var (bl, al, _) = Nominal(true);
                 var (br, ar, _) = Nominal(false);
+                // Bordo da pista: fica com o que está dentro dele, salvo um elemento de pista acrescentado depois do último.
+                int CurbSide(bool left, double at) =>
+                    comps.Any(c => c.Left == left && c.T.Operacao == OperacaoComponente.Inserir && Math.Abs(c.Seam - at) < 1e-6
+                                   && c.T.Elemento?.Tipo is not (TipoElementoSecao.Calcada or null)) ? 1 : -1;
+                var (cl, cr) = (CurbSide(true, bl), CurbSide(false, br));
                 pav.EdgeVariation = stations.Select(s => new EdgeVariationPoint
                 {
                     Station = s, Anchor = Anchor(s),
-                    CurbLeft = wl(s, bl), CurbRight = wr(s, br), LotLeft = wl(s, al), LotRight = wr(s, ar),
+                    CurbLeft = W(1, s, bl, cl), CurbRight = W(-1, s, br, cr), LotLeft = W(1, s, al, 1), LotRight = W(-1, s, ar, 1),
                 }).ToList();
                 if (!pav.HasEdgeVariation) pav.EdgeVariation.Clear();
                 pav.Gaps = pav.Gaps.Select(g =>
@@ -561,9 +625,32 @@ public sealed partial class RoadSetup
                         }).ToList() };
                         return cp.IsEmpty ? g : g with { Lateral = cp };
                     }
-                    var lp = new LateralProfile { Points = stations.Select(s => new LateralPoint(s, sg * W(sg, s, Math.Abs(g.Offset)), 0, Anchor(s))).ToList() };
+                    // Cada borda acompanha a sua distância (uma faixa dentro de um elemento tirado afunila até sumir).
+                    var (g0, g1) = (Math.Abs(g.Offset) - g.Width / 2, Math.Abs(g.Offset) + g.Width / 2);
+                    var lp = new LateralProfile { Points = stations.Select(s =>
+                    {
+                        var x0 = W(sg, s, g0, 1);
+                        var x1 = W(sg, s, g1, -1);
+                        return new LateralPoint(s, sg * (x0 + x1) / 2, x1 - x0, Anchor(s));
+                    }).ToList() };
                     return lp.IsEmpty ? g : g with { Lateral = lp };
                 }).ToList();
+                // Vãos que só a seção de um componente tem (canteiro acrescentado): só entre A e B, com o deslocamento dos outros.
+                pav.StretchGaps = (vaos ?? new List<VaoDoTrecho>()).Select(v =>
+                {
+                    var sg = Math.Sign(v.Gap.Offset);
+                    var prof = OwnProfile(v.C, sg, Math.Abs(v.Gap.Offset) - v.Gap.Width / 2, Math.Abs(v.Gap.Offset) + v.Gap.Width / 2);
+                    // Estacas do perfil no eixo da via (o vão é recortado da pista inteira, não de um caminho recortado).
+                    foreach (var q in prof.Points) q.Station += Math.Max(0, v.C.T.A);
+                    return prof.IsEmpty ? v.Gap : v.Gap with { Lateral = prof };
+                }).ToList();
+                continue;
+            }
+            if (own != null && own.TryGetValue(def, out var od))
+            {
+                // Marca própria de um componente por trecho: a posição já é a da seção do trecho; só os outros trechos a deslocam.
+                var prof = OwnProfile(od.C, od.Sigma, od.D0, od.D1);
+                if (!prof.IsEmpty && def.Path != null) def.Path.Lateral = prof;
                 continue;
             }
             if (def.Path == null) continue;
@@ -592,14 +679,15 @@ public sealed partial class RoadSetup
                 continue;
             }
             if (band is not { } bd || bd.Sigma == 0) continue;
-            var prof = new LateralProfile();
+            var profile = new LateralProfile();
+            var isBand = bd.D1 > bd.D0 + 1e-6;
             foreach (var s in stations)
             {
-                var d0 = W(bd.Sigma, s, bd.D0);
-                var d1 = W(bd.Sigma, s, bd.D1);
-                prof.Points.Add(new LateralPoint(s, bd.Sigma * (d0 + d1) / 2, d1 - d0, Anchor(s)));
+                var d0 = W(bd.Sigma, s, bd.D0, isBand ? 1 : 0);
+                var d1 = W(bd.Sigma, s, bd.D1, isBand ? -1 : 0);
+                profile.Points.Add(new LateralPoint(s, bd.Sigma * (d0 + d1) / 2, d1 - d0, Anchor(s)));
             }
-            if (!prof.IsEmpty) def.Path.Lateral = prof;
+            if (!profile.IsEmpty) def.Path.Lateral = profile;
         }
 
         foreach (var sideLeft in new[] { false, true })

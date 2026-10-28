@@ -144,7 +144,8 @@ public static class TerrainService
                 // Fundo da estrutura sob a pista: a estrutura do pavimento da via (revestimento + camadas, Etapa 5) ou o subleito padrão.
                 var depth = EarthworkRecord.Profundidade(road, opt.Subgrade);
                 // Fora dos trechos em obra; junto a encontros e emboques a via termina numa face vertical (emboque: testa + talude).
-                var roadCorr = InfraRoads.RoadCorridors(axis, prof, right, left, s0, s1, depth, cut, fill, works);
+                // Taludes por lado e por trecho do greide da via (Etapa 19) sobre os da via.
+                var roadCorr = InfraRoads.RoadCorridors(axis, prof, right, left, s0, s1, depth, cut, fill, works, g?.Taludes, opt.MaxDaylight);
                 // A plataforma acompanha a mesma superfície dos pisos (abaulamento, superelevação e concordância com os nós).
                 if (g != null)
                 {

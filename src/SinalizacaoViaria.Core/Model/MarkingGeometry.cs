@@ -384,6 +384,14 @@ public sealed class GradeCorridor
     /// </summary>
     public List<Vec3> StartFinish { get; } = new();
     public List<Vec3> EndFinish { get; } = new();
+    /// <summary>Estaca no eixo de cada vértice das bordas (faixas das vias); vazio nas outras. Só em memória.</summary>
+    public List<double> Stations { get; } = new();
+    /// <summary>
+    /// Talude de cada vértice da borda esquerda/direita (taludes por lado e por trecho da via, mesma contagem das bordas); nulo =
+    /// <see cref="CutSlope"/> e <see cref="FillSlope"/> no lado inteiro. Só em memória.
+    /// </summary>
+    public List<TaludeNoPonto>? TaludesEsquerda { get; set; }
+    public List<TaludeNoPonto>? TaludesDireita { get; set; }
 
     /// <summary>Soma <paramref name="dz"/> a todas as cotas (relativas → absolutas).</summary>
     public GradeCorridor WithOffset(double dz)

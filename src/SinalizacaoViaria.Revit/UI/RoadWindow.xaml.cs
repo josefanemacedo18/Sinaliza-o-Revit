@@ -325,6 +325,9 @@ public partial class RoadWindow : Window
         _stretches.Clear();
         _stretches.AddRange(s.TrechosLargura.Select(t => t.Clone()));
         UpdateStretchText();
+        _components.Clear();
+        _components.AddRange(s.ComponentesTrecho.Select(t => t.Clone()));
+        UpdateComponentText();
         _recesses.Clear();
         foreach (var r in s.Recuos) _recesses.Add(new RecessRow(r.Clone(), _estacas));
         Select(CbAbsorb, s.Absorcao);
@@ -393,6 +396,7 @@ public partial class RoadWindow : Window
         };
         s.Sinalizacao = auto.Empty ? null : auto;
         s.TrechosLargura = _stretches.Select(t => t.Clone()).ToList();
+        s.ComponentesTrecho = _components.Select(t => t.Clone()).ToList();
         s.Estaqueamento = _estacas.Estaqueamento;
         if (_loaded != null)
         {
@@ -473,6 +477,41 @@ public partial class RoadWindow : Window
         TxtStretches.Text = _stretches.Count == 0 ? "Nenhum trecho com largura alterada." : string.Join("\n", _stretches.OrderBy(x => x.A).Select(x =>
             $"• {TrechoLargura.Rotulo(x.Elemento)}: {UiHelpers.F(x.NovaLargura)} m de {_estacas.Mostrar(x.A)} (A) a {_estacas.Mostrar(x.B)} (B), " +
             $"transições {UiHelpers.F(x.TransicaoA)} / {UiHelpers.F(x.TransicaoB)} m"));
+    }
+
+    /// <summary>Componentes por trecho (mesma janela da ferramenta Componentes por Trecho, com as estacas digitadas).</summary>
+    private readonly List<ComponenteTrecho> _components = new();
+
+    private void AddComponentClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var s = BuildSetup();
+            s.ComponentesTrecho.Clear();
+            var start = _components.Count == 0 ? 20 : _components.Max(x => x.Fim) + 20;
+            var t = new ComponenteTrecho { EstacaA = start + 10, EstacaB = start + 50, Posicao = Math.Max(0, s.Right.Count - 1) };
+            if (!Commands.ComponentStretchForm.Show(s, t, "Componente por trecho")) return;
+            Commands.ComponentStretchForm.Validar(s, t);
+            _components.Add(t);
+            UpdateComponentText();
+            SchedulePreview();
+        }
+        catch (FormatException ex) { UiHelpers.Error(ex.Message); }
+        catch (UserMessageException ex) { UiHelpers.Error(ex.Message); }
+    }
+
+    private void ClearComponentsClick(object sender, RoutedEventArgs e)
+    {
+        _components.Clear();
+        UpdateComponentText();
+        SchedulePreview();
+    }
+
+    private void UpdateComponentText()
+    {
+        if (TxtComponents == null) return;
+        TxtComponents.Text = _components.Count == 0 ? "Nenhum componente por trecho."
+            : string.Join("\n", _components.OrderBy(x => x.A).Select(x => "• " + x.Descricao(_estacas.Mostrar)));
     }
 
     private void AddRecessClick(object sender, RoutedEventArgs e)

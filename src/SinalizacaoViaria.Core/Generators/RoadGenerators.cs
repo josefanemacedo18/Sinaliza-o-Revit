@@ -61,7 +61,8 @@ public static class RoadGenerator
     /// <summary>Área de pista (sem as faixas de canteiros/sarjetas).</summary>
     public static List<Polygon2> Carriageway(RoadPavementDefinition d, Polyline2 axis, bool withGaps = true)
     {
-        if (d.HasEdgeVariation) return VariableCarriageway(d, axis, withGaps);
+        // Faixas sem pavimento só num trecho (componentes por trecho): o recorte por estacas é o da pista variável.
+        if (d.HasEdgeVariation || withGaps && (d.StretchGaps.Count > 0 || d.Gaps.Any(g => g.IsPartial))) return VariableCarriageway(d, axis, withGaps);
         var a = Trimmed(axis, d.StartSetback, d.EndSetback);
         if (!withGaps || d.Gaps.Count == 0) return Band(a, -d.RightWidth, d.LeftWidth);
         if (d.MedianOpenings.Count > 0)
@@ -96,17 +97,21 @@ public static class RoadGenerator
         var s1 = Math.Clamp(axis.Length - d.EndSetback, s0, axis.Length);
         var (fn, samples) = d.EdgeFunctions(axis);
         var band = VariableBand(axis, s0, s1, s => -(d.RightWidth + fn(s).CurbR), s => d.LeftWidth + fn(s).CurbL, samples);
-        if (!withGaps || d.Gaps.Count == 0) return band;
+        if (!withGaps || d.Gaps.Count + d.StretchGaps.Count == 0) return band;
         var gaps = new List<Polygon2>();
-        foreach (var g in d.Gaps)
+        foreach (var g in d.Gaps.Concat(d.StretchGaps))
         {
-            if (g.Lateral is { IsEmpty: false } gl)
+            // Só nos trechos em que a faixa existe (componente acrescentado ou tirado entre duas estacas).
+            foreach (var (g0, g1) in g.Ranges(s0, s1, axis))
             {
-                var (sh, wd, br) = gl.For(axis);
-                var gs = samples.Concat(LateralProfile.Samples(br, axis.Length, sh, gl.Smooth)).Distinct().ToList();
-                gaps.AddRange(VariableBand(axis, s0, s1, s => g.Offset - (g.Width + wd(s)) / 2 + sh(s), s => g.Offset + (g.Width + wd(s)) / 2 + sh(s), gs));
+                if (g.Lateral is { IsEmpty: false } gl)
+                {
+                    var (sh, wd, br) = gl.For(axis);
+                    var gs = samples.Concat(LateralProfile.Samples(br, axis.Length, sh, gl.Smooth)).Distinct().ToList();
+                    gaps.AddRange(VariableBand(axis, g0, g1, s => g.Offset - (g.Width + wd(s)) / 2 + sh(s), s => g.Offset + (g.Width + wd(s)) / 2 + sh(s), gs));
+                }
+                else gaps.AddRange(VariableBand(axis, g0, g1, _ => g.Offset - g.Width / 2, _ => g.Offset + g.Width / 2, samples));
             }
-            else gaps.AddRange(VariableBand(axis, s0, s1, _ => g.Offset - g.Width / 2, _ => g.Offset + g.Width / 2, samples));
         }
         if (d.MedianOpenings.Count > 0) gaps = PolygonOps.Difference(gaps, MedianOpenings(d, axis).Fill);
         return PolygonOps.Difference(band, gaps);
