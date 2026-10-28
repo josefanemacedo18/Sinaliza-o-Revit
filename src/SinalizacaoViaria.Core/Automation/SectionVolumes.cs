@@ -97,6 +97,18 @@ public static class SectionVolumes
             }
             res.Secoes.Add(new SecaoVolume(s, cut, fill));
         }
+        return FromSections(res.Secoes);
+    }
+
+    /// <summary>
+    /// Volumes pela média das áreas das seções vizinhas × a distância entre elas, e os acumulados em cada seção (a base do
+    /// diagrama de massas). As seções em ordem de estaca.
+    /// </summary>
+    public static VolumesPorSecao FromSections(IEnumerable<SecaoVolume> sections)
+    {
+        var res = new VolumesPorSecao();
+        res.Secoes.AddRange(sections.OrderBy(x => x.Estaca));
+        if (res.Secoes.Count == 0) return res;
         double vc = 0, vf = 0;
         res.Acumulado.Add((res.Secoes[0].Estaca, 0, 0));
         for (var i = 1; i < res.Secoes.Count; i++)
@@ -111,6 +123,37 @@ public static class SectionVolumes
         res.CorteM3 = vc;
         res.AterroM3 = vf;
         return res;
+    }
+
+    /// <summary>
+    /// Volumes de um trecho de estacas (de <paramref name="s0"/> a <paramref name="s1"/>, m ao longo do eixo): a mesma média
+    /// das áreas, com as áreas nas pontas do trecho interpoladas entre as seções vizinhas. Trechos vizinhos somam o total.
+    /// </summary>
+    public static (double Corte, double Aterro) Trecho(VolumesPorSecao v, double s0, double s1)
+    {
+        if (s1 < s0) (s0, s1) = (s1, s0);
+        var secs = v.Secoes;
+        if (secs.Count < 2) return (0, 0);
+        SecaoVolume At(double s)
+        {
+            if (s <= secs[0].Estaca) return secs[0] with { Estaca = s };
+            for (int i = 0; i + 1 < secs.Count; i++)
+                if (s <= secs[i + 1].Estaca)
+                {
+                    var (a, b) = (secs[i], secs[i + 1]);
+                    var t = (s - a.Estaca) / Math.Max(1e-12, b.Estaca - a.Estaca);
+                    return new SecaoVolume(s, a.Corte + (b.Corte - a.Corte) * t, a.Aterro + (b.Aterro - a.Aterro) * t);
+                }
+            return secs[^1] with { Estaca = s };
+        }
+        s0 = Math.Max(s0, secs[0].Estaca);
+        s1 = Math.Min(s1, secs[^1].Estaca);
+        if (s1 - s0 < 1e-9) return (0, 0);
+        var pts = new List<SecaoVolume> { At(s0) };
+        pts.AddRange(secs.Where(x => x.Estaca > s0 + 1e-9 && x.Estaca < s1 - 1e-9));
+        pts.Add(At(s1));
+        var r = FromSections(pts);
+        return (r.CorteM3, r.AterroM3);
     }
 
     /// <summary>

@@ -41,6 +41,17 @@ public sealed class CmdPerfilVia : CommandBase
         var o = _opt;
         var pt = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
         PerfilResultado Compute() => RoadProfileDesigner.Design(L, s => hasTerrain ? GroundAt(s) : road.Grade.Z(s), o);
+        // Estaqueamento da via (D-023): rótulos dos gráficos e das seções; gravado ao aplicar.
+        var est = road.Pavement.Estaqueamento?.Clone() ?? new Estaqueamento();
+        // Terraplenagem por estaca estimada pela seção-tipo (Etapa 18): plataforma da via (pista e calçadas) e os taludes.
+        Func<Vec2, double?> ground = p => hasTerrain ? groundFn(p) : null;
+        SecaoTipo Tipo() => new(road.Pavement.TotalLeft, road.Pavement.TotalRight, o.CutSlope, o.FillSlope);
+        var grafico = 0;
+        double estacaVer = 0, exagero = 2, trechoDe = 0, trechoAte = L;
+        var pivNum = 1;
+        double pivS = Math.Round(L / 2), pivZ = 0, pivC = 0;
+        List<GradePoint> Pivs() => RoadGrade.ParsePvis(o.ManualPvis);
+        void GravarPivs(List<GradePoint> l) => o.ManualPvis = EstacasTerraplenagem.TextoPivs(l);
 
         var w = new FormWindow("Perfil da via", "Perfil longitudinal e obras pela topografia",
                 $"PARA QUE SERVE: definir a altura da via (o GREIDE) ao longo dos seus {L.ToString("0", pt)} m sobre a topografia.\n" +
@@ -56,11 +67,45 @@ public sealed class CmdPerfilVia : CommandBase
                 null, () =>
                 {
                     var r = Compute();
-                    var g = RoadProfileDesigner.Chart(r);
+                    var tipo = Tipo();
+                    var (vol, _) = EstacasTerraplenagem.Volumes(road.Axis, r.Grade, tipo, ground, est.Intervalo, 0.5);
+                    var g = grafico switch
+                    {
+                        1 => EarthworkCharts.Secao(EstacasTerraplenagem.Secao(road.Axis, estacaVer, r.Grade, tipo, ground), $"Estaca {est.Rotulo(estacaVer)}", exagero),
+                        2 => EarthworkCharts.PorEstaca(vol, est),
+                        3 => EarthworkCharts.Massas(EstacasTerraplenagem.Bruckner(vol, o.Homogenization), o.Homogenization, est),
+                        _ => RoadProfileDesigner.Chart(r),
+                    };
                     g.Warnings.AddRange(r.Warnings);
-                    return new FormPreview(g, null, null,
-                        $"{r.Summary()}\nÁrea de corte no eixo {r.CutM2.ToString("N0", pt)} m² · aterro {r.FillM2.ToString("N0", pt)} m²", Paper: true);
+                    var (tc, ta) = SectionVolumes.Trecho(vol, trechoDe, trechoAte);
+                    var info = $"{r.Summary()}\nÁrea de corte no eixo {r.CutM2.ToString("N0", pt)} m² · aterro {r.FillM2.ToString("N0", pt)} m²";
+                    info += hasTerrain
+                        ? $"\nTerraplenagem estimada pela seção-tipo (plataforma de {(tipo.LeftHalf + tipo.RightHalf).ToString("0.##", pt)} m e taludes; seções a cada " +
+                          $"{est.Intervalo.ToString("0.##", pt)} m, média das áreas): corte {vol.CorteM3.ToString("N0", pt)} m³ · aterro {vol.AterroM3.ToString("N0", pt)} m³; " +
+                          $"trecho {est.Rotulo(trechoDe)} a {est.Rotulo(trechoAte)}: corte {tc.ToString("N0", pt)} m³ · aterro {ta.ToString("N0", pt)} m³ – o exato vem da Terraplenagem."
+                        : "\nSem Toposolid: sem terreno nas seções (corte e aterro por estaca indisponíveis).";
+                    return new FormPreview(g, null, null, info, Paper: true);
                 }, false, "Aplicar", 1240, 800)
+            .Choice("Gráfico", new[]
+            {
+                ("Perfil longitudinal – terreno × greide", 0), ("Seção transversal na estaca", 1), ("Áreas de corte e aterro por estaca", 2),
+                ("Diagrama de massas (Brückner)", 3),
+            }, () => grafico, v => grafico = v,
+                "A seção, as áreas e o diagrama usam a seção-tipo da via (plataforma e taludes) sobre o terreno – uma estimativa na hora; o resultado exato vem da Terraplenagem.")
+            .If(() => grafico == 1, x => x
+                .Text("Estaca da seção (n+resto ou m)", () => est.Rotulo(estacaVer), v =>
+                {
+                    if (est.Ler(v) is { } val && est.Distancia(val, L) is { } d) estacaVer = Math.Clamp(d, 0, L);
+                }, false, "Ex.: 5+10,00 – ou a distância em metros desde o início do eixo.")
+                .Button("◀ Estaca anterior", () => estacaVer = Math.Max(0, Math.Ceiling(estacaVer / est.Intervalo - 1 - 1e-9) * est.Intervalo))
+                .Button("Próxima estaca ▶", () => estacaVer = Math.Min(L, Math.Floor(estacaVer / est.Intervalo + 1 + 1e-9) * est.Intervalo))
+                .Number("Exagero vertical (1 = sem exagero)", () => exagero, v => exagero = v, 1, 20, "0.#"))
+            .If(() => grafico == 3 && o.Mode != ModoGreide.Compensado, x => x
+                .Number("Fator de homogeneização (corte ÷ aterro)", () => o.Homogenization, v => o.Homogenization = v, 1, 2, "0.00",
+                    "Volume de corte que cada m³ de aterro compactado consome (informado por você – ensaio ou projeto)."))
+            .If(() => grafico >= 2, x => x
+                .Number("Volumes do trecho – da distância (m)", () => trechoDe, v => trechoDe = Math.Clamp(v, 0, L), 0, L, "0.##")
+                .Number("até a distância (m)", () => trechoAte, v => trechoAte = Math.Clamp(v, 0, L), 0, L, "0.##"))
             .Choice("Greide", new[]
             {
                 ("Acompanhar o terreno suavizado (menor terraplenagem)", ModoGreide.AcompanharTerreno), ("Rampa constante entre as pontas", ModoGreide.RampaConstante),
@@ -90,7 +135,21 @@ public sealed class CmdPerfilVia : CommandBase
                 .Number("Cota no fim (m, relativa à base)", () => o.EndZ ?? 0, v => { if (o.EndZ != null) o.EndZ = v; }, -500, 500))
             .If(() => o.Mode == ModoGreide.Nivelado, x => x.Number("Cota do greide (m, relativa à base)", () => o.LevelZ, v => o.LevelZ = v, -500, 500))
             .If(() => o.Mode == ModoGreide.Manual, x => x.Text("PIVs – uma linha por PIV: estaca; cota; curva", () => o.ManualPvis, v => o.ManualPvis = v ?? "", true,
-                "Ex.: 0; 0\\n120; 8; 80\\n300; 2"))
+                "Ex.: 0; 0\\n120; 8; 80\\n300; 2")
+                // Editar um PIV com o perfil à vista: o gráfico, as áreas e os volumes se refazem a cada botão.
+                .Integer("PIV nº (1 = o primeiro em estaca)", () => pivNum, v => pivNum = v, 1, 500)
+                .Button("Ler o PIV nº nos campos abaixo", () =>
+                {
+                    var l = Pivs();
+                    if (pivNum >= 1 && pivNum <= l.Count) (pivS, pivZ, pivC) = (l[pivNum - 1].S, l[pivNum - 1].Z, l[pivNum - 1].Curve ?? 0);
+                })
+                .Number("Estaca do PIV (m ao longo do eixo)", () => pivS, v => pivS = Math.Clamp(v, 0, L), 0, L, "0.##")
+                .Number("Cota do PIV (m, relativa à base)", () => pivZ, v => pivZ = v, -500, 500, "0.###")
+                .Number("Curva vertical do PIV (m; 0 = a padrão)", () => pivC, v => pivC = v, 0, 1000, "0")
+                .Button("Cota do terreno nesta estaca", () => { if (hasTerrain && GroundAt(pivS) is { } gz) pivZ = Math.Round(gz, 3); })
+                .Button("Acrescentar o PIV", () => GravarPivs(EstacasTerraplenagem.AcrescentarPiv(Pivs(), pivS, pivZ, pivC)))
+                .Button("Mover o PIV nº para a estaca e a cota acima", () => GravarPivs(EstacasTerraplenagem.MoverPiv(Pivs(), pivNum, pivS, pivZ)))
+                .Button("Remover o PIV nº", () => GravarPivs(EstacasTerraplenagem.RemoverPiv(Pivs(), pivNum))))
             .Section("Seção")
             .Number("Caimento transversal da pista (%)", () => o.Crossfall * 100, v => o.Crossfall = v / 100, 0, 8, "0.0#", "Abaulamento de duas águas (2 % usual).")
             .Number("Talude de corte (H : 1 V)", () => o.CutSlope, v => o.CutSlope = v, 0.3, 5, "0.0#")
@@ -107,7 +166,6 @@ public sealed class CmdPerfilVia : CommandBase
                 .Check("Substituir as obras que esta via já tem", () => _replace, v => _replace = v,
                     "As obras usam os últimos parâmetros de Viaduto/Ponte, Túnel e Trincheira (sistema, pilares, emboques, muros)."));
         // Estaqueamento da via (D-023): só muda como as estacas aparecem nos relatórios desta via.
-        var est = road.Pavement.Estaqueamento?.Clone() ?? new Estaqueamento();
         var inicioTxt = est.Formatar(est.Inicio);
         var intervalo = est.Intervalo;
         var equacoesTxt = est.EquacoesTexto();
