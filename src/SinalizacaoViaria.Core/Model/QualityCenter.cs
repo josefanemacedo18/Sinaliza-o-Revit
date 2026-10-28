@@ -49,11 +49,12 @@ public static class CentralQualidade
 
     /// <summary>
     /// Ordem das categorias (Prompt de Interface §17.1, só as que têm verificador): geometria, topografia, vias, interseções,
-    /// terraplenagem, drenagem, quadras e lotes, dependências e integração com o Revit; depois as demais do validador.
+    /// terraplenagem, drenagem (e os corpos d'água, desde a Etapa 21), quadras e lotes, dependências e integração com o Revit;
+    /// depois as demais do validador.
     /// </summary>
     public static IReadOnlyList<string> Ordem { get; } = new[]
     {
-        "Geometria", "Topografia", "Vias (traçado e greide)", "Interseções", "Terraplenagem", "Drenagem", "Quadras e lotes", "Dependências",
+        "Geometria", "Topografia", "Vias (traçado e greide)", "Interseções", "Terraplenagem", "Drenagem", "Corpos d'água", "Quadras e lotes", "Dependências",
         "Integração com o Revit", "Integração", "Dados e versões", "Detalhamento", "Outros",
     };
 
