@@ -3,6 +3,32 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-28 – Etapa 18: seção por estaca, PIVs editáveis e diagrama de massas (versão 2.23.0)
+
+Itens 4 e 21 do [plano 2](docs/PLANO_DE_ACAO_2.md) (D-036). Entrega: `Releases/Etapa18` (a janela não foi aberta no Revit 2027).
+
+### Perfil da via
+- **Gráfico escolhido:** perfil longitudinal, **seção transversal na estaca** (estaca digitada em n+resto ou metros, setas
+  anterior/próxima, exagero vertical; plataforma no greide com o abaulamento e taludes de corte e aterro até o terreno; corte
+  e aterro com as áreas), **áreas de corte e aterro por estaca** e **diagrama de massas** (Brückner, com o fator de
+  homogeneização, os pontos de passagem e o saldo: bota-fora ou empréstimo).
+- **Trecho de estacas:** os volumes de corte e aterro de um trecho, com as áreas das pontas interpoladas.
+- **PIVs com o perfil à vista:** ler, acrescentar, mover (estaca e cota, ou a cota do terreno) e remover um PIV por botões; o
+  texto, o gráfico, as áreas e os volumes se refazem na hora.
+- Os volumes da janela são pela média das áreas das seções da **seção-tipo** (antes de aplicar) – estimativa para comparar
+  greides; o exato continua vindo da Terraplenagem.
+
+### Núcleo
+- `EstacasTerraplenagem` (seção na estaca, volumes, Brückner, pontos de passagem, edição de PIV) e `EarthworkCharts`.
+- A média das áreas é uma conta só (`SectionVolumes.FromSections`), usada também pelas seções da Terraplenagem (mesmo
+  resultado); `SectionVolumes.Trecho`.
+
+### Testes
+- `Etapa18EstacasTests` (10): área do trapézio em aterro e corte sobre terreno plano, terreno inclinado com corte e aterro na
+  mesma seção, volumes por média das áreas (à mão e iguais ao método da Terraplenagem), trecho de estacas, Brückner à mão,
+  edição de PIV com o volume refeito, gráficos, a ligação na janela.
+- NÃO EXECUTADO NO REVIT (K32).
+
 ## 2026-10-27 – Etapa 17: rampas como Pisos e materiais realistas (versão 2.22.0)
 
 Itens 2 e 1 do [plano 2](docs/PLANO_DE_ACAO_2.md) (D-035). Entrega: `Releases/Etapa17` (não executada no Revit 2027).

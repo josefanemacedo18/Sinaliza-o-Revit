@@ -602,3 +602,19 @@ como substituída.
   - ativo genérico tingido para as pinturas: a tinta real é lisa; ficou a cor do material.
 - **Consequências:** projetos salvos mudam na próxima atualização das rampas e na próxima geração de cada cor; nada disso foi
   visto no Revit (K31).
+
+## D-036 – Etapa 18: terraplenagem por estaca estimada pela seção-tipo no Perfil da via
+- **Contexto:** itens 4 e 21: estacas e PIVs editáveis com corte e aterro calculados na hora e vista da seção; gráficos de
+  corte e aterro por estaca (InfraWorks: Road Cross Section e o painel de corte e aterro, `docs/INFRAWORKS_REFERENCIA.md`).
+- **Decisão:**
+  - os gráficos e a edição de PIV ficam na janela que já define o greide (Perfil da via), para o resultado aparecer antes de
+    aplicar; a seção é a seção-tipo (plataforma pista + calçadas no greide, com abaulamento/superelevação, e os taludes até
+    o terreno) – a terraplenagem completa (malha conjunta, nós, rampas, camadas) é cara demais para refazer a cada tecla;
+  - volumes pela média das áreas, com a mesma função das seções da Terraplenagem (`SectionVolumes.FromSections`);
+  - Brückner com o fator de homogeneização do usuário (o mesmo do modo compensado), ordenada = corte acumulado − aterro
+    acumulado × fator;
+  - edição de PIV por botões sobre o texto dos PIVs (o texto continua a fonte – nada novo é gravado na via além do greide
+    aplicado).
+- **Alternativas descartadas:** arrastar PIVs no gráfico (a prévia da janela não recebe cliques); recalcular a terraplenagem
+  completa a cada mudança.
+- **Consequências:** a janela mostra uma estimativa; o volume exato continua na Terraplenagem (K32).

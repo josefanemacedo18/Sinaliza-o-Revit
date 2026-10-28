@@ -2631,6 +2631,29 @@ via vira obra. É o "perfil longitudinal" do projeto rodoviário.
 * embaixo as **estacas** (km+m ao longo da via), à esquerda as **cotas**; os quadrados brancos são os **PIVs** (onde a rampa
   muda, com a cota) e "i = %" é a **rampa** de cada trecho.
 
+**Gráfico (desde a 2.23)** – no alto da janela, escolha o que a prévia mostra; tudo se refaz a cada mudança:
+* **Perfil longitudinal** – terreno × greide, como acima;
+* **Seção transversal na estaca** – a seção numa estaca qualquer: digite a estaca (n+resto, ou metros desde o início do eixo)
+  ou ande com **◀ Estaca anterior** / **Próxima estaca ▶** (no intervalo do estaqueamento); o **exagero vertical** é seu
+  (1 = sem exagero). Mostra o terreno (marrom), a **montagem** da seção – a plataforma da via (pista e calçadas) no greide,
+  com o abaulamento, e os **taludes de corte e de aterro** até o terreno –, o corte em vermelho e o aterro em verde, com as
+  **áreas** (m²);
+* **Áreas de corte e aterro por estaca** – barras de cada seção (corte para cima, aterro para baixo) e os volumes;
+* **Diagrama de massas (Brückner)** – a ordenada de cada estaca é o corte acumulado menos o aterro acumulado × o **fator de
+  homogeneização** (informado por você); a curva acima do zero é corte sobrando, abaixo é aterro a cobrir; os **pontos de
+  passagem** (onde a curva cruza o zero) e o **saldo no fim** (sobra = bota-fora, falta = empréstimo) vêm escritos.
+
+Com as áreas e o diagrama, informe o **trecho de estacas** (da distância … até …) e o resumo dá os volumes de corte e de
+aterro só desse trecho. Os volumes da janela são pela **média das áreas** das seções a cada intervalo do estaqueamento – a
+mesma conta das seções da Terraplenagem –, mas sobre a **seção-tipo** (plataforma e taludes, antes de aplicar o greide): é a
+estimativa na hora para comparar greides; o volume exato, com interseções, rampas e camadas do pavimento, vem da
+**Terraplenagem** depois de aplicar.
+
+**Editar PIVs com o perfil à vista** (modo **PIVs digitados**): além do texto, escolha o **PIV nº** (1 = o primeiro em estaca)
+e use **Ler o PIV nº nos campos**, mude a **estaca**, a **cota** (ou **Cota do terreno nesta estaca**) e a **curva**, e
+**Acrescentar o PIV**, **Mover o PIV nº** ou **Remover o PIV nº** (ficam sempre pelo menos dois). Um PIV a menos de 0,5 m
+de outro o substitui. O texto dos PIVs, o gráfico, as áreas e os volumes se refazem a cada botão.
+
 **Como usar**:
 1. Clique a via.
 2. Escolha como o greide é traçado: **acompanhar o terreno suavizado** (menor terraplenagem; ajuste a suavização e o

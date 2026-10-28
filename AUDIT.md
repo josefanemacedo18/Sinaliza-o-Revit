@@ -490,3 +490,9 @@ Etapa 17 (2.22.0):
   compila contra a referência dela); com camada variável a edição de forma inclina só o topo (ajuda do Revit).
 - INFERÊNCIA: as rampas como pisos de camada variável e os ativos escolhidos pelo título funcionam no Revit; só um teste nele
   confirma (K31).
+
+Etapa 18 (2.23.0):
+- FATO (código): os volumes por estaca e a curva de massas já existiam no quantitativo (CSV), sem gráfico nem seção à vista;
+  agora a média das áreas é uma função só, usada pelas duas pontas (`SectionVolumes.FromSections`).
+- FATO (teste): a seção-tipo dá a área do trapézio h·(L + m·h) em aterro e corte sobre terreno plano; Brückner conferido à mão.
+- LACUNA: a seção da terraplenagem aplicada (malha conjunta) não tem visualizador próprio por estaca – fica o Corte Transversal.
