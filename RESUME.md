@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-27 (plano unificado concluído – Etapas 0–13; plano 2 – Etapas 14–17 entregues)
+## Estado em 2026-10-28 (plano unificado concluído – Etapas 0–13; plano 2 – Etapas 14–21 entregues)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -57,7 +57,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     seção 9 com sementes, passo, aquecimento e assinatura); **Fluxo integrado** no Autoteste (via → interseção →
     terraplenagem → drenagem → quantitativos → validação); **relatório técnico final** em `docs/RELATORIO_TECNICO.md`.
     Não executada no Revit (K27).
-  - `Instalar/Revit2027` tem a DLL 2.25.0 (Etapa 20). As anteriores continuam em `Releases/`.
+  - `Instalar/Revit2027` tem a DLL 2.26.0 (Etapa 21). As anteriores continuam em `Releases/`.
 - **Plano unificado concluído** (14 etapas, 2.8.0 a 2.19.0). Pendências abertas: F12 (cenários de projeto comparados por
   quantitativos), K14/K15 no Revit e tudo o que depende de rodar no Revit (K3, K17, K19, K23–K27).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
@@ -104,11 +104,22 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
 - **Fontes de lei bloqueadas nesta sessão:** `www.planalto.gov.br` e `www2.camara.leg.br` não resolvem na rede do ambiente
   (liberar em Network access do ambiente). Sem o texto conferido, nenhum limite de lei entra como padrão: faixas de proteção das
   águas (Etapa 21) e limites do parcelamento (Etapa 23) ficam **informados pelo usuário**, com a lei citada por ele.
-- **Próxima: Etapa 21** – corpos d'água (item 11): rio e córrego por eixo (fundo por estaca, largura do fundo, lâmina d'água,
-  taludes das margens), lago e lagoa por contorno (cota do fundo e nível d'água); escavação no Toposolid pela Terraplenagem
-  (`GradeCorridor`/`GradePad` na geometria, como a Plataforma) e no registro; superfície de água (`MarkingColor.Agua`,
-  `SolidSweep.Along`); faixa de proteção informada com a lei citada pelo usuário; ligação com lançamentos da drenagem,
-  parcelamento (lote na faixa – nova regra na Validação) e quantitativos.
+- Etapa 21 ✅: 2.26.0 em `Releases/Etapa21` (`7577fd0`, 3 232/3 232) – D-039: **Drenagem › Corpos d'Água** – **Rio ou Córrego**
+  (eixo, fundo por estaca ou do terreno natural sem subir para jusante, largura do fundo, lâmina, talude) e **Lago ou Lagoa**
+  (margem no nível d'água, cota do fundo); leito como faixa/plataforma da Terraplenagem (com registro), água no modelo, faixa
+  de proteção informada com a lei citada; **V18** (lotes na faixa, lançamento afogado pelo fundo da rede, faixa não
+  informada). Núcleo em `CorposDagua` (`WaterBodies.cs`), `WaterGenerator`. Achados: `TerrainService.Features` não copiava
+  `SpillStart`/`SpillEnd`; a propriedade `Tipo` colidia com o discriminador do JSON (renomeada `Corpo`; teste de ida e volta de
+  toda marca). NÃO VALIDADO NO REVIT (K35).
+- **Próxima: Etapa 22** – drenagem completa (itens 6 e 21), em partes: (a) catálogo de tubos editável no Projeto de Drenagem
+  (material, classe, DN, parede, comprimento da peça, junta, n – padrão do plugin quando sem fonte), tubo do catálogo por
+  trecho, peças, juntas, conexões e vala (largura, berço, talude, escavação, reaterro) no quantitativo e no memorial
+  (`DrainageMemorial.Quantitativo`); (b) linha piezométrica e de energia de jusante para montante (`DrainageHydraulics`
+  dá a vazão em L/s; nível de jusante pelo corpo d'água a menos de 30 m – `CorposDagua.NivelPerto` – ou saída livre),
+  tubos afogados e PVs extravasando, no perfil da rede (`PerfilRede`); (c) bueiros (circular ou celular, células, n,
+  capacidade a seção plena; contam como travessia no talvegue do V13 – `DrenagemDoModelo.TalveguesSemTravessia`); (d) rede
+  gerada ao longo da via (bocas nos pontos baixos do greide e pelo espaçamento informado, PVs, trechos pela declividade
+  mínima e recobrimento).
 
 ## Próxima tarefa (antes do plano 2)
 

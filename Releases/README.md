@@ -52,6 +52,7 @@ desejada. `Instalar/Revit2027` tem sempre a versão mais recente.
 | Etapa 18 – Estacas, greide e seção: gráficos por estaca, Brückner e PIVs editáveis no Perfil da via (plano 2, itens 4 e 21) | 2.23.0 | 2026-10-28 | `cf64e41` | 3 193/3 193 | não executado – [`Etapa18`](Etapa18/RELEASE.md) |
 | Etapa 19 – Componentes da via por trecho e taludes por lado e por trecho (plano 2, itens 5 e 17) | 2.24.0 | 2026-10-28 | `5660834` | 3 212/3 212 | não executado – [`Etapa19`](Etapa19/RELEASE.md) |
 | Etapa 20 – Terreno e topografia: temas, comparação, medidas, plataforma, linha de quebra e suavização (plano 2, itens 13 e 21) | 2.25.0 | 2026-10-28 | `443860b` | 3 221/3 221 | não executado – [`Etapa20`](Etapa20/RELEASE.md) |
+| Etapa 21 – Corpos d'água: rio, córrego, lago e lagoa com o leito na Terraplenagem, a água e a faixa informada (plano 2, item 11) | 2.26.0 | 2026-10-28 | `7577fd0` | 3 232/3 232 | não executado – [`Etapa21`](Etapa21/RELEASE.md) |
 
 As fases I, II, IX e XI foram concluídas antes desta pasta existir. As DLLs delas estão no histórico do git, no commit
 indicado: `git show <commit>:Instalar/Revit2027/SinalizaBIM.dll > SinalizaBIM.dll`. As fases seguintes ganham uma linha
