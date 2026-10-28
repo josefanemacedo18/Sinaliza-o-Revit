@@ -57,7 +57,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     seção 9 com sementes, passo, aquecimento e assinatura); **Fluxo integrado** no Autoteste (via → interseção →
     terraplenagem → drenagem → quantitativos → validação); **relatório técnico final** em `docs/RELATORIO_TECNICO.md`.
     Não executada no Revit (K27).
-  - `Instalar/Revit2027` tem a DLL 2.23.0 (Etapa 18). As anteriores continuam em `Releases/`.
+  - `Instalar/Revit2027` tem a DLL 2.24.0 (Etapa 19). As anteriores continuam em `Releases/`.
 - **Plano unificado concluído** (14 etapas, 2.8.0 a 2.19.0). Pendências abertas: F12 (cenários de projeto comparados por
   quantitativos), K14/K15 no Revit e tudo o que depende de rodar no Revit (K3, K17, K19, K23–K27).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
@@ -89,11 +89,18 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
   volumes por média das áreas pela seção-tipo (`EstacasTerraplenagem`, iguais ao método da Terraplenagem), trecho de
   estacas, PIVs acrescentados, movidos e removidos com a cota do terreno e os volumes refeitos na hora – itens 4 e 21
   (terraplenagem). NÃO VALIDADO NO REVIT (K32).
-- **Próxima: Etapa 19** – componentes da via por trecho (itens 5 e 17): inserir, dividir, mudar e tirar qualquer componente
-  (faixa, ciclofaixa, estacionamento, canteiro, calçada, baia, extensão) entre duas estacas, com transição de entrada e de
-  saída, em via modelada ou nova; taludamento por lado e por trecho (talude fixo com limite ou largura fixa), com transição
-  – PLANO_DE_ACAO_2 §3. Ponto de partida: `RoadSetupWidths.cs` (`TrechoLargura`, `SideWarp`, `ApplyVariation`) e
-  `GradeCorridor` (`CutSlope`/`FillSlope` globais).
+- Etapa 19 ✅: 2.24.0 em `Releases/Etapa19` (`5660834`, 3 212/3 212) – D-037: **Componentes por Trecho** (acrescentar, tirar,
+  mudar a largura e dividir qualquer elemento de um lado entre duas estacas, com transições; marcas do trecho pela comparação da
+  seção do trecho com a da via; vãos do pavimento por trecho – `RoadSetupComponents`, `StretchGaps`), na ferramenta e na janela
+  da via (itens 5 e 17); **Taludes por Trecho** (talude fixo com limite ou largura fixa, por lado, no greide – `RoadSlopes`,
+  `SlopeEdge.CutV/FillV/MaxV`). Achado: a terraplenagem depois de gravar o greide recebia o pavimento antigo (corrigido).
+  NÃO VALIDADO NO REVIT (K33).
+- **Próxima: Etapa 20** – terreno e topografia (itens 13 e 21): temas de elevação, declividade e orientação (regiões coloridas
+  e legenda numa vista – `FilledRegion.Create(doc, tipo, vista, laços)` e `FilledRegionType` conferidos na API 2027); distância
+  e declividade entre dois pontos e pelo caminho; plataformas (área nivelada com taludes – `GradePad` – na terraplenagem e no
+  registro); linhas de quebra e suavização de região (no terreno natural guardado – `TerrainModel.Original/Save`, pontos pelo
+  `SlabShapeEditor` como em `TerrainService.ApplyPoints`); comparação de superfícies com gráfico. Classes de declividade:
+  padrão do plugin, configuráveis (o limite de 30 % da Lei 6.766/1979, art. 3º, par. único, III, só com o texto conferido).
 
 ## Próxima tarefa (antes do plano 2)
 
