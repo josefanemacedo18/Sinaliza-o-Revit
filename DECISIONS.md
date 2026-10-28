@@ -618,3 +618,28 @@ como substituída.
 - **Alternativas descartadas:** arrastar PIVs no gráfico (a prévia da janela não recebe cliques); recalcular a terraplenagem
   completa a cada mudança.
 - **Consequências:** a janela mostra uma estimativa; o volume exato continua na Terraplenagem (K32).
+
+## D-037 – Etapa 19: componentes por trecho como deformação da seção e marcas da seção do trecho
+- **Contexto:** itens 5 e 17: inserir, dividir, mudar e tirar qualquer componente entre duas estacas, com transições, em via
+  modelada ou nova; taludamento por lado e por trecho (InfraWorks: *To insert components…*, *To add or modify component road
+  transitions*, *To set the roadside grading method*, *To split roadside grading* – `docs/INFRAWORKS_REFERENCIA.md` §1).
+- **Decisão:**
+  - o componente fica na seção da via (`RoadSetup.ComponentesTrecho`), como a largura por trecho e os recuos: a via é sempre
+    refeita a partir do eixo (regeneração pela seção gravada, edições à mão preservadas por `AutoSignage.Preserve`);
+  - a geometria é a deformação da seção já usada pela largura variável (zona que some, costura que abre), com as transições
+    na mesma conta (`TrechoLargura.FatorTransicao`);
+  - as marcas do trecho saem da comparação da seção do trecho (gerada inteira) com a da via, com as posições levadas de uma à
+    outra: o que só existe no trecho é gerado entre A e B no eixo recortado; o que só existe na via é interrompido (linhas e
+    vagas pelas interrupções; símbolos, dispositivos e zebrados por recorte sem dono);
+  - o pavimento ganha vãos por trecho numa lista própria (`StretchGaps`), lida só pela pista – as conexões continuam com a
+    seção inteira (`Gaps`) e a seção na estaca (`Local`);
+  - taludes por trecho no greide da via (`RoadGrade.Taludes`): inclinação, limite e largura fixa por vértice da borda na
+    Terraplenagem (`SlopeEdge.CutV/FillV/MaxV`), a mesma conta (`TaludeNoPonto.NoVertice`) na seção do Perfil da Via;
+  - o limite do talude fixo deixa o terreno natural além dele (face quase vertical), como o InfraWorks descreve o *Fixed Slope*
+    com limite; nada de muro gerado automaticamente.
+- **Alternativas descartadas:** dividir a via em vias menores por trecho (perderia a continuidade das linhas e das conexões);
+  regras específicas por tipo de elemento para as marcas do trecho (a comparação das seções cobre todos os tipos com o gerador
+  que já existe); sobrepor trechos do mesmo lado (as marcas de um não sabem do outro – ignorado com aviso).
+- **Consequências:** vias salvas abrem iguais (lista vazia); a sinalização de transição (zebrado, setas de mudança de faixa)
+  fica com o projeto; nada disso foi visto no Revit (K33).
+

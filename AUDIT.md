@@ -496,3 +496,12 @@ Etapa 18 (2.23.0):
   agora a média das áreas é uma função só, usada pelas duas pontas (`SectionVolumes.FromSections`).
 - FATO (teste): a seção-tipo dá a área do trapézio h·(L + m·h) em aterro e corte sobre terreno plano; Brückner conferido à mão.
 - LACUNA: a seção da terraplenagem aplicada (malha conjunta) não tem visualizador próprio por estaca – fica o Corte Transversal.
+
+Etapa 19 (2.24.0):
+- FATO (código): a largura por trecho cobria pista, calçadas, estacionamentos e canteiro central; os componentes por trecho
+  cobrem qualquer elemento de um lado, acrescentado, tirado ou com outra largura, com as marcas próprias do trecho.
+- FATO (código): depois de gravar o greide (Perfil da Via, Relevo), `TerrainService.Apply` recebia o pavimento lido antes da
+  gravação e dava preferência a ele sobre o gravado – o terreno seguia o greide anterior até a próxima terraplenagem; corrigido.
+- FATO (teste): talude 3 : 1 por trecho dá o pé a 4,8 m num aterro de 1,6 m (2,4 m fora do trecho); a largura fixa leva o pé a
+  exatamente 4 m em aterro e em corte; o limite deixa o terreno natural além dele.
+- LACUNA: sinalização das transições (zebrado de aproximação, setas e placas de mudança de faixa) não é gerada (K33).

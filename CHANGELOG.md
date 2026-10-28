@@ -3,6 +3,47 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-28 – Etapa 19: componentes da via por trecho e taludes por trecho (versão 2.24.0)
+
+Itens 5 e 17 do [plano 2](docs/PLANO_DE_ACAO_2.md) (D-037). Entrega: `Releases/Etapa19` (não executada no Revit 2027).
+
+### Componentes por trecho (item 5)
+- **Componentes por Trecho** (Sistema Viário › Ajustar Via ▾, e o botão na janela da via): acrescentar, tirar ou mudar a
+  largura de **qualquer elemento** de um lado da seção (faixa, ciclofaixa, estacionamento, acostamento, faixa de segurança,
+  canteiro físico ou pintado, faixa de caminhada, calçada) entre as estacas **A** e **B**, com **transição** antes de A e
+  depois de B (retas, em S ou degrau). Em via já modelada (a via é refeita pela seção gravada) ou nova (item 17).
+- A seção se deforma a partir do eixo: os elementos de fora se deslocam; a sarjeta, o meio-fio e a linha de bordo vão com o
+  lado de fora. As marcas que só a seção do trecho tem (linha da ciclofaixa, meios-fios e grama do canteiro, vagas, bordo
+  novo) saem **só entre A e B**; as que ela não tem são **interrompidas** (ao tirar, desde o início da transição – o elemento
+  afunila até sumir); símbolos, segregadores e zebrados por recorte sem dono, refeito com a via.
+- Pavimento: o canteiro acrescentado recorta a pista **só no trecho**; o tirado a fecha no trecho; as interseções e
+  rotatórias leem a seção da estaca onde ficam (`RoadPavementDefinition.Local`).
+- Trechos gravados podem ser **divididos** numa estaca ou **removidos**; trechos sobrepostos do mesmo lado e trechos cujo
+  elemento mudou de tipo na seção são ignorados com aviso.
+
+### Taludes por lado e por trecho (item 5)
+- **Taludes por Trecho** (Terraplenagem › Contenções ▾): por lado e por trecho, **talude fixo** (corte e aterro, com
+  **largura máxima** opcional – onde não alcança o terreno, o terreno fica natural além do limite, face quase vertical) ou
+  **largura fixa**, com transições; a seção numa estaca mostra o resultado antes de aplicar.
+- A Terraplenagem usa inclinação e limite por vértice da borda; as seções e volumes do Perfil da Via usam os mesmos taludes;
+  o Perfil da Via mantém os trechos ao regravar o greide.
+
+### Correções achadas no caminho
+- Depois de gravar o greide (Perfil da Via, Relevo da via nova), o terreno era refeito com o pavimento lido **antes** da
+  gravação – com o greide anterior; agora recebe o pavimento gravado (achado pela leitura do código, NÃO VALIDADO NO REVIT).
+- A cópia da seção (`RoadSetup.Clone`) dividia a lista de avisos com a original: gerar uma prévia apagava os avisos.
+- O vão do pavimento numa via de largura variável acompanha as duas bordas (antes só o centro se deslocava).
+
+### Testes
+- `Etapa19ComponentesTests` (13): ciclofaixa acrescentada (bordos, transições, linha nova só no trecho, bordo interrompido,
+  sarjeta e calçada deslocadas, pavimento), faixa tirada (afunila, divisória interrompida, bordo contínuo), largura de uma
+  faixa, canteiro acrescentado e tirado (vãos do pavimento, seção na estaca), ciclofaixa tirada com símbolos e segregadores,
+  transições retas e em S, trechos inválidos, dividir, via refeita pela seção gravada (e num eixo em curva), edição à mão
+  preservada, sem componentes nada muda, ligação na faixa e na janela.
+- `Etapa19TaludesTests` (6): talude por lado e por trecho com transições (pé, superfície e volume), limite com face, largura
+  fixa em aterro e corte, seção do Perfil da Via com os mesmos taludes, greide com os trechos (cópia e JSON), ligação.
+- NÃO EXECUTADO NO REVIT (K33).
+
 ## 2026-10-28 – Etapa 18: seção por estaca, PIVs editáveis e diagrama de massas (versão 2.23.0)
 
 Itens 4 e 21 do [plano 2](docs/PLANO_DE_ACAO_2.md) (D-036). Entrega: `Releases/Etapa18` (a janela não foi aberta no Revit 2027).
