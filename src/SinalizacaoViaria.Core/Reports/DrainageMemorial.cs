@@ -30,43 +30,47 @@ public static class DrainageMemorial
     private static string NomeTipo(TipoDrenagem t) => DrainageDefinition.NomeTipo(t);
 
     /// <summary>
-    /// Materiais e serviços da rede. Tubos pela extensão entre os centros dos dispositivos (como na planilha do modelo);
-    /// valas com a largura de <see cref="ProjetoDrenagem.LarguraValaDiametros"/> diâmetros e a profundidade média até o fundo
-    /// externo do tubo; escoramento das duas paredes onde a vala passa da profundidade de escoramento; reaterro = escavação
-    /// menos o volume externo dos tubos, que sai como material excedente. Estimativas – não incluem PVs, caixas e berços.
+    /// Materiais e serviços da rede. Tubos do catálogo (<see cref="CatalogoTubos"/>) pela extensão entre os centros dos
+    /// dispositivos (como na planilha do modelo), as peças e as juntas pelo tubo entre as paredes das caixas e as conexões com as
+    /// caixas; valas com a largura de <see cref="ProjetoDrenagem.LarguraValaDiametros"/> diâmetros, até o fundo externo do tubo
+    /// mais o berço, com o talude informado; escoramento das duas paredes verticais onde a vala passa da profundidade de
+    /// escoramento; reaterro = escavação menos o volume externo dos tubos (material excedente) e o berço. Estimativas – não
+    /// incluem PVs e caixas.
     /// </summary>
     public static List<ItemDrenagem> Quantitativo(IReadOnlyCollection<MarkingDefinition> defs, ProjetoDrenagem p)
     {
         var itens = new List<ItemDrenagem>();
-        var trechos = DrainageNetwork.Analyze(defs);
-        var byId = defs.GroupBy(d => d.Id).ToDictionary(g => g.Key, g => g.First());
-        foreach (var g in trechos.GroupBy(t => Math.Round(t.Diametro * 1000)).OrderBy(g => g.Key))
-            itens.Add(new($"Tubo de concreto DN {N(g.Key, "0")} (ponta e bolsa)", "m", g.Sum(t => t.Comprimento), "0.00"));
+        var trechos = CatalogoTubos.Trechos(defs, p);
+        var grupos = trechos.GroupBy(t => t.Tubo.Nome).OrderBy(g => g.First().Tubo.Diametro).ThenBy(g => g.Key, StringComparer.Ordinal).ToList();
+        foreach (var g in grupos)
+            itens.Add(new(g.Key, "m", g.Sum(t => t.Extensao), "0.00"));
         foreach (var g in defs.OfType<DrainageDefinition>().GroupBy(d => d.Type).OrderBy(g => g.Key == TipoDrenagem.PocoDeVisita ? 0 : 1).ThenBy(g => g.Key))
             itens.Add(new(NomeTipo(g.Key), g.Key == TipoDrenagem.GrelhaContinua ? "un (trechos)" : "un", g.Count(), "0"));
-
-        double esc = 0, escor = 0, tubo = 0;
-        foreach (var t in trechos)
+        foreach (var g in grupos)
         {
-            if (byId.GetValueOrDefault(t.Id) is not DrainagePipeDefinition pipe || DrainageNetwork.Ends(pipe, id => byId.GetValueOrDefault(id)) is not { } e) continue;
-            var parede = DrainageNetwork.Wall(t.Diametro);
-            var prof = ((e.RimA - t.FundoMontante) + (e.RimB - t.FundoJusante)) / 2 + parede;
-            if (prof <= 0) continue;
-            var largura = Math.Max(t.Diametro + 2 * parede, p.LarguraValaDiametros * t.Diametro);
-            esc += t.Comprimento * largura * prof;
-            if (prof > p.ProfundidadeEscoramento) escor += 2 * t.Comprimento * prof;
-            var r = t.Diametro / 2 + parede;
-            tubo += Math.PI * r * r * t.Comprimento;
+            var t0 = g.First().Tubo;
+            itens.Add(new($"Peças – {Minusculo(t0.Nome)}, de {N(t0.ComprimentoPeca, "0.##")} m (entre as paredes das caixas)", "un", g.Sum(t => t.Pecas), "0"));
+            if (g.Sum(t => t.Juntas) > 0)
+                itens.Add(new($"Juntas{(string.IsNullOrWhiteSpace(t0.Junta) ? "" : " " + t0.Junta.Trim())} – {Minusculo(t0.Nome)}", "un", g.Sum(t => t.Juntas), "0"));
         }
+        var conexoes = trechos.Sum(t => t.Conexoes);
+        if (conexoes > 0) itens.Add(new("Conexões dos tubos com as caixas (chegadas e saídas)", "un", conexoes, "0"));
+
+        var esc = trechos.Sum(t => t.Vala.Escavacao);
         if (esc > 0)
         {
+            var escor = trechos.Sum(t => t.Vala.Escoramento);
+            var berco = trechos.Sum(t => t.Vala.Berco);
             itens.Add(new("Escavação mecanizada de valas (estimativa)", "m³", esc, "0.0"));
             if (escor > 0) itens.Add(new($"Escoramento de valas com mais de {N(p.ProfundidadeEscoramento)} m (estimativa)", "m²", escor, "0.0"));
-            itens.Add(new("Reaterro compactado de valas (estimativa)", "m³", Math.Max(0, esc - tubo), "0.0"));
-            itens.Add(new("Material excedente a remover (volume dos tubos)", "m³", tubo, "0.0"));
+            if (berco > 0) itens.Add(new($"Berço sob os tubos, {N(p.EspessuraBerco * 100, "0")} cm (estimativa)", "m³", berco, "0.0"));
+            itens.Add(new("Reaterro compactado de valas (estimativa)", "m³", trechos.Sum(t => t.Vala.Reaterro), "0.0"));
+            itens.Add(new("Material excedente a remover (volume dos tubos)", "m³", trechos.Sum(t => t.Vala.VolumeTubo), "0.0"));
         }
         return itens;
     }
+
+    private static string Minusculo(string nome) => nome.Length > 0 ? char.ToLower(nome[0], Pt) + nome[1..] : nome;
 
     /// <param name="superficie">Superfície acabada para o recobrimento (<see cref="DrenagemDoModelo.SuperficieAcabada"/>); nula =
     /// a reta entre as tampas.</param>
@@ -78,7 +82,8 @@ public static class DrainageMemorial
         var doc = new MemorialDocument { Title = "MEMORIAL DESCRITIVO", Header = header, PageNumbers = true };
         var b = doc.Blocks;
         var r = DrainageHydraulics.Calcular(defs, p);
-        var problemas = DrainageNetwork.Check(defs, p, superficie).Concat(r.Problemas).ToList();
+        var hgl = LinhaPiezometrica.Calcular(defs, p, r);
+        var problemas = DrainageNetwork.Check(defs, p, superficie).Concat(r.Problemas).Concat(hgl.Problemas).ToList();
         var dispositivos = defs.OfType<DrainageDefinition>().ToList();
         var trechos = DrainageNetwork.Analyze(defs, superficie);
         var galerias = trechos.Where(t => !t.Ligacao).ToList();
@@ -165,7 +170,12 @@ public static class DrainageMemorial
         b.Add(new MemHeading(2, "2.9. Tipos e diâmetros dos tubos"));
         var dnGal = galerias.Select(t => N(t.Diametro * 1000, "0")).Distinct().ToList();
         var dnLig = ligacoes.Select(t => N(t.Diametro * 1000, "0")).Distinct().ToList();
-        b.Add(new MemParagraph("Na condução das águas pluviais serão utilizados tubos de concreto conforme a NBR 8890. " +
+        // Tubos do catálogo do projeto: o texto do memorial modelo quando todos são de concreto; senão, os tubos usados e as fontes.
+        var usados = CatalogoTubos.Trechos(defs, p).Select(t => t.Tubo).GroupBy(t => t.Nome).Select(g => g.First()).ToList();
+        var soConcreto = usados.All(t => string.Equals(t.Material.Trim(), "concreto", StringComparison.OrdinalIgnoreCase));
+        b.Add(new MemParagraph((soConcreto ? "Na condução das águas pluviais serão utilizados tubos de concreto conforme a NBR 8890. "
+                : "Na condução das águas pluviais serão utilizados os tubos do catálogo do projeto: " +
+                  string.Join("; ", usados.Select(t => t.Nome + (string.IsNullOrWhiteSpace(t.Fonte) ? "" : $" ({t.Fonte!.Trim()})"))) + ". ") +
             (dnGal.Count > 0 ? $"Diâmetros nominais das galerias: DN {string.Join(", DN ", dnGal)}. " : "") +
             (dnLig.Count > 0 ? $"Diâmetro nominal das ligações: DN {string.Join(", DN ", dnLig)}. " : "") +
             $"Diâmetros comerciais considerados no dimensionamento: {string.Join("; ", p.Diametros.OrderBy(d => d).Select(d => N(d * 1000, "0")))} mm."));
@@ -220,6 +230,22 @@ public static class DrainageMemorial
                         c.VelocidadeSarjeta is { } vs ? N(vs) : "–", N(c.Engolimento), N(c.Excesso),
                     }).ToList(), new[] { 1.4, 1, 1, 0.8, 1, 1, 0.9 }, Enumerable.Range(1, 6).ToList()));
             }
+            if (hgl.Trechos.Count > 0)
+            {
+                b.Add(new MemHeading(2, "Linha piezométrica"));
+                b.Add(new MemTable(new[] { "Trecho", "Vazão (L/s)", "Diâm. (mm)", "Lâmina normal (y/D)", "Nível d'água M (m)", "Nível d'água J (m)",
+                        "Energia M (m)", "Veloc. M (m/s)", "Regime" },
+                    hgl.Trechos.Select(t => (IReadOnlyList<string>)new[]
+                    {
+                        $"{t.Nome} ({t.Montante}–{t.Jusante})", N(t.Vazao), N(t.Diametro * 1000, "0"), t.LaminaNormal is { } y ? N(y / t.Diametro, "0.00") : "acima da seção",
+                        N(t.NivelMontante, "0.000"), N(t.NivelJusante, "0.000"), N(t.EnergiaMontante, "0.000"), N(t.Velocidade),
+                        t.Afogado ? "sob pressão" : "livre",
+                    }).ToList(), new[] { 2.2, 1, 0.8, 1.1, 1.1, 1.1, 1.1, 0.9, 1 }, Enumerable.Range(1, 7).ToList()));
+                var lanc = string.Join("; ", hgl.Lancamentos.Select(x => $"{x.Key}: {x.Value}"));
+                b.Add(new MemParagraph("Calculada de jusante para montante com as vazões da planilha: lâmina normal por Manning na seção parcialmente cheia; sob pressão, " +
+                    "a perda por atrito a seção plena; com remanso abaixo da geratriz superior, o nível de jusante estendido em nível até o montante. " +
+                    $"Perda localizada na entrada de cada trecho: K = {N(p.PerdaPv, "0.##")} (Projeto de Drenagem). Lançamento – {lanc}.", Italic: true));
+            }
             if (problemas.Count > 0)
             {
                 b.Add(new MemHeading(2, "Observações da verificação"));
@@ -265,8 +291,21 @@ public static class DrainageMemorial
         b.Add(new MemTable(new[] { "Item", "Descrição", "Unidade", "Quantidade" },
             itens.Select((it, k) => (IReadOnlyList<string>)new[] { (k + 1).ToString(Pt), it.Descricao, it.Unidade, N(it.Quantidade, it.Formato) }).ToList(),
             new[] { 0.5, 4, 1.1, 1.2 }, new[] { 3 }));
-        b.Add(new MemParagraph("Tubos pela extensão entre os centros dos dispositivos. Escavação, escoramento e reaterro estimados pela largura mínima da vala e " +
-            "pela profundidade média até o fundo externo do tubo, sem os poços de visita, as caixas e os berços.", Italic: true));
+        var porTrecho = CatalogoTubos.Trechos(defs, p, superficie);
+        b.Add(new MemParagraph("Tubos pela extensão entre os centros dos dispositivos; peças e juntas pelo tubo entre as paredes das caixas. Escavação, escoramento, " +
+            "berço e reaterro estimados pela largura mínima da vala e pela profundidade média até o fundo externo do tubo mais o berço" +
+            (p.TaludeVala > 0 ? $", com paredes em talude {N(p.TaludeVala, "0.##")} : 1" : ", com paredes verticais") + ", sem os poços de visita e as caixas." +
+            (porTrecho.Any(t => !t.DoCatalogo) ? " Trechos sem tubo do catálogo com o diâmetro deles: tubo de concreto do padrão do plugin." : ""), Italic: true));
+        if (porTrecho.Count > 0)
+        {
+            b.Add(new MemHeading(2, "Tubos, peças e valas por trecho"));
+            b.Add(new MemTable(new[] { "Trecho", "Tubo", "Extensão (m)", "Tubo entre caixas (m)", "Peças", "Juntas", "Largura da vala (m)", "Prof. média (m)", "Escavação (m³)" },
+                porTrecho.Select(t => (IReadOnlyList<string>)new[]
+                {
+                    $"{t.Nome} ({t.Montante}–{t.Jusante})", t.Tubo.Nome, N(t.Extensao), N(t.ExtensaoTubo), t.Pecas.ToString(Pt), t.Juntas.ToString(Pt),
+                    N(t.Vala.Largura), N(t.Vala.ProfundidadeMedia), N(t.Vala.Escavacao, "0.0"),
+                }).ToList(), new[] { 1.6, 2.6, 0.9, 1, 0.6, 0.6, 0.9, 0.9, 0.9 }, Enumerable.Range(2, 7).ToList()));
+        }
 
         // ---- 6. Disposições finais
         b.Add(new MemHeading(1, SecFinais));

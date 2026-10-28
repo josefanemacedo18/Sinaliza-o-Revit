@@ -34,6 +34,10 @@ public sealed record TelaRedeDrenagem(string Resumo, IReadOnlyList<SecaoRede> Se
     IReadOnlyList<DispositivoRede> Dispositivos, IReadOnlyList<LinhaPerfilRede> Perfil, IReadOnlyList<LinhaDimensionamento> Dimensionamento,
     IReadOnlyList<ProblemaRede> Problemas, ResultadoDrenagem Hidraulica, IReadOnlyList<CaptacaoLida> Captacoes)
 {
+    /// <summary>Tubo do catálogo, peças, juntas e vala de cada trecho (Etapa 22).</summary>
+    public IReadOnlyList<TuboTrecho> Tubos { get; init; } = Array.Empty<TuboTrecho>();
+    /// <summary>Linha piezométrica e de energia (Etapa 22); não calculada sem a equação de chuva.</summary>
+    public ResultadoPiezometrica Piezometrica { get; init; } = new();
     public SecaoRede Secao(CategoriaRede c) => Secoes.First(s => s.Categoria == c);
     /// <summary>Trechos cujo diâmetro do modelo difere do calculado (o que "Aplicar os diâmetros calculados" muda).</summary>
     public int Mudam => Dimensionamento.Count(l => l.Muda);
@@ -70,6 +74,8 @@ public static class RedeDrenagemTela
         ["velocidade"] = CategoriaRede.Hidraulica,
         ["sarjeta"] = CategoriaRede.Hidraulica,
         ["engolimento"] = CategoriaRede.Hidraulica,
+        ["afogamento"] = CategoriaRede.Hidraulica,
+        ["extravasamento"] = CategoriaRede.Hidraulica,
         ["sarjeta-modelo"] = CategoriaRede.ViasETerreno,
         ["ponto-baixo-modelo"] = CategoriaRede.ViasETerreno,
         ["ponto-baixo"] = CategoriaRede.ViasETerreno,
@@ -104,6 +110,8 @@ public static class RedeDrenagemTela
         "velocidade" => "Ajuste a declividade (cotas de fundo) ou o diâmetro do trecho.",
         "sarjeta" => "Coloque uma captação antes ou divida a área de contribuição.",
         "engolimento" => "Aumente a captação (tipo ou módulos) ou divida a área com outra captação.",
+        "afogamento" => "O remanso vem de jusante (nível d'água do lançamento ou trecho sob pressão): aumente o diâmetro de jusante, suba o trecho ou reveja o nível informado.",
+        "extravasamento" => "Aumente os diâmetros ou as declividades a jusante do dispositivo, ou suba o lançamento acima do nível d'água.",
         "sarjeta-modelo" => "Confira a declividade informada ou use Ler do Modelo.",
         "ponto-baixo-modelo" => "Marque a captação como em ponto baixo (o engolimento muda) ou use Ler do Modelo.",
         "ponto-baixo" => "Coloque uma captação no ponto baixo ou reveja o greide.",
@@ -132,7 +140,9 @@ public static class RedeDrenagemTela
         Func<Vec2, double?>? terrenoNatural, ResultadoDrenagem? hidraulica = null, IReadOnlyList<CaptacaoLida>? captacoes = null)
     {
         var res = DrainageNetwork.Check(defs, p, superficie);
-        res.AddRange((hidraulica ?? DrainageHydraulics.Calcular(defs, p)).Problemas);
+        var hid = hidraulica ?? DrainageHydraulics.Calcular(defs, p);
+        res.AddRange(hid.Problemas);
+        res.AddRange(LinhaPiezometrica.Calcular(defs, p, hid).Problemas);
         if (!defs.Any(d => d is DrainageDefinition)) return res;
         res.AddRange(DrenagemDoModelo.Divergencias(captacoes ?? DrenagemDoModelo.Captacoes(defs)));
         foreach (var pb in DrenagemDoModelo.PontosBaixosSemCaptacao(defs))
@@ -183,6 +193,7 @@ public static class RedeDrenagemTela
     {
         var trechos = DrainageNetwork.Analyze(defs, superficie);
         var hid = DrainageHydraulics.Calcular(defs, p);
+        var hgl = LinhaPiezometrica.Calcular(defs, p, hid);
         var captacoes = DrenagemDoModelo.Captacoes(defs);
         var problemas = Problemas(defs, p, superficie, terrenoNatural, hid, captacoes);
         var itens = problemas.Select(Item).ToList();
@@ -296,7 +307,17 @@ public static class RedeDrenagemTela
                 var semArea = defs.OfType<DrainageDefinition>().Count(d => d.IsInlet && !d.IsLinear && d.AreaContribuicao <= 0);
                 notas.Add(L(NivelSituacao.Informacao, $"{hid.Captacoes.Count} captação(ões) verificada(s)" +
                     (semArea > 0 ? $"; {semArea} sem área de contribuição não verificada(s) (Ler do Modelo preenche a área)." : ".")));
-                notas.Add(L(NivelSituacao.Informacao, "Tubos verificados a seção plena: a lâmina nos tubos e o remanso não são calculados."));
+                // Linha piezométrica (Etapa 22): de jusante para montante, com o nível do lançamento.
+                if (hgl.Trechos.Count > 0)
+                {
+                    var pressao = hgl.Trechos.Count(t => t.Afogado);
+                    var extravasa = hgl.Dispositivos.Count(d => d.Extravasa);
+                    var folga = hgl.Dispositivos.Count > 0 ? hgl.Dispositivos.Min(d => d.Folga) : double.NaN;
+                    notas.Add(L(pressao + extravasa > 0 ? NivelSituacao.Aviso : NivelSituacao.Informacao,
+                        $"Linha piezométrica: {pressao} trecho(s) sob pressão, {extravasa} dispositivo(s) extravasando" +
+                        (double.IsFinite(folga) ? $"; menor folga até a tampa {N(folga)} m." : ".") + " Lançamento – " +
+                        string.Join("; ", hgl.Lancamentos.Select(x => $"{x.Key}: {x.Value}")) + "."));
+                }
                 sit = hid.Trechos.Count == 0 ? L(NivelSituacao.NaoVerificado, "Nenhum trecho calculado (os trechos não ligam duas caixas).")
                     : it.Count == 0 ? L(NivelSituacao.Ok, "Vazões dentro da capacidade a seção plena; velocidades, sarjetas e engolimento dentro dos limites informados.")
                     : L(NivelSituacao.Aviso, $"{it.Count} item(ns) do cálculo hidráulico fora dos limites.");
@@ -375,7 +396,11 @@ public static class RedeDrenagemTela
                      (p.TemChuva
                          ? "Cálculo hidráulico feito pelo método racional; " + (mudam == 0 ? "diâmetros do modelo iguais aos calculados." : $"{mudam} trecho(s) com diâmetro diferente do calculado.")
                          : "Sem equação de chuva: só geometria, conectividade e parâmetros foram conferidos – nenhum cálculo hidráulico.");
-        return new TelaRedeDrenagem(resumo, secoes, trechos, dispositivos, perfil, dim, problemas, hid, captacoes);
+        return new TelaRedeDrenagem(resumo, secoes, trechos, dispositivos, perfil, dim, problemas, hid, captacoes)
+        {
+            Tubos = CatalogoTubos.Trechos(defs, p, superficie),
+            Piezometrica = hgl,
+        };
     }
 
     /// <summary>Quantas redes separadas: componentes ligados pelos trechos entre caixas (dispositivos soltos não contam).</summary>

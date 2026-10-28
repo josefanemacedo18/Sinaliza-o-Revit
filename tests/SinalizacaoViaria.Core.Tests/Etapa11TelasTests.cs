@@ -213,7 +213,7 @@ public class Etapa11TelasTests
     {
         // Os critérios que o núcleo emite (DrainageNetwork, DrainageHydraulics, DrenagemDoModelo e a própria tela): nenhum cai na parte errada.
         var nucleo = Path.Combine(Raiz(), "src", "SinalizacaoViaria.Core", "Automation");
-        var criterios = new[] { "DrainageNetwork.cs", "DrainageHydraulics.cs", "DrainageModel.cs", "DrainageNetworkScreen.cs" }
+        var criterios = new[] { "DrainageNetwork.cs", "DrainageHydraulics.cs", "DrainageModel.cs", "DrainageNetworkScreen.cs", "DrainagePipes.cs" }
             .SelectMany(f => Regex.Matches(File.ReadAllText(Path.Combine(nucleo, f)), @"(?:\.Add\(new|new ProblemaRede)\(\s*[^,()]+,\s*""([^""]+)"",")
                 .Select(m => m.Groups[1].Value)).ToHashSet();
         Assert.True(criterios.Count >= 19, string.Join(", ", criterios));
@@ -301,7 +301,8 @@ public class Etapa11TelasTests
         Assert.Contains("Manning", hid.Escopo);
         Assert.Contains("Fendrich", hid.Escopo);
         Assert.Contains(hid.Itens, i => i.Criterio == "capacidade" && i.Ids.Contains(t1.Id));
-        Assert.Contains(hid.Notas, n => n.Texto.Contains("a lâmina nos tubos e o remanso não são calculados"));
+        // Desde a Etapa 22, a lâmina nos tubos e o remanso saem na linha piezométrica (o T1, acima da capacidade, sob pressão).
+        Assert.Contains(hid.Notas, n => n.Texto.StartsWith("Linha piezométrica: 1 trecho(s) sob pressão"));
         Assert.Contains(hid.Notas, n => n.Texto.StartsWith("Vazão máxima"));
         // O dimensionamento é o do "Aplicar": o cálculo refeito com os diâmetros calculados, diante do diâmetro do modelo.
         var dim = DrainageHydraulics.Calcular(defs, p, dimensionar: true);

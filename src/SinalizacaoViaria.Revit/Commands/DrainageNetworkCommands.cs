@@ -24,11 +24,22 @@ internal static class DrainageNetworkForms
     /// Janela do trecho. Com <paramref name="ends"/> (edição), mostra as cotas de fundo: automáticas (o fundo das caixas) ou
     /// informadas.
     /// </summary>
-    public static FormWindow Pipe(DrainagePipeDefinition p, bool edit, PontasTrecho? ends)
+    public static FormWindow Pipe(DrainagePipeDefinition p, bool edit, PontasTrecho? ends, ProjetoDrenagem? projeto = null)
     {
         var w = new FormWindow(edit ? "Editar trecho de rede" : "Trecho de rede", "Trecho de rede de drenagem", Hint, null, null, false,
-            edit ? "Aplicar" : "Escolher os dispositivos", 640, edit ? 460 : 340);
+            edit ? "Aplicar" : "Escolher os dispositivos", 640, edit ? 500 : 380);
+        // Tubo do catálogo do Projeto de Drenagem (Etapa 22): escolher um traz o diâmetro dele; "pelo diâmetro" usa o do catálogo com o mesmo DN.
+        var catalogo = CatalogoTubos.Lista(projeto);
+        var opcoes = new List<(string, string)> { ("Pelo diâmetro (o tubo do catálogo com o mesmo DN)", "") };
+        opcoes.AddRange(catalogo.Select(t => ($"{t.Codigo} – {t.Nome}", t.Codigo)));
         w.Section("Tubo")
+         .Choice("Tubo do catálogo", opcoes, () => p.Tubo != null && catalogo.Any(t => t.Codigo == p.Tubo) ? p.Tubo : "", v => p.Tubo = v.Length == 0 ? null : v,
+             "O catálogo é editado no Projeto de Drenagem (material, classe, DN, parede, peça, junta, n); sai no quantitativo e no memorial.",
+             v =>
+             {
+                 p.Tubo = v.Length == 0 ? null : v;
+                 if (catalogo.FirstOrDefault(t => t.Codigo == v) is { } tb) p.Diameter = tb.Diametro;
+             })
          .Number("Diâmetro interno (mm)", () => p.Diameter * 1000, v => p.Diameter = v / 1000, 100, 3000, "0",
              "Diâmetro comercial do trecho. A parede é desenhada com 8 % do diâmetro, mínimo 4 cm.");
         if (ends == null) return w;
@@ -48,7 +59,7 @@ internal static class DrainageNetworkForms
         var working = (DrainagePipeDefinition)MarkingDefinition.FromJson(def.ToJson())!;
         var all = MarkingStorage.Definitions(uidoc.Document);
         var ends = DrainageNetwork.Ends(working, id => all.FirstOrDefault(d => d.Id == id));
-        return (Pipe(working, true, ends), working);
+        return (Pipe(working, true, ends, DrainageDesignStore.Load(uidoc.Document)), working);
     }
 
     private static double? Opt(double v) => v > 0 ? v : null;
@@ -136,7 +147,29 @@ internal static class DrainageNetworkForms
 
         w.Section("Valas (quantitativo do memorial)")
          .Number("Escorar valas a partir de (m)", () => p.ProfundidadeEscoramento, v => p.ProfundidadeEscoramento = v, 0, 20, "0.00")
-         .Number("Largura mínima da vala (× diâmetro)", () => p.LarguraValaDiametros, v => p.LarguraValaDiametros = v, 1, 5, "0.#");
+         .Number("Largura mínima da vala (× diâmetro)", () => p.LarguraValaDiametros, v => p.LarguraValaDiametros = v, 1, 5, "0.#")
+         .Number("Berço sob o tubo (cm; 0 = sem berço)", () => p.EspessuraBerco * 100, v => p.EspessuraBerco = v / 100, 0, 100, "0.#",
+             "Padrão do plugin: sem berço. Informe a espessura da especificação do projeto: entra na profundidade da vala, no volume do berço e no reaterro.")
+         .Number("Talude das paredes da vala (H : 1 V; 0 = verticais)", () => p.TaludeVala, v => p.TaludeVala = v, 0, 5, "0.##",
+             "Padrão do plugin: paredes verticais, escoradas acima da profundidade de escoramento. Com talude, a seção cresce e não há escoramento.");
+
+        // Catálogo de tubos (Etapa 22): texto editável, uma linha por tubo; vazio = o padrão do plugin (concreto ponta e bolsa, peças de 1 m).
+        var catalogoTexto = CatalogoTubos.Texto(p.Tubos.Count > 0 ? p.Tubos : CatalogoTubos.Padrao(p));
+        var (textoInicial, eraPadrao) = (catalogoTexto, p.Tubos.Count == 0);
+        w.Section("Catálogo de tubos", "Uma linha por tubo: " + CatalogoTubos.CabecalhoTexto + ". Vazio = o padrão do plugin (concreto ponta e bolsa, peças de " +
+                  "1 m, um por diâmetro comercial). Os valores e a fonte são os do fabricante ou da especificação que você usar.")
+         .Text("Tubos", () => catalogoTexto, v =>
+         {
+             catalogoTexto = v ?? "";
+             // Padrão não editado: continua vazio e acompanha a lista de diâmetros comerciais.
+             if (eraPadrao && catalogoTexto == textoInicial) { p.Tubos = new List<TuboCatalogo>(); return; }
+             var lista = CatalogoTubos.Ler(catalogoTexto, out var erros);
+             if (erros.Count > 0) throw new FormatException("Catálogo de tubos – " + string.Join("; ", erros.Take(3)) + (erros.Count > 3 ? "…" : ""));
+             // Igual ao padrão do plugin: guarda vazio (acompanha a lista de diâmetros).
+             p.Tubos = CatalogoTubos.Texto(lista) == CatalogoTubos.Texto(CatalogoTubos.Padrao(p)) ? new List<TuboCatalogo>() : lista;
+         }, multiline: true)
+         .Number("Perda localizada na entrada dos trechos K (× V²/2g; linha piezométrica)", () => p.PerdaPv, v => p.PerdaPv = v, 0, 10, "0.##",
+             "Padrão do plugin: 0 (sem perda localizada). Informe o coeficiente da sua referência: soma K·V²/2g ao nível d'água no dispositivo de montante.");
 
         static string? T(string? v) => string.IsNullOrWhiteSpace(v) ? null : v!.Trim();
         w.Section("Identificação (memorial)")
@@ -164,7 +197,7 @@ public sealed class CmdTrechoDrenagem : CommandBase
     protected override Result Run(UIApplication app, UIDocument uidoc)
     {
         var template = UiHelpers.Remembered<DrainagePipeDefinition>(Key) ?? new DrainagePipeDefinition();
-        if (UiHelpers.ShowModal(DrainageNetworkForms.Pipe(template, false, null)) != true) return Result.Cancelled;
+        if (UiHelpers.ShowModal(DrainageNetworkForms.Pipe(template, false, null, DrainageDesignStore.Load(uidoc.Document))) != true) return Result.Cancelled;
         UiHelpers.Remember(Key, template);
         PluginContext.SaveSettings();
 
@@ -258,7 +291,8 @@ public sealed class CmdRedeDrenagem : CommandBase
             Directory.CreateDirectory(PluginPaths.Root);
             path = Path.Combine(PluginPaths.Root, $"rede-drenagem-{DateTime.Now:yyyyMMdd-HHmmss}.csv");
             var csv = DrainageNetwork.Csv(tela.Trechos, tela.Problemas, p) + (p.TemChuva ? "\n" + DrainageHydraulics.Csv(tela.Hidraulica, p) : "") +
-                      "\n" + PerfilRede.Csv(tela.Perfil, tela.Dispositivos) +
+                      "\n" + PerfilRede.Csv(tela.Perfil, tela.Dispositivos) + "\n" + CatalogoTubos.Csv(tela.Tubos) +
+                      (p.TemChuva ? "\n" + LinhaPiezometrica.Csv(tela.Piezometrica) : "") +
                       (tela.Captacoes.Count > 0 ? "\n" + DrenagemDoModelo.Csv(tela.Captacoes) : "");
             File.WriteAllText(path, csv, new UTF8Encoding(true));
         }

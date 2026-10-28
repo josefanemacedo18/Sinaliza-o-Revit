@@ -294,7 +294,7 @@ public class Fase08HidraulicaTests(ITestOutputHelper output)
         Assert.Equal(2, doc.Blocks.OfType<MemSection>().Count());
         // Quantitativo: tubo DN 1200 = soma das extensões (691,81 m; o modelo arredonda para 692) e 13 PVs.
         var q = DrainageMemorial.Quantitativo(defs, p);
-        Assert.Equal(691.81, q.Single(x => x.Descricao.Contains("DN 1200")).Quantidade, 2);
+        Assert.Equal(691.81, q.Single(x => x.Descricao == "Tubo de concreto DN 1200 (ponta e bolsa)").Quantidade, 2);
         Assert.Equal(13, q.Single(x => x.Descricao == "Poço de visita").Quantidade);
         Assert.Contains(q, x => x.Descricao.StartsWith("Escavação"));
 

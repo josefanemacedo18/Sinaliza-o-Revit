@@ -621,7 +621,12 @@ public static class ModelValidator
         // Recobrimento sob a superfície acabada: vias do plugin e, fora delas, o terreno projetado (Etapa 6; antes, a reta entre as tampas).
         var superficie = Automation.DrenagemDoModelo.SuperficieAcabada(defs.Values, terreno == null ? null : terreno.Z);
         var problemas = Automation.DrainageNetwork.Check(defs.Values, c, superficie).Where(p => p.Criterio != "dispositivo").ToList();
-        if (c is { TemChuva: true }) problemas.AddRange(Automation.DrainageHydraulics.Calcular(defs.Values, c).Problemas);
+        if (c is { TemChuva: true })
+        {
+            var hid = Automation.DrainageHydraulics.Calcular(defs.Values, c);
+            problemas.AddRange(hid.Problemas);
+            problemas.AddRange(Automation.LinhaPiezometrica.Calcular(defs.Values, c, hid).Problemas);
+        }
         foreach (var p in problemas)
         {
             var texto = p.PorLimite ? $"{p.Texto} Critérios: {c!.FonteTexto}." : p.Texto;

@@ -30,7 +30,9 @@ public sealed class DrainageNetworkWindow : Window
     public sealed record LinhaDispositivo(string Rotulo, string Tipo, string Tampa, string Fundo, string Profundidade, string Entradas, string Saidas,
         IReadOnlyList<string> Ids);
     public sealed record LinhaPerfil(string Dispositivo, string Distancia, string Tampa, string FundoChegada, string FundoSaida, string Trecho, string Extensao,
-        string Declividade, string Diametro, string Recobrimento);
+        string Declividade, string Diametro, string Recobrimento, string Nivel);
+    public sealed record LinhaTubo(string Trecho, string Tubo, string Extensao, string ExtensaoTubo, string Pecas, string Juntas, string Largura, string Profundidade,
+        string Escavacao, string Reaterro, IReadOnlyList<string> Ids);
 
     private readonly TelaRedeDrenagem _tela;
     private readonly string _texto;
@@ -115,8 +117,9 @@ public sealed class DrainageNetworkWindow : Window
             ("Dispositivo", nameof(LinhaPerfil.Dispositivo), 1.0), ("Distância (m)", nameof(LinhaPerfil.Distancia), 0.8), ("Tampa (m)", nameof(LinhaPerfil.Tampa), 0.8),
             ("Fundo chegada (m)", nameof(LinhaPerfil.FundoChegada), 0.9), ("Fundo saída (m)", nameof(LinhaPerfil.FundoSaida), 0.9), ("Trecho", nameof(LinhaPerfil.Trecho), 0.6),
             ("Extensão (m)", nameof(LinhaPerfil.Extensao), 0.8), ("Declividade (%)", nameof(LinhaPerfil.Declividade), 0.8), ("Ø (mm)", nameof(LinhaPerfil.Diametro), 0.6),
-            ("Recobrimento (m)", nameof(LinhaPerfil.Recobrimento), 0.9));
+            ("Recobrimento (m)", nameof(LinhaPerfil.Recobrimento), 0.9), ("Nível d'água (m)", nameof(LinhaPerfil.Nivel), 0.9));
         _tabs.Items.Add(new TabItem { Header = "Perfil", Content = UiHelpers.Scroller(Perfil()) });
+        _tabs.Items.Add(new TabItem { Header = "Tubos e valas", Content = UiHelpers.Scroller(Tubos()) });
         _tabs.Items.Add(new TabItem { Header = "Dispositivos", Content = UiHelpers.Scroller(Dispositivos()) });
         root.Children.Add(_tabs);
         Content = root;
@@ -256,7 +259,8 @@ public sealed class DrainageNetworkWindow : Window
         {
             Style = S("Hint"),
             Text = "De montante para jusante; o primeiro ramo é o mais longo até o lançamento e cada ramo seguinte para no dispositivo em que encontra um ramo já listado. " +
-                   "Linha escura: tampas; linhas azuis: fundo e geratriz superior interna do tubo. Escala vertical exagerada para caber.",
+                   "Linha escura: tampas; linhas azuis: fundo e geratriz superior interna do tubo; tracejado verde: linha piezométrica (nível d'água); pontilhado: " +
+                   "linha de energia – com a equação de chuva. Escala vertical exagerada para caber.",
         });
         var ramos = _tela.Perfil.Select(l => l.Ramo).Distinct().ToList();
         if (ramos.Count == 0)
@@ -286,8 +290,10 @@ public sealed class DrainageNetworkWindow : Window
 
     private void Ramo()
     {
+        var niveis = _tela.Piezometrica.Dispositivos.GroupBy(d => d.Rotulo).ToDictionary(g => g.Key, g => g.First());
         _perfilGrid.ItemsSource = LinhasDoRamo().Select(l => new LinhaPerfil(l.Dispositivo, F(l.Distancia), F(l.Tampa, "0.000"), F(l.FundoChegada, "0.000"),
-            F(l.FundoSaida, "0.000"), l.Trecho ?? "", F(l.Comprimento), F(l.Declividade, "0.000"), l.Diametro is { } d ? F(d * 1000, "0") : "—", F(l.Recobrimento))).ToList();
+            F(l.FundoSaida, "0.000"), l.Trecho ?? "", F(l.Comprimento), F(l.Declividade, "0.000"), l.Diametro is { } d ? F(d * 1000, "0") : "—", F(l.Recobrimento),
+            niveis.TryGetValue(l.Dispositivo, out var nv) ? F(nv.Nivel, "0.000") + (nv.Extravasa ? " (extravasa)" : "") : "—")).ToList();
         Desenhar();
     }
 
@@ -298,7 +304,9 @@ public sealed class DrainageNetworkWindow : Window
         var linhas = LinhasDoRamo();
         var (w, h) = (_perfil.ActualWidth, _perfil.ActualHeight);
         if (linhas.Count < 2 || w < 40 || h < 40) return;
+        var hgl = _tela.Piezometrica.Trechos.GroupBy(t => t.Nome).ToDictionary(g => g.Key, g => g.First());
         var cotas = linhas.SelectMany(l => new[] { l.Tampa, l.FundoChegada ?? double.NaN, l.FundoSaida ?? double.NaN, (l.FundoSaida ?? double.NaN) + (l.Diametro ?? 0) })
+            .Concat(linhas.Where(l => l.Trecho != null && hgl.ContainsKey(l.Trecho)).SelectMany(l => new[] { hgl[l.Trecho!].EnergiaMontante, hgl[l.Trecho!].EnergiaJusante }))
             .Where(double.IsFinite).ToList();
         if (cotas.Count == 0) return;
         var (zmin, zmax) = (cotas.Min(), cotas.Max());
@@ -317,6 +325,14 @@ public sealed class DrainageNetworkWindow : Window
             var d = a.Diametro ?? 0;
             _perfil.Children.Add(new Line { X1 = X(a.Distancia), Y1 = Y(f0), X2 = X(b.Distancia), Y2 = Y(f1), Stroke = UiTokens.Accent, StrokeThickness = 2 });
             _perfil.Children.Add(new Line { X1 = X(a.Distancia), Y1 = Y(f0 + d), X2 = X(b.Distancia), Y2 = Y(f1 + d), Stroke = UiTokens.Accent, StrokeThickness = 1 });
+            // Linha piezométrica (nível d'água) e de energia do trecho (Etapa 22).
+            if (a.Trecho != null && hgl.TryGetValue(a.Trecho, out var hp))
+            {
+                _perfil.Children.Add(new Line { X1 = X(a.Distancia), Y1 = Y(hp.NivelMontante), X2 = X(b.Distancia), Y2 = Y(hp.NivelJusante), Stroke = UiTokens.Success,
+                    StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 5, 3 } });
+                _perfil.Children.Add(new Line { X1 = X(a.Distancia), Y1 = Y(hp.EnergiaMontante), X2 = X(b.Distancia), Y2 = Y(hp.EnergiaJusante), Stroke = UiTokens.Warning,
+                    StrokeThickness = 1, StrokeDashArray = new DoubleCollection { 1, 3 } });
+            }
         }
         foreach (var l in linhas)
         {
@@ -332,6 +348,37 @@ public sealed class DrainageNetworkWindow : Window
         Canvas.SetLeft(escala, 4);
         Canvas.SetTop(escala, h - 18);
         _perfil.Children.Add(escala);
+    }
+
+    // ---------------------------------------------------------------- tubos e valas
+    private StackPanel Tubos()
+    {
+        var sp = new StackPanel();
+        sp.Children.Add(new TextBlock { Text = "Tubos, peças e valas por trecho", Style = S("SectionTitle"), Margin = new Thickness(0, 0, 0, 2) });
+        sp.Children.Add(new TextBlock
+        {
+            Style = S("Hint"),
+            Text = "Tubo do catálogo do Projeto de Drenagem (ou, sem um com o diâmetro do trecho, o concreto do padrão do plugin). Extensão entre os centros dos " +
+                   "dispositivos; peças e juntas pelo tubo entre as paredes das caixas; vala até o fundo externo do tubo mais o berço. Estimativas, como no memorial.",
+        });
+        if (_tela.Tubos.Count == 0)
+        {
+            sp.Children.Add(ContextPanelPage.Linha(NivelSituacao.NaoVerificado, "Nenhum trecho medido."));
+            return sp;
+        }
+        var semCatalogo = _tela.Tubos.Count(t => !t.DoCatalogo);
+        if (semCatalogo > 0)
+            sp.Children.Add(ContextPanelPage.Linha(NivelSituacao.Informacao, $"{semCatalogo} trecho(s) sem tubo do catálogo com o diâmetro deles: concreto do padrão do plugin."));
+        var linhas = _tela.Tubos.Select(t => new LinhaTubo($"{t.Nome} ({t.Montante} → {t.Jusante})", t.Tubo.Nome, F(t.Extensao), F(t.ExtensaoTubo),
+            t.Pecas.ToString(UiHelpers.PtBr), t.Juntas.ToString(UiHelpers.PtBr), F(t.Vala.Largura), F(t.Vala.ProfundidadeMedia), F(t.Vala.Escavacao, "0.0"),
+            F(t.Vala.Reaterro, "0.0"), new[] { t.Id })).ToList();
+        var g = Tabela(linhas, 420, true, ("Trecho", nameof(LinhaTubo.Trecho), 1.2), ("Tubo", nameof(LinhaTubo.Tubo), 2.0), ("Extensão (m)", nameof(LinhaTubo.Extensao), 0.7),
+            ("Entre caixas (m)", nameof(LinhaTubo.ExtensaoTubo), 0.8), ("Peças", nameof(LinhaTubo.Pecas), 0.5), ("Juntas", nameof(LinhaTubo.Juntas), 0.5),
+            ("Vala (m)", nameof(LinhaTubo.Largura), 0.6), ("Prof. média (m)", nameof(LinhaTubo.Profundidade), 0.8), ("Escavação (m³)", nameof(LinhaTubo.Escavacao), 0.8),
+            ("Reaterro (m³)", nameof(LinhaTubo.Reaterro), 0.8));
+        sp.Children.Add(g);
+        sp.Children.Add(Selecionar(g, r => ((LinhaTubo)r).Ids));
+        return sp;
     }
 
     // ---------------------------------------------------------------- dispositivos

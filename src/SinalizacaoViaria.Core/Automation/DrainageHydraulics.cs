@@ -187,6 +187,19 @@ public sealed class ProjetoDrenagem
     /// <summary>Largura mínima da vala em diâmetros do tubo.</summary>
     public double LarguraValaDiametros { get; set; } = 2.0;
 
+    // ---- Tubos, valas e linha piezométrica (Etapa 22)
+    /// <summary>
+    /// Catálogo de tubos do projeto (material, classe, DN, parede, peça, junta, n); vazio = o padrão do plugin
+    /// (<see cref="CatalogoTubos.Padrao"/>: concreto ponta e bolsa, peças de 1 m, um por diâmetro comercial).
+    /// </summary>
+    public List<TuboCatalogo> Tubos { get; set; } = new();
+    /// <summary>Espessura do berço sob o tubo (m). Padrão do plugin: 0 (sem berço) – a da especificação do projeto quando houver.</summary>
+    public double EspessuraBerco { get; set; }
+    /// <summary>Talude das paredes da vala (H : 1 V). Padrão do plugin: 0 (paredes verticais, escoradas acima da profundidade de escoramento).</summary>
+    public double TaludeVala { get; set; }
+    /// <summary>Perda localizada na entrada de cada trecho, em K·V²/2g (linha piezométrica). Padrão do plugin: 0 (sem perda localizada).</summary>
+    public double PerdaPv { get; set; }
+
     public bool TemChuva => Chuva != null;
 
     public string FonteTexto => string.IsNullOrWhiteSpace(Fonte) ? "fonte não informada pelo usuário" : Fonte!.Trim();
@@ -196,6 +209,7 @@ public sealed class ProjetoDrenagem
         var c = (ProjetoDrenagem)MemberwiseClone();
         c.Chuva = Chuva?.Clone();
         c.Diametros = new List<double>(Diametros);
+        c.Tubos = Tubos.Select(t => t.Clone()).ToList();
         return c;
     }
 
@@ -208,12 +222,17 @@ public sealed class ProjetoDrenagem
         catch (JsonException) { return new ProjetoDrenagem(); }
     }
 
-    /// <summary>Copia os critérios de <paramref name="p"/> (predefinição) mantendo a identificação deste projeto.</summary>
+    /// <summary>
+    /// Copia os critérios de <paramref name="p"/> (predefinição) mantendo a identificação deste projeto e o que as fontes não
+    /// definem: o catálogo de tubos, o berço, o talude da vala e a perda nos PVs.
+    /// </summary>
     public void AplicarCriterios(ProjetoDrenagem p)
     {
         var (obra, mun, end, prop, doc, autor, reg, art) = (Obra, Municipio, Endereco, Proprietario, ProprietarioDocumento, Autor, Registro, Art);
+        var (tubos, berco, talude, perda) = (Tubos, EspessuraBerco, TaludeVala, PerdaPv);
         foreach (var prop0 in typeof(ProjetoDrenagem).GetProperties().Where(x => x.CanWrite)) prop0.SetValue(this, prop0.GetValue(p.Clone()));
         (Obra, Municipio, Endereco, Proprietario, ProprietarioDocumento, Autor, Registro, Art) = (obra, mun, end, prop, doc, autor, reg, art);
+        (Tubos, EspessuraBerco, TaludeVala, PerdaPv) = (tubos, berco, talude, perda);
     }
 
     /// <summary>Todos os critérios do Manual de Drenagem Urbana da SUDERHSA (2002), com a curva de Fendrich.</summary>
@@ -461,9 +480,11 @@ public static class DrainageHydraulics
             var len = e.A.DistanceTo(e.B);
             var s = len > 1e-9 ? (e.InvertA - e.InvertB) / len : 0;
             var dmin = (ligacao ? p.DiametroLigacao : p.DiametroMinimo) ?? 0;
-            var dNec = s > 0 ? Hidraulica.DiametroNecessario(q / 1000, s, p.Rugosidade, p.Diametros, dmin) : null;
+            // Rugosidade: a do tubo do catálogo, quando informada; senão a do projeto.
+            var rug = CatalogoTubos.Do(pipe, p).Tubo.Rugosidade ?? p.Rugosidade;
+            var dNec = s > 0 ? Hidraulica.DiametroNecessario(q / 1000, s, rug, p.Diametros, dmin) : null;
             var diam = dimensionar && dNec is { } dn ? dn : pipe.Diameter;
-            var (qmax, v) = Hidraulica.SecaoPlena(diam, s, p.Rugosidade);
+            var (qmax, v) = Hidraulica.SecaoPlena(diam, s, rug);
             var (ma, ju) = (labels.GetValueOrDefault(pipe.FromId, e.CodeA), labels.GetValueOrDefault(pipe.ToId, e.CodeB));
             res.Trechos.Add(new TrechoHidraulico(pipe.Id, nome, ma, ju, ligacao, len, t, i, c, a, q, diam, qmax * 1000, v, e.RimA, e.RimB, s,
                 e.InvertA, e.InvertB, dNec));
