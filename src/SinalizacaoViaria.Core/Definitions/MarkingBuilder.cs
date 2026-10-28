@@ -285,6 +285,7 @@ public static class MarkingBuilder
         NorthArrowDefinition na => DetailGenerator.NorthArrow(na, ctx),
         TemaTerrenoDefinition tt => TerrainGenerators.Tema(tt, ctx),
         PlataformaDefinition pf => TerrainGenerators.Plataforma(pf, path),
+        CorpoDaguaDefinition ca => WaterGenerator.Build(ca, path, ctx),
         SheetSegmentDefinition ss => DetailGenerator.SheetSegment(ss, ctx),
         RoadPavementDefinition rp2 => path == null ? Missing("Eixo da via não encontrado.") : RoadGenerator.Pavement(rp2, path),
         IntersectionDefinition it => IntersectionGenerator.Build(it, ctx),
@@ -1088,6 +1089,9 @@ public static class MarkingBuilder
             case EscapeRampDefinition er:
                 return new MarkingInfo(er.DisplayCode, $"Área de escape – caixa de retenção {er.ActualLength:0} × {er.Width:0.#} m", GrupoMarca.Urbanizacao,
                     "AASHTO Green Book – Emergency Escape Ramps; DNIT – Manual de Projeto Geométrico de Rodovias Rurais", "un");
+            case CorpoDaguaDefinition ca:
+                return new MarkingInfo(ca.DisplayCode, $"{ca.KindName}{(string.IsNullOrWhiteSpace(ca.Nome) ? "" : " " + ca.Nome)} – superfície de água", GrupoMarca.Urbanizacao,
+                    "Escavação do leito no registro da Terraplenagem", "m²");
             case PlataformaDefinition pf:
                 return new MarkingInfo(pf.DisplayCode, $"Plataforma na cota {pf.Cota:0.00} m (taludes {pf.CutSlope:0.0#} : 1 e {pf.FillSlope:0.0#} : 1)", GrupoMarca.Urbanizacao,
                     "Volumes no registro da Terraplenagem", "un");

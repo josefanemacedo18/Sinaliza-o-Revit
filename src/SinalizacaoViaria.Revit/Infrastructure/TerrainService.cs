@@ -113,7 +113,7 @@ public static class TerrainService
             {
                 CutSlope = c.CutSlope, FillSlope = c.FillSlope, DaylightLeft = c.DaylightLeft, DaylightRight = c.DaylightRight, Label = c.Label,
                 WallLeft = c.WallLeft, WallRight = c.WallRight, WallStart = c.WallStart, WallEnd = c.WallEnd, WallCap = c.WallCap, EndSpill = c.EndSpill,
-                Owner = def.Id,
+                SpillStart = c.SpillStart, SpillEnd = c.SpillEnd, Owner = def.Id,
             };
             a.Left.AddRange(c.Left.Select(p => p with { Z = p.Z + baseZ }));
             a.Right.AddRange(c.Right.Select(p => p with { Z = p.Z + baseZ }));

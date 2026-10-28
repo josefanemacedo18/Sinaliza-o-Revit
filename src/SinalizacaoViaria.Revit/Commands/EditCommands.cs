@@ -141,7 +141,7 @@ public sealed class CmdEditar : CommandBase
             return Result.Succeeded;
         }
         if ((SidewalkForms.ForEdit(stored.Definition) ?? InfraForms.ForEdit(stored.Definition) ?? DrainageNetworkForms.ForEdit(uidoc, stored.Definition)
-             ?? SafetyForms.ForEdit(stored.Definition) ?? DetailForms.ForEdit(uidoc, stored.Definition) ?? TerrainForms.ForEdit(stored.Definition)) is { } form)
+             ?? SafetyForms.ForEdit(stored.Definition) ?? DetailForms.ForEdit(uidoc, stored.Definition) ?? TerrainForms.ForEdit(stored.Definition) ?? WaterForms.ForEdit(uidoc, stored.Definition)) is { } form)
         {
             if (UiHelpers.ShowModal(form.Window) != true) return Result.Cancelled;
             var def = form.Working;

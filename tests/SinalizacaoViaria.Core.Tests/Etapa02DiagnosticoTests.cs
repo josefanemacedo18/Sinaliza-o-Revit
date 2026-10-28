@@ -22,7 +22,7 @@ public class Etapa02DiagnosticoTests
     [Fact]
     public void Regras_CadaCodigoComModuloEAcao_EAcaoPropriaQuandoHa()
     {
-        Assert.Equal(17, ModelValidator.Regras.Count);     // V15 na Etapa 5, V16 na Etapa 7, V17 (integração) na Etapa 8
+        Assert.Equal(18, ModelValidator.Regras.Count);     // V15 na Etapa 5, V16 na Etapa 7, V17 (integração) na Etapa 8, V18 (corpos d'água) na Etapa 21
         Assert.All(ModelValidator.Regras.Values, r =>
         {
             Assert.False(string.IsNullOrWhiteSpace(r.Modulo));

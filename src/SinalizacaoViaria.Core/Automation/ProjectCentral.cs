@@ -245,7 +245,7 @@ public static class CentralDoProjeto
             or BridgeDefinition or TunnelDefinition or TrenchDefinition => "viario",
         IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or InterchangeDefinition => "intersecoes",
         RetainingWallDefinition or SlopeDefinition or PlataformaDefinition or TemaTerrenoDefinition => "terraplenagem",
-        DrainageDefinition or DrainagePipeDefinition => "drenagem",
+        DrainageDefinition or DrainagePipeDefinition or CorpoDaguaDefinition => "drenagem",
         LoteamentoDefinition or QuadraDefinition or UrbanElementDefinition or PlanterDefinition => "urbanismo",
         LinearMarkingDefinition or HatchMarkingDefinition or SymbolMarkingDefinition or TextMarkingDefinition or ParkingMarkingDefinition
             or RepeatedMarkingDefinition or DeviceMarkingDefinition or SignDefinition or TrafficCalmingDefinition or ChannelizationDefinition

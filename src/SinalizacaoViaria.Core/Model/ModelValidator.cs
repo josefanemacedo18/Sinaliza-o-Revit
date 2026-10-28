@@ -109,6 +109,7 @@ public static class ModelValidator
 
         CheckLayout(defs, res);
         CheckParcelamento(defs, res);
+        CheckCorposDagua(defs, res);
         if (criterios is { IsEmpty: false }) CheckAlignment(defs, criterios, res);
         CheckDrainage(defs, drenagem, terreno, res);
         CheckDrainageModel(defs, terrenoNatural, res);
@@ -269,6 +270,8 @@ public static class ModelValidator
             "rodar a Terraplenagem (o terreno original fica guardado e é a base do novo cálculo)"),
         new Regra("V16", "Quadras e lotes", "parcelamento: percentual da gleba (sistema viário, áreas públicas, categoria) abaixo do mínimo informado no loteamento; lote abaixo do lote mínimo informado (frente e área)",
             "rever as quadras e os lotes, ou o mínimo informado e a sua fonte"),
+        new Regra("V18", "Corpos d'água", "lote dentro da faixa de proteção informada de um rio, córrego, lago ou lagoa; lançamento da drenagem abaixo do nível d'água informado; faixa de proteção não informada",
+            "rever os lotes junto à margem ou a faixa informada (e a lei citada); rever a cota do lançamento ou o nível d'água"),
         new Regra("V17", "Integração", "resultado lido do modelo que ficou desatualizado: área ou declividade de captação lida da via que o modelo agora dá diferente",
             "atualizar só o que ficou desatualizado (as edições à mão ficam)"),
     }.ToDictionary(r => r.Codigo);
@@ -465,6 +468,78 @@ public static class ModelValidator
             $"{velhas.Count} captação(ões) com área ou declividade lidas do modelo que ficaram desatualizadas (a via mudou, outra captação entrou ou o " +
             $"dispositivo saiu da sarjeta): {nomes}.", velhas.Select(c => c.Dispositivo.Id).ToArray(),
             "Ler do Modelo › Atualizar só as desatualizadas (as editadas à mão ficam)"));
+    }
+
+    /// <summary>Distância (m, padrão do plugin) até a água em que o último dispositivo da rede conta como lançamento no corpo d'água.</summary>
+    public const double DistanciaLancamento = 30;
+
+    /// <summary>
+    /// Corpos d'água (V18, Etapa 21): lotes dentro da faixa de proteção informada (com a lei que o usuário citou), faixa não
+    /// informada (não verificado) e o lançamento da rede de drenagem junto à água – abaixo do nível d'água informado, aviso.
+    /// </summary>
+    private static void CheckCorposDagua(Dictionary<string, MarkingDefinition> defs, List<Achado> res)
+    {
+        var aguas = defs.Values.OfType<CorpoDaguaDefinition>().Where(a => a.PathRef.Points.Count >= 2).ToList();
+        if (aguas.Count == 0) return;
+        var quadras = defs.Values.OfType<QuadraDefinition>().ToList();
+        var lotes = defs.Values.OfType<LoteamentoDefinition>().ToDictionary(l => l.Id);
+        var tubos = defs.Values.OfType<DrainagePipeDefinition>().ToList();
+        var dispositivos = defs.Values.OfType<DrainageDefinition>().ToList();
+        foreach (var a in aguas)
+        {
+            var nome = $"{a.KindName}{(string.IsNullOrWhiteSpace(a.Nome) ? "" : " " + a.Nome)}";
+            var path = new Polyline2(a.PathRef.Points, !a.EhRio);
+            if (a.FaixaProtecao <= 0.01)
+                res.Add(new("V18", Severidade.NaoVerificavel, Confianca.Alta, false,
+                    $"{nome}: faixa de proteção não informada – lotes e obras junto às margens não conferidos.", new[] { a.Id },
+                    "informar a largura da faixa e a lei que a define no corpo d'água (Editar)"));
+            else if (quadras.Count > 0)
+            {
+                var faixa = Automation.CorposDagua.Faixa(a, path);
+                var fonte = string.IsNullOrWhiteSpace(a.FonteFaixa) ? "sem lei citada" : $"fonte: {a.FonteFaixa.Trim()}";
+                foreach (var q in quadras)
+                {
+                    List<Parcelamento.Parcela> dentro;
+                    try
+                    {
+                        var div = Parcelamento.LotDivider.Divide(q, q.LoteamentoId != null && lotes.TryGetValue(q.LoteamentoId, out var lt) ? lt : null);
+                        dentro = div.Parcelas.Where(p => PolygonOps.Intersect(new[] { p.Forma }, faixa).Sum(x => x.Area) > 0.5).ToList();
+                    }
+                    catch { continue; }
+                    if (dentro.Count == 0) continue;
+                    var lista = string.Join(", ", dentro.Take(8).Select(p => p.Numero)) + (dentro.Count > 8 ? $" e mais {dentro.Count - 8}" : "");
+                    res.Add(new("V18", Severidade.Aviso, Confianca.Alta, true,
+                        $"Quadra {q.Nome}: {dentro.Count} lote(s) dentro da faixa de proteção de {a.FaixaProtecao:0.##} m de {nome} (lotes {lista}; {fonte}).",
+                        new[] { q.Id, a.Id }, "rever os lotes junto à margem, ou a largura informada e a lei"));
+                }
+            }
+            // Lançamentos: últimos dispositivos da rede (sem trecho saindo) perto da água.
+            var agua = Automation.CorposDagua.Agua(a, path);
+            foreach (var dv in dispositivos.Where(x => !tubos.Any(t => t.FromId == x.Id) && tubos.Any(t => t.ToId == x.Id)))
+            {
+                var dist = agua.Count == 0 ? double.MaxValue : agua.Min(g => g.Contains(dv.Position) ? 0 : g.Outer.Select((v, i) => Seg(dv.Position, v, g.Outer[(i + 1) % g.Outer.Count])).Min());
+                if (dist > DistanciaLancamento) continue;
+                var nivel = Automation.CorposDagua.NivelPerto(a, path, dv.Position, null);
+                // Fundo de chegada de cada trecho: o informado ou o da caixa (o mesmo da Rede de Drenagem).
+                var fundos = tubos.Where(t => t.ToId == dv.Id)
+                    .Select(t => Automation.DrainageNetwork.Ends(t, id => defs.GetValueOrDefault(id))?.InvertB).Where(z => z != null).Select(z => z!.Value).ToList();
+                if (fundos.Count > 0 && fundos.Min() < nivel - 0.02)
+                    res.Add(new("V18", Severidade.Aviso, Confianca.Media, true,
+                        $"{dv.DisplayCode}: lançamento em {nome} com o fundo do tubo em {fundos.Min():0.00} m, abaixo do nível d'água informado ({nivel:0.00} m) – saída afogada.",
+                        new[] { dv.Id, a.Id }, "subir o lançamento acima do nível d'água ou rever o nível informado"));
+                else
+                    res.Add(new("V18", Severidade.Info, Confianca.Media, false,
+                        $"{dv.DisplayCode}: a rede lança em {nome} (a {dist:0.#} m da água; nível d'água {nivel:0.00} m).", new[] { dv.Id, a.Id }));
+            }
+        }
+
+        static double Seg(Vec2 p, Vec2 a, Vec2 b)
+        {
+            var ab = b - a;
+            var l2 = ab.Dot(ab);
+            var u = l2 < 1e-12 ? 0 : Math.Clamp((p - a).Dot(ab) / l2, 0, 1);
+            return p.DistanceTo(a + ab * u);
+        }
     }
 
     /// <summary>

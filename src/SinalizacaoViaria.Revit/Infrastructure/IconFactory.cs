@@ -904,6 +904,32 @@ public static class IconFactory
                 dc.DrawLine(new Pen(B(Magenta), 1.6) { DashStyle = DashStyles.Dash }, new Point(5, 22), new Point(16, 12));
                 dc.DrawEllipse(B(Blue), null, new Point(10.5, 17), 2.2, 2.2);
                 break;
+            case "rio":
+            {
+                // Rio em planta: margens verdes (faixa de proteção) e o leito azul serpenteando.
+                var verde = Color.FromRgb(118, 170, 92);
+                dc.DrawRectangle(B(Color.FromRgb(214, 232, 200)), null, new Rect(1, 1, 30, 30));
+                var leito = new StreamGeometry();
+                using (var g = leito.Open())
+                {
+                    g.BeginFigure(new Point(2, 4), false, false);
+                    g.BezierTo(new Point(14, 4), new Point(6, 16), new Point(16, 17), true, true);
+                    g.BezierTo(new Point(26, 18), new Point(18, 28), new Point(30, 29), true, true);
+                }
+                dc.DrawGeometry(null, new Pen(B(verde), 13), leito);
+                dc.DrawGeometry(null, new Pen(B(Color.FromRgb(86, 150, 196)), 7), leito);
+                dc.DrawGeometry(null, new Pen(B(White), 1) { DashStyle = DashStyles.Dash }, leito);
+                break;
+            }
+            case "lago":
+                // Lago: o talude da margem (anel) e a água no meio, com a faixa de proteção em volta.
+                dc.DrawRectangle(B(Color.FromRgb(214, 232, 200)), null, new Rect(1, 1, 30, 30));
+                dc.DrawEllipse(B(Color.FromRgb(118, 170, 92)), null, new Point(16, 16), 14.5, 11.5);
+                dc.DrawEllipse(B(Color.FromRgb(196, 174, 132)), null, new Point(16, 16), 11, 8.5);
+                dc.DrawEllipse(B(Color.FromRgb(86, 150, 196)), null, new Point(16, 16), 9, 6.5);
+                dc.DrawLine(P(White, 1.2), new Point(11, 15), new Point(16, 15));
+                dc.DrawLine(P(White, 1.2), new Point(15, 18), new Point(21, 18));
+                break;
             default:
                 dc.DrawEllipse(B(Blue), null, new Point(16, 16), 13, 13);
                 Text(dc, "i", 16, White, new Point(16, 5), true);

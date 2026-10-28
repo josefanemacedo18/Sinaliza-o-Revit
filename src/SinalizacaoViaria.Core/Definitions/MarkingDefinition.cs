@@ -200,6 +200,7 @@ public enum Justificacao
 [JsonDerivedType(typeof(QuadroLoteamentoDefinition), "quadro-loteamento")]
 [JsonDerivedType(typeof(TemaTerrenoDefinition), "tema-terreno")]
 [JsonDerivedType(typeof(PlataformaDefinition), "plataforma")]
+[JsonDerivedType(typeof(CorpoDaguaDefinition), "corpo-dagua")]
 public abstract class MarkingDefinition
 {
     public const int CurrentVersion = 1;

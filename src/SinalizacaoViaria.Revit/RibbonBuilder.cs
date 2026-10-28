@@ -227,6 +227,15 @@ public static class RibbonBuilder
             "Rede em partes: geometria, conectividade, parâmetros, cálculo hidráulico e dimensionamento; perfil e CSV.",
             "Separa a conferência geométrica, a conectividade e os parâmetros (critérios do Projeto de Drenagem) do cálculo hidráulico pelo método racional e do " +
             "dimensionamento das galerias; perfil por ramo, dispositivos, selecionar no modelo, aplicar os diâmetros calculados e relatório CSV."));
+        Split(drenagem, "SvCorposDagua", "Corpos d'Água",
+            Data(typeof(CmdRioCorrego), "Rio ou Córrego", "rio",
+                "Leito por eixo (fundo, largura, lâmina, taludes) escavado no Toposolid, com a água e a faixa informada.",
+                "Rio ou córrego pelo eixo (de montante para jusante): fundo por estaca ou do terreno, largura do fundo, lâmina e taludes das margens; o leito é escavado no " +
+                "Toposolid pela Terraplenagem (com registro), a água fica no modelo e a faixa de proteção é a que você informar, com a lei citada."),
+            Data(typeof(CmdLagoLagoa), "Lago ou Lagoa", "lago",
+                "Margem no nível d'água e cota do fundo, com os taludes, escavado no Toposolid, com a água e a faixa.",
+                "Lago ou lagoa pelo contorno da margem no nível d'água: cota do fundo e talude das margens; o fundo é escavado no Toposolid pela Terraplenagem (com registro), " +
+                "a água fica no modelo e a faixa de proteção em volta é a que você informar, com a lei citada."));
 
         // ---------------------------------------------------------------- Urbanismo
         var urbanismo = Panel(app, TabName, "Urbanismo");

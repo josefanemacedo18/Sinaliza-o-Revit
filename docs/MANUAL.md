@@ -941,6 +941,7 @@ A correção é sempre sua, com Editar, Atualizar ou apagando o elemento.
 | V14 | **superfície do terreno projetado** (o Toposolid como está): menos de três pontos ou todos numa reta, coordenada não numérica, o mesmo ponto com cotas diferentes (degrau vertical ou dado duplicado), triângulos sem área, faces mais íngremes que a **declividade máxima do terreno** que você informou e eixos das vias que moldam o terreno passando fora dele (ali o cálculo seria extrapolação) | confira o levantamento ou o Toposolid no ponto indicado; amplie o terreno até as vias. Sem Toposolid ou sem a declividade informada, o relatório diz "não verificado" |
 | V15 | **terraplenagem desatualizada**: uma marca que molda o terreno (via com greide, nó ligado a ela, obra, caixa de drenagem) **mudou**, foi **apagada**, **deixou de moldar** o terreno ou **entrou** depois da última Terraplenagem aplicada. Um achado por situação, com as marcas | rode a **Terraplenagem**: o terreno é refeito a partir do original guardado. Sem registro (terraplenagem nunca aplicada ou aplicada por versão anterior à 2.11), o relatório diz "não verificado" |
 | V16 | **parcelamento**: percentual da gleba (sistema viário, áreas públicas, uma categoria) abaixo do **mínimo informado no loteamento**, e lotes abaixo do **lote mínimo** informado (frente e área), com a fonte que você escreveu | reveja as quadras, as categorias ou o mínimo informado. Sem mínimos informados, o relatório diz "não verificado" |
+| V18 | **corpos d'água**: lote dentro da **faixa de proteção informada** de um rio, córrego, lago ou lagoa (com a lei que você citou); lançamento da rede a menos de 30 m da água com o fundo do tubo **abaixo do nível d'água** (saída afogada) | reveja os lotes junto à margem ou a faixa informada; suba o lançamento ou reveja o nível d'água. Sem faixa informada, "não verificado" |
 | V17 | **integração**: área ou declividade de uma captação **lida do modelo** (Ler do Modelo) que o modelo agora dá diferente – a via mudou, outra captação entrou acima ou o dispositivo saiu da sarjeta. As editadas à mão não entram | **Ler do Modelo › Atualizar só as desatualizadas**: relê só elas e troca só os campos que ainda eram os lidos |
 
 O resultado abre na **Central de Qualidade** (desde a 2.18). O relatório completo continua gravado em
@@ -983,6 +984,7 @@ No fim do relatório, a seção **Não verificado** diz o que faltou para confer
 - terreno não lido ou declividade máxima não informada (V14);
 - terraplenagem sem registro (V15);
 - percentuais mínimos do loteamento não informados (V16);
+- faixa de proteção de um corpo d'água não informada (V18);
 - elementos do Revit (V06), quando a validação roda sem o documento.
 
 **Estado dos resultados** (desde a 2.14): no fim do relatório, cada resultado derivado do modelo com a situação –
@@ -2971,6 +2973,30 @@ No painel **Terreno**:
 * **Modelar Terreno ▾ → Suavizar Terreno**: clique o contorno; cada ponto do levantamento dentro dele vai para a média dos vizinhos
   (raio, peso e passadas), com o peso caindo a zero junto à borda – sem degrau; o terreno natural guardado muda e a terraplenagem é
   refeita. Desfazer (Ctrl+Z) volta o Toposolid.
+
+### 24.10 Corpos d'água – rio, córrego, lago e lagoa (desde a 2.26)
+No painel **Drenagem**, **Corpos d'Água ▾**:
+* **Rio ou Córrego**: clique o **eixo de montante para jusante** (ESC termina). Informe a **largura do fundo**, a **lâmina d'água**
+  sobre o fundo e o **talude das margens** (H : 1 V). O **fundo** é o informado por estaca ("estaca; cota", uma por linha, cotas
+  absolutas) ou, sem ele, o **terreno natural no eixo menos a profundidade** informada, **sem nunca subir para jusante** (o mínimo
+  acumulado – padrão do plugin). A largura na superfície é a do fundo + 2 × lâmina × talude, e a área molhada é (fundo + talude ×
+  lâmina) × lâmina.
+* **Lago ou Lagoa**: clique o **contorno da margem no nível d'água**. Informe o **nível d'água** (o padrão é o ponto mais baixo do
+  terreno no contorno, para a água não transbordar) e a **cota do fundo** (o padrão é 2 m abaixo – padrão do plugin). O fundo é o
+  contorno recuado para dentro de (nível − fundo) × talude; se não couber, a janela avisa.
+* Em ambos, o **leito é escavado no Toposolid pela Terraplenagem** (com o registro, como as outras obras) e a **superfície de água**
+  fica no modelo, na cota do nível d'água. Desmarque **Escavar o leito** para só desenhar a água.
+* **Faixa de proteção**: a largura em cada margem, medida da borda da água, e a **lei e o artigo** que a definem são **informados por
+  você** – o plugin não fixa largura legal. Sem largura informada, o Validar Modelo diz que os lotes junto à margem **não foram
+  conferidos** (V18).
+* A **prévia** mostra a água e a faixa em planta, as áreas, a **estimativa da escavação** (corte e aterro pela Terraplenagem, sobre o
+  terreno natural) e, no rio, as cotas do fundo e da água no início e no fim; marque **Prévia: perfil do leito** para ver o perfil do
+  terreno natural no eixo, do fundo e do nível d'água (exagero vertical 5×).
+* **Editar** reabre a mesma janela; o leito e a água são refeitos e a terraplenagem é atualizada. Nos quantitativos, o corpo d'água
+  fica em **Drenagem**, com a área da água (m²); o volume escavado está no registro da Terraplenagem.
+* No **Validar Modelo** (V18): lotes dentro da faixa informada (com a lei citada), e os **lançamentos** da rede (o último dispositivo,
+  sem trecho saindo) a menos de 30 m da água – aviso de **saída afogada** se o fundo do tubo que chega está abaixo do nível d'água
+  (o do lago, ou o do rio no ponto mais próximo do eixo), senão uma informação com a distância e o nível.
 
 ## 25. O que foi aplicado dos manuais
 
