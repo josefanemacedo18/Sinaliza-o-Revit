@@ -757,6 +757,49 @@ public static class IconFactory
                 dc.DrawGeometry(B(Yellow), null, Close(Poly(new Point(22, 10), new Point(28, 10), new Point(25, 6))));
                 dc.DrawGeometry(B(Yellow), null, Close(Poly(new Point(22, 22), new Point(28, 22), new Point(25, 26))));
                 break;
+            case "temas":
+                // Mapa de classes coloridas (declividade) com uma legenda em barras.
+                dc.DrawRectangle(B(Color.FromRgb(56, 158, 72)), null, new Rect(1, 1, 20, 30));
+                dc.DrawGeometry(B(Color.FromRgb(250, 224, 90)), null, Close(Poly(new Point(1, 12), new Point(9, 8), new Point(21, 12), new Point(21, 22), new Point(1, 24))));
+                dc.DrawGeometry(B(Color.FromRgb(222, 75, 50)), null, Close(Poly(new Point(6, 18), new Point(14, 14), new Point(21, 17), new Point(21, 22), new Point(8, 22))));
+                dc.DrawRectangle(B(Color.FromRgb(56, 158, 72)), null, new Rect(23, 4, 8, 5));
+                dc.DrawRectangle(B(Color.FromRgb(250, 224, 90)), null, new Rect(23, 13, 6, 5));
+                dc.DrawRectangle(B(Color.FromRgb(222, 75, 50)), null, new Rect(23, 22, 4, 5));
+                break;
+            case "compararsup":
+                // Duas superfícies (natural e atual) com o corte e o aterro entre elas.
+                dc.DrawGeometry(B(Color.FromRgb(214, 80, 60)), null, Close(Poly(new Point(1, 14), new Point(10, 8), new Point(16, 16), new Point(16, 20), new Point(1, 20))));
+                dc.DrawGeometry(B(Color.FromRgb(70, 160, 80)), null, Close(Poly(new Point(16, 20), new Point(16, 16), new Point(24, 26), new Point(31, 22), new Point(31, 20))));
+                dc.DrawLine(P(Color.FromRgb(140, 92, 64), 2), new Point(1, 20), new Point(31, 20));
+                dc.DrawGeometry(null, P(Asphalt, 1.5), Poly(new Point(1, 14), new Point(10, 8), new Point(16, 16), new Point(24, 26), new Point(31, 22)));
+                break;
+            case "medirterreno":
+                // Perfil do terreno com a régua entre dois pontos.
+                dc.DrawGeometry(B(Color.FromRgb(98, 158, 74)), null, Close(Poly(new Point(1, 30), new Point(1, 22), new Point(10, 16), new Point(20, 19), new Point(31, 9), new Point(31, 30))));
+                dc.DrawLine(P(Yellow, 1.5), new Point(3, 20), new Point(29, 8));
+                dc.DrawEllipse(B(Asphalt), null, new Point(3, 20), 2, 2);
+                dc.DrawEllipse(B(Asphalt), null, new Point(29, 8), 2, 2);
+                break;
+            case "plataforma":
+                // Área nivelada com talude de corte de um lado e de aterro do outro.
+                dc.DrawGeometry(B(Color.FromRgb(140, 92, 64)), null, Close(Poly(new Point(1, 8), new Point(9, 16), new Point(23, 16), new Point(31, 26), new Point(31, 30), new Point(1, 30))));
+                dc.DrawLine(P(Color.FromRgb(188, 186, 180), 3), new Point(9, 16), new Point(23, 16));
+                dc.DrawGeometry(null, P(Color.FromRgb(98, 158, 74), 1.5), Poly(new Point(1, 8), new Point(9, 16)));
+                dc.DrawGeometry(null, P(Color.FromRgb(98, 158, 74), 1.5), Poly(new Point(23, 16), new Point(31, 26)));
+                break;
+            case "linhaquebra":
+                // Terreno triangulado com uma linha de quebra em destaque.
+                dc.DrawRectangle(B(Color.FromRgb(201, 214, 105)), null, new Rect(1, 1, 30, 30));
+                foreach (var (a, b) in new[] { ((1.0, 1.0), (31.0, 31.0)), ((1.0, 31.0), (16.0, 1.0)), ((16.0, 1.0), (31.0, 31.0)), ((1.0, 16.0), (31.0, 16.0)) })
+                    dc.DrawLine(P(Color.FromRgb(122, 171, 70), 1), new Point(a.Item1, a.Item2), new Point(b.Item1, b.Item2));
+                dc.DrawGeometry(null, P(Color.FromRgb(196, 64, 52), 2.5), Poly(new Point(2, 26), new Point(12, 18), new Point(20, 20), new Point(30, 8)));
+                break;
+            case "suavizar":
+                // Terreno irregular que vira uma curva suave.
+                dc.DrawGeometry(null, P(Color.FromRgb(140, 92, 64), 1.5), Poly(new Point(1, 14), new Point(5, 8), new Point(9, 15), new Point(13, 6), new Point(17, 13), new Point(21, 7), new Point(25, 14), new Point(31, 9)));
+                dc.DrawGeometry(B(Color.FromRgb(98, 158, 74)), null, Close(Poly(new Point(1, 30), new Point(1, 24), new Point(8, 21), new Point(16, 20), new Point(24, 21), new Point(31, 24), new Point(31, 30))));
+                dc.DrawLine(P(Yellow, 1.5), new Point(16, 15), new Point(16, 19));
+                break;
             case "componentes":
                 // Elemento acrescentado num trecho da via (ciclofaixa vermelha entre duas transições).
                 dc.DrawRectangle(B(Color.FromRgb(188, 186, 180)), null, new Rect(1, 1, 30, 30));

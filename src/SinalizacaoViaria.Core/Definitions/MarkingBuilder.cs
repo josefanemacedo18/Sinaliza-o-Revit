@@ -45,6 +45,10 @@ public sealed class BuildContext
     /// </summary>
     public Func<Vec2, double?>? Ground { get; init; }
 
+    /// <summary>Terreno natural e atual (cotas absolutas, m) para os temas do terreno; nulos sem Toposolid.</summary>
+    public Func<Vec2, double?>? TerrenoNatural { get; set; }
+    public Func<Vec2, double?>? TerrenoAtual { get; set; }
+
     /// <summary>Cota do terreno no ponto, ou 0 (plano da base) sem terreno.</summary>
     public double GroundAt(Vec2 p) => Ground?.Invoke(p) ?? 0;
 
@@ -279,6 +283,8 @@ public static class MarkingBuilder
         QuantityTableDefinition qt => DetailGenerator.QuantityTable(qt, ctx),
         NotesDefinition nt => DetailGenerator.Notes(nt, ctx),
         NorthArrowDefinition na => DetailGenerator.NorthArrow(na, ctx),
+        TemaTerrenoDefinition tt => TerrainGenerators.Tema(tt, ctx),
+        PlataformaDefinition pf => TerrainGenerators.Plataforma(pf, path),
         SheetSegmentDefinition ss => DetailGenerator.SheetSegment(ss, ctx),
         RoadPavementDefinition rp2 => path == null ? Missing("Eixo da via não encontrado.") : RoadGenerator.Pavement(rp2, path),
         IntersectionDefinition it => IntersectionGenerator.Build(it, ctx),
@@ -1082,6 +1088,9 @@ public static class MarkingBuilder
             case EscapeRampDefinition er:
                 return new MarkingInfo(er.DisplayCode, $"Área de escape – caixa de retenção {er.ActualLength:0} × {er.Width:0.#} m", GrupoMarca.Urbanizacao,
                     "AASHTO Green Book – Emergency Escape Ramps; DNIT – Manual de Projeto Geométrico de Rodovias Rurais", "un");
+            case PlataformaDefinition pf:
+                return new MarkingInfo(pf.DisplayCode, $"Plataforma na cota {pf.Cota:0.00} m (taludes {pf.CutSlope:0.0#} : 1 e {pf.FillSlope:0.0#} : 1)", GrupoMarca.Urbanizacao,
+                    "Volumes no registro da Terraplenagem", "un");
             case IAnnotationDefinition:
                 return new MarkingInfo(def.DisplayCode, def.KindName, GrupoMarca.Detalhamento, "", "");
             default:

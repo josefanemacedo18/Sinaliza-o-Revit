@@ -602,6 +602,26 @@ public static class TerrainService
         }
     }
 
+    /// <summary>
+    /// Edição do terreno natural numa região (linha de quebra, suavização): os pontos naturais novos (o levantamento inteiro do
+    /// Toposolid, já editado) viram o terreno natural guardado e substituem os pontos do Toposolid dentro da região. Onde houver
+    /// terraplenagem, quem chama refaz a terraplenagem depois (ela parte do terreno natural). Exige transação.
+    /// </summary>
+    public static void EditarNatural(Document doc, Toposolid topo, IReadOnlyList<Vec3> naturais, Polygon2 regiao, TerrainReport report)
+    {
+        var mesh = Tin.Mesh(naturais);
+        if (mesh.Count == 0) { report.Notes.Add("Edição do terreno: os pontos não formam uma superfície."); return; }
+        var footprint = TerrainModel.LastFootprint(topo);
+        TerrainModel.ReplaceOriginal(topo, mesh);
+        if (footprint.Count > 0) TerrainModel.Save(topo, mesh, footprint);
+        var editor = topo.GetSlabShapeEditor();
+        if (editor == null) { report.Notes.Add("Edição do terreno: o Toposolid não aceita a edição de forma."); return; }
+        if (!editor.IsEnabled) editor.Enable();
+        var inRegion = TerrainRebuild.Mask(new[] { regiao }, 0.5);
+        ApplyPoints(doc, topo, editor, inRegion, naturais.Where(p => inRegion(p.XY)).ToList(), report);
+        report.Toposolids++;
+    }
+
     /// <summary>Esquece o terreno original dos Toposolids (o atual vira o terreno natural). Exige transação.</summary>
     public static int ResetOriginal(Document doc)
     {

@@ -234,6 +234,12 @@ public sealed class MarkingService
         var ctx = PluginContext.BuildContext(def.Output.Drape && def.Output.Mode == OutputMode.Modelo3D,
             _scaleOverride ?? view?.Scale ?? 100, Lookup, () => Definitions.Values.ToList(), OtherGeometry,
             d => PathResolver.Resolve(_doc, d.Path)?.Main, ground, native, d => PathResolver.Resolve(_doc, d.Path)?.Z ?? 0);
+        // Temas do terreno: o terreno natural (guardado pela terraplenagem) e o atual do Toposolid, em cotas absolutas.
+        if (def is TemaTerrenoDefinition)
+        {
+            ctx.TerrenoNatural = TerrainModel.Ground(_doc);
+            ctx.TerrenoAtual = TerrainModel.Current(_doc);
+        }
         if (def.Path == null)
         {
             baseZ = def.PointZ ?? 0;

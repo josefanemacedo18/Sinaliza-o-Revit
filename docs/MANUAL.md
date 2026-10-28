@@ -24,7 +24,7 @@ Guia **SinalizaBIM** – o fluxo de projeto:
 | Painel | Ferramentas |
 |---|---|
 | **Projeto** | **Central do Projeto** (abaixo) · **Atualizar Todas** · **Editar** · Selecionar Conjunto · Alternar 2D/3D · **Painel Contextual** (abaixo) |
-| **Terreno** | **Diagnóstico do Terreno** (seção 9.3.1) · **Imagem Aérea ▾** (Importar Imagem e Calibrar · Calibrar Escala da Imagem) |
+| **Terreno** | **Diagnóstico do Terreno** (seção 9.3.1) · **Análise do Terreno ▾** (Temas do Terreno · Comparar Superfícies · Medir no Terreno) · **Modelar Terreno ▾** (Plataforma · Linha de Quebra · Suavizar Terreno) · **Imagem Aérea ▾** (Importar Imagem e Calibrar · Calibrar Escala da Imagem) |
 | **Sistema Viário** | **Via ▾** (Via · Via Férrea) · **Eixos ▾** (Desenhar Eixo · Mostrar/Ocultar Eixos) · **Perfil da Via** · **Seções Transversais ▾** (Corte Transversal · Cotar Seção) · **Ajustar Via ▾** (Alterar Largura por Trecho · Componentes por Trecho · Recuo na Via (baia / faixa auxiliar) · Distância entre Vias · Mover Via · Hierarquia e Esquinas) · **Calçadas ▾** (Meio-fio, Calçada e Sarjeta · Extensão de Calçada · Área de Calçada · Rampas) · **Obras de Arte ▾** (Viaduto · Ponte · Passarela · Túnel · Trincheira) |
 | **Interseções** | **Interseção** · **Rotatória** · **Nó Viário** · Trocar Conexão · Cul-de-sac |
 | **Terraplenagem** | **Terraplenagem** · **Contenções ▾** (Talude · Taludes por Trecho · Muro de Arrimo) |
@@ -2945,6 +2945,32 @@ inteira, sem afinar).
   célula de 1 m – com o ponto no centro, as transições da plataforma caíam sempre do mesmo lado numa via alinhada à malha.
 * Cotas conferidas nos vértices inseridos (correção automática de deslocamento constante); **grama** de taludes, ilhas e laços
   como **subdivisões** do Toposolid; volumes de corte e aterro no relatório. Use **Desfazer** para voltar.
+
+### 24.9 Ferramentas de terreno e topografia (desde a 2.25)
+No painel **Terreno**:
+* **Análise do Terreno ▾ → Temas do Terreno**: numa planta, clique dois cantos (ESC no primeiro = o terreno inteiro) e escolha
+  o tema – **elevação**, **declividade (%)** ou **orientação das encostas** (para onde a água desce: azimute a partir do Norte do
+  projeto, eixo Y, em oito rumos; células abaixo de 1 % ficam "plano") – do **terreno natural** (o guardado pela terraplenagem) ou
+  do **atual**. As **classes padrão são do plugin** (elevação em intervalos iguais; declividade 0–5, 5–10, 10–20, 20–30, 30–50 e
+  acima de 50 %) e podem ser trocadas pelos **limites informados** ("0; 8; 30"). Nenhum limite é de norma: um limite legal (de
+  declividade para parcelar, por exemplo) é informado pelo usuário, com a lei conferida. Na vista ficam as **regiões coloridas** e a
+  **legenda** (cor, intervalo, área e fração em barras, extremos e média) como uma marca do plugin – refeita ao atualizar, editada,
+  movida e apagada como as outras. Malha de amostragem em metros (aumentada sozinha acima de 40 mil células).
+* **Análise do Terreno ▾ → Comparar Superfícies**: o mesmo, para a **diferença entre o terreno atual e o natural** – classes de
+  profundidade de corte e de aterro, com os **volumes** e a distribuição em barras. Pede um terreno já terraplenado.
+* **Análise do Terreno ▾ → Medir no Terreno**: clique dois pontos (linha reta) ou um caminho; a janela mostra a distância
+  horizontal e sobre o terreno, as cotas do início e do fim, o desnível, a **declividade** início → fim e a **máxima** no caminho, a
+  subida e a descida acumuladas e o **perfil** do terreno natural e do atual (exagero vertical). Nada é alterado.
+* **Modelar Terreno ▾ → Plataforma**: clique o contorno; a área fica **nivelada** na cota **informada**, na **média** do terreno ou na
+  de **equilíbrio** (corte = aterro × homogeneização dentro do contorno), com **taludes** de corte e aterro até o terreno (ou sem
+  eles). A prévia mostra os volumes dentro do contorno e com os taludes; no modelo fica a borda da plataforma, e ela entra na
+  **Terraplenagem** e no **registro** dela com o próprio volume (Editar muda cota e taludes). Fora dos quantitativos de materiais.
+* **Modelar Terreno ▾ → Linha de Quebra**: clique a linha e informe a **cota de cada vértice** (o padrão é o terreno nele); os pontos
+  do levantamento a menos da folga da linha saem e entram os dela – o **terreno natural guardado** passa a seguir a linha (crista,
+  pé, borda, margem) e a terraplenagem das obras é **refeita** sobre ele.
+* **Modelar Terreno ▾ → Suavizar Terreno**: clique o contorno; cada ponto do levantamento dentro dele vai para a média dos vizinhos
+  (raio, peso e passadas), com o peso caindo a zero junto à borda – sem degrau; o terreno natural guardado muda e a terraplenagem é
+  refeita. Desfazer (Ctrl+Z) volta o Toposolid.
 
 ## 25. O que foi aplicado dos manuais
 

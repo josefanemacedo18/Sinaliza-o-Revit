@@ -128,6 +128,19 @@ public static class TerrainModel
         _originals[topo.UniqueId] = original;
     }
 
+    /// <summary>
+    /// Troca o terreno natural guardado (linha de quebra, suavização – edições do levantamento): a terraplenagem passa a partir
+    /// dele. A área terraplenada da última vez fica como estava. Exige transação.
+    /// </summary>
+    public static void ReplaceOriginal(Toposolid topo, TerrainMesh original)
+    {
+        var sc = Schema();
+        var en = Entity(topo) ?? new Entity(sc);
+        en.Set(FMesh, original.Serialize());
+        topo.SetEntity(en);
+        _originals[topo.UniqueId] = original;
+    }
+
     /// <summary>Esquece o terreno original (o terreno atual passa a ser o natural – novo levantamento). Exige transação.</summary>
     public static void Reset(Toposolid topo)
     {

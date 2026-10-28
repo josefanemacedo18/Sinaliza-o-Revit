@@ -48,6 +48,32 @@ public static class RibbonBuilder
             "Origem dos dados (os Toposolids), terreno natural guardado pela terraplenagem × superfície projetada (com a diferença por amostragem), " +
             "limites e parâmetros, o V14 do Validar Modelo (dados insuficientes ou inválidos, cotas diferentes no mesmo ponto, triângulos sem área, " +
             "faces acima do limite, eixos fora da superfície), qual superfície cada cálculo lê e os módulos a atualizar quando o terreno muda."));
+        Split(terreno, "SvAnaliseTerreno", "Análise do Terreno",
+            Data(typeof(CmdTemasTerreno), "Temas do Terreno", "temas",
+                "Elevação, declividade ou orientação em regiões coloridas, com legenda e áreas, na vista ativa.",
+                "Regiões coloridas por classe – elevação, declividade (%) ou orientação das encostas – do terreno natural ou do atual, com a legenda " +
+                "(cor, intervalo, área e fração em barras) na vista ativa. Classes padrão do plugin ou informadas; refeito a cada atualização."),
+            Data(typeof(CmdCompararSuperficies), "Comparar Superfícies", "compararsup",
+                "Terreno atual × natural: corte e aterro por profundidade, com os volumes, na vista ativa.",
+                "Diferença entre o terreno atual (com a terraplenagem) e o natural guardado: regiões por classe de profundidade de corte e aterro, " +
+                "com os volumes e a distribuição em barras, na vista ativa."),
+            Data(typeof(CmdMedirTerreno), "Medir no Terreno", "medirterreno",
+                "Distância, desnível e declividades entre dois pontos ou ao longo de um caminho, com o perfil.",
+                "Clique dois pontos (linha reta) ou um caminho: distância horizontal e sobre o terreno, cotas, desnível, declividade média e máxima, " +
+                "subida e descida acumuladas e o perfil do terreno natural e do atual. Nada é alterado."));
+        Split(terreno, "SvModelarTerreno", "Modelar Terreno",
+            Data(typeof(CmdPlataforma), "Plataforma", "plataforma",
+                "Área nivelada numa cota (informada, média ou de equilíbrio) com taludes até o terreno.",
+                "Contorno clicado nivelado na cota informada, na média do terreno ou na de equilíbrio entre corte e aterro, com taludes de corte e aterro – " +
+                "entra na Terraplenagem e no registro dela com o próprio volume."),
+            Data(typeof(CmdLinhaQuebra), "Linha de Quebra", "linhaquebra",
+                "Linha 3D que o terreno natural passa a seguir (crista, pé, margem); a terraplenagem é refeita.",
+                "Clique a linha e informe a cota de cada vértice: os pontos do levantamento junto à linha saem e entram os dela – o terreno natural guardado " +
+                "passa a seguir a linha e a terraplenagem das obras é refeita sobre ele."),
+            Data(typeof(CmdSuavizarTerreno), "Suavizar Terreno", "suavizar",
+                "Suaviza o terreno natural dentro de um contorno, sem degrau na borda; a terraplenagem é refeita.",
+                "Cada ponto do levantamento dentro do contorno vai para a média dos vizinhos, com peso que cai a zero junto à borda – o terreno natural " +
+                "guardado muda e a terraplenagem das obras é refeita sobre ele."));
         Split(terreno, "SvImagem", "Imagem Aérea",
             Data(typeof(CmdImportarImagem), "Importar Imagem e Calibrar", "importarimagem",
                 "Importa uma imagem aérea na escala e posição certas (world file ou GeoTIFF) ou a calibra por 2 pontos.",

@@ -244,6 +244,8 @@ public static class QuantityCalculator
         foreach (var (def, geo) in lista)
         {
             if (def is IAnnotationDefinition) continue;
+            // Plataforma: a borda é só a marca no modelo – o volume dela está no registro da Terraplenagem.
+            if (def is PlataformaDefinition) continue;
             // Lotes e quadras têm quadro próprio (quadro de áreas do loteamento).
             if (Parcelamento.LotDrawing.IsParcelamento(def)) continue;
             // Placas empilhadas no mesmo suporte: cada uma conta como uma unidade do seu código (o suporte é da principal).
