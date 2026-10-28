@@ -512,3 +512,15 @@ Etapa 20 (2.25.0):
 - FATO (teste): num plano de 12 % toda a área cai na classe 10–20 % com a orientação oeste; num cone os oito rumos têm a mesma
   área (região circular); a cota de equilíbrio com homogeneização 1,25 dá corte = 1,25 × aterro.
 - LACUNA: nenhum limite de lei usado nos temas – o texto da Lei 6.766/1979 não pôde ser conferido (rede do ambiente).
+
+Etapa 21 (2.26.0):
+- FATO (código): não havia corpo d'água – só a lâmina de referência sob as pontes (`BridgeGenerator`, nível da ponte), sem
+  leito nem escavação. Rio, córrego, lago e lagoa agora são marcas da Terraplenagem (leito em faixa ou plataforma) com a água
+  no modelo.
+- FATO (código): `TerrainService.Features` deixava de copiar `SpillStart`/`SpillEnd` das faixas da geometria – nenhuma marca
+  anterior dependia disso; corrigido para o leito.
+- FATO (teste): o rio de 100 m (fundo 3 m, talude 2 : 1, 1 a 2 m de corte num plano) escava ≈ 917 m³ mais as pontas; o lago
+  40 × 40 m com 2 m de profundidade e talude 2 : 1 escava o prismoide de 2 602,7 m³ (±4 %).
+- FATO (teste): uma propriedade com o nome do discriminador do JSON (`tipo`) impede gravar a marca – agora toda marca
+  registrada é levada e trazida pelo JSON num teste.
+- LACUNA: nenhuma largura de faixa de proteção de lei (Código Florestal) conferida – a largura e a lei são as informadas.

@@ -661,3 +661,19 @@ como substituída.
   vista); editar só o Toposolid na linha de quebra (a próxima terraplenagem voltaria ao levantamento antigo).
 - **Consequências:** nada disso foi visto no Revit (K34).
 
+## D-039 – Etapa 21: corpos d'água como obras da terraplenagem, com a faixa informada
+- **Contexto:** item 11: rio, córrego, lago e lagoa parametrizados, com nível d'água, fundo, taludes, escavação, faixa de
+  proteção e ligação com a drenagem e o parcelamento (InfraWorks: *To add or modify water areas and rivers*, *How to change
+  water levels* – `docs/INFRAWORKS_REFERENCIA.md` §3).
+- **Decisão:**
+  - uma marca só (`CorpoDaguaDefinition`, `ITerrainAware`), rio e córrego por eixo, lago e lagoa pelo contorno da margem, com
+    o caminho na cota 0 e as cotas absolutas – o leito é uma faixa (`GradeCorridor`) ou uma plataforma (`GradePad`) da
+    Terraplenagem, com o registro por dona como as outras obras; a água é uma peça 3D na cota do nível;
+  - o fundo padrão do rio vem do terreno **natural guardado** (nunca do atual, que a própria escavação muda) e é o mínimo
+    acumulado para jusante; o informado por estaca vale sobre ele;
+  - a faixa de proteção é um número e um texto do usuário (largura e lei); sem a largura, o V18 diz que não conferiu – nenhuma
+    largura de lei é usada sem o texto conferido;
+  - o lançamento afogado usa o mesmo fundo da Rede de Drenagem (`DrainageNetwork.Ends`: o informado no trecho ou o da caixa).
+- **Alternativas descartadas:** Toposolid separado para o fundo do lago (o fundo ficaria fora do registro da terraplenagem);
+  material "água" como subdivisão do Toposolid (não dá o nível acima do fundo); largura de APP fixa no código.
+- **Consequências:** nada disso foi visto no Revit (K35).

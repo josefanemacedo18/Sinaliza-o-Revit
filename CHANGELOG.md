@@ -3,6 +3,39 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-28 – Etapa 21: corpos d'água – rio, córrego, lago e lagoa (versão 2.26.0)
+
+Item 11 do [plano 2](docs/PLANO_DE_ACAO_2.md) (D-039). Entrega: `Releases/Etapa21` (não executada no Revit 2027).
+
+### Drenagem › Corpos d'Água
+- **Rio ou Córrego:** eixo de montante para jusante, largura do fundo, lâmina d'água e talude das margens; o **fundo** é o
+  informado por estaca ou o terreno natural no eixo menos a profundidade, **sem subir para jusante** (padrão do plugin). O leito
+  é uma faixa da **Terraplenagem** (com o registro), com as margens e as pontas em talude até o terreno; a **água** é um sólido
+  na largura da superfície, no nível (fundo + lâmina).
+- **Lago ou Lagoa:** contorno da margem no nível d'água e cota do fundo; o fundo é o contorno recuado por (nível − fundo) ×
+  talude e entra na Terraplenagem como plataforma com taludes; a água fica no nível. Nível padrão: o ponto mais baixo do
+  terreno no contorno.
+- **Faixa de proteção** em cada margem, com a **lei e o artigo como o usuário informar** – o plugin não fixa largura legal.
+- Prévia com a água e a faixa em planta, as áreas, a **estimativa da escavação** e o **perfil do leito** (terreno, fundo e
+  nível d'água); Editar reabre a janela; quantitativo em Drenagem; Central do Projeto no módulo Drenagem.
+
+### Validar Modelo – V18 (corpos d'água)
+- Lotes dentro da faixa informada (com a lei citada); lançamento da rede a menos de 30 m da água com o fundo do tubo abaixo
+  do nível d'água (**saída afogada**) – pelo fundo informado no trecho ou pelo da caixa, como a Rede de Drenagem; faixa não
+  informada fica "não verificado". Na Central de Qualidade, a categoria **Corpos d'água** vem logo depois da Drenagem.
+
+### Correções
+- **Terraplenagem:** `TerrainService.Features` não copiava `SpillStart`/`SpillEnd` das faixas da geometria – uma faixa com as
+  pontas em talude terminaria num paredão (nenhuma marca anterior usava; o leito do rio usa).
+- **JSON das marcas:** a primeira versão do corpo d'água tinha a propriedade `Tipo`, que colide com o discriminador `tipo` e
+  impediria gravar a marca; renomeada para `Corpo`, e um teste passa a levar e trazer pelo JSON **toda** marca registrada.
+
+### Testes
+- `Etapa21AguaTests` (11): seção e fundo por estaca, fundo pelo terreno sem subir, fundo do lago pelo talude, água e faixa,
+  rio e lago escavados pela Terraplenagem (volumes conferidos à mão), V18 dos lotes na faixa e do lançamento afogado, JSON,
+  ida e volta de toda marca registrada, ligação na faixa e no plugin.
+- NÃO EXECUTADO NO REVIT (K35).
+
 ## 2026-10-28 – Etapa 20: ferramentas de terreno e topografia (versão 2.25.0)
 
 Itens 13 e 21 do [plano 2](docs/PLANO_DE_ACAO_2.md) (D-038). Entrega: `Releases/Etapa20` (não executada no Revit 2027).
