@@ -643,3 +643,21 @@ como substituída.
 - **Consequências:** vias salvas abrem iguais (lista vazia); a sinalização de transição (zebrado, setas de mudança de faixa)
   fica com o projeto; nada disso foi visto no Revit (K33).
 
+## D-038 – Etapa 20: análise do terreno numa malha e edição do terreno natural guardado
+- **Contexto:** itens 13 e 21: temas de elevação, declividade e orientação, medidas, plataformas, linhas de quebra, suavização e
+  comparação de superfícies (InfraWorks: *To theme terrain*, *To measure the slope between two points*, *Grading Areas* –
+  `docs/INFRAWORKS_REFERENCIA.md` §3).
+- **Decisão:**
+  - os temas amostram o terreno numa malha regular (declividade e orientação pelo plano médio dos quatro cantos de cada
+    célula) e viram uma marca 2D do plugin (`TemaTerrenoDefinition`) com as cores próprias das peças – regiões preenchidas e
+    textos criados pelo caminho de detalhamento que já existe; refeitos a partir do terreno a cada atualização;
+  - classes padrão do plugin e configuráveis; nenhum limite de lei sem o texto conferido (o da Lei 6.766/1979 não pôde ser
+    lido nesta sessão);
+  - a plataforma é uma marca que entra na Terraplenagem como as plataformas das obras (`GradePad` na geometria dela), com o
+    volume no registro por dona; a borda no modelo permite selecioná-la e editá-la;
+  - linha de quebra e suavização editam o **terreno natural guardado** (a terraplenagem parte dele) e trocam os pontos do
+    Toposolid na região; a terraplenagem das obras é refeita depois – a edição não se perde na próxima terraplenagem.
+- **Alternativas descartadas:** subdivisões do Toposolid para os temas (mudariam o modelo; a região preenchida fica só na
+  vista); editar só o Toposolid na linha de quebra (a próxima terraplenagem voltaria ao levantamento antigo).
+- **Consequências:** nada disso foi visto no Revit (K34).
+

@@ -244,7 +244,7 @@ public static class CentralDoProjeto
         RoadPavementDefinition or RailwayDefinition or RecessMarkingDefinition or CurbExtensionDefinition or SidewalkAreaDefinition or RampDefinition
             or BridgeDefinition or TunnelDefinition or TrenchDefinition => "viario",
         IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or InterchangeDefinition => "intersecoes",
-        RetainingWallDefinition or SlopeDefinition => "terraplenagem",
+        RetainingWallDefinition or SlopeDefinition or PlataformaDefinition or TemaTerrenoDefinition => "terraplenagem",
         DrainageDefinition or DrainagePipeDefinition => "drenagem",
         LoteamentoDefinition or QuadraDefinition or UrbanElementDefinition or PlanterDefinition => "urbanismo",
         LinearMarkingDefinition or HatchMarkingDefinition or SymbolMarkingDefinition or TextMarkingDefinition or ParkingMarkingDefinition

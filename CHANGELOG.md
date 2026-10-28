@@ -3,6 +3,40 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-10-28 – Etapa 20: ferramentas de terreno e topografia (versão 2.25.0)
+
+Itens 13 e 21 do [plano 2](docs/PLANO_DE_ACAO_2.md) (D-038). Entrega: `Releases/Etapa20` (não executada no Revit 2027).
+
+### Análise do Terreno (painel Terreno)
+- **Temas do Terreno:** elevação, declividade (%) e orientação das encostas (azimute a partir do Norte do projeto, oito
+  rumos e "plano") do terreno natural ou do atual, em **regiões coloridas** com a **legenda** – cor, intervalo, área, fração em
+  barras, extremos e média – na vista ativa. É uma marca do plugin (refeita ao atualizar, editada, movida e apagada como as
+  outras). Classes **padrão do plugin** ou **limites informados**; nenhum é limite de norma.
+- **Comparar Superfícies:** terreno atual × natural por classes de corte e aterro, com os **volumes**.
+- **Medir no Terreno:** dois pontos ou um caminho – distância horizontal e sobre o terreno, cotas, desnível, declividade
+  início → fim e máxima, subida e descida e o **perfil** do natural e do atual. Nada é alterado.
+
+### Modelar Terreno (painel Terreno)
+- **Plataforma:** contorno nivelado na cota informada, na média do terreno ou na de **equilíbrio** (corte = aterro ×
+  homogeneização, dentro do contorno), com taludes de corte e aterro; entra na **Terraplenagem** e no **registro** dela com o
+  próprio volume; Editar muda cota e taludes.
+- **Linha de Quebra:** linha clicada com a cota de cada vértice; o terreno natural guardado passa a segui-la e a terraplenagem
+  é refeita sobre ele.
+- **Suavizar Terreno:** média dos vizinhos dentro de um contorno, sem degrau na borda; o terreno natural guardado muda e a
+  terraplenagem é refeita.
+
+### Núcleo
+- `TerrainAnalysis` (`TemasTerreno`, `MedidasTerreno`, `Plataformas`, `EdicaoTerreno`, `ComparacaoSuperficies`),
+  `TerrainCharts`, `TerrainGenerators`; definições `TemaTerrenoDefinition` e `PlataformaDefinition`.
+- A Central do Projeto conta os temas e as plataformas no módulo Terraplenagem.
+
+### Testes
+- `Etapa20TerrenoTests` (9): temas num plano inclinado e num cone (classes, áreas, orientação com a volta em 360°, limites
+  informados), medidas entre pontos e por caminho, cota média e de equilíbrio (com homogeneização) e a plataforma na
+  terraplenagem e no registro, suavização (ruído dentro, nada fora, menos na borda), linha de quebra na triangulação,
+  comparação de superfícies, tema como marca da vista com legenda, ligação na faixa e no plugin.
+- NÃO EXECUTADO NO REVIT (K34).
+
 ## 2026-10-28 – Etapa 19: componentes da via por trecho e taludes por trecho (versão 2.24.0)
 
 Itens 5 e 17 do [plano 2](docs/PLANO_DE_ACAO_2.md) (D-037). Entrega: `Releases/Etapa19` (não executada no Revit 2027).

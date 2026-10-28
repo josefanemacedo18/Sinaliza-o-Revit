@@ -55,14 +55,14 @@ aplica** (fica no Revit ou depende de terceiros).
 
 | Ferramenta do InfraWorks | O que faz (pela fonte) | Fonte | No SinalizaBIM hoje | Situação | Etapa |
 |---|---|---|---|---|---|
-| Temas do terreno | colore por elevação, orientação ou declividade, com faixas, distribuição e rampa de cores | *To theme terrain*; *About Creating Themes* | diagnóstico da superfície e V14 (declividade só com limite) | falta: sem tema visual | 20 |
+| Temas do terreno | colore por elevação, orientação ou declividade, com faixas, distribuição e rampa de cores | *To theme terrain*; *About Creating Themes* | Temas do Terreno (2.25): elevação, declividade e orientação do terreno natural ou atual, com legenda, áreas e barras na vista; classes do plugin ou informadas | existe (2.25) | 20 |
 | Estatísticas do terreno | ferramenta de medição com dados da superfície e volumes da terraplenagem proposta | *No cut or fill volumes for "Terrain Statistics"* (suporte) | tela do terreno: natural × projetado, área e maiores corte e aterro | parcial | 20 |
 | Medir ponto a ponto | distância em linha reta, sem acompanhar o terreno | *To measure point to point* | Revit mede distâncias | não se aplica (Revit) | — |
-| Distância 2D e declividade | distância horizontal, vertical e declividade entre dois pontos | *To measure the slope between two points* | — | falta | 20 |
-| Distância pelo caminho | medida por polilinha que acompanha o terreno (a ajuda remete a ela para medidas sobre o terreno) | *To measure point to point* (nota) | — | falta | 20 |
+| Distância 2D e declividade | distância horizontal, vertical e declividade entre dois pontos | *To measure the slope between two points* | Medir no Terreno (2.25): distância horizontal, desnível e declividade entre dois pontos | existe (2.25) | 20 |
+| Distância pelo caminho | medida por polilinha que acompanha o terreno (a ajuda remete a ela para medidas sobre o terreno) | *To measure point to point* (nota) | Medir no Terreno (2.25): por caminho, sobre o terreno, com subida, descida, declividade máxima e perfil | existe (2.25) | 20 |
 | Áreas de cobertura | cobrem o terreno, moldam-no, abrem buracos e marcam áreas a evitar | *To add or modify coverage areas or create a hole in terrain* | subdivisões do Toposolid nos lotes | parcial | 20 |
-| Áreas de terraplenagem (plataformas) | aplainam o terreno na cota dada, com talude e material de corte e aterro | *Grading Areas* | plataformas internas da terraplenagem (`GradePad`) para obras e nós; sem comando de plataforma | parcial | 20 |
-| Camadas de superfície e subsolo | camadas com material e opacidade; subsolo para sondagens | *Subsurface Terrain Layers* | terreno natural guardado × projetado | parcial | 20 |
+| Áreas de terraplenagem (plataformas) | aplainam o terreno na cota dada, com talude e material de corte e aterro | *Grading Areas* | Plataforma (2.25): contorno na cota informada, média ou de equilíbrio, com taludes, na Terraplenagem e no registro; sem material próprio | existe (2.25) | 20 |
+| Camadas de superfície e subsolo | camadas com material e opacidade; subsolo para sondagens | *Subsurface Terrain Layers* | terreno natural guardado × atual; Comparar Superfícies (2.25) com volumes e distribuição; Linha de Quebra e Suavizar Terreno (2.25) editam o natural; sem subsolo | parcial: sem camadas de subsolo | 20 |
 | Água: lagos, lagoas e rios | polígono (lago, lagoa) ou polilinha (rio) com estilo de água; nível d'água nas propriedades; margem com faixa | *To add or modify water areas and rivers*; *How to change water levels*; *How to control a river or water embankment* (suporte) | — | falta | 21 |
 | Simulação de cheias | depende do RiverFlow2D, de terceiros | *New features in 2017 releases* | — | não se aplica (licença de terceiros) | — |
 

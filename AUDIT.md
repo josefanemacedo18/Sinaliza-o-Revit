@@ -505,3 +505,10 @@ Etapa 19 (2.24.0):
 - FATO (teste): talude 3 : 1 por trecho dá o pé a 4,8 m num aterro de 1,6 m (2,4 m fora do trecho); a largura fixa leva o pé a
   exatamente 4 m em aterro e em corte; o limite deixa o terreno natural além dele.
 - LACUNA: sinalização das transições (zebrado de aproximação, setas e placas de mudança de faixa) não é gerada (K33).
+
+Etapa 20 (2.25.0):
+- FATO (código): havia diagnóstico da superfície (V14) e mapa de corte e aterro em subdivisões do Toposolid; não havia tema
+  visual, medida sobre o terreno, comando de plataforma, linha de quebra, suavização nem comparação com volumes por classe.
+- FATO (teste): num plano de 12 % toda a área cai na classe 10–20 % com a orientação oeste; num cone os oito rumos têm a mesma
+  área (região circular); a cota de equilíbrio com homogeneização 1,25 dá corte = 1,25 × aterro.
+- LACUNA: nenhum limite de lei usado nos temas – o texto da Lei 6.766/1979 não pôde ser conferido (rede do ambiente).
