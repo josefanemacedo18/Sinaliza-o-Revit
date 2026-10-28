@@ -49,6 +49,7 @@ desejada. `Instalar/Revit2027` tem sempre a versão mais recente.
 | Etapa 15 – Defeitos críticos: travessias em trechos curtos e terreno sob as rampas (plano 2, itens 18 e 13; a Etapa 14 só teve documentos) | 2.20.0 | 2026-10-27 | `a62975c` | 3 145/3 145 | não executado – [`Etapa15`](Etapa15/RELEASE.md) |
 | Etapa 16 – Esquinas: chanfro de 1,50 m, piso tátil pelo alinhamento e extensão em chanfro (plano 2, itens 19, 20 e 12) | 2.21.0 | 2026-10-27 | `0ef734a` | 3 163/3 163 | não executado – [`Etapa16`](Etapa16/RELEASE.md) |
 | Etapa 17 – Rampas como Pisos e materiais com a aparência da biblioteca do Revit (plano 2, itens 2 e 1) | 2.22.0 | 2026-10-27 | `3dc933a` | 3 183/3 183 | não executado – [`Etapa17`](Etapa17/RELEASE.md) |
+| Etapa 18 – Estacas, greide e seção: gráficos por estaca, Brückner e PIVs editáveis no Perfil da via (plano 2, itens 4 e 21) | 2.23.0 | 2026-10-28 | `cf64e41` | 3 193/3 193 | não executado – [`Etapa18`](Etapa18/RELEASE.md) |
 
 As fases I, II, IX e XI foram concluídas antes desta pasta existir. As DLLs delas estão no histórico do git, no commit
 indicado: `git show <commit>:Instalar/Revit2027/SinalizaBIM.dll > SinalizaBIM.dll`. As fases seguintes ganham uma linha

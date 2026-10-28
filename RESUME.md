@@ -57,7 +57,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     seção 9 com sementes, passo, aquecimento e assinatura); **Fluxo integrado** no Autoteste (via → interseção →
     terraplenagem → drenagem → quantitativos → validação); **relatório técnico final** em `docs/RELATORIO_TECNICO.md`.
     Não executada no Revit (K27).
-  - `Instalar/Revit2027` tem a DLL 2.22.0 (Etapa 17). As anteriores continuam em `Releases/`.
+  - `Instalar/Revit2027` tem a DLL 2.23.0 (Etapa 18). As anteriores continuam em `Releases/`.
 - **Plano unificado concluído** (14 etapas, 2.8.0 a 2.19.0). Pendências abertas: F12 (cenários de projeto comparados por
   quantitativos), K14/K15 no Revit e tudo o que depende de rodar no Revit (K3, K17, K19, K23–K27).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
@@ -84,11 +84,16 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
   e recorte da rampa contendo as abas inteiras – item 2; materiais com o ativo de aparência da biblioteca do Revit escolhido
   pelo título, cor de Cores consistentes intacta (`MaterialAppearance`, `StyleService.Appearance`) – item 1. Duas opções
   novas nas Configurações. NÃO VALIDADO NO REVIT (K31).
-- **Próxima: Etapa 18** – estacas, greide e seção (itens 4 e 21): visualizador de seção por estaca (setas, estaca digitada,
-  exagero vertical, corte/aterro com áreas), PIVs acrescentados/movidos/removidos com o perfil à vista e corte e aterro
-  recalculados na hora, trecho de estacas nos volumes, gráficos (perfil terreno × greide, corte e aterro por estaca, áreas e
-  diagrama de massas) – PLANO_DE_ACAO_2 §3. No núcleo: volumes por média das áreas iguais aos atuais e diagrama de massas
-  conferido à mão.
+- Etapa 18 ✅: 2.23.0 em `Releases/Etapa18` (`cf64e41`, 3 193/3 193) – D-036: no Perfil da via, gráfico escolhido
+  (perfil, seção na estaca com setas e exagero, áreas por estaca, diagrama de massas de Brückner com homogeneização),
+  volumes por média das áreas pela seção-tipo (`EstacasTerraplenagem`, iguais ao método da Terraplenagem), trecho de
+  estacas, PIVs acrescentados, movidos e removidos com a cota do terreno e os volumes refeitos na hora – itens 4 e 21
+  (terraplenagem). NÃO VALIDADO NO REVIT (K32).
+- **Próxima: Etapa 19** – componentes da via por trecho (itens 5 e 17): inserir, dividir, mudar e tirar qualquer componente
+  (faixa, ciclofaixa, estacionamento, canteiro, calçada, baia, extensão) entre duas estacas, com transição de entrada e de
+  saída, em via modelada ou nova; taludamento por lado e por trecho (talude fixo com limite ou largura fixa), com transição
+  – PLANO_DE_ACAO_2 §3. Ponto de partida: `RoadSetupWidths.cs` (`TrechoLargura`, `SideWarp`, `ApplyVariation`) e
+  `GradeCorridor` (`CutSlope`/`FillSlope` globais).
 
 ## Próxima tarefa (antes do plano 2)
 
