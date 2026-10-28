@@ -57,7 +57,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     seção 9 com sementes, passo, aquecimento e assinatura); **Fluxo integrado** no Autoteste (via → interseção →
     terraplenagem → drenagem → quantitativos → validação); **relatório técnico final** em `docs/RELATORIO_TECNICO.md`.
     Não executada no Revit (K27).
-  - `Instalar/Revit2027` tem a DLL 2.24.0 (Etapa 19). As anteriores continuam em `Releases/`.
+  - `Instalar/Revit2027` tem a DLL 2.25.0 (Etapa 20). As anteriores continuam em `Releases/`.
 - **Plano unificado concluído** (14 etapas, 2.8.0 a 2.19.0). Pendências abertas: F12 (cenários de projeto comparados por
   quantitativos), K14/K15 no Revit e tudo o que depende de rodar no Revit (K3, K17, K19, K23–K27).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
@@ -95,12 +95,20 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
   da via (itens 5 e 17); **Taludes por Trecho** (talude fixo com limite ou largura fixa, por lado, no greide – `RoadSlopes`,
   `SlopeEdge.CutV/FillV/MaxV`). Achado: a terraplenagem depois de gravar o greide recebia o pavimento antigo (corrigido).
   NÃO VALIDADO NO REVIT (K33).
-- **Próxima: Etapa 20** – terreno e topografia (itens 13 e 21): temas de elevação, declividade e orientação (regiões coloridas
-  e legenda numa vista – `FilledRegion.Create(doc, tipo, vista, laços)` e `FilledRegionType` conferidos na API 2027); distância
-  e declividade entre dois pontos e pelo caminho; plataformas (área nivelada com taludes – `GradePad` – na terraplenagem e no
-  registro); linhas de quebra e suavização de região (no terreno natural guardado – `TerrainModel.Original/Save`, pontos pelo
-  `SlabShapeEditor` como em `TerrainService.ApplyPoints`); comparação de superfícies com gráfico. Classes de declividade:
-  padrão do plugin, configuráveis (o limite de 30 % da Lei 6.766/1979, art. 3º, par. único, III, só com o texto conferido).
+- Etapa 20 ✅: 2.25.0 em `Releases/Etapa20` (`443860b`, 3 221/3 221) – D-038: painel Terreno com **Temas do Terreno**
+  (elevação, declividade, orientação – marca 2D `TemaTerrenoDefinition` com legenda e barras), **Comparar Superfícies**
+  (atual × natural com volumes), **Medir no Terreno** (perfil), **Plataforma** (`PlataformaDefinition`: cota informada, média ou
+  de equilíbrio, na Terraplenagem e no registro), **Linha de Quebra** e **Suavizar Terreno** (editam o terreno natural guardado –
+  `TerrainService.EditarNatural`, `TerrainModel.ReplaceOriginal` – e refazem a terraplenagem). Núcleo em `TerrainAnalysis`.
+  NÃO VALIDADO NO REVIT (K34).
+- **Fontes de lei bloqueadas nesta sessão:** `www.planalto.gov.br` e `www2.camara.leg.br` não resolvem na rede do ambiente
+  (liberar em Network access do ambiente). Sem o texto conferido, nenhum limite de lei entra como padrão: faixas de proteção das
+  águas (Etapa 21) e limites do parcelamento (Etapa 23) ficam **informados pelo usuário**, com a lei citada por ele.
+- **Próxima: Etapa 21** – corpos d'água (item 11): rio e córrego por eixo (fundo por estaca, largura do fundo, lâmina d'água,
+  taludes das margens), lago e lagoa por contorno (cota do fundo e nível d'água); escavação no Toposolid pela Terraplenagem
+  (`GradeCorridor`/`GradePad` na geometria, como a Plataforma) e no registro; superfície de água (`MarkingColor.Agua`,
+  `SolidSweep.Along`); faixa de proteção informada com a lei citada pelo usuário; ligação com lançamentos da drenagem,
+  parcelamento (lote na faixa – nova regra na Validação) e quantitativos.
 
 ## Próxima tarefa (antes do plano 2)
 
