@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>SinalizaBIM</Name>
+    <Assembly>SinalizaBIM.dll</Assembly>
+    <FullClassName>SinalizacaoViaria.Revit.App</FullClassName>
+    <ClientId>6F0B6C1E-3A57-4C11-9E6B-5B1D2F7A9C40</ClientId>
+    <VendorId>SinalizaBIM</VendorId>
+    <VendorDescription>SinalizaBIM – sinalização viária horizontal e vertical, urbanização e dispositivos para Revit (MBST / CONTRAN / ABNT)</VendorDescription>
+  </AddIn>
+</RevitAddIns>

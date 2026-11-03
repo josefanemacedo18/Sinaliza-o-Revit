@@ -114,7 +114,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
 - **Mudança de prioridade em 2026-11 (D-040):** o usuário pausou a drenagem para a análise geral (`docs/ANALISE_GERAL.md`) e pediu
   primeiro as interseções sem defeitos e mais personalizáveis, pelo manual de interseções do DNIT (IPR-718), e a rotatória com a
   calçada de cada saída. A drenagem completa passou a **Etapa 23**; parcelamento 24, placas 25, detalhamento 26, desempenho 27.
-- Etapa 22 ✅: 2.27.0 em `Releases/Etapa22` – D-040: **canteiro central pela curva de giro** (DNIT, cap. 8: abertura 2R − M da
+- Etapa 22 ✅: 2.27.0 em `Releases/Etapa22` (`1d2b78e`, 3 249/3 249) – D-040: **canteiro central pela curva de giro** (DNIT, cap. 8: abertura 2R − M da
   Tabela 63 com o raio de controle da Tabela 62 – 12 m por padrão –, nariz semicircular até 3 m e ogiva acima; opção de voltar
   à abertura na boca da via – `IntersectionMedians.cs`); **travessia atrás do nariz** com refúgio no nível da pista através do
   canteiro (`CrosswalkExtra`); **ciclofaixa até a faixa de pedestres** (`CyclePaintCuts`); **rotatória com a calçada de cada
