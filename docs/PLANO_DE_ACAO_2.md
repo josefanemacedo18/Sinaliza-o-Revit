@@ -20,21 +20,22 @@ Situação: ✅ feito · 🔶 parcial (o limite fica dito) · ⬜ não iniciado.
 | 18 | rampas, extensões e travessias demais em trechos curtos | 15 | ✅ 2.20.0 (regra do trecho mínimo; NÃO VALIDADO NO REVIT, K28) |
 | 13 | terreno "comendo" a via nas rampas e interseções | 15 | ✅ 2.20.0 (plataforma sob as rampas; Autoteste confere rampas e nós; NÃO VALIDADO NO REVIT, K28) |
 | 19 | chanfro de 1,50 m por padrão, personalizável | 16 | ✅ 2.21.0 (catetos sobre os limites, padrão do loteamento nas quadras novas; NÃO VALIDADO NO REVIT, K30) |
-| 20 | piso tátil na esquina como a imagem 1 | 16 | ✅ 2.21.0 (paralela ao alinhamento, seguindo o chanfro, alerta nas quinas; ramais às entradas dos lotes: Etapa 23; NÃO VALIDADO NO REVIT, K30) |
+| 20 | piso tátil na esquina como a imagem 1 | 16 | ✅ 2.21.0 (paralela ao alinhamento, seguindo o chanfro, alerta nas quinas; ramais às entradas dos lotes: Etapa 24; NÃO VALIDADO NO REVIT, K30) |
 | 12 | extensão de calçada e esquina como a imagem 2 | 16 | ✅ 2.21.0 (esquina da extensão em chanfro; rampas no eixo das travessias conferidas; NÃO VALIDADO NO REVIT, K30) |
 | 2 | rampas como pisos | 17 | ✅ 2.22.0 (piso de camada variável por corpo, fundo plano; NÃO VALIDADO NO REVIT, K31) |
 | 1 | materiais realistas no modo Realista | 17 | ✅ 2.22.0 (ativo da biblioteca do Revit pelo título, cor de Cores consistentes intacta; NÃO VALIDADO NO REVIT, K31) |
 | 4 | estacas e PIVs editáveis, cota no terreno, corte e aterro na hora, vista da seção | 18 | ✅ 2.23.0 (no Perfil da via, pela seção-tipo; NÃO VALIDADO NO REVIT, K32) |
-| 21 | gráficos de corte e aterro por estaca (e nas outras matérias) | 18 (terraplenagem), 20–22 (demais) | 🟡 terraplenagem 2.23.0 (áreas por estaca, Brückner); terreno 2.25.0 (distribuição por classe, perfil, comparação); drenagem na etapa 22 |
+| 21 | gráficos de corte e aterro por estaca (e nas outras matérias) | 18 (terraplenagem), 20–23 (demais) | 🟡 terraplenagem 2.23.0 (áreas por estaca, Brückner); terreno 2.25.0 (distribuição por classe, perfil, comparação); drenagem 2.27.0 (linha piezométrica no perfil da rede) e etapa 23 |
 | 5 | faixas e demais componentes por trecho, inclusive extensões | 19 | ✅ 2.24.0 (acrescentar, tirar, mudar e dividir por trecho com transições; taludes por lado e por trecho; baia e extensão nas ferramentas próprias; NÃO VALIDADO NO REVIT, K33) |
 | 17 | personalização da via, modelada ou não | 19 | ✅ 2.24.0 (na janela da via nova e na ferramenta sobre a via modelada, refeita pela seção gravada; NÃO VALIDADO NO REVIT, K33) |
 | 13 | ferramentas de terreno e topografia | 20 | ✅ 2.25.0 (temas, medidas, plataforma, linha de quebra, suavização, comparação; NÃO VALIDADO NO REVIT, K34) |
 | 11 | rio, córrego, lago e lagoa parametrizados | 21 | ✅ 2.26.0 (leito na Terraplenagem, água, faixa informada, V18 com lotes e lançamentos; NÃO VALIDADO NO REVIT, K35) |
-| 6 | drenagem completa: tubo, peças, conexões, vala | 22 | ⬜ |
-| 7 | o que falta ao parcelamento e às outras matérias | 23 (e as lacunas da §2 nas etapas indicadas) | ⬜ |
-| 16 | placas personalizadas sem limite | 24 | ⬜ |
-| 15 | detalhamento profissional | 25 | ⬜ |
-| 9, 10 | motores mais amplos e mais rápidos, sem perder qualidade | medido em toda etapa; 26 | ⬜ |
+| — | interseções sem defeitos com canteiro, ciclofaixa e travessia; rotatória com a calçada de cada via (pedido de 2026-11, D-040) | 22 | ✅ 2.27.0 (canteiro pela curva de giro – DNIT IPR-718, Tabelas 62 e 63 –, travessia atrás do nariz, ciclofaixa até a faixa, calçada de cada ramo com alargamento junto às rampas; NÃO VALIDADO NO REVIT, K36) |
+| 6 | drenagem completa: tubo, peças, conexões, vala | 23 | 🟡 2.27.0: catálogo de tubos, peças, juntas, conexões, vala e linha piezométrica (partes a e b); bueiros e rede gerada pela via ⬜ |
+| 7 | o que falta ao parcelamento e às outras matérias | 24 (e as lacunas da §2 nas etapas indicadas) | ⬜ |
+| 16 | placas personalizadas sem limite | 25 | ⬜ |
+| 15 | detalhamento profissional | 26 | ⬜ |
+| 9, 10 | motores mais amplos e mais rápidos, sem perder qualidade | medido em toda etapa; 27 | ⬜ |
 
 ## 2. Lacunas por matéria (item 7)
 
@@ -42,17 +43,17 @@ Levantadas pela leitura do código e do MANUAL, e comparadas com o InfraWorks. O
 
 | Matéria | Já existe | Lacuna | Etapa |
 |---|---|---|---|
-| Vias | seção montada (faixas, ciclofaixa, estacionamento, canteiros, calçada NBR 9050), largura variável, recuos, greide, estaqueamento com equações, janela da via em nove abas | componentes por trecho (início, fim, transição) para qualquer elemento; dividir e apagar um componente num trecho; taludamento por lado e por trecho; anotações automáticas dos componentes | 19, 25 |
-| Interseções e calçadas | interseções I–IV, rotatórias, extensões de calçada, rampas, travessias, piso tátil ligado às rampas | geração automática sem regra de espaçamento nem noção de quadra (item 18); esquina como as imagens 1 e 2 | 15, 16 |
+| Vias | seção montada (faixas, ciclofaixa, estacionamento, canteiros, calçada NBR 9050), largura variável, recuos, greide, estaqueamento com equações, janela da via em nove abas | componentes por trecho (início, fim, transição) para qualquer elemento; dividir e apagar um componente num trecho; taludamento por lado e por trecho; anotações automáticas dos componentes | 19, 26 |
+| Interseções e calçadas | interseções I–IV, rotatórias, extensões de calçada, rampas, travessias, piso tátil ligado às rampas | geração automática sem regra de espaçamento nem noção de quadra (item 18); esquina como as imagens 1 e 2; canteiro aberto pela curva de giro, ciclofaixa até a faixa, calçada de cada ramo na rotatória (D-040) | 15, 16, 22 |
 | Terraplenagem | malha e seções por estaca, por elemento, registro e V15, mapa de corte e aterro | visualizador de seção por estaca, edição de estaca e PIV com o resultado na hora, trecho de estacas, gráficos por estaca e diagrama de massas | 18 |
 | Topografia | Toposolid moldado, terreno natural guardado, diagnóstico (V14), tela do terreno | temas (elevação, declividade, orientação), distância e declividade entre pontos e pelo caminho, plataformas, linhas de quebra, suavização, comparação de superfícies; terreno sobre os pisos nas rampas e nós | 15, 20 |
 | Corpos d'água | — | rio, córrego, lago, lagoa | 21 |
-| Drenagem | rede manual, método racional, Manning, sarjetas e bocas de lobo (Manual SUDERHSA), dimensionamento, V13, perfil, memorial, Ler do Modelo | catálogo de tubos (material, DN, classe, comprimento útil, junta), número de peças, conexões, vala (escavação, berço, reaterro, bota-fora), linha piezométrica, rede gerada pela via, bueiros | 22 |
+| Drenagem | rede manual, método racional, Manning, sarjetas e bocas de lobo (Manual SUDERHSA), dimensionamento, V13, perfil, memorial, Ler do Modelo | catálogo de tubos (material, DN, classe, comprimento útil, junta), número de peças, conexões, vala (escavação, berço, reaterro, bota-fora), linha piezométrica, rede gerada pela via, bueiros | 23 |
 | Pavimentação | estrutura em camadas, gerenciador, quantitativo por camada | rampas como pisos; aparência realista dos materiais | 17 |
-| Parcelamento | gleba, quadras reconhecidas, lotes, categorias, mínimos com fonte, chanfro (pela face), quadros, memorial com confrontações, masterplan, V09, V10 e V16 | chanfro pelos catetos (1,50 m) como padrão; coordenadas e rumos ou azimutes dos vértices no memorial; faixas não edificáveis (ao longo de águas e vias) e faixa de domínio, com a lei citada e o valor informado; conferência da declividade do terreno na gleba com o limite da lei conferido | 16, 23 |
-| Sinalização vertical | 168 placas do catálogo, suportes, placa personalizada | forma, dimensões, cores, textos, pictogramas e setas livres, com prévia e biblioteca | 24 |
-| Detalhamento | anotação, cota de seção e perfil transversal, detalhe típico, quadros, legenda, notas, norte, folhas | seções transversais em série nas folhas, perfil longitudinal com grade de estacas e cotas, planta de estaqueamento, rótulos de terreno e greide, carimbo do projeto | 25 |
-| Desempenho | terraplenagem linear (Etapa 13), progresso e cancelamento | K14 (piso tátil longo), K15 (varreduras do documento) | 26 |
+| Parcelamento | gleba, quadras reconhecidas, lotes, categorias, mínimos com fonte, chanfro (pela face), quadros, memorial com confrontações, masterplan, V09, V10 e V16 | chanfro pelos catetos (1,50 m) como padrão; coordenadas e rumos ou azimutes dos vértices no memorial; faixas não edificáveis (ao longo de águas e vias) e faixa de domínio, com a lei citada e o valor informado; conferência da declividade do terreno na gleba com o limite da lei conferido | 16, 24 |
+| Sinalização vertical | 168 placas do catálogo, suportes, placa personalizada | forma, dimensões, cores, textos, pictogramas e setas livres, com prévia e biblioteca | 25 |
+| Detalhamento | anotação, cota de seção e perfil transversal, detalhe típico, quadros, legenda, notas, norte, folhas | seções transversais em série nas folhas, perfil longitudinal com grade de estacas e cotas, planta de estaqueamento, rótulos de terreno e greide, carimbo do projeto | 26 |
+| Desempenho | terraplenagem linear (Etapa 13), progresso e cancelamento | K14 (piso tátil longo), K15 (varreduras do documento) | 27 |
 | Redes de água, esgoto e iluminação | — | fora deste plano: dependem das normas da concessionária e do município, que o usuário não enviou; registradas para quando houver fonte | — |
 
 ## 3. Etapas
@@ -73,14 +74,19 @@ Cada etapa que muda código termina com:
 | **19 – Componentes da via por trecho** ✅ 2.24.0 | 5, 17 | inserir, dividir, mudar e tirar qualquer componente (faixa, ciclofaixa, estacionamento, canteiro, calçada, baia, extensão) entre duas estacas, com transição de entrada e de saída; em via modelada ou nova; taludamento por lado e por trecho (talude fixo com limite ou largura fixa), com transição | testes de seção por estaca com componentes por trecho, das transições, da regeneração pelo grafo e das edições preservadas |
 | **20 – Terreno e topografia** ✅ 2.25.0 | 13, 21 | temas de elevação, declividade e orientação (regiões coloridas e legenda numa vista); distância e declividade entre dois pontos e pelo caminho; plataformas (área nivelada com taludes, na terraplenagem e no registro); linhas de quebra; suavização de região; comparação de superfícies com gráfico | testes dos temas, das medidas e das plataformas no núcleo |
 | **21 – Corpos d'água** ✅ 2.26.0 | 11 | rio e córrego por eixo, lago e lagoa por contorno: nível d'água, profundidade, taludes das margens, fundo por estaca; escavação no Toposolid com registro; superfície de água; faixa de proteção configurável, com a lei citada; ligação com lançamentos, parcelamento e quantitativos | testes da seção do leito, da escavação e da faixa |
-| **22 – Drenagem completa** | 6, 21 | catálogo editável de tubos; por trecho: tubo, peças, conexões e vala; quantitativo e memorial com eles; linha piezométrica; rede gerada ao longo da via; bueiros; gráficos do perfil da rede | testes das peças e da vala, da linha piezométrica conferida à mão e da rede gerada |
-| **23 – Parcelamento e lacunas** | 7 | coordenadas e rumos ou azimutes no memorial dos lotes; faixas não edificáveis e de domínio com a fonte; declividade da gleba com o limite conferido na lei; demais lacunas da §2 | testes do memorial (coordenadas, azimutes, fechamento), das faixas e da conferência da declividade |
-| **24 – Placas personalizadas** | 16 | editor com forma livre, dimensões, cores, textos com fonte, altura e alinhamento, pictogramas e setas posicionáveis, camadas, prévia e biblioteca do usuário | testes do modelo da placa (ida e volta JSON, geometria das camadas) |
-| **25 – Detalhamento** | 15 | seções em série nas folhas, perfil longitudinal com grade de estacas, planta de estaqueamento, rótulos, anotações automáticas dos componentes, carimbo | testes dos modelos de desenho no núcleo; folhas NÃO VALIDADAS NO REVIT |
-| **26 – Desempenho** | 9, 10 | K15 (uma leitura do documento por geração de marca, com reserva da varredura completa), K14 (relevos do piso tátil agrupados), o que as medições das etapas 15–25 mostrarem | medido antes e depois (`tools/Desempenho` e contadores do Autoteste), resultado idêntico onde possível; NÃO VALIDADO NO REVIT até um Autoteste |
+| **22 – Interseções e rotatórias** ✅ 2.27.0 | pedido de 2026-11 (D-040) | canteiro central aberto pela curva de giro (DNIT IPR-718, cap. 8, Tabelas 62 e 63) com nariz semicircular ou em ogiva e a regra antiga como opção; travessia atrás do nariz com refúgio; ciclofaixa até a faixa de pedestres; calçada de cada lado de cada ramo na rotatória, com transição e alargamento junto às rampas (NBR 9050) | Tabela 63 reproduzida (10,5 m; 12,0 m na ogiva), nenhuma falha na matriz de interseções, calçada da rotatória igual à da via em cada boca; NÃO VALIDADO NO REVIT (K36) |
+| **23 – Drenagem completa** (era a 22; partes a e b na 2.27.0) | 6, 21 | catálogo editável de tubos; por trecho: tubo, peças, conexões e vala; quantitativo e memorial com eles; linha piezométrica; rede gerada ao longo da via; bueiros; gráficos do perfil da rede | testes das peças e da vala, da linha piezométrica conferida à mão e da rede gerada |
+| **24 – Parcelamento e lacunas** | 7 | coordenadas e rumos ou azimutes no memorial dos lotes; faixas não edificáveis e de domínio com a fonte; declividade da gleba com o limite conferido na lei; demais lacunas da §2 | testes do memorial (coordenadas, azimutes, fechamento), das faixas e da conferência da declividade |
+| **25 – Placas personalizadas** | 16 | editor com forma livre, dimensões, cores, textos com fonte, altura e alinhamento, pictogramas e setas posicionáveis, camadas, prévia e biblioteca do usuário | testes do modelo da placa (ida e volta JSON, geometria das camadas) |
+| **26 – Detalhamento** | 15 | seções em série nas folhas, perfil longitudinal com grade de estacas, planta de estaqueamento, rótulos, anotações automáticas dos componentes, carimbo | testes dos modelos de desenho no núcleo; folhas NÃO VALIDADAS NO REVIT |
+| **27 – Desempenho** | 9, 10 | K15 (uma leitura do documento por geração de marca, com reserva da varredura completa), K14 (relevos do piso tátil agrupados), o que as medições das etapas 15–26 mostrarem | medido antes e depois (`tools/Desempenho` e contadores do Autoteste), resultado idêntico onde possível; NÃO VALIDADO NO REVIT até um Autoteste |
 
 A ordem segue o pedido do usuário: primeiro os defeitos que estragam o projeto hoje, depois as esquinas (que dependem da
 correção da geração), e então os pedidos maiores. Se uma etapa depender de outra, a mudança de ordem é registrada aqui.
+
+**Mudança de ordem (2026-11, D-040):** a pedido do usuário, a drenagem foi pausada depois das partes a e b e as interseções
+entraram como Etapa 22; a drenagem passou a Etapa 23 e as seguintes andaram uma casa (parcelamento 24, placas 25,
+detalhamento 26, desempenho 27).
 
 ## 4. Limites deste ambiente
 

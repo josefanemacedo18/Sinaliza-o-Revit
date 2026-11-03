@@ -524,3 +524,19 @@ Etapa 21 (2.26.0):
 - FATO (teste): uma propriedade com o nome do discriminador do JSON (`tipo`) impede gravar a marca – agora toda marca
   registrada é levada e trazida pelo JSON num teste.
 - LACUNA: nenhuma largura de faixa de proteção de lei (Código Florestal) conferida – a largura e a lei são as informadas.
+
+Etapa 22 (2.27.0) – interseções e rotatórias (D-040):
+- FATO (núcleo, `tools/Cenas`): o T da imagem 1 reproduzido – o canteiro central ia até 1 m além da boca da transversal (ponta a
+  ~4,8 m do eixo dela; DNIT, Tabela 63, pede 10,5 m para canteiro de 3 m e R = 12 m); a ciclofaixa parava junto com as linhas
+  da via, na retenção, deixando ~2,4 m sem ciclofaixa antes da faixa de pedestres; na cruz, a abertura era de 9,85 m (DNIT:
+  21 m); a calçada da rotatória era uma largura só (a do perfil mais largo), com degrau em cada via mais estreita.
+- FATO (teste): com a regra nova a ponta fica a 10,50 m (canteiro de 3 m), 6,00 m na ogiva de 6 m e 10,00 m entre duas avenidas;
+  a matriz de interseções (cruz, T, Y, 5 ramos × seções × ângulos) passa sem falhas novas – as falhas que a regra nova
+  provocou em ramos oblíquos (fresta e ponta aguda entre o nariz e a pista da via fora da zona do nó, lasca do nariz em ogiva
+  à frente da faixa, fresta de espessura zero na emenda do nariz) foram corrigidas na causa.
+- FATO (teste): na rotatória, a borda da calçada em cada boca fica na largura daquele lado da via (±2 cm), com e sem a composição
+  das vias; o rebaixamento total nas calçadas estreitas foi testado e descartado – empurrava a travessia a 11–16 m do anel e
+  quebrava 8 testes da regra "faixa a um veículo da entrada"; ficou o alargamento junto às rampas.
+- LACUNA: a peça "SV - Concreto 15 cm" e as esquinas marcadas da imagem 1 não foram identificadas sem o projeto (K36); a
+  travessia no meio da quadra da imagem 2 (canteiro e ciclofaixa cortados, rampa elevada) não foi feita nesta etapa.
+

@@ -677,3 +677,35 @@ como substituída.
 - **Alternativas descartadas:** Toposolid separado para o fundo do lago (o fundo ficaria fora do registro da terraplenagem);
   material "água" como subdivisão do Toposolid (não dá o nível acima do fundo); largura de APP fixa no código.
 - **Consequências:** nada disso foi visto no Revit (K35).
+
+## D-040 – Etapa 22: interseções antes da drenagem; canteiro pela curva de giro (DNIT) e calçada de cada ramo na rotatória
+- **Contexto:** em 2026-11, usando o plugin num projeto real, o usuário pediu uma pausa para analisar a quantidade de defeitos
+  nas interseções (canteiros, ciclofaixas, faixas de pedestres) e a rigidez do plugin (`docs/ANALISE_GERAL.md`). Escolheu
+  continuar dentro do Revit e corrigir as interseções primeiro; enviou o T gerado (imagem 1), o mesmo T feito à mão (imagem 2),
+  o DNIT IPR-718 (*Manual de Projeto de Interseções*, 2005) para ser aplicado e o pedido de que a calçada da rotatória siga a
+  de cada via.
+- **Decisão:**
+  - **ordem:** as interseções viram a **Etapa 22** (2.27.0); a drenagem completa passa a **Etapa 23** (as partes a e b já
+    commitadas vão nesta DLL; a parte c, bueiros, fica no `git stash` até ter testes) e as seguintes andam uma casa
+    (`docs/PLANO_DE_ACAO_2.md`);
+  - **canteiro central:** a abertura sai da curva de giro à esquerda do veículo de projeto (DNIT, cap. 8, Tabelas 62 e 63) – arco
+    do raio de controle tangente à face do canteiro e ao eixo da transversal (à face do canteiro dela, se houver); semicírculo
+    até 3 m, ogiva acima; abertura ≥ 12 m e ≥ a transversal. A regra anterior (boca + 1 m) continua como opção por interseção;
+    a nova vale por padrão, também nas interseções salvas na próxima atualização (é a correção pedida);
+  - **travessia atrás do nariz** com recuo de até 5 m (padrão do plugin): reproduz a imagem 2 (nariz à frente, refúgio no
+    canteiro); acima de 5 m a esquina manda e o canteiro termina na faixa;
+  - **ciclofaixa:** recorte próprio das marcas da ciclofaixa até a borda de longe da faixa de pedestres (as linhas da via
+    continuam até a retenção);
+  - **rotatória:** calçada de cada lado de cada ramo, com transição entre ramos, construída pelo deslocamento verdadeiro (união
+    de círculos – o afastamento ponto a ponto deixava pontas onde a curva tem raio menor que a calçada); junto às rampas, a
+    calçada alarga para a rampa e a faixa livre de 1,20 m (NBR 9050) em vez do rebaixamento total, que pede 7 a 8 m de meio-fio
+    reto e empurraria a travessia para 11–16 m do anel (contra a regra da faixa a um veículo da entrada); opção de voltar à
+    largura única.
+- **Alternativas descartadas:** manter a regra de 1 m além da boca com um aviso (o defeito continuaria); recuar sempre a
+  travessia até o fim de qualquer nariz (em esquinas agudas a faixa iria a 20 m da esquina); rebaixamento total nas calçadas
+  estreitas da rotatória (travessia longe da entrada; testado e revertido); um app próprio fora do Revit (o usuário preferiu
+  continuar no Revit).
+- **Consequências:** interseções com canteiro abrem mais (como o DNIT); as faixas de pedestres desses ramos ficam um pouco mais
+  longe da esquina; rotatórias com vias de calçadas estreitas ganham calçada mais larga junto às rampas. Nada disso foi visto no
+  Revit (K36). A imagem 1 mostrava também uma peça "SV - Concreto 15 cm" e esquinas marcadas que não foram identificadas no
+  núcleo sem o projeto – ficam para o usuário apontar nas imagens das cenas (K36).

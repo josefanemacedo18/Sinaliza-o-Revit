@@ -69,7 +69,14 @@ Desde 2026-10-26 a lista de próximas etapas é o **plano unificado** dos três 
 critério de aceite. Os itens que estavam aqui (X1–X5, P6–P8, K11, K12, F10–F12, K14/K15) foram para as etapas 1–13 do plano.
 
 Desde 2026-10-27 o trabalho segue o **plano 2** – "InfraWorks dentro do Revit": [docs/PLANO_DE_ACAO_2.md](docs/PLANO_DE_ACAO_2.md)
-(Etapas 14–26, D-032), com a referência do InfraWorks em [docs/INFRAWORKS_REFERENCIA.md](docs/INFRAWORKS_REFERENCIA.md).
+(Etapas 14–27, D-032), com a referência do InfraWorks em [docs/INFRAWORKS_REFERENCIA.md](docs/INFRAWORKS_REFERENCIA.md).
+
+Em 2026-11 o usuário mudou a prioridade (D-040, análise em [docs/ANALISE_GERAL.md](docs/ANALISE_GERAL.md)): primeiro os defeitos
+das interseções e das rotatórias (Etapa 22, 2.27.0 – canteiro pela curva de giro do DNIT, travessia atrás do nariz,
+ciclofaixa até a faixa, calçada de cada ramo na rotatória); a drenagem completa passou a Etapa 23. Próximo nas interseções,
+com o retorno do usuário: o que ainda estiver errado nas imagens das cenas (`tools/Cenas`) e no Revit (K36), a travessia no
+meio da quadra com o canteiro e a ciclofaixa cortados (imagem 2) e os parâmetros por ramo que hoje são constantes do
+gerador (`docs/ANALISE_GERAL.md`, caminho B).
 
 As 14 etapas do plano unificado foram entregues (2.8.0 a 2.19.0). O que vem depois, em ordem de risco, está no relatório técnico final
 ([docs/RELATORIO_TECNICO.md](docs/RELATORIO_TECNICO.md) §15):

@@ -1439,8 +1439,11 @@ pista junto ao meio-fio: a **ciclofaixa, a faixa de caminhada e a faixa de segur
 meio-fio. Antes, a ciclofaixa junto ao meio-fio era a que alargava.
 
 **Nas interseções e acessos** (gerado com a interseção, a partir da seção de cada via):
+* **Até a faixa de pedestres** (desde a 2.27): nas aproximações com travessia, o fundo, as linhas, os símbolos e as setas da
+  ciclofaixa vão até a borda da faixa de pedestres (antes paravam junto com as linhas da via, na retenção, e sobrava um trecho
+  de ~2,4 m sem ciclofaixa antes da faixa). A retenção (LRE) cruza a ciclofaixa, como antes.
 * **Lado sem boca** (lado contínuo de um T, esquinas): a ciclofaixa segue **contínua** pela área do cruzamento, com a
-  linha de delimitação e o fundo – só a faixa de pedestres e a área da retenção ficam livres.
+  linha de delimitação e o fundo – só a faixa de pedestres fica livre.
 * **Onde atravessa a pista de outra via** (boca da transversal, miolo do cruzamento): **marcação de cruzamento
   rodocicloviário (MCC – MBST Vol. IV)**, uma linha de quadrados de 0,40 m em cada borda (0,50 m nas ciclofaixas de
   2,20 m ou mais). **Pintura colorida** entre os quadrados é opcional, com a cor escolhida (padrão vermelho, a cor da
@@ -1448,8 +1451,8 @@ meio-fio. Antes, a ciclofaixa junto ao meio-fio era a que alargava.
 * **Via que termina no nó** (haste do T): a ciclofaixa atravessa a via que segue até a ciclofaixa do outro lado dela
   (quando existe), abrindo a linha de delimitação onde chega.
 * **Zona de conflito**: nas aproximações em que os veículos que convertem cruzam a ciclofaixa (há uma via do lado dela), a
-  linha de delimitação fica **seccionada** (1 × 1 m) do cruzamento até 20 m [a confirmar] além do fim da área do cruzamento
-  (editável; 0 = contínua). Onde não há conversão (lado sem boca) a linha segue contínua.
+  linha de delimitação fica **seccionada** (1 × 1 m) da faixa de pedestres até 20 m [a confirmar] além dela (editável; 0 =
+  contínua). Onde não há conversão (lado sem boca) a linha segue contínua.
 * **Ciclofaixas que se cruzam** formam a interseção entre elas: os quadrados de cada uma param na borda da outra e a área
   comum é pintada uma vez.
 * As travessias de ciclistas interrompem as linhas da via atravessada (como a faixa de pedestres).
@@ -2066,12 +2069,29 @@ atualizada/editada**; **Editar** sobre uma delas abre os ajustes daquela esquina
 
 Bloco **Canteiro central** da janela da interseção:
 
-* **Nariz arredondado.** O canteiro termina 1 m antes da pista da outra via com a ponta arredondada: raio = metade da
-  largura do canteiro (semicírculo) até **1,50 m** – em canteiros mais largos os dois cantos são arredondados com 1,50 m
-  e a frente fica reta (valor de projeto [a confirmar] na norma). Se a ponta é estreita (bolsão de conversão recortado
-  do canteiro), o raio cai até caber, sem apagar a ponta. Os cantos junto às travessias e aos bolsões continuam retos.
-* **Abertura só onde precisa.** Uma via sem canteiro que encontra uma via com canteiro abre o canteiro **só na boca dela**
-  (pista da outra via + 1 m de cada lado); a outra via não é alargada nem deformada.
+* **Abertura do canteiro pela curva de giro (padrão desde a 2.27).** O canteiro central abre o quanto o veículo de projeto
+  precisa para converter à esquerda – DNIT IPR-718 (*Manual de Projeto de Interseções*, 2005), cap. 8, Tabelas 62 e 63: a
+  ponta do nariz fica fora do arco de **raio de controle** tangente à face do canteiro e ao eixo da via transversal (ou à face
+  do canteiro dela, quando ela também tem canteiro). Raio de controle: **12 m** para veículo de passeio (VP, padrão), **15 m**
+  para caminhão e ônibus (CO), **23 m** para semirreboque (O) – Tabela 62. Com nariz semicircular a abertura dá **2R − L**
+  (L = largura do canteiro): 21,0 m num canteiro de 3 m com R = 12 m, como a Tabela 63; nunca menos de **12 m** nem menos que
+  a largura da via transversal. Só o lado que tem conversão para aquele ramo da transversal é limitado.
+* **Forma do nariz.** *Automática*: semicircular até 3,00 m de canteiro, **ogiva** acima (os arcos de controle dos dois
+  lados, com a ponta arredondada em cerca de 1/5 da largura – DNIT, item 8.8.2); ou fixa em *Semicircular* ou *Ogiva*. Com
+  bolsão de conversão recortado do canteiro, o nariz é a ponta do canteiro estreitado.
+* **Travessia atrás do nariz** (ligada por padrão): com nariz semicircular, a faixa de pedestres recua até o centro do
+  semicírculo – o nariz inteiro fica **à frente** da faixa, protegendo o refúgio, e a faixa atravessa o canteiro no nível da
+  pista com piso tátil (como na imagem de referência do usuário). O recuo vai até **5 m** além da posição da esquina e das
+  rampas (padrão do plugin); acima disso a travessia fica onde estava e o canteiro termina na faixa (refúgio com a ponta
+  reta). Desligada, a travessia fica onde a esquina e as rampas a põem; se ela cair inteira na abertura, antes da ponta, há
+  aviso (atravessa sem refúgio).
+* **Pista em volta do nariz.** Onde o nariz fica além da área do nó (ramo oblíquo), a interseção refaz o canteiro e a pista
+  junto a ele (1 m além de cada face) até o fim do nariz – sem fresta nem ponta aguda entre o nariz e a pista da via. Sobra do
+  nariz mais fina que 0,70 m à frente da travessia vira pista.
+* **Regra antiga** (opção *Abertura do canteiro → Na boca da outra via*): o canteiro abre só na boca da outra via (pista dela +
+  1 m de cada lado), com o nariz arredondado (raio = metade da largura até 1,50 m) – como até a versão 2.26.
+* **Projetos salvos:** cada interseção passa à regra nova na próxima atualização dela; para manter a antiga, escolha *Na boca
+  da outra via* na janela da interseção.
 * **Canteiro contínuo** (opção, desligada por padrão): o canteiro não abre para as vias sem canteiro – só conversões à
   direita (entra e sai pela direita). A via sem canteiro termina no meio-fio do canteiro.
 * **Travessia sobre o canteiro** (vale para todas as travessias da interseção):
@@ -2252,6 +2272,21 @@ ajardinada** ganhou faixa pavimentada entre o meio-fio e a grama e grama elevada
 **Concordâncias da rotatória.** A curva de entrada/saída de cada ramo é tangente ao bordo do ramo e ao círculo
 externo do anel (traçado usual), com o raio daquele lado – não há mais o "dente" que aparecia entre os raios de entrada e
 de saída na calçada.
+
+**Calçada de cada ramo (desde a 2.27).** Cada via que chega tem a sua calçada, e a rotatória se adapta a elas: em cada boca a
+calçada em volta tem a **largura daquele lado da via** (e, com *Seguir a composição*, as mesmas faixas – meio-fio, grama,
+passeio, sarjeta); entre dois ramos ela passa **aos poucos**, pela curva, da largura de um lado de uma via à do lado da
+outra. Não importa quantos ramos nem se cada lado é diferente (ex.: 4 m de um lado e 1,5 m do outro) – antes era uma largura
+só em volta toda e sobrava um degrau na emenda com cada via. Uma via que atravessa a rotatória dá os dois ramos com os lados
+trocados (a direita de quem sai num é a esquerda de quem sai no outro).
+* **Junto às rampas das travessias:** onde a calçada da via não comporta a rampa (1,80 m com meio-fio de 15 cm a 8,33 %) e a
+  **faixa livre de 1,20 m** atrás dela (NBR 9050), a calçada da rotatória **alarga junto à rampa** e volta à largura da via
+  antes da boca (transição de 4 m ou mais, 4 m por metro alargado – padrão do plugin), com aviso. A travessia fica onde a
+  rotatória a põe, a cerca de um veículo da entrada (o rebaixamento total da calçada, com 7 a 8 m de meio-fio, não cabe no
+  meio-fio curvo da entrada). Lado sem calçada não recebe rampa.
+* **Opção** *Calçada de cada ramo* (bloco *Calçadas e meio-fio em volta*, ligada por padrão): desligada, volta a **uma largura
+  só** em volta toda (*Calçada em volta*), como até a 2.26. Ramos sem via (por ângulo) usam a calçada geral, ou a de cada
+  lado informada em *Personalizar cada ramo*. Rotatórias salvas passam à regra nova na próxima atualização.
 
 **Rotatória elevada (platô)** e **ilha em calota**: em *Ilha central e anel*, marque *Rotatória elevada* para a pista
 giratória subir (altura e comprimento das rampas editáveis; rampas geradas em cada ramo) – solução de moderação de

@@ -1,0 +1,383 @@
+diff --git a/src/SinalizacaoViaria.Core/Automation/Culverts.cs b/src/SinalizacaoViaria.Core/Automation/Culverts.cs
+new file mode 100644
+index 0000000..515a256
+--- /dev/null
++++ b/src/SinalizacaoViaria.Core/Automation/Culverts.cs
+@@ -0,0 +1,76 @@
++using System.Globalization;
++using SinalizacaoViaria.Core.Definitions;
++using SinalizacaoViaria.Core.Geometry;
++
++namespace SinalizacaoViaria.Core.Automation;
++
++/// <summary>Verificação de um bueiro: extensão, declividade, capacidade a seção plena, velocidade e ocupação pela vazão informada.</summary>
++public sealed record VerificacaoBueiro(string Id, string Nome, double Extensao, double Declividade, double AreaUtil, double Capacidade, double Velocidade,
++    double? Vazao, double? Ocupacao);
++
++/// <summary>
++/// Bueiros (Etapa 22): capacidade a seção plena por Manning em cada linha ou célula (circular: R = D/4; celular: R = b·h /
++/// 2(b + h)), somada; a ocupação pela vazão de projeto informada. O controle de entrada (FHWA HDS-5) e a condição de jusante
++/// não são calculados – a verificação diz isso.
++/// </summary>
++public static class Bueiros
++{
++    private static readonly CultureInfo Pt = CultureInfo.GetCultureInfo("pt-BR");
++    private static string N(double v, string f = "0.00") => v.ToString(f, Pt);
++
++    public static string Rotulo(BueiroDefinition b) =>
++        $"{b.KindName}{(string.IsNullOrWhiteSpace(b.Nome) ? "" : " " + b.Nome.Trim())}";
++
++    /// <summary>Dimensões no texto: "2 × Ø 1000 mm" ou "1 × 2,00 × 2,00 m".</summary>
++    public static string Dimensoes(BueiroDefinition b) => b.Forma == FormaBueiro.Circular
++        ? $"{Math.Max(1, b.Celulas)} × Ø {N(b.Diametro * 1000, "0")} mm"
++        : $"{Math.Max(1, b.Celulas)} × {N(b.Largura)} × {N(b.Altura)} m";
++
++    public static VerificacaoBueiro Verificar(BueiroDefinition b, ProjetoDrenagem? p)
++    {
++        var pts = b.PathRef.Points;
++        var L = pts.Count >= 2 ? pts[0].DistanceTo(pts[^1]) : 0;
++        var s = L > 1e-6 ? (b.CotaEntrada - b.CotaSaida) / L : 0;
++        var n = b.Rugosidade ?? p?.Rugosidade ?? 0.013;
++        var k = Math.Max(1, b.Celulas);
++        double area, q;
++        if (b.Forma == FormaBueiro.Circular)
++        {
++            area = Math.PI * b.Diametro * b.Diametro / 4;
++            q = Hidraulica.SecaoPlena(b.Diametro, s, n).Vazao;
++        }
++        else
++        {
++            area = b.Largura * b.Altura;
++            var r = area / (2 * (b.Largura + b.Altura));
++            q = s > 0 && n > 0 ? area * Math.Pow(r, 2.0 / 3) * Math.Sqrt(s) / n : 0;
++        }
++        var cap = q * k * 1000;
++        var v = area > 0 ? q / area : 0;
++        double? oc = b.VazaoProjeto is { } qp && cap > 1e-9 ? qp / cap : null;
++        return new VerificacaoBueiro(b.Id, Rotulo(b), L, s, area * k, cap, v, b.VazaoProjeto, oc);
++    }
++
++    /// <summary>Problemas dos bueiros (a tela da rede e o Validar Modelo): declividade nula ou contrária e vazão acima da capacidade.</summary>
++    public static List<ProblemaRede> Problemas(IReadOnlyCollection<MarkingDefinition> defs, ProjetoDrenagem? p)
++    {
++        var res = new List<ProblemaRede>();
++        foreach (var b in defs.OfType<BueiroDefinition>())
++        {
++            var v = Verificar(b, p);
++            var ids = new[] { b.Id };
++            if (v.Extensao < 0.5) { res.Add(new(v.Nome, "bueiro", $"{v.Nome}: sem as duas bocas (eixo com menos de 0,5 m).", false, ids)); continue; }
++            if (v.Declividade <= 0)
++                res.Add(new(v.Nome, "bueiro", $"{v.Nome}: fundo da saída ({N(b.CotaSaida, "0.000")} m) não está abaixo do da entrada ({N(b.CotaEntrada, "0.000")} m) – " +
++                    "sem escoamento por gravidade.", false, ids));
++            else if (v.Vazao is { } q && q > v.Capacidade + 1e-6)
++                res.Add(new(v.Nome, "bueiro", $"{v.Nome} ({Dimensoes(b)}): vazão de projeto {N(q)} L/s acima da capacidade a seção plena {N(v.Capacidade)} L/s" +
++                    (string.IsNullOrWhiteSpace(b.FonteVazao) ? "" : $" (vazão: {b.FonteVazao!.Trim()})") + ".", false, ids));
++        }
++        return res;
++    }
++
++    /// <summary>Extremos do eixo de cada bueiro (para a travessia dos talvegues sob as vias).</summary>
++    public static IEnumerable<(Vec2 A, Vec2 B)> Eixos(IEnumerable<MarkingDefinition> defs) =>
++        defs.OfType<BueiroDefinition>().Where(b => b.PathRef.Points.Count >= 2).Select(b => (b.PathRef.Points[0], b.PathRef.Points[^1]));
++}
+diff --git a/src/SinalizacaoViaria.Core/Automation/DrainageModel.cs b/src/SinalizacaoViaria.Core/Automation/DrainageModel.cs
+index beabfb5..9a8d17e 100644
+--- a/src/SinalizacaoViaria.Core/Automation/DrainageModel.cs
++++ b/src/SinalizacaoViaria.Core/Automation/DrainageModel.cs
+@@ -404,6 +404,8 @@ public static class DrenagemDoModelo
+             grupos.TryGetValue(v.Id, out var g) && g != null && obras.Any(o => o.HostRoad == g && s >= o.A - AlcanceTravessia && s <= o.B + AlcanceTravessia);
+         var tubos = defs.OfType<DrainagePipeDefinition>().Select(p => DrainageNetwork.Ends(p, id => defs.FirstOrDefault(x => x.Id == id)))
+             .Where(e => e != null).Select(e => (e!.A, e.B)).ToList();
++        // Bueiros (Etapa 22) também atravessam a via.
++        tubos.AddRange(Bueiros.Eixos(defs));
+         foreach (var v in Vias(defs).Where(v => v.Greide is { AdjustTerrain: true }))
+         {
+             var L = v.Eixo.Length;
+diff --git a/src/SinalizacaoViaria.Core/Automation/DrainageNetworkScreen.cs b/src/SinalizacaoViaria.Core/Automation/DrainageNetworkScreen.cs
+index 7033cc5..15ba101 100644
+--- a/src/SinalizacaoViaria.Core/Automation/DrainageNetworkScreen.cs
++++ b/src/SinalizacaoViaria.Core/Automation/DrainageNetworkScreen.cs
+@@ -76,6 +76,7 @@ public static class RedeDrenagemTela
+         ["engolimento"] = CategoriaRede.Hidraulica,
+         ["afogamento"] = CategoriaRede.Hidraulica,
+         ["extravasamento"] = CategoriaRede.Hidraulica,
++        ["bueiro"] = CategoriaRede.Hidraulica,
+         ["sarjeta-modelo"] = CategoriaRede.ViasETerreno,
+         ["ponto-baixo-modelo"] = CategoriaRede.ViasETerreno,
+         ["ponto-baixo"] = CategoriaRede.ViasETerreno,
+@@ -111,6 +112,7 @@ public static class RedeDrenagemTela
+         "sarjeta" => "Coloque uma captação antes ou divida a área de contribuição.",
+         "engolimento" => "Aumente a captação (tipo ou módulos) ou divida a área com outra captação.",
+         "afogamento" => "O remanso vem de jusante (nível d'água do lançamento ou trecho sob pressão): aumente o diâmetro de jusante, suba o trecho ou reveja o nível informado.",
++        "bueiro" => "Edite o bueiro: cotas de fundo das bocas (a saída abaixo da entrada), dimensões ou número de linhas/células para a vazão informada.",
+         "extravasamento" => "Aumente os diâmetros ou as declividades a jusante do dispositivo, ou suba o lançamento acima do nível d'água.",
+         "sarjeta-modelo" => "Confira a declividade informada ou use Ler do Modelo.",
+         "ponto-baixo-modelo" => "Marque a captação como em ponto baixo (o engolimento muda) ou use Ler do Modelo.",
+@@ -143,6 +145,7 @@ public static class RedeDrenagemTela
+         var hid = hidraulica ?? DrainageHydraulics.Calcular(defs, p);
+         res.AddRange(hid.Problemas);
+         res.AddRange(LinhaPiezometrica.Calcular(defs, p, hid).Problemas);
++        res.AddRange(Bueiros.Problemas(defs, p));
+         if (!defs.Any(d => d is DrainageDefinition)) return res;
+         res.AddRange(DrenagemDoModelo.Divergencias(captacoes ?? DrenagemDoModelo.Captacoes(defs)));
+         foreach (var pb in DrenagemDoModelo.PontosBaixosSemCaptacao(defs))
+@@ -150,7 +153,7 @@ public static class RedeDrenagemTela
+                 false, new[] { pb.ViaId }));
+         if (terrenoNatural != null)
+             foreach (var tv in DrenagemDoModelo.TalveguesSemTravessia(defs, terrenoNatural))
+-                res.Add(new ProblemaRede(tv.Via, "talvegue", $"Talvegue sob o aterro da {tv.Via}, estaca {tv.EstacaTexto} (aterro {N(tv.Aterro, "0.0")} m): sem travessia da rede – a via represa a água.",
++                res.Add(new ProblemaRede(tv.Via, "talvegue", $"Talvegue sob o aterro da {tv.Via}, estaca {tv.EstacaTexto} (aterro {N(tv.Aterro, "0.0")} m): sem travessia da rede nem bueiro – a via represa a água.",
+                     false, new[] { tv.ViaId }));
+         return res;
+     }
+diff --git a/src/SinalizacaoViaria.Core/Automation/ProjectCentral.cs b/src/SinalizacaoViaria.Core/Automation/ProjectCentral.cs
+index 8b331dd..5a6741f 100644
+--- a/src/SinalizacaoViaria.Core/Automation/ProjectCentral.cs
++++ b/src/SinalizacaoViaria.Core/Automation/ProjectCentral.cs
+@@ -245,7 +245,7 @@ public static class CentralDoProjeto
+             or BridgeDefinition or TunnelDefinition or TrenchDefinition => "viario",
+         IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or InterchangeDefinition => "intersecoes",
+         RetainingWallDefinition or SlopeDefinition or PlataformaDefinition or TemaTerrenoDefinition => "terraplenagem",
+-        DrainageDefinition or DrainagePipeDefinition or CorpoDaguaDefinition => "drenagem",
++        DrainageDefinition or DrainagePipeDefinition or CorpoDaguaDefinition or BueiroDefinition => "drenagem",
+         LoteamentoDefinition or QuadraDefinition or UrbanElementDefinition or PlanterDefinition => "urbanismo",
+         LinearMarkingDefinition or HatchMarkingDefinition or SymbolMarkingDefinition or TextMarkingDefinition or ParkingMarkingDefinition
+             or RepeatedMarkingDefinition or DeviceMarkingDefinition or SignDefinition or TrafficCalmingDefinition or ChannelizationDefinition
+diff --git a/src/SinalizacaoViaria.Core/Definitions/CulvertDefinitions.cs b/src/SinalizacaoViaria.Core/Definitions/CulvertDefinitions.cs
+new file mode 100644
+index 0000000..f4c0373
+--- /dev/null
++++ b/src/SinalizacaoViaria.Core/Definitions/CulvertDefinitions.cs
+@@ -0,0 +1,62 @@
++using SinalizacaoViaria.Core.Geometry;
++
++namespace SinalizacaoViaria.Core.Definitions;
++
++public enum FormaBueiro
++{
++    /// <summary>Tubos circulares (uma ou mais linhas).</summary>
++    Circular,
++    /// <summary>Células retangulares (galeria celular de uma ou mais células).</summary>
++    Celular,
++}
++
++/// <summary>
++/// Bueiro (Etapa 22): travessia de um talvegue sob a via, da boca de entrada (primeiro ponto, a montante) à de saída, com as
++/// cotas de fundo nas duas bocas (absolutas – o caminho fica na cota 0), a forma (tubos circulares ou células retangulares), o
++/// número de linhas ou células, as dimensões internas, o material e a rugosidade, a vazão de projeto informada (com a fonte) e
++/// os muros de testa. A capacidade é verificada a seção plena por Manning; o controle de entrada não é calculado.
++/// </summary>
++public sealed class BueiroDefinition : MarkingDefinition
++{
++    public PathReference PathRef { get; set; } = new();
++    public string Nome { get; set; } = "";
++    public FormaBueiro Forma { get; set; } = FormaBueiro.Circular;
++    /// <summary>Linhas de tubo ou células.</summary>
++    public int Celulas { get; set; } = 1;
++    /// <summary>Circular: diâmetro interno (m).</summary>
++    public double Diametro { get; set; } = 1.0;
++    /// <summary>Celular: vão interno de cada célula (m).</summary>
++    public double Largura { get; set; } = 2.0;
++    /// <summary>Celular: altura interna (m).</summary>
++    public double Altura { get; set; } = 2.0;
++    /// <summary>Espessura das paredes (m); nula = a do desenho (circular: 8 % do diâmetro, mínimo 4 cm; celular: 0,20 m) – padrão do plugin.</summary>
++    public double? Parede { get; set; }
++    /// <summary>Circular: afastamento livre entre as linhas de tubo (m) – padrão do plugin.</summary>
++    public double Afastamento { get; set; } = 0.30;
++    /// <summary>Cota de fundo na boca de entrada (m).</summary>
++    public double CotaEntrada { get; set; }
++    /// <summary>Cota de fundo na boca de saída (m).</summary>
++    public double CotaSaida { get; set; }
++    public string Material { get; set; } = "concreto";
++    /// <summary>Rugosidade de Manning; nula = a do Projeto de Drenagem.</summary>
++    public double? Rugosidade { get; set; }
++    /// <summary>Vazão de projeto (L/s), da bacia, informada pelo usuário; nula = só a capacidade.</summary>
++    public double? VazaoProjeto { get; set; }
++    /// <summary>De onde vem a vazão de projeto (estudo hidrológico, método, como o usuário escrever).</summary>
++    public string? FonteVazao { get; set; }
++    /// <summary>Muros de testa nas duas bocas (desenho e quantitativo).</summary>
++    public bool Testas { get; set; } = true;
++
++    public double ParedeEfetiva => Parede ?? (Forma == FormaBueiro.Circular ? Math.Max(0.04, Diametro / 2 * 0.16) : 0.20);
++    /// <summary>Largura externa do conjunto (m).</summary>
++    public double LarguraTotal => Forma == FormaBueiro.Circular
++        ? Math.Max(1, Celulas) * (Diametro + 2 * ParedeEfetiva) + (Math.Max(1, Celulas) - 1) * Math.Max(0, Afastamento)
++        : Math.Max(1, Celulas) * Largura + (Math.Max(1, Celulas) + 1) * ParedeEfetiva;
++    /// <summary>Altura externa (m).</summary>
++    public double AlturaTotal => Forma == FormaBueiro.Circular ? Diametro + 2 * ParedeEfetiva : Altura + 2 * ParedeEfetiva;
++
++    public override string KindName => "Bueiro";
++    public override string DisplayCode => Forma == FormaBueiro.Circular ? "BUEIRO-TUBO" : "BUEIRO-CEL";
++    public override PathReference? Path => PathRef;
++    public override void SetPath(PathReference path) => PathRef = path;
++}
+diff --git a/src/SinalizacaoViaria.Core/Definitions/MarkingBuilder.cs b/src/SinalizacaoViaria.Core/Definitions/MarkingBuilder.cs
+index bf4f7fd..76e7db6 100644
+--- a/src/SinalizacaoViaria.Core/Definitions/MarkingBuilder.cs
++++ b/src/SinalizacaoViaria.Core/Definitions/MarkingBuilder.cs
+@@ -286,6 +286,7 @@ public static class MarkingBuilder
+         TemaTerrenoDefinition tt => TerrainGenerators.Tema(tt, ctx),
+         PlataformaDefinition pf => TerrainGenerators.Plataforma(pf, path),
+         CorpoDaguaDefinition ca => WaterGenerator.Build(ca, path, ctx),
++        BueiroDefinition bu => CulvertGenerator.Build(bu, path),
+         SheetSegmentDefinition ss => DetailGenerator.SheetSegment(ss, ctx),
+         RoadPavementDefinition rp2 => path == null ? Missing("Eixo da via não encontrado.") : RoadGenerator.Pavement(rp2, path),
+         IntersectionDefinition it => IntersectionGenerator.Build(it, ctx),
+@@ -1089,6 +1090,9 @@ public static class MarkingBuilder
+             case EscapeRampDefinition er:
+                 return new MarkingInfo(er.DisplayCode, $"Área de escape – caixa de retenção {er.ActualLength:0} × {er.Width:0.#} m", GrupoMarca.Urbanizacao,
+                     "AASHTO Green Book – Emergency Escape Ramps; DNIT – Manual de Projeto Geométrico de Rodovias Rurais", "un");
++            case BueiroDefinition bu:
++                return new MarkingInfo(bu.DisplayCode, $"Bueiro {(bu.Forma == FormaBueiro.Circular ? "tubular" : "celular")} de {bu.Material.Trim()} " +
++                    Automation.Bueiros.Dimensoes(bu), GrupoMarca.Urbanizacao, "Capacidade a seção plena (Manning); controle de entrada não calculado", "m");
+             case CorpoDaguaDefinition ca:
+                 return new MarkingInfo(ca.DisplayCode, $"{ca.KindName}{(string.IsNullOrWhiteSpace(ca.Nome) ? "" : " " + ca.Nome)} – superfície de água", GrupoMarca.Urbanizacao,
+                     "Escavação do leito no registro da Terraplenagem", "m²");
+diff --git a/src/SinalizacaoViaria.Core/Definitions/MarkingDefinition.cs b/src/SinalizacaoViaria.Core/Definitions/MarkingDefinition.cs
+index ab34b7c..24a698e 100644
+--- a/src/SinalizacaoViaria.Core/Definitions/MarkingDefinition.cs
++++ b/src/SinalizacaoViaria.Core/Definitions/MarkingDefinition.cs
+@@ -201,6 +201,7 @@ public enum Justificacao
+ [JsonDerivedType(typeof(TemaTerrenoDefinition), "tema-terreno")]
+ [JsonDerivedType(typeof(PlataformaDefinition), "plataforma")]
+ [JsonDerivedType(typeof(CorpoDaguaDefinition), "corpo-dagua")]
++[JsonDerivedType(typeof(BueiroDefinition), "bueiro")]
+ public abstract class MarkingDefinition
+ {
+     public const int CurrentVersion = 1;
+diff --git a/src/SinalizacaoViaria.Core/Generators/CulvertGenerator.cs b/src/SinalizacaoViaria.Core/Generators/CulvertGenerator.cs
+new file mode 100644
+index 0000000..ba84054
+--- /dev/null
++++ b/src/SinalizacaoViaria.Core/Generators/CulvertGenerator.cs
+@@ -0,0 +1,74 @@
++using SinalizacaoViaria.Core.Definitions;
++using SinalizacaoViaria.Core.Geometry;
++using SinalizacaoViaria.Core.Model;
++
++namespace SinalizacaoViaria.Core.Generators;
++
++/// <summary>
++/// Bueiro em 3D: as linhas de tubo (sólidos de revolução ocos) ou as células (laje de fundo, laje de topo e paredes), do fundo
++/// da entrada ao da saída, e os muros de testa nas bocas (0,30 m de espessura, 0,50 m além do conjunto de cada lado e acima
++/// dele – padrão do plugin).
++/// </summary>
++public static class CulvertGenerator
++{
++    public const double TestaEspessura = 0.30;
++    public const double TestaFolga = 0.50;
++
++    public static MarkingGeometry Build(BueiroDefinition b, Polyline2? path)
++    {
++        var geo = new MarkingGeometry();
++        if (path == null || path.Points.Count < 2)
++        {
++            geo.Warnings.Add("Bueiro: eixo não encontrado.");
++            return geo;
++        }
++        // Reto da entrada à saída (os pontos do meio não contam).
++        var eixo = new Polyline2(new[] { path.Points[0], path.Points[^1] }, false);
++        var L = eixo.Length;
++        if (L < 0.5) { geo.Warnings.Add("Bueiro: as bocas estão a menos de 0,5 m."); return geo; }
++        if (b.CotaSaida >= b.CotaEntrada) geo.Warnings.Add("Bueiro: o fundo da saída não está abaixo do da entrada.");
++        double Z(double s) => b.CotaEntrada + (b.CotaSaida - b.CotaEntrada) * s / L;
++        var u = (eixo.Points[1] - eixo.Points[0]) * (1 / L);
++        var nrm = u.PerpLeft;
++        var t = b.ParedeEfetiva;
++        var k = Math.Max(1, b.Celulas);
++        var W = b.LarguraTotal;
++        // Extensão do quantitativo: o eixo × as linhas ou células.
++        geo.PaintedLength = L * k;
++        if (b.Forma == FormaBueiro.Circular)
++        {
++            var r = b.Diametro / 2;
++            var passo = b.Diametro + 2 * t + Math.Max(0, b.Afastamento);
++            for (int i = 0; i < k; i++)
++            {
++                var o = (i - (k - 1) / 2.0) * passo;
++                var a = eixo.Points[0] + nrm * o;
++                var c = eixo.Points[1] + nrm * o;
++                // O fundo interno na cota informada: o centro fica r acima.
++                SolidSweep.AddRound(geo, Vec3.At(a, b.CotaEntrada + r), Vec3.At(c, b.CotaSaida + r), r + t, r + t, MarkingColor.Concreto, "BUEIRO", false, r, r, 32);
++            }
++        }
++        else
++        {
++            // Lajes de fundo e de topo e as k + 1 paredes.
++            SolidSweep.Along(geo, eixo, s => SolidSweep.Rect(-W / 2, W / 2, Z(s) - t, Z(s)), MarkingColor.Concreto, 0, L, 4, "BUEIRO");
++            SolidSweep.Along(geo, eixo, s => SolidSweep.Rect(-W / 2, W / 2, Z(s) + b.Altura, Z(s) + b.Altura + t), MarkingColor.Concreto, 0, L, 4, "BUEIRO");
++            for (int j = 0; j <= k; j++)
++            {
++                var y0 = -W / 2 + j * (b.Largura + t);
++                SolidSweep.Along(geo, eixo, s => SolidSweep.Rect(y0, y0 + t, Z(s), Z(s) + b.Altura), MarkingColor.Concreto, 0, L, 4, "BUEIRO");
++            }
++        }
++        if (b.Testas)
++        {
++            var h = b.AlturaTotal + TestaFolga;
++            var largura = W / 2 + TestaFolga;
++            foreach (var (s0, s1, z) in new[] { (0.0, Math.Min(L, TestaEspessura), b.CotaEntrada), (Math.Max(0, L - TestaEspessura), L, b.CotaSaida) })
++            {
++                var zb = z - (b.Forma == FormaBueiro.Celular ? t : 0) - 0.20;
++                SolidSweep.Along(geo, eixo, _ => SolidSweep.Rect(-largura, largura, zb, zb + h + 0.20), MarkingColor.Concreto, s0, s1, 1, "TESTA");
++            }
++        }
++        return geo;
++    }
++}
+diff --git a/src/SinalizacaoViaria.Core/Model/ModelValidator.cs b/src/SinalizacaoViaria.Core/Model/ModelValidator.cs
+index 9c1d5a0..605a451 100644
+--- a/src/SinalizacaoViaria.Core/Model/ModelValidator.cs
++++ b/src/SinalizacaoViaria.Core/Model/ModelValidator.cs
+@@ -617,6 +617,9 @@ public static class ModelValidator
+     private static void CheckDrainage(Dictionary<string, MarkingDefinition> defs, Automation.ProjetoDrenagem? c, Automation.TerrainMesh? terreno,
+         List<Achado> res)
+     {
++        // Bueiros (Etapa 22): declividade e vazão informada × capacidade, com ou sem rede.
++        foreach (var p in Automation.Bueiros.Problemas(defs.Values, c))
++            res.Add(new("V13", Severidade.Aviso, Confianca.Alta, true, p.Texto, p.Ids ?? Array.Empty<string>()));
+         if (!defs.Values.Any(d => d is DrainagePipeDefinition)) return;
+         // Recobrimento sob a superfície acabada: vias do plugin e, fora delas, o terreno projetado (Etapa 6; antes, a reta entre as tampas).
+         var superficie = Automation.DrenagemDoModelo.SuperficieAcabada(defs.Values, terreno == null ? null : terreno.Z);
+diff --git a/src/SinalizacaoViaria.Core/Quantities/QuantityCalculator.cs b/src/SinalizacaoViaria.Core/Quantities/QuantityCalculator.cs
+index a8be752..d6b83a4 100644
+--- a/src/SinalizacaoViaria.Core/Quantities/QuantityCalculator.cs
++++ b/src/SinalizacaoViaria.Core/Quantities/QuantityCalculator.cs
+@@ -188,7 +188,7 @@ public sealed class QuantityRow
+     public static CategoriaQuantitativo Categorize(MarkingDefinition def, GrupoMarca group) => def switch
+     {
+         RampDefinition or TactileRouteDefinition => CategoriaQuantitativo.Acessibilidade,
+-        DrainageDefinition or DrainagePipeDefinition or CorpoDaguaDefinition => CategoriaQuantitativo.Drenagem,
++        DrainageDefinition or DrainagePipeDefinition or CorpoDaguaDefinition or BueiroDefinition => CategoriaQuantitativo.Drenagem,
+         BridgeDefinition or TunnelDefinition or TrenchDefinition or RetainingWallDefinition or SlopeDefinition or InterchangeDefinition => CategoriaQuantitativo.ObrasDeArteTerraplenagem,
+         RoadPavementDefinition or IntersectionDefinition or RoundaboutDefinition or CulDeSacDefinition or RailwayDefinition => CategoriaQuantitativo.PavimentacaoGeometria,
+         _ => group switch
+diff --git a/src/SinalizacaoViaria.Core/Reports/DrainageMemorial.cs b/src/SinalizacaoViaria.Core/Reports/DrainageMemorial.cs
+index bd3b3ad..246df30 100644
+--- a/src/SinalizacaoViaria.Core/Reports/DrainageMemorial.cs
++++ b/src/SinalizacaoViaria.Core/Reports/DrainageMemorial.cs
+@@ -55,6 +55,11 @@ public static class DrainageMemorial
+         }
+         var conexoes = trechos.Sum(t => t.Conexoes);
+         if (conexoes > 0) itens.Add(new("Conexões dos tubos com as caixas (chegadas e saídas)", "un", conexoes, "0"));
++        // Bueiros: extensão das linhas ou células por forma e dimensão, e os muros de testa.
++        var bueiros = defs.OfType<BueiroDefinition>().Where(b => b.PathRef.Points.Count >= 2).ToList();
++        foreach (var g in bueiros.GroupBy(b => $"Bueiro {(b.Forma == FormaBueiro.Circular ? "tubular" : "celular")} de {b.Material.Trim()} {Bueiros.Dimensoes(b)}"))
++            itens.Add(new(g.Key + " (extensão de cada linha ou célula)", "m", g.Sum(b => b.PathRef.Points[0].DistanceTo(b.PathRef.Points[^1]) * Math.Max(1, b.Celulas)), "0.00"));
++        if (bueiros.Count(b => b.Testas) > 0) itens.Add(new("Muros de testa dos bueiros", "un", 2 * bueiros.Count(b => b.Testas), "0"));
+ 
+         var esc = trechos.Sum(t => t.Vala.Escavacao);
+         if (esc > 0)
+diff --git a/tests/SinalizacaoViaria.Core.Tests/Etapa11TelasTests.cs b/tests/SinalizacaoViaria.Core.Tests/Etapa11TelasTests.cs
+index 5ab7159..25d6f80 100644
+--- a/tests/SinalizacaoViaria.Core.Tests/Etapa11TelasTests.cs
++++ b/tests/SinalizacaoViaria.Core.Tests/Etapa11TelasTests.cs
+@@ -213,7 +213,7 @@ public class Etapa11TelasTests
+     {
+         // Os critérios que o núcleo emite (DrainageNetwork, DrainageHydraulics, DrenagemDoModelo e a própria tela): nenhum cai na parte errada.
+         var nucleo = Path.Combine(Raiz(), "src", "SinalizacaoViaria.Core", "Automation");
+-        var criterios = new[] { "DrainageNetwork.cs", "DrainageHydraulics.cs", "DrainageModel.cs", "DrainageNetworkScreen.cs", "DrainagePipes.cs" }
++        var criterios = new[] { "DrainageNetwork.cs", "DrainageHydraulics.cs", "DrainageModel.cs", "DrainageNetworkScreen.cs", "DrainagePipes.cs", "Culverts.cs" }
+             .SelectMany(f => Regex.Matches(File.ReadAllText(Path.Combine(nucleo, f)), @"(?:\.Add\(new|new ProblemaRede)\(\s*[^,()]+,\s*""([^""]+)"",")
+                 .Select(m => m.Groups[1].Value)).ToHashSet();
+         Assert.True(criterios.Count >= 19, string.Join(", ", criterios));

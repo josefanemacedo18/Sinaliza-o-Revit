@@ -2,7 +2,7 @@
 
 Atualize este arquivo ao fim de cada ciclo de trabalho.
 
-## Estado em 2026-10-28 (plano unificado concluído – Etapas 0–13; plano 2 – Etapas 14–21 entregues)
+## Estado em 2026-11-03 (plano unificado concluído – Etapas 0–13; plano 2 – Etapas 14–22 entregues)
 
 - **Três prompts, um plano** (D-022): Prompt Master, Prompt Complementar Mestre de Motores e Prompt de Interface
   executados por `docs/PLANO_DE_ACAO.md` (etapas 0–13). Entregas em `Releases/EtapaNN` (`tools/release.sh E<n>`). Ao fim
@@ -57,7 +57,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
     seção 9 com sementes, passo, aquecimento e assinatura); **Fluxo integrado** no Autoteste (via → interseção →
     terraplenagem → drenagem → quantitativos → validação); **relatório técnico final** em `docs/RELATORIO_TECNICO.md`.
     Não executada no Revit (K27).
-  - `Instalar/Revit2027` tem a DLL 2.26.0 (Etapa 21). As anteriores continuam em `Releases/`.
+  - `Instalar/Revit2027` tem a DLL 2.27.0 (Etapa 22). As anteriores continuam em `Releases/`.
 - **Plano unificado concluído** (14 etapas, 2.8.0 a 2.19.0). Pendências abertas: F12 (cenários de projeto comparados por
   quantitativos), K14/K15 no Revit e tudo o que depende de rodar no Revit (K3, K17, K19, K23–K27).
 - **Revit:** nada desde o 4º Autoteste completo rodou no Revit (K3). Relatórios em `docs/evidencias/`.
@@ -66,7 +66,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
 
 ## Plano 2 – "InfraWorks dentro do Revit" (desde 2026-10-27)
 
-- Pedido do usuário em `docs/PROMPT_INFRAWORKS.md` (19 itens); plano em `docs/PLANO_DE_ACAO_2.md` (Etapas 14–26, D-032);
+- Pedido do usuário em `docs/PROMPT_INFRAWORKS.md` (19 itens); plano em `docs/PLANO_DE_ACAO_2.md` (Etapas 14–27, D-032);
   referência do InfraWorks, com a fonte de cada ferramenta, em `docs/INFRAWORKS_REFERENCIA.md`.
 - Etapa 14 ✅ (só documentos, sem DLL): estudo do InfraWorks pela ajuda oficial, lacunas por matéria, plano.
 - Etapa 15 ✅: 2.20.0 em `Releases/Etapa15` (`a62975c`, 3 145/3 145) – D-033: trecho mínimo para travessia nas duas pontas
@@ -103,7 +103,7 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
   NÃO VALIDADO NO REVIT (K34).
 - **Fontes de lei bloqueadas nesta sessão:** `www.planalto.gov.br` e `www2.camara.leg.br` não resolvem na rede do ambiente
   (liberar em Network access do ambiente). Sem o texto conferido, nenhum limite de lei entra como padrão: faixas de proteção das
-  águas (Etapa 21) e limites do parcelamento (Etapa 23) ficam **informados pelo usuário**, com a lei citada por ele.
+  águas (Etapa 21) e limites do parcelamento (Etapa 24) ficam **informados pelo usuário**, com a lei citada por ele.
 - Etapa 21 ✅: 2.26.0 em `Releases/Etapa21` (`7577fd0`, 3 232/3 232) – D-039: **Drenagem › Corpos d'Água** – **Rio ou Córrego**
   (eixo, fundo por estaca ou do terreno natural sem subir para jusante, largura do fundo, lâmina, talude) e **Lago ou Lagoa**
   (margem no nível d'água, cota do fundo); leito como faixa/plataforma da Terraplenagem (com registro), água no modelo, faixa
@@ -111,15 +111,42 @@ Atualize este arquivo ao fim de cada ciclo de trabalho.
   informada). Núcleo em `CorposDagua` (`WaterBodies.cs`), `WaterGenerator`. Achados: `TerrainService.Features` não copiava
   `SpillStart`/`SpillEnd`; a propriedade `Tipo` colidia com o discriminador do JSON (renomeada `Corpo`; teste de ida e volta de
   toda marca). NÃO VALIDADO NO REVIT (K35).
-- **Próxima: Etapa 22** – drenagem completa (itens 6 e 21), em partes: (a) catálogo de tubos editável no Projeto de Drenagem
-  (material, classe, DN, parede, comprimento da peça, junta, n – padrão do plugin quando sem fonte), tubo do catálogo por
-  trecho, peças, juntas, conexões e vala (largura, berço, talude, escavação, reaterro) no quantitativo e no memorial
-  (`DrainageMemorial.Quantitativo`); (b) linha piezométrica e de energia de jusante para montante (`DrainageHydraulics`
-  dá a vazão em L/s; nível de jusante pelo corpo d'água a menos de 30 m – `CorposDagua.NivelPerto` – ou saída livre),
-  tubos afogados e PVs extravasando, no perfil da rede (`PerfilRede`); (c) bueiros (circular ou celular, células, n,
-  capacidade a seção plena; contam como travessia no talvegue do V13 – `DrenagemDoModelo.TalveguesSemTravessia`); (d) rede
-  gerada ao longo da via (bocas nos pontos baixos do greide e pelo espaçamento informado, PVs, trechos pela declividade
-  mínima e recobrimento).
+- **Mudança de prioridade em 2026-11 (D-040):** o usuário pausou a drenagem para a análise geral (`docs/ANALISE_GERAL.md`) e pediu
+  primeiro as interseções sem defeitos e mais personalizáveis, pelo manual de interseções do DNIT (IPR-718), e a rotatória com a
+  calçada de cada saída. A drenagem completa passou a **Etapa 23**; parcelamento 24, placas 25, detalhamento 26, desempenho 27.
+- Etapa 22 ✅: 2.27.0 em `Releases/Etapa22` – D-040: **canteiro central pela curva de giro** (DNIT, cap. 8: abertura 2R − M da
+  Tabela 63 com o raio de controle da Tabela 62 – 12 m por padrão –, nariz semicircular até 3 m e ogiva acima; opção de voltar
+  à abertura na boca da via – `IntersectionMedians.cs`); **travessia atrás do nariz** com refúgio no nível da pista através do
+  canteiro (`CrosswalkExtra`); **ciclofaixa até a faixa de pedestres** (`CyclePaintCuts`); **rotatória com a calçada de cada
+  ramo e de cada lado** pela largura da via que sai, com e sem a composição das vias, e alargamento local junto às rampas
+  (`RoundaboutSidewalks.cs`; opção de voltar à largura única). Ferramenta `tools/Cenas` (cenas em SVG a partir do núcleo).
+  Não identificados sem o projeto: a peça "SV - Concreto 15 cm" e as esquinas marcadas da imagem 1 (K36). NÃO VALIDADO NO
+  REVIT (K36).
+- **Próxima: Etapa 23** – drenagem completa (itens 6 e 21). Partes (a) catálogo de tubos, peças, juntas, conexões e vala e
+  (b) linha piezométrica e de energia já estão no ramo (`262f6e1`, testes em `Etapa23DrenagemTests`), sem entrega. A parte
+  (c) **bueiros** está em `docs/wip/etapa23c-bueiros.patch` (cópia do `stash@{0}` "WIP Etapa 22c (bueiros) sem testes", que só
+  existe no contêiner onde foi criado; aplica sem conflito sobre a Etapa 22) – retomar com
+  `git apply --3way docs/wip/etapa23c-bueiros.patch` (ou `git stash pop` no mesmo contêiner), apagar o patch no mesmo commit,
+  trocar "Etapa 22c" por "Etapa 23c" nos comentários e escrever os testes; depois (d) rede gerada ao longo da via. Detalhes:
+  (c) bueiros circular ou celular, células, n, capacidade a seção plena, contam como travessia no talvegue do V13
+  (`DrenagemDoModelo.TalveguesSemTravessia`); (d) bocas nos pontos baixos do greide e pelo espaçamento informado, PVs,
+  trechos pela declividade mínima e recobrimento.
+- **Interseções, com o retorno do usuário:** o que ainda estiver errado nas cenas (`tools/Cenas`) e no Revit (K36); a
+  travessia no meio da quadra da imagem 2 (canteiro e ciclofaixa cortados, rampa elevada); os parâmetros por ramo que hoje são
+  constantes do gerador (`docs/ANALISE_GERAL.md`, caminho B).
+
+### Ver as interseções sem o Revit (`tools/Cenas`)
+
+```bash
+dotnet build tools/Cenas -c Release
+dotnet run -c Release --no-build --project tools/Cenas -- <pasta> [cenas]   # sem nomes: todas as cenas
+```
+
+Cenas: `t-canteiro-ciclofaixa` (e `-zoom`), `t-canteiro-largo`, `cruz-canteiro-ciclofaixa`, `cruz-duas-avenidas`,
+`rotatoria-calcadas`, `rotatoria-calcadas-sem-secao`, `rotatoria-largura-unica`, `rotatoria-via-passante`, e os casos da
+matriz dos testes `m-<tipo>-<a>-<b>-<ângulo>[~x0~y0~x1~y1]` (ex.: `m-T-canteiroLargo-coletora-60`). Cada cena gera um SVG em
+escala e um relatório (avisos, pontas agudas "ponta de N°"); `CENAS_PONTO="x;y;r"` lista as peças perto de um ponto e
+`CENAS_TODOS=1` lista todas.
 
 ## Próxima tarefa (antes do plano 2)
 

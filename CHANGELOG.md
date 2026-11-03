@@ -3,6 +3,63 @@
 Formato: data, etapa, mudanças, testes. O histórico anterior a 2026-10-19 está no `git log`: 118 commits, rodadas A a LX,
 cada uma com seus testes.
 
+## 2026-11-03 – Etapa 22: interseções e rotatórias – canteiro, ciclofaixa, travessia e calçada de cada ramo (versão 2.27.0)
+
+Prioridade do usuário (D-040): a drenagem completa foi pausada (passou a ser a Etapa 23) para corrigir os defeitos das
+interseções vistos no projeto real (imagem 1 – o T gerado pelo plugin – e imagem 2 – o mesmo T feito à mão) e as calçadas das
+rotatórias. Base técnica: DNIT IPR-718 (*Manual de Projeto de Interseções*, 2005), cap. 8, enviado pelo usuário. Entrega:
+`Releases/Etapa22` (não executada no Revit 2027).
+
+### Interseções – canteiro central (DNIT, cap. 8, Tabelas 62 e 63)
+- **Abertura pela curva de giro** (padrão): o nariz fica fora do arco do raio de controle (12 m VP, 15 m CO, 23 m O – Tabela
+  62) tangente à face do canteiro e ao eixo da via transversal (ou à face do canteiro dela). Canteiro de 3 m com R = 12 m:
+  ponta a 10,5 m do eixo (abertura 21,0 m, como a Tabela 63); canteiro de 6 m: ogiva, abertura 12,0 m; duas avenidas: 10,0 m
+  (o arco passa pela face do canteiro da outra). Abertura nunca menor que 12 m nem que a via transversal. **Antes** o
+  canteiro ia até a boca da transversal + 1 m (ponta a ~4,8 m) e entrava no caminho de quem converte à esquerda.
+- **Nariz** automático (semicircular até 3 m de canteiro, ogiva acima), semicircular ou ogiva.
+- **Travessia atrás do nariz** (padrão): a faixa de pedestres recua até o centro do semicírculo (até 5 m – padrão do plugin),
+  o nariz fica à frente dela e a faixa atravessa o canteiro no nível da pista, com piso tátil (como a imagem 2).
+- Pista e canteiro refeitos em volta do nariz até o fim dele, também além da área do nó (ramo oblíquo); sobra do nariz mais
+  fina que 0,70 m à frente da faixa vira pista; emenda do nariz com o resto do canteiro sem fresta.
+- **Opções** na janela da interseção, bloco *Canteiro central*: abertura (*curva de giro* ou *na boca da outra via*, a regra
+  de antes), raio de controle, forma do nariz e travessia atrás do nariz. Interseções salvas passam à regra nova na próxima
+  atualização.
+
+### Interseções – ciclofaixa
+- O fundo, as linhas, os símbolos e as setas da ciclofaixa vão **até a faixa de pedestres** (antes paravam na retenção e
+  sobravam ~2,4 m sem ciclofaixa); o tracejado da zona de conflito começa logo depois da faixa.
+
+### Rotatórias – calçada de cada ramo
+- A calçada em volta tem, em cada boca, a **largura (e a composição) daquele lado da via que chega**, e passa aos poucos de uma
+  via à outra pela curva – qualquer número de ramos, cada lado com a sua largura. **Antes** era uma largura só (a do perfil
+  mais largo ou a geral) e sobrava um degrau na emenda com cada via.
+- Onde a calçada da via não comporta a rampa e a faixa livre de 1,20 m (NBR 9050), a calçada **alarga junto à rampa** e volta
+  à largura da via antes da boca, com aviso; a travessia continua a cerca de um veículo da entrada. Lado sem calçada não
+  recebe rampa.
+- Calçada variável pelo deslocamento verdadeiro (união de círculos ao longo do meio-fio): sem pontas nas curvas fechadas; a
+  composição (grama, passeio) passa de um perfil ao outro; a sarjeta segue o meio-fio e as ilhas como antes.
+- **Opções:** *Calçada de cada ramo* (desligada = largura única, como até a 2.26) e, em ramos sem via, a calçada de cada lado.
+  O serviço do Revit lê os dois lados de cada via ligada (`IntersectionService.Refresh`).
+
+### Drenagem (Etapa 23, partes a e b – já no código desde `262f6e1`, entregues nesta DLL)
+- Catálogo de tubos editável no Projeto de Drenagem (material, classe, DN, parede, peça, junta, n), tubo por trecho, peças,
+  juntas, conexões e vala no quantitativo e no memorial; linha piezométrica e de energia de jusante para montante no perfil da
+  rede. Os bueiros (parte c) continuam em desenvolvimento.
+
+### Ferramenta de desenvolvimento
+- `tools/Cenas`: desenha em planta (SVG) as cenas do núcleo – o T da imagem 1, cruzamentos, rotatórias e qualquer caso da
+  matriz de testes (`m-<tipo>-<a>-<b>-<ângulo>`) – para ver a geometria sem o Revit. Fora do CI e do plugin.
+
+### Testes
+- `Etapa22IntersecoesTests` (12): Tabela 63 (10,5 m, ogiva 6,0 m, duas avenidas 10,0 m, abertura ≥ 12 m), travessia atrás do
+  nariz com refúgio, regra antiga como opção, JSON das opções, ciclofaixa até a faixa, calçada de cada lado nas bocas (com e
+  sem composição), passagem sem degraus, composição sem pisos sobrepostos, largura única e ramos sem via, lados trocados da via
+  passante, alargamento junto à rampa com a travessia no lugar.
+- Ajustados para a regra nova (o comportamento antigo segue testado pela opção): `AB2IntersectionTests` (abertura na boca),
+  `AI1CornerTipTests` (com o nariz, a posição da faixa vem dele; retenção, PARE e R-1 seguem conferidos).
+- `Etapa22DrenagemTests` → `Etapa23DrenagemTests` (renumeração).
+- NÃO EXECUTADO NO REVIT (K36).
+
 ## 2026-10-28 – Etapa 21: corpos d'água – rio, córrego, lago e lagoa (versão 2.26.0)
 
 Item 11 do [plano 2](docs/PLANO_DE_ACAO_2.md) (D-039). Entrega: `Releases/Etapa21` (não executada no Revit 2027).
