@@ -31,6 +31,11 @@ public sealed class RoundaboutLayout
     public List<Polygon2> Sidewalk { get; } = new();
     /// <summary>Faixa de serviço da calçada (composição das vias) – subconjunto de Sidewalk.</summary>
     public List<Polygon2> SidewalkService { get; } = new();
+    /// <summary>
+    /// Trechos do meio-fio externo entre ramos vizinhos, com a largura da calçada de cada ponto (calçada por ramo); vazio
+    /// quando a calçada tem a mesma largura em volta toda.
+    /// </summary>
+    public List<RoundaboutWalkChain> WalkChains { get; } = new();
     /// <summary>Sarjeta junto ao meio-fio.</summary>
     public List<Polygon2> Gutter { get; } = new();
     public List<Polygon2> SplitterCurb { get; } = new();
@@ -70,7 +75,7 @@ public sealed class RoundaboutLayout
 /// elíptica, faixa galgável, pista giratória, ramos com raios de entrada e saída distintos, ilhas separadoras e
 /// sinalização.
 /// </summary>
-public static class RoundaboutGenerator
+public static partial class RoundaboutGenerator
 {
     private static Polygon2 Disk(Vec2 c, double r) => new(CurveTools.Circle(c, r, Math.Max(0.005, r * 0.0012)));
     private static Vec2 Dir(double deg) => new(Math.Cos(deg * Math.PI / 180), Math.Sin(deg * Math.PI / 180));
@@ -264,7 +269,7 @@ public static class RoundaboutGenerator
             {
                 // Zona efetiva: o miolo (anel + ilhas separadoras + transição) e a área dos by-pass com a calçada em volta.
                 // Fora dela as vias continuam com a sua seção (canteiro, estacionamento, faixas).
-                var sideW = Math.Max(0, d.SidewalkWidth) + cw + 0.5;
+                var sideW = MaxWalk(d) + cw + 0.5;
                 var coreZone = Grow(outer, baseLeg);
                 var byArea = PolygonOps.Offset(PolygonOps.Difference(full, new[] { coreZone }).Where(p => !LegStripOnly(p, d, c)).ToList(), sideW, true);
                 var tight = PolygonOps.Union(new[] { coreZone }.Concat(byArea)).OrderByDescending(p => p.Area).ToList();
@@ -322,7 +327,7 @@ public static class RoundaboutGenerator
         // Zonas de recorte da pintura das vias: completa = a zona inteira; anel/ilha = até depois da travessia e da ilha
         // separadora (linhas não cruzam a faixa de pedestres nem a ilha), estacionamento 5 m antes da travessia.
         var reach = 0.0;
-        var withRamps = complete && d.Legs.Any(l => l.Sidewalk > 0.5) || complete && d.SidewalkWidth > 0.5;
+        var withRamps = complete && d.Legs.Any(l => HasWalk(d, l)) || complete && !d.SidewalkPerLeg && d.SidewalkWidth > 0.5;
         foreach (var g in L.Legs)
         {
             var rou = L.ToOuter(c, g.Dir);
@@ -330,7 +335,7 @@ public static class RoundaboutGenerator
             var cwOn = g.Leg.Crosswalk ?? d.Crosswalks;
             // Travessia com rampas: recuada (a partir da distância pedida) até as rampas ficarem inteiras no trecho reto do
             // meio-fio, fora da curva de entrada/saída do ramo.
-            if (cwOn && withRamps && (g.Leg.Sidewalk > 0.5 || d.SidewalkWidth > 0.5))
+            if (cwOn && withRamps && HasWalk(d, g.Leg))
             {
                 var fit = FitRamps(d, g, c, full, g.CrosswalkT);
                 g.CrosswalkT = fit.T;
@@ -412,7 +417,16 @@ public static class RoundaboutGenerator
             var sw = Math.Max(0, d.SidewalkWidth);
             var curb = PolygonOps.Intersect(PolygonOps.Difference(PolygonOps.Offset(full, cw, true), full), zone);
             L.Curb.AddRange(curb);
-            if (sw > 0.05)
+            // Calçada de cada ramo: entre dois ramos vizinhos ela passa, pela curva, da largura de um lado da via do primeiro
+            // à do lado da via do segundo (cada via com a sua; antes era uma largura só em volta toda e sobrava um degrau na
+            // emenda com cada via). Com todas iguais, a faixa constante de antes.
+            var chains = d.SidewalkPerLeg ? WalkChains(d, L, full, c, RampNeeds(d, L, c, cw)) : new List<RoundaboutWalkChain>();
+            if (chains.Count > 0 && chains.Any(ch => Math.Abs(ch.WidthFrom - sw) > 0.005 || Math.Abs(ch.WidthTo - sw) > 0.005))
+            {
+                L.WalkChains.AddRange(chains);
+                L.Sidewalk.AddRange(VariableWalk(chains, full, cw, zone));
+            }
+            else if (sw > 0.05)
                 L.Sidewalk.AddRange(PolygonOps.Intersect(PolygonOps.Difference(PolygonOps.Offset(full, cw + sw, true), PolygonOps.Offset(full, cw, true)), zone));
             if (d.ServiceStripWidth > 0.05) L.SidewalkService.AddRange(Automation.SectionMatch.ServiceBand(full, L.Sidewalk, cw, d.ServiceStripWidth));
             if (d.GutterWidth > 0.05) L.Gutter.AddRange(Automation.SectionMatch.GutterBand(full, curb, d.GutterWidth));
@@ -437,6 +451,8 @@ public static class RoundaboutGenerator
     /// <summary>Rampa das travessias da rotatória (NBR 9050, recorte retangular).</summary>
     internal static RampDefinition RampOf(RoundaboutDefinition d, TipoRampa type = TipoRampa.RebaixamentoComAbas) =>
         new() { Type = type, Height = d.CurbHeight, SquareCut = true };
+
+
 
     /// <summary>Ponto do meio-fio na ponta da travessia e o sentido da subida, perpendicular ao meio-fio ali (entrada alargada).</summary>
     private static (Vec2 Curb, Vec2 Up) RampFrame(IReadOnlyList<Polygon2> full, RoundaboutLegGeometry g, Vec2 c, double t, double sgn)
@@ -463,9 +479,8 @@ public static class RoundaboutGenerator
         if (full.Count == 0) return (t0, TipoRampa.RebaixamentoComAbas, null, null, true);
         foreach (var type in new[] { TipoRampa.RebaixamentoComAbas, TipoRampa.RebaixamentoSemAbas })
         {
-            var rp = RampOf(d, type);
-            var (_, len, _) = RampGenerator.Dimensions(rp);
-            var ext = IntersectionGenerator.RampHalfExtent(rp);
+            // Só os lados com calçada recebem rampa (calçada de cada ramo).
+            var sides = new[] { 1, -1 }.Where(sg => HasWalk(d, g.Leg, sg)).Select(sg => (Sg: sg, Rp: RampOf(d, type))).ToList();
             // A travessia fica a cerca de um veículo da entrada: as rampas só a afastam até MaxCrosswalkShift; além disso
             // ficam sem abas, perpendiculares ao meio-fio curvo, na posição pedida (com aviso).
             for (var t = t0; t <= t0 + MaxCrosswalkShift + 1e-9; t += 0.25)
@@ -473,8 +488,11 @@ public static class RoundaboutGenerator
                 var hi = RampFrame(full, g, c, t, 1);
                 var lo = RampFrame(full, g, c, t, -1);
                 var ok = true;
-                foreach (var (curb, up) in new[] { hi, lo })
+                foreach (var (sg, rp) in sides)
                 {
+                    var (curb, up) = sg > 0 ? hi : lo;
+                    var (_, len, _) = RampGenerator.Dimensions(rp);
+                    var ext = IntersectionGenerator.RampHalfExtent(rp);
                     var side = up.PerpLeft;
                     var body = new Polygon2(new[] { curb - side * ext + up * 0.01, curb + side * ext + up * 0.01, curb + side * ext + up * len, curb - side * ext + up * len });
                     if (PolygonOps.TotalArea(PolygonOps.Intersect(new[] { body }, full)) > 1e-4) { ok = false; break; }
@@ -622,11 +640,13 @@ public static class RoundaboutGenerator
         Raised(L.SplitterCurb, MarkingColor.Concreto, d.CurbHeight, 0, SectionComponent.MeioFio);
         Raised(L.SplitterCore, MarkingColor.Concreto, d.CurbHeight, 0, SectionComponent.Ilha);
         var profile = d.MatchRoadSection ? d.EdgeProfile : new List<Automation.EdgeBand>();
-        if (profile.Count > 0 && L.Curb.Count > 0)
+        // Composição de cada ramo: os perfis de cada lado das vias, passando de um ao outro entre os ramos.
+        var perLeg = d.MatchRoadSection && d.SidewalkPerLeg && L.WalkChains.Count > 0 && d.Legs.Any(l => l.EdgeLeft.Count + l.EdgeRight.Count > 0);
+        if ((profile.Count > 0 || perLeg) && L.Curb.Count > 0)
         {
             // Mesmos elementos das vias ligadas (meio-fio, sarjeta, faixa gramada, passeio) em volta da rotatória.
             var region = PolygonOps.Union(L.Curb.Concat(L.Sidewalk));
-            var (pieces, inside) = Automation.EdgeProfile.Apply(L.Pavement, region, profile, new[] { L.Zone });
+            var (pieces, inside) = perLeg ? ApplyPerLeg(d, L, region, profile) : Automation.EdgeProfile.Apply(L.Pavement, region, profile, new[] { L.Zone });
             IntersectionGenerator.AddPieces(geo, pieces);
             if (inside.Count > 0)
             {
@@ -976,9 +996,11 @@ public static class RoundaboutGenerator
                     if (DetailGenerator.SegmentIntervals(isl!, a, b).Any())
                         foreach (var z0 in gutterAtIsland && gutter > 0.01 ? PolygonOps.Offset(new[] { isl! }, gutter + 0.02, true) : new List<Polygon2> { isl! })
                             cwk.Exclusions.Add(new ExclusionZone { SourceId = d.Id, Points = z0.Outer.ToList() });
-                if ((leg.Sidewalk > 0.5 || d.SidewalkWidth > 0.5) && d.Integration == IntegracaoRotatoria.Completa)
+                if (d.Integration == IntegracaoRotatoria.Completa)
                     foreach (var (sgn, o, frame) in new[] { (1.0, hi, g.RampHi), (-1.0, lo, g.RampLo) })
                     {
+                        // Rampa só do lado que tem calçada (a via de um lado sem calçada não recebe rampa).
+                        if (!HasWalk(d, leg, (int)sgn)) continue;
                         // Ajustada ao meio-fio no arranjo (perpendicular a ele, com ou sem abas); sem ajuste, perpendicular ao ramo.
                         var (curb, up) = frame ?? (g.At(c, tc, o), g.Left * sgn);
                         var ramp = RampOf(d, g.RampType);
@@ -1039,6 +1061,10 @@ public static class RoundaboutGenerator
                     AngleDeg = Math.Atan2(v.Y, v.X) * 180 / Math.PI,
                     Width = r.Def.RightWidth + r.Def.LeftWidth,
                     Sidewalk = Math.Max(r.Def.RightSidewalk, r.Def.LeftSidewalk),
+                    // Cada lado do ramo com a calçada daquele lado da via (o ramo pode sair contra o sentido do eixo).
+                    SidewalkLeft = sign > 0 ? r.Def.LeftSidewalk : r.Def.RightSidewalk,
+                    SidewalkRight = sign > 0 ? r.Def.RightSidewalk : r.Def.LeftSidewalk,
+                    RoadSign = sign,
                     RoadId = r.Def.Id,
                     GroupId = r.Def.GroupId,
                     TwoWay = r.Def.TwoWay,

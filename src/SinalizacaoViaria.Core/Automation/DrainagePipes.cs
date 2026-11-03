@@ -5,7 +5,7 @@ using SinalizacaoViaria.Core.Geometry;
 namespace SinalizacaoViaria.Core.Automation;
 
 /// <summary>
-/// Tubo do catálogo do Projeto de Drenagem (Etapa 22): material, classe, diâmetro interno, parede, comprimento da peça, junta e
+/// Tubo do catálogo do Projeto de Drenagem (Etapa 23): material, classe, diâmetro interno, parede, comprimento da peça, junta e
 /// rugosidade – os valores e a fonte são os do usuário; sem eles, os do padrão do plugin (<see cref="CatalogoTubos.Padrao"/>).
 /// </summary>
 public sealed class TuboCatalogo
@@ -47,7 +47,7 @@ public sealed record TuboTrecho(string Id, string Nome, string Montante, string 
     double ExtensaoTubo, int Pecas, int Juntas, int Conexoes, ValaTrecho Vala);
 
 /// <summary>
-/// Catálogo de tubos, peças e valas (Etapa 22, item 6). O tubo de cada trecho é o do código gravado nele, ou o do catálogo com
+/// Catálogo de tubos, peças e valas (Etapa 23, item 6). O tubo de cada trecho é o do código gravado nele, ou o do catálogo com
 /// o mesmo diâmetro, ou um tubo de concreto do padrão do plugin. As peças contam o tubo entre as paredes das caixas; a extensão
 /// do quantitativo continua entre os centros dos dispositivos (como na planilha do memorial modelo). A vala tem a largura de
 /// <see cref="ProjetoDrenagem.LarguraValaDiametros"/> diâmetros (no mínimo o diâmetro externo), vai até o fundo externo do tubo
@@ -230,7 +230,7 @@ public sealed class ResultadoPiezometrica
 }
 
 /// <summary>
-/// Linha piezométrica e de energia da rede (Etapa 22), de jusante para montante, com as vazões do método racional
+/// Linha piezométrica e de energia da rede (Etapa 23), de jusante para montante, com as vazões do método racional
 /// (<see cref="DrainageHydraulics.Calcular"/>). No lançamento, o nível d'água informado do corpo d'água a menos de
 /// <see cref="Model.ModelValidator.DistanciaLancamento"/> m ou, sem ele, a saída livre (a lâmina normal do último trecho). Em cada
 /// trecho: lâmina normal por Manning na seção circular parcialmente cheia; se o nível de jusante passa da geratriz superior, ou

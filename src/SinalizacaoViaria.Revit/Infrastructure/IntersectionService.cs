@@ -422,12 +422,17 @@ public sealed class IntersectionService
             if (linked.Count > 0) rb.Z = linked.Average(r => RoadZ(r, rb.Center));
         }
         rb.EdgeProfile = new List<EdgeBand>();
+        foreach (var l in rb.Legs) l.SetEdgeSides(null);
         if (rb.MatchRoadSection)
         {
             // Os mesmos elementos das vias ligadas (meio-fio, sarjeta, grama, passeio) em volta da rotatória.
             var ids = rb.Legs.Select(l => l.RoadId).Where(i => i != null).ToHashSet();
             var pavs = MarkingStorage.Definitions<RoadPavementDefinition>(_doc).Where(p => ids.Contains(p.Id)).ToList();
             rb.EdgeProfile = EdgeProfile.Best(pavs.Select(ProfileOf));
+            // E a composição de cada lado de cada ramo (a calçada em volta passa de uma via à outra entre os ramos).
+            var sides = pavs.GroupBy(p => p.Id).ToDictionary(g => g.Key, g => SidesOf(g.First()));
+            foreach (var l in rb.Legs)
+                if (l.RoadId != null && sides.TryGetValue(l.RoadId, out var sp)) l.SetEdgeSides(sp);
             if (rb.EdgeProfile.Count > 0) rb.SidewalkWidth = Math.Max(0, EdgeProfile.OuterWidth(rb.EdgeProfile) - rb.CurbWidth);
             else if (SectionMatch.From(pavs, RoadSetup.CurbWidth) is { } sec)
             {

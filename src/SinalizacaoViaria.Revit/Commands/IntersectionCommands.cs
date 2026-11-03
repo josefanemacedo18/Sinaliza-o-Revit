@@ -178,8 +178,25 @@ internal static class IntersectionForms
          .Number("Comprimento de armazenamento (m)", () => d.PocketLength, v => d.PocketLength = v, 5, 120)
          .Number("Comprimento do teiper (m)", () => d.PocketTaper, v => d.PocketTaper = v, 5, 80)
          .Number("Largura do bolsão (m)", () => d.PocketWidth, v => d.PocketWidth = v, 2.5, 5);
-        w.Section("Canteiro central", "Nariz arredondado junto à outra via. A travessia de pedestres sobre o canteiro tem sempre piso tátil de alerta.")
+        w.Section("Canteiro central", "O canteiro abre pela curva de giro à esquerda (DNIT IPR-718, cap. 8, Tabelas 62 e 63), com o nariz à frente da travessia. A travessia de pedestres sobre o canteiro tem sempre piso tátil de alerta.")
          .Check("Canteiro contínuo (não abre para as vias sem canteiro – só conversões à direita)", () => d.MedianContinuous, v => d.MedianContinuous = v)
+         .Choice("Abertura do canteiro", new[]
+             {
+                 ("Pela curva de giro – nariz recuado (DNIT IPR-718, Tabelas 62 e 63)", AberturaCanteiro.CurvaDeGiro),
+                 ("Na boca da outra via (como até a versão 2.26)", AberturaCanteiro.BocaDaVia),
+             }, () => d.MedianOpening, v => d.MedianOpening = v,
+             "Curva de giro: abertura de 2R − L com nariz semicircular (L = largura do canteiro), nunca menos de 12 m. Boca da via: o canteiro vai até a boca da outra via + 1 m.")
+         .If(() => d.MedianOpening == AberturaCanteiro.CurvaDeGiro, x => x
+             .Number("Raio de controle da conversão à esquerda (m)", () => d.MedianControlRadius, v => d.MedianControlRadius = v, 6, 40, "0.0",
+                 "DNIT IPR-718, Tabela 62: 12 m para veículo de passeio (VP), 15 m para caminhão/ônibus (CO), 23 m para semirreboque (O).")
+             .Choice("Forma do nariz", new[]
+                 {
+                     ("Automática – semicircular até 3,00 m de canteiro, ogiva acima (DNIT)", FormaNarizCanteiro.Automatica),
+                     ("Semicircular", FormaNarizCanteiro.Semicircular),
+                     ("Ogiva", FormaNarizCanteiro.Ogiva),
+                 }, () => d.MedianNose, v => d.MedianNose = v)
+             .Check("Travessia atrás do nariz (o nariz fica inteiro à frente da faixa de pedestres)", () => d.CrosswalkBehindNose, v => d.CrosswalkBehindNose = v,
+                 "A travessia recua até o centro do nariz semicircular (no máximo 5 m – padrão do plugin). Desligado: fica onde a esquina e as rampas a põem."))
          .Choice("Travessia sobre o canteiro", new[]
              {
                  ("Automática (rampas e patamar se o canteiro comportar, senão no nível da pista)", SinalizacaoViaria.Core.Automation.TipoTravessiaCanteiro.Automatica),
@@ -587,7 +604,8 @@ internal static class RoundaboutForms
          .Check("By-pass: conversão livre à direita em todos os ramos", () => d.Bypass, v => d.Bypass = v)
          .Number("Largura da faixa de by-pass (m)", () => d.BypassWidth, v => d.BypassWidth = v, 3, 8)
          .Number("Raio do by-pass (m)", () => d.BypassRadius, v => d.BypassRadius = v, 10, 150)
-         .Number("Calçada em volta (m)", () => d.SidewalkWidth, v => d.SidewalkWidth = v, 0, 20)
+         .Number("Calçada em volta (m)", () => d.SidewalkWidth, v => d.SidewalkWidth = v, 0, 20,
+             tooltip: "Sem o meio-fio. Com \"Calçada de cada ramo\" ligada, vale só para os ramos sem via; as vias usam a calçada delas.")
          .Choice("Pavimento", new[] { ("Asfalto", TipoPavimento.Asfalto), ("Bloquete", TipoPavimento.Bloquete), ("Concreto", TipoPavimento.Concreto), ("Terra", TipoPavimento.Terra), ("Nenhum", TipoPavimento.Nenhum) },
              () => d.Pavement, v => d.Pavement = v);
         if (!hasRoads)
@@ -599,6 +617,8 @@ internal static class RoundaboutForms
                  d.Legs = RoundaboutGenerator.MergeLegSettings(d.Legs, fresh);
              }, 3, 40);
         w.Section("Calçadas e meio-fio em volta")
+         .Check("Calçada de cada ramo: a largura de cada lado da via que chega, mudando aos poucos na curva entre ramos", () => d.SidewalkPerLeg, v => d.SidewalkPerLeg = v,
+             "Cada via tem a sua calçada e a rotatória se adapta a elas. Desligado: uma largura só em volta toda (\"Calçada em volta\"), como antes da versão 2.27.")
          .Check("Seguir a composição das calçadas das vias ligadas (faixa de serviço gramada e sarjeta)", () => d.MatchRoadSection, v => d.MatchRoadSection = v,
              "Lê a seção das vias que chegam à rotatória e continua a faixa de serviço e a sarjeta pela calçada da rotatória. Desligado: use os campos abaixo.")
          .Number("Faixa de serviço junto ao meio-fio (m, 0 = nenhuma)", () => d.ServiceStripWidth, v => d.ServiceStripWidth = v, 0, 5)
@@ -636,6 +656,10 @@ internal static class RoundaboutForms
              .Choice("Ramo", d.Legs.Select((l, i) => ($"{l.Label} – pista {UiHelpers.F(l.Width)} m{(l.TwoWay ? "" : ", mão única")}", i)).ToList(), () => legIdx, v => legIdx = v,
                  preset: v => legIdx = v)
              .Number("Largura da pista do ramo (m)", () => Leg().Width, v => Leg().Width = v, 3, 40)
+             .If(() => d.SidewalkPerLeg && Leg().RoadId == null && Leg().GroupId == null, x => x
+                 .Number("Calçada à esquerda de quem sai (m, com o meio-fio)", () => Leg().SidewalkLeft ?? d.SidewalkWidth + d.CurbWidth, v => Leg().SidewalkLeft = v, 0, 20,
+                     tooltip: "Ramo sem via ligada. Nos ramos com via, vale a calçada da própria via.")
+                 .Number("Calçada à direita de quem sai (m, com o meio-fio)", () => Leg().SidewalkRight ?? d.SidewalkWidth + d.CurbWidth, v => Leg().SidewalkRight = v, 0, 20))
              .Check("Mão dupla (ilha pintada amarela; mão única = branca)", () => Leg().TwoWay, v => Leg().TwoWay = v)
              .Choice("Ilha separadora", new[] { ("Padrão da rotatória", IlhaSeparadora.Padrao), ("Física", IlhaSeparadora.Fisica), ("Pintada (zebrado)", IlhaSeparadora.Pintada), ("Nenhuma", IlhaSeparadora.Nenhuma) },
                  () => Leg().Splitter, v => Leg().Splitter = v)

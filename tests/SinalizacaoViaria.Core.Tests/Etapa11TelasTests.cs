@@ -301,7 +301,7 @@ public class Etapa11TelasTests
         Assert.Contains("Manning", hid.Escopo);
         Assert.Contains("Fendrich", hid.Escopo);
         Assert.Contains(hid.Itens, i => i.Criterio == "capacidade" && i.Ids.Contains(t1.Id));
-        // Desde a Etapa 22, a lâmina nos tubos e o remanso saem na linha piezométrica (o T1, acima da capacidade, sob pressão).
+        // Desde a Etapa 23, a lâmina nos tubos e o remanso saem na linha piezométrica (o T1, acima da capacidade, sob pressão).
         Assert.Contains(hid.Notas, n => n.Texto.StartsWith("Linha piezométrica: 1 trecho(s) sob pressão"));
         Assert.Contains(hid.Notas, n => n.Texto.StartsWith("Vazão máxima"));
         // O dimensionamento é o do "Aplicar": o cálculo refeito com os diâmetros calculados, diante do diâmetro do modelo.

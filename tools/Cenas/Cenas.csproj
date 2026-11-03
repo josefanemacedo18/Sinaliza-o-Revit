@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Cenas de interseção desenhadas em planta (SVG) a partir do núcleo, para ver a geometria sem o Revit. Ferramenta de
+       desenvolvimento: fora do CI e do plugin. Uso: dotnet run com -c Release e o projeto tools/Cenas, passando a pasta de saída e, opcionalmente, os nomes das cenas. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/SinalizacaoViaria.Core/SinalizacaoViaria.Core.csproj" />
+  </ItemGroup>
+</Project>

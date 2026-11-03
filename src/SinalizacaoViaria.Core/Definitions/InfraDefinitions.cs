@@ -831,7 +831,7 @@ public sealed class DrainagePipeDefinition : MarkingDefinition
     public double? InvertTo { get; set; }
     /// <summary>Cota de referência das peças (a do dispositivo de montante), m.</summary>
     public double Z { get; set; }
-    /// <summary>Código do tubo no catálogo do Projeto de Drenagem; nulo = o do catálogo com o mesmo diâmetro (Etapa 22).</summary>
+    /// <summary>Código do tubo no catálogo do Projeto de Drenagem; nulo = o do catálogo com o mesmo diâmetro (Etapa 23).</summary>
     public string? Tubo { get; set; }
 
     public override string KindName => "Trecho de drenagem";

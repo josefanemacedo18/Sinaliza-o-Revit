@@ -170,8 +170,10 @@ public static class EdgeProfile
     /// pista): as larguras variam continuamente de A para B. Faixas externas saem para fora; as internas (sarjeta) entram
     /// na pista.
     /// </summary>
+    /// <param name="winding">Faixas pela regra do enrolamento (<see cref="SweptWinding"/>): sem as pontas que os quadriláteros deixam
+    /// onde a linha curva para dentro com raio menor que o afastamento (usado na rotatória).</param>
     public static List<(Polygon2 Shape, EdgeBand Attr, bool Inside)> AlongChain(IReadOnlyList<Vec2> chain, IReadOnlyList<Vec2> normals, IReadOnlyList<double> weights,
-        IReadOnlyList<AlignedBand> bands)
+        IReadOnlyList<AlignedBand> bands, bool winding = false)
     {
         var res = new List<(Polygon2, EdgeBand, bool)>();
         if (chain.Count < 2) return res;
@@ -189,7 +191,8 @@ public static class EdgeProfile
                 // Faixa = área varrida até a borda externa menos a varrida até a interna. Num raio menor que o afastamento
                 // (esquina aguda com raio reduzido) a borda externa dá uma volta sobre si mesma: o anel "interna → externa"
                 // se cruzava e as faixas (meio-fio, grama, passeio) se sobrepunham.
-                var band = d0.Max() < 1e-6 ? Swept(chain, normals, acc, sg) : PolygonOps.Difference(Swept(chain, normals, acc, sg), Swept(chain, normals, d0, sg));
+                List<Polygon2> Sw(IReadOnlyList<double> dd) => winding ? SweptWinding(chain, normals, dd, sg) : Swept(chain, normals, dd, sg);
+                var band = d0.Max() < 1e-6 ? Sw(acc) : PolygonOps.Difference(Sw(acc), Sw(d0));
                 foreach (var pg in band.Where(pg => pg.Area > 1e-3))
                     res.Add((pg, bd.Attr, inside));
             }
@@ -198,7 +201,7 @@ public static class EdgeProfile
     }
 
     /// <summary>Área entre a linha e o afastamento <paramref name="d"/> (por ponto) do lado <paramref name="sg"/> da normal.</summary>
-    private static List<Polygon2> Swept(IReadOnlyList<Vec2> chain, IReadOnlyList<Vec2> normals, IReadOnlyList<double> d, int sg)
+    internal static List<Polygon2> Swept(IReadOnlyList<Vec2> chain, IReadOnlyList<Vec2> normals, IReadOnlyList<double> d, int sg)
     {
         var quads = new List<Polygon2>();
         for (int i = 0; i + 1 < chain.Count; i++)
@@ -210,6 +213,20 @@ public static class EdgeProfile
             if (Math.Abs(Polygon2.SignedArea(q)) > 1e-8) quads.Add(new Polygon2(q));
         }
         return PolygonOps.Union(quads);
+    }
+
+    /// <summary>
+    /// Área entre a linha e o afastamento <paramref name="d"/> (por ponto) do lado <paramref name="sg"/>, resolvida pelo enrolamento:
+    /// a linha e o afastamento formam um anel só; onde o afastamento se cruza (curva para dentro com raio menor que ele), o laço
+    /// invertido fica de fora (regra positiva) – a área é a do deslocamento verdadeiro, sem pontas.
+    /// </summary>
+    internal static List<Polygon2> SweptWinding(IReadOnlyList<Vec2> chain, IReadOnlyList<Vec2> normals, IReadOnlyList<double> d, int sg)
+    {
+        if (chain.Count < 2 || d.All(x => x < 1e-6)) return new();
+        var ring = new List<Vec2>(chain);
+        for (int i = chain.Count - 1; i >= 0; i--) ring.Add(chain[i] + normals[i] * (sg * d[i]));
+        if (Polygon2.SignedArea(ring) < 0) ring.Reverse();
+        return PolygonOps.FromContours(new[] { ring }, Clipper2Lib.FillRule.Positive).Where(p => p.Area > 1e-4).ToList();
     }
 
     /// <summary>Alinhamento (maior subsequência comum pelo código) de duas listas de faixas.</summary>

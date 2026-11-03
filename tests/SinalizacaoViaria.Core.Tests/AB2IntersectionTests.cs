@@ -310,8 +310,11 @@ public class AB2IntersectionTests
     [Fact]
     public void Canteiro_abre_so_na_boca_da_outra_via_ou_fica_continuo()
     {
-        // T: avenida com canteiro (principal) × local sem canteiro a 90°.
-        var open = AB2Matrix.Make("T", "canteiro", "local", 90);
+        // T: avenida com canteiro (principal) × local sem canteiro a 90°. Regra antiga (opção "na boca da outra via"); a regra
+        // padrão desde a 2.27 (curva de giro, DNIT) está nos testes da Etapa 22.
+        var boca = AB2Matrix.Template();
+        boca.MedianOpening = AberturaCanteiro.BocaDaVia;
+        var open = AB2Matrix.Make("T", "canteiro", "local", 90, boca);
         var Lo = open.Nodes[0].Layout;
         var stemHalf = Lo.Roads.First(r => r.Def.Gaps.All(g => !g.Median)).Def.RightWidth;
         var med = PolygonOps.Union(Lo.Obstacles);

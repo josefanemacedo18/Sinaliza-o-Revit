@@ -34,9 +34,9 @@ public sealed record TelaRedeDrenagem(string Resumo, IReadOnlyList<SecaoRede> Se
     IReadOnlyList<DispositivoRede> Dispositivos, IReadOnlyList<LinhaPerfilRede> Perfil, IReadOnlyList<LinhaDimensionamento> Dimensionamento,
     IReadOnlyList<ProblemaRede> Problemas, ResultadoDrenagem Hidraulica, IReadOnlyList<CaptacaoLida> Captacoes)
 {
-    /// <summary>Tubo do catálogo, peças, juntas e vala de cada trecho (Etapa 22).</summary>
+    /// <summary>Tubo do catálogo, peças, juntas e vala de cada trecho (Etapa 23).</summary>
     public IReadOnlyList<TuboTrecho> Tubos { get; init; } = Array.Empty<TuboTrecho>();
-    /// <summary>Linha piezométrica e de energia (Etapa 22); não calculada sem a equação de chuva.</summary>
+    /// <summary>Linha piezométrica e de energia (Etapa 23); não calculada sem a equação de chuva.</summary>
     public ResultadoPiezometrica Piezometrica { get; init; } = new();
     public SecaoRede Secao(CategoriaRede c) => Secoes.First(s => s.Categoria == c);
     /// <summary>Trechos cujo diâmetro do modelo difere do calculado (o que "Aplicar os diâmetros calculados" muda).</summary>
@@ -307,7 +307,7 @@ public static class RedeDrenagemTela
                 var semArea = defs.OfType<DrainageDefinition>().Count(d => d.IsInlet && !d.IsLinear && d.AreaContribuicao <= 0);
                 notas.Add(L(NivelSituacao.Informacao, $"{hid.Captacoes.Count} captação(ões) verificada(s)" +
                     (semArea > 0 ? $"; {semArea} sem área de contribuição não verificada(s) (Ler do Modelo preenche a área)." : ".")));
-                // Linha piezométrica (Etapa 22): de jusante para montante, com o nível do lançamento.
+                // Linha piezométrica (Etapa 23): de jusante para montante, com o nível do lançamento.
                 if (hgl.Trechos.Count > 0)
                 {
                     var pressao = hgl.Trechos.Count(t => t.Afogado);

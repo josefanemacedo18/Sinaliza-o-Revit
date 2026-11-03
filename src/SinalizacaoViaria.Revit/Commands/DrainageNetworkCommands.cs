@@ -28,7 +28,7 @@ internal static class DrainageNetworkForms
     {
         var w = new FormWindow(edit ? "Editar trecho de rede" : "Trecho de rede", "Trecho de rede de drenagem", Hint, null, null, false,
             edit ? "Aplicar" : "Escolher os dispositivos", 640, edit ? 500 : 380);
-        // Tubo do catálogo do Projeto de Drenagem (Etapa 22): escolher um traz o diâmetro dele; "pelo diâmetro" usa o do catálogo com o mesmo DN.
+        // Tubo do catálogo do Projeto de Drenagem (Etapa 23): escolher um traz o diâmetro dele; "pelo diâmetro" usa o do catálogo com o mesmo DN.
         var catalogo = CatalogoTubos.Lista(projeto);
         var opcoes = new List<(string, string)> { ("Pelo diâmetro (o tubo do catálogo com o mesmo DN)", "") };
         opcoes.AddRange(catalogo.Select(t => ($"{t.Codigo} – {t.Nome}", t.Codigo)));
@@ -153,7 +153,7 @@ internal static class DrainageNetworkForms
          .Number("Talude das paredes da vala (H : 1 V; 0 = verticais)", () => p.TaludeVala, v => p.TaludeVala = v, 0, 5, "0.##",
              "Padrão do plugin: paredes verticais, escoradas acima da profundidade de escoramento. Com talude, a seção cresce e não há escoramento.");
 
-        // Catálogo de tubos (Etapa 22): texto editável, uma linha por tubo; vazio = o padrão do plugin (concreto ponta e bolsa, peças de 1 m).
+        // Catálogo de tubos (Etapa 23): texto editável, uma linha por tubo; vazio = o padrão do plugin (concreto ponta e bolsa, peças de 1 m).
         var catalogoTexto = CatalogoTubos.Texto(p.Tubos.Count > 0 ? p.Tubos : CatalogoTubos.Padrao(p));
         var (textoInicial, eraPadrao) = (catalogoTexto, p.Tubos.Count == 0);
         w.Section("Catálogo de tubos", "Uma linha por tubo: " + CatalogoTubos.CabecalhoTexto + ". Vazio = o padrão do plugin (concreto ponta e bolsa, peças de " +

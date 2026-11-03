@@ -200,7 +200,7 @@ public static class FormularioNo
         var terra = new List<EstadoContexto>();
         Terra(terra, d, existente, ligadas, all, registro);
         var dren = new List<EstadoContexto>();
-        var alcance = d.OuterRadius + Math.Max(0, d.SidewalkWidth);
+        var alcance = d.OuterRadius + RoundaboutGenerator.MaxWalk(d);
         Agua(dren, p => p.DistanceTo(d.Center) <= alcance, all, d.Raised);
 
         var verif = Limites("RoundaboutGenerator");

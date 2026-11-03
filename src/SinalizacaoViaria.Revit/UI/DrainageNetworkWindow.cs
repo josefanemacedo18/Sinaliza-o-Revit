@@ -325,7 +325,7 @@ public sealed class DrainageNetworkWindow : Window
             var d = a.Diametro ?? 0;
             _perfil.Children.Add(new Line { X1 = X(a.Distancia), Y1 = Y(f0), X2 = X(b.Distancia), Y2 = Y(f1), Stroke = UiTokens.Accent, StrokeThickness = 2 });
             _perfil.Children.Add(new Line { X1 = X(a.Distancia), Y1 = Y(f0 + d), X2 = X(b.Distancia), Y2 = Y(f1 + d), Stroke = UiTokens.Accent, StrokeThickness = 1 });
-            // Linha piezométrica (nível d'água) e de energia do trecho (Etapa 22).
+            // Linha piezométrica (nível d'água) e de energia do trecho (Etapa 23).
             if (a.Trecho != null && hgl.TryGetValue(a.Trecho, out var hp))
             {
                 _perfil.Children.Add(new Line { X1 = X(a.Distancia), Y1 = Y(hp.NivelMontante), X2 = X(b.Distancia), Y2 = Y(hp.NivelJusante), Stroke = UiTokens.Success,

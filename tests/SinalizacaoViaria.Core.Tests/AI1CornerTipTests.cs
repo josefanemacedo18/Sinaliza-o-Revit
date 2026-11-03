@@ -17,7 +17,8 @@ public class AI1CornerTipTests
 {
     /// <summary>Medidas de um ramo com travessia.</summary>
     public sealed record LegTip(string Leg, double Tangent, double Near, double Far, double? StopNear, double? StopFar, double? PareNear,
-        Vec2? Sign, double? SignT, double SignLateral, double CurbLateral, double WalkLateral, double Bulge, double TanHi = double.NaN, double TanLo = double.NaN, double Clear = 0, double? RampHi = null, double? RampLo = null, bool AcuteClash = false);
+        Vec2? Sign, double? SignT, double SignLateral, double CurbLateral, double WalkLateral, double Bulge, double TanHi = double.NaN, double TanLo = double.NaN, double Clear = 0, double? RampHi = null, double? RampLo = null, bool AcuteClash = false,
+        double NoseSetback = 0);
 
     /// <summary>Pista até a face do meio-fio: asfalto + sarjeta (junto às rampas a sarjeta vira asfalto).</summary>
     public static List<Polygon2> Asphalt(List<Y34TipTests.Part> parts, Vec2 node, double r)
@@ -160,7 +161,8 @@ public class AI1CornerTipTests
                     pare.Count > 0 ? pare.Min(v => T(L, leg, v)) : null,
                     sign, sign is { } sp ? T(L, leg, sp) : null, sign is { } sq ? Math.Abs(Lat(L, leg, sq)) : 0, curbLat, curbLat + walk,
                     Bulge(L, leg, asphalt, tRef, near, far), tHi, tLo, L.ClearCap.TryGetValue((leg.Road, leg.Sign), out var cap) ? Math.Min(leg.Clear, cap) : leg.Clear, RampNear(1), RampNear(-1),
-                    L.Warnings.Any(x => x.Contains("esquina aguda") && x.Contains("recuadas"))));
+                    L.Warnings.Any(x => x.Contains("esquina aguda") && x.Contains("recuadas")),
+                    L.CrosswalkExtra.GetValueOrDefault((leg.Road, leg.Sign))));
             }
         }
         return res;
@@ -186,7 +188,10 @@ public class AI1CornerTipTests
                 if (g < -0.05) res.Add($"{m.Leg}: rampa do lado {side} entra {-g:0.00} m na curva");
                 gaps.Add(g);
             }
-            if (gaps.Count > 0)
+            // Travessia recuada para trás do nariz do canteiro central (Etapa 22, DNIT): a posição vem do nariz, não da esquina –
+            // conferida nos testes da Etapa 22; aqui só a retenção, o PARE e o R-1, que acompanham a faixa.
+            if (m.NoseSetback > 0) { }
+            else if (gaps.Count > 0)
             {
                 // Com rampas: a do lado que comanda a posição da faixa termina junto ao fim da curva.
                 if (gaps.Min() > 0.30 && !m.AcuteClash) res.Add($"{m.Leg}: rampa a {gaps.Min():0.00} m do fim da curva");

@@ -1888,9 +1888,30 @@ public sealed class IntersectionDefinition : MarkingDefinition
 
     /// <summary>
     /// Canteiro central contínuo: o canteiro de uma via não abre para as vias sem canteiro (só conversões à direita). Falso
-    /// (padrão) = o canteiro abre só na boca da outra via (+ 1 m de cada lado), com nariz arredondado.
+    /// (padrão) = o canteiro abre na interseção, com o nariz pela regra de <see cref="MedianOpening"/>.
     /// </summary>
     public bool MedianContinuous { get; set; }
+
+    /// <summary>
+    /// Onde termina o canteiro central na abertura: pela curva de giro à esquerda do veículo de projeto (padrão desde a 2.27 –
+    /// DNIT IPR-718, 2005, cap. 8, item 8, Tabelas 62 e 63) ou só a boca da outra via + 1 m, como até a 2.26.
+    /// </summary>
+    public AberturaCanteiro MedianOpening { get; set; } = AberturaCanteiro.CurvaDeGiro;
+
+    /// <summary>
+    /// Raio de controle do giro à esquerda que define a abertura do canteiro (m): 12 (VP), 15 (CO) ou 23 (O) – DNIT IPR-718,
+    /// Tabela 62; o arco é tangente ao bordo do canteiro e ao eixo (ou ao bordo do canteiro) da via transversal.
+    /// </summary>
+    public double MedianControlRadius { get; set; } = 12.0;
+
+    /// <summary>Forma do nariz do canteiro central na abertura (automática: semicircular até 3,00 m de largura, ogiva acima).</summary>
+    public FormaNarizCanteiro MedianNose { get; set; } = FormaNarizCanteiro.Automatica;
+
+    /// <summary>
+    /// Com nariz semicircular, a travessia de pedestres recua até o centro do semicírculo: o nariz inteiro fica à frente da faixa,
+    /// protegendo o refúgio (até 5 m de recuo – padrão do plugin). Falso = a travessia fica onde a esquina e as rampas a põem.
+    /// </summary>
+    public bool CrosswalkBehindNose { get; set; } = true;
 
     /// <summary>
     /// Travessia de pedestres sobre o canteiro central: automática (rampas e patamar quando o canteiro comporta, senão
@@ -2140,6 +2161,30 @@ public enum TipoIlha
     Pintada,
 }
 
+/// <summary>Regra do fim do canteiro central numa interseção.</summary>
+public enum AberturaCanteiro
+{
+    /// <summary>
+    /// Pela curva de giro à esquerda do veículo de projeto (DNIT IPR-718, 2005, cap. 8, item 8, Tabelas 62 e 63): o nariz fica
+    /// fora do arco de raio de controle tangente ao bordo do canteiro e ao eixo da via transversal – abertura 2R − L com
+    /// nariz semicircular (L = largura do canteiro), nunca menos de 12 m.
+    /// </summary>
+    CurvaDeGiro,
+    /// <summary>Só a boca da outra via + 1 m de cada lado (regra do plugin até a 2.26).</summary>
+    BocaDaVia,
+}
+
+/// <summary>Forma do nariz do canteiro central (DNIT IPR-718, cap. 8, item 8.8.2).</summary>
+public enum FormaNarizCanteiro
+{
+    /// <summary>Semicircular até 3,00 m de largura; ogiva acima (a forma preferível para canteiros largos).</summary>
+    Automatica,
+    /// <summary>Semicírculo com o diâmetro da largura do canteiro (concordância circular).</summary>
+    Semicircular,
+    /// <summary>Ogiva (bullet nose): os arcos de controle dos dois lados, com a ponta arredondada em cerca de 1/5 da largura.</summary>
+    Ogiva,
+}
+
 /// <summary>Esquinas que recebem faixa de conversão livre (canalização).</summary>
 public enum EsquinasCanalizadas
 {
@@ -2158,6 +2203,20 @@ public sealed class RoundaboutLeg
     /// <summary>Largura da pista do ramo (m).</summary>
     public double Width { get; set; } = 7.0;
     public double Sidewalk { get; set; } = 2.5;
+    /// <summary>
+    /// Largura da calçada (com o meio-fio) à esquerda e à direita de quem sai da rotatória pelo ramo – a da via ligada, de
+    /// cada lado. Nula = a calçada geral da rotatória (<see cref="RoundaboutDefinition.SidewalkWidth"/>).
+    /// </summary>
+    public double? SidewalkLeft { get; set; }
+    public double? SidewalkRight { get; set; }
+    /// <summary>
+    /// Composição da calçada da via de cada lado do ramo (meio-fio, sarjeta, faixa gramada, passeio), lida dos elementos da
+    /// via quando a rotatória segue a seção das vias. Vazia = o perfil geral da rotatória.
+    /// </summary>
+    public List<Automation.EdgeBand> EdgeLeft { get; set; } = new();
+    public List<Automation.EdgeBand> EdgeRight { get; set; } = new();
+    /// <summary>+1: o ramo sai no sentido do eixo da via ligada; −1: no sentido contrário; 0: sem via.</summary>
+    public int RoadSign { get; set; }
     /// <summary>Pavimento da via ligada a este ramo (opcional).</summary>
     public string? RoadId { get; set; }
     /// <summary>Grupo (Sinalizar via) da via ligada – recebe o recorte da rotatória.</summary>
@@ -2184,6 +2243,15 @@ public sealed class RoundaboutLeg
     {
         Splitter = o.Splitter; SplitterLength = o.SplitterLength; Crosswalk = o.Crosswalk; EntryRadius = o.EntryRadius;
         ExitRadius = o.ExitRadius; Control = o.Control; Signs = o.Signs;
+        // As calçadas de um ramo ligado vêm da via (relidas a cada atualização); as de um ramo sem via são do usuário.
+        if (RoadId == null && GroupId == null) { SidewalkLeft = o.SidewalkLeft; SidewalkRight = o.SidewalkRight; }
+    }
+
+    /// <summary>Perfis de calçada dos dois lados da via ligada, em cada lado do ramo (pelo sentido do ramo na via).</summary>
+    public void SetEdgeSides(Automation.RoadEdgeProfile? p)
+    {
+        EdgeLeft = p == null || RoadSign == 0 ? new() : (RoadSign > 0 ? p.Left : p.Right).ToList();
+        EdgeRight = p == null || RoadSign == 0 ? new() : (RoadSign > 0 ? p.Right : p.Left).ToList();
     }
 }
 
@@ -2293,6 +2361,11 @@ public sealed class RoundaboutDefinition : MarkingDefinition
     public double GrassRaise { get; set; }
     /// <summary>Calçadas da rotatória com a composição das vias ligadas (faixa de serviço e sarjeta lidas das vias).</summary>
     public bool MatchRoadSection { get; set; } = true;
+    /// <summary>
+    /// Calçada em volta com a largura (e a composição) de cada lado de cada via que chega, mudando aos poucos na curva entre
+    /// dois ramos. Desligado: uma largura só em volta toda (<see cref="SidewalkWidth"/>), como antes da versão 2.27.
+    /// </summary>
+    public bool SidewalkPerLeg { get; set; } = true;
     /// <summary>Faixa de serviço entre o meio-fio e o passeio (m); 0 = nenhuma. Preenchida pelas vias quando MatchRoadSection.</summary>
     public double ServiceStripWidth { get; set; }
     public bool ServiceStripGrass { get; set; } = true;

@@ -187,7 +187,7 @@ public sealed class ProjetoDrenagem
     /// <summary>Largura mínima da vala em diâmetros do tubo.</summary>
     public double LarguraValaDiametros { get; set; } = 2.0;
 
-    // ---- Tubos, valas e linha piezométrica (Etapa 22)
+    // ---- Tubos, valas e linha piezométrica (Etapa 23)
     /// <summary>
     /// Catálogo de tubos do projeto (material, classe, DN, parede, peça, junta, n); vazio = o padrão do plugin
     /// (<see cref="CatalogoTubos.Padrao"/>: concreto ponta e bolsa, peças de 1 m, um por diâmetro comercial).

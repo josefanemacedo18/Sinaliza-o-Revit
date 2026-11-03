@@ -8,10 +8,10 @@ using SinalizacaoViaria.Core.Reports;
 namespace SinalizacaoViaria.Core.Tests;
 
 /// <summary>
-/// Etapa 22 (itens 6 e 21): drenagem completa – catálogo de tubos, peças, juntas, conexões e vala por trecho no quantitativo e
+/// Etapa 23 (itens 6 e 21; era a 22 até a reordenação de 2026-11 – D-040): drenagem completa – catálogo de tubos, peças, juntas, conexões e vala por trecho no quantitativo e
 /// no memorial; linha piezométrica e de energia com o nível do lançamento; bueiros; rede gerada ao longo da via.
 /// </summary>
-public class Etapa22DrenagemTests
+public class Etapa23DrenagemTests
 {
     private static List<CopiaGravada> Copias(params MarkingDefinition[] defs) => defs.Select(d => new CopiaGravada(d.Id, d.ToJson(), "e-" + d.Id)).ToList();
 

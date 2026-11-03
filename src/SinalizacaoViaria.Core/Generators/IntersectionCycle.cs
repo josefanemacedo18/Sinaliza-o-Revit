@@ -128,7 +128,9 @@ public static partial class IntersectionGenerator
     {
         var r = L.Roads[b.Road];
         var axis = r.Axis;
-        var paint = L.PaintCuts.GetValueOrDefault(b.Road) ?? new();
+        // O recorte das marcas da ciclofaixa (até a faixa de pedestres): o tracejado da zona de conflito começa logo depois da
+        // faixa, e não na retenção (sobrava um trecho contínuo de ~2 m entre as duas).
+        var paint = L.CyclePaintCuts.GetValueOrDefault(b.Road) ?? L.PaintCuts.GetValueOrDefault(b.Road) ?? new();
         var mouth = L.Mouths.GetValueOrDefault(b.Road) ?? new();
         var edge = b.Side > 0 ? r.Def.LeftWidth : r.Def.RightWidth;
         var through = legs.Count >= 2;
